@@ -1,24 +1,27 @@
 # Genoa — Digital Ocean App Platform spec.
-# Standalone propagation studio for AM / FM / LPFM / FM-translators.
+# ============================================================
+# THIS FILE IS A REFERENCE — IT IS NOT READ BY APP PLATFORM.
+# ------------------------------------------------------------
+# This spec lives at `genoa/.do.example/app.yaml` (note the
+# `.example` suffix on the directory) precisely so App Platform
+# does NOT pick it up on every push and try to reconcile its
+# fields against the live console-configured app — which has
+# repeatedly caused "Generic Internal Error" deploy-phase
+# failures whenever the live state drifted from the repo spec
+# (instance size, DB attach/detach, region, env var edits
+# performed in the console).
 #
-# This spec mirrors the live state of the App Platform app exactly so
-# that auto-deploys triggered by a master push reconcile cleanly. Past
-# generic-internal-error deploys were caused by drift between the live
-# app (`seahorse-app` in region `sfo`, with a managed PG bound and an
-# ingress rule pointing at the `itmlogic` component) and a more
-# minimal repo spec that omitted those fields — App Platform refused
-# to apply the changes mid-flight and failed the deploy phase.
+# The deployable app is configured in the DO Console:
+#   Apps → seahorse-app → Settings (component itmlogic)
+# Pushes to master trigger code rebuilds against the existing
+# console configuration; nothing in this file is applied.
 #
-# Secrets (DATABASE_URL, SPACES_KEY, SPACES_SECRET) are deliberately
-# NOT redeclared here so App Platform preserves the encrypted values
-# already set on the live component across re-applies. Adding them
-# here in plaintext would commit credentials to git; even with
-# `type: SECRET` the YAML `value:` field is stored unencrypted in the
-# repo.
-#
-# Update path:
-#   doctl apps update <APP_ID> --spec .do/app.yaml
-# or push to master (deploy_on_push: true) and the spec auto-reconciles.
+# To bootstrap a NEW App Platform deployment from this file:
+#   1. Copy this file to .do/app.yaml at the REPO ROOT
+#   2. doctl apps create --spec .do/app.yaml
+#   3. Move it back to genoa/.do.example/app.yaml so subsequent
+#      pushes don't re-trigger reconciliation.
+# ============================================================
 
 name: seahorse-app
 region: sfo
@@ -31,7 +34,6 @@ features:
   - buildpack-stack=ubuntu-22
 
 databases:
-  # Auto-attached managed Postgres 17.
   - name: db
     cluster_name: app-c0f0eaf1-ab75-4b6c-a866-df85006d2011
     db_name: db
@@ -52,14 +54,6 @@ ingress:
 
 services:
   - name: itmlogic
-    # Component name is "itmlogic" (NOT "web") because the DO app was
-    # originally created via "Deploy from GitHub" which auto-named the
-    # component after the repo. Renaming a component in-place is brittle
-    # — it split-brains the deploy log task. Keep this as "itmlogic".
-    #
-    # Dockerfile build context is the genoa/ subdirectory so the parent
-    # itmlogic Python project (top-level requirements.txt → fiona/GDAL)
-    # is never part of the build. dockerfile_path is repo-root relative.
     dockerfile_path: genoa/Dockerfile
     source_dir: genoa
 
@@ -89,9 +83,7 @@ services:
         value: "8080"
 
       # ----- Postgres ---------------------------------------------------
-      # DATABASE_URL is set as an ENCRYPTED env var on the live
-      # component (do not redeclare here — that would wipe it across
-      # spec re-applies). PG SSL flags are non-secret defaults.
+      # DATABASE_URL is set as an ENCRYPTED env var on the live component.
       - key: PG_SSL
         scope: RUN_TIME
         value: "true"
