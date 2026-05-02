@@ -45,7 +45,7 @@
     body{
       font-family:var(--body); color:var(--cream);
       background:var(--night-grad) fixed; min-height:100vh;
-      letter-spacing:.005em;
+      letter-spacing:.01em;
     }
     body::before{
       content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
@@ -102,7 +102,7 @@
     .marquee{
       padding:16px 40px;border-bottom:1px solid var(--rule);
       display:flex;align-items:center;gap:18px;flex-wrap:wrap;
-      background:linear-gradient(90deg, rgba(212,166,79,.07), transparent 60%);
+      background:linear-gradient(90deg, rgba(212,166,79,.14), transparent 72%);
     }
     .marquee .title{font-family:var(--display);font-style:italic;font-size:26px;color:var(--brass-2)}
     .marquee .sub{font-size:13px;color:var(--cream-dim);max-width:760px}
@@ -146,12 +146,12 @@
       border-radius:16px;
       padding:22px 24px;
       box-shadow:var(--shadow-warm);
-      backdrop-filter:blur(4px);
+      backdrop-filter:blur(7px);
     }
-    .card + .card{margin-top:20px}
+    .card + .card{margin-top:24px}
     .card h2{
       font-family:var(--display);font-style:italic;font-weight:600;
-      margin:0 0 4px;font-size:24px;color:var(--cream);
+      margin:0 0 6px;font-size:29px;color:#fff2e2;
     }
     .card .h2-rule{height:1px;background:linear-gradient(90deg,var(--brass) 0,transparent 90%);margin:6px 0 14px}
     .card h3{
@@ -161,8 +161,8 @@
 
     label{display:block;font-size:12px;letter-spacing:.04em;color:var(--cream-dim);margin:10px 0 4px}
     input, select, textarea{
-      width:100%;padding:9px 11px;border-radius:8px;
-      background:rgba(0,0,0,.32);color:var(--cream);
+      width:100%;padding:10px 12px;border-radius:10px;
+      background:rgba(0,0,0,.38);color:var(--cream);
       border:1px solid var(--rule);
       font-family:var(--mono);font-size:13px;
       transition:border-color .15s, box-shadow .15s;
@@ -177,7 +177,7 @@
     button.primary, button.ghost{
       cursor:pointer;font-family:var(--body);font-weight:700;
       letter-spacing:.18em;text-transform:uppercase;font-size:11.5px;
-      padding:12px 18px;border-radius:10px;border:1px solid transparent;
+      padding:12px 18px;border-radius:999px;border:1px solid transparent;
     }
     button.primary{
       background:linear-gradient(180deg,#ffd889,var(--brass));
