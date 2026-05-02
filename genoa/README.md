@@ -12,11 +12,24 @@ Genoa is a **standalone** FCC propagation studio for **AM / FM / LPFM / FM-trans
 
 ## Deploy (Digital Ocean App Platform)
 
-```sh
-doctl apps create --spec .do/app.yaml
-```
+Genoa is designed to **deploy first, attach storage later**. The service boots in stateless mode and only the storage-backed endpoints (`POST /api/exhibits`, `POST /api/assets`) return 503 until DB / Spaces are wired up. The deterministic compute engine works the whole time.
 
-Bind the managed Postgres component automatically; create a Spaces bucket called `genoa-exhibits` and set `SPACES_KEY` / `SPACES_SECRET` as encrypted env vars in the DO console.
+1. **Create the app (web service only):**
+   ```sh
+   doctl apps create --spec .do/app.yaml
+   ```
+2. **Attach managed Postgres** (DO console → Apps → genoa → *Create/Attach Database* → PostgreSQL).
+   Copy the connection string from the database's *Connection Details* page and add it on the web component as an **encrypted** env var:
+   ```
+   DATABASE_URL = postgresql://...
+   ```
+   Genoa runs `db/migrate.sql` idempotently on every boot — the schema appears on the next deploy.
+3. **Attach Spaces** — create a Space (e.g. `genoa-exhibits`) and a Spaces access key, then set on the web component as **encrypted** env vars:
+   ```
+   SPACES_KEY     = ...
+   SPACES_SECRET  = ...
+   ```
+   `SPACES_BUCKET`, `SPACES_REGION`, `SPACES_ENDPOINT` already have sane defaults in `app.yaml`; override them if you put the bucket in a different region.
 
 ## Run locally
 

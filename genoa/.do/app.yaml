@@ -1,14 +1,35 @@
 # Genoa — Digital Ocean App Platform spec.
 # Standalone propagation studio for AM / FM / LPFM / FM-translators.
 #
-# Deploy:
-#   doctl apps create --spec .do/app.yaml
-# Update:
-#   doctl apps update <APP_ID> --spec .do/app.yaml
+# DEPLOY ORDER
+# ============
+# 1. Create the app from this spec (web service only):
+#      doctl apps create --spec .do/app.yaml
+#    The service boots in stateless mode — /healthz returns ok, the
+#    deterministic engine works, but POST /api/exhibits and /api/assets
+#    return 503 until you wire up storage.
 #
-# This app is intentionally isolated. It does NOT read or write the
-# zerotrustradio / buoyIQ database; if you want Genoa to consult that
-# facility catalog it must be done through a published, read-only API.
+# 2. Attach managed Postgres POST-DEPLOY:
+#      DO Console → Apps → genoa → Create/Attach Database → PostgreSQL.
+#    Then copy the connection string from the database's "Connection Details"
+#    page and set it as an ENCRYPTED env var on the web component:
+#      DATABASE_URL = postgresql://...   (scope: RUN_TIME, encrypted)
+#    Genoa runs db/migrate.sql idempotently on every boot, so the schema
+#    is created on the next deploy.
+#
+# 3. Attach Spaces POST-DEPLOY:
+#      Create a Space (e.g. "genoa-exhibits") and a Spaces access key.
+#      Set these as ENCRYPTED env vars on the web component:
+#        SPACES_BUCKET, SPACES_REGION, SPACES_ENDPOINT,
+#        SPACES_KEY (encrypted), SPACES_SECRET (encrypted)
+#
+# Why no `databases:` block here?
+#   App Platform's `${db.*}` bindings have historically failed to substitute
+#   when the cluster is renamed (db → production-database), leaving the env
+#   value as a literal "${db.DATABASE_URL}". Setting DATABASE_URL manually
+#   post-deploy is the reliable path.
+#
+# Update: doctl apps update <APP_ID> --spec .do/app.yaml
 
 name: genoa
 region: nyc
@@ -28,6 +49,8 @@ services:
     http_port: 8080
 
     health_check:
+      # Liveness only — does NOT touch the DB so a transient DB blip
+      # does not cycle the container.
       http_path: /healthz
       initial_delay_seconds: 15
       period_seconds: 30
@@ -46,13 +69,10 @@ services:
         scope: RUN_TIME
         value: "8080"
 
-      # Postgres — bound to the managed component below.
-      # DATABASE_URL is injected automatically when bound this way; if you
-      # rename the database component DO will rename the binding token, so
-      # you can also set DATABASE_URL manually as an encrypted env var.
-      - key: DATABASE_URL
-        scope: RUN_TIME
-        value: ${db.DATABASE_URL}
+      # ----- Postgres (set post-deploy in the DO console) ---------------
+      # Set DATABASE_URL as an encrypted env var on the web component
+      # AFTER the managed Postgres is attached. Until then, /api/exhibits
+      # returns 503 and the rest of the app runs stateless.
       - key: PG_SSL
         scope: RUN_TIME
         value: "true"
@@ -60,8 +80,10 @@ services:
         scope: RUN_TIME
         value: "false"
 
-      # Spaces (S3-compatible). Set these as encrypted env vars in the DO
-      # console — the values here are placeholders.
+      # ----- Spaces (set post-deploy in the DO console) -----------------
+      # SPACES_KEY and SPACES_SECRET must be encrypted env vars on the web
+      # component. Without them, /api/assets returns 503 and the rest of
+      # the app runs as a pure compute service.
       - key: SPACES_REGION
         scope: RUN_TIME
         value: nyc3
@@ -71,19 +93,3 @@ services:
       - key: SPACES_BUCKET
         scope: RUN_TIME
         value: genoa-exhibits
-      - key: SPACES_KEY
-        scope: RUN_TIME
-        type: SECRET
-        value: REPLACE_IN_DO_CONSOLE
-      - key: SPACES_SECRET
-        scope: RUN_TIME
-        type: SECRET
-        value: REPLACE_IN_DO_CONSOLE
-
-databases:
-  - name: db
-    engine: PG
-    production: false
-    cluster_name: genoa-db
-    db_name: genoa
-    db_user: genoa
