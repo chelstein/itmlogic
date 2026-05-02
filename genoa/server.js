@@ -92,6 +92,37 @@ app.get('/readyz', async (_req, res) => {
   res.status(ok ? 200 : 503).json({ ok, db, space });
 });
 
+/* -------- FCC curve datasets (read-only static bundle) ----------
+   The frontend fetches these once on load and uses 2D bilinear lookup.
+   Bundle ships from /app/data/fcc-curves/<version>/.  Cached aggressively
+   in production (curves are immutable per version; rev the version
+   directory to ship new ones).
+------------------------------------------------------------------ */
+const CURVE_VERSION = 'v0.2';
+const CURVE_DIR     = path.join(__dirname, 'data', 'fcc-curves', CURVE_VERSION);
+
+app.get('/api/curves', async (_req, res) => {
+  try {
+    const manifest = JSON.parse(await fs.readFile(path.join(CURVE_DIR, 'manifest.json'), 'utf8'));
+    res.set('Cache-Control', NODE_ENV === 'production' ? 'public, max-age=86400, immutable' : 'no-cache');
+    res.json({ version: CURVE_VERSION, ...manifest });
+  } catch (e) {
+    res.status(500).json({ error: 'curve manifest unavailable', detail: String(e.message) });
+  }
+});
+
+app.get('/api/curves/:name', async (req, res) => {
+  const safe = String(req.params.name).replace(/[^a-z0-9_]/gi, '');
+  const file = path.join(CURVE_DIR, safe + '.json');
+  try {
+    const buf = await fs.readFile(file);
+    res.set('Cache-Control', NODE_ENV === 'production' ? 'public, max-age=86400, immutable' : 'no-cache');
+    res.type('application/json').send(buf);
+  } catch {
+    res.status(404).json({ error: 'curve dataset not found', name: safe });
+  }
+});
+
 /* -------- Exhibits API ------------------------------------------- */
 
 // POST /api/exhibits — persist a computed exhibit.

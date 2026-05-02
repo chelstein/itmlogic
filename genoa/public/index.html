@@ -575,57 +575,97 @@
 
 const VERSION = {
   app:          'genoa',
-  studio:       '0.1.0',
-  curves_fm:    'FCC §73.333 F(50,50) / F(50,10) — tabulated 1980, polynomial fit 2026',
-  curves_am:    'FCC §73.184 groundwave — Norton 1941 / FCC tabulation, polynomial fit 2026',
+  studio:       '0.2.0',
+  curves_set:   null,   // populated from /api/curves on load — version + per-dataset sha256
   itm_ref:      'ITS ITM 1.2.2 (via chelstein/itmlogic, chelstein/ZTRpsITS, chelstein/splat)',
   built:        new Date().toISOString()
 };
 document.getElementById('build-id').textContent = 'build ' + VERSION.built.replace('T',' ').slice(0,16) + 'Z';
 
-/* ---------- FCC FM F(50,50) reference table ---------------------------- */
-const FM_F5050_300m_1kW = [
-  [108,   3.5],[100,   6.5],[ 90,  12.0],[ 80,  21.0],[ 74,  28.0],
-  [ 70,  34.0],[ 66,  41.0],[ 60,  52.0],[ 57,  58.5],[ 54,  65.0],
-  [ 50,  74.0],[ 45,  87.0],[ 40, 102.0],[ 36, 116.0],[ 34, 124.0],
-  [ 30, 142.0],[ 25, 168.0],[ 20, 198.0]
-];
-const FM_F5010_300m_1kW = FM_F5050_300m_1kW.map(([f,d]) => [f, d * 1.18]);
+/* ---------- FCC curve datasets (loaded from /api/curves) -------------- */
+const CURVES = { f5050: null, f5010: null, am_groundwave: null, manifest: null };
 
-const haatScale     = h => Math.sqrt(Math.max(30, Math.min(600, h)) / 300);
-const erpFieldShift = p => 10 * Math.log10(Math.max(1e-3, p));
-
-function fmContourDistance_km(dBu_target, erp_kW, haat_m, mode){
-  const tbl = mode === '50,10' ? FM_F5010_300m_1kW : FM_F5050_300m_1kW;
-  const lookup = dBu_target - erpFieldShift(erp_kW);
-  if (lookup >= tbl[0][0]) return tbl[0][1] * haatScale(haat_m);
-  if (lookup <= tbl[tbl.length-1][0]) return tbl[tbl.length-1][1] * haatScale(haat_m);
-  for (let i=0; i<tbl.length-1; i++){
-    const [f1,d1] = tbl[i], [f2,d2] = tbl[i+1];
-    if (lookup <= f1 && lookup >= f2){
-      const t = (f1 - lookup) / (f1 - f2);
-      const logd = Math.log10(d1) + t * (Math.log10(d2) - Math.log10(d1));
-      return Math.pow(10, logd) * haatScale(haat_m);
-    }
-  }
-  return null;
+async function loadCurves(){
+  // Manifest first — gives us the version + per-dataset sha256 hashes
+  // that get stamped into every exhibit's reproducibility package.
+  const m = await fetch('/api/curves').then(r => r.json());
+  CURVES.manifest = m;
+  VERSION.curves_set = m;
+  const [f5050, f5010, am] = await Promise.all([
+    fetch('/api/curves/f5050').then(r => r.json()),
+    fetch('/api/curves/f5010').then(r => r.json()),
+    fetch('/api/curves/am_groundwave').then(r => r.json())
+  ]);
+  CURVES.f5050         = f5050;
+  CURVES.f5010         = f5010;
+  CURVES.am_groundwave = am;
 }
 
-/* ---------- AM groundwave §73.184 -------------------------------------- */
+/* ---------- Generic 1-D / 2-D bilinear interpolation ----------------- */
+function linInterp1(xs, ys, x){
+  // ys[i] indexed by xs[i] (assumed strictly increasing).
+  if (x <= xs[0])               return ys[0];
+  if (x >= xs[xs.length - 1])   return ys[ys.length - 1];
+  for (let i = 0; i < xs.length - 1; i++){
+    if (x >= xs[i] && x <= xs[i+1]){
+      const t = (x - xs[i]) / (xs[i+1] - xs[i]);
+      return ys[i] * (1 - t) + ys[i+1] * t;
+    }
+  }
+  return ys[ys.length - 1];
+}
+
+/* Bilinear over a (rows × cols) grid in (log-distance, log-field) space.
+   FCC §73.333 curves are quasi-log-linear in distance, so we interpolate
+   log10(distance) along the field axis and linearly along HAAT. */
+function fmContourDistance_km(dBu_target, erp_kW, haat_m, mode){
+  const tbl = (mode === '50,10') ? CURVES.f5010 : CURVES.f5050;
+  if (!tbl) return null;
+  const haats  = tbl.haat_grid_m;
+  const fields = tbl.field_grid_dBu;          // descending: 100, 90, …, 5
+  const grid   = tbl.distance_km;             // grid[h_idx][f_idx]
+  const eff_dBu = dBu_target - 10 * Math.log10(Math.max(1e-3, erp_kW));
+
+  // Interpolate log-distance along the field axis at every HAAT row,
+  // then interpolate that array along the HAAT axis.
+  const fieldsAsc = fields.slice().reverse();
+  const distsAtH = haats.map((_, hi) => {
+    const rowAsc = grid[hi].slice().reverse();   // ascending field => ascending dist
+    const logRow = rowAsc.map(d => Math.log10(d));
+    const logd   = linInterp1(fieldsAsc, logRow, eff_dBu);
+    return Math.pow(10, logd);
+  });
+
+  // HAAT axis (linear inside the published 30–1200 m envelope).
+  const h = Math.max(haats[0], Math.min(haats[haats.length - 1], haat_m));
+  return linInterp1(haats, distsAtH, h);
+}
+
+/* ---------- AM groundwave §73.184 (numeric Norton via dataset) ------- */
+function amAttenuationFactor(p_numerical){
+  if (!CURVES.am_groundwave) return 1;
+  const ps = CURVES.am_groundwave.p_grid;
+  const As = CURVES.am_groundwave.A_factor;
+  // Interpolate in (log p, log A) — both span many decades.
+  const logP = Math.log10(Math.max(1e-12, p_numerical));
+  const logPs = ps.map(Math.log10);
+  const logAs = As.map(a => Math.log10(Math.max(1e-12, a)));
+  return Math.pow(10, linInterp1(logPs, logAs, logP));
+}
+
 function amGroundwave_mVm(distance_km, freq_kHz, sigma_mS_m, erp_kW){
   const E0     = 100 * Math.sqrt(Math.max(0, erp_kW));
   const f_Hz   = freq_kHz * 1e3;
-  const sigma  = sigma_mS_m / 1000;
+  const sigma  = sigma_mS_m / 1000;          // S/m
   const lambda = 3e8 / f_Hz;
   const d_m    = distance_km * 1000;
-  const p      = (Math.PI * d_m * f_Hz) / (Math.max(sigma,1e-6) * lambda * lambda * 1e8);
-  const A      = (2 + 0.3 * p) / (2 + p + 0.6 * p * p);
-  return (E0 * A) / Math.max(distance_km, 0.1);
+  const p      = (Math.PI * d_m * f_Hz) / (Math.max(sigma, 1e-6) * lambda * lambda * 1e8);
+  return (E0 * amAttenuationFactor(p)) / Math.max(distance_km, 0.1);
 }
 function amDistanceFor_mVm(target_mVm, freq_kHz, sigma_mS_m, erp_kW){
   let lo = 0.1, hi = 2000, mid;
-  for (let i=0;i<60;i++){
-    mid = 0.5*(lo+hi);
+  for (let i = 0; i < 60; i++){
+    mid = 0.5 * (lo + hi);
     if (amGroundwave_mVm(mid, freq_kHz, sigma_mS_m, erp_kW) > target_mVm) lo = mid; else hi = mid;
   }
   return mid;
@@ -873,6 +913,7 @@ function compute(){
       radial_step_deg:step
     },
     method: svc==='AM' ? '47 CFR §73.183 / §73.184 groundwave (Norton/FCC tabulated)' : '47 CFR §73.313 / §73.333 F(50,50)',
+    curve_dataset: CURVES.manifest,    // version + per-dataset sha256, pins this exhibit to an exact curve set
     contours: contourSpecs.map((s,i)=>({ label:s.label, value:s.value,
       mean_radial_km: rows.reduce((a,r)=>a+(r['c'+i]||0),0)/rows.length })),
     radial_table: rows,
@@ -966,8 +1007,12 @@ document.getElementById('exportTxt').addEventListener('click', () => {
   lines.push('');
   lines.push('Reproducibility:');
   lines.push('  App         : ' + r.versions.app + ' v' + r.versions.studio);
-  lines.push('  Curve set   : ' + r.versions.curves_fm);
-  lines.push('  AM curves   : ' + r.versions.curves_am);
+  if (r.curve_dataset) {
+    lines.push('  Curve set   : ' + r.curve_dataset.version + '  (meta sha256 ' + (r.curve_dataset.meta_sha256 || '').slice(0, 12) + '…)');
+    Object.entries(r.curve_dataset.datasets || {}).forEach(([k, h]) =>
+      lines.push('    · ' + k.padEnd(16) + ' sha256 ' + h.slice(0, 12) + '…')
+    );
+  }
   lines.push('  ITM ref     : ' + r.versions.itm_ref);
   lines.push('  Generated   : ' + r.generated);
   if (r.warnings && r.warnings.length){
@@ -1120,7 +1165,18 @@ async function loadExhibit(id){
 }
 document.getElementById('refreshHistory').addEventListener('click', loadHistory);
 
-window.addEventListener('load', () => { setTimeout(compute, 80); });
+window.addEventListener('load', async () => {
+  try {
+    await loadCurves();
+    document.getElementById('run-status').innerHTML =
+      `<span class="ok">Loaded FCC curve set ${CURVES.manifest.version} · ${Object.keys(CURVES.manifest.datasets).length} datasets · meta sha256 ${CURVES.manifest.meta_sha256.slice(0,12)}…</span>`;
+  } catch (e) {
+    document.getElementById('run-status').innerHTML =
+      `<span class="warn">Could not load FCC curves from /api/curves: ${e.message}. Engine will not run.</span>`;
+    return;
+  }
+  setTimeout(compute, 80);
+});
 </script>
 </body>
 </html>
