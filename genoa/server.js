@@ -23,9 +23,20 @@ import { fileURLToPath } from 'node:url';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
-// ---- Surface every otherwise-silent failure ------------------------
-process.on('uncaughtException',  (err) => { console.error('[genoa] uncaughtException:',  err && err.stack || err); });
-process.on('unhandledRejection', (err) => { console.error('[genoa] unhandledRejection:', err && err.stack || err); });
+// ---- Surface every otherwise-silent failure --- AND fail fast.
+// Log the full stack so the next deploy failure shows the actual error
+// in runtime logs, then exit with non-zero so App Platform tears the
+// container down and restarts it.  Swallowing these would leave the
+// process in an undefined state while /healthz still answers ok,
+// which is the worst of both worlds.
+process.on('uncaughtException',  (err) => {
+  console.error('[genoa] uncaughtException:',  err && err.stack || err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  console.error('[genoa] unhandledRejection:', err && err.stack || err);
+  process.exit(1);
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
