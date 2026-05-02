@@ -1,0 +1,22 @@
+{
+  "name": "genoa",
+  "version": "0.1.0",
+  "description": "Genoa — FCC propagation studio for AM / FM / LPFM / FM-translators. Carries the signal farther on a single tack. Standalone deployable service: Express + Postgres + DO Spaces.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "node migrate.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1030.0",
+    "@aws-sdk/s3-request-presigner": "^3.1030.0",
+    "express": "^4.21.1",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.1"
+  }
+}

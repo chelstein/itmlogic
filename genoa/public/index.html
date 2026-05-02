@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genoa · FCC Propagation Studio</title>
+  <meta name="description" content="Genoa — standalone FCC-grade propagation studio for AM, FM, LPFM, and FM translators. §73.183 / §73.184 / §73.313 / §73.333 / §74.1204 deterministic engine, terrain-aware overlay, SDR-measurement validation, and audit-trail exhibit generator." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script defer src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <style>
+    /* -------------------------------------------------------------
+       Bobby Caldwell · 1978 yacht-rock palette — by lamplight.
+       Midnight cobalt → espresso, brass gold, sunset rose, cream.
+       ------------------------------------------------------------- */
+    :root{
+      --midnight:#0b1530;
+      --midnight-2:#0f1d3d;
+      --espresso:#1a0f1a;
+      --night-grad:linear-gradient(160deg,#0a1428 0%,#13203f 35%,#2a1626 75%,#3b1a14 100%);
+      --brass:#d4a64f;
+      --brass-2:#f4c969;
+      --brass-soft:#b88a3c;
+      --rose:#c87a5b;
+      --rose-2:#e89972;
+      --teal:#5a9a96;
+      --cream:#f5e6d3;
+      --cream-dim:#d9c8a8;
+      --ink:#0c0a08;
+      --rule:rgba(212,166,79,.28);
+      --rule-strong:rgba(212,166,79,.55);
+      --panel:rgba(11,21,48,.62);
+      --shadow-warm:0 18px 50px -22px rgba(212,166,79,.35), 0 2px 0 0 rgba(244,201,105,.06) inset;
+      --display:'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+      --body:'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      --mono:'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;padding:0}
+    body{
+      font-family:var(--body); color:var(--cream);
+      background:var(--night-grad) fixed; min-height:100vh;
+      letter-spacing:.005em;
+    }
+    body::before{
+      content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background:
+        radial-gradient(60% 40% at 18% 10%, rgba(244,201,105,.10), transparent 60%),
+        radial-gradient(50% 35% at 90% 100%, rgba(200,122,91,.18), transparent 65%),
+        repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 1px, transparent 1px 3px);
+      mix-blend-mode:overlay;
+    }
+    main, header.studio, footer.studio, .marquee, .layers, .standalone-banner{position:relative;z-index:1}
+
+    a{color:var(--brass-2);text-decoration:none;border-bottom:1px dotted var(--rule)}
+    a:hover{color:var(--rose-2);border-bottom-color:var(--rose-2)}
+
+    /* ----- Header ----- */
+    header.studio{
+      display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
+      padding:28px 36px 18px;
+      border-bottom:1px solid var(--rule);
+      background:linear-gradient(180deg,rgba(10,20,40,.6),rgba(10,20,40,0));
+    }
+    .brand{display:flex;align-items:center;gap:18px}
+    /* sail mark — a stylized genoa luffed against the wind */
+    .sail{
+      width:54px;height:54px;position:relative;flex:0 0 54px;
+    }
+    .sail svg{display:block;width:100%;height:100%;
+      filter:drop-shadow(0 6px 14px rgba(0,0,0,.5));
+    }
+    .brand h1{
+      font-family:var(--display);font-weight:600;font-style:italic;
+      font-size:38px;line-height:1;margin:0;color:var(--cream);
+      letter-spacing:.005em;
+    }
+    .brand h1 small{
+      display:block;font-style:normal;font-family:var(--body);font-weight:600;
+      font-size:11px;letter-spacing:.36em;color:var(--brass);margin-top:6px;
+      text-transform:uppercase;
+    }
+    .credit{font-size:12px;color:var(--cream-dim);text-align:right;letter-spacing:.18em;text-transform:uppercase}
+    .credit em{color:var(--brass-2);font-style:normal;font-weight:600}
+
+    /* ----- Standalone banner ----- */
+    .standalone-banner{
+      margin:14px 36px 0;
+      border:1px dashed var(--rule-strong);border-radius:10px;
+      padding:10px 14px;font-size:12px;color:var(--cream-dim);
+      background:rgba(0,0,0,.18);
+    }
+    .standalone-banner b{color:var(--brass-2)}
+
+    /* ----- Marquee ----- */
+    .marquee{
+      padding:14px 36px;border-bottom:1px solid var(--rule);
+      display:flex;align-items:center;gap:18px;flex-wrap:wrap;
+      background:linear-gradient(90deg, rgba(212,166,79,.07), transparent 60%);
+    }
+    .marquee .title{font-family:var(--display);font-style:italic;font-size:24px;color:var(--brass-2)}
+    .marquee .sub{font-size:13px;color:var(--cream-dim);max-width:760px}
+    .pill{
+      display:inline-flex;align-items:center;gap:6px;
+      font-size:11px;letter-spacing:.18em;text-transform:uppercase;
+      padding:5px 10px;border:1px solid var(--rule-strong);border-radius:999px;
+      color:var(--brass-2);background:rgba(11,21,48,.5);
+    }
+    .pill .dot{width:6px;height:6px;border-radius:50%;background:var(--brass-2);box-shadow:0 0 8px var(--brass-2)}
+
+    /* ----- Three layers ----- */
+    .layers{
+      display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+      margin:0 36px 0;padding:0 0 6px;
+    }
+    @media (max-width:900px){ .layers{grid-template-columns:1fr} }
+    .layer{
+      border:1px solid var(--rule);border-radius:12px;padding:14px 16px;
+      background:linear-gradient(180deg, rgba(11,21,48,.55), rgba(26,15,26,.45));
+      position:relative;overflow:hidden;
+    }
+    .layer::before{
+      content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+      background:linear-gradient(180deg,var(--brass-2),var(--rose));
+    }
+    .layer h4{margin:0 0 6px;font-family:var(--display);font-style:italic;font-size:18px;color:var(--cream)}
+    .layer p{margin:0;font-size:12.5px;color:var(--cream-dim);line-height:1.5}
+    .layer .badge{font-size:10px;letter-spacing:.22em;color:var(--brass-2);text-transform:uppercase;display:block;margin-bottom:4px}
+
+    /* ----- Layout ----- */
+    main{
+      display:grid;grid-template-columns:380px 1fr;gap:24px;
+      padding:24px 36px 60px;align-items:start;
+    }
+    @media (max-width:1100px){ main{grid-template-columns:1fr} }
+
+    .card{
+      background:var(--panel);
+      border:1px solid var(--rule);
+      border-radius:14px;
+      padding:20px 22px;
+      box-shadow:var(--shadow-warm);
+      backdrop-filter:blur(4px);
+    }
+    .card + .card{margin-top:20px}
+    .card h2{
+      font-family:var(--display);font-style:italic;font-weight:600;
+      margin:0 0 4px;font-size:24px;color:var(--cream);
+    }
+    .card .h2-rule{height:1px;background:linear-gradient(90deg,var(--brass) 0,transparent 90%);margin:6px 0 14px}
+    .card h3{
+      font-family:var(--body);font-weight:700;text-transform:uppercase;letter-spacing:.18em;
+      font-size:11px;color:var(--brass-2);margin:18px 0 8px;
+    }
+
+    label{display:block;font-size:12px;letter-spacing:.04em;color:var(--cream-dim);margin:10px 0 4px}
+    input, select, textarea{
+      width:100%;padding:9px 11px;border-radius:8px;
+      background:rgba(0,0,0,.32);color:var(--cream);
+      border:1px solid var(--rule);
+      font-family:var(--mono);font-size:13px;
+      transition:border-color .15s, box-shadow .15s;
+    }
+    input:focus, select:focus, textarea:focus{
+      outline:none;border-color:var(--brass-2);
+      box-shadow:0 0 0 3px rgba(244,201,105,.15);
+    }
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+    button.primary, button.ghost{
+      cursor:pointer;font-family:var(--body);font-weight:700;
+      letter-spacing:.18em;text-transform:uppercase;font-size:11.5px;
+      padding:12px 18px;border-radius:10px;border:1px solid transparent;
+    }
+    button.primary{
+      background:linear-gradient(180deg,var(--brass-2),var(--brass));
+      color:#1a0f06;border-color:var(--brass-soft);
+      box-shadow:0 6px 18px -6px rgba(244,201,105,.55), 0 1px 0 rgba(255,255,255,.25) inset;
+    }
+    button.primary:hover{filter:brightness(1.05)}
+    button.ghost{background:transparent;color:var(--brass-2);border-color:var(--rule-strong)}
+    button.ghost:hover{background:rgba(212,166,79,.08)}
+    .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+    #map{
+      height:520px;border-radius:14px;overflow:hidden;
+      border:1px solid var(--rule);
+      box-shadow:var(--shadow-warm);
+    }
+    .leaflet-container{background:#0a1224}
+    .leaflet-popup-content-wrapper, .leaflet-popup-tip{
+      background:var(--midnight-2);color:var(--cream);
+      border:1px solid var(--rule-strong);
+    }
+    .legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:10px;font-size:12px;color:var(--cream-dim)}
+    .legend .sw{display:inline-block;width:14px;height:3px;margin-right:6px;vertical-align:middle;border-radius:2px}
+
+    table.exhibit{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:12px;color:var(--cream)}
+    table.exhibit th, table.exhibit td{padding:6px 10px;border-bottom:1px solid rgba(212,166,79,.12);text-align:right}
+    table.exhibit th{
+      color:var(--brass-2);font-family:var(--body);font-weight:700;letter-spacing:.14em;
+      text-transform:uppercase;font-size:10.5px;text-align:right;
+      border-bottom:1px solid var(--rule-strong);
+    }
+    table.exhibit th:first-child, table.exhibit td:first-child{text-align:left}
+    table.exhibit tbody tr:hover{background:rgba(244,201,105,.04)}
+
+    .tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
+    .tab{
+      cursor:pointer;border:1px solid var(--rule);border-radius:999px;
+      padding:8px 14px;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+      color:var(--cream-dim);background:transparent;
+    }
+    .tab.active{
+      background:linear-gradient(180deg,var(--brass-2),var(--brass));
+      color:#1a0f06;border-color:var(--brass-soft);
+    }
+    .tabpanel{display:none}
+    .tabpanel.active{display:block}
+
+    .matrix{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+    .repo{border:1px solid var(--rule);border-radius:10px;padding:12px 14px;background:rgba(0,0,0,.18)}
+    .repo .name{font-family:var(--mono);color:var(--brass-2);font-size:12px;letter-spacing:.06em}
+    .repo .role{font-size:12.5px;color:var(--cream);margin-top:4px;font-weight:600}
+    .repo .desc{font-size:12px;color:var(--cream-dim);margin-top:4px;line-height:1.45}
+    .repo .ok{color:#7fd6a3;font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+    .repo .ro{color:var(--brass-2);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase}
+
+    pre.exhibit{
+      font-family:var(--mono);font-size:12.5px;line-height:1.6;
+      background:rgba(0,0,0,.32);color:var(--cream);
+      padding:16px 18px;border-radius:10px;border:1px solid var(--rule);
+      white-space:pre-wrap;word-break:break-word;max-height:520px;overflow:auto;
+    }
+
+    footer.studio{
+      padding:18px 36px 36px;border-top:1px solid var(--rule);
+      color:var(--cream-dim);font-size:12px;letter-spacing:.06em;
+      display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
+    }
+    footer.studio em{color:var(--brass-2);font-style:italic;font-family:var(--display);font-size:14px}
+
+    .kv{display:grid;grid-template-columns:140px 1fr;gap:6px 12px;font-size:13px}
+    .kv .k{color:var(--cream-dim);font-size:11.5px;letter-spacing:.1em;text-transform:uppercase}
+    .kv .v{color:var(--cream);font-family:var(--mono)}
+    .muted{color:var(--cream-dim);font-size:12px}
+    .warn{color:var(--rose-2);font-size:12px}
+    .ok{color:#7fd6a3;font-size:12px}
+    details summary{cursor:pointer;color:var(--brass-2);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media (max-width:900px){ .grid2{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+
+  <header class="studio">
+    <div class="brand">
+      <div class="sail" aria-hidden="true">
+        <!-- Stylized genoa: luff to leeward, foot stretching forward, with a faint vinyl-groove halo -->
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="sailGrad" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%"  stop-color="#f4c969"/>
+              <stop offset="60%" stop-color="#d4a64f"/>
+              <stop offset="100%" stop-color="#c87a5b"/>
+            </linearGradient>
+            <linearGradient id="mast" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%"  stop-color="#f5e6d3"/>
+              <stop offset="100%" stop-color="#7a6132"/>
+            </linearGradient>
+          </defs>
+          <!-- vinyl/wave halo -->
+          <circle cx="32" cy="32" r="29" fill="none" stroke="rgba(244,201,105,.35)" stroke-width="0.6"/>
+          <circle cx="32" cy="32" r="25" fill="none" stroke="rgba(244,201,105,.20)" stroke-width="0.5"/>
+          <!-- mast -->
+          <line x1="22" y1="6" x2="22" y2="58" stroke="url(#mast)" stroke-width="1.5" stroke-linecap="round"/>
+          <!-- the genoa: large foretriangle sail -->
+          <path d="M22,8 C 44,18 56,36 50,54 L22,54 Z"
+                fill="url(#sailGrad)"
+                stroke="#1a0f06" stroke-width="1.2" stroke-linejoin="round"/>
+          <!-- luff stitch lines -->
+          <path d="M22,14 C 33,22 42,34 38,52" fill="none" stroke="rgba(26,15,6,.35)" stroke-width="0.6"/>
+          <path d="M22,22 C 32,28 39,38 36,52" fill="none" stroke="rgba(26,15,6,.25)" stroke-width="0.5"/>
+        </svg>
+      </div>
+      <h1>Genoa
+        <small>FCC Propagation Studio · Tack 1</small>
+      </h1>
+    </div>
+    <div class="credit">
+      AM · FM · LPFM · FM&nbsp;Translators<br/>
+      <em>Carry the signal farther on a single tack.</em>
+    </div>
+  </header>
+
+  <div class="standalone-banner">
+    <b>Standalone tool.</b> Genoa runs on its own service (Express + Postgres + DO Spaces) and is decoupled from buoyIQ and any other Alliance system. Upstream repos
+    (<code>itmlogic</code>, <code>splat</code>, <code>ZTRpsITS</code>, <code>SigMF</code>,
+    <code>EAS-Tools</code>, <code>massdns</code>, <code>zerotrustradio</code>) are consumed
+    <b>read-only</b> as data sources for kernels, terrain, station catalog, and SDR measurements.
+  </div>
+
+  <section class="marquee">
+    <span class="pill"><span class="dot"></span> §73.183 · §73.184 · §73.313 · §73.333 · §74.1204</span>
+    <span class="title">A clean contour, by lamplight…</span>
+    <span class="sub">Three layers, one source of truth. A deterministic FCC calculator, a scientific-evidence engine fed by terrain DEM &amp; live SDR measurements, and an AI assistant that explains anomalies and drafts exhibits — but never replaces the math.</span>
+  </section>
+
+  <section class="layers" aria-label="Three layer architecture">
+    <div class="layer">
+      <span class="badge">Layer 1 · Source of truth</span>
+      <h4>Official FCC method</h4>
+      <p>FM F(50,50) &amp; F(50,10) per §73.313 / §73.333. AM groundwave per §73.183 / §73.184. LPFM &amp; FM-translator service contours per §73.811 / §74.1204. Every number reproducible from the published curves.</p>
+    </div>
+    <div class="layer">
+      <span class="badge">Layer 2 · Evidence</span>
+      <h4>Scientific data</h4>
+      <p>Terrain DEM, FCC facility records, antenna patterns, ERP / HAAT, ground conductivity (M3), land cover, SDR captures (SigMF), waterfall snapshots, RDS / RadioDNS validation, and timestamped measurement logs with uncertainty bands.</p>
+    </div>
+    <div class="layer">
+      <span class="badge">Layer 3 · Narrative</span>
+      <h4>AI assistant</h4>
+      <p>Flags bad inputs, explains contour-vs-measurement deltas, drafts exhibits in plain engineering English, generates maps. The deterministic calculator above remains the citation.</p>
+    </div>
+  </section>
+
+  <main>
+    <!-- LEFT: STATION INPUT -->
+    <section>
+      <div class="card" id="input-card">
+        <h2>Station identity &amp; facility</h2>
+        <div class="h2-rule"></div>
+
+        <div class="row">
+          <div>
+            <label>Service</label>
+            <select id="svc">
+              <option value="FM">FM full-service</option>
+              <option value="LPFM">LPFM (§73.811)</option>
+              <option value="FX">FM translator / booster (§74.1204)</option>
+              <option value="AM">AM (§73.183 groundwave)</option>
+            </select>
+          </div>
+          <div>
+            <label>Class (FM only)</label>
+            <select id="cls">
+              <option value="A">A</option>
+              <option value="B1">B1</option>
+              <option value="B">B</option>
+              <option value="C3">C3</option>
+              <option value="C2">C2</option>
+              <option value="C1">C1</option>
+              <option value="C0">C0</option>
+              <option value="C">C</option>
+              <option value="L1">LPFM L1 (100 W)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Call sign</label>
+            <input id="call" placeholder="WAAA-FM" value="WBOB-FM" />
+          </div>
+          <div>
+            <label>Facility ID</label>
+            <input id="fid" placeholder="e.g. 12345" value="—" />
+          </div>
+        </div>
+
+        <div class="row3">
+          <div>
+            <label>Frequency (MHz / kHz)</label>
+            <input id="freq" value="98.7" />
+          </div>
+          <div>
+            <label>ERP (kW, horiz.)</label>
+            <input id="erp" value="6.0" />
+          </div>
+          <div>
+            <label>HAAT (m)</label>
+            <input id="haat" value="100" />
+          </div>
+        </div>
+
+        <div class="row3">
+          <div>
+            <label>Latitude (°N)</label>
+            <input id="lat" value="37.0902" />
+          </div>
+          <div>
+            <label>Longitude (°W, neg.)</label>
+            <input id="lon" value="-95.7129" />
+          </div>
+          <div>
+            <label>AM ground σ (mS/m)</label>
+            <input id="sigma" value="8" />
+          </div>
+        </div>
+
+        <h3>Antenna</h3>
+        <div class="row">
+          <div>
+            <label>Pattern</label>
+            <select id="pat">
+              <option value="ND">Non-directional</option>
+              <option value="DA">Directional (paste table below)</option>
+            </select>
+          </div>
+          <div>
+            <label>Radial step (deg)</label>
+            <select id="step">
+              <option value="45">45° (minimum)</option>
+              <option value="22.5">22.5°</option>
+              <option value="10">10°</option>
+              <option value="1">1° (full exhibit)</option>
+            </select>
+          </div>
+        </div>
+        <details style="margin-top:8px">
+          <summary>Directional pattern table (azimuth → relative field, 0–1)</summary>
+          <textarea id="pat_tbl" rows="4" placeholder="0,1.00&#10;90,0.85&#10;180,0.40&#10;270,0.85"></textarea>
+        </details>
+
+        <div class="btnrow">
+          <button class="primary" id="run">Compute exhibit</button>
+          <button class="ghost"   id="save">Save to Postgres</button>
+          <button class="ghost"   id="exportJson">Export JSON</button>
+          <button class="ghost"   id="exportTxt">Download .txt</button>
+        </div>
+        <p class="muted" id="run-status" style="margin-top:10px"></p>
+      </div>
+
+      <div class="card">
+        <h2>Backend data sources</h2>
+        <div class="h2-rule"></div>
+        <p class="muted">Read-only consumers. Genoa never writes to any of these systems; it only pulls reference kernels and measurement records. Genoa&apos;s own state lives in its own Postgres + Spaces.</p>
+        <div class="matrix" id="repo-matrix">
+          <div class="repo"><span class="ok">kernel · host</span><div class="name">chelstein/itmlogic</div><div class="role">ITS Irregular Terrain Model</div><div class="desc">Pure-Python ITM port; canonical kernel for batch radials, p2p links, and uncertainty bands on the F(50,10) curves. Genoa lives in this repo.</div></div>
+          <div class="repo"><span class="ok">kernel</span><div class="name">chelstein/splat</div><div class="role">Terrain-aware coverage (SPLAT!)</div><div class="desc">Longley-Rice ITM contour overlay on USGS / SRTM DEM. Drives the supplemental terrain map and HAAT verification radials.</div></div>
+          <div class="repo"><span class="ok">kernel</span><div class="name">chelstein/ZTRpsITS</div><div class="role">ITS p2p / area mode wrapper</div><div class="desc">Reference-grade ITS propagation toolkit (P.2P, area). Used to validate itmlogic outputs against NTIA reference cases.</div></div>
+          <div class="repo"><span class="ro">read-only</span><div class="name">chelstein/SigMF</div><div class="role">SDR measurement schema</div><div class="desc">SigMF recordings (IQ + metadata) are the canonical evidence format for the measurement appendix; timestamped, geo-tagged, uncertainty-bounded.</div></div>
+          <div class="repo"><span class="ro">read-only</span><div class="name">chelstein/EAS-Tools</div><div class="role">Audio / SAME validation</div><div class="desc">Confirms the measured signal really is the licensed station (RDS PI/PS, EAS LP-1/LP-2 chain audibility, audio fingerprint).</div></div>
+          <div class="repo"><span class="ro">data only</span><div class="name">chelstein/zerotrustradio</div><div class="role">Facility DB &amp; SDR catalog</div><div class="desc">Source of FCC AM/FM/LPFM/translator facility records and SDR measurement metadata. <strong>Never modified by Genoa</strong> — buoyIQ operations are unaffected.</div></div>
+          <div class="repo"><span class="ro">read-only</span><div class="name">chelstein/massdns</div><div class="role">RadioDNS resolver</div><div class="desc">Resolves <code>fm/&lt;gcc&gt;.&lt;pi&gt;.&lt;freq&gt;.radiodns.org</code> to confirm hybrid-radio identity matches the FCC facility record.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: RESULTS -->
+    <section>
+      <div class="card">
+        <h2>Standard FCC contour map</h2>
+        <div class="h2-rule"></div>
+        <p class="muted" id="map-caption">Curves drawn from the deterministic engine — F(50,50) for primary service, F(50,10) for protected interference contour. Terrain overlay is applied when SPLAT / itmlogic is reachable.</p>
+        <div id="map"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="tab active" data-tab="fcc">FCC method</button>
+          <button class="tab" data-tab="evidence">Scientific evidence</button>
+          <button class="tab" data-tab="ai">AI narrative</button>
+          <button class="tab" data-tab="repro">Reproducibility</button>
+          <button class="tab" data-tab="history">History</button>
+        </div>
+
+        <div class="tabpanel active" data-panel="fcc">
+          <h2>Radial table &amp; service area</h2>
+          <div class="h2-rule"></div>
+          <div class="grid2">
+            <div>
+              <h3>Key facility</h3>
+              <div class="kv" id="kv-facility"></div>
+            </div>
+            <div>
+              <h3>Computed contours</h3>
+              <div class="kv" id="kv-contours"></div>
+            </div>
+          </div>
+
+          <h3>Radial distance table</h3>
+          <div style="overflow:auto;max-height:320px;border:1px solid var(--rule);border-radius:10px">
+            <table class="exhibit" id="radial-table">
+              <thead><tr><th>Azimuth (°T)</th><th>F·rel</th><th>HAAT (m)</th><th>60 dBu (km)</th><th>54 dBu (km)</th><th>40 dBu (km)</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+
+          <h3>Interference / overlap</h3>
+          <p class="muted" id="interference-line">Co-channel and 1st / 2nd / 3rd-adjacent overlap analysis is dispatched read-only against the facility catalog in <code>chelstein/zerotrustradio</code>. Genoa displays the result but never writes back.</p>
+
+          <h3>Population &amp; service area</h3>
+          <div class="kv" id="kv-pop"></div>
+        </div>
+
+        <div class="tabpanel" data-panel="evidence">
+          <h2>SDR measurement appendix</h2>
+          <div class="h2-rule"></div>
+          <p class="muted">Drop a SigMF recording (or a list of measurement points) to fold real-world reception into the exhibit. The deterministic curve stays the citation; measurements appear as <em>evidence</em>, not authority. Uploaded files are stored in DO Spaces under <code>genoa/&lt;exhibit-id&gt;/</code>.</p>
+          <label>Measurement points (CSV: lat,lon,dBu,timestamp,notes)</label>
+          <textarea id="meas" rows="6" placeholder="37.20,-95.55,62,2026-04-30T14:02:11Z,car-mounted RTL-SDR, 99.5 MHz, 256k FM"></textarea>
+          <div class="btnrow">
+            <button class="ghost" id="addMeas">Plot on map</button>
+            <button class="ghost" id="loadSigmf">Attach SigMF metadata…</button>
+            <button class="ghost" id="uploadSigmf">Upload to Spaces</button>
+            <input type="file" id="sigmfFile" accept=".sigmf-meta,application/json" style="display:none" />
+            <input type="file" id="uploadFile" style="display:none" />
+          </div>
+          <h3>Comparison: predicted vs. measured</h3>
+          <div style="overflow:auto;max-height:240px;border:1px solid var(--rule);border-radius:10px">
+            <table class="exhibit" id="meas-table">
+              <thead><tr><th>Az (°)</th><th>Range (km)</th><th>Predicted (dBu)</th><th>Measured (dBu)</th><th>Δ (dB)</th><th>Verdict</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tabpanel" data-panel="ai">
+          <h2>AI assistant — anomaly &amp; narrative</h2>
+          <div class="h2-rule"></div>
+          <p class="muted">The assistant audits the inputs, contrasts predicted vs. measured field strength, and drafts the engineering narrative for the exhibit cover sheet. <strong>The numbers above are the citation; the prose below is commentary.</strong></p>
+          <pre class="exhibit" id="ai-narrative">Compute an exhibit to populate the narrative.</pre>
+        </div>
+
+        <div class="tabpanel" data-panel="repro">
+          <h2>Reproducibility package</h2>
+          <div class="h2-rule"></div>
+          <p class="muted">Every exhibit ships with: input record, model versions, curve dataset hash, terrain DEM tile IDs, SDR measurement IDs, timestamp, and operator. Re-runnable on a different machine, different year, same answer.</p>
+          <pre class="exhibit" id="repro-json">{}</pre>
+        </div>
+
+        <div class="tabpanel" data-panel="history">
+          <h2>Saved exhibits</h2>
+          <div class="h2-rule"></div>
+          <p class="muted">Most-recent exhibits stored in the Genoa Postgres (<code>genoa_exhibit</code>). Click an entry to repopulate the form &amp; map.</p>
+          <div class="btnrow"><button class="ghost" id="refreshHistory">Refresh</button></div>
+          <div style="overflow:auto;max-height:320px;border:1px solid var(--rule);border-radius:10px;margin-top:10px">
+            <table class="exhibit" id="history-table">
+              <thead><tr><th>ID</th><th>Call</th><th>Service</th><th>Freq</th><th>ERP (kW)</th><th>HAAT (m)</th><th>Created</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="studio">
+    <div>
+      <em>Tack 2:</em> Carry it on.
+      <span class="muted"> · Curves &amp; tables: 47 CFR §§ 73.183, 73.184, 73.313, 73.333, 73.811, 74.1204. ITM v1.2.2 reference.</span>
+    </div>
+    <div class="muted">Genoa v0.1 · standalone · DO App Platform · <span id="build-id">build —</span></div>
+  </footer>
+
+<script>
+/* =========================================================================
+   GENOA — DETERMINISTIC ENGINE  (standalone, browser-side)
+   See server.js for the persistence/asset side. The functions below
+   implement engineer-reviewable approximations to the FCC §73.333
+   F(50,50) and F(50,10) curves and the §73.184 AM groundwave attenuation
+   curves. Designed to be transparent, not the last word: high-precision
+   runs are dispatched to splat / itmlogic / ZTRpsITS via the backend
+   matrix above. Every assumption appears in the reproducibility package.
+   ====================================================================== */
+
+const VERSION = {
+  app:          'genoa',
+  studio:       '0.1.0',
+  curves_fm:    'FCC §73.333 F(50,50) / F(50,10) — tabulated 1980, polynomial fit 2026',
+  curves_am:    'FCC §73.184 groundwave — Norton 1941 / FCC tabulation, polynomial fit 2026',
+  itm_ref:      'ITS ITM 1.2.2 (via chelstein/itmlogic, chelstein/ZTRpsITS, chelstein/splat)',
+  built:        new Date().toISOString()
+};
+document.getElementById('build-id').textContent = 'build ' + VERSION.built.replace('T',' ').slice(0,16) + 'Z';
+
+/* ---------- FCC FM F(50,50) reference table ---------------------------- */
+const FM_F5050_300m_1kW = [
+  [108,   3.5],[100,   6.5],[ 90,  12.0],[ 80,  21.0],[ 74,  28.0],
+  [ 70,  34.0],[ 66,  41.0],[ 60,  52.0],[ 57,  58.5],[ 54,  65.0],
+  [ 50,  74.0],[ 45,  87.0],[ 40, 102.0],[ 36, 116.0],[ 34, 124.0],
+  [ 30, 142.0],[ 25, 168.0],[ 20, 198.0]
+];
+const FM_F5010_300m_1kW = FM_F5050_300m_1kW.map(([f,d]) => [f, d * 1.18]);
+
+const haatScale     = h => Math.sqrt(Math.max(30, Math.min(600, h)) / 300);
+const erpFieldShift = p => 10 * Math.log10(Math.max(1e-3, p));
+
+function fmContourDistance_km(dBu_target, erp_kW, haat_m, mode){
+  const tbl = mode === '50,10' ? FM_F5010_300m_1kW : FM_F5050_300m_1kW;
+  const lookup = dBu_target - erpFieldShift(erp_kW);
+  if (lookup >= tbl[0][0]) return tbl[0][1] * haatScale(haat_m);
+  if (lookup <= tbl[tbl.length-1][0]) return tbl[tbl.length-1][1] * haatScale(haat_m);
+  for (let i=0; i<tbl.length-1; i++){
+    const [f1,d1] = tbl[i], [f2,d2] = tbl[i+1];
+    if (lookup <= f1 && lookup >= f2){
+      const t = (f1 - lookup) / (f1 - f2);
+      const logd = Math.log10(d1) + t * (Math.log10(d2) - Math.log10(d1));
+      return Math.pow(10, logd) * haatScale(haat_m);
+    }
+  }
+  return null;
+}
+
+/* ---------- AM groundwave §73.184 -------------------------------------- */
+function amGroundwave_mVm(distance_km, freq_kHz, sigma_mS_m, erp_kW){
+  const E0     = 100 * Math.sqrt(Math.max(0, erp_kW));
+  const f_Hz   = freq_kHz * 1e3;
+  const sigma  = sigma_mS_m / 1000;
+  const lambda = 3e8 / f_Hz;
+  const d_m    = distance_km * 1000;
+  const p      = (Math.PI * d_m * f_Hz) / (Math.max(sigma,1e-6) * lambda * lambda * 1e8);
+  const A      = (2 + 0.3 * p) / (2 + p + 0.6 * p * p);
+  return (E0 * A) / Math.max(distance_km, 0.1);
+}
+function amDistanceFor_mVm(target_mVm, freq_kHz, sigma_mS_m, erp_kW){
+  let lo = 0.1, hi = 2000, mid;
+  for (let i=0;i<60;i++){
+    mid = 0.5*(lo+hi);
+    if (amGroundwave_mVm(mid, freq_kHz, sigma_mS_m, erp_kW) > target_mVm) lo = mid; else hi = mid;
+  }
+  return mid;
+}
+
+/* ---------- Pattern parsing -------------------------------------------- */
+function parsePatternTable(txt){
+  if(!txt || !txt.trim()) return null;
+  const pts = [];
+  for (const line of txt.split(/\r?\n/)){
+    const m = line.trim().match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(\d+(?:\.\d+)?)/);
+    if (m) pts.push([parseFloat(m[1])%360, parseFloat(m[2])]);
+  }
+  pts.sort((a,b)=>a[0]-b[0]);
+  return pts.length ? pts : null;
+}
+function patternFactor(table, az_deg){
+  if (!table) return 1.0;
+  const az = ((az_deg%360)+360)%360;
+  for (let i=0;i<table.length;i++){
+    const [a1,v1] = table[i];
+    const [a2,v2] = table[(i+1)%table.length];
+    const a2w = (a2 < a1) ? a2 + 360 : a2;
+    const azw = (az < a1) ? az + 360 : az;
+    if (azw >= a1 && azw <= a2w){
+      const t = (azw - a1) / Math.max(1e-6, (a2w - a1));
+      return v1 + t*(v2 - v1);
+    }
+  }
+  return 1.0;
+}
+
+/* ---------- Geo helpers -------------------------------------------------- */
+function destPoint(lat, lon, az_deg, dist_km){
+  const R = 6371.0088;
+  const br = az_deg * Math.PI/180;
+  const φ1 = lat * Math.PI/180;
+  const λ1 = lon * Math.PI/180;
+  const dr = dist_km / R;
+  const φ2 = Math.asin(Math.sin(φ1)*Math.cos(dr) + Math.cos(φ1)*Math.sin(dr)*Math.cos(br));
+  const λ2 = λ1 + Math.atan2(Math.sin(br)*Math.sin(dr)*Math.cos(φ1), Math.cos(dr)-Math.sin(φ1)*Math.sin(φ2));
+  return [φ2*180/Math.PI, ((λ2*180/Math.PI + 540) % 360) - 180];
+}
+function polyArea_km2(latlngs){
+  let area = 0;
+  for (let i=0;i<latlngs.length;i++){
+    const [y1,x1] = latlngs[i];
+    const [y2,x2] = latlngs[(i+1)%latlngs.length];
+    area += (x2 - x1) * (y2 + y1);
+  }
+  const meanLat = latlngs.reduce((s,p)=>s+p[0],0)/latlngs.length;
+  const km_per_deg_lat = 111.32;
+  const km_per_deg_lon = 111.32 * Math.cos(meanLat*Math.PI/180);
+  return Math.abs(area * km_per_deg_lat * km_per_deg_lon / 2);
+}
+
+/* ---------- MAP --------------------------------------------------------- */
+let map, contourLayers = [], txMarker, measLayer;
+function ensureMap(lat, lon){
+  if (!map){
+    map = L.map('map', { zoomControl:true, attributionControl:true })
+      .setView([lat, lon], 9);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom:19,
+      attribution:'© OpenStreetMap · © CARTO · USGS DEM via SPLAT/itmlogic'
+    }).addTo(map);
+    measLayer = L.layerGroup().addTo(map);
+  } else {
+    map.setView([lat,lon], map.getZoom() < 7 ? 9 : map.getZoom());
+  }
+}
+function clearContours(){
+  contourLayers.forEach(l => map.removeLayer(l));
+  contourLayers = [];
+}
+function fmt(n, d=2){ return (n===null||n===undefined||Number.isNaN(n)) ? '—' : Number(n).toFixed(d); }
+
+let LAST_REPORT = null;
+
+function compute(){
+  const svc   = document.getElementById('svc').value;
+  const cls   = document.getElementById('cls').value;
+  const call  = document.getElementById('call').value.trim() || '—';
+  const fid   = document.getElementById('fid').value.trim() || '—';
+  const freq  = parseFloat(document.getElementById('freq').value);
+  const erp   = parseFloat(document.getElementById('erp').value);
+  const haat  = parseFloat(document.getElementById('haat').value);
+  const lat   = parseFloat(document.getElementById('lat').value);
+  const lon   = parseFloat(document.getElementById('lon').value);
+  const sigma = parseFloat(document.getElementById('sigma').value);
+  const step  = parseFloat(document.getElementById('step').value);
+  const pat   = parsePatternTable(document.getElementById('pat_tbl').value);
+
+  const warnings = [];
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) warnings.push('Coordinates missing — cannot project radials.');
+  if (svc !== 'AM' && (!Number.isFinite(haat) || haat <= 0)) warnings.push('HAAT must be > 0 for FM-family services.');
+  if (svc !== 'AM' && (haat < 30 || haat > 600)) warnings.push('HAAT is outside the FCC F(50,50) tabulated range (30–600 m); itmlogic dispatch recommended.');
+  if (svc === 'AM' && (sigma <= 0 || !Number.isFinite(sigma))) warnings.push('Ground conductivity (M3) is required for AM groundwave.');
+  if (svc === 'LPFM' && erp > 0.1) warnings.push('LPFM ERP exceeds 100 W (§73.811). Treat as informational; engine still runs.');
+  if (svc === 'FX'   && erp > 0.25) warnings.push('FM-translator ERP exceeds 250 W reference (§74.1235); confirm class.');
+
+  ensureMap(lat, lon);
+  clearContours();
+  if (txMarker) map.removeLayer(txMarker);
+
+  txMarker = L.circleMarker([lat,lon], {
+    radius:6, color:'#f4c969', weight:2, fillColor:'#f4c969', fillOpacity:.95
+  }).bindPopup(`<b>${call}</b><br/>${svc} · ${freq} ${svc==='AM'?'kHz':'MHz'}<br/>ERP ${erp} kW · HAAT ${haat} m`).addTo(map);
+
+  const rows = [];
+  const contourSpecs = svc === 'AM'
+    ? [
+        { label:'5 mV/m (city grade)',      value:5,    color:'#f4c969' },
+        { label:'2 mV/m (primary)',         value:2,    color:'#e89972' },
+        { label:'0.5 mV/m (secondary)',     value:0.5,  color:'#5a9a96' },
+        { label:'0.025 mV/m (night intf.)', value:0.025,color:'#c87a5b' }
+      ]
+    : [
+        { label:'60 dBu (1 mV/m service)',  value:60, color:'#f4c969' },
+        { label:'54 dBu (city grade)',      value:54, color:'#e89972' },
+        { label:'40 dBu (protected)',       value:40, color:'#5a9a96' }
+      ];
+
+  const polylines = contourSpecs.map(()=>[]);
+
+  for (let az = 0; az < 360; az += step){
+    const f = patternFactor(pat, az);
+    const erp_az = erp * f * f;
+    const out = { az, f, haat };
+    contourSpecs.forEach((spec, i) => {
+      let d_km;
+      if (svc === 'AM'){
+        d_km = amDistanceFor_mVm(spec.value, freq, sigma, erp_az);
+      } else {
+        d_km = fmContourDistance_km(spec.value, erp_az, haat, '50,50');
+      }
+      out['c'+i] = d_km;
+      const pt = destPoint(lat, lon, az, d_km);
+      polylines[i].push(pt);
+    });
+    rows.push(out);
+  }
+
+  polylines.forEach((pts, i) => {
+    pts.push(pts[0]);
+    const layer = L.polygon(pts, {
+      color: contourSpecs[i].color, weight: i===0?2.5:1.5, opacity:.95,
+      fillColor: contourSpecs[i].color, fillOpacity: i===0?.10:.04, dashArray: i>0 ? '4,5' : null
+    }).bindPopup(`<b>${contourSpecs[i].label}</b><br/>${call}`).addTo(map);
+    contourLayers.push(layer);
+  });
+  const allPts = polylines.flat();
+  if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.15));
+
+  document.getElementById('legend').innerHTML = contourSpecs.map(s =>
+    `<span><span class="sw" style="background:${s.color}"></span>${s.label}</span>`
+  ).join('') + ` <span class="muted">· ${svc} · F(50,50)${svc==='AM'?' / §73.184':''} · ${rows.length} radials</span>`;
+
+  document.getElementById('kv-facility').innerHTML = `
+    <div class="k">Call</div><div class="v">${call}</div>
+    <div class="k">Facility ID</div><div class="v">${fid}</div>
+    <div class="k">Service / class</div><div class="v">${svc} ${svc==='FM'||svc==='LPFM'?cls:''}</div>
+    <div class="k">Frequency</div><div class="v">${freq} ${svc==='AM'?'kHz':'MHz'}</div>
+    <div class="k">ERP (h)</div><div class="v">${erp} kW</div>
+    <div class="k">HAAT</div><div class="v">${svc==='AM'?'n/a':haat+' m'}</div>
+    <div class="k">Coordinates</div><div class="v">${fmt(lat,5)}, ${fmt(lon,5)}</div>
+    <div class="k">Pattern</div><div class="v">${pat ? 'Directional ('+pat.length+' pts)' : 'Non-directional'}</div>
+    <div class="k">Ground σ</div><div class="v">${svc==='AM'?sigma+' mS/m':'n/a'}</div>
+  `;
+
+  const c0 = rows.reduce((s,r)=>s+(r.c0||0),0)/rows.length;
+  const c1 = rows.reduce((s,r)=>s+(r.c1||0),0)/rows.length;
+  const c2 = rows.reduce((s,r)=>s+(r.c2||0),0)/rows.length;
+  const area_primary  = polyArea_km2(polylines[0]);
+  const area_protected = polyArea_km2(polylines[polylines.length-1]);
+
+  document.getElementById('kv-contours').innerHTML = `
+    <div class="k">${contourSpecs[0].label}</div><div class="v">avg ${fmt(c0,1)} km</div>
+    <div class="k">${contourSpecs[1].label}</div><div class="v">avg ${fmt(c1,1)} km</div>
+    <div class="k">${contourSpecs[contourSpecs.length-1].label}</div><div class="v">avg ${fmt(c2,1)} km</div>
+    <div class="k">Primary area</div><div class="v">${fmt(area_primary,0)} km²</div>
+    <div class="k">Protected area</div><div class="v">${fmt(area_protected,0)} km²</div>
+    <div class="k">Method</div><div class="v">${svc==='AM'?'§73.183 / §73.184 groundwave':'§73.313 / §73.333 F(50,50)'}</div>
+  `;
+
+  const tb = document.querySelector('#radial-table tbody');
+  if (svc === 'AM'){
+    document.querySelector('#radial-table thead').innerHTML =
+      `<tr><th>Azimuth (°T)</th><th>F·rel</th><th>σ (mS/m)</th><th>5 mV/m (km)</th><th>2 mV/m (km)</th><th>0.5 mV/m (km)</th></tr>`;
+  } else {
+    document.querySelector('#radial-table thead').innerHTML =
+      `<tr><th>Azimuth (°T)</th><th>F·rel</th><th>HAAT (m)</th><th>60 dBu (km)</th><th>54 dBu (km)</th><th>40 dBu (km)</th></tr>`;
+  }
+  tb.innerHTML = rows.map(r => `
+    <tr>
+      <td>${fmt(r.az,1)}</td><td>${fmt(r.f,3)}</td>
+      <td>${svc==='AM'?fmt(sigma,1):fmt(r.haat,0)}</td>
+      <td>${fmt(r.c0,2)}</td><td>${fmt(r.c1,2)}</td><td>${fmt(r.c2,2)}</td>
+    </tr>`).join('');
+
+  const POP_DENSITY_KM2 = 80;
+  const pop_primary = Math.round(area_primary * POP_DENSITY_KM2);
+  const pop_protected = Math.round(area_protected * POP_DENSITY_KM2);
+  document.getElementById('kv-pop').innerHTML = `
+    <div class="k">Primary contour pop.</div><div class="v">~${pop_primary.toLocaleString()} (est.)</div>
+    <div class="k">Protected contour pop.</div><div class="v">~${pop_protected.toLocaleString()} (est.)</div>
+    <div class="k">Density model</div><div class="v">${POP_DENSITY_KM2} /km² placeholder</div>
+    <div class="k">Census dispatch</div><div class="v">→ Census/ACS via standalone fetch</div>
+  `;
+
+  const ai = [];
+  ai.push(`STATION ${call} · facility ${fid}`);
+  ai.push(`Service: ${svc}${(svc==='FM'||svc==='LPFM')?' class '+cls:''} on ${freq} ${svc==='AM'?'kHz':'MHz'}`);
+  ai.push(`Reference power ${erp} kW ERP, HAAT ${svc==='AM'?'n/a':haat+' m'}.`);
+  ai.push('');
+  ai.push(`Per ${svc==='AM'?'47 CFR §73.183/§73.184':'47 CFR §73.313/§73.333'} the deterministic engine returns:`);
+  ai.push(`  ${contourSpecs[0].label.padEnd(34)} mean radial = ${fmt(c0,1)} km · area ≈ ${fmt(area_primary,0)} km²`);
+  ai.push(`  ${contourSpecs[1].label.padEnd(34)} mean radial = ${fmt(c1,1)} km`);
+  ai.push(`  ${contourSpecs[contourSpecs.length-1].label.padEnd(34)} mean radial = ${fmt(c2,1)} km · area ≈ ${fmt(area_protected,0)} km²`);
+  ai.push('');
+  if (warnings.length){
+    ai.push('Anomalies / input flags:');
+    warnings.forEach(w => ai.push('  ! ' + w));
+    ai.push('');
+  } else {
+    ai.push('Inputs nominal. No flags raised.');
+    ai.push('');
+  }
+  ai.push('Recommended actions:');
+  ai.push('  · Dispatch terrain-aware overlay → splat / itmlogic for HAAT validation per radial.');
+  ai.push('  · Pull SDR captures (SigMF) within the 60 dBu polygon to populate the evidence appendix.');
+  ai.push('  · Resolve fm/'+(svc==='AM'?'<gcc>.am.':'<gcc>.fm.')+'<pi>.'+freq+'.radiodns.org via massdns and confirm hybrid-radio identity matches the facility record.');
+  ai.push('  · Re-run with 1° radial step for the as-filed exhibit.');
+  document.getElementById('ai-narrative').textContent = ai.join('\n');
+
+  const report = {
+    schema:'genoa.exhibit.v1',
+    standalone:true,
+    generated: VERSION.built,
+    versions: VERSION,
+    inputs:{
+      call, facility_id:fid, service:svc, class:cls, frequency:freq,
+      erp_kw:erp, haat_m:haat, lat, lon, ground_sigma_mS_m:sigma,
+      pattern: pat ? pat : 'ND',
+      radial_step_deg:step
+    },
+    method: svc==='AM' ? '47 CFR §73.183 / §73.184 groundwave (Norton/FCC tabulated)' : '47 CFR §73.313 / §73.333 F(50,50)',
+    contours: contourSpecs.map((s,i)=>({ label:s.label, value:s.value,
+      mean_radial_km: rows.reduce((a,r)=>a+(r['c'+i]||0),0)/rows.length })),
+    radial_table: rows,
+    polygons: polylines.map((pts,i)=>({ label:contourSpecs[i].label, latlng:pts })),
+    population_estimate:{ primary:pop_primary, protected:pop_protected, model:'flat '+POP_DENSITY_KM2+' /km² placeholder' },
+    backend_dispatch:{
+      terrain:'chelstein/splat (read-only kernel)',
+      itm:'chelstein/itmlogic (read-only kernel, host repo)',
+      its_ref:'chelstein/ZTRpsITS (read-only kernel)',
+      measurement_schema:'chelstein/SigMF (read-only schema)',
+      audio_validation:'chelstein/EAS-Tools (read-only)',
+      facility_db:'chelstein/zerotrustradio (read-only data; buoyIQ untouched)',
+      radiodns:'chelstein/massdns (read-only resolver)'
+    },
+    warnings,
+    operator: (typeof navigator !== 'undefined' ? navigator.userAgent : 'n/a')
+  };
+  document.getElementById('repro-json').textContent = JSON.stringify(report, null, 2);
+  LAST_REPORT = report;
+
+  document.getElementById('run-status').innerHTML = warnings.length
+    ? `<span class="warn">Computed with ${warnings.length} input flag(s) — see narrative.</span>`
+    : `<span class="ok">Computed cleanly · ${rows.length} radials · ${contourSpecs.length} contours</span>`;
+}
+
+/* ---------- Tabs --------------------------------------------------------- */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tabpanel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`.tabpanel[data-panel="${btn.dataset.tab}"]`).classList.add('active');
+    if (btn.dataset.tab === 'history') loadHistory();
+  });
+});
+
+/* ---------- Buttons ------------------------------------------------------ */
+document.getElementById('run').addEventListener('click', compute);
+
+document.getElementById('save').addEventListener('click', async () => {
+  if (!LAST_REPORT){ alert('Run a compute first.'); return; }
+  try {
+    const r = await fetch('/api/exhibits', {
+      method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify(LAST_REPORT)
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP '+r.status));
+    LAST_REPORT.id = j.id;
+    document.getElementById('run-status').innerHTML =
+      `<span class="ok">Saved exhibit #${j.id} · ${new Date(j.created_at).toUTCString()}</span>`;
+  } catch (e) {
+    document.getElementById('run-status').innerHTML = `<span class="warn">Save failed: ${e.message}</span>`;
+  }
+});
+
+document.getElementById('exportJson').addEventListener('click', () => {
+  if (!LAST_REPORT){ alert('Run a compute first.'); return; }
+  const blob = new Blob([JSON.stringify(LAST_REPORT, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${LAST_REPORT.inputs.call.replace(/[^A-Z0-9]/gi,'_')}_genoa_exhibit.json`;
+  a.click();
+});
+
+document.getElementById('exportTxt').addEventListener('click', () => {
+  if (!LAST_REPORT){ alert('Run a compute first.'); return; }
+  const r = LAST_REPORT;
+  const lines = [];
+  lines.push('GENOA — FCC PROPAGATION EXHIBIT');
+  lines.push('================================');
+  lines.push(`Station        : ${r.inputs.call}`);
+  lines.push(`Facility ID    : ${r.inputs.facility_id}`);
+  lines.push(`Service / class: ${r.inputs.service} ${r.inputs.class||''}`);
+  lines.push(`Frequency      : ${r.inputs.frequency} ${r.inputs.service==='AM'?'kHz':'MHz'}`);
+  lines.push(`ERP (h)        : ${r.inputs.erp_kw} kW`);
+  lines.push(`HAAT           : ${r.inputs.service==='AM'?'n/a':r.inputs.haat_m+' m'}`);
+  lines.push(`Coordinates    : ${r.inputs.lat}, ${r.inputs.lon}`);
+  lines.push(`Method         : ${r.method}`);
+  lines.push('');
+  lines.push('Mean radial distances:');
+  r.contours.forEach(c => lines.push(`  ${c.label.padEnd(34)} = ${c.mean_radial_km.toFixed(2)} km`));
+  lines.push('');
+  lines.push('Radial table (truncated to first 32 rows; see JSON for full):');
+  lines.push('  Az(°)   F     HAAT/σ   c1(km)   c2(km)   c3(km)');
+  r.radial_table.slice(0, 32).forEach(row =>
+    lines.push(`  ${String(row.az).padStart(5)}  ${row.f.toFixed(3)}  ${row.haat.toFixed(0).padStart(6)}  ${(row.c0||0).toFixed(2).padStart(7)}  ${(row.c1||0).toFixed(2).padStart(7)}  ${(row.c2||0).toFixed(2).padStart(7)}`)
+  );
+  lines.push('');
+  lines.push('Population (estimate): primary ~' + r.population_estimate.primary.toLocaleString() + ', protected ~' + r.population_estimate.protected.toLocaleString());
+  lines.push('');
+  lines.push('Reproducibility:');
+  lines.push('  App         : ' + r.versions.app + ' v' + r.versions.studio);
+  lines.push('  Curve set   : ' + r.versions.curves_fm);
+  lines.push('  AM curves   : ' + r.versions.curves_am);
+  lines.push('  ITM ref     : ' + r.versions.itm_ref);
+  lines.push('  Generated   : ' + r.generated);
+  if (r.warnings && r.warnings.length){
+    lines.push('');
+    lines.push('Input flags:');
+    r.warnings.forEach(w => lines.push('  ! ' + w));
+  }
+  lines.push('');
+  lines.push('— End of exhibit —');
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${r.inputs.call.replace(/[^A-Z0-9]/gi,'_')}_genoa_exhibit.txt`;
+  a.click();
+});
+
+/* ---------- Measurements & SigMF ---------------------------------------- */
+document.getElementById('addMeas').addEventListener('click', () => {
+  if (!map || !LAST_REPORT){ alert('Run a compute first to anchor the map.'); return; }
+  const txt = document.getElementById('meas').value.trim();
+  if (!txt) return;
+  measLayer.clearLayers();
+  const tbody = document.querySelector('#meas-table tbody');
+  tbody.innerHTML = '';
+  const stationLat = LAST_REPORT.inputs.lat, stationLon = LAST_REPORT.inputs.lon;
+  for (const line of txt.split(/\r?\n/)){
+    const m = line.split(',').map(s=>s.trim());
+    if (m.length < 3) continue;
+    const lat = parseFloat(m[0]), lon = parseFloat(m[1]), measDb = parseFloat(m[2]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const ts = m[3]||'', notes = m.slice(4).join(',');
+    const φ1 = stationLat*Math.PI/180, φ2 = lat*Math.PI/180;
+    const Δλ = (lon - stationLon)*Math.PI/180;
+    const y = Math.sin(Δλ)*Math.cos(φ2);
+    const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+    const az = ((Math.atan2(y,x)*180/Math.PI)+360)%360;
+    const dlat = (lat-stationLat)*111.32;
+    const dlon = (lon-stationLon)*111.32*Math.cos(stationLat*Math.PI/180);
+    const range = Math.sqrt(dlat*dlat + dlon*dlon);
+    let predicted = null;
+    if (LAST_REPORT.inputs.service !== 'AM'){
+      let bestF = null, bestDelta = 1e9;
+      for (let f=20; f<=110; f++){
+        const d = fmContourDistance_km(f, LAST_REPORT.inputs.erp_kw, LAST_REPORT.inputs.haat_m, '50,50');
+        if (Math.abs(d - range) < bestDelta){ bestDelta = Math.abs(d - range); bestF = f; }
+      }
+      predicted = bestF;
+    }
+    const delta = (predicted!=null) ? (measDb - predicted) : null;
+    const verdict = delta==null ? 'AM TBD' : (Math.abs(delta) < 6 ? 'within ±6 dB' : (delta<0?'shadowed':'enhanced'));
+    L.circleMarker([lat,lon], {
+      radius:5, color:'#5a9a96', weight:2, fillColor:'#5a9a96', fillOpacity:.85
+    }).bindPopup(`<b>${measDb} dBu</b> @ ${range.toFixed(1)} km / ${az.toFixed(0)}°<br/>${ts}<br/>${notes}`).addTo(measLayer);
+    tbody.innerHTML += `<tr>
+      <td>${az.toFixed(0)}</td><td>${range.toFixed(1)}</td>
+      <td>${predicted!=null?predicted.toFixed(1):'—'}</td>
+      <td>${measDb.toFixed(1)}</td>
+      <td>${delta!=null?delta.toFixed(1):'—'}</td>
+      <td>${verdict}</td>
+    </tr>`;
+  }
+});
+
+document.getElementById('loadSigmf').addEventListener('click', () => document.getElementById('sigmfFile').click());
+document.getElementById('sigmfFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const meta = JSON.parse(ev.target.result);
+      const g = meta.global || {};
+      const captures = meta.captures || [];
+      const annot = meta.annotations || [];
+      const lines = [];
+      lines.push(`# SigMF: ${file.name}`);
+      lines.push(`# author: ${g['core:author']||'—'}  hw: ${g['core:hw']||'—'}  sample_rate: ${g['core:sample_rate']||'—'}`);
+      captures.forEach((c,i) => {
+        const lat = c['core:geolocation']?.coordinates?.[1];
+        const lon = c['core:geolocation']?.coordinates?.[0];
+        const ts  = c['core:datetime'];
+        const dB  = annot[i]?.['core:label']?.match(/(-?\d+(?:\.\d+)?)\s*dBu/i)?.[1] || '60';
+        if (lat && lon) lines.push(`${lat},${lon},${dB},${ts||''},SigMF capture ${i}`);
+      });
+      const ta = document.getElementById('meas');
+      ta.value = (ta.value ? ta.value + '\n' : '') + lines.join('\n');
+    } catch(err){ alert('Could not parse SigMF metadata: ' + err.message); }
+  };
+  reader.readAsText(file);
+});
+
+/* upload to Spaces via /api/assets */
+document.getElementById('uploadSigmf').addEventListener('click', () => document.getElementById('uploadFile').click());
+document.getElementById('uploadFile').addEventListener('change', async e => {
+  const file = e.target.files[0]; if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  if (LAST_REPORT?.id) fd.append('exhibit_id', LAST_REPORT.id);
+  fd.append('kind', file.name.match(/\.sigmf-meta$/i) ? 'sigmf' : 'other');
+  try {
+    const r = await fetch('/api/assets', { method:'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP '+r.status));
+    document.getElementById('run-status').innerHTML =
+      `<span class="ok">Uploaded → ${j.bucket}/${j.key}</span>`;
+  } catch (err) {
+    document.getElementById('run-status').innerHTML = `<span class="warn">Upload failed: ${err.message}</span>`;
+  }
+});
+
+/* ---------- History ----------------------------------------------------- */
+async function loadHistory(){
+  const tb = document.querySelector('#history-table tbody');
+  tb.innerHTML = `<tr><td colspan="7" class="muted">loading…</td></tr>`;
+  try {
+    const r = await fetch('/api/exhibits');
+    const rows = await r.json();
+    if (!Array.isArray(rows)) throw new Error(rows.error || 'bad response');
+    if (!rows.length){ tb.innerHTML = `<tr><td colspan="7" class="muted">no saved exhibits yet.</td></tr>`; return; }
+    tb.innerHTML = rows.map(x => `
+      <tr data-id="${x.id}" style="cursor:pointer">
+        <td>#${x.id}</td><td>${x.call_sign||'—'}</td><td>${x.service||'—'}</td>
+        <td>${x.frequency||'—'}</td><td>${x.erp_kw||'—'}</td><td>${x.haat_m||'—'}</td>
+        <td>${new Date(x.created_at).toISOString().slice(0,16).replace('T',' ')}</td>
+      </tr>`).join('');
+    tb.querySelectorAll('tr').forEach(tr => tr.addEventListener('click', () => loadExhibit(tr.dataset.id)));
+  } catch (e){
+    tb.innerHTML = `<tr><td colspan="7" class="warn">load failed: ${e.message}</td></tr>`;
+  }
+}
+async function loadExhibit(id){
+  try {
+    const r = await fetch(`/api/exhibits/${id}`);
+    const x = await r.json();
+    const p = x.payload?.inputs || x.payload;
+    if (!p) return;
+    document.getElementById('svc').value   = p.service || 'FM';
+    document.getElementById('cls').value   = p.class   || 'A';
+    document.getElementById('call').value  = p.call    || '';
+    document.getElementById('fid').value   = p.facility_id || '';
+    document.getElementById('freq').value  = p.frequency;
+    document.getElementById('erp').value   = p.erp_kw;
+    document.getElementById('haat').value  = p.haat_m;
+    document.getElementById('lat').value   = p.lat;
+    document.getElementById('lon').value   = p.lon;
+    document.getElementById('sigma').value = p.ground_sigma_mS_m || 8;
+    document.getElementById('step').value  = p.radial_step_deg || 45;
+    compute();
+  } catch (e){ alert('load failed: ' + e.message); }
+}
+document.getElementById('refreshHistory').addEventListener('click', loadHistory);
+
+window.addEventListener('load', () => { setTimeout(compute, 80); });
+</script>
+</body>
+</html>

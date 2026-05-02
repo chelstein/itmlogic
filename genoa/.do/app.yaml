@@ -1,0 +1,95 @@
+# Genoa — Digital Ocean App Platform spec.
+# Standalone propagation studio for AM / FM / LPFM / FM-translators.
+#
+# DEPLOY ORDER
+# ============
+# 1. Create the app from this spec (web service only):
+#      doctl apps create --spec .do/app.yaml
+#    The service boots in stateless mode — /healthz returns ok, the
+#    deterministic engine works, but POST /api/exhibits and /api/assets
+#    return 503 until you wire up storage.
+#
+# 2. Attach managed Postgres POST-DEPLOY:
+#      DO Console → Apps → genoa → Create/Attach Database → PostgreSQL.
+#    Then copy the connection string from the database's "Connection Details"
+#    page and set it as an ENCRYPTED env var on the web component:
+#      DATABASE_URL = postgresql://...   (scope: RUN_TIME, encrypted)
+#    Genoa runs db/migrate.sql idempotently on every boot, so the schema
+#    is created on the next deploy.
+#
+# 3. Attach Spaces POST-DEPLOY:
+#      Create a Space (e.g. "genoa-exhibits") and a Spaces access key.
+#      Set these as ENCRYPTED env vars on the web component:
+#        SPACES_BUCKET, SPACES_REGION, SPACES_ENDPOINT,
+#        SPACES_KEY (encrypted), SPACES_SECRET (encrypted)
+#
+# Why no `databases:` block here?
+#   App Platform's `${db.*}` bindings have historically failed to substitute
+#   when the cluster is renamed (db → production-database), leaving the env
+#   value as a literal "${db.DATABASE_URL}". Setting DATABASE_URL manually
+#   post-deploy is the reliable path.
+#
+# Update: doctl apps update <APP_ID> --spec .do/app.yaml
+
+name: genoa
+region: nyc
+
+services:
+  - name: web
+    environment_slug: node-js
+    github:
+      repo: chelstein/itmlogic
+      branch: master
+      deploy_on_push: true
+    source_dir: /genoa
+    build_command: npm ci --omit=dev
+    run_command: npm start
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 8080
+
+    health_check:
+      # Liveness only — does NOT touch the DB so a transient DB blip
+      # does not cycle the container.
+      http_path: /healthz
+      initial_delay_seconds: 15
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 5
+
+    routes:
+      - path: /
+
+    envs:
+      - key: NODE_ENV
+        scope: RUN_TIME
+        value: production
+      - key: PORT
+        scope: RUN_TIME
+        value: "8080"
+
+      # ----- Postgres (set post-deploy in the DO console) ---------------
+      # Set DATABASE_URL as an encrypted env var on the web component
+      # AFTER the managed Postgres is attached. Until then, /api/exhibits
+      # returns 503 and the rest of the app runs stateless.
+      - key: PG_SSL
+        scope: RUN_TIME
+        value: "true"
+      - key: PG_SSL_REJECT
+        scope: RUN_TIME
+        value: "false"
+
+      # ----- Spaces (set post-deploy in the DO console) -----------------
+      # SPACES_KEY and SPACES_SECRET must be encrypted env vars on the web
+      # component. Without them, /api/assets returns 503 and the rest of
+      # the app runs as a pure compute service.
+      - key: SPACES_REGION
+        scope: RUN_TIME
+        value: nyc3
+      - key: SPACES_ENDPOINT
+        scope: RUN_TIME
+        value: https://nyc3.digitaloceanspaces.com
+      - key: SPACES_BUCKET
+        scope: RUN_TIME
+        value: genoa-exhibits
