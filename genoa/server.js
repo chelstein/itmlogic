@@ -1,9 +1,4 @@
-const port = process.env.PORT;
-
-if (!port) {
-  console.error("NO PORT PROVIDED BY DO");
-  process.exit(1);
-}
+const port = 8080;
 
 require('http')
   .createServer((req, res) => {
