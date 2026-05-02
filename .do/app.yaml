@@ -37,7 +37,14 @@ name: genoa
 region: sfo3
 
 services:
-  - name: web
+  - name: itmlogic
+    # IMPORTANT: this component name is "itmlogic" (NOT "web") because the
+    # DO app was originally created via "Deploy from GitHub" which auto-
+    # named the component after the repo. Renaming the component on a
+    # live App Platform app is brittle (it can split-brain the deploy
+    # log task — "cannot get deploy logs for component <old> with log
+    # task status failed"), and the ingress rule references this name.
+    # Keep it as "itmlogic" so spec re-applies are idempotent.
     # Dockerfile path is relative to the REPO ROOT (not source_dir).
     # source_dir scopes the Docker build context so the parent itmlogic
     # Python project (top-level requirements.txt → fiona/GDAL) is never
