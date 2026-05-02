@@ -7,6 +7,12 @@
 // writes to upstream data sources (zerotrustradio / buoyIQ / etc.). It
 // only persists its own exhibit records in its own Postgres schema and
 // uploads exhibit assets to its own Spaces bucket.
+//
+// HARDENED STARTUP: every optional feature (Postgres, Spaces) is wrapped
+// in try/catch so a misconfigured env var can never crash the container
+// before /healthz binds.  Top-level handlers print the full stack to
+// runtime logs so App Platform's "Generic Internal Error" never hides a
+// real diagnostic.
 
 import express from 'express';
 import multer  from 'multer';
@@ -17,26 +23,41 @@ import { fileURLToPath } from 'node:url';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
+// ---- Surface every otherwise-silent failure ------------------------
+process.on('uncaughtException',  (err) => { console.error('[genoa] uncaughtException:',  err && err.stack || err); });
+process.on('unhandledRejection', (err) => { console.error('[genoa] unhandledRejection:', err && err.stack || err); });
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
 const PORT       = parseInt(process.env.PORT || '8080', 10);
 const NODE_ENV   = process.env.NODE_ENV || 'development';
 
+console.log(`[genoa] boot pid=${process.pid} node=${process.version} env=${NODE_ENV} port=${PORT}`);
+console.log(`[genoa] env present: DATABASE_URL=${!!process.env.DATABASE_URL} SPACES_KEY=${!!process.env.SPACES_KEY} SPACES_SECRET=${!!process.env.SPACES_SECRET} SPACES_BUCKET=${!!process.env.SPACES_BUCKET}`);
+
 /* ------------------------------------------------------------------ */
-/* Postgres                                                            */
+/* Postgres — fail open: a bad DATABASE_URL must NEVER prevent boot.   */
 /* ------------------------------------------------------------------ */
 const PG_SSL = (process.env.PG_SSL || 'false').toLowerCase() === 'true';
 const PG_SSL_REJECT = (process.env.PG_SSL_REJECT || 'false').toLowerCase() === 'true';
 
-const pool = process.env.DATABASE_URL
-  ? new pg.Pool({
+let pool = null;
+if (process.env.DATABASE_URL) {
+  try {
+    pool = new pg.Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: PG_SSL ? { rejectUnauthorized: PG_SSL_REJECT } : false,
       max: 5,
       idleTimeoutMillis: 30_000
-    })
-  : null;
+    });
+    pool.on('error', (err) => console.warn('[genoa] pg pool error:', err.message));
+    console.log('[genoa] pg pool constructed');
+  } catch (e) {
+    console.warn('[genoa] pg pool construction failed:', e.message);
+    pool = null;
+  }
+}
 
 async function dbReady(){
   if (!pool) return false;
@@ -51,7 +72,7 @@ async function migrate(){
 }
 
 /* ------------------------------------------------------------------ */
-/* Spaces (S3-compatible)                                              */
+/* Spaces — fail open: missing creds must NEVER prevent boot.          */
 /* ------------------------------------------------------------------ */
 const SPACES_REGION   = process.env.SPACES_REGION   || 'nyc3';
 const SPACES_ENDPOINT = process.env.SPACES_ENDPOINT || `https://${SPACES_REGION}.digitaloceanspaces.com`;
@@ -59,14 +80,21 @@ const SPACES_BUCKET   = process.env.SPACES_BUCKET;
 const SPACES_KEY      = process.env.SPACES_KEY;
 const SPACES_SECRET   = process.env.SPACES_SECRET;
 
-const s3 = (SPACES_KEY && SPACES_SECRET && SPACES_BUCKET)
-  ? new S3Client({
+let s3 = null;
+if (SPACES_KEY && SPACES_SECRET && SPACES_BUCKET) {
+  try {
+    s3 = new S3Client({
       region: SPACES_REGION,
       endpoint: SPACES_ENDPOINT,
       forcePathStyle: false,
       credentials: { accessKeyId: SPACES_KEY, secretAccessKey: SPACES_SECRET }
-    })
-  : null;
+    });
+    console.log(`[genoa] spaces client constructed (region=${SPACES_REGION} bucket=${SPACES_BUCKET})`);
+  } catch (e) {
+    console.warn('[genoa] spaces client construction failed:', e.message);
+    s3 = null;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* App                                                                  */
@@ -402,17 +430,38 @@ app.get('/api/assets/:id/url', async (req, res) => {
 });
 
 /* ----------------------------------------------------------------- */
-const server = app.listen(PORT, async () => {
-  console.log(`[genoa] listening on :${PORT} (${NODE_ENV})`);
+// Bind synchronously and IMMEDIATELY answer /healthz.  Do not await any
+// IO before the health check can succeed — App Platform will tear down
+// the container otherwise.  Migrations happen in the background after
+// the server is already listening.
+const server = app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[genoa] listening on 0.0.0.0:${PORT} (${NODE_ENV})`);
+});
+server.on('error', (err) => {
+  console.error('[genoa] listen error:', err && err.stack || err);
+  process.exit(1);
+});
+
+// Background migrations — deliberately NOT awaited at boot.
+(async () => {
   if (pool) {
-    try { await migrate(); console.log('[genoa] postgres migrations applied'); }
-    catch (e) { console.warn('[genoa] migration skipped:', e.message); }
+    try {
+      await migrate();
+      console.log('[genoa] postgres migrations applied');
+    } catch (e) {
+      console.warn('[genoa] migration skipped:', e && e.stack || e.message || e);
+    }
   } else {
     console.warn('[genoa] DATABASE_URL not set — running in stateless mode');
   }
   if (!s3) console.warn('[genoa] SPACES not configured — asset uploads disabled');
-});
+})();
 
-const stop = () => server.close(() => process.exit(0));
-process.on('SIGTERM', stop);
-process.on('SIGINT', stop);
+const stop = (sig) => () => {
+  console.log(`[genoa] received ${sig}, draining`);
+  server.close(() => process.exit(0));
+  // Belt + suspenders — DO sometimes leaves the container hanging.
+  setTimeout(() => process.exit(0), 10_000).unref();
+};
+process.on('SIGTERM', stop('SIGTERM'));
+process.on('SIGINT',  stop('SIGINT'));
