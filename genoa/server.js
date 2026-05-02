@@ -123,6 +123,177 @@ app.get('/api/curves/:name', async (req, res) => {
   }
 });
 
+/* -------- Terrain DEM (per-radial HAAT, §73.313) -----------------
+   Computes per-radial HAAT by sampling a DEM along the 3–16 km arc
+   on each azimuth and averaging.  Results are cached in Postgres so
+   repeated compute runs near the same site don't re-hit the provider.
+------------------------------------------------------------------ */
+const TERRAIN_PROVIDER     = process.env.TERRAIN_PROVIDER     || 'open-elevation';
+const OPEN_ELEVATION_URL   = process.env.OPEN_ELEVATION_URL   || 'https://api.open-elevation.com/api/v1/lookup';
+const TERRAIN_BATCH_LIMIT  = parseInt(process.env.TERRAIN_BATCH_LIMIT || '512', 10);
+const TERRAIN_TIMEOUT_MS   = parseInt(process.env.TERRAIN_TIMEOUT_MS  || '20000', 10);
+
+const R_EARTH_KM = 6371.0088;
+function destPointGeo(lat, lon, az_deg, dist_km){
+  const br = az_deg * Math.PI / 180;
+  const φ1 = lat * Math.PI / 180;
+  const λ1 = lon * Math.PI / 180;
+  const dr = dist_km / R_EARTH_KM;
+  const φ2 = Math.asin(Math.sin(φ1)*Math.cos(dr) + Math.cos(φ1)*Math.sin(dr)*Math.cos(br));
+  const λ2 = λ1 + Math.atan2(Math.sin(br)*Math.sin(dr)*Math.cos(φ1), Math.cos(dr) - Math.sin(φ1)*Math.sin(φ2));
+  return [φ2 * 180 / Math.PI, ((λ2 * 180 / Math.PI + 540) % 360) - 180];
+}
+const round4 = n => Math.round(n * 1e4) / 1e4;
+
+async function elevationsCached(points){
+  // points: [{latitude, longitude}, ...]
+  // Returns parallel array of elevations in meters.
+  const n = points.length;
+  const out = new Array(n).fill(null);
+  const need = [];        // indexes still to fetch
+  const needSet = new Map();   // key -> [indexes]
+
+  if (pool){
+    // Bulk lookup of cached rows.
+    const lats = points.map(p => round4(p.latitude));
+    const lons = points.map(p => round4(p.longitude));
+    const r = await pool.query(
+      `SELECT lat_q4, lon_q4, elev_m
+         FROM genoa_terrain_cache
+        WHERE (lat_q4, lon_q4) IN (
+          SELECT UNNEST($1::numeric[]), UNNEST($2::numeric[])
+        )`,
+      [lats, lons]
+    );
+    const hit = new Map();
+    for (const row of r.rows) hit.set(row.lat_q4 + ':' + row.lon_q4, parseFloat(row.elev_m));
+    for (let i = 0; i < n; i++){
+      const k = lats[i] + ':' + lons[i];
+      if (hit.has(k)) out[i] = hit.get(k);
+      else {
+        need.push(i);
+        if (!needSet.has(k)) needSet.set(k, []);
+        needSet.get(k).push(i);
+      }
+    }
+  } else {
+    for (let i = 0; i < n; i++) need.push(i);
+  }
+
+  if (!need.length) return out;
+
+  // Deduplicate: many radials' samples can land in the same 4-decimal cell.
+  const uniqKeys = [...needSet.keys()].length ? [...needSet.keys()] : need.map((_,i) => 'i' + i);
+  const uniqPts  = needSet.size
+    ? [...needSet.keys()].map(k => {
+        const [a, o] = k.split(':').map(parseFloat);
+        return { latitude: a, longitude: o };
+      })
+    : need.map(i => points[i]);
+
+  // Batch the provider calls.
+  const fetched = [];
+  for (let i = 0; i < uniqPts.length; i += TERRAIN_BATCH_LIMIT){
+    const slice = uniqPts.slice(i, i + TERRAIN_BATCH_LIMIT);
+    const ctrl = new AbortController();
+    const tm = setTimeout(() => ctrl.abort(), TERRAIN_TIMEOUT_MS);
+    let resp;
+    try {
+      resp = await fetch(OPEN_ELEVATION_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ locations: slice }),
+        signal: ctrl.signal
+      });
+    } finally { clearTimeout(tm); }
+    if (!resp.ok) throw new Error(`elevation provider HTTP ${resp.status}`);
+    const j = await resp.json();
+    const arr = (j.results || []).map(r => Number(r.elevation));
+    if (arr.length !== slice.length) throw new Error('elevation provider returned wrong length');
+    fetched.push(...arr);
+  }
+
+  // Map fetched values back to output indexes, write-through to cache.
+  const writeRows = [];
+  if (needSet.size){
+    [...needSet.keys()].forEach((k, j) => {
+      const elev = fetched[j];
+      for (const idx of needSet.get(k)) out[idx] = elev;
+      const [a, o] = k.split(':').map(parseFloat);
+      writeRows.push([a, o, elev]);
+    });
+  } else {
+    need.forEach((idx, j) => { out[idx] = fetched[j]; });
+  }
+
+  if (pool && writeRows.length){
+    const valuesSql = writeRows.map((_, i) => `($${i*3+1},$${i*3+2},$${i*3+3},'${TERRAIN_PROVIDER}')`).join(',');
+    const flat = writeRows.flat();
+    await pool.query(
+      `INSERT INTO genoa_terrain_cache (lat_q4, lon_q4, elev_m, source) VALUES ${valuesSql}
+       ON CONFLICT (lat_q4, lon_q4) DO UPDATE SET elev_m = EXCLUDED.elev_m, fetched_at = now()`,
+      flat
+    );
+  }
+
+  return out;
+}
+
+app.post('/api/terrain/haat', async (req, res) => {
+  const b = req.body || {};
+  const tx_lat = parseFloat(b.tx_lat);
+  const tx_lon = parseFloat(b.tx_lon);
+  const tx_amsl = parseFloat(b.tx_amsl_m);
+  const from_km = Number.isFinite(b.from_km) ? +b.from_km : 3;
+  const to_km   = Number.isFinite(b.to_km)   ? +b.to_km   : 16;
+  const samples = Number.isFinite(b.samples) ? +b.samples : 27;
+  const radials = Array.isArray(b.radials_deg) ? b.radials_deg.map(Number).filter(Number.isFinite) : [];
+
+  if (!Number.isFinite(tx_lat) || !Number.isFinite(tx_lon)) return res.status(400).json({ error: 'tx_lat / tx_lon required' });
+  if (!Number.isFinite(tx_amsl)) return res.status(400).json({ error: 'tx_amsl_m required (antenna center of radiation, m AMSL)' });
+  if (!radials.length)            return res.status(400).json({ error: 'radials_deg required (array of azimuths in degrees true)' });
+  if (samples < 4 || samples > 256) return res.status(400).json({ error: 'samples out of range (4..256)' });
+
+  const stride = (to_km - from_km) / (samples - 1);
+  const points = [];
+  for (const az of radials){
+    for (let i = 0; i < samples; i++){
+      const km = from_km + i * stride;
+      const [la, lo] = destPointGeo(tx_lat, tx_lon, az, km);
+      points.push({ latitude: la, longitude: lo });
+    }
+  }
+
+  let elevations;
+  try {
+    elevations = await elevationsCached(points);
+  } catch (e) {
+    return res.status(502).json({ error: 'elevation provider failed', detail: String(e.message) });
+  }
+
+  const out = [];
+  for (let r = 0; r < radials.length; r++){
+    const slice = elevations.slice(r * samples, (r + 1) * samples);
+    const valid = slice.filter(v => Number.isFinite(v));
+    const avg   = valid.length ? valid.reduce((s, v) => s + v, 0) / valid.length : null;
+    out.push({
+      az: radials[r],
+      avg_elev_m:    avg,
+      min_elev_m:    valid.length ? Math.min(...valid) : null,
+      max_elev_m:    valid.length ? Math.max(...valid) : null,
+      haat_m:        avg !== null ? (tx_amsl - avg) : null,
+      sample_elevs:  slice
+    });
+  }
+
+  res.json({
+    tx:    { lat: tx_lat, lon: tx_lon, amsl_m: tx_amsl },
+    arc:   { from_km, to_km, samples },
+    provider: TERRAIN_PROVIDER,
+    haat_per_radial: out
+  });
+});
+
 /* -------- Exhibits API ------------------------------------------- */
 
 // POST /api/exhibits — persist a computed exhibit.
