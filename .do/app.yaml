@@ -1,78 +1,84 @@
 # Genoa — Digital Ocean App Platform spec.
 # Standalone propagation studio for AM / FM / LPFM / FM-translators.
 #
-# DEPLOY ORDER
-# ============
-# 1. Create the app from this spec (web service only):
-#      doctl apps create --spec .do/app.yaml
-#    The service boots in stateless mode — /healthz returns ok, the
-#    deterministic engine works, but POST /api/exhibits and /api/assets
-#    return 503 until you wire up storage.
+# This spec mirrors the live state of the App Platform app exactly so
+# that auto-deploys triggered by a master push reconcile cleanly. Past
+# generic-internal-error deploys were caused by drift between the live
+# app (`seahorse-app` in region `sfo`, with a managed PG bound and an
+# ingress rule pointing at the `itmlogic` component) and a more
+# minimal repo spec that omitted those fields — App Platform refused
+# to apply the changes mid-flight and failed the deploy phase.
 #
-# 2. Attach managed Postgres POST-DEPLOY:
-#      DO Console → Apps → genoa → Create/Attach Database → PostgreSQL.
-#    Then copy the connection string from the database's "Connection Details"
-#    page and set it as an ENCRYPTED env var on the web component:
-#      DATABASE_URL = postgresql://...   (scope: RUN_TIME, encrypted)
-#    Genoa runs db/migrate.sql idempotently on every boot, so the schema
-#    is created on the next deploy.
+# Secrets (DATABASE_URL, SPACES_KEY, SPACES_SECRET) are deliberately
+# NOT redeclared here so App Platform preserves the encrypted values
+# already set on the live component across re-applies. Adding them
+# here in plaintext would commit credentials to git; even with
+# `type: SECRET` the YAML `value:` field is stored unencrypted in the
+# repo.
 #
-# 3. Attach Spaces POST-DEPLOY:
-#      Create a Space (e.g. "genoa-exhibits") and a Spaces access key.
-#      Set these as ENCRYPTED env vars on the web component:
-#        SPACES_BUCKET, SPACES_REGION, SPACES_ENDPOINT,
-#        SPACES_KEY (encrypted), SPACES_SECRET (encrypted)
-#
-# Why no `databases:` block here?
-#   App Platform's `${db.*}` bindings have historically failed to substitute
-#   when the cluster is renamed (db → production-database), leaving the env
-#   value as a literal "${db.DATABASE_URL}". Setting DATABASE_URL manually
-#   post-deploy is the reliable path.
-#
-# Update: doctl apps update <APP_ID> --spec .do/app.yaml
+# Update path:
+#   doctl apps update <APP_ID> --spec .do/app.yaml
+# or push to master (deploy_on_push: true) and the spec auto-reconciles.
 
-name: genoa
-# Co-located with the managed Postgres cluster (sfo3) and the
-# `ztrps` Spaces bucket (sfo3) to avoid cross-region egress.
-region: sfo3
+name: seahorse-app
+region: sfo
+
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+features:
+  - buildpack-stack=ubuntu-22
+
+databases:
+  # Auto-attached managed Postgres 17.
+  - name: db
+    cluster_name: app-c0f0eaf1-ab75-4b6c-a866-df85006d2011
+    db_name: db
+    db_user: db
+    engine: PG
+    production: true
+    version: "17"
+
+ingress:
+  rules:
+    - component:
+        name: itmlogic
+      match:
+        authority:
+          exact: ""
+        path:
+          prefix: /
 
 services:
   - name: itmlogic
-    # IMPORTANT: this component name is "itmlogic" (NOT "web") because the
-    # DO app was originally created via "Deploy from GitHub" which auto-
-    # named the component after the repo. Renaming the component on a
-    # live App Platform app is brittle (it can split-brain the deploy
-    # log task — "cannot get deploy logs for component <old> with log
-    # task status failed"), and the ingress rule references this name.
-    # Keep it as "itmlogic" so spec re-applies are idempotent.
-    # Dockerfile path is relative to the REPO ROOT (not source_dir).
-    # source_dir scopes the Docker build context so the parent itmlogic
-    # Python project (top-level requirements.txt → fiona/GDAL) is never
-    # part of the build. We deliberately use Dockerfile rather than the
-    # Node buildpack so autodetect can never fall through to the parent
-    # Python project.
+    # Component name is "itmlogic" (NOT "web") because the DO app was
+    # originally created via "Deploy from GitHub" which auto-named the
+    # component after the repo. Renaming a component in-place is brittle
+    # — it split-brains the deploy log task. Keep this as "itmlogic".
+    #
+    # Dockerfile build context is the genoa/ subdirectory so the parent
+    # itmlogic Python project (top-level requirements.txt → fiona/GDAL)
+    # is never part of the build. dockerfile_path is repo-root relative.
     dockerfile_path: genoa/Dockerfile
     source_dir: genoa
+
     github:
       repo: chelstein/itmlogic
       branch: master
       deploy_on_push: true
-    instance_size_slug: basic-xxs
-    instance_count: 1
+
+    instance_size_slug: apps-s-1vcpu-1gb
+    instance_count: 2
     http_port: 8080
 
     health_check:
-      # Liveness only — does NOT touch the DB so a transient DB blip
-      # does not cycle the container.
       http_path: /healthz
       initial_delay_seconds: 15
       period_seconds: 30
       timeout_seconds: 5
       success_threshold: 1
       failure_threshold: 5
-
-    routes:
-      - path: /
 
     envs:
       - key: NODE_ENV
@@ -82,10 +88,10 @@ services:
         scope: RUN_TIME
         value: "8080"
 
-      # ----- Postgres (set post-deploy in the DO console) ---------------
-      # Set DATABASE_URL as an encrypted env var on the web component
-      # AFTER the managed Postgres is attached. Until then, /api/exhibits
-      # returns 503 and the rest of the app runs stateless.
+      # ----- Postgres ---------------------------------------------------
+      # DATABASE_URL is set as an ENCRYPTED env var on the live
+      # component (do not redeclare here — that would wipe it across
+      # spec re-applies). PG SSL flags are non-secret defaults.
       - key: PG_SSL
         scope: RUN_TIME
         value: "true"
@@ -93,12 +99,7 @@ services:
         scope: RUN_TIME
         value: "false"
 
-      # ----- Spaces (non-secret defaults) -------------------------------
-      # Bucket: ztrps in sfo3 (https://ztrps.sfo3.digitaloceanspaces.com).
-      # SPACES_KEY and SPACES_SECRET MUST be set as ENCRYPTED env vars on
-      # the web component in the DO console — they are intentionally
-      # absent from this spec. Without them, /api/assets returns 503 and
-      # the rest of the app runs as a pure compute service.
+      # ----- Spaces (non-secret defaults; bucket is ztrps in sfo3) ------
       - key: SPACES_REGION
         scope: RUN_TIME
         value: sfo3
@@ -110,11 +111,6 @@ services:
         value: ztrps
 
       # ----- Terrain DEM (per-radial HAAT, §73.313) ---------------------
-      # Public Open-Elevation API by default — no key, free, rate-limited.
-      # Swap to a self-hosted OpenTopoData URL for higher throughput /
-      # SRTM-1 fidelity. Genoa caches every queried (lat,lon) in
-      # genoa_terrain_cache, so repeated computes near the same site
-      # are free after the first.
       - key: TERRAIN_PROVIDER
         scope: RUN_TIME
         value: open-elevation
