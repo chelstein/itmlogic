@@ -36,14 +36,17 @@ region: nyc
 
 services:
   - name: web
-    environment_slug: node-js
+    # Dockerfile-based build. We deliberately do NOT use the Node
+    # buildpack here, because the parent itmlogic repo has a top-level
+    # requirements.txt (fiona, shapely) which App Platform's autodetect
+    # otherwise picks up first, then fails on missing GDAL. The
+    # Dockerfile gives Genoa a sealed build context confined to /genoa.
+    dockerfile_path: genoa/Dockerfile
+    source_dir: /genoa
     github:
       repo: chelstein/itmlogic
       branch: master
       deploy_on_push: true
-    source_dir: /genoa
-    build_command: npm ci --omit=dev
-    run_command: npm start
     instance_size_slug: basic-xxs
     instance_count: 1
     http_port: 8080
