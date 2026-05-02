@@ -154,15 +154,17 @@ async function elevationsCached(points){
   const needSet = new Map();   // key -> [indexes]
 
   if (pool){
-    // Bulk lookup of cached rows.
+    // Bulk lookup of cached rows.  In Postgres 10+ multiple set-returning
+    // functions in the SELECT list no longer zip — they return a
+    // Cartesian product.  Use UNNEST(..., ...) in the FROM clause
+    // (lockstep zip) joined to the cache table.
     const lats = points.map(p => round4(p.latitude));
     const lons = points.map(p => round4(p.longitude));
     const r = await pool.query(
-      `SELECT lat_q4, lon_q4, elev_m
-         FROM genoa_terrain_cache
-        WHERE (lat_q4, lon_q4) IN (
-          SELECT UNNEST($1::numeric[]), UNNEST($2::numeric[])
-        )`,
+      `SELECT c.lat_q4, c.lon_q4, c.elev_m
+         FROM genoa_terrain_cache c
+         JOIN UNNEST($1::numeric[], $2::numeric[]) AS k(lat, lon)
+           ON c.lat_q4 = k.lat AND c.lon_q4 = k.lon`,
       [lats, lons]
     );
     const hit = new Map();
@@ -227,12 +229,17 @@ async function elevationsCached(points){
   }
 
   if (pool && writeRows.length){
-    const valuesSql = writeRows.map((_, i) => `($${i*3+1},$${i*3+2},$${i*3+3},'${TERRAIN_PROVIDER}')`).join(',');
-    const flat = writeRows.flat();
+    // Bulk upsert via UNNEST.  Pass three parallel arrays + the provider.
+    const lats = writeRows.map(r => r[0]);
+    const lons = writeRows.map(r => r[1]);
+    const els  = writeRows.map(r => r[2]);
     await pool.query(
-      `INSERT INTO genoa_terrain_cache (lat_q4, lon_q4, elev_m, source) VALUES ${valuesSql}
-       ON CONFLICT (lat_q4, lon_q4) DO UPDATE SET elev_m = EXCLUDED.elev_m, fetched_at = now()`,
-      flat
+      `INSERT INTO genoa_terrain_cache (lat_q4, lon_q4, elev_m, source)
+       SELECT lat, lon, elev, $4
+         FROM UNNEST($1::numeric[], $2::numeric[], $3::numeric[]) AS t(lat, lon, elev)
+       ON CONFLICT (lat_q4, lon_q4)
+         DO UPDATE SET elev_m = EXCLUDED.elev_m, fetched_at = now()`,
+      [lats, lons, els, TERRAIN_PROVIDER]
     );
   }
 
