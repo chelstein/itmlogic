@@ -9,6 +9,7 @@ RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY server.js ./
 COPY public ./public
 COPY db ./db
+COPY data ./data
 
 ENV NODE_ENV=production
 ENV PORT=8080
