@@ -101,3 +101,22 @@ services:
       - key: SPACES_BUCKET
         scope: RUN_TIME
         value: ztrps
+
+      # ----- Terrain DEM (per-radial HAAT, §73.313) ---------------------
+      # Public Open-Elevation API by default — no key, free, rate-limited.
+      # Swap to a self-hosted OpenTopoData URL for higher throughput /
+      # SRTM-1 fidelity. Genoa caches every queried (lat,lon) in
+      # genoa_terrain_cache, so repeated computes near the same site
+      # are free after the first.
+      - key: TERRAIN_PROVIDER
+        scope: RUN_TIME
+        value: open-elevation
+      - key: OPEN_ELEVATION_URL
+        scope: RUN_TIME
+        value: https://api.open-elevation.com/api/v1/lookup
+      - key: TERRAIN_BATCH_LIMIT
+        scope: RUN_TIME
+        value: "512"
+      - key: TERRAIN_TIMEOUT_MS
+        scope: RUN_TIME
+        value: "20000"
