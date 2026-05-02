@@ -1,4 +1,12 @@
-// Genoa — FCC propagation studio (standalone)
+console.log("[genoa] ENV CHECK:", {
+  hasDB: !!process.env.DATABASE_URL,
+  hasSpacesKey: !!process.env.SPACES_KEY,
+  hasSpacesSecret: !!process.env.SPACES_SECRET,
+  spacesRegion: process.env.SPACES_REGION,
+  spacesEndpoint: process.env.SPACES_ENDPOINT,
+  spacesBucket: process.env.SPACES_BUCKET,
+});
+\n// Genoa — FCC propagation studio (standalone)
 // Express + Postgres + Digital Ocean Spaces (S3-compatible)
 //
 // Carries the signal farther on a single tack.
