@@ -38,12 +38,13 @@ region: sfo3
 
 services:
   - name: web
-    # Dockerfile-based build. We deliberately do NOT use the Node
-    # buildpack here, because the parent itmlogic repo has a top-level
-    # requirements.txt (fiona, shapely) which App Platform's autodetect
-    # otherwise picks up first, then fails on missing GDAL. The
-    # Dockerfile gives Genoa a sealed build context confined to /genoa.
-    dockerfile_path: Dockerfile
+    # Dockerfile path is relative to the REPO ROOT (not source_dir).
+    # source_dir scopes the Docker build context so the parent itmlogic
+    # Python project (top-level requirements.txt → fiona/GDAL) is never
+    # part of the build. We deliberately use Dockerfile rather than the
+    # Node buildpack so autodetect can never fall through to the parent
+    # Python project.
+    dockerfile_path: genoa/Dockerfile
     source_dir: genoa
     github:
       repo: chelstein/itmlogic
