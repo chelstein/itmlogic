@@ -1,3 +1,10 @@
+const port = process.env.PORT;
+
+if (!port) {
+  console.error("NO PORT PROVIDED BY DO");
+  process.exit(1);
+}
+
 require('http')
   .createServer((req, res) => {
     if (req.url === '/healthz') {
@@ -6,6 +13,6 @@ require('http')
       res.end('booting');
     }
   })
-  .listen(process.env.PORT || 8080, () => {
-    console.log("MINIMAL SERVER UP");
+  .listen(port, () => {
+    console.log("BOUND TO PORT:", port);
   });
