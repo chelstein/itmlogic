@@ -14,10 +14,14 @@ Genoa is a **standalone** FCC propagation studio for **AM / FM / LPFM / FM-trans
 
 Genoa is designed to **deploy first, attach storage later**. The service boots in stateless mode and only the storage-backed endpoints (`POST /api/exhibits`, `POST /api/assets`) return 503 until DB / Spaces are wired up. The deterministic compute engine works the whole time.
 
+The App Platform spec lives at the **repo root** (`.do/app.yaml`) so DO's "Create App from GitHub" auto-detect picks it up. It declares a Dockerfile-based build pointing at `genoa/Dockerfile` with build context `/genoa`, which sidesteps the parent itmlogic Python project entirely.
+
 1. **Create the app (web service only):**
    ```sh
    doctl apps create --spec .do/app.yaml
    ```
+   *Or in the DO console:* Create App → From GitHub → choose `chelstein/itmlogic` → it will auto-detect `.do/app.yaml` and offer to use it. Accept.
+
 2. **Attach managed Postgres** (DO console → Apps → genoa → *Create/Attach Database* → PostgreSQL).
    Copy the connection string from the database's *Connection Details* page and add it on the web component as an **encrypted** env var:
    ```
@@ -29,7 +33,16 @@ Genoa is designed to **deploy first, attach storage later**. The service boots i
    SPACES_KEY     = ...
    SPACES_SECRET  = ...
    ```
-   `SPACES_BUCKET`, `SPACES_REGION`, `SPACES_ENDPOINT` already have sane defaults in `app.yaml`; override them if you put the bucket in a different region.
+   `SPACES_BUCKET`, `SPACES_REGION`, `SPACES_ENDPOINT` already have sane defaults in `.do/app.yaml`; override them if you put the bucket in a different region.
+
+### Repairing an existing app that was created without the spec
+
+If you already created the app via DO console "Deploy from GitHub" before `.do/app.yaml` lived at the repo root, App Platform autodetected the parent itmlogic Python buildpack and the build will fail on `fiona` / GDAL. Two console-only paths to fix:
+
+- **Re-apply the spec (preserves env vars):**
+  Apps → *(your app)* → **Settings** → scroll to **App Spec** → **Edit** → paste the contents of `.do/app.yaml` from the repo root → **Save**. App Platform replaces the component config and redeploys via the Dockerfile. Your encrypted env vars (`DATABASE_URL`, `SPACES_KEY`, `SPACES_SECRET`) survive.
+- **Or fix the component in place:**
+  Apps → *(your app)* → **Components** → *(component)* → **Edit Source** → set **Source Directory** to `/genoa`, switch resource type to **Dockerfile**, set **Dockerfile Path** to `Dockerfile` (relative to source dir). Save → redeploy.
 
 ### Wiring all three secrets in one shot
 
