@@ -32,7 +32,9 @@
 # Update: doctl apps update <APP_ID> --spec .do/app.yaml
 
 name: genoa
-region: nyc
+# Co-located with the managed Postgres cluster (sfo3) and the
+# `ztrps` Spaces bucket (sfo3) to avoid cross-region egress.
+region: sfo3
 
 services:
   - name: web
@@ -83,16 +85,18 @@ services:
         scope: RUN_TIME
         value: "false"
 
-      # ----- Spaces (set post-deploy in the DO console) -----------------
-      # SPACES_KEY and SPACES_SECRET must be encrypted env vars on the web
-      # component. Without them, /api/assets returns 503 and the rest of
-      # the app runs as a pure compute service.
+      # ----- Spaces (non-secret defaults) -------------------------------
+      # Bucket: ztrps in sfo3 (https://ztrps.sfo3.digitaloceanspaces.com).
+      # SPACES_KEY and SPACES_SECRET MUST be set as ENCRYPTED env vars on
+      # the web component in the DO console — they are intentionally
+      # absent from this spec. Without them, /api/assets returns 503 and
+      # the rest of the app runs as a pure compute service.
       - key: SPACES_REGION
         scope: RUN_TIME
-        value: nyc3
+        value: sfo3
       - key: SPACES_ENDPOINT
         scope: RUN_TIME
-        value: https://nyc3.digitaloceanspaces.com
+        value: https://sfo3.digitaloceanspaces.com
       - key: SPACES_BUCKET
         scope: RUN_TIME
-        value: genoa-exhibits
+        value: ztrps
