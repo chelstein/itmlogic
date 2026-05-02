@@ -43,9 +43,7 @@ services:
     # requirements.txt (fiona, shapely) which App Platform's autodetect
     # otherwise picks up first, then fails on missing GDAL. The
     # Dockerfile gives Genoa a sealed build context confined to /genoa.
-    # App Platform resolves dockerfile_path from repo root for GitHub-based
-    # builds, so keep the full subpath here to force Dockerfile mode.
-    dockerfile_path: genoa/Dockerfile
+    dockerfile_path: Dockerfile
     source_dir: genoa
     github:
       repo: chelstein/itmlogic
