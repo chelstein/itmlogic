@@ -31,6 +31,22 @@ Genoa is designed to **deploy first, attach storage later**. The service boots i
    ```
    `SPACES_BUCKET`, `SPACES_REGION`, `SPACES_ENDPOINT` already have sane defaults in `app.yaml`; override them if you put the bucket in a different region.
 
+### Wiring all three secrets in one shot
+
+If you have `doctl` set up, you can splice `DATABASE_URL`, `SPACES_KEY`, and `SPACES_SECRET` into the live spec without touching the console (and **without** committing them to git):
+
+```sh
+export APP_ID=$(doctl apps list --format ID,Spec.Name --no-header | awk '$2=="genoa"{print $1}')
+export DATABASE_URL='postgresql://doadmin:<password>@db-postgresql-sfo3-78863-do-user-14684436-0.m.db.ondigitalocean.com:25060/defaultdb?sslmode=require'
+export SPACES_KEY='<key-id>'
+export SPACES_SECRET='<secret>'
+bash genoa/scripts/wire-env.sh
+```
+
+The script fetches the current spec, marks the three values as `SECRET` (encrypted at rest by App Platform), and applies it — triggering a redeploy. Secrets live only in your shell environment for the duration of the script.
+
+> **Why not put them in `app.yaml`?**  The `value:` field of an env var is committed to git in plaintext, even with `type: SECRET` (that flag controls encryption *at rest in App Platform*, not in your repo). Use the helper script or the console — never the spec file.
+
 ## Run locally
 
 ```sh

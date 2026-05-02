@@ -1,0 +1,12 @@
+# Local env files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Local spec dumps from `doctl apps spec get`
+genoa-spec.*.yaml
+*.local.yaml
+
+# Node
+node_modules/
+npm-debug.log
