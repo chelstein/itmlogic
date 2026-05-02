@@ -1,0 +1,89 @@
+# Genoa — Digital Ocean App Platform spec.
+# Standalone propagation studio for AM / FM / LPFM / FM-translators.
+#
+# Deploy:
+#   doctl apps create --spec .do/app.yaml
+# Update:
+#   doctl apps update <APP_ID> --spec .do/app.yaml
+#
+# This app is intentionally isolated. It does NOT read or write the
+# zerotrustradio / buoyIQ database; if you want Genoa to consult that
+# facility catalog it must be done through a published, read-only API.
+
+name: genoa
+region: nyc
+
+services:
+  - name: web
+    environment_slug: node-js
+    github:
+      repo: chelstein/itmlogic
+      branch: claude/fcc-exhibits-reporting-tool-VfQGv
+      deploy_on_push: true
+    source_dir: /genoa
+    build_command: npm ci --omit=dev
+    run_command: npm start
+    instance_size_slug: basic-xxs
+    instance_count: 1
+    http_port: 8080
+
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 15
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 5
+
+    routes:
+      - path: /
+
+    envs:
+      - key: NODE_ENV
+        scope: RUN_TIME
+        value: production
+      - key: PORT
+        scope: RUN_TIME
+        value: "8080"
+
+      # Postgres — bound to the managed component below.
+      # DATABASE_URL is injected automatically when bound this way; if you
+      # rename the database component DO will rename the binding token, so
+      # you can also set DATABASE_URL manually as an encrypted env var.
+      - key: DATABASE_URL
+        scope: RUN_TIME
+        value: ${db.DATABASE_URL}
+      - key: PG_SSL
+        scope: RUN_TIME
+        value: "true"
+      - key: PG_SSL_REJECT
+        scope: RUN_TIME
+        value: "false"
+
+      # Spaces (S3-compatible). Set these as encrypted env vars in the DO
+      # console — the values here are placeholders.
+      - key: SPACES_REGION
+        scope: RUN_TIME
+        value: nyc3
+      - key: SPACES_ENDPOINT
+        scope: RUN_TIME
+        value: https://nyc3.digitaloceanspaces.com
+      - key: SPACES_BUCKET
+        scope: RUN_TIME
+        value: genoa-exhibits
+      - key: SPACES_KEY
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DO_CONSOLE
+      - key: SPACES_SECRET
+        scope: RUN_TIME
+        type: SECRET
+        value: REPLACE_IN_DO_CONSOLE
+
+databases:
+  - name: db
+    engine: PG
+    production: false
+    cluster_name: genoa-db
+    db_name: genoa
+    db_user: genoa
