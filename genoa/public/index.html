@@ -19,23 +19,23 @@
        Midnight cobalt → espresso, brass gold, sunset rose, cream.
        ------------------------------------------------------------- */
     :root{
-      --midnight:#0b1530;
-      --midnight-2:#0f1d3d;
-      --espresso:#1a0f1a;
-      --night-grad:linear-gradient(160deg,#0a1428 0%,#13203f 35%,#2a1626 75%,#3b1a14 100%);
-      --brass:#d4a64f;
-      --brass-2:#f4c969;
-      --brass-soft:#b88a3c;
-      --rose:#c87a5b;
-      --rose-2:#e89972;
-      --teal:#5a9a96;
-      --cream:#f5e6d3;
-      --cream-dim:#d9c8a8;
+      --midnight:#081127;
+      --midnight-2:#0d1a39;
+      --espresso:#1b0e19;
+      --night-grad:linear-gradient(152deg,#071024 0%,#111f45 34%,#2a152f 72%,#4b1f1a 100%);
+      --brass:#ce9d45;
+      --brass-2:#f3c86d;
+      --brass-soft:#9f7331;
+      --rose:#c4745a;
+      --rose-2:#eca17c;
+      --teal:#4f8f8a;
+      --cream:#f7e8d8;
+      --cream-dim:#d9c6a2;
       --ink:#0c0a08;
       --rule:rgba(212,166,79,.28);
       --rule-strong:rgba(212,166,79,.55);
       --panel:rgba(11,21,48,.62);
-      --shadow-warm:0 18px 50px -22px rgba(212,166,79,.35), 0 2px 0 0 rgba(244,201,105,.06) inset;
+      --shadow-warm:0 24px 60px -24px rgba(206,157,69,.34), 0 2px 0 0 rgba(244,201,105,.1) inset;
       --display:'Cormorant Garamond', 'Playfair Display', Georgia, serif;
       --body:'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       --mono:'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
@@ -52,7 +52,8 @@
       background:
         radial-gradient(60% 40% at 18% 10%, rgba(244,201,105,.10), transparent 60%),
         radial-gradient(50% 35% at 90% 100%, rgba(200,122,91,.18), transparent 65%),
-        repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 1px, transparent 1px 3px);
+        repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 1px, transparent 1px 3px),
+        repeating-radial-gradient(circle at 30% 10%, rgba(255,255,255,.03) 0 1px, transparent 1px 4px);
       mix-blend-mode:overlay;
     }
     main, header.studio, footer.studio, .marquee, .layers, .standalone-banner{position:relative;z-index:1}
@@ -63,7 +64,7 @@
     /* ----- Header ----- */
     header.studio{
       display:flex;align-items:flex-end;justify-content:space-between;gap:24px;
-      padding:28px 36px 18px;
+      padding:30px 40px 20px;
       border-bottom:1px solid var(--rule);
       background:linear-gradient(180deg,rgba(10,20,40,.6),rgba(10,20,40,0));
     }
@@ -77,33 +78,33 @@
     }
     .brand h1{
       font-family:var(--display);font-weight:600;font-style:italic;
-      font-size:38px;line-height:1;margin:0;color:var(--cream);
-      letter-spacing:.005em;
+      font-size:42px;line-height:1;margin:0;color:var(--cream);
+      letter-spacing:.015em;text-shadow:0 4px 22px rgba(0,0,0,.45);
     }
     .brand h1 small{
       display:block;font-style:normal;font-family:var(--body);font-weight:600;
-      font-size:11px;letter-spacing:.36em;color:var(--brass);margin-top:6px;
+      font-size:11px;letter-spacing:.32em;color:var(--brass);margin-top:7px;
       text-transform:uppercase;
     }
-    .credit{font-size:12px;color:var(--cream-dim);text-align:right;letter-spacing:.18em;text-transform:uppercase}
+    .credit{font-size:12px;color:var(--cream-dim);text-align:right;letter-spacing:.16em;text-transform:uppercase}
     .credit em{color:var(--brass-2);font-style:normal;font-weight:600}
 
     /* ----- Standalone banner ----- */
     .standalone-banner{
-      margin:14px 36px 0;
+      margin:16px 40px 0;
       border:1px dashed var(--rule-strong);border-radius:10px;
-      padding:10px 14px;font-size:12px;color:var(--cream-dim);
-      background:rgba(0,0,0,.18);
+      padding:11px 15px;font-size:12px;color:var(--cream-dim);
+      background:linear-gradient(90deg, rgba(8,17,39,.72), rgba(27,14,25,.5));
     }
     .standalone-banner b{color:var(--brass-2)}
 
     /* ----- Marquee ----- */
     .marquee{
-      padding:14px 36px;border-bottom:1px solid var(--rule);
+      padding:16px 40px;border-bottom:1px solid var(--rule);
       display:flex;align-items:center;gap:18px;flex-wrap:wrap;
       background:linear-gradient(90deg, rgba(212,166,79,.07), transparent 60%);
     }
-    .marquee .title{font-family:var(--display);font-style:italic;font-size:24px;color:var(--brass-2)}
+    .marquee .title{font-family:var(--display);font-style:italic;font-size:26px;color:var(--brass-2)}
     .marquee .sub{font-size:13px;color:var(--cream-dim);max-width:760px}
     .pill{
       display:inline-flex;align-items:center;gap:6px;
@@ -116,11 +117,11 @@
     /* ----- Three layers ----- */
     .layers{
       display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
-      margin:0 36px 0;padding:0 0 6px;
+      margin:0 40px 0;padding:2px 0 10px;
     }
     @media (max-width:900px){ .layers{grid-template-columns:1fr} }
     .layer{
-      border:1px solid var(--rule);border-radius:12px;padding:14px 16px;
+      border:1px solid var(--rule);border-radius:14px;padding:16px 18px;
       background:linear-gradient(180deg, rgba(11,21,48,.55), rgba(26,15,26,.45));
       position:relative;overflow:hidden;
     }
@@ -134,16 +135,16 @@
 
     /* ----- Layout ----- */
     main{
-      display:grid;grid-template-columns:380px 1fr;gap:24px;
-      padding:24px 36px 60px;align-items:start;
+      display:grid;grid-template-columns:390px 1fr;gap:26px;
+      padding:26px 40px 66px;align-items:start;
     }
     @media (max-width:1100px){ main{grid-template-columns:1fr} }
 
     .card{
       background:var(--panel);
       border:1px solid var(--rule);
-      border-radius:14px;
-      padding:20px 22px;
+      border-radius:16px;
+      padding:22px 24px;
       box-shadow:var(--shadow-warm);
       backdrop-filter:blur(4px);
     }
@@ -179,7 +180,7 @@
       padding:12px 18px;border-radius:10px;border:1px solid transparent;
     }
     button.primary{
-      background:linear-gradient(180deg,var(--brass-2),var(--brass));
+      background:linear-gradient(180deg,#ffd889,var(--brass));
       color:#1a0f06;border-color:var(--brass-soft);
       box-shadow:0 6px 18px -6px rgba(244,201,105,.55), 0 1px 0 rgba(255,255,255,.25) inset;
     }
@@ -189,7 +190,7 @@
     .btnrow{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 
     #map{
-      height:520px;border-radius:14px;overflow:hidden;
+      height:560px;border-radius:16px;overflow:hidden;
       border:1px solid var(--rule);
       box-shadow:var(--shadow-warm);
     }
@@ -240,7 +241,7 @@
     }
 
     footer.studio{
-      padding:18px 36px 36px;border-top:1px solid var(--rule);
+      padding:20px 40px 36px;border-top:1px solid var(--rule);
       color:var(--cream-dim);font-size:12px;letter-spacing:.06em;
       display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
     }
@@ -255,6 +256,13 @@
     details summary{cursor:pointer;color:var(--brass-2);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     @media (max-width:900px){ .grid2{grid-template-columns:1fr} }
+    @media (max-width:700px){
+      header.studio,.marquee,footer.studio{padding-left:18px;padding-right:18px}
+      .standalone-banner,.layers,main{margin-left:18px;margin-right:18px;padding-left:0;padding-right:0}
+      main{padding-bottom:44px;grid-template-columns:1fr}
+      .brand h1{font-size:36px}
+      #map{height:420px}
+    }
   </style>
 </head>
 <body>
@@ -290,12 +298,12 @@
         </svg>
       </div>
       <h1>Genoa
-        <small>FCC Propagation Studio · Tack 1</small>
+        <small>FCC Propagation Studio · Night Tack I</small>
       </h1>
     </div>
     <div class="credit">
       AM · FM · LPFM · FM&nbsp;Translators<br/>
-      <em>Carry the signal farther on a single tack.</em>
+      <em>Carry the signal farther while Bobby rides the night watch.</em>
     </div>
   </header>
 
@@ -308,8 +316,8 @@
 
   <section class="marquee">
     <span class="pill"><span class="dot"></span> §73.183 · §73.184 · §73.313 · §73.333 · §74.1204</span>
-    <span class="title">A clean contour, by lamplight…</span>
-    <span class="sub">Three layers, one source of truth. A deterministic FCC calculator, a scientific-evidence engine fed by terrain DEM &amp; live SDR measurements, and an AI assistant that explains anomalies and drafts exhibits — but never replaces the math.</span>
+    <span class="title">A clean contour, by lamplight and low brass…</span>
+    <span class="sub">Three layers, one source of truth. A deterministic FCC calculator, a scientific-evidence engine fed by terrain DEM &amp; live SDR measurements, and an AI assistant that explains anomalies and drafts exhibits — while the Bobby Caldwell yacht-soul mood stays in the paint, never in the math.</span>
   </section>
 
   <section class="layers" aria-label="Three layer architecture">
