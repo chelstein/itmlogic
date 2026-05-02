@@ -34,3 +34,21 @@ CREATE TABLE IF NOT EXISTS genoa_asset (
 );
 
 CREATE INDEX IF NOT EXISTS genoa_asset_exhibit_idx ON genoa_asset (exhibit_id);
+
+-- ----------------------------------------------------------------
+-- Terrain cache. Genoa stores DEM elevations keyed by lat/lon
+-- rounded to 4 decimals (~10 m precision) so repeated compute runs
+-- near the same site don't re-hit Open-Elevation (or whichever
+-- provider TERRAIN_PROVIDER is set to). Caller fetches missing
+-- points only and back-fills the cache.
+-- ----------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS genoa_terrain_cache (
+  lat_q4       NUMERIC(8,4) NOT NULL,   -- rounded latitude
+  lon_q4       NUMERIC(9,4) NOT NULL,   -- rounded longitude
+  elev_m       NUMERIC      NOT NULL,
+  source       TEXT,                    -- e.g. 'open-elevation', 'usgs-epqs', 'srtm-local'
+  fetched_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  PRIMARY KEY (lat_q4, lon_q4)
+);
+
+CREATE INDEX IF NOT EXISTS genoa_terrain_cache_fetched_at_idx ON genoa_terrain_cache (fetched_at);

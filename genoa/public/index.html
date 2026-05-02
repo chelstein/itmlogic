@@ -404,6 +404,25 @@
           </div>
         </div>
 
+        <h3>Terrain HAAT (§73.313)</h3>
+        <div class="row">
+          <div>
+            <label>Antenna AMSL (m, optional)</label>
+            <input id="amsl" placeholder="center of radiation" />
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;margin:0;color:var(--cream)">
+              <input type="checkbox" id="use_terrain" style="width:auto" />
+              Compute per-radial HAAT from DEM
+            </label>
+          </div>
+        </div>
+        <p class="muted" style="margin:6px 0 0;font-size:11.5px">
+          When enabled, Genoa samples the 3–16 km arc on every radial via the configured DEM provider
+          (default: open-elevation), averages the elevations per §73.313, and uses the resulting
+          radial-specific HAAT in the F(50,50) lookup. Falls back to the flat HAAT field above on provider failure.
+        </p>
+
         <h3>Antenna</h3>
         <div class="row">
           <div>
@@ -745,27 +764,31 @@ function fmt(n, d=2){ return (n===null||n===undefined||Number.isNaN(n)) ? '—' 
 
 let LAST_REPORT = null;
 
-function compute(){
+async function compute(){
   const svc   = document.getElementById('svc').value;
   const cls   = document.getElementById('cls').value;
   const call  = document.getElementById('call').value.trim() || '—';
   const fid   = document.getElementById('fid').value.trim() || '—';
   const freq  = parseFloat(document.getElementById('freq').value);
   const erp   = parseFloat(document.getElementById('erp').value);
-  const haat  = parseFloat(document.getElementById('haat').value);
+  const haatFlat = parseFloat(document.getElementById('haat').value);
   const lat   = parseFloat(document.getElementById('lat').value);
   const lon   = parseFloat(document.getElementById('lon').value);
   const sigma = parseFloat(document.getElementById('sigma').value);
   const step  = parseFloat(document.getElementById('step').value);
   const pat   = parsePatternTable(document.getElementById('pat_tbl').value);
+  const amsl  = parseFloat(document.getElementById('amsl').value);
+  const useTerrain = document.getElementById('use_terrain').checked;
 
   const warnings = [];
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) warnings.push('Coordinates missing — cannot project radials.');
-  if (svc !== 'AM' && (!Number.isFinite(haat) || haat <= 0)) warnings.push('HAAT must be > 0 for FM-family services.');
-  if (svc !== 'AM' && (haat < 30 || haat > 600)) warnings.push('HAAT is outside the FCC F(50,50) tabulated range (30–600 m); itmlogic dispatch recommended.');
+  if (svc !== 'AM' && (!Number.isFinite(haatFlat) || haatFlat <= 0)) warnings.push('HAAT must be > 0 for FM-family services.');
+  if (svc !== 'AM' && (haatFlat < 30 || haatFlat > 600)) warnings.push('Flat HAAT is outside the FCC F(50,50) tabulated range (30–600 m); itmlogic dispatch recommended.');
   if (svc === 'AM' && (sigma <= 0 || !Number.isFinite(sigma))) warnings.push('Ground conductivity (M3) is required for AM groundwave.');
   if (svc === 'LPFM' && erp > 0.1) warnings.push('LPFM ERP exceeds 100 W (§73.811). Treat as informational; engine still runs.');
   if (svc === 'FX'   && erp > 0.25) warnings.push('FM-translator ERP exceeds 250 W reference (§74.1235); confirm class.');
+  if (useTerrain && !Number.isFinite(amsl)) warnings.push('Per-radial HAAT requested but Antenna AMSL (m) is empty — falling back to flat HAAT.');
+  if (useTerrain && svc === 'AM') warnings.push('Per-radial HAAT does not apply to AM (groundwave); flag ignored for AM service.');
 
   ensureMap(lat, lon);
   clearContours();
@@ -773,7 +796,7 @@ function compute(){
 
   txMarker = L.circleMarker([lat,lon], {
     radius:6, color:'#f4c969', weight:2, fillColor:'#f4c969', fillOpacity:.95
-  }).bindPopup(`<b>${call}</b><br/>${svc} · ${freq} ${svc==='AM'?'kHz':'MHz'}<br/>ERP ${erp} kW · HAAT ${haat} m`).addTo(map);
+  }).bindPopup(`<b>${call}</b><br/>${svc} · ${freq} ${svc==='AM'?'kHz':'MHz'}<br/>ERP ${erp} kW · HAAT ${haatFlat} m`).addTo(map);
 
   const rows = [];
   const contourSpecs = svc === 'AM'
@@ -789,18 +812,57 @@ function compute(){
         { label:'40 dBu (protected)',       value:40, color:'#5a9a96' }
       ];
 
+  // Build the list of azimuths up front so we can fetch terrain HAAT
+  // for all of them in one round trip before the contour loop.
+  const azList = [];
+  for (let az = 0; az < 360; az += step) azList.push(az);
+
+  // ----- Per-radial HAAT (§73.313 arc averaging) ---------------------
+  let haatByAz = null;          // { az → haat_m }
+  let terrainBlock = null;      // for the reproducibility package
+
+  if (useTerrain && Number.isFinite(amsl) && svc !== 'AM' && Number.isFinite(lat) && Number.isFinite(lon)){
+    document.getElementById('run-status').innerHTML = `<span class="muted">Sampling DEM along ${azList.length} radials…</span>`;
+    try {
+      const r = await fetch('/api/terrain/haat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          tx_lat: lat, tx_lon: lon, tx_amsl_m: amsl,
+          radials_deg: azList,
+          from_km: 3, to_km: 16, samples: 27   // FCC §73.313: 3–16 km
+        })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+      haatByAz = {};
+      for (const row of j.haat_per_radial) haatByAz[row.az] = row.haat_m;
+      terrainBlock = {
+        provider:    j.provider,
+        arc:         j.arc,
+        amsl_m:      amsl,
+        radials:     j.haat_per_radial.map(({az, avg_elev_m, min_elev_m, max_elev_m, haat_m}) =>
+          ({ az, avg_elev_m, min_elev_m, max_elev_m, haat_m }))
+      };
+    } catch (e) {
+      warnings.push(`Per-radial HAAT failed (${e.message}); using flat HAAT for all azimuths.`);
+      haatByAz = null;
+    }
+  }
+
   const polylines = contourSpecs.map(()=>[]);
 
-  for (let az = 0; az < 360; az += step){
+  for (const az of azList){
     const f = patternFactor(pat, az);
     const erp_az = erp * f * f;
-    const out = { az, f, haat };
+    const haatAz = (haatByAz && Number.isFinite(haatByAz[az])) ? haatByAz[az] : haatFlat;
+    const out = { az, f, haat: haatAz };
     contourSpecs.forEach((spec, i) => {
       let d_km;
       if (svc === 'AM'){
         d_km = amDistanceFor_mVm(spec.value, freq, sigma, erp_az);
       } else {
-        d_km = fmContourDistance_km(spec.value, erp_az, haat, '50,50');
+        d_km = fmContourDistance_km(spec.value, erp_az, haatAz, '50,50');
       }
       out['c'+i] = d_km;
       const pt = destPoint(lat, lon, az, d_km);
@@ -894,8 +956,20 @@ function compute(){
     ai.push('Inputs nominal. No flags raised.');
     ai.push('');
   }
+  if (terrainBlock){
+    const haats = terrainBlock.radials.map(r => r.haat_m).filter(Number.isFinite);
+    const minH = Math.min(...haats), maxH = Math.max(...haats);
+    const meanH = haats.reduce((s,v)=>s+v,0)/haats.length;
+    ai.push(`HAAT method: §73.313 arc-averaged DEM (3–16 km) via ${terrainBlock.provider}.`);
+    ai.push(`  Per-radial HAAT range: ${minH.toFixed(0)} m … ${maxH.toFixed(0)} m  (mean ${meanH.toFixed(0)} m, spread ${(maxH-minH).toFixed(0)} m)`);
+    if ((maxH - minH) > 50)
+      ai.push('  Spread > 50 m indicates significant terrain asymmetry — flat-HAAT exhibits would mis-state coverage on shadowed radials.');
+    ai.push('');
+  }
   ai.push('Recommended actions:');
-  ai.push('  · Dispatch terrain-aware overlay → splat / itmlogic for HAAT validation per radial.');
+  if (!terrainBlock)
+    ai.push('  · Enable "Compute per-radial HAAT from DEM" to replace the flat HAAT with §73.313 arc averages.');
+  ai.push('  · Dispatch full terrain-aware overlay → splat / itmlogic ITM for shadowed-radial validation.');
   ai.push('  · Pull SDR captures (SigMF) within the 60 dBu polygon to populate the evidence appendix.');
   ai.push('  · Resolve fm/'+(svc==='AM'?'<gcc>.am.':'<gcc>.fm.')+'<pi>.'+freq+'.radiodns.org via massdns and confirm hybrid-radio identity matches the facility record.');
   ai.push('  · Re-run with 1° radial step for the as-filed exhibit.');
@@ -913,6 +987,8 @@ function compute(){
       radial_step_deg:step
     },
     method: svc==='AM' ? '47 CFR §73.183 / §73.184 groundwave (Norton/FCC tabulated)' : '47 CFR §73.313 / §73.333 F(50,50)',
+    haat_method: terrainBlock ? '§73.313 arc-averaged DEM' : 'flat user input',
+    terrain: terrainBlock,
     curve_dataset: CURVES.manifest,    // version + per-dataset sha256, pins this exhibit to an exact curve set
     contours: contourSpecs.map((s,i)=>({ label:s.label, value:s.value,
       mean_radial_km: rows.reduce((a,r)=>a+(r['c'+i]||0),0)/rows.length })),
@@ -1005,6 +1081,13 @@ document.getElementById('exportTxt').addEventListener('click', () => {
   lines.push('');
   lines.push('Population (estimate): primary ~' + r.population_estimate.primary.toLocaleString() + ', protected ~' + r.population_estimate.protected.toLocaleString());
   lines.push('');
+  if (r.terrain){
+    lines.push('Per-radial HAAT (§73.313 arc-averaged DEM via ' + r.terrain.provider + '):');
+    lines.push(`  arc ${r.terrain.arc.from_km}-${r.terrain.arc.to_km} km, ${r.terrain.arc.samples} samples`);
+    r.terrain.radials.slice(0, 16).forEach(t =>
+      lines.push(`  az ${String(Math.round(t.az)).padStart(3)}°  avg_elev ${t.avg_elev_m?.toFixed(0).padStart(5)} m  HAAT ${t.haat_m?.toFixed(0).padStart(5)} m`));
+    lines.push('');
+  }
   lines.push('Reproducibility:');
   lines.push('  App         : ' + r.versions.app + ' v' + r.versions.studio);
   if (r.curve_dataset) {
