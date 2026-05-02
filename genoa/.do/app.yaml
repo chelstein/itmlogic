@@ -18,7 +18,7 @@ services:
     environment_slug: node-js
     github:
       repo: chelstein/itmlogic
-      branch: claude/fcc-exhibits-reporting-tool-VfQGv
+      branch: master
       deploy_on_push: true
     source_dir: /genoa
     build_command: npm ci --omit=dev
