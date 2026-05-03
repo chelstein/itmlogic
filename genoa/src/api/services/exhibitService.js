@@ -80,16 +80,30 @@ export async function computeExhibit(req){
   // ---- 2. Rich station enrichment (FCC contour + captures) ----
   // Needs a ZTR station id, which is on the normalized facility row's
   // facility_lookup_source.ztr_id.  Skip silently when unavailable.
+  //
+  // SDR evidence gating: ZTR's capture infrastructure currently only
+  // produces meaningful evidence for AM stations (FM-band capture
+  // coverage is not yet in place).  Pulling FM "captures" today would
+  // attach noise as evidence and clear SDR_MEASUREMENTS_MISSING
+  // dishonestly.  The gate is service-aware and configurable via
+  // SDR_EVIDENCE_SERVICES (CSV, default "AM") so FM can be flipped on
+  // when the capture coverage is ready — no code change required.
+  const SDR_SERVICES = (process.env.SDR_EVIDENCE_SERVICES || 'AM')
+    .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  const sdrEnabledForService = SDR_SERVICES.includes(String(inputs.service || '').toUpperCase());
+
   const ztrStationId = facilityResolution?.facility?.facility_lookup_source?.ztr_id;
   if (ztrStationId && sidecars.facility?.getRichStation){
     richStation = await sidecars.facility.getRichStation(ztrStationId);
     if (richStation?.available){
-      // FCC contour (cross-check input)
+      // FCC contour (cross-check input) — pulled for every service.
       const fc = await sidecars.facility.getFccContour({ stationId: ztrStationId, rich: richStation });
       if (fc.available) fccContourResp = fc;
-      // SDR evidence
-      const sdr = await sidecars.facility.getSdrEvidence({ stationId: ztrStationId, rich: richStation });
-      if (sdr.available) sdrResp = sdr;
+      // SDR evidence — gated by service.
+      if (sdrEnabledForService){
+        const sdr = await sidecars.facility.getSdrEvidence({ stationId: ztrStationId, rich: richStation });
+        if (sdr.available) sdrResp = sdr;
+      }
     }
   }
 
@@ -299,6 +313,14 @@ export async function computeExhibit(req){
       if (!has) warnings.push(W.make('SDR_MEASUREMENTS_NOT_CALIBRATED',
         `Attached ${evidence.measurements.n_records} capture(s) from ${evidence.measurements.source} carry no calibration metadata.`));
     }
+  } else if (!sdrEnabledForService){
+    // No SDR evidence pulled because the service isn't in the
+    // SDR_EVIDENCE_SERVICES gate (default: AM only).  Replace the
+    // engine's default SDR_MEASUREMENTS_MISSING with one that names
+    // the gate so reviewers know it isn't a missing-data bug.
+    warnings = warnings.filter(w => w.code !== 'SDR_MEASUREMENTS_MISSING');
+    warnings.push(W.make('SDR_MEASUREMENTS_MISSING',
+      `SDR capture coverage not yet enabled for service "${inputs.service}". ZTR captures only the services in SDR_EVIDENCE_SERVICES (currently: ${SDR_SERVICES.join(', ')}); flip this on by setting SDR_EVIDENCE_SERVICES once FM-band capture is in place.`));
   }
 
   // Population: clear ONLY when we have a fully-validated record from
