@@ -340,10 +340,59 @@ export async function computeExhibit(req){
   if (crossCheckRun?.authoritative_pass){
     warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
   } else if (crossCheckRun && !crossCheckRun.authoritative_pass){
-    // Cross-check ran but didn't pass: keep the blocker, attach detail.
+    // Cross-check ran but didn't pass.  Distinguish two cases so
+    // reviewers know whether to retry, refile, or chase a real engine
+    // discrepancy.
+    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
+    if (!crossCheckRun.reference_cases_present || crossCheckRun.n_run === 0){
+      warnings.push(W.make('CURVE_VALIDATION_MISSING',
+        'FCC contour cross-check skipped: ZTR returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable, the station may not have a published FCC contour yet, or the response was malformed).'));
+    } else {
+      warnings.push(W.make('CURVE_VALIDATION_MISSING',
+        `FCC contour cross-check failed: ${crossCheckRun.n_run - crossCheckRun.n_pass} of ${crossCheckRun.n_run} contours out of tolerance (max error ${crossCheckRun.max_error_km?.toFixed(2)} km, tolerance ${crossCheckRun.tolerance_km} km).`));
+    }
+  } else if (richStation?.available && !fccContourResp){
+    // We reached ZTR's rich-station endpoint but it carried no
+    // `_fcc_contour`.  That's NOT an engine failure; it's an upstream
+    // gap.  Replace the engine's generic CURVE_VALIDATION_MISSING with
+    // a "skipped" detail so reviewers can distinguish "validation
+    // never ran" from "validation ran and failed."
     warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
     warnings.push(W.make('CURVE_VALIDATION_MISSING',
-      `FCC contour cross-check failed: ${crossCheckRun.n_run - crossCheckRun.n_pass} of ${crossCheckRun.n_run} contours out of tolerance (max error ${crossCheckRun.max_error_km?.toFixed(2)} km).`));
+      'FCC contour cross-check skipped: ZTR rich-station endpoint returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable or the station has no published FCC contour yet).'));
+    // Stamp a synthetic provenance row so the Provenance UI can
+    // surface "skipped" instead of "no validation run attached".
+    crossCheckRun = {
+      source:                  'zerotrustradio',
+      endpoint:                richStation.endpoint || null,
+      upstream_api:            'https://geo.fcc.gov/api/contours/entity.json',
+      method:                  'FCC contour cross-check (geo.fcc.gov)',
+      tolerance_km:            null,
+      ran_at:                  new Date().toISOString(),
+      n_run: 0, n_pass: 0,
+      max_error_km:            null,
+      authoritative_pass:      false,
+      reference_cases_present: false,
+      result:                  'skipped'
+    };
+  }
+  // Also surface the cross-check provenance directly on the exhibit's
+  // validation block so the Provenance UI can render it without
+  // peeling the array.
+  if (crossCheckRun){
+    exhibit.validation = exhibit.validation || { runs: [] };
+    exhibit.validation.fcc_cross_check = {
+      source:       crossCheckRun.source,
+      endpoint:     crossCheckRun.endpoint,
+      upstream_api: crossCheckRun.upstream_api,
+      method:       crossCheckRun.method,
+      tolerance_km: crossCheckRun.tolerance_km,
+      ran_at:       crossCheckRun.ran_at,
+      n_run:        crossCheckRun.n_run,
+      n_pass:       crossCheckRun.n_pass,
+      max_error_km: crossCheckRun.max_error_km,
+      result:       crossCheckRun.authoritative_pass ? 'pass' : (crossCheckRun.reference_cases_present ? 'fail' : 'skipped')
+    };
   }
 
   if (process.env.TERRAIN_SIDECAR_URL && !sidecars.terrain){
