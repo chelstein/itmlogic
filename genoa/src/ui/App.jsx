@@ -543,9 +543,32 @@ function PaneProvenance({ exhibit }){
         ['Fetched at', ev.measurements.fetched_at || '—']
       ] : [['Status', 'no SDR evidence attached']]} />
       <SubHead title="Population source" />
-      <SubKv kv={[['Status', exhibit.population_estimate?.method === 'placeholder'
-        ? 'placeholder — no Census/ACS adapter wired (POPULATION_EVIDENCE_URL unset)'
-        : (exhibit.population_estimate?.method || '—')]]} />
+      <SubKv kv={(() => {
+        const pop = exhibit.population_estimate || {};
+        if (pop.source && pop.vintage && pop.method && pop.fetched_at){
+          return [
+            ['Source',     pop.source],
+            ['Dataset',    pop.dataset || '—'],
+            ['Vintage',    String(pop.vintage)],
+            ['Method',     pop.method],
+            ['Endpoint',   pop.endpoint || '—'],
+            ['SHA256',     (pop.sha256 || '').slice(0, 12) + (pop.sha256 ? '…' : '—'),],
+            ['Fetched at', pop.fetched_at],
+            ['Persons',    Number(pop.primary).toLocaleString()],
+            ['Contour',    pop.contour_label || '—']
+          ];
+        }
+        if (pop.attempt_status === 'failed'){
+          return [
+            ['Status',          'malformed upstream — POPULATION_PLACEHOLDER stays'],
+            ['Attempted source', pop.attempted_source || '—'],
+            ['Endpoint',         pop.attempt_endpoint || '—'],
+            ['Error',            pop.attempt_error    || '—'],
+            ['Missing fields',   (pop.attempt_missing || []).join(', ') || '—']
+          ];
+        }
+        return [['Status', 'placeholder — POPULATION_EVIDENCE_URL not configured']];
+      })()} />
     </div>
   );
 }

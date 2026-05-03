@@ -183,7 +183,53 @@ export async function computeExhibit(req){
     validation:   validationContext
   }});
 
-  // ---- 8. Cross-validate engine output against FCC contour ----
+  // ---- 8a. Population evidence (sourced; never invented) ----
+  // Ask the population adapter for an estimate over the SERVICE contour
+  // (first/largest polygon) when the upstream is configured AND the
+  // engine actually produced a closed polygon.  If anything in the
+  // chain fails or the response is malformed, leave the engine's
+  // placeholder estimate in place — the warning persists.
+  let populationResp = null;
+  const servicePoly = (exhibit.polygons || []).find(p => p.closed && p.ring_latlng?.length);
+  const serviceFeature = (exhibit.geojson?.features || [])[0];
+  if (sidecars.population && serviceFeature && servicePoly){
+    try {
+      populationResp = await sidecars.population.populationForContour({
+        geojson:       serviceFeature,
+        contour_label: servicePoly.label
+      });
+    } catch (e){
+      populationResp = { available: false, source: null, error: String(e.message) };
+    }
+  }
+  if (populationResp?.available){
+    exhibit.population_estimate = {
+      primary:       populationResp.persons,
+      protected:     null,
+      model:         populationResp.method,
+      method:        populationResp.method,
+      source:        populationResp.source,
+      dataset:       populationResp.dataset,
+      vintage:       populationResp.vintage,
+      endpoint:      populationResp.endpoint,
+      fetched_at:    populationResp.fetched_at,
+      sha256:        populationResp.sha256,
+      contour_label: populationResp.contour_label
+    };
+  } else if (populationResp){
+    // Reachable but malformed/HTTP error: stamp the failure reason on
+    // the placeholder so the UI can surface why the warning persists.
+    exhibit.population_estimate = {
+      ...(exhibit.population_estimate || {}),
+      attempted_source: 'POPULATION_EVIDENCE_URL',
+      attempt_status:   'failed',
+      attempt_error:    populationResp.error || null,
+      attempt_missing:  populationResp.missing || null,
+      attempt_endpoint: populationResp.endpoint || null
+    };
+  }
+
+  // ---- 8b. Cross-validate engine output against FCC contour ----
   // The cross-check requires the engine's polygons + station coords,
   // both available now.  If the FCC contour is reachable AND the
   // cross-check passes, REPLACE the validation context with this run
@@ -253,6 +299,20 @@ export async function computeExhibit(req){
       if (!has) warnings.push(W.make('SDR_MEASUREMENTS_NOT_CALIBRATED',
         `Attached ${evidence.measurements.n_records} capture(s) from ${evidence.measurements.source} carry no calibration metadata.`));
     }
+  }
+
+  // Population: clear ONLY when we have a fully-validated record from
+  // a real upstream.  Malformed or missing responses keep the warning.
+  if (populationResp?.available){
+    warnings = warnings.filter(w => w.code !== 'POPULATION_PLACEHOLDER');
+  } else if (populationResp && !populationResp.available){
+    // Upstream was reachable but returned malformed data: keep the
+    // warning AND attach detail describing what was missing.
+    warnings = warnings.filter(w => w.code !== 'POPULATION_PLACEHOLDER');
+    const detail = populationResp.missing?.length
+      ? `Upstream returned malformed population evidence; missing fields: ${populationResp.missing.join(', ')}.`
+      : `Population upstream attempt failed: ${populationResp.error || 'unknown'}.`;
+    warnings.push(W.make('POPULATION_PLACEHOLDER', detail));
   }
 
   if (crossCheckRun?.authoritative_pass){
