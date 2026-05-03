@@ -118,8 +118,15 @@
 
         <div class="row">
           <div><label>Call sign</label><input id="call" value="WBOB-FM" /></div>
-          <div><label>Facility ID</label><input id="fid" value="" placeholder="e.g. 12345" /></div>
+          <div>
+            <label>Facility ID</label>
+            <div style="display:flex; gap:8px; align-items:center">
+              <input id="fid" value="" placeholder="e.g. 11282" style="flex:1" />
+              <button class="ghost" id="lookupFid" type="button" title="Resolve from chelstein/zerotrustradio (read-only FCC source)">Lookup from FCC</button>
+            </div>
+          </div>
         </div>
+        <p class="muted" id="facility-source" style="margin:6px 0 0; font-size:11.5px"></p>
 
         <div class="row3">
           <div><label>Frequency (MHz / kHz)</label><input id="freq" value="98.7" /></div>

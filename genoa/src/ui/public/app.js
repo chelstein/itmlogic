@@ -2,7 +2,7 @@
 // implement engineering math.  All compute happens server-side via
 // /api/exhibits/compute; the UI only renders + collects inputs.
 
-import { readInputs, setInputs, PRESETS } from '/panels/facility.js';
+import { readInputs, setInputs, applyFacility, PRESETS } from '/panels/facility.js';
 import { renderMethod }     from '/panels/method.js';
 import { renderRadials }    from '/panels/radials.js';
 import { renderMap }        from '/panels/map.js';
@@ -65,9 +65,58 @@ document.querySelectorAll('.tab').forEach(btn => {
 
 // ---- Buttons ----------------------------------------------------------
 $('run').addEventListener('click', compute);
-$('loadKslx').addEventListener('click', () => { setInputs(PRESETS.kslx); compute(); });
-$('loadSynthetic').addEventListener('click', () => { setInputs(PRESETS.synthetic); compute(); });
+$('loadKslx').addEventListener('click', async () => {
+  setInputs(PRESETS.kslx);
+  if (PRESETS.kslx._resolveFacility){
+    await lookupFacility(PRESETS.kslx.facility_id, { silent: false });
+  }
+  compute();
+});
+$('loadSynthetic').addEventListener('click', () => {
+  setInputs(PRESETS.synthetic);
+  setFacilitySource('');
+  compute();
+});
+$('lookupFid').addEventListener('click', async () => {
+  const fid = ($('fid').value || '').trim();
+  if (!fid){ setFacilitySource('<span class="warn">Enter a Facility ID first.</span>'); return; }
+  await lookupFacility(fid, { silent: false });
+});
 $('refreshHistory').addEventListener('click', () => loadHistory(loadExhibit));
+
+async function lookupFacility(id, { silent = true } = {}){
+  setFacilitySource('<span class="muted">looking up…</span>');
+  try {
+    const r = await fetch(`/api/facilities/${encodeURIComponent(id)}`);
+    if (r.status === 503){
+      const j = await r.json().catch(() => ({}));
+      setFacilitySource(`<span class="warn">FACILITY_LOOKUP_UNAVAILABLE — ${j.warning?.detail || 'no upstream configured'}</span>`);
+      return;
+    }
+    if (r.status === 404){
+      setFacilitySource(`<span class="warn">Facility ${id} not found in upstream.</span>`);
+      return;
+    }
+    if (!r.ok){
+      const j = await r.json().catch(() => ({}));
+      setFacilitySource(`<span class="warn">lookup failed (${r.status}): ${j.message || j.error || ''}</span>`);
+      return;
+    }
+    const j = await r.json();
+    const { applied } = applyFacility(j.facility);
+    const cacheTag = j.cached ? ' (cached)' : '';
+    setFacilitySource(applied.length
+      ? `<span class="ok">resolved via ${j.source}${cacheTag} — filled: ${applied.join(', ')}</span>`
+      : `<span class="muted">resolved via ${j.source}${cacheTag} — no missing fields to fill</span>`);
+  } catch (e){
+    if (!silent) setFacilitySource(`<span class="warn">lookup failed: ${e.message}</span>`);
+  }
+}
+
+function setFacilitySource(html){
+  const el = document.getElementById('facility-source');
+  if (el) el.innerHTML = html;
+}
 
 $('save').addEventListener('click', async () => {
   if (!LAST_EXHIBIT){ alert('Run a compute first.'); return; }
