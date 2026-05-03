@@ -30,8 +30,14 @@ app.use(express.json({ limit: '8mb' }));
 // Health (mount before everything; keep it cheap).
 app.use(healthRoutes);
 
-// Static UI (served from src/ui/public).
-app.use(express.static(path.resolve(__dirname, '../ui/public'), {
+// Static UI.  In production the React app is built to src/ui/dist/.
+// During local dev (vite dev server on :5173) this directory may not
+// exist yet; serve whichever path is present so the API still boots.
+const distDir   = path.resolve(__dirname, '../ui/dist');
+const publicDir = path.resolve(__dirname, '../ui/public');
+const uiRoot    = (await import('node:fs')).existsSync(distDir) ? distDir : publicDir;
+console.log(`[genoa-api] serving UI from ${path.relative(process.cwd(), uiRoot)}`);
+app.use(express.static(uiRoot, {
   index: 'index.html',
   maxAge: NODE_ENV === 'production' ? '1h' : 0
 }));
