@@ -2,12 +2,17 @@
 // Missing sidecar URL → null client → engine still runs.
 
 import { makeTerrainClient }    from '../../evidence/terrain/client.js';
+import { makeSplatClient }      from '../../evidence/terrain/splatClient.js';
 import { makeIdentityClient }   from '../../evidence/identity/index.js';
 import { makeFacilityClient }   from './facilityClient.js';
 import { makePopulationClient } from '../../evidence/populationClient.js';
 
 export const sidecars = Object.freeze({
   terrain:     makeTerrainClient ({ baseUrl: process.env.TERRAIN_SIDECAR_URL  }),
+  // SPLAT sidecar (chelstein/splat — Genoa Flask sidecar).  When set,
+  // Genoa probes its capability and surfaces SPLAT availability /
+  // DEM-provisioning state as evidence provenance.
+  splat:       makeSplatClient   ({ baseUrl: process.env.SPLAT_SIDECAR_URL    }),
   identity:    makeIdentityClient({ baseUrl: process.env.IDENTITY_SIDECAR_URL }),
   measurement: process.env.MEASUREMENT_SIDECAR_URL ? { baseUrl: process.env.MEASUREMENT_SIDECAR_URL } : null,
   // Facility lookup is not a sidecar in the propagation sense — it's a
