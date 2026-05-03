@@ -1,9 +1,10 @@
 // Resolves environment-configured sidecars into ready-to-use clients.
 // Missing sidecar URL → null client → engine still runs.
 
-import { makeTerrainClient }  from '../../evidence/terrain/client.js';
-import { makeIdentityClient } from '../../evidence/identity/index.js';
-import { makeFacilityClient } from './facilityClient.js';
+import { makeTerrainClient }    from '../../evidence/terrain/client.js';
+import { makeIdentityClient }   from '../../evidence/identity/index.js';
+import { makeFacilityClient }   from './facilityClient.js';
+import { makePopulationClient } from '../../evidence/populationClient.js';
 
 export const sidecars = Object.freeze({
   terrain:     makeTerrainClient ({ baseUrl: process.env.TERRAIN_SIDECAR_URL  }),
@@ -13,7 +14,11 @@ export const sidecars = Object.freeze({
   // read-only adapter into chelstein/zerotrustradio (and optionally the
   // n8n station/analyze webhook).  Lives here so the same /readyz block
   // can report all upstreams.
-  facility:    makeFacilityClient()
+  facility:    makeFacilityClient(),
+  // Population evidence is also a thin read-only adapter.  When
+  // POPULATION_EVIDENCE_URL is unset, this is null and Genoa keeps the
+  // POPULATION_PLACEHOLDER warning.
+  population:  makePopulationClient()
 });
 
 export async function sidecarStatus(){
