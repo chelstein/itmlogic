@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { stripDomAndReact } from './lib/stripDomAndReact.js';
 import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
@@ -128,6 +129,14 @@ export default function App() {
   // `overrideInputs` lets preset loaders pass freshly-merged inputs
   // directly without depending on React state having flushed.
   async function compute(overrideInputs = null){
+    // Defense: a careless `onClick={compute}` would pass a React
+    // SyntheticEvent here.  The wrapper bindings below already shield
+    // against that, but if any future callsite regresses we drop the
+    // event here so it cannot land in the payload.
+    if (overrideInputs && typeof overrideInputs === 'object'
+        && (overrideInputs.nativeEvent || overrideInputs.currentTarget || overrideInputs.target || overrideInputs._reactName)){
+      overrideInputs = null;
+    }
     const i = overrideInputs || inputs;
     setComputing(true);
     setStatusMsg(i.use_terrain
@@ -155,10 +164,14 @@ export default function App() {
           use_terrain: !!i.use_terrain
         }
       };
+      // Belt-and-suspenders: strip any DOM/React refs that could have
+      // snuck into the payload (would crash JSON.stringify with
+      // "Converting circular structure to JSON ... HTMLButtonElement").
+      const cleanPayload = stripDomAndReact(payload);
       const r = await fetch('/api/exhibits/compute', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body:    JSON.stringify(payload)
+        body:    JSON.stringify(cleanPayload)
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || j.message || `HTTP ${r.status}`);
@@ -215,7 +228,7 @@ export default function App() {
       const r = await fetch('/api/exhibits', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body:    JSON.stringify(exhibit)
+        body:    JSON.stringify(stripDomAndReact(exhibit))
       });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
@@ -342,13 +355,19 @@ export default function App() {
         <FacilityRack
           inputs={inputs}
           onChange={onChange}
-          onCompute={compute}
-          onReset={reset}
-          onSave={save}
-          onExport={downloadExport}
+          // Wrap every callback so React's SyntheticEvent never lands
+          // as the first argument of compute/save/etc — it would be
+          // mistaken for an `overrideInputs` object and crash
+          // JSON.stringify on circular DOM refs (target/currentTarget/
+          // nativeEvent/_react*).  The sanitizer in compute() is a
+          // belt-and-suspenders defense; this is the seatbelt.
+          onCompute={() => compute()}
+          onReset={() => reset()}
+          onSave={() => save()}
+          onExport={(format) => downloadExport(format)}
           onLookupFid={() => lookupFacility(inputs.facility_id)}
-          onLoadKslx={loadKslx}
-          onLoadSynthetic={loadSynthetic}
+          onLoadKslx={() => loadKslx()}
+          onLoadSynthetic={() => loadSynthetic()}
           facilitySource={facilitySource}
           computing={computing}
           busy={busy}
