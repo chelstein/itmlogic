@@ -135,6 +135,19 @@ export default function FacilityRack({
         <HardwareButton variant="ghost" onClick={onLoadSynthetic} disabled={busy}>Reset synthetic Class A</HardwareButton>
       </div>
 
+      <div className="rack-eyebrow mt-4 mb-1">Evidence</div>
+      <label className="flex items-center gap-2 font-mono text-[11px] text-text">
+        <input
+          type="checkbox"
+          checked={!!inputs.use_terrain}
+          onChange={e => set('use_terrain', e.target.checked)}
+        />
+        <span>Request per-radial §73.313 HAAT (terrain) from ZTR</span>
+      </label>
+      <p className="font-mono text-[10px] text-textDim mt-1 leading-snug">
+        Calls ZTR's terrain-haat endpoint (OpenTopoData SRTM30m). Slow (~30s) on cold cache. Clears the CONSTANT_HAAT_ASSUMED warning when valid radials are returned.
+      </p>
+
       <div className="rack-eyebrow mt-4 mb-1">Operate</div>
       <div className="flex flex-wrap gap-2">
         <HardwareButton variant="primary" onClick={onCompute} disabled={busy || computing}>

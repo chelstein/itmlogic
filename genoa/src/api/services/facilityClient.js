@@ -91,6 +91,101 @@ export function makeFacilityClient({
       const n8n = await callN8nStationAnalyze({ n8nBaseUrl, n8nSecret, timeoutMs, facility_id });
       if (n8n && n8n.rows[0]) return { facility: n8n.rows[0], source: 'n8n' };
       return { facility: null, source: null, error: 'facility not found in any configured source' };
+    },
+
+    // ---- Outcome-A enrichment endpoints (read-only) ----
+    // All three return { available, source, endpoint, fetched_at, ... }
+    // when ZTR is reachable; { available: false, source: null, error }
+    // otherwise.  Genoa does NOT fall back to fabrication; missing data
+    // stays missing and the corresponding warning persists.
+
+    async getRichStation(stationId){
+      if (!ztrUrl || !stationId) return { available: false, source: null, error: 'ztrUrl or stationId missing' };
+      try {
+        const u = joinUrl(ztrUrl, `/api/radiodns/station/${encodeURIComponent(stationId)}`);
+        const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok) return { available: false, source: null, error: `HTTP ${r.status}` };
+        const j = await r.json();
+        return {
+          available:  true,
+          source:     'zerotrustradio',
+          endpoint:   u,
+          fetched_at: new Date().toISOString(),
+          station:    j
+        };
+      } catch (e){
+        return { available: false, source: null, error: String(e.message) };
+      }
+    },
+
+    async getTerrainHaatRadials({ facility_id, radial_step_deg = 10 }){
+      if (!ztrUrl || !facility_id) return { available: false, source: null, error: 'ztrUrl or facility_id missing' };
+      try {
+        const u = joinUrl(ztrUrl, `/api/broadcast/stations/${encodeURIComponent(facility_id)}/terrain-haat?radial_step_deg=${radial_step_deg}`);
+        // Terrain calls are slow (DEM batched at 1 req/sec); allow up to 60s.
+        const r = await fetch(u, { signal: AbortSignal.timeout(60_000) });
+        if (!r.ok) return { available: false, source: null, error: `HTTP ${r.status}` };
+        const j = await r.json();
+        if (!Array.isArray(j.radials) || !j.radials.length){
+          return { available: false, source: null, error: 'no radials returned' };
+        }
+        return {
+          available:  true,
+          source:     'zerotrustradio',
+          endpoint:   u,
+          fetched_at: new Date().toISOString(),
+          method:     j.method || '47 CFR §73.313 arc-averaged HAAT',
+          arc:        j.arc,
+          dem:        j.dem,
+          tx:         j.tx,
+          n_radials:  j.n_radials,
+          radials:    j.radials
+        };
+      } catch (e){
+        return { available: false, source: null, error: String(e.message) };
+      }
+    },
+
+    // Pull the FCC's own canonical contour out of the rich-station
+    // response.  If `rich` (already-fetched) is supplied, reuse it; else
+    // fetch it.  The FCC contour comes from
+    //   https://geo.fcc.gov/api/contours/entity.json
+    // proxied by ZTR's /api/radiodns/station/:id endpoint.
+    async getFccContour({ stationId, rich = null }){
+      if (!stationId) return { available: false, source: null, error: 'stationId required' };
+      const r = rich || await this.getRichStation(stationId);
+      if (!r.available) return { available: false, source: null, error: r.error || 'rich station unavailable' };
+      const fc = r.station?._fcc_contour;
+      if (!fc || fc.type !== 'FeatureCollection' || !(fc.features || []).length){
+        return { available: false, source: null, error: 'no _fcc_contour on rich station response' };
+      }
+      return {
+        available:    true,
+        source:       'zerotrustradio',
+        endpoint:     r.endpoint,
+        fetched_at:   r.fetched_at,
+        upstream_api: 'https://geo.fcc.gov/api/contours/entity.json',
+        feature_count: fc.features.length,
+        contour:      fc
+      };
+    },
+
+    async getSdrEvidence({ stationId, rich = null }){
+      if (!stationId) return { available: false, source: null, error: 'stationId required' };
+      const r = rich || await this.getRichStation(stationId);
+      if (!r.available) return { available: false, source: null, error: r.error || 'rich station unavailable' };
+      const captures = Array.isArray(r.station?._captures) ? r.station._captures : [];
+      return {
+        available:    captures.length > 0,
+        source:       'zerotrustradio',
+        endpoint:     r.endpoint,
+        fetched_at:   r.fetched_at,
+        n_records:    captures.length,
+        // ZTR captures don't carry a calibration flag.  Until calibration
+        // metadata flows through the SDR ingest, treat them as raw.
+        calibrated:   false,
+        records:      captures
+      };
     }
   };
 }

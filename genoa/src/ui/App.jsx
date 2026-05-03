@@ -37,6 +37,7 @@ const TABS = [
   { id: 'radials',    label: 'Radials' },
   { id: 'evidence',   label: 'Evidence' },
   { id: 'validation', label: 'Validation' },
+  { id: 'provenance', label: 'Provenance' },
   { id: 'narrative',  label: 'AI narrative' },
   { id: 'exports',    label: 'Exports' },
   { id: 'history',    label: 'History' }
@@ -108,7 +109,9 @@ export default function App() {
 
   async function compute(){
     setComputing(true);
-    setStatusMsg('Computing…');
+    setStatusMsg(inputs.use_terrain
+      ? 'Computing… (DEM fetch may take ~30s on cold cache)'
+      : 'Computing…');
     try {
       const payload = {
         inputs: {
@@ -123,6 +126,9 @@ export default function App() {
           radial_step_deg:   num(inputs.radial_step_deg) || 10,
           // Pass DA pattern only when the user toggled it on.
           pattern_table: inputs.pattern_mode === 'DA' ? inputs.pattern_table : null
+        },
+        options: {
+          use_terrain: !!inputs.use_terrain
         }
       };
       const r = await fetch('/api/exhibits/compute', {
@@ -365,6 +371,9 @@ function TabBody({ id, exhibit, history, onPickHistory }){
   if (id === 'narrative'){
     return <PaneNarrative exhibit={exhibit} />;
   }
+  if (id === 'provenance'){
+    return <PaneProvenance exhibit={exhibit} />;
+  }
   if (id === 'exports'){
     return <PaneExports exhibit={exhibit} />;
   }
@@ -411,33 +420,41 @@ function PaneRadials({ exhibit }){
   const rt   = exhibit?.radial_table || [];
   const cdef = exhibit?.contour_definitions || [];
   if (!rt.length) return <Empty/>;
+  const t = exhibit?.evidence?.terrain;
+  const haatBadge = t?.available
+    ? <span className="text-green">per-radial · {t.method} · {t.dem?.source} {t.dem?.dataset}</span>
+    : <span className="text-amber">flat HAAT (CONSTANT_HAAT_ASSUMED) — toggle "Request per-radial §73.313 HAAT" to use ZTR terrain</span>;
   return (
-    <div className="overflow-auto max-h-[520px] rounded-md border border-rule">
-      <table className="telemetry">
-        <thead>
-          <tr>
-            <th>Az (°)</th><th>F·rel</th><th>HAAT (m)</th>
-            {cdef.map(c => <th key={c.id}>{c.label || c.id}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {rt.map((r, i) => (
-            <tr key={i}>
-              <td className="text-cream">{Number(r.azimuth_deg).toFixed(1)}</td>
-              <td>{Number(r.relative_field).toFixed(3)}</td>
-              <td>{r.haat_computed_m ?? r.haat_input_m ?? '—'}</td>
-              {cdef.map(c => (
-                <td key={c.id} className="text-right">
-                  {r.contour_distances_km?.[c.id] != null
-                    ? Number(r.contour_distances_km[c.id]).toFixed(2)
-                    : '—'}
-                </td>
-              ))}
+    <>
+      <div className="font-mono text-[11px] mb-2">{haatBadge}</div>
+      <div className="overflow-auto max-h-[520px] rounded-md border border-rule">
+        <table className="telemetry">
+          <thead>
+            <tr>
+              <th>Az (°)</th><th>F·rel</th><th>HAAT (m)</th><th>Source</th>
+              {cdef.map(c => <th key={c.id}>{c.label || c.id}</th>)}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rt.map((r, i) => (
+              <tr key={i}>
+                <td className="text-cream">{Number(r.azimuth_deg).toFixed(1)}</td>
+                <td>{Number(r.relative_field).toFixed(3)}</td>
+                <td>{r.haat_computed_m ?? r.haat_input_m ?? '—'}</td>
+                <td className="text-textDim">{r.haat_source || '—'}</td>
+                {cdef.map(c => (
+                  <td key={c.id} className="text-right">
+                    {r.contour_distances_km?.[c.id] != null
+                      ? Number(r.contour_distances_km[c.id]).toFixed(2)
+                      : '—'}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -448,16 +465,87 @@ function PaneEvidence({ exhibit }){
     <div className="space-y-3">
       <SubHead title="Terrain" />
       <SubKv kv={ev.terrain?.available
-        ? [['Source', ev.terrain.source], ['Profiles', (ev.terrain.profiles || []).length + ' radials']]
+        ? [
+            ['Source',     ev.terrain.source],
+            ['Endpoint',   ev.terrain.endpoint || '—'],
+            ['Method',     ev.terrain.method],
+            ['DEM',        `${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`.trim()],
+            ['Profiles',   (ev.terrain.profiles || []).length + ' radials'],
+            ['Fetched at', ev.terrain.fetched_at || '—']
+          ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
-      <SubHead title="Measurements (SigMF)" />
+      <SubHead title="Measurements (SDR captures via ZTR)" />
       <SubKv kv={ev.measurements?.available
-        ? [['Source', ev.measurements.source], ['Records', ev.measurements.n_records ?? (ev.measurements.records || []).length], ['Calibrated', ev.measurements.calibrated ? 'yes' : 'no — raw indications only'], ['Author', ev.measurements.author || '—'], ['Hardware', ev.measurements.hw || '—']]
-        : [['Status', 'No SDR / SigMF records attached.']]} />
+        ? [
+            ['Source',     ev.measurements.source || '—'],
+            ['Endpoint',   ev.measurements.endpoint || '—'],
+            ['Records',    ev.measurements.n_records ?? (ev.measurements.records || []).length],
+            ['Calibrated', ev.measurements.calibrated
+              ? 'yes'
+              : 'no — raw indications only (SDR_MEASUREMENTS_NOT_CALIBRATED)'],
+            ['Fetched at', ev.measurements.fetched_at || '—']
+          ]
+        : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
       <SubHead title="Identity (RDS / RadioDNS / EAS / audio)" />
       <SubKv kv={ev.identity?.available
         ? [['Available', 'yes'], ['Confirmations', (ev.identity.confirmations || []).length], ['Sources', (ev.identity.sources || []).map(s => s.kind + ':' + s.status).join(', ')]]
         : [['Status', 'Identity sidecar not attached or no confirmations returned.']]} />
+    </div>
+  );
+}
+
+function PaneProvenance({ exhibit }){
+  if (!exhibit) return <Empty/>;
+  const fm  = exhibit.facility_metadata || {};
+  const ev  = exhibit.evidence || {};
+  const sig = exhibit.engine_signature || {};
+  const v   = exhibit.validation || {};
+  const last = v.runs?.slice(-1)[0] || null;
+  return (
+    <div className="space-y-3">
+      <SubHead title="Engine signature" />
+      <SubKv kv={[
+        ['Module',  sig.module || '—'],
+        ['Version', sig.version || '—'],
+        ['Build',   sig.hash || '—'],
+        ['Node',    sig.node || '—']
+      ]} />
+      <SubHead title="Facility source" />
+      <SubKv kv={[
+        ['Upstream',   fm.facility_lookup_source || '—'],
+        ['Endpoint',   fm.facility_endpoint || '—'],
+        ['Updated at', fm.facility_updated_at || '—']
+      ]} />
+      <SubHead title="Terrain source" />
+      <SubKv kv={ev.terrain?.available ? [
+        ['Upstream', ev.terrain.source || '—'],
+        ['Endpoint', ev.terrain.endpoint || '—'],
+        ['Method',   ev.terrain.method   || '—'],
+        ['DEM',      `${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`.trim()],
+        ['Fetched at', ev.terrain.fetched_at || '—']
+      ] : [['Status', 'no terrain source attached']]} />
+      <SubHead title="Curve validation source" />
+      <SubKv kv={last ? [
+        ['Method',   last.method   || '—'],
+        ['Source',   last.source   || '—'],
+        ['Endpoint', last.endpoint || '—'],
+        ['Upstream API', last.upstream_api || '—'],
+        ['Result',   last.authoritative_pass ? 'PASS — clears CURVE_VALIDATION_MISSING' : 'NOT PASSING'],
+        ['Tolerance', last.tolerance_km != null ? last.tolerance_km + ' km' : '—'],
+        ['Max error', last.max_error_km != null ? last.max_error_km.toFixed(2) + ' km' : '—']
+      ] : [['Status', 'no validation run attached']]} />
+      <SubHead title="Measurement source" />
+      <SubKv kv={ev.measurements?.available ? [
+        ['Upstream', ev.measurements.source || '—'],
+        ['Endpoint', ev.measurements.endpoint || '—'],
+        ['Records',  ev.measurements.n_records ?? (ev.measurements.records || []).length],
+        ['Calibrated', ev.measurements.calibrated ? 'yes' : 'no'],
+        ['Fetched at', ev.measurements.fetched_at || '—']
+      ] : [['Status', 'no SDR evidence attached']]} />
+      <SubHead title="Population source" />
+      <SubKv kv={[['Status', exhibit.population_estimate?.method === 'placeholder'
+        ? 'placeholder — no Census/ACS adapter wired (POPULATION_EVIDENCE_URL unset)'
+        : (exhibit.population_estimate?.method || '—')]]} />
     </div>
   );
 }
