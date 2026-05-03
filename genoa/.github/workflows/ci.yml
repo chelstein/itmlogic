@@ -32,6 +32,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm install --no-audit --no-fund
+      - name: Build React/Tailwind UI
+        run: npm run build:ui
       - name: Engine + exports + API integration tests
         run: npm test
       - name: CLI sample exhibit (synthetic FM Class A)
