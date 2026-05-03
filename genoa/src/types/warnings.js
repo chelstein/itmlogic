@@ -96,11 +96,16 @@ export class W {
   }
   static codes(){ return Object.keys(WARNING_CODES); }
   static dedupe(warnings){
-    const seen = new Map();
+    // Collapse to one warning per code.  When the same code appears
+    // multiple times (e.g. the engine emits a detail-less default and
+    // the API service emits a richer one), prefer the entry with a
+    // non-empty `detail` so the UI shows the most informative copy.
+    const byCode = new Map();
     for (const w of warnings){
-      const key = w.code + '|' + (w.detail || '');
-      if (!seen.has(key)) seen.set(key, w);
+      const prev = byCode.get(w.code);
+      if (!prev){ byCode.set(w.code, w); continue; }
+      if (!prev.detail && w.detail) byCode.set(w.code, w);
     }
-    return [...seen.values()];
+    return [...byCode.values()];
   }
 }

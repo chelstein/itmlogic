@@ -60,16 +60,29 @@ test('GeoJSON is a valid FeatureCollection with required properties', async () =
   }
 });
 
-test('Warnings system: typed codes only, deduped', async () => {
+test('Warnings system: typed codes only, ONE entry per code', async () => {
   const x = await buildExhibit(FM_CLASS_A);
   const codes = new Set();
   for (const w of x.warnings){
     assert.ok(typeof w.code === 'string' && w.code.length > 0);
     assert.ok(['blocker', 'warning', 'info'].includes(w.severity));
-    const key = w.code + '|' + (w.detail || '');
-    assert.ok(!codes.has(key), 'duplicate warning ' + key);
-    codes.add(key);
+    assert.ok(!codes.has(w.code), 'duplicate warning code ' + w.code);
+    codes.add(w.code);
   }
+});
+
+test('W.dedupe collapses same-code/different-detail; richer detail wins', async () => {
+  const { W } = await import('../types/warnings.js');
+  const a = W.make('FACILITY_LOOKUP_UNAVAILABLE');                              // no detail
+  const b = W.make('FACILITY_LOOKUP_UNAVAILABLE', 'no upstream configured');    // richer
+  const out = W.dedupe([a, b]);
+  assert.equal(out.length, 1);
+  assert.equal(out[0].code, 'FACILITY_LOOKUP_UNAVAILABLE');
+  assert.equal(out[0].detail, 'no upstream configured');
+  // Order independence — richer detail still wins when it appears first.
+  const out2 = W.dedupe([b, a]);
+  assert.equal(out2.length, 1);
+  assert.equal(out2[0].detail, 'no upstream configured');
 });
 
 test('Missing curve validation -> CURVE_VALIDATION_MISSING blocker present', async () => {

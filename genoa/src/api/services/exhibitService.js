@@ -137,7 +137,14 @@ export async function computeExhibit(req){
     // default; we resolved the facility through the adapter.
     exhibit.warnings = exhibit.warnings.filter(w => w.code !== 'FACILITY_LOOKUP_UNAVAILABLE');
   }
-  for (const w of facilityWarnings) exhibit.warnings.push(w);
+  if (facilityWarnings.length){
+    // We're about to push richer FACILITY_LOOKUP_UNAVAILABLE warnings
+    // (with detail).  Strip the engine's default detail-less version so
+    // the UI doesn't show the same code twice.
+    const facilityCodes = new Set(facilityWarnings.map(w => w.code));
+    exhibit.warnings = exhibit.warnings.filter(w => !facilityCodes.has(w.code));
+    for (const w of facilityWarnings) exhibit.warnings.push(w);
+  }
 
   exhibit.narrative = renderNarrative(exhibit);
 

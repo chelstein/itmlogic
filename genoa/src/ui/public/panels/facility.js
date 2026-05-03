@@ -58,10 +58,45 @@ export const PRESETS = {
     lat:37.0902, lon:-95.7129,
     radial_step_deg: 10
   },
+  // KSLX-FM ships with the public-profile fields populated and
+  // coordinates intentionally null.  The UI prompts a follow-up
+  // /api/facilities/:id call so coordinates and any other missing
+  // fields come from the configured FCC source (chelstein/zerotrustradio
+  // by default).  We do NOT invent coordinates here.
   kslx: {
     call:'KSLX-FM', facility_id:'11282', service:'FM', fcc_class:'C',
     frequency:100.7, erp_kw:100, haat_m:561,
     lat:null, lon:null,
-    radial_step_deg: 10
+    radial_step_deg: 10,
+    _resolveFacility: true
   }
 };
+
+// Apply a normalized facility row from /api/facilities/:id to the form.
+// Only fills cells the user has not already typed into; never overwrites
+// caller input.  Returns { applied: [...fieldNames] } so the UI can
+// surface what changed.
+export function applyFacility(facility){
+  if (!facility) return { applied: [] };
+  const set = (id, val, key) => {
+    const el = document.getElementById(id);
+    if (!el) return null;
+    const current = (el.value || '').trim();
+    if (current !== '') return null;          // never overwrite user input
+    if (val === null || val === undefined) return null;
+    el.value = val;
+    return key;
+  };
+  const applied = [
+    set('call',  facility.call,         'call'),
+    set('fid',   facility.facility_id,  'facility_id'),
+    set('svc',   facility.service,      'service'),
+    set('cls',   facility.fcc_class,    'fcc_class'),
+    set('freq',  facility.frequency,    'frequency'),
+    set('erp',   facility.erp_kw,       'erp_kw'),
+    set('haat',  facility.haat_m,       'haat_m'),
+    set('lat',   facility.lat,          'lat'),
+    set('lon',   facility.lon,          'lon')
+  ].filter(Boolean);
+  return { applied };
+}
