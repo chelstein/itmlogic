@@ -78,6 +78,24 @@ test('PDF export route returns 501 (not implemented) with structured warning', a
   assert.ok([404, 501, 503].includes(r.status));
 });
 
+test('GET /api/facilities/search with no upstream configured -> 503 + FACILITY_LOOKUP_UNAVAILABLE', async () => {
+  const r = await fetch(baseUrl + '/api/facilities/search?q=KSLX');
+  assert.equal(r.status, 503);
+  const j = await r.json();
+  assert.equal(j.error, 'FACILITY_LOOKUP_UNAVAILABLE');
+  assert.equal(j.warning?.code, 'FACILITY_LOOKUP_UNAVAILABLE');
+});
+
+test('GET /api/facilities/:id with no upstream configured -> 503', async () => {
+  const r = await fetch(baseUrl + '/api/facilities/11282');
+  assert.equal(r.status, 503);
+});
+
+test('GET /api/facilities/search with q too short -> 400', async () => {
+  const r = await fetch(baseUrl + '/api/facilities/search?q=K');
+  assert.equal(r.status, 400);
+});
+
 async function waitForHealth(url, timeoutMs){
   const start = Date.now();
   while (Date.now() - start < timeoutMs){

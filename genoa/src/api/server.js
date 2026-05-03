@@ -6,9 +6,10 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import healthRoutes  from './routes/health.js';
-import curveRoutes   from './routes/curves.js';
-import exhibitRoutes from './routes/exhibits.js';
+import healthRoutes    from './routes/health.js';
+import curveRoutes     from './routes/curves.js';
+import exhibitRoutes   from './routes/exhibits.js';
+import facilityRoutes  from './routes/facilities.js';
 import { errorHandler } from './middleware/errors.js';
 import { migrate }   from '../db/migrate.js';
 import { poolReady } from '../db/pool.js';
@@ -37,6 +38,7 @@ app.use(express.static(path.resolve(__dirname, '../ui/public'), {
 
 // API routes
 app.use('/api', curveRoutes);
+app.use('/api', facilityRoutes);
 app.use('/api', exhibitRoutes);
 
 // Last-resort error handler
