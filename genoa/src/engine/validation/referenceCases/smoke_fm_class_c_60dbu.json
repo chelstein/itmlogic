@@ -1,0 +1,12 @@
+{
+  "id":                    "smoke.fm.class_c.100kW.600m.60dBu",
+  "service":               "FM",
+  "mode":                  "50,50",
+  "erp_kW":                100.0,
+  "haat_m":                600,
+  "target_dBu":            60,
+  "expected_distance_km":  144.300,
+  "tolerance_km":          1.0,
+  "authoritative":         false,
+  "source_note":           "ENGINE REGRESSION SMOKE TEST. Expected distance is the value the current Genoa engine + curve dataset v0.2 produce; the case exists to detect silent engine drift, NOT to assert an authoritative FCC reference. Replace with an FCC OET / NTIA reference value to clear CURVE_VALIDATION_MISSING."
+}

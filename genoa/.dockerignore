@@ -1,8 +1,10 @@
 node_modules
-npm-debug.log
-.env
-.env.*
-!.env.example
 .git
-.do
-*.md
+.github
+docs
+*.log
+.env
+.env.local
+.env.*.local
+/tmp
+.DS_Store

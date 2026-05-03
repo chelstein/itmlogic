@@ -1,7 +1,4 @@
-# Top-level Dockerfile for DigitalOcean App Platform.
-# Builds the genoa-api (which serves both /api and the static UI).
-# Sidecar / worker Dockerfiles live under infra/docker/.
-
+# genoa-api — Express API + UI static (Node 20 alpine).
 FROM node:20-alpine
 WORKDIR /app
 
