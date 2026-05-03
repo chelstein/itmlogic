@@ -96,6 +96,57 @@ test('GET /api/facilities/search with q too short -> 400', async () => {
   assert.equal(r.status, 400);
 });
 
+test('POST /api/exhibits/save without DATABASE_URL returns JSON ephemeral ack (never HTML)', async () => {
+  // Minimal compute payload — the service computes then tries to
+  // persist, hits PersistenceUnavailable, and falls back to ephemeral.
+  // The CRITICAL invariant is: response is always application/json
+  // with a parseable body, so the frontend's readJsonOrThrow doesn't
+  // crash on "<!DOCTYPE …".
+  const r = await fetch(baseUrl + '/api/exhibits/save', {
+    method:  'POST',
+    headers: { 'content-type': 'application/json' },
+    body:    JSON.stringify({
+      inputs: {
+        call: 'WTEST-FM', service: 'FM', fcc_class: 'A',
+        frequency: 98.7, erp_kw: 6, haat_m: 100,
+        lat: 37.0902, lon: -95.7129, radial_step_deg: 45
+      }
+    })
+  });
+  assert.equal(r.status, 200, 'ephemeral fallback returns 200, not 503');
+  assert.match(r.headers.get('content-type') || '', /application\/json/i,
+    'response MUST be JSON, never HTML — this is the bug guard');
+  const j = await r.json();
+  assert.equal(j.status, 'ok');
+  assert.equal(j.saved, false);
+  assert.equal(j.mode,  'ephemeral');
+  assert.match(j.message || '', /Persistence unavailable/i);
+});
+
+test('POST /api/exhibits/save with empty body returns JSON (never HTML)', async () => {
+  // The CRITICAL invariant: even malformed/empty bodies get a JSON
+  // response.  The frontend's readJsonOrThrow will then receive a
+  // structured error instead of crashing on "<!DOCTYPE …".
+  const r = await fetch(baseUrl + '/api/exhibits/save', {
+    method:  'POST',
+    headers: { 'content-type': 'application/json' },
+    body:    '{}'
+  });
+  assert.match(r.headers.get('content-type') || '', /application\/json/i,
+    'response MUST be JSON, never HTML');
+  const j = await r.json();
+  // It either returns 400 BAD_REQUEST or falls through to ephemeral
+  // — either is fine for the bug-guard.  What matters is the body parses.
+  assert.ok(typeof j === 'object' && j !== null);
+  if (j.error){
+    assert.equal(j.error, 'BAD_REQUEST');
+    assert.equal(j.saved, false);
+  } else {
+    assert.equal(j.saved, false);
+    assert.equal(j.mode,  'ephemeral');
+  }
+});
+
 async function waitForHealth(url, timeoutMs){
   const start = Date.now();
   while (Date.now() - start < timeoutMs){
