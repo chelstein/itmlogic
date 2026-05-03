@@ -80,16 +80,30 @@ export async function computeExhibit(req){
   // ---- 2. Rich station enrichment (FCC contour + captures) ----
   // Needs a ZTR station id, which is on the normalized facility row's
   // facility_lookup_source.ztr_id.  Skip silently when unavailable.
+  //
+  // SDR evidence gating: ZTR's capture infrastructure currently only
+  // produces meaningful evidence for AM stations (FM-band capture
+  // coverage is not yet in place).  Pulling FM "captures" today would
+  // attach noise as evidence and clear SDR_MEASUREMENTS_MISSING
+  // dishonestly.  The gate is service-aware and configurable via
+  // SDR_EVIDENCE_SERVICES (CSV, default "AM") so FM can be flipped on
+  // when the capture coverage is ready — no code change required.
+  const SDR_SERVICES = (process.env.SDR_EVIDENCE_SERVICES || 'AM')
+    .split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+  const sdrEnabledForService = SDR_SERVICES.includes(String(inputs.service || '').toUpperCase());
+
   const ztrStationId = facilityResolution?.facility?.facility_lookup_source?.ztr_id;
   if (ztrStationId && sidecars.facility?.getRichStation){
     richStation = await sidecars.facility.getRichStation(ztrStationId);
     if (richStation?.available){
-      // FCC contour (cross-check input)
+      // FCC contour (cross-check input) — pulled for every service.
       const fc = await sidecars.facility.getFccContour({ stationId: ztrStationId, rich: richStation });
       if (fc.available) fccContourResp = fc;
-      // SDR evidence
-      const sdr = await sidecars.facility.getSdrEvidence({ stationId: ztrStationId, rich: richStation });
-      if (sdr.available) sdrResp = sdr;
+      // SDR evidence — gated by service.
+      if (sdrEnabledForService){
+        const sdr = await sidecars.facility.getSdrEvidence({ stationId: ztrStationId, rich: richStation });
+        if (sdr.available) sdrResp = sdr;
+      }
     }
   }
 
@@ -299,6 +313,14 @@ export async function computeExhibit(req){
       if (!has) warnings.push(W.make('SDR_MEASUREMENTS_NOT_CALIBRATED',
         `Attached ${evidence.measurements.n_records} capture(s) from ${evidence.measurements.source} carry no calibration metadata.`));
     }
+  } else if (!sdrEnabledForService){
+    // No SDR evidence pulled because the service isn't in the
+    // SDR_EVIDENCE_SERVICES gate (default: AM only).  Replace the
+    // engine's default SDR_MEASUREMENTS_MISSING with one that names
+    // the gate so reviewers know it isn't a missing-data bug.
+    warnings = warnings.filter(w => w.code !== 'SDR_MEASUREMENTS_MISSING');
+    warnings.push(W.make('SDR_MEASUREMENTS_MISSING',
+      `SDR capture coverage not yet enabled for service "${inputs.service}". ZTR captures only the services in SDR_EVIDENCE_SERVICES (currently: ${SDR_SERVICES.join(', ')}); flip this on by setting SDR_EVIDENCE_SERVICES once FM-band capture is in place.`));
   }
 
   // Population: clear ONLY when we have a fully-validated record from
@@ -318,10 +340,59 @@ export async function computeExhibit(req){
   if (crossCheckRun?.authoritative_pass){
     warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
   } else if (crossCheckRun && !crossCheckRun.authoritative_pass){
-    // Cross-check ran but didn't pass: keep the blocker, attach detail.
+    // Cross-check ran but didn't pass.  Distinguish two cases so
+    // reviewers know whether to retry, refile, or chase a real engine
+    // discrepancy.
+    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
+    if (!crossCheckRun.reference_cases_present || crossCheckRun.n_run === 0){
+      warnings.push(W.make('CURVE_VALIDATION_MISSING',
+        'FCC contour cross-check skipped: ZTR returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable, the station may not have a published FCC contour yet, or the response was malformed).'));
+    } else {
+      warnings.push(W.make('CURVE_VALIDATION_MISSING',
+        `FCC contour cross-check failed: ${crossCheckRun.n_run - crossCheckRun.n_pass} of ${crossCheckRun.n_run} contours out of tolerance (max error ${crossCheckRun.max_error_km?.toFixed(2)} km, tolerance ${crossCheckRun.tolerance_km} km).`));
+    }
+  } else if (richStation?.available && !fccContourResp){
+    // We reached ZTR's rich-station endpoint but it carried no
+    // `_fcc_contour`.  That's NOT an engine failure; it's an upstream
+    // gap.  Replace the engine's generic CURVE_VALIDATION_MISSING with
+    // a "skipped" detail so reviewers can distinguish "validation
+    // never ran" from "validation ran and failed."
     warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
     warnings.push(W.make('CURVE_VALIDATION_MISSING',
-      `FCC contour cross-check failed: ${crossCheckRun.n_run - crossCheckRun.n_pass} of ${crossCheckRun.n_run} contours out of tolerance (max error ${crossCheckRun.max_error_km?.toFixed(2)} km).`));
+      'FCC contour cross-check skipped: ZTR rich-station endpoint returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable or the station has no published FCC contour yet).'));
+    // Stamp a synthetic provenance row so the Provenance UI can
+    // surface "skipped" instead of "no validation run attached".
+    crossCheckRun = {
+      source:                  'zerotrustradio',
+      endpoint:                richStation.endpoint || null,
+      upstream_api:            'https://geo.fcc.gov/api/contours/entity.json',
+      method:                  'FCC contour cross-check (geo.fcc.gov)',
+      tolerance_km:            null,
+      ran_at:                  new Date().toISOString(),
+      n_run: 0, n_pass: 0,
+      max_error_km:            null,
+      authoritative_pass:      false,
+      reference_cases_present: false,
+      result:                  'skipped'
+    };
+  }
+  // Also surface the cross-check provenance directly on the exhibit's
+  // validation block so the Provenance UI can render it without
+  // peeling the array.
+  if (crossCheckRun){
+    exhibit.validation = exhibit.validation || { runs: [] };
+    exhibit.validation.fcc_cross_check = {
+      source:       crossCheckRun.source,
+      endpoint:     crossCheckRun.endpoint,
+      upstream_api: crossCheckRun.upstream_api,
+      method:       crossCheckRun.method,
+      tolerance_km: crossCheckRun.tolerance_km,
+      ran_at:       crossCheckRun.ran_at,
+      n_run:        crossCheckRun.n_run,
+      n_pass:       crossCheckRun.n_pass,
+      max_error_km: crossCheckRun.max_error_km,
+      result:       crossCheckRun.authoritative_pass ? 'pass' : (crossCheckRun.reference_cases_present ? 'fail' : 'skipped')
+    };
   }
 
   if (process.env.TERRAIN_SIDECAR_URL && !sidecars.terrain){

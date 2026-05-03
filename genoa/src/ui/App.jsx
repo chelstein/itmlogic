@@ -13,13 +13,19 @@ import HardwareButton from '@components/ui/HardwareButton.jsx';
    component never does FCC math.
    ========================================================================= */
 
+// Synthetic preset.  No facility_id — this is intentionally a fake
+// engineering test fixture, NOT a real station that could be resolved
+// against ZTR.  The orchestrator therefore won't attempt a lookup,
+// won't stamp facility_lookup_source='zerotrustradio', and the
+// "Resolved via …" UI banner stays empty.
 const PRESET_SYNTHETIC = {
-  call:'WBOB-FM', facility_id:'12345', service:'FM', fcc_class:'A',
+  call:'WBOB-FM (synthetic)', facility_id:'', service:'FM', fcc_class:'A',
   frequency:98.7, erp_kw:6.0, haat_m:100,
   lat:37.0902, lon:-95.7129,
   ground_sigma_mS_m: 8,
   radial_step_deg: 10,
-  pattern_mode: 'ND'
+  pattern_mode: 'ND',
+  _synthetic: true
 };
 
 const PRESET_KSLX = {
@@ -59,7 +65,32 @@ export default function App() {
 
   /* ---------------- FACILITY LOOKUP ---------------- */
 
-  async function lookupFacility(id){
+  // Merge an upstream facility row into a base inputs object, only
+  // filling fields the caller hasn't already set.  Pure: returns the
+  // merged inputs without touching React state.
+  function mergeFacility(base, f){
+    if (!f) return base;
+    const fill = (k, v) => (base[k] === undefined || base[k] === '' || base[k] === null) ? v : base[k];
+    return {
+      ...base,
+      call:        fill('call',        f.call),
+      facility_id: fill('facility_id', f.facility_id),
+      service:     fill('service',     f.service),
+      fcc_class:   fill('fcc_class',   f.fcc_class),
+      frequency:   fill('frequency',   f.frequency),
+      erp_kw:      fill('erp_kw',      f.erp_kw),
+      haat_m:      fill('haat_m',      f.haat_m),
+      lat:         fill('lat',         f.lat),
+      lon:         fill('lon',         f.lon)
+    };
+  }
+
+  // Returns { facility, source, cached } on success, null on any
+  // failure.  ALSO updates React state + facility-source banner so the
+  // form visibly fills.  Callers that need to chain a compute() right
+  // after should use the merged inputs returned by mergeFacility (to
+  // dodge the React stale-closure on `inputs`).
+  async function lookupFacility(id, baseInputs = null){
     if (!id){ setFacilitySource('Enter a Facility ID first.'); return null; }
     setFacilitySource('Looking up…');
     try {
@@ -79,26 +110,13 @@ export default function App() {
         return null;
       }
       const j = await r.json();
-      // Apply only to missing fields — never overwrite caller input.
       const f = j.facility || {};
-      setInputs(prev => {
-        const fill = (k, v) => (prev[k] === undefined || prev[k] === '' || prev[k] === null) ? v : prev[k];
-        return {
-          ...prev,
-          call:        fill('call',        f.call),
-          facility_id: fill('facility_id', f.facility_id),
-          service:     fill('service',     f.service),
-          fcc_class:   fill('fcc_class',   f.fcc_class),
-          frequency:   fill('frequency',   f.frequency),
-          erp_kw:      fill('erp_kw',      f.erp_kw),
-          haat_m:      fill('haat_m',      f.haat_m),
-          lat:         fill('lat',         f.lat),
-          lon:         fill('lon',         f.lon)
-        };
-      });
+      // Apply only to missing fields — never overwrite caller input.
+      // Use the functional form so React batched updates compose.
+      setInputs(prev => mergeFacility(baseInputs || prev, f));
       const cacheTag = j.cached ? ' (cached)' : '';
       setFacilitySource(`Resolved via ${j.source}${cacheTag}`);
-      return f;
+      return { facility: f, source: j.source, cached: j.cached };
     } catch (e){
       setFacilitySource(`Lookup failed: ${e.message}`);
       return null;
@@ -107,28 +125,34 @@ export default function App() {
 
   /* ---------------- COMPUTE ---------------- */
 
-  async function compute(){
+  // `overrideInputs` lets preset loaders pass freshly-merged inputs
+  // directly without depending on React state having flushed.
+  async function compute(overrideInputs = null){
+    const i = overrideInputs || inputs;
     setComputing(true);
-    setStatusMsg(inputs.use_terrain
+    setStatusMsg(i.use_terrain
       ? 'Computing… (DEM fetch may take ~30s on cold cache)'
       : 'Computing…');
     try {
       const payload = {
         inputs: {
-          ...inputs,
+          ...i,
+          // Drop UI-only flags before sending to the API.
+          _synthetic:       undefined,
+          _resolveFacility: undefined,
           // Re-cast string inputs to numbers where the engine expects them.
-          frequency:         num(inputs.frequency),
-          erp_kw:            num(inputs.erp_kw),
-          haat_m:            num(inputs.haat_m),
-          lat:               num(inputs.lat),
-          lon:               num(inputs.lon),
-          ground_sigma_mS_m: num(inputs.ground_sigma_mS_m),
-          radial_step_deg:   num(inputs.radial_step_deg) || 10,
+          frequency:         num(i.frequency),
+          erp_kw:            num(i.erp_kw),
+          haat_m:            num(i.haat_m),
+          lat:               num(i.lat),
+          lon:               num(i.lon),
+          ground_sigma_mS_m: num(i.ground_sigma_mS_m),
+          radial_step_deg:   num(i.radial_step_deg) || 10,
           // Pass DA pattern only when the user toggled it on.
-          pattern_table: inputs.pattern_mode === 'DA' ? inputs.pattern_table : null
+          pattern_table: i.pattern_mode === 'DA' ? i.pattern_table : null
         },
         options: {
-          use_terrain: !!inputs.use_terrain
+          use_terrain: !!i.use_terrain
         }
       };
       const r = await fetch('/api/exhibits/compute', {
@@ -150,17 +174,30 @@ export default function App() {
 
   /* ---------------- PRESETS ---------------- */
 
+  // Load KSLX-FM, resolve via ZTR, compute against the resolved row.
+  // We thread the merged inputs through compute() to dodge React's
+  // stale-closure on `inputs` — setInputs queues a render but compute
+  // would otherwise still see the previous state.
   async function loadKslx(){
     setInputs(PRESET_KSLX);
+    setFacilitySource('Looking up KSLX-FM (facility 11282)…');
+    let merged = PRESET_KSLX;
     if (PRESET_KSLX._resolveFacility){
-      await lookupFacility(PRESET_KSLX.facility_id);
+      const r = await lookupFacility(PRESET_KSLX.facility_id, PRESET_KSLX);
+      if (r?.facility){
+        merged = mergeFacility(PRESET_KSLX, r.facility);
+        setInputs(merged);
+      }
     }
-    setTimeout(compute, 0);
+    // Thread the merged inputs into compute() directly so the request
+    // body matches what the user just loaded — no React render delay.
+    await compute(merged);
   }
   function loadSynthetic(){
     setInputs(PRESET_SYNTHETIC);
     setFacilitySource('');
-    setTimeout(compute, 0);
+    // Synthetic carries no facility_id; fine to compute via state.
+    setTimeout(() => compute(PRESET_SYNTHETIC), 0);
   }
   function reset(){
     setInputs(PRESET_SYNTHETIC);
@@ -524,16 +561,31 @@ function PaneProvenance({ exhibit }){
         ['DEM',      `${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`.trim()],
         ['Fetched at', ev.terrain.fetched_at || '—']
       ] : [['Status', 'no terrain source attached']]} />
-      <SubHead title="Curve validation source" />
-      <SubKv kv={last ? [
-        ['Method',   last.method   || '—'],
-        ['Source',   last.source   || '—'],
-        ['Endpoint', last.endpoint || '—'],
-        ['Upstream API', last.upstream_api || '—'],
-        ['Result',   last.authoritative_pass ? 'PASS — clears CURVE_VALIDATION_MISSING' : 'NOT PASSING'],
-        ['Tolerance', last.tolerance_km != null ? last.tolerance_km + ' km' : '—'],
-        ['Max error', last.max_error_km != null ? last.max_error_km.toFixed(2) + ' km' : '—']
-      ] : [['Status', 'no validation run attached']]} />
+      <SubHead title="Curve validation (FCC contour cross-check)" />
+      <SubKv kv={(() => {
+        // Prefer the explicit cross_check provenance block if the
+        // orchestrator stamped one; fall back to the last validation run.
+        const cc = exhibit.validation?.fcc_cross_check;
+        const src = cc || last;
+        if (!src) return [['Status', 'no validation run attached']];
+        const passLabel =
+          src.result === 'pass'    ? 'PASS — clears CURVE_VALIDATION_MISSING'
+        : src.result === 'fail'    ? 'FAIL — engine output outside tolerance'
+        : src.result === 'skipped' ? 'SKIPPED — no usable _fcc_contour from ZTR'
+        : (src.authoritative_pass ? 'PASS — clears CURVE_VALIDATION_MISSING' : 'NOT PASSING');
+        return [
+          ['Method',       src.method   || 'FCC contour cross-check'],
+          ['Source',       src.source   || 'zerotrustradio'],
+          ['Field',        '_fcc_contour'],
+          ['Endpoint',     src.endpoint || '—'],
+          ['Upstream API', src.upstream_api || 'https://geo.fcc.gov/api/contours/entity.json'],
+          ['Tolerance',    src.tolerance_km != null ? src.tolerance_km + ' km' : '—'],
+          ['Cases',        src.n_run != null ? `${src.n_pass ?? 0}/${src.n_run} pass` : '—'],
+          ['Max error',    src.max_error_km != null ? src.max_error_km.toFixed(2) + ' km' : '—'],
+          ['Ran at',       src.ran_at || '—'],
+          ['Result',       passLabel]
+        ];
+      })()} />
       <SubHead title="Measurement source" />
       <SubKv kv={ev.measurements?.available ? [
         ['Upstream', ev.measurements.source || '—'],
