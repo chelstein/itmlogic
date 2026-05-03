@@ -1,0 +1,43 @@
+{
+  "$schema":      "genoa.curve-reference-validation.v1",
+  "name":         "fm-f5050-golden",
+  "description":  "Internal golden fixtures for Genoa's pinned §73.333 F(50,50) curve dataset + linear-log10 interpolation.  Each case asserts what the CURRENT engine + curve dataset must produce; a failure indicates engine drift, dataset corruption, or interpolation regression.  These are NOT FCC OET reference values — they pin engine consistency, NOT FCC compliance.  External FCC geo cross-check is a separate evidence channel (see fcc_geo_contour_crosscheck).",
+  "method":       "47 CFR §73.333 F(50,50)",
+  "curve_dataset": {
+    "version":     "0.2",
+    "meta_sha256": "e277dce510717ad6e5c492278a5b3ca4139f39120e860d7889584c51bb171b84"
+  },
+  "tolerance_km": 0.1,
+  "cases": [
+    {
+      "id":                   "fm.f5050.kslx_class_c.60dbu",
+      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m → 60 dBu service contour",
+      "service":              "FM",
+      "mode":                 "50,50",
+      "erp_kw":               100,
+      "haat_m":               561,
+      "target_dBu":           60,
+      "expected_distance_km": 138.80
+    },
+    {
+      "id":                   "fm.f5050.kslx_class_c.54dbu",
+      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m → 54 dBu city-grade contour",
+      "service":              "FM",
+      "mode":                 "50,50",
+      "erp_kw":               100,
+      "haat_m":               561,
+      "target_dBu":           54,
+      "expected_distance_km": 168.72
+    },
+    {
+      "id":                   "fm.f5050.kslx_class_c.40dbu",
+      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m → 40 dBu protected contour",
+      "service":              "FM",
+      "mode":                 "50,50",
+      "erp_kw":               100,
+      "haat_m":               561,
+      "target_dBu":           40,
+      "expected_distance_km": 269.34
+    }
+  ]
+}

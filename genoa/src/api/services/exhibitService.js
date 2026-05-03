@@ -18,6 +18,7 @@ import { renderNarrative }      from '../../narrative/generator.js';
 import { sidecars }             from './sidecars.js';
 import { getCached, putCached } from './facilityCache.js';
 import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFccContourValidator.js';
+import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
 import { W }                    from '../../types/warnings.js';
 
 let _validationCache = null;
@@ -213,12 +214,23 @@ export async function computeExhibit(req){
   }
 
   // ---- 6. Validation context ----
-  // Pre-attach the local reference-cases run so the engine has SOMETHING.
-  // We may replace it below with the FCC cross-check if it passes.
-  const validationRun = await getOrRunValidation();
+  // Two INDEPENDENT validation systems:
+  //   a) curve_reference_validation — internal golden fixtures that
+  //      pin the engine + dataset + interpolation against known
+  //      values.  PASS clears CURVE_VALIDATION_MISSING.  This is the
+  //      ONLY system that touches that blocker.
+  //   b) fcc_geo_contour_crosscheck — external comparison against
+  //      ZTR's _fcc_contour proxy.  PASS / FAIL / SKIP are reported
+  //      as evidence (FCC_GEO_CROSSCHECK_FAILED / SKIPPED warnings),
+  //      never as CURVE_VALIDATION_MISSING.  See PRs #24, this PR.
+  const curveRefRun = await runCurveReferenceValidation();
+  // The legacy reference-cases run (smoke + KSLX seed) is still
+  // surfaced for engine-regression visibility, but no longer drives
+  // CURVE_VALIDATION_MISSING — the golden fixture does.
+  const legacyRun = await getOrRunValidation();
   let validationContext = {
-    runs: [validationRun],
-    reference_cases_present: validationRun.reference_cases_present
+    runs: [curveRefRun, legacyRun],
+    reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
   };
 
   // ---- 7. Compute ----
@@ -287,10 +299,13 @@ export async function computeExhibit(req){
       endpoint:     fccContourResp.endpoint,
       upstream_api: fccContourResp.upstream_api
     });
-    // Append to the runs list so the local suite is still visible.
+    // Append the FCC cross-check to the runs list so it sits next to
+    // the curve-reference run and the legacy regression run.
     exhibit.validation = {
-      runs:                    [validationRun, crossCheckRun],
-      reference_cases_present: crossCheckRun.reference_cases_present || validationRun.reference_cases_present
+      runs:                    [curveRefRun, legacyRun, crossCheckRun],
+      reference_cases_present: curveRefRun.pass
+                               || crossCheckRun.reference_cases_present
+                               || legacyRun.reference_cases_present
     };
   }
 
@@ -372,31 +387,42 @@ export async function computeExhibit(req){
     warnings.push(W.make('POPULATION_PLACEHOLDER', detail));
   }
 
+  // ---- Curve reference validation (drives CURVE_VALIDATION_MISSING) ----
+  // PASS clears the blocker.  This is the ONLY system that touches it.
+  // Internal golden fixtures pin the engine + dataset + interpolation;
+  // failure means engine drift, dataset corruption, or interp regression.
+  if (curveRefRun?.pass){
+    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
+  } else {
+    // Replace any prior CURVE_VALIDATION_MISSING (default-detail one
+    // emitted by the engine pre-compute) with a curve-reference-specific
+    // detail so reviewers know which suite failed.
+    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
+    const detail = curveRefRun?.n_run === 0
+      ? 'Internal golden fixture suite produced no runnable cases; pinned-dataset validation could not score.'
+      : `Internal golden fixture suite failed: ${curveRefRun.n_run - curveRefRun.n_pass} of ${curveRefRun.n_run} cases out of tolerance (max error ${curveRefRun.max_error_km?.toFixed(3)} km, tolerance ${curveRefRun.tolerance_km} km).  This means the engine + curve dataset are not producing their pinned values — engine drift, dataset corruption, or interpolation regression.`;
+    warnings.push(W.make('CURVE_VALIDATION_MISSING', detail));
+  }
+
+  // ---- FCC geo contour cross-check (independent, evidence-only) ----
+  // Drives FCC_GEO_CROSSCHECK_FAILED / FCC_GEO_CROSSCHECK_SKIPPED.
+  // NEVER drives CURVE_VALIDATION_MISSING.  The FCC's published contour
+  // uses a terrain-aware ITM method that the engine doesn't replicate;
+  // a mismatch is engineering evidence, not a curve-validation failure.
   if (crossCheckRun?.authoritative_pass){
-    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
+    // No warning — the cross-check passes (or absent).
   } else if (crossCheckRun && !crossCheckRun.authoritative_pass){
-    // Cross-check ran but didn't pass.  Distinguish two cases so
-    // reviewers know whether to retry, refile, or chase a real engine
-    // discrepancy.
-    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
     if (!crossCheckRun.reference_cases_present || crossCheckRun.n_run === 0){
-      warnings.push(W.make('CURVE_VALIDATION_MISSING',
-        'FCC contour cross-check skipped: ZTR returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable, the station may not have a published FCC contour yet, or the response was malformed).'));
+      warnings.push(W.make('FCC_GEO_CROSSCHECK_SKIPPED',
+        'ZTR returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable, the station has no published FCC contour yet, or the response was malformed).'));
     } else {
-      warnings.push(W.make('CURVE_VALIDATION_MISSING',
-        `FCC contour cross-check failed: ${crossCheckRun.n_run - crossCheckRun.n_pass} of ${crossCheckRun.n_run} contours out of tolerance (max error ${crossCheckRun.max_error_km?.toFixed(2)} km, tolerance ${crossCheckRun.tolerance_km} km).`));
+      warnings.push(W.make('FCC_GEO_CROSSCHECK_FAILED',
+        `${crossCheckRun.n_run - crossCheckRun.n_pass} of ${crossCheckRun.n_run} FCC contours out of tolerance (max error ${crossCheckRun.max_error_km?.toFixed(2)} km, tolerance ${crossCheckRun.tolerance_km} km).  FCC's contour is terrain-aware (ITM); the engine is free-space §73.333.  This deviation is expected for sites with terrain shadowing.`));
     }
   } else if (richStation?.available && !fccContourResp){
-    // We reached ZTR's rich-station endpoint but it carried no
-    // `_fcc_contour`.  That's NOT an engine failure; it's an upstream
-    // gap.  Replace the engine's generic CURVE_VALIDATION_MISSING with
-    // a "skipped" detail so reviewers can distinguish "validation
-    // never ran" from "validation ran and failed."
-    warnings = warnings.filter(w => w.code !== 'CURVE_VALIDATION_MISSING');
-    warnings.push(W.make('CURVE_VALIDATION_MISSING',
-      'FCC contour cross-check skipped: ZTR rich-station endpoint returned no usable _fcc_contour for this station (geo.fcc.gov may be unreachable or the station has no published FCC contour yet).'));
-    // Stamp a synthetic provenance row so the Provenance UI can
-    // surface "skipped" instead of "no validation run attached".
+    // Rich-station reached but no _fcc_contour.
+    warnings.push(W.make('FCC_GEO_CROSSCHECK_SKIPPED',
+      'ZTR rich-station endpoint returned no usable _fcc_contour for this station.'));
     crossCheckRun = {
       source:                  'zerotrustradio',
       endpoint:                richStation.endpoint || null,
@@ -411,11 +437,24 @@ export async function computeExhibit(req){
       result:                  'skipped'
     };
   }
-  // Also surface the cross-check provenance directly on the exhibit's
-  // validation block so the Provenance UI can render it without
+  // Surface BOTH validation systems directly on the exhibit's
+  // validation block so the Provenance UI can render them without
   // peeling the array.
+  exhibit.validation = exhibit.validation || { runs: [] };
+  exhibit.validation.curve_reference_validation = {
+    name:           curveRefRun?.name || 'fm-f5050-golden',
+    method:         curveRefRun?.method || null,
+    fixture_path:   curveRefRun?.fixture_path || null,
+    curve_dataset:  curveRefRun?.curve_dataset || null,
+    tolerance_km:   curveRefRun?.tolerance_km ?? null,
+    ran_at:         curveRefRun?.ran_at || null,
+    n_run:          curveRefRun?.n_run ?? 0,
+    n_pass:         curveRefRun?.n_pass ?? 0,
+    max_error_km:   curveRefRun?.max_error_km ?? null,
+    mean_error_km:  curveRefRun?.mean_error_km ?? null,
+    result:         curveRefRun?.result || 'no_cases'
+  };
   if (crossCheckRun){
-    exhibit.validation = exhibit.validation || { runs: [] };
     exhibit.validation.fcc_cross_check = {
       source:       crossCheckRun.source,
       endpoint:     crossCheckRun.endpoint,
