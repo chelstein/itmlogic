@@ -77,7 +77,23 @@ export const WARNING_CODES = Object.freeze({
 
   FACILITY_COORDINATES_MISSING:    { severity: 'blocker', phase: 'input',
     title: 'Facility coordinates missing',
-    description: 'Transmitter latitude / longitude are missing. The engine can compute contour distances along radials but cannot project polygons or generate the GeoJSON map. Filing requires verified facility coordinates.' }
+    description: 'Transmitter latitude / longitude are missing. The engine can compute contour distances along radials but cannot project polygons or generate the GeoJSON map. Filing requires verified facility coordinates.' },
+
+  // ---- FCC geo contour cross-check (external evidence; NOT a blocker) ----
+  // The FCC's published contour from geo.fcc.gov uses terrain-aware
+  // ITM under the hood; Genoa's free-space §73.333 F(50,50) lookup is
+  // a different method.  A mismatch is engineering-meaningful but is
+  // EVIDENCE, not a curve-validation failure.  These warnings replace
+  // the previous habit of emitting CURVE_VALIDATION_MISSING when the
+  // FCC cross-check disagreed.
+
+  FCC_GEO_CROSSCHECK_FAILED:       { severity: 'warning', phase: 'evidence',
+    title: 'FCC geo contour cross-check failed',
+    description: 'Engine output deviates from the FCC published contour beyond the cross-check tolerance.  This is external evidence — the FCC contour is computed with a terrain-aware method (ITM) that the engine does not yet replicate.  Engineering review required; CURVE_VALIDATION_MISSING is unaffected.' },
+
+  FCC_GEO_CROSSCHECK_SKIPPED:      { severity: 'warning', phase: 'evidence',
+    title: 'FCC geo contour cross-check skipped',
+    description: 'No usable _fcc_contour was returned by the upstream (geo.fcc.gov / ZTR proxy).  The cross-check did not run.  This does not affect curve validation status.' }
 });
 
 export class W {

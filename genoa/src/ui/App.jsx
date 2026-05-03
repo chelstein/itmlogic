@@ -611,18 +611,36 @@ function PaneProvenance({ exhibit }){
         ['DEM',      `${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`.trim()],
         ['Fetched at', ev.terrain.fetched_at || '—']
       ] : [['Status', 'no terrain source attached']]} />
-      <SubHead title="Curve validation (FCC contour cross-check)" />
+      <SubHead title="Curve reference validation (internal golden fixtures)" />
       <SubKv kv={(() => {
-        // Prefer the explicit cross_check provenance block if the
-        // orchestrator stamped one; fall back to the last validation run.
+        const cr = exhibit.validation?.curve_reference_validation;
+        if (!cr) return [['Status', 'no curve-reference run attached']];
+        const passLabel =
+          cr.result === 'pass'  ? 'PASS — clears CURVE_VALIDATION_MISSING'
+        : cr.result === 'fail'  ? 'FAIL — engine + dataset drift detected'
+        : 'NO CASES RUN';
+        return [
+          ['Fixture',      cr.name || '—'],
+          ['Method',       cr.method || '—'],
+          ['Path',         cr.fixture_path || '—'],
+          ['Curve dataset', cr.curve_dataset?.version || '—'],
+          ['Tolerance',    cr.tolerance_km != null ? cr.tolerance_km + ' km' : '—'],
+          ['Cases',        cr.n_run != null ? `${cr.n_pass ?? 0}/${cr.n_run} pass` : '—'],
+          ['Max error',    cr.max_error_km != null ? cr.max_error_km.toFixed(3) + ' km' : '—'],
+          ['Ran at',       cr.ran_at || '—'],
+          ['Result',       passLabel]
+        ];
+      })()} />
+      <SubHead title="FCC geo contour cross-check (external evidence)" />
+      <SubKv kv={(() => {
         const cc = exhibit.validation?.fcc_cross_check;
         const src = cc || last;
-        if (!src) return [['Status', 'no validation run attached']];
+        if (!src) return [['Status', 'no FCC cross-check run attached']];
         const passLabel =
-          src.result === 'pass'    ? 'PASS — clears CURVE_VALIDATION_MISSING'
-        : src.result === 'fail'    ? 'FAIL — engine output outside tolerance'
+          src.result === 'pass'    ? 'PASS — engine matches FCC geo contour'
+        : src.result === 'fail'    ? 'FAIL — engine differs from FCC geo contour (warning, not blocker)'
         : src.result === 'skipped' ? 'SKIPPED — no usable _fcc_contour from ZTR'
-        : (src.authoritative_pass ? 'PASS — clears CURVE_VALIDATION_MISSING' : 'NOT PASSING');
+        : (src.authoritative_pass ? 'PASS' : 'NOT PASSING');
         return [
           ['Method',       src.method   || 'FCC contour cross-check'],
           ['Source',       src.source   || 'zerotrustradio'],
@@ -633,7 +651,8 @@ function PaneProvenance({ exhibit }){
           ['Cases',        src.n_run != null ? `${src.n_pass ?? 0}/${src.n_run} pass` : '—'],
           ['Max error',    src.max_error_km != null ? src.max_error_km.toFixed(2) + ' km' : '—'],
           ['Ran at',       src.ran_at || '—'],
-          ['Result',       passLabel]
+          ['Result',       passLabel],
+          ['Note',         'External evidence only.  FCC uses terrain-aware ITM; engine is free-space §73.333.  This does NOT drive CURVE_VALIDATION_MISSING.']
         ];
       })()} />
       <SubHead title="Measurement source" />
