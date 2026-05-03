@@ -1,0 +1,88 @@
+# DigitalOcean App Platform spec for Genoa.
+# Copy to .do/app.yaml at the repo root + `doctl apps create --spec` to bootstrap,
+# or import in the DO console.  This is a reference spec; the live app is
+# expected to be configured in the console for ongoing operation (see
+# https://docs.digitalocean.com/products/app-platform/).
+
+name: genoa
+region: sfo
+
+alerts:
+  - rule: DEPLOYMENT_FAILED
+  - rule: DOMAIN_FAILED
+
+features:
+  - buildpack-stack=ubuntu-22
+
+databases:
+  - name: db
+    engine: PG
+    production: true
+    version: "16"
+
+ingress:
+  rules:
+    - component: { name: genoa-api }
+      match: { path: { prefix: / } }
+
+services:
+
+  # ---- API + UI (single component, serves /api and / static UI) ----
+  - name: genoa-api
+    dockerfile_path: infra/docker/api.Dockerfile
+    source_dir: .
+    github:
+      repo: chelstein/itmlogic
+      branch: master
+      deploy_on_push: true
+    instance_size_slug: apps-s-1vcpu-1gb
+    instance_count: 1
+    http_port: 8080
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 15
+      period_seconds: 30
+      timeout_seconds: 5
+      success_threshold: 1
+      failure_threshold: 5
+    envs:
+      - { key: NODE_ENV,                    scope: RUN_TIME, value: production }
+      - { key: PORT,                        scope: RUN_TIME, value: "8080" }
+      - { key: PG_SSL,                      scope: RUN_TIME, value: "true" }
+      - { key: PG_SSL_REJECT,               scope: RUN_TIME, value: "false" }
+      # DATABASE_URL is provisioned automatically when component is bound to ${db.DATABASE_URL}.
+      - { key: DATABASE_URL,                scope: RUN_TIME, value: "${db.DATABASE_URL}" }
+      # Spaces — set as encrypted SECRET in the console, not in this file.
+      - { key: SPACES_ENDPOINT,             scope: RUN_TIME, value: "https://sfo3.digitaloceanspaces.com" }
+      - { key: SPACES_BUCKET,               scope: RUN_TIME, value: "genoa-exhibits" }
+      # Sidecars — leave blank for first deploy; the engine still produces an FM exhibit
+      # without them and emits SIDECAR_UNAVAILABLE.
+      - { key: TERRAIN_SIDECAR_URL,         scope: RUN_TIME, value: "" }
+      - { key: MEASUREMENT_SIDECAR_URL,     scope: RUN_TIME, value: "" }
+      - { key: IDENTITY_SIDECAR_URL,        scope: RUN_TIME, value: "" }
+      - { key: ZERO_TRUST_RADIO_READONLY_URL, scope: RUN_TIME, value: "" }
+      - { key: RADIODNS_RESOLVER_URL,       scope: RUN_TIME, value: "" }
+
+# ---- Worker (App Platform 'workers' component, no HTTP) ----
+workers:
+  - name: genoa-worker
+    dockerfile_path: infra/docker/worker.Dockerfile
+    source_dir: .
+    github:
+      repo: chelstein/itmlogic
+      branch: master
+      deploy_on_push: true
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    envs:
+      - { key: NODE_ENV,    scope: RUN_TIME, value: production }
+      - { key: DATABASE_URL, scope: RUN_TIME, value: "${db.DATABASE_URL}" }
+      - { key: PG_SSL,       scope: RUN_TIME, value: "true" }
+      - { key: PG_SSL_REJECT, scope: RUN_TIME, value: "false" }
+      - { key: WORKER_POLL_MS, scope: RUN_TIME, value: "5000" }
+
+# Sidecars (terrain, measurement, identity) are NOT modeled as App Platform
+# services in this spec because they each depend on upstream chelstein/* tools
+# at runtime.  Deploy them as separate App Platform services or as Droplets
+# once the upstream tools are containerized; then point the API envs above at
+# their URLs.  See docs/SIDECARS.md.
