@@ -20,11 +20,50 @@ r.post('/exhibits/compute', asyncHandler(async (req, res) => {
 }));
 
 // POST /api/exhibits/save  — compute (if not already) and persist.
+// EPHEMERAL FALLBACK: when the database is not configured (or an
+// upstream returns HTML), persistence is unavailable.  Rather than
+// crash the frontend on a non-JSON error response, this route ALWAYS
+// returns JSON: it tries to persist, falls back to acknowledging an
+// ephemeral session save, and never lets a JSON-parse error reach the
+// UI.  This is the safety net behind /api/exhibits's strict path.
 r.post('/exhibits/save', asyncHandler(async (req, res) => {
-  let exhibit = req.body?.exhibit;
-  if (!exhibit) exhibit = await computeExhibit(req.body || {});
-  const saved = await saveExhibit(exhibit);
-  res.json({ id: saved.id, created_at: saved.created_at, exhibit });
+  let exhibit = req.body?.exhibit || req.body;
+  if (!exhibit || !exhibit.station_inputs){
+    // Caller passed a compute-style body { inputs, options } instead
+    // of a full exhibit; compute first.
+    try { exhibit = await computeExhibit(req.body || {}); }
+    catch (e){
+      return res.status(400).json({
+        error:   'BAD_REQUEST',
+        message: e.message || 'exhibit body required',
+        mode:    'ephemeral',
+        saved:   false
+      });
+    }
+  }
+  try {
+    const saved = await saveExhibit(exhibit);
+    return res.json({
+      status:     'ok',
+      saved:      true,
+      mode:       'persisted',
+      id:         saved.id,
+      created_at: saved.created_at
+    });
+  } catch (e){
+    // Persistence unavailable (no DATABASE_URL, DB down, etc).  Return
+    // JSON acknowledging the ephemeral session — the UI will then
+    // offer a local download.  NEVER let this surface as HTML.
+    return res.json({
+      status:    'ok',
+      saved:     false,
+      mode:      'ephemeral',
+      message:   e.code === 'DB_UNAVAILABLE'
+        ? 'Persistence unavailable (DATABASE_URL not configured).  Exhibit was held in this request only.'
+        : `Persistence unavailable (${e.code || 'unknown'}: ${e.message}).  Exhibit was held in this request only.`,
+      reason:    e.code || null
+    });
+  }
 }));
 
 // POST /api/exhibits  — backward-compat: persist a fully-formed exhibit.

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { stripDomAndReact } from './lib/stripDomAndReact.js';
+import { readJsonOrThrow }  from './lib/readJson.js';
 import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
@@ -173,8 +174,7 @@ export default function App() {
         headers: { 'content-type': 'application/json' },
         body:    JSON.stringify(cleanPayload)
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || j.message || `HTTP ${r.status}`);
+      const j = await readJsonOrThrow(r);
       setExhibit(j);
       const fr = j.filing_readiness || {};
       setStatusMsg(j.degraded_mode
@@ -224,16 +224,48 @@ export default function App() {
   async function save(){
     if (!exhibit){ setStatusMsg('Run a compute first.'); return; }
     setBusy(true);
-    try {
-      const r = await fetch('/api/exhibits', {
+    const cleanedExhibit = stripDomAndReact(exhibit);
+    const body = JSON.stringify(cleanedExhibit);
+
+    // Try the persisted-save endpoint first.  When persistence is
+    // unavailable (no DATABASE_URL on the deploy, App Platform error
+    // page, proxy 502 → HTML body), fall back to /api/exhibits/save
+    // (ephemeral; never crashes on missing DB), then to a local file
+    // download — never let the UI surface a JSON-parse crash.
+    const tryPost = async (url) => {
+      const r = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body:    JSON.stringify(stripDomAndReact(exhibit))
+        body
       });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
-      setExhibit(prev => ({ ...prev, id: j.id }));
-      setStatusMsg(`Saved exhibit #${j.id}`);
+      // readJsonOrThrow surfaces HTML / non-JSON / non-2xx as a
+      // structured Error instead of crashing inside response.json().
+      return readJsonOrThrow(r);
+    };
+
+    try {
+      try {
+        const j = await tryPost('/api/exhibits');
+        setExhibit(prev => ({ ...prev, id: j.id }));
+        setStatusMsg(`Saved exhibit #${j.id}`);
+        return;
+      } catch (e){ console.warn('[save] persistent save failed:', e.message); }
+
+      try {
+        const j = await tryPost('/api/exhibits/save');
+        const tag = j.id ? `exhibit #${j.id}` : (j.mode === 'ephemeral' ? 'ephemeral session' : 'session');
+        setStatusMsg(`Save unavailable on server — held in ${tag}.  Use JSON / TXT / GeoJSON to export locally.`);
+        if (j.id) setExhibit(prev => ({ ...prev, id: j.id }));
+        return;
+      } catch (e){ console.warn('[save] ephemeral save failed:', e.message); }
+
+      // Final fallback: synthesize a downloadable JSON file in-browser.
+      const blob = new Blob([JSON.stringify(cleanedExhibit, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${(cleanedExhibit.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_')}_genoa_exhibit.json`;
+      a.click();
+      setStatusMsg('Save unavailable on server — exhibit downloaded locally as JSON.');
     } catch (e){
       setStatusMsg(`Save failed: ${e.message}`);
     } finally { setBusy(false); }
@@ -266,7 +298,7 @@ export default function App() {
     try {
       const r = await fetch('/api/exhibits');
       if (!r.ok){ setHistory([]); return; }
-      const rows = await r.json();
+      const rows = await readJsonOrThrow(r);
       setHistory(Array.isArray(rows) ? rows : []);
     } catch { setHistory([]); }
   }
@@ -399,8 +431,7 @@ export default function App() {
   async function pickHistory(id){
     try {
       const r = await fetch(`/api/exhibits/${id}`);
-      const x = await r.json();
-      if (!r.ok) throw new Error(x.error || 'load failed');
+      const x = await readJsonOrThrow(r);
       setExhibit(x.payload);
       const s = x.payload.station_inputs || {};
       setInputs(prev => ({ ...prev, ...s, pattern_mode: Array.isArray(s.pattern) ? 'DA' : 'ND' }));
