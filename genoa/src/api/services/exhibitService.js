@@ -154,6 +154,38 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 3b. SPLAT sidecar capability probe (provenance only today) ----
+  // When SPLAT_SIDECAR_URL is configured, probe the sidecar's health +
+  // version and stamp the result on evidence.splat.  We do NOT compute
+  // engineering output via SPLAT yet — that requires DEM tiles
+  // provisioned in the sidecar's WORKDIR plus an inline-QTH route the
+  // sidecar doesn't yet expose.  This wiring puts the connection in
+  // place so the moment those land, switching the engine over is a
+  // single-call change in this same block.
+  if (sidecars.splat){
+    try {
+      const cap = await sidecars.splat.capability();
+      evidence.splat = cap.available
+        ? {
+            available:        true,
+            source:           cap.source,
+            endpoint:         cap.endpoint,
+            sidecar_name:     cap.sidecar_name,
+            splat_bin:        cap.splat_bin,
+            workdir:          cap.workdir,
+            dem_provisioned:  cap.dem_provisioned,
+            note:             cap.notes
+          }
+        : {
+            available: false,
+            source:    null,
+            error:     cap.error
+          };
+    } catch (e){
+      evidence.splat = { available: false, source: null, error: String(e.message) };
+    }
+  }
+
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
   if (sdrResp?.available){
     evidence.measurements = {
@@ -281,6 +313,9 @@ export async function computeExhibit(req){
   }
   if (evidence.identity){
     exhibit.evidence.identity = evidence.identity;
+  }
+  if (evidence.splat){
+    exhibit.evidence.splat = evidence.splat;
   }
 
   // ---- 10. Reconcile warnings against actual evidence ----

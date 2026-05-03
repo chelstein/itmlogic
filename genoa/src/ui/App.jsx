@@ -613,6 +613,26 @@ function PaneProvenance({ exhibit }){
         ['Calibrated', ev.measurements.calibrated ? 'yes' : 'no'],
         ['Fetched at', ev.measurements.fetched_at || '—']
       ] : [['Status', 'no SDR evidence attached']]} />
+      <SubHead title="SPLAT sidecar (terrain-aware contour, future)" />
+      <SubKv kv={(() => {
+        const sp = exhibit.evidence?.splat;
+        if (!sp) return [['Status', 'not configured (SPLAT_SIDECAR_URL unset)']];
+        if (!sp.available) return [
+          ['Status',  'sidecar unreachable'],
+          ['Source',  sp.source || '—'],
+          ['Error',   sp.error  || '—']
+        ];
+        return [
+          ['Status',          'reachable'],
+          ['Source',          sp.source],
+          ['Endpoint',        sp.endpoint || '—'],
+          ['Sidecar',         sp.sidecar_name || '—'],
+          ['SPLAT bin',       sp.splat_bin || '—'],
+          ['Workdir',         sp.workdir || '—'],
+          ['DEM provisioned', sp.dem_provisioned === true ? 'yes' : (sp.dem_provisioned === false ? 'no' : 'unknown')],
+          ['Note',            sp.note || '—']
+        ];
+      })()} />
       <SubHead title="Population source" />
       <SubKv kv={(() => {
         const pop = exhibit.population_estimate || {};
