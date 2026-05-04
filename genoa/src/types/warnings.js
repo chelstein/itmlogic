@@ -93,7 +93,24 @@ export const WARNING_CODES = Object.freeze({
 
   FCC_GEO_CROSSCHECK_SKIPPED:      { severity: 'warning', phase: 'evidence',
     title: 'FCC geo contour cross-check skipped',
-    description: 'No usable _fcc_contour was returned by the upstream (geo.fcc.gov / ZTR proxy).  The cross-check did not run.  This does not affect curve validation status.' }
+    description: 'No usable _fcc_contour was returned by the upstream (geo.fcc.gov / ZTR proxy).  The cross-check did not run.  This does not affect curve validation status.' },
+
+  // ---- Regulatory compliance (47 CFR §73.811 / §74.1204) ----
+  // These warnings are emitted by the regulatory compliance modules
+  // (src/engine/regulatory/) when an exhibit fails — or cannot complete
+  // — its rule check.
+
+  LPFM_RULE_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'LPFM rule violation (47 CFR §73.811)',
+    description: 'The exhibit fails one or more 47 CFR §73.811 LPFM rules (ERP ceiling, service-contour distance).  The exhibit is not filable as an LPFM application.' },
+
+  TRANSLATOR_INTERFERENCE: { severity: 'blocker', phase: 'engine',
+    title: 'FM translator interference (47 CFR §74.1204)',
+    description: 'The translator fails one or more §74.1204 D/U interference gates against a nearby primary station.  Filing requires that all D/U ratios be satisfied.' },
+
+  MISSING_NEARBY_STATIONS: { severity: 'warning', phase: 'evidence',
+    title: 'Nearby-stations list missing',
+    description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' }
 });
 
 export class W {

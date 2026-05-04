@@ -25,6 +25,8 @@ import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
 import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, fxInputGuards } from './translators/contour.js';
 import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.js';
+import { checkLpfmCompliance } from './regulatory/lpfm.js';
+import { checkTranslatorInterference } from './regulatory/translator.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -185,6 +187,41 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
         contours
       });
       break;
+  }
+
+  // ---- Regulatory compliance (§73.811 / §74.1204) -------------------
+  // LPFM exhibits get §73.811 service-contour + ERP-ceiling check.
+  // FM-translator exhibits get §74.1204 D/U short-spacing study against
+  // any primary stations supplied via evidence.nearby_primaries.  All
+  // results are stamped on exhibit.regulatory_compliance for downstream
+  // consumers; rule failures bubble up as typed warnings.
+  let regulatory_compliance = null;
+  if (service === 'LPFM'){
+    regulatory_compliance = await checkLpfmCompliance({
+      erp_kw:        erp_kW,
+      haat_m,
+      frequency_mhz: freq,
+      fcc_class:     inputs.fcc_class || 'LP100'
+    });
+    if (regulatory_compliance.pass === false){
+      warnings.push(W.make('LPFM_RULE_VIOLATION',
+        regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+  } else if (service === 'FX'){
+    const primaries = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
+    regulatory_compliance = checkTranslatorInterference({
+      translator: {
+        erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+        call: inputs.call || null, facility_id
+      },
+      primaries
+    });
+    if (regulatory_compliance.missing_nearby_stations){
+      warnings.push(W.make('MISSING_NEARBY_STATIONS'));
+    } else if (regulatory_compliance.pass === false){
+      warnings.push(W.make('TRANSLATOR_INTERFERENCE',
+        regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
   }
 
   // ---- Polygons + GeoJSON ------------------------------------------
@@ -401,6 +438,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_mode    = exhibit.warnings.length > 0;
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
+  exhibit.regulatory_compliance = regulatory_compliance;
   exhibit.exports      = {
     json:        'pending',
     txt:         'pending',

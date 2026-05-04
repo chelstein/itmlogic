@@ -148,6 +148,67 @@ export function fccDistanceKm({
   };
 }
 
+// Compute predicted field strength (dBu) at a given distance for a given
+// ERP / HAAT / channel / curve.  This is the inverse of fccDistanceKm —
+// used by the §74.1204 D/U interference analysis where the engine asks
+// "what F(50,10) field does this translator produce at distance d?".
+//
+// Same vendored FCC routine, fs_or_dist = 1 (return field).
+export function fccFieldDbuAtDistance({
+  haat_m,
+  distance_km,
+  erp_kw,
+  mode = '50,10',
+  channel = null,
+  frequency_mhz = null
+}){
+  const ch = channel ?? (frequency_mhz != null ? fmFrequencyToChannel(frequency_mhz) : 261);
+  const curve = mode === '50,10' ? CURVE_F5010
+              : mode === '50,90' ? CURVE_F5090
+              :                    CURVE_F5050;
+  const flag = new Array(19).fill(0);
+
+  console.log = _silent;
+  let result;
+  try {
+    result = fcc.tvfmfs_metric(
+      Number(erp_kw),       // erp (kW)
+      Number(haat_m),       // haat (m)
+      Number(ch),           // channel
+      0,                    // field — placeholder; FCC fills via curve walk
+      Number(distance_km),  // distance (km) — input for fs_or_dist=1
+      FS_OR_DIST_FIELD,     // fs_or_dist = 1 → return field
+      curve,
+      flag
+    );
+  } finally {
+    console.log = _origLog;
+  }
+
+  if (flag[3]){
+    throw Object.assign(new Error('FCC: channel out of range'),
+      { code: 'FCC_CHANNEL_OUT_OF_RANGE', flag });
+  }
+  if (flag[5]){
+    throw Object.assign(new Error('FCC: fs_or_dist invalid'),
+      { code: 'FCC_FSDIST_INVALID', flag });
+  }
+  if (!Number.isFinite(result)){
+    throw Object.assign(new Error('FCC: tvfmfs_metric returned non-finite field'),
+      { code: 'FCC_NO_RESULT', flag, result });
+  }
+
+  return {
+    field_dBu:   Number(result),
+    source:      'fcc-tvfm_curves',
+    method:      curve === CURVE_F5050 ? '47 CFR §73.333 F(50,50)' :
+                 curve === CURVE_F5010 ? '47 CFR §73.333 F(50,10)' :
+                                          '47 CFR §73.333 F(50,90)',
+    channel:     ch,
+    flags:       flag.slice(0, 19)
+  };
+}
+
 export const FCC_PROVENANCE = Object.freeze({
   repo:    'github.com/fcc/contours-api-node',
   commit:  'b55870d3f20618e886cd02379008ef980229d44b',
