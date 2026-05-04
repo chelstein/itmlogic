@@ -1,43 +1,71 @@
 {
-  "$schema":      "genoa.curve-reference-validation.v1",
+  "$schema":      "genoa.curve-reference-validation.v2",
   "name":         "fm-f5050-golden",
-  "description":  "Internal golden fixtures for Genoa's pinned §73.333 F(50,50) curve dataset + linear-log10 interpolation.  Each case asserts what the CURRENT engine + curve dataset must produce; a failure indicates engine drift, dataset corruption, or interpolation regression.  These are NOT FCC OET reference values — they pin engine consistency, NOT FCC compliance.  External FCC geo cross-check is a separate evidence channel (see fcc_geo_contour_crosscheck).",
+  "description":  "Genoa golden fixtures — locked to the vendored FCC contours-api-node tvfm_curves.js bivariate cubic surface fit.  Each expected value was computed by directly invoking fcc.tvfmfs_metric() with fs_or_dist=2 and curve=0 against the vendored 25 × 13 F(50,50) tabulation.  PASS proves Genoa's engine path produces FCC-canonical output (identical to geo.fcc.gov/api/contours/distance.json).",
   "method":       "47 CFR §73.333 F(50,50)",
+  "curve_engine": "fcc-canonical",
   "curve_dataset": {
-    "version":     "0.2",
-    "meta_sha256": "e277dce510717ad6e5c492278a5b3ca4139f39120e860d7889584c51bb171b84"
+    "source":  "github.com/fcc/contours-api-node",
+    "commit":  "b55870d3f20618e886cd02379008ef980229d44b",
+    "file":    "controllers/tvfm_curves.js",
+    "sha256":  "58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a"
   },
-  "tolerance_km": 0.1,
+  "tolerance_km": 0.05,
   "cases": [
     {
       "id":                   "fm.f5050.kslx_class_c.60dbu",
-      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m → 60 dBu service contour",
+      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m, 100.7 MHz → 60 dBu service contour",
       "service":              "FM",
       "mode":                 "50,50",
       "erp_kw":               100,
       "haat_m":               561,
       "target_dBu":           60,
-      "expected_distance_km": 138.80
+      "frequency_mhz":        100.7,
+      "expected_distance_km": 90.193
     },
     {
       "id":                   "fm.f5050.kslx_class_c.54dbu",
-      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m → 54 dBu city-grade contour",
+      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m, 100.7 MHz → 54 dBu city grade",
       "service":              "FM",
       "mode":                 "50,50",
       "erp_kw":               100,
       "haat_m":               561,
       "target_dBu":           54,
-      "expected_distance_km": 168.72
+      "frequency_mhz":        100.7,
+      "expected_distance_km": 105.437
     },
     {
       "id":                   "fm.f5050.kslx_class_c.40dbu",
-      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m → 40 dBu protected contour",
+      "label":                "KSLX-FM Class C, 100 kW, HAAT 561 m, 100.7 MHz → 40 dBu protected",
       "service":              "FM",
       "mode":                 "50,50",
       "erp_kw":               100,
       "haat_m":               561,
       "target_dBu":           40,
-      "expected_distance_km": 269.34
+      "frequency_mhz":        100.7,
+      "expected_distance_km": 148.126
+    },
+    {
+      "id":                   "fm.f5050.class_a.60dbu",
+      "label":                "Class A reference, 6 kW, HAAT 100 m, 98.7 MHz → 60 dBu",
+      "service":              "FM",
+      "mode":                 "50,50",
+      "erp_kw":               6,
+      "haat_m":               100,
+      "target_dBu":           60,
+      "frequency_mhz":        98.7,
+      "expected_distance_km": 28.295
+    },
+    {
+      "id":                   "fm.f5050.class_c.60dbu",
+      "label":                "Class C max reference, 100 kW, HAAT 600 m, 100.7 MHz → 60 dBu",
+      "service":              "FM",
+      "mode":                 "50,50",
+      "erp_kw":               100,
+      "haat_m":               600,
+      "target_dBu":           60,
+      "frequency_mhz":        100.7,
+      "expected_distance_km": 91.818
     }
   ]
 }

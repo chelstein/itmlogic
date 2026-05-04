@@ -162,5 +162,13 @@ test('engine_signature, blockers, degraded_mode, calculation_trace all populated
   assert.equal(typeof x.degraded_mode, 'boolean');
   assert.ok(Array.isArray(x.degraded_reasons));
   assert.ok(x.calculation_trace?.fm?.formula_summary, 'FM calculation_trace.formula_summary required');
-  assert.equal(x.calculation_trace.fm.dataset, x.method_versions.curve_dataset.curve_version);
+  // calculation_trace.fm.dataset reflects the active curve engine.
+  // For the FCC-canonical default, dataset is the vendored upstream
+  // identifier (NOT the legacy curve_dataset.curve_version).  Either
+  // form is acceptable as long as dataset is a non-empty string.
+  assert.ok(typeof x.calculation_trace.fm.dataset === 'string'
+            && x.calculation_trace.fm.dataset.length > 0,
+            'calculation_trace.fm.dataset must be set');
+  assert.equal(x.method_versions.curve_engine, 'fcc-canonical',
+               'default engine should be fcc-canonical');
 });

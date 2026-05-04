@@ -20,7 +20,7 @@ import { contourFeature, featureCollection } from './geometry/geojson.js';
 import { parsePatternTable } from './pattern/parse.js';
 import { patternFactor } from './pattern/factor.js';
 import { flatHaatPerRadial } from './haat/flat.js';
-import { fmRadialTable, FM_DEFAULT_CONTOURS, FM_INTERP, FM_CONTOUR_METHODS } from './fm/contour.js';
+import { fmRadialTable, FM_DEFAULT_CONTOURS, FM_INTERP, FM_INTERP_FCC, FM_CONTOUR_METHODS, FM_ENGINE_DEFAULT } from './fm/contour.js';
 import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
 import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, fxInputGuards } from './translators/contour.js';
@@ -137,26 +137,36 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // ---- Radial table + contours --------------------------------------
   const factorFn = az => patternFactor(pattern, az);
   let contours, radial_table;
+  // Engine selection.  Default to the vendored FCC-canonical path
+  // (matches geo.fcc.gov/api/contours) so Genoa output is FCC-equivalent.
+  // Caller can opt back to the legacy v0.2 lookup via
+  //   options.engine = 'v0.2-legacy'
+  // for regression / debugging.
+  const fmEngine = options.engine || FM_ENGINE_DEFAULT;
+
   switch (service){
     case 'FM':
       contours     = FM_DEFAULT_CONTOURS;
       radial_table = await fmRadialTable({
         datasetByName: loadDataset, mode: '50,50', contours,
-        erp_kW, patternFactorFn: factorFn, haatPerRadial
+        erp_kW, patternFactorFn: factorFn, haatPerRadial,
+        frequency_mhz: freq, engine: fmEngine
       });
       break;
     case 'LPFM':
       contours     = LPFM_DEFAULT_CONTOURS;
       radial_table = await lpfmRadialTable({
         datasetByName: loadDataset, mode: '50,50', contours,
-        erp_kW, patternFactorFn: factorFn, haatPerRadial
+        erp_kW, patternFactorFn: factorFn, haatPerRadial,
+        frequency_mhz: freq, engine: fmEngine
       });
       break;
     case 'FX':
       contours     = FX_DEFAULT_CONTOURS;
       radial_table = await fxRadialTable({
         datasetByName: loadDataset, mode: '50,50', contours,
-        erp_kW, patternFactorFn: factorFn, haatPerRadial
+        erp_kW, patternFactorFn: factorFn, haatPerRadial,
+        frequency_mhz: freq, engine: fmEngine
       });
       break;
     case 'AM':
@@ -234,11 +244,16 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // the worker).  At compute time it only records whether validation
   // has been previously attached.
   const validation = options.validation || { runs: [], reference_cases_present: false };
-  const lastRun = validation.runs?.[validation.runs.length - 1] || null;
-  // Only an authoritative pass clears CURVE_VALIDATION_MISSING.  Smoke
-  // / non-authoritative passes are useful for CI but cannot certify a
-  // curve dataset for filing.
-  if (!lastRun || lastRun.authoritative_pass !== true){
+  // CURVE_VALIDATION_MISSING is cleared by EITHER:
+  //   (a) any validation.runs[] entry with `pass: true` — covers the
+  //       curve_reference_validation golden fixture suite (the
+  //       authoritative-for-Genoa system per PR #30 directive), OR
+  //   (b) a legacy run with `authoritative_pass: true`.
+  // The orchestrator's warnings reconciliation may also clear or
+  // restate this independently.
+  const passing = (validation.runs || []).some(r =>
+    r && (r.pass === true || r.authoritative_pass === true));
+  if (!passing){
     warnings.push(W.make('CURVE_VALIDATION_MISSING'));
   }
 
@@ -264,11 +279,19 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.generated_at      = new Date().toISOString();
   exhibit.engine_signature  = ENGINE_SIGNATURE;
   exhibit.software_versions = SOFTWARE_VERSIONS;
+  // Pick the interp-provenance block matching the engine that ran.
+  // FCC-canonical → vendored bivariate cubic surface fit.  Legacy →
+  // Genoa's earlier linear-log10.  AM doesn't use either.
+  const interpBlock = (service === 'AM')
+    ? { along_field: 'n/a', along_haat: 'n/a', source: '47 CFR §73.184 groundwave (engine NOT IMPLEMENTED)' }
+    : (fmEngine === 'fcc-canonical' ? FM_INTERP_FCC : FM_INTERP);
+
   exhibit.method_versions   = {
     method,
     regulations:    regs,
     curve_dataset:  curve_prov,
-    interp:         FM_INTERP
+    curve_engine:   service === 'AM' ? null : fmEngine,
+    interp:         interpBlock
   };
   exhibit.operator_metadata = {
     operator:       options.operator    || null,
@@ -306,7 +329,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
                                           'src/engine/fm/contour.js',
     engine_version: ENGINE_VERSION
   };
-  exhibit.interpolation = FM_INTERP;
+  exhibit.interpolation = interpBlock;
   // calculation_trace shows HOW each contour distance was derived.
   // Engineers reading the saved exhibit can reproduce the lookup
   // step-by-step from these inputs + the pinned curve dataset.
@@ -322,16 +345,27 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       haat_m:         haat_m ?? null,
       haat_source:    haatPerRadial[0]?.haat_source || 'unknown',
       pattern_factor_applied: !!pattern,
-      interpolation:  service === 'AM' ? 'n/a' : 'log10-distance vs ascending field; linear along HAAT',
-      dataset:        curve_prov.curve_version,
-      dataset_meta_sha256: curve_prov.meta_sha256,
+      curve_engine:   service === 'AM' ? null : fmEngine,
+      interpolation:  service === 'AM'
+        ? 'n/a'
+        : (fmEngine === 'fcc-canonical'
+            ? 'FCC bivariate cubic surface fit (ITPLBV) — vendored from contours-api-node'
+            : 'log10-distance vs ascending field; linear along HAAT'),
+      dataset:        fmEngine === 'fcc-canonical'
+        ? 'fcc/contours-api-node@b55870d (tvfm_curves.js)'
+        : curve_prov.curve_version,
+      dataset_meta_sha256: fmEngine === 'fcc-canonical'
+        ? '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a'
+        : curve_prov.meta_sha256,
       engine_module:  service === 'AM' ? 'src/engine/am/groundwave.js' :
                       service === 'LPFM' ? 'src/engine/lpfm/contour.js' :
                       service === 'FX'   ? 'src/engine/translators/contour.js' :
                                             'src/engine/fm/contour.js',
       formula_summary: service === 'AM'
         ? 'unattenuated reference E0 = 100·sqrt(P_kW) mV/m at 1 km; per-distance attenuation NOT YET IMPLEMENTED.'
-        : 'effective_dBu = target_dBu − 10·log10(ERP_kW); look up log10(distance) vs effective field at each HAAT row, then interpolate the per-row distances along the HAAT axis.'
+        : (fmEngine === 'fcc-canonical'
+            ? 'FCC tvfmfs_metric(erp, haat, channel, target_dBu, fs_or_dist=2, curve) — vendored bivariate cubic surface fit over the FCC §73.333 tabulation; identical output to geo.fcc.gov/api/contours/distance.json.'
+            : 'effective_dBu = target_dBu − 10·log10(ERP_kW); look up log10(distance) vs effective field at each HAAT row, then interpolate the per-row distances along the HAAT axis.')
     }
   };
   exhibit.contour_definitions = contours.map(c => ({

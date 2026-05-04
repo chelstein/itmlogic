@@ -1,21 +1,24 @@
-// FM F(50,50) and F(50,10) contour distance, deterministic, dataset-driven.
-// Implements 47 CFR §73.333 Figure 1 (F(50,50)) and Figure 1a (F(50,10))
-// via 2-D interpolation over the published curve grid.
+// FM F(50,50) and F(50,10) contour distance, deterministic.
+// TWO IMPLEMENTATIONS, choose via the `engine` argument:
 //
-// AXES (per dataset.axes):
-//   rows = haat_m            (ascending)
-//   cols = f_dBu             (DESCENDING in the source dataset)
-//   value = distance_km at 1 kW ERP
+//   'fcc-canonical' (DEFAULT)
+//     Vendored FCC source from github.com/fcc/contours-api-node
+//     (controllers/tvfm_curves.js).  Bivariate cubic surface fit over
+//     the FCC's full-resolution F(50,50) / F(50,10) tabulation
+//     (13 HAAT × 25 distance, 13 HAAT × 31 distance).  Identical
+//     output to geo.fcc.gov/api/contours/distance.json.
 //
-// ALGORITHM:
-//   1. effective field at 1 kW = target_dBu - 10*log10(erp_kW)
-//   2. for each haat row, interpolate log10(distance) vs ascending field
-//   3. interpolate that distances-by-haat array linearly along haat
+//   'v0.2-legacy'
+//     Genoa's earlier coarse linear-log10 interpolation over a 9 × 20
+//     grid.  Kept as a fallback / regression reference.  Produces
+//     systematically larger distances than the FCC canonical path on
+//     mountaintop sites — see PR #30 for the divergence numbers.
 //
-// Interpolation choice (linear-along-field on log10(distance), linear-
-// along-HAAT) is recorded in the result so the exhibit is reproducible.
+// Interpolation source is stamped on every exhibit's
+// method_versions.interp.source so the engine output is reproducible.
 
 import { lerp1, INTERP_METHODS } from '../curves/interp.js';
+import { fccDistanceKm, FCC_PROVENANCE } from '../curves/fcc/index.mjs';
 
 const MODE_DATASET = {
   '50,50': 'f5050',
@@ -33,7 +36,23 @@ export const FM_DEFAULT_CONTOURS = Object.freeze([
   { id: 'protected_40dbu',label: '40 dBu (protected)',      field_dBu: 40 }
 ]);
 
-export async function fmContourDistance_km({ datasetByName, mode = '50,50', target_dBu, erp_kW, haat_m }){
+export const FM_ENGINE_DEFAULT = 'fcc-canonical';
+
+export async function fmContourDistance_km({
+  datasetByName,
+  mode = '50,50',
+  target_dBu,
+  erp_kW,
+  haat_m,
+  frequency_mhz = null,
+  engine = FM_ENGINE_DEFAULT
+}){
+  if (engine === 'fcc-canonical'){
+    const r = fccDistanceKm({ haat_m, target_dBu, erp_kw: erp_kW, mode, frequency_mhz });
+    return r.distance_km;
+  }
+
+  // ---- legacy v0.2 path (kept for regression reference) ----
   const tbl = await datasetByName(MODE_DATASET[mode]);
   if (!tbl) throw new Error(`fm dataset unavailable for mode ${mode}`);
   const haats     = tbl.haat_grid_m;
@@ -63,7 +82,9 @@ export async function fmRadialTable({
   contours = FM_DEFAULT_CONTOURS,
   erp_kW,
   patternFactorFn,
-  haatPerRadial
+  haatPerRadial,
+  frequency_mhz = null,
+  engine = FM_ENGINE_DEFAULT
 }){
   const out = [];
   for (const r of haatPerRadial){
@@ -77,7 +98,9 @@ export async function fmRadialTable({
         mode,
         target_dBu: c.field_dBu,
         erp_kW:     erp_az,
-        haat_m:     haat
+        haat_m:     haat,
+        frequency_mhz,
+        engine
       });
     }
     out.push({
@@ -97,4 +120,19 @@ export const FM_INTERP = Object.freeze({
   along_field: INTERP_METHODS.LINEAR_LOG10,
   along_haat:  INTERP_METHODS.LINEAR_LINEAR,
   source:      '47 CFR §73.333 tabulated F(50,50) / F(50,10) curves'
+});
+
+// Provenance block stamped on every exhibit's method_versions when the
+// FCC-canonical engine is in use.
+export const FM_INTERP_FCC = Object.freeze({
+  along_field: 'FCC bivariate cubic surface fit (ITPLBV)',
+  along_haat:  'FCC bivariate cubic surface fit (ITPLBV)',
+  source:      'github.com/fcc/contours-api-node controllers/tvfm_curves.js — vendored verbatim',
+  upstream: {
+    repo:        'github.com/fcc/contours-api-node',
+    commit:      'b55870d3f20618e886cd02379008ef980229d44b',
+    file:        'controllers/tvfm_curves.js',
+    sha256:      '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a',
+    license:     '17 U.S.C. § 105 — US Government work product, public domain in the United States'
+  }
 });

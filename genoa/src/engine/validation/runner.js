@@ -108,10 +108,11 @@ export async function runValidationSuite(){
       try {
         computed = await fmContourDistance_km({
           datasetByName,
-          mode:        c.mode || '50,50',
-          target_dBu:  60,
-          erp_kW:      c.erp_kw ?? c.erp_kW,
-          haat_m:      c.haat_m
+          mode:           c.mode || '50,50',
+          target_dBu:     60,
+          erp_kW:         c.erp_kw ?? c.erp_kW,
+          haat_m:         c.haat_m,
+          frequency_mhz:  c.frequency_mhz ?? null
         });
       } catch (_){}
       results.push({
@@ -134,10 +135,11 @@ export async function runValidationSuite(){
       try {
         const d = await fmContourDistance_km({
           datasetByName,
-          mode:        c.mode || '50,50',
-          target_dBu:  chk.target_dBu,
-          erp_kW:      c.erp_kw ?? c.erp_kW,
-          haat_m:      c.haat_m
+          mode:           c.mode || '50,50',
+          target_dBu:     chk.target_dBu,
+          erp_kW:         c.erp_kw ?? c.erp_kW,
+          haat_m:         c.haat_m,
+          frequency_mhz:  c.frequency_mhz ?? null
         });
         const err = Math.abs(d - chk.expected_distance_km);
         const pass = err <= chk.tolerance_km;

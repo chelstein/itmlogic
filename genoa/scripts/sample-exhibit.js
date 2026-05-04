@@ -16,9 +16,10 @@ import fs   from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { compute }            from '../src/engine/index.js';
-import { runValidationSuite } from '../src/engine/validation/runner.js';
-import { renderNarrative }    from '../src/narrative/generator.js';
+import { compute }                    from '../src/engine/index.js';
+import { runValidationSuite }         from '../src/engine/validation/runner.js';
+import { runCurveReferenceValidation } from '../src/validation/curveReferenceValidation.js';
+import { renderNarrative }            from '../src/narrative/generator.js';
 import { exportJson }         from '../src/exports/json/exporter.js';
 import { exportTxt }          from '../src/exports/txt/exporter.js';
 import { exportGeoJson }      from '../src/exports/geojson/exporter.js';
@@ -67,6 +68,11 @@ async function main(){
 
   await fs.mkdir(OUT_DIR, { recursive: true });
 
+  // Run BOTH validation systems independently:
+  //   curve_reference_validation (golden fixtures) — clears
+  //                                                  CURVE_VALIDATION_MISSING
+  //   legacy regression suite                      — engine drift detector
+  const curveRefRun   = await runCurveReferenceValidation();
   const validationRun = await runValidationSuite();
 
   const built = station === 'kslx' ? await buildKslxInputs() : await buildSyntheticInputs();
@@ -77,7 +83,10 @@ async function main(){
     options: {
       operator:     'genoa-sample-script',
       organization: 'genoa-cli',
-      validation:   { runs: [validationRun], reference_cases_present: validationRun.reference_cases_present }
+      validation:   {
+        runs: [curveRefRun, validationRun],
+        reference_cases_present: curveRefRun.pass || validationRun.reference_cases_present
+      }
     }
   });
 
