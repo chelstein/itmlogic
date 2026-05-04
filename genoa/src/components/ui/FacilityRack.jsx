@@ -26,6 +26,15 @@ export default function FacilityRack({
   onCompute, onReset, onLookupFid, onSave, onExport,
   onLoadKslx, onLoadSynthetic,
   facilitySource,
+  // Station search (call sign, partial, or facility ID against
+  // /api/facilities/search).  Debounced in App.jsx; this component
+  // only renders the textbox + results list.
+  stationQuery        = '',
+  stationResults      = [],
+  stationSearching    = false,
+  stationError        = '',
+  onStationQueryChange,
+  onStationPick,
   computing = false,
   busy = false
 }) {
@@ -37,6 +46,49 @@ export default function FacilityRack({
       italicAccent="Station identity & FCC fields"
       tone="amber"
     >
+      <div className="rack-eyebrow mb-1">Station search</div>
+      <input
+        className="rack-input"
+        value={stationQuery}
+        onChange={e => onStationQueryChange && onStationQueryChange(e.target.value)}
+        placeholder="Call sign, partial (e.g. KSLX), or facility ID"
+        autoComplete="off"
+      />
+      {stationSearching && (
+        <div className="mt-1 font-mono text-[11px] text-textDim">Searching…</div>
+      )}
+      {stationError && !stationSearching && (
+        <div className="mt-1 font-mono text-[11px] text-rose-300">{stationError}</div>
+      )}
+      {stationResults.length > 0 && (
+        <ul className="mt-2 max-h-48 overflow-y-auto border border-text/10 rounded-sm bg-black/30">
+          {stationResults.map((row, i) => (
+            <li key={`${row.facility_id || 'x'}-${i}`}>
+              <button
+                type="button"
+                className="w-full text-left px-2 py-1 font-mono text-[11px] hover:bg-text/10"
+                onClick={() => onStationPick && onStationPick(row)}
+                disabled={busy || computing}
+              >
+                <span className="text-text">{row.call || '—'}</span>
+                <span className="text-textDim">
+                  {' · '}{row.service || '?'}
+                  {row.frequency ? ` · ${row.frequency} ${row.frequency_unit || ''}` : ''}
+                  {row.facility_id ? ` · #${row.facility_id}` : ''}
+                  {row.city || row.state ? ` · ${[row.city, row.state].filter(Boolean).join(', ')}` : ''}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="font-mono text-[10px] text-textDim mt-1 leading-snug">
+        Pick a station to fill the form and run an exhibit. Backed by{' '}
+        <code className="text-text/80">/api/facilities/search</code> — same
+        upstream as the Lookup button, just multi-result interactive.
+      </p>
+
+      <div className="my-3 border-t border-text/10" />
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="rack-label">Service</label>
