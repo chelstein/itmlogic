@@ -128,7 +128,12 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     warnings.push(...fxInputGuards({ erp_kW }));
     warnings.push(...fmInputGuards({ erp_kW, haat_m, frequency_mhz: freq }));
   } else if (service === 'AM') {
-    warnings.push(...amWarnings());
+    // AM frequency is in kHz at the engine boundary.
+    warnings.push(...amWarnings({
+      frequency_khz:    Number(freq),
+      conductivity_msm: Number(sigma),
+      erp_kw:           erp_kW
+    }));
     if (!Number.isFinite(sigma) || sigma <= 0){
       warnings.push(W.make('FCC_METHOD_MISSING', 'Ground conductivity (M3) is required for any AM groundwave run.'));
     }
@@ -171,7 +176,14 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       break;
     case 'AM':
       contours     = AM_DEFAULT_CONTOURS;
-      radial_table = amRadialTable({ erp_kW, patternFactorFn: factorFn, radials_deg, contours });
+      radial_table = amRadialTable({
+        erp_kW,
+        frequency_khz:    Number(freq),       // AM frequency is kHz at the input boundary
+        conductivity_msm: Number(sigma),
+        patternFactorFn:  factorFn,
+        radials_deg,
+        contours
+      });
       break;
   }
 

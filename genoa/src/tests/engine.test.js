@@ -120,15 +120,29 @@ test('AI cannot modify engineering output: narrative.ai_used is false and engine
   assert.equal(before, after, 'radial_table changed after re-rendering narrative');
 });
 
-test('AM incomplete: warning, no fake distances', async () => {
+test('AM in-range inputs: FCC-canonical engine returns real contour distances', async () => {
+  // 1 kW @ 1240 kHz, σ = 8 mS/m — all inside FCC §73.184 grid.  After
+  // PR B (vendored gwave.js) AM is no longer "not implemented".
   const x = await buildExhibit(AM_INCOMPLETE);
-  assert.ok(x.warnings.find(w => w.code === 'AM_ENGINE_NOT_IMPLEMENTED'),
-    'AM must emit AM_ENGINE_NOT_IMPLEMENTED');
+  assert.ok(!x.warnings.find(w => w.code === 'AM_ENGINE_NOT_IMPLEMENTED'),
+    'AM_ENGINE_NOT_IMPLEMENTED must be gone now that gwave.js is wired');
+  // Every radial must have at least one numeric contour distance.
   for (const r of x.radial_table){
-    for (const v of Object.values(r.contour_distances_km)){
-      assert.equal(v, null, 'AM engine must not return contour distances yet');
-    }
+    const numericVals = Object.values(r.contour_distances_km).filter(Number.isFinite);
+    assert.ok(numericVals.length > 0,
+      'AM engine must return real distances for in-range inputs; got all nulls');
   }
+});
+
+test('AM out-of-range inputs: distances are null + FCC_METHOD_MISSING (no fabrication)', async () => {
+  // σ = 0 is outside FCC M3 (1..8 mS/m) — engine must NOT fake numbers.
+  const x = await buildExhibit({
+    ...AM_INCOMPLETE,
+    ground_sigma_mS_m: 0
+  });
+  // FCC_METHOD_MISSING emitted by amWarnings() for out-of-range σ.
+  assert.ok(x.warnings.find(w => w.code === 'FCC_METHOD_MISSING'),
+    'out-of-range σ must emit FCC_METHOD_MISSING');
 });
 
 test('Missing facility coordinates: contour distances still computed, no polygons projected', async () => {

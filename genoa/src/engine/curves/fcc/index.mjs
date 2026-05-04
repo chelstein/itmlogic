@@ -12,7 +12,11 @@
 //   controllers/tvfm_curves.js, sha256 58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a.
 
 import { createRequire } from 'node:module';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 const require = createRequire(import.meta.url);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // The FCC code emits a debug console.log on every entry into
 // tvfmfs_metric().  Silence it ONLY around our calls so server logs
@@ -21,6 +25,15 @@ const _origLog = console.log;
 const _silent  = () => {};
 
 const fcc = require('./tvfm_curves.js');
+
+// --- AM groundwave (gwave.js) ----------------------------------------
+// Upstream gwave.js does `require('../data/gwave_field.json')`.  Genoa
+// keeps the data file inside the vendor boundary at
+// src/engine/curves/fcc/data/gwave_field.json, so the only modification
+// to the vendored gwave.js is changing that relative path to
+// `./data/gwave_field.json`.  Documented in PROVENANCE.md and noted
+// inline at the changed line.
+const fccAm = require('./gwave.js');
 
 // fcc.tvfmfs_metric signature:
 //   tvfmfs_metric(erp, haat, channel, field, distance, fs_or_dist, curve, flag)
@@ -141,6 +154,146 @@ export const FCC_PROVENANCE = Object.freeze({
   file:    'controllers/tvfm_curves.js',
   sha256:  '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a',
   vendor_path: 'src/engine/curves/fcc/tvfm_curves.js',
+  vendored_at: '2026-05-04',
+  license_basis: '17 U.S.C. § 105 — US Government work product, public domain in the United States'
+});
+
+/* =============================================================
+   AM GROUNDWAVE (gwave.js — 47 CFR §73.184 Sommerfeld-Norton)
+   ============================================================= */
+
+// Compute AM groundwave distance to a target field strength via the
+// vendored FCC gwave.js.  This is the same code that backs
+// geo.fcc.gov/api/contours/amDistance.json.
+//
+// The FCC routine takes:
+//   conductivity (sigma)  — mS/m, integer in {1,2,3,4,5,6,7,8} per FCC M3
+//   dielectric            — relative permittivity ε_r (FCC default 15)
+//   frequency_khz         — AM carrier frequency in kHz (530..1700)
+//   target_mvm            — target field strength in mV/m
+//   fs1km_mvm             — reference field at 1 km = 100·sqrt(P_kW)
+//
+// Returns distance in km on success.  On any error or out-of-range
+// input the FCC routine throws or returns NaN; we surface that as a
+// structured Error with code 'FCC_AM_*'.
+
+const AM_DEFAULT_DIELECTRIC = 15;          // §73.184 standard ε_r
+const AM_FREQ_MIN_KHZ = 530;
+const AM_FREQ_MAX_KHZ = 1700;
+
+export function fccAmDistanceKm({
+  frequency_khz,
+  target_mvm,
+  conductivity_msm,           // ground conductivity σ in mS/m
+  dielectric = AM_DEFAULT_DIELECTRIC,
+  erp_kw
+}){
+  const freq = Number(frequency_khz);
+  const f    = Number(target_mvm);
+  const sigma = Number(conductivity_msm);
+  const epsilon = Number(dielectric);
+  const erp = Number(erp_kw);
+
+  if (!Number.isFinite(freq) || freq < AM_FREQ_MIN_KHZ || freq > AM_FREQ_MAX_KHZ){
+    throw Object.assign(new Error(`FCC AM: frequency ${freq} kHz out of range ${AM_FREQ_MIN_KHZ}..${AM_FREQ_MAX_KHZ}`),
+      { code: 'FCC_AM_FREQ_OUT_OF_RANGE' });
+  }
+  // FCC pre-tabulated data is keyed at 10-kHz steps.  Round to the
+  // nearest channel grid point.
+  const freqGrid = Math.round(freq / 10) * 10;
+  if (!Number.isFinite(f) || f <= 0){
+    throw Object.assign(new Error('FCC AM: target_mvm must be positive'),
+      { code: 'FCC_AM_FIELD_INVALID' });
+  }
+  if (!Number.isFinite(sigma) || sigma < 1 || sigma > 8){
+    throw Object.assign(new Error(`FCC AM: conductivity ${sigma} mS/m out of FCC M3 range 1..8`),
+      { code: 'FCC_AM_SIGMA_OUT_OF_RANGE' });
+  }
+  if (!Number.isFinite(erp) || erp <= 0){
+    throw Object.assign(new Error('FCC AM: erp_kw must be positive'),
+      { code: 'FCC_AM_ERP_INVALID' });
+  }
+
+  // FCC M3 sigma is keyed by integer (1..8).  Round to nearest.
+  const sigmaInt = Math.max(1, Math.min(8, Math.round(sigma)));
+  const fs1km    = 100 * Math.sqrt(erp);   // 100·sqrt(P_kW) mV/m at 1 km
+
+  let distance;
+  console.log = _silent;
+  try {
+    distance = fccAm.amDistance(sigmaInt, epsilon, freqGrid, f, fs1km);
+  } finally {
+    console.log = _origLog;
+  }
+
+  if (!Number.isFinite(distance) || distance <= 0){
+    throw Object.assign(new Error('FCC AM: amDistance returned non-positive distance'),
+      { code: 'FCC_AM_NO_RESULT', distance });
+  }
+
+  return {
+    distance_km: Number(distance),
+    source:      'fcc-gwave',
+    method:      '47 CFR §73.184 groundwave (Sommerfeld-Norton)',
+    inputs: {
+      frequency_khz_grid: freqGrid,
+      conductivity_msm:   sigmaInt,
+      dielectric:         epsilon,
+      target_mvm:         f,
+      fs1km_mvm:          fs1km
+    },
+    upstream: {
+      repo:   'github.com/fcc/contours-api-node',
+      commit: 'b55870d3f20618e886cd02379008ef980229d44b',
+      file:   'controllers/gwave.js',
+      sha256: '0ba81eca1bda166e36d34906dfdbc72c730a976d91a3356c12b1ccde2a8b059f'
+    }
+  };
+}
+
+// Compute AM groundwave field strength at a given distance.  Returns
+// mV/m.  Useful for inverse checks and per-radial radial-table fill.
+export function fccAmFieldMvmAtDistance({
+  frequency_khz,
+  distance_km,
+  conductivity_msm,
+  dielectric = AM_DEFAULT_DIELECTRIC,
+  erp_kw
+}){
+  const freq = Number(frequency_khz);
+  const dist = Number(distance_km);
+  const sigma = Number(conductivity_msm);
+  const epsilon = Number(dielectric);
+  const erp = Number(erp_kw);
+  if (!Number.isFinite(freq) || freq < AM_FREQ_MIN_KHZ || freq > AM_FREQ_MAX_KHZ){
+    throw Object.assign(new Error(`FCC AM: frequency ${freq} kHz out of range`),
+      { code: 'FCC_AM_FREQ_OUT_OF_RANGE' });
+  }
+  const freqGrid = Math.round(freq / 10) * 10;
+  const sigmaInt = Math.max(1, Math.min(8, Math.round(sigma)));
+  const fs1km    = 100 * Math.sqrt(Math.max(0, erp));
+
+  let mvm;
+  console.log = _silent;
+  try {
+    mvm = fccAm.amField(sigmaInt, epsilon, freqGrid, dist, fs1km);
+  } finally {
+    console.log = _origLog;
+  }
+  return Number(mvm);
+}
+
+export const FCC_AM_PROVENANCE = Object.freeze({
+  repo:    'github.com/fcc/contours-api-node',
+  commit:  'b55870d3f20618e886cd02379008ef980229d44b',
+  files: [
+    { path: 'controllers/gwave.js',        sha256: '0ba81eca1bda166e36d34906dfdbc72c730a976d91a3356c12b1ccde2a8b059f' },
+    { path: 'data/gwave_field.json',       sha256: '81e90fd493d2ef1be46ab71096d647fca45d51b2b0ca1a8306f20e390780412e' }
+  ],
+  vendor_paths: [
+    'src/engine/curves/fcc/gwave.js',
+    'src/engine/curves/fcc/data/gwave_field.json'
+  ],
   vendored_at: '2026-05-04',
   license_basis: '17 U.S.C. § 105 — US Government work product, public domain in the United States'
 });
