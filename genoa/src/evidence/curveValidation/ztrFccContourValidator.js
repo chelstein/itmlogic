@@ -119,6 +119,21 @@ export function validateAgainstFccContour(engineExhibit, fccContour, provenance 
     byField.set(Math.round(p.field_strength.value), p);
   }
 
+  // The FCC contour API returns one feature PER AUTHORIZATION at a given
+  // dBu — a station with HD multicast subchannels (or dual licensed +
+  // pending applications) returns multiple features with different ERP
+  // values.  Genoa's engine produces ONE polygon at the primary ERP, so
+  // matching every FCC feature blindly will flag the lower-ERP HD
+  // contours as "out of tolerance" even when the primary contour is a
+  // bit-perfect match.
+  //
+  // Fix: only score FCC features whose ERP is within ±10% of the
+  // engine's primary ERP (or where dom_status === 'L', the licensed
+  // dominant).  Other features are reported with status='skipped'
+  // and an explicit reason so reviewers can see why.
+  const engineErpKw = Number(engineExhibit.station_inputs?.erp_kw);
+  const erpTolerance = 0.10;   // ±10%
+
   const results = [];
   let n_run = 0, n_pass = 0;
   let max_err = 0, sum_err = 0;
@@ -134,6 +149,32 @@ export function validateAgainstFccContour(engineExhibit, fccContour, provenance 
         status:     'skipped',
         reason:     `engine produced no polygon at ${dBu} dBu to compare`,
         fcc_method: { curve: props.curve, erp: props.erp, channel: props.channel, nradial: props.nradial }
+      });
+      continue;
+    }
+    // ERP gate: skip auxiliary / HD-multicast features that don't
+    // match the primary authorization.  Rule:
+    //   include if  dom_status === 'L'  (licensed / dominant)
+    //   include if  |erp - engineErpKw| / engineErpKw <= 0.10
+    //   skip otherwise.
+    const fccErp = Number(props.erp);
+    const isDominant = String(props.dom_status || '').toUpperCase() === 'L';
+    const erpMatches =
+      Number.isFinite(fccErp) && Number.isFinite(engineErpKw) && engineErpKw > 0
+        ? Math.abs(fccErp - engineErpKw) / engineErpKw <= erpTolerance
+        : true;   // if either ERP is unknown, default to including
+    if (!isDominant && !erpMatches){
+      results.push({
+        target_dBu: dBu,
+        status:     'skipped',
+        reason:     `FCC feature ERP ${fccErp} kW ≠ engine ERP ${engineErpKw} kW (auxiliary/HD authorization)`,
+        fcc_method: {
+          curve:      props.curve,
+          erp:        fccErp,
+          channel:    props.channel,
+          nradial:    props.nradial,
+          dom_status: props.dom_status || null
+        }
       });
       continue;
     }
