@@ -15,6 +15,7 @@
 
 import { loadDataset, loadManifest, curveProvenance } from './curves/loader.js';
 import { destPoint } from './geometry/geodesic.js';
+import { fccSphericalDestPoint, FCC_ORCHESTRATION_PROVENANCE } from './curves/fcc/orchestration.mjs';
 import { closeRing, ringArea_km2 } from './geometry/polygon.js';
 import { contourFeature, featureCollection } from './geometry/geojson.js';
 import { parsePatternTable } from './pattern/parse.js';
@@ -229,6 +230,15 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // The radial table (azimuth + contour distances) is still produced;
   // exhibits without coordinates remain useful as an engineering view
   // of the contour distance solver but cannot be plotted on a map.
+  //
+  // Projection.  Default 'wgs84-vincenty' (Genoa's PR A path, sub-mm
+  // ellipsoid error).  Set options.projection = 'fcc-spherical' for
+  // byte-equivalent vertex coordinates with FCC contours.js
+  // (great-circle on a sphere of radius 6371 km).
+  const projection = options.projection === 'fcc-spherical' ? 'fcc-spherical' : 'wgs84-vincenty';
+  const projectVertex = projection === 'fcc-spherical'
+    ? (lt, ln, az, d) => fccSphericalDestPoint(lt, ln, az, d)
+    : (lt, ln, az, d) => destPoint(lt, ln, az, d);
   const polygons = [];
   const features = [];
   for (const c of contours){
@@ -241,7 +251,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       for (const r of radial_table){
         const d = r.contour_distances_km?.[c.id];
         if (!Number.isFinite(d) || d <= 0) continue;
-        ring.push(destPoint(lat, lon, r.azimuth_deg, d));
+        ring.push(projectVertex(lat, lon, r.azimuth_deg, d));
       }
       closed = closeRing(ring);
       area_km2 = closed.length >= 4 ? ringArea_km2(closed) : null;
@@ -340,7 +350,9 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     regulations:    regs,
     curve_dataset:  curve_prov,
     curve_engine:   service === 'AM' ? null : fmEngine,
-    interp:         interpBlock
+    interp:         interpBlock,
+    projection,
+    fcc_orchestration: FCC_ORCHESTRATION_PROVENANCE
   };
   exhibit.operator_metadata = {
     operator:       options.operator    || null,

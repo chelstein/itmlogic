@@ -7,6 +7,7 @@
 | `tvfm_curves.js` | FM/TV propagation curves (F(50,50), F(50,10), F(50,90)) — `geo.fcc.gov/api/contours/distance.json` engine. |
 | `gwave.js` | AM groundwave per 47 CFR §73.184 — Sommerfeld-Norton attenuation. Backs `geo.fcc.gov/api/contours/amField.json` and `amDistance.json`. |
 | `data/gwave_field.json` | FCC pre-tabulated AM field strengths (120 frequencies × 8 conductivity values × 230 distances). |
+| `orchestration.mjs` | Per-radial orchestration conventions ported from `controllers/contours.js` (HAAT clamp 30..1600 m, distance floor at 1 km, FCC spherical-Earth destination at R = 6371 km).  Not a verbatim vendor — these are the small numeric conventions that make Genoa's per-radial output match `geo.fcc.gov/api/contours/contours.json`. |
 
 ## Upstream
 
@@ -19,6 +20,7 @@
 | `tvfm_curves.js` | `controllers/tvfm_curves.js` | `58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a` | none (byte-identical) |
 | `gwave.js` | `controllers/gwave.js` | `0ba81eca1bda166e36d34906dfdbc72c730a976d91a3356c12b1ccde2a8b059f` | **one line**: `'../data/gwave_field.json'` → `'./data/gwave_field.json'` (line 10) |
 | `data/gwave_field.json` | `data/gwave_field.json` | `81e90fd493d2ef1be46ab71096d647fca45d51b2b0ca1a8306f20e390780412e` | none (byte-identical) |
+| `orchestration.mjs` | `controllers/contours.js` (orchestration conventions only) | n/a (not a verbatim vendor) | ported `clampHaatToFcc`, `applyFccDistanceFloor`, and `fccSphericalDestPoint` (R=6371) constants and helpers; the upstream HTTP handler / GeoJSON wrapping / DB calls are NOT vendored. |
 
 The single line changed in `gwave.js` is the relative `require()` path
 to the data file.  Upstream layout has `controllers/gwave.js` and
@@ -100,3 +102,28 @@ fccAmDistanceKm({ frequency_khz, target_mvm, conductivity_msm,
 ```
 
 Engine modules import only the adapter.
+
+## Orchestration parity (`orchestration.mjs`)
+
+The vendored FCC engine (`tvfm_curves.js`, `gwave.js`) only does the
+per-call propagation evaluation.  The upstream HTTP orchestrator at
+`controllers/contours.js` wraps each per-radial call with a few numeric
+conventions; Genoa ports those into `orchestration.mjs` so the
+end-to-end output of `compute()` matches `geo.fcc.gov/api/contours`:
+
+- **`clampHaatToFcc(haat_m)`** — clamps HAAT to `[30, 1600]` m.  The
+  FCC F(50,50) / F(50,10) tabulation only covers that range; the
+  upstream clamps before lookup.  `tvfmfs_metric` itself also clamps
+  internally, but does not echo the clamped value back; Genoa records
+  it on every result so the radial table carries `haat_used_m` for
+  traceability.
+- **`applyFccDistanceFloor(dist_km)`** — replaces negative or NaN
+  distances with `1` km, matching the upstream `if (dist < 0) dist = 1;`
+  guard.
+- **`fccSphericalDestPoint(lat, lon, az, dist_km)`** — great-circle
+  destination on a sphere of radius `R = 6371` km, byte-equivalent to
+  the upstream `getLatLonFromDist`.  Genoa defaults polygon projection
+  to WGS-84 Vincenty (sub-mm error vs the FCC sphere's < 0.25 km error
+  at typical FCC contour ranges); set `options.projection =
+  'fcc-spherical'` to use this helper for byte-exact polygon parity
+  with the FCC API output.

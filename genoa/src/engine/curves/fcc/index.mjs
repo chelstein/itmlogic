@@ -14,6 +14,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { clampHaatToFcc, applyFccDistanceFloor } from './orchestration.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -93,6 +94,11 @@ export function fccDistanceKm({
               :                    CURVE_F5050;
   const flag = new Array(19).fill(0);
 
+  // FCC contours.js orchestration parity: HAAT is clamped to
+  // [30, 1600] m before lookup, and the clamped value is recorded
+  // alongside the raw input.  See ./orchestration.js.
+  const { haat_used_m, clamped: haat_clamp } = clampHaatToFcc(haat_m);
+
   // The FCC fn returns the computed distance in km (positive) when
   // fs_or_dist === 2 succeeds.  When inputs are out of range it sets
   // entries in `flag` (1..18) and may early-return 0 / NaN.
@@ -101,7 +107,7 @@ export function fccDistanceKm({
   try {
     result = fcc.tvfmfs_metric(
       Number(erp_kw),       // erp (kW)
-      Number(haat_m),       // haat (m)
+      haat_used_m,          // haat (m), FCC-clamped
       Number(ch),           // channel
       Number(target_dBu),   // field (dBu) — input for fs_or_dist=2
       0,                    // distance — placeholder; FCC fills via curve walk
@@ -127,12 +133,21 @@ export function fccDistanceKm({
   if (flag[5]){
     throw Object.assign(new Error('FCC: fs_or_dist invalid'), { code: 'FCC_FSDIST_INVALID', flag });
   }
-  if (!Number.isFinite(result) || result <= 0){
-    throw Object.assign(new Error('FCC: tvfmfs_metric returned non-positive distance'), { code: 'FCC_NO_RESULT', flag, result });
+  if (!Number.isFinite(result)){
+    throw Object.assign(new Error('FCC: tvfmfs_metric returned non-finite distance'),
+      { code: 'FCC_NO_RESULT', flag, result });
   }
 
+  // FCC contours.js orchestration: negative distances become 1 km.
+  const distance_km = applyFccDistanceFloor(Number(result));
+  const distance_floored = distance_km !== Number(result);
+
   return {
-    distance_km: Number(result),
+    distance_km,
+    distance_floored,
+    haat_input_m:    Number(haat_m),
+    haat_used_m,
+    haat_clamp,
     source:      'fcc-tvfm_curves',
     method:      curve === CURVE_F5050 ? '47 CFR §73.333 F(50,50)' :
                  curve === CURVE_F5010 ? '47 CFR §73.333 F(50,10)' :
@@ -168,12 +183,15 @@ export function fccFieldDbuAtDistance({
               :                    CURVE_F5050;
   const flag = new Array(19).fill(0);
 
+  // FCC orchestration parity — clamp HAAT to [30, 1600] m.
+  const { haat_used_m } = clampHaatToFcc(haat_m);
+
   console.log = _silent;
   let result;
   try {
     result = fcc.tvfmfs_metric(
       Number(erp_kw),       // erp (kW)
-      Number(haat_m),       // haat (m)
+      haat_used_m,          // haat (m), FCC-clamped
       Number(ch),           // channel
       0,                    // field — placeholder; FCC fills via curve walk
       Number(distance_km),  // distance (km) — input for fs_or_dist=1
