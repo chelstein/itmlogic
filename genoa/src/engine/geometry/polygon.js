@@ -17,18 +17,9 @@ export function isClosed(latlngs){
   return a0 === aN && b0 === bN;
 }
 
-// Equirectangular area approximation; OK for FCC-scale contours where
-// the ring spans well under 5 degrees of latitude.  Returns km².
-export function ringArea_km2(latlngs){
-  if (latlngs.length < 3) return 0;
-  let sum = 0;
-  for (let i = 0; i < latlngs.length - 1; i++){
-    const [y1, x1] = latlngs[i];
-    const [y2, x2] = latlngs[i+1];
-    sum += (x2 - x1) * (y2 + y1);
-  }
-  const meanLat = latlngs.reduce((s,p)=>s+p[0],0) / latlngs.length;
-  const km_per_deg_lat = 111.32;
-  const km_per_deg_lon = 111.32 * Math.cos(meanLat * Math.PI / 180);
-  return Math.abs(sum * km_per_deg_lat * km_per_deg_lon / 2);
-}
+// Polygon area on the WGS-84 authalic sphere (Karney spherical-excess).
+// Replaces the equirectangular shoelace approximation that ran here
+// previously (which was ~1% high on Class C contours due to the
+// longitude-degree shrinkage at the ring extremes).  See
+// ./karneyArea.js for the formula and references.
+export { ringArea_km2 } from './karneyArea.js';
