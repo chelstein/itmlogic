@@ -87,15 +87,21 @@ export default function App() {
     const fill = (k, v) => (base[k] === undefined || base[k] === '' || base[k] === null) ? v : base[k];
     return {
       ...base,
-      call:        fill('call',        f.call),
-      facility_id: fill('facility_id', f.facility_id),
-      service:     fill('service',     f.service),
-      fcc_class:   fill('fcc_class',   f.fcc_class),
-      frequency:   fill('frequency',   f.frequency),
-      erp_kw:      fill('erp_kw',      f.erp_kw),
-      haat_m:      fill('haat_m',      f.haat_m),
-      lat:         fill('lat',         f.lat),
-      lon:         fill('lon',         f.lon)
+      call:         fill('call',         f.call),
+      facility_id:  fill('facility_id',  f.facility_id),
+      service:      fill('service',      f.service),
+      fcc_class:    fill('fcc_class',    f.fcc_class),
+      frequency:    fill('frequency',    f.frequency),
+      erp_kw:       fill('erp_kw',       f.erp_kw),
+      haat_m:       fill('haat_m',       f.haat_m),
+      lat:          fill('lat',          f.lat),
+      lon:          fill('lon',          f.lon),
+      // Pattern is only filled when the upstream row carries it.
+      // FCC FMQ (and Radio-Locator-style scrapes) report 'DA' / 'ND' in
+      // col 5 of the pipe-delim row; ZTR's broadcast_stations doesn't
+      // carry pattern today, so this stays at the user's prior choice
+      // when picking a ZTR result.
+      pattern_mode: f.pattern_mode ? fill('pattern_mode', f.pattern_mode) : base.pattern_mode
     };
   }
 
@@ -269,20 +275,31 @@ export default function App() {
   // loadKslx so the compute body matches what just got loaded.
   async function loadStationRow(row){
     if (!row) return;
+    // Build a clean base where every FCC-sourced field is empty so
+    // mergeFacility's "fill if empty" actually fills from the row.
+    // Operator-only UI choices (radial step, terrain toggle) carry
+    // forward; engineering inputs (call/service/freq/erp/haat/lat/lon/
+    // class/pattern) are reset.  Without this reset, picking a new
+    // station leaves the previous lat/lon, ERP, HAAT, etc. visible
+    // because mergeFacility is conservative ("fill if empty").
     const base = {
       ...PRESET_SYNTHETIC,
       _synthetic: false,
-      // Carry forward operator UI choices that don't come from the row.
       radial_step_deg: inputs.radial_step_deg || 10,
-      pattern_mode:    inputs.pattern_mode    || 'ND',
       use_terrain:     !!inputs.use_terrain,
-      // Reset coords so mergeFacility's "fill if empty" actually fills.
+      // Engineering fields — reset so the row's values show through.
       lat: '', lon: '',
       facility_id: '', call: '',
       service:    '', fcc_class: '',
-      frequency:  '', erp_kw: '', haat_m: ''
+      frequency:  '', erp_kw: '', haat_m: '',
+      pattern_mode: ''                      // mergeFacility falls back to
+                                            // base when row.pattern_mode is null
     };
     const merged = mergeFacility(base, row);
+    // mergeFacility leaves pattern_mode='' (from base) when the row
+    // doesn't carry pattern (e.g. ZTR rows) — coerce that to 'ND' so
+    // the dropdown shows a sensible default.
+    if (!merged.pattern_mode) merged.pattern_mode = 'ND';
     setInputs(merged);
     setFacilitySource(`Loaded ${row.call || row.facility_id || 'station'} via ${row.facility_lookup_source?.upstream || 'upstream'}`);
     setStationQuery('');
