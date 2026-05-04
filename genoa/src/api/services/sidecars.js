@@ -6,6 +6,24 @@ import { makeSplatClient }      from '../../evidence/terrain/splatClient.js';
 import { makeIdentityClient }   from '../../evidence/identity/index.js';
 import { makeFacilityClient }   from './facilityClient.js';
 import { makePopulationClient } from '../../evidence/populationClient.js';
+import { makeFccCensusClient }  from '../../evidence/fccCensusClient.js';
+
+// Population evidence priority:
+//   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source)
+//   2. FCC Census Block API direct — geo.fcc.gov/api/census/area, no
+//      sidecar required (default ON; disable with
+//      POPULATION_DISABLE_FCC_CENSUS=1).
+//   3. null — POPULATION_PLACEHOLDER warning persists.
+function buildPopulationClient(){
+  const sidecar = makePopulationClient();
+  if (sidecar) return sidecar;
+  if (process.env.POPULATION_DISABLE_FCC_CENSUS === '1') return null;
+  return makeFccCensusClient({
+    censusYear:  Number(process.env.POPULATION_CENSUS_YEAR) || 2020,
+    samples:     Number(process.env.POPULATION_SAMPLES)     || undefined,
+    concurrency: Number(process.env.POPULATION_CONCURRENCY) || undefined
+  });
+}
 
 export const sidecars = Object.freeze({
   terrain:     makeTerrainClient ({ baseUrl: process.env.TERRAIN_SIDECAR_URL  }),
@@ -20,10 +38,9 @@ export const sidecars = Object.freeze({
   // n8n station/analyze webhook).  Lives here so the same /readyz block
   // can report all upstreams.
   facility:    makeFacilityClient(),
-  // Population evidence is also a thin read-only adapter.  When
-  // POPULATION_EVIDENCE_URL is unset, this is null and Genoa keeps the
-  // POPULATION_PLACEHOLDER warning.
-  population:  makePopulationClient()
+  // Population evidence: operator sidecar first, FCC Census API
+  // fallback (always available unless explicitly disabled).
+  population:  buildPopulationClient()
 });
 
 export async function sidecarStatus(){
