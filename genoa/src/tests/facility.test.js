@@ -85,6 +85,56 @@ test('searchByQuery rejects too-short queries before hitting the network', async
   } finally { restore(); }
 });
 
+test('searchByQuery: ZTR reachable but empty + no n8n -> 200 success with 0 rows', async () => {
+  // ZTR catalog uses current call signs (KMVP-FM at facility 11272),
+  // not historical ones (KDKB).  The adapter should report ZTR as the
+  // source so the route returns 200 (not 503), and the UI can show a
+  // "no matches" hint instead of treating it as an outage.
+  let zhits = 0;
+  const restore = mockFetch((url) => {
+    assert.match(url, /\/api\/broadcast\/stations\?q=KDKB/);
+    zhits += 1;
+    return jsonResp({ rows: [], count: 0 });
+  });
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const r = await c.searchByQuery('KDKB');
+    assert.equal(zhits, 1, 'ZTR was hit exactly once');
+    assert.equal(r.source, 'zerotrustradio');
+    assert.equal(r.count, 0);
+    assert.deepEqual(r.rows, []);
+    assert.equal(r.error, undefined);
+  } finally { restore(); }
+});
+
+test('searchByQuery: ZTR reachable but empty + n8n configured -> n8n fallback fires on legacy callsign', async () => {
+  // Same ZTR-empty case, but now n8n is configured.  The adapter
+  // should fall back to n8n station/analyze (which can resolve
+  // legacy / historical callsigns via FCC live lookup) and return its
+  // rows when present.
+  const N8N_ROW = {
+    facility_id: '99999', call: 'KDKB-FM', service: 'FM', frequency: 93.3,
+    erp_kw: 50, haat_m: 200, lat: 33.5, lon: -111.9,
+    facility_lookup_source: { upstream: 'n8n', endpoint: 'http://n8n.test/webhook/station/analyze',
+                              fetched_at: '2025-01-01T00:00:00Z' }
+  };
+  const restore = mockFetch((url) => {
+    if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [], count: 0 });
+    if (url.includes('/webhook/station/analyze')) return jsonResp({ rows: [N8N_ROW] });
+    throw new Error('unexpected url ' + url);
+  });
+  try {
+    const c = makeFacilityClient({
+      ztrUrl:     'http://ztr.test',
+      n8nBaseUrl: 'http://n8n.test'
+    });
+    const r = await c.searchByQuery('KDKB');
+    assert.equal(r.source, 'n8n');
+    assert.equal(r.count, 1);
+    assert.equal(r.rows[0].call, 'KDKB-FM');
+  } finally { restore(); }
+});
+
 test('getById returns a single normalized facility', async () => {
   const restore = mockFetch((url) => {
     assert.match(url, /\/api\/broadcast\/stations\?facility_id=11282/);
