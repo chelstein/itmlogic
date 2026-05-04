@@ -1,38 +1,40 @@
-// Geodesic destination on a spherical Earth.  Adequate for FCC contour
-// radial endpoints (≤ ~300 km, sub-100 m absolute error vs WGS-84).
-// Returns [lat, lon] in degrees.  Longitude is normalized to (-180, 180].
+// Geodesic destination + bearing on the WGS-84 ellipsoid.
+//
+// MIGRATION FROM PRIOR (spherical Earth) IMPLEMENTATION
+//   This module now uses Vincenty's formulae against WGS-84 (a, b, f).
+//   The previous spherical-Earth haversine + great-circle destination
+//   produced sub-100 m absolute error vs WGS-84 at FCC contour ranges
+//   (≤ 300 km).  Vincenty gives sub-mm error, identical to what
+//   geo.fcc.gov uses internally.  Function signatures are unchanged
+//   so all callers keep working.
+//
+//   The constant R_EARTH_KM is RETAINED as a convenience for callers
+//   that need a spherical-mean radius (e.g. legacy distance bounds);
+//   it is NO LONGER used by destPoint() or bearingAndRange_km().
 
+import { vincentyDirect, vincentyInverse, WGS84_A_KM, WGS84_B_KM } from './wgs84.js';
+
+// Spherical-mean radius (kept for callers that import this constant).
+// Not used by the geodesic functions below.
 export const R_EARTH_KM = 6371.0088;
 
+/**
+ * Returns [lat_deg, lon_deg] at azimuth `az_deg` and distance `dist_km`
+ * from (lat, lon) on the WGS-84 ellipsoid.
+ */
 export function destPoint(lat, lon, az_deg, dist_km){
-  const br = az_deg  * Math.PI / 180;
-  const φ1 = lat     * Math.PI / 180;
-  const λ1 = lon     * Math.PI / 180;
-  const dr = dist_km / R_EARTH_KM;
-  const φ2 = Math.asin(
-    Math.sin(φ1) * Math.cos(dr) +
-    Math.cos(φ1) * Math.sin(dr) * Math.cos(br)
-  );
-  const λ2 = λ1 + Math.atan2(
-    Math.sin(br) * Math.sin(dr) * Math.cos(φ1),
-    Math.cos(dr) - Math.sin(φ1) * Math.sin(φ2)
-  );
-  return [
-    φ2 * 180 / Math.PI,
-    ((λ2 * 180 / Math.PI + 540) % 360) - 180
-  ];
+  const r = vincentyDirect(lat, lon, az_deg, dist_km);
+  return [r.lat, r.lon];
 }
 
+/**
+ * Returns { az_deg, range_km } from (lat1, lon1) to (lat2, lon2)
+ * on the WGS-84 ellipsoid via Vincenty's inverse formula.
+ */
 export function bearingAndRange_km(lat1, lon1, lat2, lon2){
-  const φ1 = lat1 * Math.PI / 180;
-  const φ2 = lat2 * Math.PI / 180;
-  const Δφ = (lat2 - lat1) * Math.PI / 180;
-  const Δλ = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(Δλ/2)**2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const range_km = R_EARTH_KM * c;
-  const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-  const az_deg = ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
-  return { az_deg, range_km };
+  const r = vincentyInverse(lat1, lon1, lat2, lon2);
+  return { az_deg: r.initial_bearing_deg, range_km: r.distance_km };
 }
+
+// Re-export ellipsoid constants for callers that want them direct.
+export { WGS84_A_KM, WGS84_B_KM };
