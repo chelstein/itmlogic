@@ -64,11 +64,11 @@ const FCC_OK = {
   type: 'FeatureCollection',
   features: [
     { type: 'Feature', properties: { field: 60, erp: 100, curve: 'F(50,50)', channel: 264, nradial: 360 },
-      geometry: ringAtRadius(KSLX_LAT, KSLX_LON, 138.8) },
+      geometry: ringAtRadius(KSLX_LAT, KSLX_LON, 90.193) },
     { type: 'Feature', properties: { field: 54, erp: 100, curve: 'F(50,50)', channel: 264, nradial: 360 },
-      geometry: ringAtRadius(KSLX_LAT, KSLX_LON, 168.7) },
+      geometry: ringAtRadius(KSLX_LAT, KSLX_LON, 105.437) },
     { type: 'Feature', properties: { field: 40, erp: 100, curve: 'F(50,50)', channel: 264, nradial: 360 },
-      geometry: ringAtRadius(KSLX_LAT, KSLX_LON, 269.3) }
+      geometry: ringAtRadius(KSLX_LAT, KSLX_LON, 148.126) }
   ]
 };
 

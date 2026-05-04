@@ -19,14 +19,14 @@ import { writeFile, mkdir, rm } from 'node:fs/promises';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TMP = path.resolve(__dirname, '..', '..', 'tmp-test-fixtures');
 
-test('runCurveReferenceValidation: shipping golden fixture passes (engine ↔ pinned dataset are consistent)', async () => {
+test('runCurveReferenceValidation: shipping golden fixture passes (engine matches FCC-canonical)', async () => {
   _resetCurveReferenceValidationCache();
   const r = await runCurveReferenceValidation();
   assert.equal(r.pass, true,  'shipped golden fixture must pass: ' + JSON.stringify(r.results));
   assert.equal(r.result, 'pass');
-  assert.equal(r.n_run, 3,    'three KSLX golden cases shipped');
-  assert.equal(r.n_pass, 3);
-  assert.ok(r.max_error_km < r.tolerance_km);
+  assert.ok(r.n_run >= 3, 'fixture should ship at least 3 golden cases; got ' + r.n_run);
+  assert.equal(r.n_pass, r.n_run, 'every golden case must pass');
+  assert.ok(r.max_error_km < r.tolerance_km, 'max error must be inside tolerance');
 });
 
 test('runCurveReferenceValidation with deliberately-wrong fixture FAILS', async () => {

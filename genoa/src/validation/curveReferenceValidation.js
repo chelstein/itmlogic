@@ -50,10 +50,15 @@ export async function runCurveReferenceValidation({ fixturePath = null } = {}){
     try {
       const d = await fmContourDistance_km({
         datasetByName,
-        mode:        c.mode || '50,50',
-        target_dBu:  c.target_dBu,
-        erp_kW:      c.erp_kw ?? c.erp_kW,
-        haat_m:      c.haat_m
+        mode:           c.mode || '50,50',
+        target_dBu:     c.target_dBu,
+        erp_kW:         c.erp_kw ?? c.erp_kW,
+        haat_m:         c.haat_m,
+        frequency_mhz:  c.frequency_mhz ?? null,
+        // Force FCC-canonical when the fixture declares it; legacy
+        // fixtures fall back to the engine default (also fcc-canonical
+        // now).  This keeps the runner immune to compute-time options.
+        engine:         'fcc-canonical'
       });
       const err = Math.abs(d - c.expected_distance_km);
       const pass = err <= tolerance_km;
