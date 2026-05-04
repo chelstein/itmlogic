@@ -62,6 +62,15 @@ export default function App() {
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
+  // Station search (call-sign / partial / facility ID).  Driven by the
+  // /api/facilities/search endpoint — same upstream as the Lookup
+  // button, just a multi-result interactive picker instead of a single
+  // facility_id resolve.
+  const [stationQuery,    setStationQuery]    = useState('');
+  const [stationResults,  setStationResults]  = useState([]);
+  const [stationSearching, setStationSearching] = useState(false);
+  const [stationError,    setStationError]    = useState('');
+  const stationDebounceRef = useRef(null);
 
   const onChange = (k, v) => setInputs(s => ({ ...s, [k]: v }));
 
@@ -204,6 +213,71 @@ export default function App() {
     }
     // Thread the merged inputs into compute() directly so the request
     // body matches what the user just loaded — no React render delay.
+    await compute(merged);
+  }
+
+  /* ---------------- STATION SEARCH ---------------- */
+
+  // Debounced search against /api/facilities/search.  Returns up to 10
+  // matches.  No business logic in the UI — just hit the endpoint and
+  // render the rows.
+  async function searchStations(q){
+    const qs = String(q || '').trim();
+    if (qs.length < 2){ setStationResults([]); setStationError(''); return; }
+    setStationSearching(true);
+    setStationError('');
+    try {
+      const r = await fetch(`/api/facilities/search?q=${encodeURIComponent(qs)}&limit=10`);
+      if (r.status === 503){
+        const j = await r.json().catch(() => ({}));
+        setStationError(j.warning?.detail || 'facility lookup unavailable');
+        setStationResults([]);
+        return;
+      }
+      if (!r.ok){
+        setStationError(`Search failed (${r.status})`);
+        setStationResults([]);
+        return;
+      }
+      const j = await r.json();
+      setStationResults(j.rows || []);
+    } catch (e){
+      setStationError(`Search failed: ${e.message}`);
+      setStationResults([]);
+    } finally {
+      setStationSearching(false);
+    }
+  }
+
+  function onStationQueryChange(q){
+    setStationQuery(q);
+    if (stationDebounceRef.current) clearTimeout(stationDebounceRef.current);
+    stationDebounceRef.current = setTimeout(() => searchStations(q), 250);
+  }
+
+  // Click handler for a station search result.  Fills inputs from the
+  // row, clears the search, then computes — same threading trick as
+  // loadKslx so the compute body matches what just got loaded.
+  async function loadStationRow(row){
+    if (!row) return;
+    const base = {
+      ...PRESET_SYNTHETIC,
+      _synthetic: false,
+      // Carry forward operator UI choices that don't come from the row.
+      radial_step_deg: inputs.radial_step_deg || 10,
+      pattern_mode:    inputs.pattern_mode    || 'ND',
+      use_terrain:     !!inputs.use_terrain,
+      // Reset coords so mergeFacility's "fill if empty" actually fills.
+      lat: '', lon: '',
+      facility_id: '', call: '',
+      service:    '', fcc_class: '',
+      frequency:  '', erp_kw: '', haat_m: ''
+    };
+    const merged = mergeFacility(base, row);
+    setInputs(merged);
+    setFacilitySource(`Loaded ${row.call || row.facility_id || 'station'} via ${row.facility_lookup_source?.upstream || 'upstream'}`);
+    setStationQuery('');
+    setStationResults([]);
     await compute(merged);
   }
   function loadSynthetic(){
@@ -401,6 +475,12 @@ export default function App() {
           onLoadKslx={() => loadKslx()}
           onLoadSynthetic={() => loadSynthetic()}
           facilitySource={facilitySource}
+          stationQuery={stationQuery}
+          stationResults={stationResults}
+          stationSearching={stationSearching}
+          stationError={stationError}
+          onStationQueryChange={onStationQueryChange}
+          onStationPick={loadStationRow}
           computing={computing}
           busy={busy}
         />
