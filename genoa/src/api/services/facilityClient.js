@@ -29,18 +29,26 @@
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 
+import { makeFccFmqClient } from '../../evidence/fccFmqClient.js';
+
 export function makeFacilityClient({
   ztrUrl     = process.env.ZERO_TRUST_RADIO_READONLY_URL || null,
   n8nBaseUrl = process.env.N8N_BASE_URL || null,
   n8nSecret  = process.env.N8N_WEBHOOK_SECRET || null,
-  timeoutMs  = DEFAULT_TIMEOUT_MS
+  timeoutMs  = DEFAULT_TIMEOUT_MS,
+  // FCC FMQ/AMQ direct fallback.  Default ON (no auth required, public
+  // upstream).  Set FACILITY_DISABLE_FCC_FMQ=1 to suppress.
+  fmqClient  = (process.env.FACILITY_DISABLE_FCC_FMQ === '1'
+                ? null
+                : makeFccFmqClient({ timeoutMs }))
 } = {}){
-  if (!ztrUrl && !n8nBaseUrl) return null;
+  if (!ztrUrl && !n8nBaseUrl && !fmqClient) return null;
 
   return {
     ztrUrl,
     n8nBaseUrl,
     hasN8n: !!n8nBaseUrl,
+    hasFmq: !!fmqClient,
 
     async health(){
       if (!ztrUrl) return false;
@@ -73,13 +81,23 @@ export function makeFacilityClient({
           }
         } catch (_){/* fall through */}
       }
-      // Fallback: n8n station/analyze webhook.  Runs when ZTR is
-      // unreachable OR when ZTR returns zero rows — the latter handles
-      // legacy / historical / out-of-catalog callsigns (e.g. KDKB,
-      // which the FCC FMQ now reports as KMVP-FM).  When ZTR was
-      // reached but empty AND n8n is unset, return an empty success
-      // (source: 'zerotrustradio', count: 0) so the UI can show a
-      // "no matches" hint instead of treating it as a server error.
+      // Fallback chain when ZTR is unreachable OR returns zero rows:
+      //   1. FCC FMQ/AMQ direct (transition.fcc.gov pipe-delim) —
+      //      catches legacy / historical / out-of-catalog callsigns
+      //      that ZTR's nightly FCC FMQ ingest hasn't picked up yet.
+      //   2. n8n station/analyze webhook (operator-managed workflow).
+      // When all of the above produce no rows AND ZTR was at least
+      // reachable, return an empty success (source: 'zerotrustradio',
+      // count: 0) so the UI can show a "no matches" hint instead of
+      // treating it as a server error.
+      if (fmqClient){
+        try {
+          const fmq = await fmqClient.searchByCallsign(q.trim());
+          if (fmq && fmq.rows && fmq.rows.length > 0){
+            return { rows: fmq.rows, count: fmq.rows.length, source: 'fcc-fmq' };
+          }
+        } catch (_){/* fall through to n8n */}
+      }
       const n8n = await callN8nStationAnalyze({ n8nBaseUrl, n8nSecret, timeoutMs, q });
       if (n8n && n8n.rows.length > 0){
         return { rows: n8n.rows, count: n8n.rows.length, source: 'n8n' };

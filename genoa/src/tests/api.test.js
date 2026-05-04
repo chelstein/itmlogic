@@ -14,7 +14,11 @@ test.before(async () => {
   baseUrl = `http://127.0.0.1:${port}`;
   proc = spawn(process.execPath, ['src/api/server.js'], {
     cwd: ROOT,
-    env: { ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: '' },
+    env: { ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: '',
+           // Disable the FCC FMQ default fallback so the
+           // "no upstream configured" assertions still hold under test.
+           // The FMQ path is exercised separately in fccFmq.test.js.
+           FACILITY_DISABLE_FCC_FMQ: '1' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   await waitForHealth(baseUrl + '/healthz', 5000);

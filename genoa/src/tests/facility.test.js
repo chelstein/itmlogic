@@ -44,8 +44,17 @@ function jsonResp(body, ok = true){
 }
 
 test('makeFacilityClient returns null when no upstream is configured', () => {
-  const c = makeFacilityClient({ ztrUrl: null, n8nBaseUrl: null });
+  const c = makeFacilityClient({ ztrUrl: null, n8nBaseUrl: null, fmqClient: null });
   assert.equal(c, null);
+});
+
+test('makeFacilityClient defaults to FCC FMQ enabled (no ZTR / n8n required)', () => {
+  // FMQ is a free, no-auth FCC public endpoint — Genoa enables it by
+  // default so the search box works on a fresh deploy without any
+  // operator configuration.
+  const c = makeFacilityClient({ ztrUrl: null, n8nBaseUrl: null });
+  assert.ok(c, 'client should construct with FMQ-only upstream');
+  assert.equal(c.hasFmq, true);
 });
 
 test('searchByQuery normalizes ZTR rows; preserves null fields, never fabricates', async () => {
@@ -54,7 +63,7 @@ test('searchByQuery normalizes ZTR rows; preserves null fields, never fabricates
     return jsonResp({ rows: [KSLX_ZTR_ROW], count: 1 });
   });
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
     const r = await c.searchByQuery('KSLX');
     assert.equal(r.source, 'zerotrustradio');
     assert.equal(r.rows.length, 1);
@@ -77,7 +86,7 @@ test('searchByQuery rejects too-short queries before hitting the network', async
   let called = false;
   const restore = mockFetch(() => { called = true; return jsonResp({ rows: [] }); });
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
     const r = await c.searchByQuery('K');
     assert.equal(called, false);
     assert.equal(r.source, null);
@@ -85,11 +94,10 @@ test('searchByQuery rejects too-short queries before hitting the network', async
   } finally { restore(); }
 });
 
-test('searchByQuery: ZTR reachable but empty + no n8n -> 200 success with 0 rows', async () => {
-  // ZTR catalog uses current call signs (KMVP-FM at facility 11272),
-  // not historical ones (KDKB).  The adapter should report ZTR as the
-  // source so the route returns 200 (not 503), and the UI can show a
-  // "no matches" hint instead of treating it as an outage.
+test('searchByQuery: ZTR reachable but empty + no FMQ + no n8n -> 200 success with 0 rows', async () => {
+  // When every fallback is disabled and ZTR returns empty, the adapter
+  // reports ZTR as the source so the route returns 200 (not 503), and
+  // the UI can show a "no matches" hint instead of an outage banner.
   let zhits = 0;
   const restore = mockFetch((url) => {
     assert.match(url, /\/api\/broadcast\/stations\?q=KDKB/);
@@ -97,7 +105,7 @@ test('searchByQuery: ZTR reachable but empty + no n8n -> 200 success with 0 rows
     return jsonResp({ rows: [], count: 0 });
   });
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
     const r = await c.searchByQuery('KDKB');
     assert.equal(zhits, 1, 'ZTR was hit exactly once');
     assert.equal(r.source, 'zerotrustradio');
@@ -107,17 +115,50 @@ test('searchByQuery: ZTR reachable but empty + no n8n -> 200 success with 0 rows
   } finally { restore(); }
 });
 
-test('searchByQuery: ZTR reachable but empty + n8n configured -> n8n fallback fires on legacy callsign', async () => {
-  // Same ZTR-empty case, but now n8n is configured.  The adapter
-  // should fall back to n8n station/analyze (which can resolve
-  // legacy / historical callsigns via FCC live lookup) and return its
-  // rows when present.
+test('searchByQuery: ZTR empty + FMQ configured -> FCC FMQ direct fallback fires', async () => {
+  // FCC FMQ pipe-delim row for KDKB-FM (real Mesa, AZ data).
+  const KDKB_FMQ_LINE =
+    '|KDKB        |93.3  MHz |FM |227 |ND  |H                   |C  |-  |LIC    |MESA                     |AZ |US |BLH-20101116AIX     |100.   kW |100.   kW |508.0   |508.0   |41299      |N |33 |20 |1.0   |W |112 |3  |46.9  |PHOENIX FCC LICENSE SUB, LLC                                                |   0.00 km |   0.00 mi |  0.00 deg |871.   m|871.0  m|-         |-       |1002069 |       m|201011161 |aaa |bbb   |';
+  const stubFmq = {
+    async searchByCallsign(call){
+      assert.equal(call, 'KDKB');
+      const { parseRow } = await import('../evidence/fccFmqClient.js');
+      const row = parseRow(KDKB_FMQ_LINE, false, 'https://transition.fcc.gov/fcc-bin/fmq?call=KDKB&list=4');
+      return { rows: [row], count: 1, source: 'fcc-fmq+amq' };
+    }
+  };
+  const restore = mockFetch((url) => {
+    if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [], count: 0 });
+    throw new Error('unexpected url ' + url);
+  });
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: stubFmq });
+    const r = await c.searchByQuery('KDKB');
+    assert.equal(r.source, 'fcc-fmq');
+    assert.equal(r.count, 1);
+    const f = r.rows[0];
+    assert.equal(f.call, 'KDKB');
+    assert.equal(f.service, 'FM');
+    assert.equal(f.fcc_class, 'C');
+    assert.equal(f.facility_id, '41299');
+    assert.equal(f.frequency, 93.3);
+    assert.equal(f.frequency_unit, 'MHz');
+    assert.equal(f.erp_kw, 100);
+    assert.equal(f.haat_m, 508);
+    assert.ok(f.lat > 33.33 && f.lat < 33.34, `expected lat ~33.33; got ${f.lat}`);
+    assert.ok(f.lon > -112.07 && f.lon < -112.06, `expected lon ~-112.06; got ${f.lon}`);
+    assert.equal(f.facility_lookup_source.upstream, 'fcc-fmq');
+  } finally { restore(); }
+});
+
+test('searchByQuery: ZTR empty + FMQ empty + n8n configured -> n8n fallback fires last', async () => {
   const N8N_ROW = {
     facility_id: '99999', call: 'KDKB-FM', service: 'FM', frequency: 93.3,
     erp_kw: 50, haat_m: 200, lat: 33.5, lon: -111.9,
     facility_lookup_source: { upstream: 'n8n', endpoint: 'http://n8n.test/webhook/station/analyze',
                               fetched_at: '2025-01-01T00:00:00Z' }
   };
+  const stubFmq = { async searchByCallsign(){ return { rows: [], source: null }; } };
   const restore = mockFetch((url) => {
     if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [], count: 0 });
     if (url.includes('/webhook/station/analyze')) return jsonResp({ rows: [N8N_ROW] });
@@ -126,7 +167,8 @@ test('searchByQuery: ZTR reachable but empty + n8n configured -> n8n fallback fi
   try {
     const c = makeFacilityClient({
       ztrUrl:     'http://ztr.test',
-      n8nBaseUrl: 'http://n8n.test'
+      n8nBaseUrl: 'http://n8n.test',
+      fmqClient:  stubFmq
     });
     const r = await c.searchByQuery('KDKB');
     assert.equal(r.source, 'n8n');
@@ -141,7 +183,7 @@ test('getById returns a single normalized facility', async () => {
     return jsonResp({ rows: [KSLX_ZTR_ROW] });
   });
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
     const r = await c.getById('11282');
     assert.equal(r.source, 'zerotrustradio');
     assert.equal(r.facility.facility_id, '11282');
@@ -153,7 +195,7 @@ test('AM rows: frequency_unit is kHz, no MHz conversion', async () => {
   const am = { ...KSLX_ZTR_ROW, kind: 'am', frequency_khz: 1240, callsign: 'WAM-AM', facility_id: '999', station_name: 'WAM' };
   const restore = mockFetch(() => jsonResp({ rows: [am] }));
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
     const r = await c.getById('999');
     assert.equal(r.facility.service, 'AM');
     assert.equal(r.facility.frequency, 1240);
@@ -161,7 +203,7 @@ test('AM rows: frequency_unit is kHz, no MHz conversion', async () => {
   } finally { restore(); }
 });
 
-test('Falls back to n8n when ZTR fails', async () => {
+test('Falls back to n8n when ZTR fails (FMQ disabled)', async () => {
   let urls = [];
   const restore = mockFetch((url, opts) => {
     urls.push(url);
@@ -173,7 +215,7 @@ test('Falls back to n8n when ZTR fails', async () => {
     throw new Error('unexpected url: ' + url);
   });
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test', fmqClient: null });
     const r = await c.searchByQuery('KSLX');
     assert.equal(r.source, 'n8n');
     assert.equal(r.rows[0].facility_id, '11282');
@@ -183,10 +225,11 @@ test('Falls back to n8n when ZTR fails', async () => {
   } finally { restore(); }
 });
 
-test('Both upstreams fail: source=null, error reported (not fabricated)', async () => {
+test('All upstreams fail: source=null, error reported (not fabricated)', async () => {
+  const stubFmq = { async searchByCallsign(){ throw new Error('FMQ network'); } };
   const restore = mockFetch(() => { throw new Error('network'); });
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test', fmqClient: stubFmq });
     const r = await c.searchByQuery('KSLX');
     assert.equal(r.source, null);
     assert.equal(r.rows.length, 0);
@@ -204,7 +247,7 @@ test('Missing fields stay null (no fabrication)', async () => {
   };
   const restore = mockFetch(() => jsonResp({ rows: [partial] }));
   try {
-    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test' });
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
     const r = await c.getById('7777');
     assert.equal(r.facility.lat,    null);
     assert.equal(r.facility.lon,    null);
