@@ -32,6 +32,7 @@ export default function FacilityRack({
   stationQuery        = '',
   stationResults      = [],
   stationSearching    = false,
+  stationSearched     = false,
   stationError        = '',
   onStationQueryChange,
   onStationPick,
@@ -59,6 +60,14 @@ export default function FacilityRack({
       )}
       {stationError && !stationSearching && (
         <div className="mt-1 font-mono text-[11px] text-rose-300">{stationError}</div>
+      )}
+      {stationSearched && stationResults.length === 0 && !stationSearching && !stationError && stationQuery.trim().length >= 2 && (
+        <div className="mt-1 font-mono text-[11px] text-textDim">
+          No matches in catalog for "<span className="text-text">{stationQuery}</span>".
+          Try a different spelling or partial match — the FCC catalog
+          uses current call signs (e.g. KDKB → KMVP-FM).
+          You can still enter a Facility ID below and click Lookup.
+        </div>
       )}
       {stationResults.length > 0 && (
         <ul className="mt-2 max-h-48 overflow-y-auto border border-text/10 rounded-sm bg-black/30">

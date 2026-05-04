@@ -54,24 +54,39 @@ export function makeFacilityClient({
       if (!q || typeof q !== 'string' || q.trim().length < 2){
         return { rows: [], source: null, error: 'query must be at least 2 characters' };
       }
-      // Primary: ZTR with the new ?q= filter (PR chelstein/zerotrustradio#242).
+      let ztrRows = null;          // null = ZTR not reached; [] = reached but empty
+      // Primary: ZTR with the ?q= filter (PR chelstein/zerotrustradio#242).
       if (ztrUrl){
         try {
           const u = joinUrl(ztrUrl, `/api/broadcast/stations?q=${encodeURIComponent(q.trim())}&limit=${limit}`);
           const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
           if (r.ok){
             const j = await r.json();
-            return {
-              rows:   (j.rows || []).map(row => normalizeZtrRow(row, u)),
-              count:  (j.rows || []).length,
-              source: 'zerotrustradio'
-            };
+            ztrRows = (j.rows || []).map(row => normalizeZtrRow(row, u));
+            if (ztrRows.length > 0){
+              return {
+                rows:   ztrRows,
+                count:  ztrRows.length,
+                source: 'zerotrustradio'
+              };
+            }
           }
         } catch (_){/* fall through */}
       }
-      // Fallback: n8n station/analyze webhook.
+      // Fallback: n8n station/analyze webhook.  Runs when ZTR is
+      // unreachable OR when ZTR returns zero rows — the latter handles
+      // legacy / historical / out-of-catalog callsigns (e.g. KDKB,
+      // which the FCC FMQ now reports as KMVP-FM).  When ZTR was
+      // reached but empty AND n8n is unset, return an empty success
+      // (source: 'zerotrustradio', count: 0) so the UI can show a
+      // "no matches" hint instead of treating it as a server error.
       const n8n = await callN8nStationAnalyze({ n8nBaseUrl, n8nSecret, timeoutMs, q });
-      if (n8n) return { rows: n8n.rows, count: n8n.rows.length, source: 'n8n' };
+      if (n8n && n8n.rows.length > 0){
+        return { rows: n8n.rows, count: n8n.rows.length, source: 'n8n' };
+      }
+      if (Array.isArray(ztrRows)){
+        return { rows: [], count: 0, source: 'zerotrustradio' };
+      }
       return { rows: [], source: null, error: 'no facility source reachable' };
     },
 

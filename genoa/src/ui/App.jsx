@@ -70,6 +70,9 @@ export default function App() {
   const [stationResults,  setStationResults]  = useState([]);
   const [stationSearching, setStationSearching] = useState(false);
   const [stationError,    setStationError]    = useState('');
+  // True when a search has completed at least once for the current
+  // query — drives the "no matches" hint in the dropdown.
+  const [stationSearched, setStationSearched] = useState(false);
   const stationDebounceRef = useRef(null);
 
   const onChange = (k, v) => setInputs(s => ({ ...s, [k]: v }));
@@ -223,9 +226,13 @@ export default function App() {
   // render the rows.
   async function searchStations(q){
     const qs = String(q || '').trim();
-    if (qs.length < 2){ setStationResults([]); setStationError(''); return; }
+    if (qs.length < 2){
+      setStationResults([]); setStationError(''); setStationSearched(false);
+      return;
+    }
     setStationSearching(true);
     setStationError('');
+    setStationSearched(false);
     try {
       const r = await fetch(`/api/facilities/search?q=${encodeURIComponent(qs)}&limit=10`);
       if (r.status === 503){
@@ -241,6 +248,7 @@ export default function App() {
       }
       const j = await r.json();
       setStationResults(j.rows || []);
+      setStationSearched(true);
     } catch (e){
       setStationError(`Search failed: ${e.message}`);
       setStationResults([]);
@@ -251,6 +259,7 @@ export default function App() {
 
   function onStationQueryChange(q){
     setStationQuery(q);
+    setStationSearched(false);
     if (stationDebounceRef.current) clearTimeout(stationDebounceRef.current);
     stationDebounceRef.current = setTimeout(() => searchStations(q), 250);
   }
@@ -478,6 +487,7 @@ export default function App() {
           stationQuery={stationQuery}
           stationResults={stationResults}
           stationSearching={stationSearching}
+          stationSearched={stationSearched}
           stationError={stationError}
           onStationQueryChange={onStationQueryChange}
           onStationPick={loadStationRow}
