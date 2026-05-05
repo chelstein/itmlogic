@@ -142,16 +142,23 @@ function section_validation(v){
     cr.result === 'pass'  ? 'PASS — clears CURVE_VALIDATION_MISSING'
   : cr.result === 'fail'  ? 'FAIL — engine + dataset drift detected; CURVE_VALIDATION_MISSING blocker stays'
   :                         'NO CASES RUN — CURVE_VALIDATION_MISSING blocker stays';
-  return [
+  const lines = [
     hr('Validation Evidence'),
     `Suite       : ${cr.name || '—'} (${cr.method || '—'})`,
     `Fixture     : ${cr.fixture_path || '—'}`,
     `Curve set   : ${cr.curve_dataset?.version || '—'}`,
     `Cases       : ${cr.n_pass ?? 0}/${cr.n_run ?? 0} pass`,
-    `Max error   : ${cr.max_error_km != null ? cr.max_error_km.toFixed(3) + ' km' : '—'}  · tolerance ${cr.tolerance_km ?? '—'} km`,
-    `Ran at      : ${cr.ran_at || '—'}`,
-    `Status      : ${status}`
-  ].join('\n');
+    `Max error   : ${cr.max_error_km != null ? cr.max_error_km.toFixed(3) + ' km' : '—'}  · tolerance ${cr.tolerance_km ?? '—'} km`
+  ];
+  if (cr.coverage_by_family){
+    lines.push('Coverage    :');
+    for (const [fam, c] of Object.entries(cr.coverage_by_family)){
+      lines.push(`  ${fam.padEnd(16)} ${c.n_pass}/${c.n_run} pass`);
+    }
+  }
+  lines.push(`Ran at      : ${cr.ran_at || '—'}`);
+  lines.push(`Status      : ${status}`);
+  return lines.join('\n');
 }
 
 const hr = title => `── ${title.toUpperCase()} ${'─'.repeat(Math.max(2, 60 - title.length))}`;

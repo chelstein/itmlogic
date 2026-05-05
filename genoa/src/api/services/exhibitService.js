@@ -559,17 +559,18 @@ export async function computeExhibit(req){
   // peeling the array.
   exhibit.validation = exhibit.validation || { runs: [] };
   exhibit.validation.curve_reference_validation = {
-    name:           curveRefRun?.name || 'fm-f5050-golden',
-    method:         curveRefRun?.method || null,
-    fixture_path:   curveRefRun?.fixture_path || null,
-    curve_dataset:  curveRefRun?.curve_dataset || null,
-    tolerance_km:   curveRefRun?.tolerance_km ?? null,
-    ran_at:         curveRefRun?.ran_at || null,
-    n_run:          curveRefRun?.n_run ?? 0,
-    n_pass:         curveRefRun?.n_pass ?? 0,
-    max_error_km:   curveRefRun?.max_error_km ?? null,
-    mean_error_km:  curveRefRun?.mean_error_km ?? null,
-    result:         curveRefRun?.result || 'no_cases'
+    name:               curveRefRun?.name || 'genoa-curve-golden',
+    method:             curveRefRun?.method || null,
+    fixture_path:       curveRefRun?.fixture_path || null,
+    curve_dataset:      curveRefRun?.curve_dataset || null,
+    coverage_by_family: curveRefRun?.coverage_by_family || null,
+    tolerance_km:       curveRefRun?.tolerance_km ?? null,
+    ran_at:             curveRefRun?.ran_at || null,
+    n_run:              curveRefRun?.n_run ?? 0,
+    n_pass:             curveRefRun?.n_pass ?? 0,
+    max_error_km:       curveRefRun?.max_error_km ?? null,
+    mean_error_km:      curveRefRun?.mean_error_km ?? null,
+    result:             curveRefRun?.result || 'no_cases'
   };
   if (crossCheckRun){
     exhibit.validation.fcc_cross_check = {
