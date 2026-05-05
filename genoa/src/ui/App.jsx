@@ -761,13 +761,13 @@ function PaneProvenance({ exhibit }){
       <SubHead title="FCC geo contour cross-check (external evidence)" />
       <SubKv kv={(() => {
         const cc = exhibit.validation?.fcc_cross_check;
-        const src = cc || last;
-        if (!src) return [['Status', 'no FCC cross-check run attached']];
+        if (!cc) return [['Status', 'SKIPPED — ZTR not configured or no facility_id resolved (cross-check requires ZTR rich-station endpoint)']];
+        const src = cc;
         const passLabel =
           src.result === 'pass'    ? 'PASS — engine matches FCC geo contour'
         : src.result === 'fail'    ? 'FAIL — engine differs from FCC geo contour (warning, not blocker)'
-        : src.result === 'skipped' ? 'SKIPPED — no usable _fcc_contour from ZTR'
-        : (src.authoritative_pass ? 'PASS' : 'NOT PASSING');
+        : src.result === 'skipped' ? 'SKIPPED — no usable _fcc_contour returned by ZTR for this station'
+        : (src.authoritative_pass  ? 'PASS' : 'SKIPPED — 0 cross-check cases ran');
         return [
           ['Method',       src.method   || 'FCC contour cross-check'],
           ['Source',       src.source   || 'zerotrustradio'],
