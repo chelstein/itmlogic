@@ -108,6 +108,29 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 2b. FCC Contours direct fallback ----
+  // When ZTR didn't supply a contour (not configured, station not in ZTR,
+  // or _fcc_contour missing), hit geo.fcc.gov/api/contours/entity.json
+  // directly using the facility_id + service from inputs.  This is the
+  // same public API ZTR proxies — public, no auth, always available.
+  //
+  // Gated to dBu-scored services (FM / LPFM / FX / FS / FB).  AM polygons
+  // are mV/m, and the cross-check validator only matches dBu polygons by
+  // design (ztrFccContourValidator.js filters on field_strength.unit ===
+  // 'dBu').  Calling the FCC API for AM here would always produce
+  // n_run=0 and emit a misleading FCC_GEO_CROSSCHECK_SKIPPED warning
+  // that degrades readiness for no engineering reason.
+  const FCC_CONTOUR_DBU_SERVICES = new Set(['FM', 'LPFM', 'FX', 'FS', 'FB']);
+  if (!fccContourResp
+      && sidecars.fccContours
+      && inputs.facility_id
+      && FCC_CONTOUR_DBU_SERVICES.has(String(inputs.service || '').toUpperCase())){
+    try {
+      const fc = await sidecars.fccContours.getContour(inputs.facility_id, inputs.service);
+      if (fc.available) fccContourResp = fc;
+    } catch { /* ignore; cross-check stays null */ }
+  }
+
   // ---- 3. Per-radial §73.313 HAAT ----
   // Pulled from ZTR's terrain-haat endpoint (Outcome A; PR
   // chelstein/zerotrustradio#243).  Only used when the request opts in
