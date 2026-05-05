@@ -296,6 +296,45 @@ export async function computeExhibit(req){
     reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
   };
 
+  // ---- 6b. §74.1204 nearby-primaries proximity search (FX only) ----
+  // For FM translator exhibits with coordinates and a frequency, hit
+  // FCC FMQ for every channel relationship governed by §74.1204(a) (co-
+  // channel + ±200/400/600 kHz adjacents + ±10.6/10.8 MHz IF) and
+  // proximity-filter to within TRANSLATOR_NEARBY_RADIUS_KM (default
+  // 300 km).  The result lands on evidence.nearby_primaries, which the
+  // engine's checkTranslatorInterference consumes verbatim to run the
+  // per-station D/U study.  Without this attach, the engine emits
+  // MISSING_NEARBY_STATIONS — honest, but the study can't run.
+  if (String(inputs.service || '').toUpperCase() === 'FX'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && Number.isFinite(Number(inputs.frequency))
+      && sidecars.facility?.getNearbyPrimaries
+      && process.env.TRANSLATOR_NEARBY_DISABLE !== '1'){
+    try {
+      const nb = await sidecars.facility.getNearbyPrimaries({
+        lat:                 Number(inputs.lat),
+        lon:                 Number(inputs.lon),
+        frequency_mhz:       Number(inputs.frequency),
+        radius_km:           Number(process.env.TRANSLATOR_NEARBY_RADIUS_KM) || 300,
+        exclude_facility_id: inputs.facility_id || null
+      });
+      if (nb?.available){
+        evidence.nearby_primaries = nb.primaries;
+        evidence.nearby_primaries_provenance = {
+          source:       nb.source,
+          method:       nb.method,
+          upstream_api: nb.upstream_api,
+          radius_km:    nb.radius_km,
+          n_queries:    nb.n_queries,
+          n_in_radius:  nb.n_in_radius,
+          fetched_at:   nb.fetched_at,
+          errors:       nb.errors
+        };
+      }
+    } catch { /* swallow; engine emits MISSING_NEARBY_STATIONS honestly */ }
+  }
+
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {
     operator:     options.operator     || null,
@@ -395,6 +434,10 @@ export async function computeExhibit(req){
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;
   }
+  if (evidence.nearby_primaries_provenance){
+    exhibit.evidence.nearby_primaries           = evidence.nearby_primaries;
+    exhibit.evidence.nearby_primaries_provenance = evidence.nearby_primaries_provenance;
+  }
 
   // ---- 10. Reconcile warnings against actual evidence ----
   // The engine pre-emptively emits CONSTANT_HAAT_ASSUMED, FACILITY_LOOKUP_UNAVAILABLE,
@@ -448,6 +491,17 @@ export async function computeExhibit(req){
       ? `Upstream returned malformed population evidence; missing fields: ${populationResp.missing.join(', ')}.`
       : `Population upstream attempt failed: ${populationResp.error || 'unknown'}.`;
     warnings.push(W.make('POPULATION_PLACEHOLDER', detail));
+  }
+
+  // ---- §74.1204 nearby-primaries proximity search reconciliation ----
+  // The engine emits MISSING_NEARBY_STATIONS whenever nearby_primaries
+  // is empty.  When the orchestrator's FCC FMQ proximity search ran
+  // successfully (provenance attached), an empty result is a positive
+  // §74.1204 outcome (no nearby restricted-channel stations) — not
+  // missing data.  Drop the warning in that case; the provenance block
+  // on the exhibit records that the search was performed.
+  if (evidence.nearby_primaries_provenance?.source){
+    warnings = warnings.filter(w => w.code !== 'MISSING_NEARBY_STATIONS');
   }
 
   // ---- Curve reference validation (drives CURVE_VALIDATION_MISSING) ----

@@ -203,6 +203,114 @@ export function makeFacilityClient({
       };
     },
 
+    /**
+     * 47 CFR §74.1204 nearby-primaries proximity search.
+     *
+     * Pulls every FM/LPFM/FX/FB/FS station from the FCC FMQ database
+     * whose carrier falls on a §74.1204(a)-restricted offset relative
+     * to the proposed translator (co-channel, ±200/400/600 kHz, ±10.6/
+     * 10.8 MHz IF), then filters to those within `radius_km` great-
+     * circle distance of the translator's coordinates.
+     *
+     * The result is shaped to plug directly into
+     * evidence.nearby_primaries — the engine's checkTranslatorInterference
+     * consumes that array verbatim and runs the per-station D/U study.
+     *
+     * @param {object} args
+     * @param {number} args.lat,lon            translator coordinates
+     * @param {number} args.frequency_mhz      translator carrier
+     * @param {number} args.radius_km          search radius (default 300)
+     * @param {string} [args.exclude_facility_id]  drop self from results
+     */
+    async getNearbyPrimaries({ lat, lon, frequency_mhz, radius_km = 300, exclude_facility_id = null } = {}){
+      if (lat == null || lon == null || frequency_mhz == null){
+        return { available: false, source: null,
+                 error: 'lat, lon, and frequency_mhz required for §74.1204 nearby-primaries search' };
+      }
+      const lat0 = Number(lat), lon0 = Number(lon), f0 = Number(frequency_mhz);
+      if (![lat0, lon0, f0].every(Number.isFinite)){
+        return { available: false, source: null,
+                 error: 'lat, lon, and frequency_mhz must be finite numbers' };
+      }
+      if (!fmqClient){
+        return { available: false, source: null,
+                 error: 'FCC FMQ client unavailable (FACILITY_DISABLE_FCC_FMQ=1)' };
+      }
+      // §74.1204(a)+(c) channel relationships — every offset whose D/U
+      // gate the translator must satisfy.  ±10.6 / ±10.8 MHz are the
+      // FCC IF-image frequencies of FM receivers (10.7 MHz IF center).
+      const RELATIONSHIPS = [
+        { rel: 'cochannel',         delta_mhz:  0.0  },
+        { rel: 'first_adjacent',    delta_mhz: +0.2  },
+        { rel: 'first_adjacent',    delta_mhz: -0.2  },
+        { rel: 'second_adjacent',   delta_mhz: +0.4  },
+        { rel: 'second_adjacent',   delta_mhz: -0.4  },
+        { rel: 'third_adjacent',    delta_mhz: +0.6  },
+        { rel: 'third_adjacent',    delta_mhz: -0.6  },
+        { rel: 'if_offset',         delta_mhz: +10.6 },
+        { rel: 'if_offset',         delta_mhz: -10.6 },
+        { rel: 'if_offset',         delta_mhz: +10.8 },
+        { rel: 'if_offset',         delta_mhz: -10.8 }
+      ];
+      const queries = RELATIONSHIPS
+        .map(r => ({ rel: r.rel, f: +(f0 + r.delta_mhz).toFixed(1) }))
+        .filter(q => q.f >= 88.0 && q.f <= 108.0);
+
+      const settled = await Promise.all(queries.map(q =>
+        fmqClient.searchByFrequencyRange(q.f, q.f).then(r => ({ ...q, ...r }))
+      ));
+
+      const { vincentyInverse } = await import('../../engine/geometry/wgs84.js');
+      const errs = [];
+      const collected = new Map();      // facility_id -> closest row
+      for (const r of settled){
+        if (r.error){ errs.push(`f=${r.f}: ${r.error}`); continue; }
+        for (const row of (r.rows || [])){
+          if (!row || !row.facility_id) continue;
+          if (exclude_facility_id && String(row.facility_id) === String(exclude_facility_id)) continue;
+          if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) continue;
+          if (row.frequency_unit !== 'MHz' || !Number.isFinite(row.frequency)) continue;
+          let inv;
+          try { inv = vincentyInverse(lat0, lon0, row.lat, row.lon); } catch { continue; }
+          if (!Number.isFinite(inv.distance_km) || inv.distance_km > radius_km) continue;
+          const prior = collected.get(row.facility_id);
+          if (prior && prior.distance_km <= inv.distance_km) continue;
+          collected.set(row.facility_id, { ...row, distance_km: inv.distance_km, channel_relationship: r.rel });
+        }
+      }
+
+      const primaries = [...collected.values()]
+        .sort((a, b) => a.distance_km - b.distance_km)
+        .map(r => ({
+          call:                  r.call,
+          facility_id:           r.facility_id,
+          fcc_class:             r.fcc_class,
+          service:               r.service,
+          frequency_mhz:         r.frequency,
+          erp_kw:                r.erp_kw,
+          haat_m:                r.haat_m,
+          lat:                   r.lat,
+          lon:                   r.lon,
+          distance_km:           +r.distance_km.toFixed(3),
+          channel_relationship:  r.channel_relationship,
+          source:                'fcc-fmq',
+          endpoint:              r.facility_lookup_source?.endpoint || null
+        }));
+
+      return {
+        available:    true,
+        source:       'fcc-fmq',
+        method:       '47 CFR §74.1204(a) channel-relationship FMQ search + WGS-84 Vincenty proximity filter',
+        upstream_api: 'https://transition.fcc.gov/fcc-bin/fmq',
+        fetched_at:   new Date().toISOString(),
+        radius_km,
+        n_queries:    queries.length,
+        n_in_radius:  primaries.length,
+        primaries,
+        errors:       errs.length ? errs : null
+      };
+    },
+
     async getSdrEvidence({ stationId, rich = null }){
       if (!stationId) return { available: false, source: null, error: 'stationId required' };
       const r = rich || await this.getRichStation(stationId);
