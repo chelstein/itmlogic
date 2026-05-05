@@ -654,7 +654,8 @@ function PaneRadials({ exhibit }){
 
 function PaneEvidence({ exhibit }){
   if (!exhibit) return <Empty/>;
-  const ev = exhibit.evidence || {};
+  const ev  = exhibit.evidence || {};
+  const pop = exhibit.population_estimate || {};
   return (
     <div className="space-y-3">
       <SubHead title="Terrain" />
@@ -668,6 +669,25 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.terrain.fetched_at || '—']
           ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
+      <SubHead title="Population (US Census 2020 via FCC Census Block API)" />
+      <SubKv kv={pop.source && pop.vintage
+        ? [
+            ['Persons',    Number(pop.primary).toLocaleString()],
+            ['Contour',    pop.contour_label || '—'],
+            ['Source',     pop.source],
+            ['Dataset',    pop.dataset || '—'],
+            ['Vintage',    String(pop.vintage)],
+            ['Method',     pop.method || '—'],
+            ['Endpoint',   pop.endpoint || '—'],
+            ['Fetched at', pop.fetched_at || '—']
+          ]
+        : pop.attempt_status === 'failed'
+          ? [
+              ['Status',   'Census API call failed — placeholder retained'],
+              ['Error',    pop.attempt_error || '—'],
+              ['Endpoint', pop.attempt_endpoint || '—']
+            ]
+          : [['Status', 'Placeholder — real Census data will populate once an exhibit is computed with lat/lon coordinates.']]} />
       <SubHead title="Measurements (SDR captures via ZTR)" />
       <SubKv kv={ev.measurements?.available
         ? [
