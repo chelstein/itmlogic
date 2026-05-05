@@ -18,6 +18,7 @@ import { renderNarrative }      from '../../narrative/generator.js';
 import { sidecars }             from './sidecars.js';
 import { getCached, putCached } from './facilityCache.js';
 import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFccContourValidator.js';
+import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
 import { W }                    from '../../types/warnings.js';
 
@@ -131,11 +132,50 @@ export async function computeExhibit(req){
     } catch { /* ignore; cross-check stays null */ }
   }
 
-  // ---- 3. Per-radial §73.313 HAAT ----
+  // ---- 2c. Per-radial HAAT directly from the FCC contour ----
+  // The FCC contour response carries `contourData[].haat` — the per-
+  // radial HAAT FCC used to compute its contour, sourced from the
+  // NED 1-arc-second DEM.  When we have it, hand it to the engine so
+  // CONSTANT_HAAT_ASSUMED clears with sourced data — no separate
+  // terrain sidecar required.  Subsamples to inputs.radial_step_deg.
+  // Only applies to dBu-scored services (HAAT is meaningless for AM).
+  if (fccContourResp?.available
+      && FCC_CONTOUR_DBU_SERVICES.has(String(inputs.service || '').toUpperCase())){
+    const step = Number(inputs.radial_step_deg) || 10;
+    const haatBundle = extractHaatFromContour(fccContourResp, step);
+    if (haatBundle && haatBundle.radials.length > 0){
+      evidence.terrain_haat_per_radial = haatBundle.radials.map(r => ({
+        az:                     r.azimuth_deg,
+        haat_input_m:           Number(inputs.haat_m) || null,
+        haat_computed_m:        r.haat_m,
+        haat_source:            'fcc_contour_radial_haat',
+        terrain_profile_source: haatBundle.elevation_data_source
+      }));
+      evidence.terrain = {
+        available:  true,
+        source:     'geo.fcc.gov',
+        endpoint:   haatBundle.endpoint,
+        method:     'per-radial HAAT extracted from FCC contour response (geo.fcc.gov/api/contours/entity.json contourData[].haat)',
+        dem:        { source: 'FCC NED', dataset: haatBundle.elevation_data_source },
+        fetched_at: fccContourResp.fetched_at || new Date().toISOString(),
+        n_radials:  haatBundle.radials.length,
+        rcamsl_m:   haatBundle.rcamsl,
+        profiles:   haatBundle.radials.map(r => ({
+          az:              r.azimuth_deg,
+          haat_computed_m: r.haat_m
+        }))
+      };
+    }
+  }
+
+  // ---- 3. Per-radial §73.313 HAAT (ZTR terrain-haat path) ----
   // Pulled from ZTR's terrain-haat endpoint (Outcome A; PR
   // chelstein/zerotrustradio#243).  Only used when the request opts in
   // (`options.use_terrain` true) AND the facility carries lat/lon AND
-  // the service isn't AM (groundwave doesn't use HAAT).
+  // the service isn't AM (groundwave doesn't use HAAT).  ZTR is
+  // arc-averaged DEM (more granular than the FCC contour's per-radial
+  // HAAT) so it overrides the FCC-extracted bundle if both are
+  // available.
   if (options.use_terrain
       && inputs.facility_id
       && inputs.service !== 'AM'

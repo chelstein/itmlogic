@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { makeFccContoursClient } from '../evidence/fccContoursClient.js';
+import { makeFccContoursClient, extractHaatFromContour } from '../evidence/fccContoursClient.js';
 
 // Minimal GeoJSON FeatureCollection matching the real FCC contours API shape.
 function fakeContourFC(facilityId = 41299, callsign = 'KDKB'){
@@ -142,4 +142,79 @@ test('makeFccContoursClient: LPFM maps to serviceType=LPFM', async () => {
   const c = makeFccContoursClient({ fetchFn });
   const r = await c.getContour('99999', 'LPFM');
   assert.equal(r.available, true);
+});
+
+/* -------------------- extractHaatFromContour -------------------- */
+
+function fcWithContourData(){
+  // FCC returns contourData with one entry per integer azimuth 0..359.
+  const contourData = [];
+  for (let az = 0; az < 360; az++){
+    contourData.push({
+      x: -112 + az * 1e-4,
+      y: 33  + az * 1e-4,
+      azimuth: az,
+      // Sinusoidal-like HAAT pattern so subsampling is verifiable.
+      haat: 500 + 50 * Math.sin(az * Math.PI / 180)
+    });
+  }
+  return {
+    available: true,
+    endpoint:  'https://geo.fcc.gov/api/contours/entity.json?facilityId=41299&serviceType=FM&unit=km',
+    fetched_at: '2026-05-05T00:00:00Z',
+    contour: {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'MultiPolygon', coordinates: [[[[0,0],[1,1],[1,0],[0,0]]]] },
+        properties: {
+          callsign: 'KDKB',
+          facility_id: 41299,
+          rcamsl: 871,
+          nradial: 360,
+          elevation_data_source: 'ned_1',
+          contourData
+        }
+      }]
+    }
+  };
+}
+
+test('extractHaatFromContour: subsamples to 8 radials at step=45', () => {
+  const fc = fcWithContourData();
+  const out = extractHaatFromContour(fc, 45);
+  assert.ok(out);
+  assert.equal(out.radials.length, 8);
+  assert.deepEqual(out.radials.map(r => r.azimuth_deg), [0, 45, 90, 135, 180, 225, 270, 315]);
+  assert.equal(out.rcamsl, 871);
+  assert.equal(out.elevation_data_source, 'ned_1');
+  assert.equal(out.source, 'fcc-contours-direct');
+});
+
+test('extractHaatFromContour: subsamples to 36 radials at step=10', () => {
+  const fc = fcWithContourData();
+  const out = extractHaatFromContour(fc, 10);
+  assert.equal(out.radials.length, 36);
+  assert.equal(out.radials[0].azimuth_deg, 0);
+  assert.equal(out.radials[35].azimuth_deg, 350);
+});
+
+test('extractHaatFromContour: returns null when fcc response not available', () => {
+  assert.equal(extractHaatFromContour({ available: false }, 45), null);
+  assert.equal(extractHaatFromContour(null, 45), null);
+});
+
+test('extractHaatFromContour: returns null when contourData missing', () => {
+  const fc = fcWithContourData();
+  delete fc.contour.features[0].properties.contourData;
+  assert.equal(extractHaatFromContour(fc, 45), null);
+});
+
+test('extractHaatFromContour: skips entries with non-finite haat', () => {
+  const fc = fcWithContourData();
+  // Corrupt the entry at azimuth 0.
+  fc.contour.features[0].properties.contourData[0].haat = NaN;
+  const out = extractHaatFromContour(fc, 45);
+  assert.equal(out.radials.length, 7, 'azimuth 0 dropped (NaN haat)');
+  assert.equal(out.radials[0].azimuth_deg, 45);
 });

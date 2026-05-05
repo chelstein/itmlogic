@@ -96,3 +96,47 @@ export function makeFccContoursClient({
     }
   };
 }
+
+/**
+ * Extract per-radial HAAT from an FCC contour response.
+ *
+ * The FCC's contour endpoint returns `contourData[]` — one entry per
+ * azimuth (0..359 at 1° step) with `haat` (m) for that radial.  This
+ * is the same HAAT FCC used to compute the contour vertex; using it
+ * here lets the engine clear CONSTANT_HAAT_ASSUMED with sourced data
+ * without requiring a separate terrain sidecar.
+ *
+ * @param {object} fccResp     Output of getContour() — { available, contour, ... }
+ * @param {number} stepDeg     Engine's radial_step_deg (subsampling factor)
+ * @returns {object|null}      Genoa-shape terrain bundle, or null if N/A
+ *                             { radials: [{azimuth_deg, haat_m}],
+ *                               rcamsl, elevation_data_source, nradial,
+ *                               source, endpoint }
+ */
+export function extractHaatFromContour(fccResp, stepDeg = 10){
+  if (!fccResp?.available) return null;
+  const features = fccResp.contour?.features;
+  if (!Array.isArray(features) || features.length === 0) return null;
+  const props = features[0].properties || {};
+  const contourData = props.contourData;
+  if (!Array.isArray(contourData) || contourData.length === 0) return null;
+  const step = Number(stepDeg) || 10;
+  // FCC azimuths are integers 0..359.  Engine radials at step S are
+  // [0, S, 2S, ...].  Subsample by az % step === 0.
+  const radials = [];
+  for (const pt of contourData){
+    if (typeof pt.azimuth !== 'number') continue;
+    if (pt.azimuth % step !== 0) continue;
+    if (!Number.isFinite(pt.haat)) continue;
+    radials.push({ azimuth_deg: pt.azimuth, haat_m: pt.haat });
+  }
+  if (radials.length === 0) return null;
+  return {
+    radials,
+    rcamsl:                props.rcamsl ?? null,
+    elevation_data_source: props.elevation_data_source || 'ned_1',
+    nradial:               props.nradial || radials.length,
+    source:                'fcc-contours-direct',
+    endpoint:              fccResp.endpoint
+  };
+}
