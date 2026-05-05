@@ -216,12 +216,23 @@ function section_measurement(ev){
 }
 
 function section_population(pop){
-  return [
-    hr('Population Estimate Disclaimer'),
-    `Primary contour:  ~${(pop?.primary ?? 0).toLocaleString()} (${pop?.model || '—'})`,
-    `Protected:        ~${(pop?.protected ?? 0).toLocaleString()}`,
-    `THIS IS A PLACEHOLDER. A Census/ACS dispatch is required for any filing-grade population claim.`
-  ].join('\n');
+  const lines = [hr('Population Estimate')];
+  if (pop?.source){
+    lines.push(`Persons:          ~${(pop.primary ?? 0).toLocaleString()}`);
+    if (pop.protected != null) lines.push(`Protected:        ~${(pop.protected ?? 0).toLocaleString()}`);
+    lines.push(`Source:           ${pop.source}`);
+    if (pop.dataset)  lines.push(`Dataset:          ${pop.dataset}`);
+    if (pop.vintage)  lines.push(`Census vintage:   ${pop.vintage}`);
+    if (pop.method)   lines.push(`Method:           ${pop.method}`);
+    if (pop.endpoint) lines.push(`Endpoint:         ${pop.endpoint}`);
+    if (pop.fetched_at) lines.push(`Fetched at:       ${pop.fetched_at}`);
+  } else {
+    lines.push(`Primary contour:  ~${(pop?.primary ?? 0).toLocaleString()} (${pop?.model || '—'})`);
+    lines.push(`Protected:        ~${(pop?.protected ?? 0).toLocaleString()}`);
+    lines.push(`PLACEHOLDER — population sourced from model estimate only.`);
+    lines.push(`A Census/ACS dispatch is required for any filing-grade population claim.`);
+  }
+  return lines.join('\n');
 }
 
 function section_warnings(warnings, fr){
