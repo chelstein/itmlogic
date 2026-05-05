@@ -10,6 +10,7 @@ export default function TelemetryRack({ exhibit }) {
   const fr   = exhibit?.filing_readiness || {};
   const polys = exhibit?.polygons || [];
   const s     = exhibit?.station_inputs || {};
+  const pop  = exhibit?.population_estimate || {};
   return (
     <div className="space-y-4">
 
@@ -44,6 +45,30 @@ export default function TelemetryRack({ exhibit }) {
 
       <RackPanel eyebrow="Channel C" title="Contour Results" tone="amber">
         <ContourResults polygons={polys} />
+      </RackPanel>
+
+      <RackPanel eyebrow="Channel D" title="Population Estimate" tone={pop.source ? 'cyan' : 'default'}>
+        {pop.source ? (
+          <div className="space-y-0.5">
+            <MetricReadout
+              label="Persons"
+              value={Number(pop.primary).toLocaleString()}
+              unit=""
+              tone="gold"
+              led="amber"
+            />
+            <MetricReadout label="Source"  value="US Census 2020" />
+            <MetricReadout label="Dataset" value={pop.dataset || '—'} />
+            <MetricReadout label="Contour" value={pop.contour_label || '—'} />
+            <MetricReadout label="Method"  value={pop.method ? pop.method.split('(')[0].trim() : '—'} />
+          </div>
+        ) : (
+          <div className="font-mono text-[11px] text-textDim italic">
+            {pop.attempt_status === 'failed'
+              ? `Census API failed: ${pop.attempt_error || 'unknown'}`
+              : 'Placeholder — computing exhibit will fetch real Census data'}
+          </div>
+        )}
       </RackPanel>
 
       <RackPanel eyebrow="Console / 02" title="Warnings" tone="danger">
