@@ -24,7 +24,7 @@ import { flatHaatPerRadial } from './haat/flat.js';
 import { fmRadialTable, FM_DEFAULT_CONTOURS, FM_INTERP, FM_INTERP_FCC, FM_CONTOUR_METHODS, FM_ENGINE_DEFAULT } from './fm/contour.js';
 import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
-import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, fxInputGuards } from './translators/contour.js';
+import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, FX_REGULATORY_METADATA, fxInputGuards } from './translators/contour.js';
 import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.js';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
@@ -170,6 +170,10 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       });
       break;
     case 'FX':
+      // Per-contour `mode` selects F(50,50) for the service contour and
+      // F(50,10) for the §74.1204(a)+(c) interfering contours.  The
+      // top-level mode here is the legacy default for any callers that
+      // pass a contour entry without its own mode field.
       contours     = FX_DEFAULT_CONTOURS;
       radial_table = await fxRadialTable({
         datasetByName: loadDataset, mode: '50,50', contours,
@@ -217,6 +221,12 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       },
       primaries
     });
+    // Stamp the §74.1204(c) D/U gate table + interfering-contour
+    // derivations onto the compliance block so the JSON exhibit / TXT
+    // export / UI can render the regulatory thresholds alongside the
+    // study results.  This is sourced data (47 CFR §74.1204), not a
+    // computed assumption.
+    regulatory_compliance.regulatory_metadata = FX_REGULATORY_METADATA;
     if (regulatory_compliance.missing_nearby_stations){
       warnings.push(W.make('MISSING_NEARBY_STATIONS'));
     } else if (regulatory_compliance.pass === false){

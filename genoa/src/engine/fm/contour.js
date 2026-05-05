@@ -95,7 +95,7 @@ export async function fmRadialTable({
     for (const c of contours){
       distances[c.id] = await fmContourDistance_km({
         datasetByName,
-        mode,
+        mode:       c.mode || mode,
         target_dBu: c.field_dBu,
         erp_kW:     erp_az,
         haat_m:     haat,
