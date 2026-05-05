@@ -419,24 +419,28 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       haat_m:         haat_m ?? null,
       haat_source:    haatPerRadial[0]?.haat_source || 'unknown',
       pattern_factor_applied: !!pattern,
-      curve_engine:   service === 'AM' ? null : fmEngine,
+      curve_engine:   service === 'AM' ? 'fcc-canonical' : fmEngine,
       interpolation:  service === 'AM'
-        ? 'n/a'
+        ? 'FCC groundwave field-grid lookup (Sommerfeld-Norton) — discrete σ {1..8} mS/m × 10 kHz frequency steps; no interpolation across σ'
         : (fmEngine === 'fcc-canonical'
             ? 'FCC bivariate cubic surface fit (ITPLBV) — vendored from contours-api-node'
             : 'log10-distance vs ascending field; linear along HAAT'),
-      dataset:        fmEngine === 'fcc-canonical'
-        ? 'fcc/contours-api-node@b55870d (tvfm_curves.js)'
-        : curve_prov.curve_version,
-      dataset_meta_sha256: fmEngine === 'fcc-canonical'
-        ? '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a'
-        : curve_prov.meta_sha256,
+      dataset:        service === 'AM'
+        ? 'fcc/contours-api-node@b55870d (gwave.js + data/gwave_field.json)'
+        : (fmEngine === 'fcc-canonical'
+            ? 'fcc/contours-api-node@b55870d (tvfm_curves.js)'
+            : curve_prov.curve_version),
+      dataset_meta_sha256: service === 'AM'
+        ? '0ba81eca1bda166e36d34906dfdbc72c730a976d91a3356c12b1ccde2a8b059f'
+        : (fmEngine === 'fcc-canonical'
+            ? '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a'
+            : curve_prov.meta_sha256),
       engine_module:  service === 'AM' ? 'src/engine/am/groundwave.js' :
                       service === 'LPFM' ? 'src/engine/lpfm/contour.js' :
                       service === 'FX'   ? 'src/engine/translators/contour.js' :
                                             'src/engine/fm/contour.js',
       formula_summary: service === 'AM'
-        ? 'unattenuated reference E0 = 100·sqrt(P_kW) mV/m at 1 km; per-distance attenuation NOT YET IMPLEMENTED.'
+        ? 'FCC amDistance(sigma, dielectric, freq_kHz, target_mV/m, fs1km) — vendored Sommerfeld-Norton groundwave from contours-api-node@b55870d (gwave.js); fs1km = 100·sqrt(P_kW) mV/m at 1 km; identical output to geo.fcc.gov/api/contours/amDistance.json.'
         : (fmEngine === 'fcc-canonical'
             ? 'FCC tvfmfs_metric(erp, haat, channel, target_dBu, fs_or_dist=2, curve) — vendored bivariate cubic surface fit over the FCC §73.333 tabulation; identical output to geo.fcc.gov/api/contours/distance.json.'
             : 'effective_dBu = target_dBu − 10·log10(ERP_kW); look up log10(distance) vs effective field at each HAAT row, then interpolate the per-row distances along the HAAT axis.')
