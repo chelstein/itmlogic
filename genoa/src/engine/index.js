@@ -284,14 +284,17 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   }
   const geojson = featureCollection(features);
 
-  // ---- Population (placeholder, by design) --------------------------
-  const POP_DENSITY_KM2 = 80;
-  const primary  = polygons[0]?.area_km2 || 0;
-  const protectedA = polygons[polygons.length-1]?.area_km2 || 0;
+  // ---- Population (null until orchestrator attaches sourced evidence) -
+  // The engine does NOT fabricate a population number.  The orchestrator
+  // (exhibitService.js step 8a) replaces this with a sourced estimate
+  // from the FCC Census Block API (geo.fcc.gov/api/census/area) or an
+  // operator-configured POPULATION_EVIDENCE_URL sidecar.  If neither is
+  // reachable, primary/protected stay null and POPULATION_PLACEHOLDER
+  // persists so reviewers see exactly what's missing.
   const population_estimate = {
-    primary:           Math.round(primary * POP_DENSITY_KM2),
-    protected:         Math.round(protectedA * POP_DENSITY_KM2),
-    model:             `uniform ${POP_DENSITY_KM2} /km² placeholder`,
+    primary:           null,
+    protected:         null,
+    model:             null,
     method:            'placeholder',
     source:            null
   };
