@@ -828,14 +828,14 @@ function PaneProvenance({ exhibit }){
         }
         if (pop.attempt_status === 'failed'){
           return [
-            ['Status',          'malformed upstream — POPULATION_PLACEHOLDER stays'],
+            ['Status',          'population API call failed — POPULATION_PLACEHOLDER stays'],
             ['Attempted source', pop.attempted_source || '—'],
             ['Endpoint',         pop.attempt_endpoint || '—'],
             ['Error',            pop.attempt_error    || '—'],
             ['Missing fields',   (pop.attempt_missing || []).join(', ') || '—']
           ];
         }
-        return [['Status', 'placeholder — POPULATION_EVIDENCE_URL not configured']];
+        return [['Status', 'placeholder — exhibit needs lat/lon coordinates for FCC Census Block API lookup']];
       })()} />
     </div>
   );
