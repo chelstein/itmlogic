@@ -713,8 +713,6 @@ function PaneProvenance({ exhibit }){
   const fm  = exhibit.facility_metadata || {};
   const ev  = exhibit.evidence || {};
   const sig = exhibit.engine_signature || {};
-  const v   = exhibit.validation || {};
-  const last = v.runs?.slice(-1)[0] || null;
   return (
     <div className="space-y-3">
       <SubHead title="Engine signature" />

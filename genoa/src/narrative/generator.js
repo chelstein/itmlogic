@@ -69,7 +69,17 @@ function section_provenance(x){
   const fm  = x.facility_metadata || {};
   const ev  = x.evidence || {};
   const v   = x.validation || {};
-  const last = v.runs?.slice(-1)[0] || null;
+  // Two INDEPENDENT validation systems, surfaced separately:
+  //   curve_reference_validation — internal golden fixture suite that
+  //     pins engine + curve dataset + interpolation.  Drives
+  //     CURVE_VALIDATION_MISSING.  This is the authoritative result.
+  //   fcc_cross_check — comparison against FCC's published contour at
+  //     geo.fcc.gov.  External evidence only.  Drives FCC_GEO_CROSSCHECK_*.
+  // Reading v.runs.slice(-1) was always wrong; it grabbed whichever run
+  // happened to be appended last (now the FCC cross-check), conflating
+  // the two systems.
+  const cr = v.curve_reference_validation || null;
+  const cc = v.fcc_cross_check || null;
   const lines = [hr('Evidence Provenance')];
   lines.push(`Facility       : ${fm.facility_lookup_source || '—'}${fm.facility_endpoint ? '  · ' + fm.facility_endpoint : ''}`);
   if (fm.facility_updated_at) lines.push(`               (updated ${fm.facility_updated_at})`);
@@ -77,8 +87,31 @@ function section_provenance(x){
     ? `${ev.terrain.source} · ${ev.terrain.method} · ${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`
     : 'not attached'}`);
   if (ev.terrain?.endpoint)    lines.push(`               (${ev.terrain.endpoint})`);
-  lines.push(`Curve check    : ${last?.method || 'local reference suite'}${last?.source ? ' · ' + last.source : ''}${last?.endpoint ? ' · ' + last.endpoint : ''}`);
-  lines.push(`Curve result   : authoritative_pass=${last?.authoritative_pass ? 'true' : 'false'} · ${last?.n_pass ?? 0}/${last?.n_run ?? 0} pass · max_err ${last?.max_error_km != null ? last.max_error_km.toFixed(2) + ' km' : '—'}`);
+  // Curve dataset validation (authoritative — drives CURVE_VALIDATION_MISSING).
+  if (cr){
+    const crResult =
+      cr.result === 'pass'  ? 'PASS — clears CURVE_VALIDATION_MISSING'
+    : cr.result === 'fail'  ? `FAIL — engine + dataset drift detected (max err ${cr.max_error_km?.toFixed?.(3) ?? '—'} km vs tolerance ${cr.tolerance_km ?? '—'} km)`
+    :                         'NO CASES RUN';
+    lines.push(`Curve check    : ${cr.method || 'internal golden fixture suite'} · fixture ${cr.name || '—'}`);
+    lines.push(`Curve result   : ${crResult} · ${cr.n_pass ?? 0}/${cr.n_run ?? 0} pass`);
+  } else {
+    lines.push('Curve check    : no curve-reference run attached');
+    lines.push('Curve result   : NO CASES RUN');
+  }
+  // FCC contour cross-check (evidence-only — drives FCC_GEO_CROSSCHECK_*).
+  if (cc){
+    const ccResult =
+      cc.result === 'pass'    ? 'PASS — engine matches FCC geo contour'
+    : cc.result === 'fail'    ? `FAIL — engine differs from FCC contour (max err ${cc.max_error_km?.toFixed?.(2) ?? '—'} km vs tolerance ${cc.tolerance_km ?? '—'} km)`
+    : cc.result === 'skipped' ? 'SKIPPED — no usable FCC contour for this station'
+    :                           '—';
+    lines.push(`FCC cross-chk  : ${cc.method || 'FCC contour cross-check'} · ${cc.source || '—'}`);
+    if (cc.endpoint) lines.push(`               (${cc.endpoint})`);
+    lines.push(`FCC result     : ${ccResult} · ${cc.n_pass ?? 0}/${cc.n_run ?? 0} pass`);
+  } else {
+    lines.push('FCC cross-chk  : not attached (ZTR or geo.fcc.gov not reached for this station)');
+  }
   lines.push(`Measurements   : ${ev.measurements?.available
     ? `${ev.measurements.source} · ${ev.measurements.n_records} record(s) · calibrated=${!!ev.measurements.calibrated}`
     : 'not attached'}`);
@@ -86,15 +119,38 @@ function section_provenance(x){
 }
 
 function section_validation(v){
-  const last = v?.runs?.slice(-1)[0] || null;
-  if (!last) return hr('Validation Evidence') + '\nNo validation run attached.';
+  // Validation evidence is the curve_reference_validation block.  This
+  // is the system that drives CURVE_VALIDATION_MISSING and is therefore
+  // the authoritative validation status for filing readiness.  The FCC
+  // cross-check is shown separately in section_provenance because it is
+  // engineering evidence, not curve-dataset validation.
+  const cr = v?.curve_reference_validation || null;
+  if (!cr){
+    // Legacy fallback for exhibits that still carry only runs[].
+    const last = v?.runs?.slice(-1)[0] || null;
+    if (!last) return hr('Validation Evidence') + '\nNo validation run attached.';
+    return [
+      hr('Validation Evidence'),
+      `Method      : ${last.method || '—'}`,
+      `Source      : ${last.source || '—'}${last.endpoint ? '  (' + last.endpoint + ')' : ''}`,
+      `Cases       : ${last.n_pass ?? 0}/${last.n_run ?? 0} pass (authoritative)`,
+      `Max error   : ${last.max_error_km != null ? last.max_error_km.toFixed(2) + ' km' : '—'}  · tolerance ${last.tolerance_km ?? '—'} km`,
+      `Status      : ${last.authoritative_pass ? 'PASS — clears CURVE_VALIDATION_MISSING' : 'NOT PASSING — CURVE_VALIDATION_MISSING blocker stays'}`
+    ].join('\n');
+  }
+  const status =
+    cr.result === 'pass'  ? 'PASS — clears CURVE_VALIDATION_MISSING'
+  : cr.result === 'fail'  ? 'FAIL — engine + dataset drift detected; CURVE_VALIDATION_MISSING blocker stays'
+  :                         'NO CASES RUN — CURVE_VALIDATION_MISSING blocker stays';
   return [
     hr('Validation Evidence'),
-    `Method      : ${last.method || '—'}`,
-    `Source      : ${last.source || '—'}${last.endpoint ? '  (' + last.endpoint + ')' : ''}`,
-    `Cases       : ${last.n_pass}/${last.n_run} pass (authoritative)`,
-    `Max error   : ${last.max_error_km != null ? last.max_error_km.toFixed(2) + ' km' : '—'}  · tolerance ${last.tolerance_km ?? '—'} km`,
-    `Status      : ${last.authoritative_pass ? 'PASS — clears CURVE_VALIDATION_MISSING' : 'NOT PASSING — CURVE_VALIDATION_MISSING blocker stays'}`
+    `Suite       : ${cr.name || '—'} (${cr.method || '—'})`,
+    `Fixture     : ${cr.fixture_path || '—'}`,
+    `Curve set   : ${cr.curve_dataset?.version || '—'}`,
+    `Cases       : ${cr.n_pass ?? 0}/${cr.n_run ?? 0} pass`,
+    `Max error   : ${cr.max_error_km != null ? cr.max_error_km.toFixed(3) + ' km' : '—'}  · tolerance ${cr.tolerance_km ?? '—'} km`,
+    `Ran at      : ${cr.ran_at || '—'}`,
+    `Status      : ${status}`
   ].join('\n');
 }
 
