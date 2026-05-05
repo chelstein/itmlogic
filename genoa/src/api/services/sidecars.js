@@ -1,12 +1,13 @@
 // Resolves environment-configured sidecars into ready-to-use clients.
 // Missing sidecar URL → null client → engine still runs.
 
-import { makeTerrainClient }    from '../../evidence/terrain/client.js';
-import { makeSplatClient }      from '../../evidence/terrain/splatClient.js';
-import { makeIdentityClient }   from '../../evidence/identity/index.js';
-import { makeFacilityClient }   from './facilityClient.js';
-import { makePopulationClient } from '../../evidence/populationClient.js';
-import { makeFccCensusClient }  from '../../evidence/fccCensusClient.js';
+import { makeTerrainClient }     from '../../evidence/terrain/client.js';
+import { makeSplatClient }       from '../../evidence/terrain/splatClient.js';
+import { makeIdentityClient }    from '../../evidence/identity/index.js';
+import { makeFacilityClient }    from './facilityClient.js';
+import { makePopulationClient }  from '../../evidence/populationClient.js';
+import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
+import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source)
@@ -40,7 +41,11 @@ export const sidecars = Object.freeze({
   facility:    makeFacilityClient(),
   // Population evidence: operator sidecar first, FCC Census API
   // fallback (always available unless explicitly disabled).
-  population:  buildPopulationClient()
+  population:  buildPopulationClient(),
+  // FCC Contours direct fallback: used when ZTR doesn't have _fcc_contour
+  // or ZTR is not configured.  Always on (geo.fcc.gov is public / no auth).
+  // Disable with FCC_CONTOURS_DISABLE=1.
+  fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient()
 });
 
 export async function sidecarStatus(){
