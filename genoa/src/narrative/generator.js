@@ -158,6 +158,28 @@ function section_validation(v){
   }
   lines.push(`Ran at      : ${cr.ran_at || '—'}`);
   lines.push(`Status      : ${status}`);
+
+  // Tolerance rationale (brief)
+  if (cr.tolerance_rationale?.distance_km){
+    lines.push(`Tol basis   : ${cr.tolerance_rationale.distance_km.basis?.[0] || '—'}`);
+  }
+
+  // Validation lock statement — machine-readable anchor for FCC review
+  const ls = cr.lock_statement || null;
+  if (ls){
+    lines.push('');
+    lines.push('Validation Lock:');
+    lines.push(`  Locked at   : ${ls.locked_at || '—'}  (${ls.locked_by || '—'})`);
+    lines.push(`  Upstream    : ${ls.upstream_commit || '—'}`);
+    lines.push(`  Cases       : ${ls.n_cases ?? cr.n_run ?? 0}`);
+    if (ls.families){
+      const famSummary = Object.entries(ls.families)
+        .map(([k, v]) => `${k} (${v.n_cases})`)
+        .join(', ');
+      lines.push(`  Families    : ${famSummary}`);
+    }
+    lines.push(`  Statement   : ${(ls.statement || '').slice(0, 200)}…`);
+  }
   return lines.join('\n');
 }
 
