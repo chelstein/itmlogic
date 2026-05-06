@@ -241,11 +241,17 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // exhibits without coordinates remain useful as an engineering view
   // of the contour distance solver but cannot be plotted on a map.
   //
-  // Projection.  Default 'wgs84-vincenty' (Genoa's PR A path, sub-mm
-  // ellipsoid error).  Set options.projection = 'fcc-spherical' for
-  // byte-equivalent vertex coordinates with FCC contours.js
-  // (great-circle on a sphere of radius 6371 km).
-  const projection = options.projection === 'fcc-spherical' ? 'fcc-spherical' : 'wgs84-vincenty';
+  // Projection.  Default 'wgs84-karney' (Karney 2013 geodesic on the
+  // WGS-84 ellipsoid; sub-nanometre round-trip residual at FCC scales).
+  // Set options.projection = 'fcc-spherical' for byte-equivalent vertex
+  // coordinates with FCC contours.js (great-circle on a sphere of
+  // radius 6371 km).
+  // Accepts the legacy alias 'wgs84-vincenty' for backwards-compatibility;
+  // both map to the Karney path.
+  const projection =
+    options.projection === 'fcc-spherical'  ? 'fcc-spherical' :
+    options.projection === 'wgs84-vincenty' ? 'wgs84-karney'  :
+                                              'wgs84-karney';
   const projectVertex = projection === 'fcc-spherical'
     ? (lt, ln, az, d) => fccSphericalDestPoint(lt, ln, az, d)
     : (lt, ln, az, d) => destPoint(lt, ln, az, d);

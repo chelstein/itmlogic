@@ -21,8 +21,8 @@
 //
 // METHOD
 //   For each candidate primary station passed in:
-//     1. Compute the great-circle range Δ between translator and
-//        primary (WGS-84 Vincenty inverse).
+//     1. Compute the geodesic range Δ between translator and
+//        primary (WGS-84 Karney 2013 inverse).
 //     2. Compute the primary's protected contour distance along the
 //        Tx→Tx bearing using F(50,50) at the primary's protected field
 //        threshold (the "Tx-toward-translator" direction is the worst
@@ -51,7 +51,7 @@
 //   strings + structured detail).
 
 import { fccDistanceKm, fccFieldDbuAtDistance } from '../curves/fcc/index.mjs';
-import { vincentyInverse } from '../geometry/wgs84.js';
+import { karneyInverse } from '../geometry/wgs84.js';
 
 // §74.1204(a) D/U gates per channel relationship.  Values are dB.
 export const TRANSLATOR_DU_GATES = Object.freeze({
@@ -246,7 +246,7 @@ function studyOnePrimary(translator, primary){
     return study;
   }
 
-  const inv = vincentyInverse(lat2, lon2, lat1, lon1);
+  const inv = karneyInverse(lat2, lon2, lat1, lon1);
   study.separation_km = inv.distance_km;
 
   // r_primary: distance from primary's Tx to its protected contour

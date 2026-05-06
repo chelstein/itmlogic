@@ -260,7 +260,7 @@ export function makeFacilityClient({
         fmqClient.searchByFrequencyRange(q.f, q.f).then(r => ({ ...q, ...r }))
       ));
 
-      const { vincentyInverse } = await import('../../engine/geometry/wgs84.js');
+      const { karneyInverse } = await import('../../engine/geometry/wgs84.js');
       const errs = [];
       const collected = new Map();      // facility_id -> closest row
       for (const r of settled){
@@ -271,7 +271,7 @@ export function makeFacilityClient({
           if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) continue;
           if (row.frequency_unit !== 'MHz' || !Number.isFinite(row.frequency)) continue;
           let inv;
-          try { inv = vincentyInverse(lat0, lon0, row.lat, row.lon); } catch { continue; }
+          try { inv = karneyInverse(lat0, lon0, row.lat, row.lon); } catch { continue; }
           if (!Number.isFinite(inv.distance_km) || inv.distance_km > radius_km) continue;
           const prior = collected.get(row.facility_id);
           if (prior && prior.distance_km <= inv.distance_km) continue;
@@ -300,7 +300,7 @@ export function makeFacilityClient({
       return {
         available:    true,
         source:       'fcc-fmq',
-        method:       '47 CFR §74.1204(a) channel-relationship FMQ search + WGS-84 Vincenty proximity filter',
+        method:       '47 CFR §74.1204(a) channel-relationship FMQ search + WGS-84 Karney (2013) geodesic proximity filter',
         upstream_api: 'https://transition.fcc.gov/fcc-bin/fmq',
         fetched_at:   new Date().toISOString(),
         radius_km,

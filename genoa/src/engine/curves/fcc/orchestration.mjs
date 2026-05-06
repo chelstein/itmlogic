@@ -24,10 +24,11 @@
 //
 //     3. Spherical Earth projection.  FCC projects each radial's
 //        polygon vertex with a great-circle destination on a sphere
-//        of radius R = 6371 km.  Genoa defaults to WGS-84 Vincenty
-//        (sub-mm error vs the FCC sphere's ≤ 30 m error) — this
-//        module exposes the FCC formula for callers that need
-//        byte-equivalent vertex coordinates.
+//        of radius R = 6371 km.  Genoa defaults to WGS-84 Karney
+//        (2013) geodesic (sub-nanometre round-trip residual vs the
+//        FCC sphere's ≤ 30 m error) — this module exposes the FCC
+//        formula for callers that need byte-equivalent vertex
+//        coordinates.
 //
 // PROVENANCE
 //   Source: github.com/fcc/contours-api-node, controllers/contours.js,
