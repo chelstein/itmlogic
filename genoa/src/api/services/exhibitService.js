@@ -647,6 +647,31 @@ export async function computeExhibit(req){
     evidence.identity = identityFromSidecar;
   }
 
+  // identity_probe — diagnostic block surfaced even when nothing
+  // confirmed.  Lets the operator see WHICH field names were checked
+  // and which keys ZTR's rich-station response actually carries, so
+  // a missing variant can be added in one line.  Same pattern as
+  // measurements_probe for SDR captures.
+  if (!evidence.identity?.available && (identityFromSidecar || identityFromZtr)){
+    evidence.identity_probe = {
+      available:                  false,
+      sidecar:                    identityFromSidecar
+        ? { configured: true,  reachable: !identityFromSidecar.error,
+            n_sources:   (identityFromSidecar.sources || []).length,
+            n_confirmations: (identityFromSidecar.confirmations || []).length,
+            error:       identityFromSidecar.error || null }
+        : { configured: false },
+      ztr_radiodns:               identityFromZtr
+        ? { configured: true,  reachable: !identityFromZtr.error || identityFromZtr.error.includes('no RadioDNS'),
+            error:               identityFromZtr.error || null,
+            checked_field_names: identityFromZtr.checked_field_names || null,
+            checked_subobjects:  identityFromZtr.checked_subobjects  || null,
+            station_keys:        identityFromZtr.station_keys        || null,
+            endpoint:            identityFromZtr.endpoint            || null }
+        : { configured: false }
+    };
+  }
+
   // ---- 6. Validation context ----
   // Two INDEPENDENT validation systems:
   //   a) curve_reference_validation — internal golden fixtures that
@@ -850,6 +875,8 @@ export async function computeExhibit(req){
   }
   if (evidence.identity){
     exhibit.evidence.identity = evidence.identity;
+  } else if (evidence.identity_probe){
+    exhibit.evidence.identity_probe = evidence.identity_probe;
   }
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;

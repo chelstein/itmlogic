@@ -702,8 +702,21 @@ function PaneEvidence({ exhibit }){
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
       <SubHead title="Identity (RDS / RadioDNS / EAS / audio)" />
       <SubKv kv={ev.identity?.available
-        ? [['Available', 'yes'], ['Confirmations', (ev.identity.confirmations || []).length], ['Sources', (ev.identity.sources || []).map(s => s.kind + ':' + s.status).join(', ')]]
-        : [['Status', 'Identity sidecar not attached or no confirmations returned.']]} />
+        ? [
+            ['Available',     'yes'],
+            ['Tiers used',    (ev.identity.tiers_used || []).join(', ') || '—'],
+            ['Confirmations', (ev.identity.confirmations || []).length],
+            ['Sources',       (ev.identity.sources || []).map(s => s.kind + ':' + s.status).join(', ')]
+          ]
+        : ev.identity_probe
+          ? [
+              ['Status', 'No identity confirmations attached. ZTR rich-station response was probed but carried no RadioDNS resolver fields and no station_record fields.'],
+              ['Sidecar configured',     ev.identity_probe.sidecar?.configured ? 'yes' : 'no'],
+              ['ZTR endpoint probed',    ev.identity_probe.ztr_radiodns?.endpoint || '—'],
+              ['ZTR station_keys (first 10)', (ev.identity_probe.ztr_radiodns?.station_keys || []).slice(0, 10).join(', ') || '—'],
+              ['Diagnostic',             'evidence.identity_probe carries the full list of checked field names and the actual ZTR station keys, so a missing variant can be added in one line.']
+            ]
+          : [['Status', 'Identity sidecar not attached and ZTR rich-station unavailable.']]} />
     </div>
   );
 }
