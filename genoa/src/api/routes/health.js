@@ -1,5 +1,5 @@
 import express from 'express';
-import { dbHealthy, poolReady } from '../../db/pool.js';
+import { dbHealthy, dbProbe, poolReady } from '../../db/pool.js';
 import { sidecarStatus } from '../services/sidecars.js';
 import { probeAllSources } from '../services/sourcesHealth.js';
 
@@ -20,6 +20,18 @@ r.get('/readyz', async (_req, res) => {
     db_healthy:    db,
     sidecars:      sc
   });
+});
+
+// /health/db — detailed DB probe.  Runs SELECT current_database(),
+// current_user, now(), version() through the SHARED pool, surfacing
+// SSL policy and connection latency.  Returns 503 when the pool is
+// configured but unreachable (most common cause: SSL self-signed
+// certificate failure on managed Postgres providers — set
+// PG_SSL_REJECT_UNAUTHORIZED=false).  No credentials, no host, no
+// password are echoed.
+r.get('/health/db', async (_req, res) => {
+  const probe = await dbProbe();
+  res.status(probe.ok ? 200 : 503).json(probe);
 });
 
 // Per-source fallback-chain health — probes every primary, secondary,
