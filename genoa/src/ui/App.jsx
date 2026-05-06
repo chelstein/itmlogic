@@ -373,6 +373,12 @@ export default function App() {
 
   function downloadExport(format){
     if (!exhibit){ setStatusMsg('Run a compute first.'); return; }
+    if (format === 'engineering-txt' || format === 'engineering-pdf'){
+      const ext = format === 'engineering-txt' ? 'txt' : 'pdf';
+      statelessEngineeringReportDownload(exhibit, ext).catch(e =>
+        setStatusMsg(`Engineering Statement export failed: ${e.message || e}`));
+      return;
+    }
     if (!exhibit.id){
       // stateless mode: synthesize JSON / GeoJSON in-browser; PDF needs
       // server-side rendering, so POST the exhibit to the stateless
@@ -397,6 +403,28 @@ export default function App() {
       return;
     }
     window.location = `/api/exhibits/${exhibit.id}/export/${format}`;
+  }
+
+  async function statelessEngineeringReportDownload(ex, ext){
+    setStatusMsg(`Rendering Engineering Statement ${ext.toUpperCase()}…`);
+    const cleaned = stripDomAndReact(ex);
+    const r = await fetch(`/api/exhibits/export/engineering-report.${ext}`, {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ exhibit: cleaned })
+    });
+    if (!r.ok){
+      const txt = await r.text().catch(() => '');
+      throw new Error(`HTTP ${r.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const call = (ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_');
+    const ts   = new Date().toISOString().slice(0, 10);
+    a.download = `genoa-engineering-statement-${call}-${ts}.${ext}`;
+    a.click();
+    setStatusMsg(`Engineering Statement ${ext.toUpperCase()} downloaded.`);
   }
 
   async function statelessPdfDownload(ex){
