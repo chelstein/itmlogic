@@ -328,16 +328,24 @@ function pairSkywaveStudy({ U, D, relationship, protected_field_mvm }){
   // §73.62 directional patterns (when pattern_table supplied).  When
   // a station has rss_erp_kw set explicitly, that overrides the
   // pattern computation (caller already did the RSS integration).
+  // Skywave-departure elevation is approximated by 0° (horizon)
+  // because §73.190 SS-1 already integrates over the ionospheric
+  // path; the antenna's elevation pattern is conventionally
+  // collapsed to its horizon slice for this study.  Operators with
+  // a 2-D pattern_table can override via U.elevation_deg /
+  // D.elevation_deg.
+  const u_el = Number.isFinite(Number(U.elevation_deg)) ? Number(U.elevation_deg) : 0;
+  const d_el = Number.isFinite(Number(D.elevation_deg)) ? Number(D.elevation_deg) : 0;
   const u_dir = (Number(U.rss_erp_kw) > 0)
     ? { erp_effective_kw: Number(U.rss_erp_kw), pattern_factor: null,
-        bearing_deg: bearing_u_to_d, directional: true, pattern_applied: false }
+        bearing_deg: bearing_u_to_d, elevation_deg: u_el, directional: true, pattern_applied: false }
     : directionalErpAtBearing({ erp_kw: Number(U.erp_kw),
-        pattern_table: U.pattern_table || null, bearing_deg: bearing_u_to_d });
+        pattern_table: U.pattern_table || null, bearing_deg: bearing_u_to_d, elevation_deg: u_el });
   const d_dir = (Number(D.rss_erp_kw) > 0)
     ? { erp_effective_kw: Number(D.rss_erp_kw), pattern_factor: null,
-        bearing_deg: bearing_d_to_u, directional: true, pattern_applied: false }
+        bearing_deg: bearing_d_to_u, elevation_deg: d_el, directional: true, pattern_applied: false }
     : directionalErpAtBearing({ erp_kw: Number(D.erp_kw),
-        pattern_table: D.pattern_table || null, bearing_deg: bearing_d_to_u });
+        pattern_table: D.pattern_table || null, bearing_deg: bearing_d_to_u, elevation_deg: d_el });
   study.u_pattern_factor             = u_dir.pattern_factor;
   study.d_pattern_factor             = d_dir.pattern_factor;
   study.u_erp_effective_kw           = u_dir.erp_effective_kw;

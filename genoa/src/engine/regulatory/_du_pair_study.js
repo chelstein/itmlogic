@@ -121,22 +121,31 @@ export function studyContourPair(U, D, {
   };
 
   // Apply directional patterns (when supplied) on the great-circle
-  // bearing.  Pattern's effect on power: ERP_eff = ERP_omni · f(az)².
+  // bearing.  Contour-pair studies operate at the horizon
+  // (elevation_deg = 0) — the protected/interfering edges are at
+  // ground level on a smooth-Earth model.  When U.pattern_table or
+  // D.pattern_table is a 2-D az×el grid the factor() interpolator
+  // reads the el=0 slice; 1-D legacy tables are unaffected.
+  // Pattern's effect on power: ERP_eff = ERP_omni · f(az)².
   const u_dir = directionalErpAtBearing({
-    erp_kw:        Number(U.erp_kw),
-    pattern_table: U.pattern_table || null,
-    bearing_deg:   bearing_u_to_d
+    erp_kw:         Number(U.erp_kw),
+    pattern_table:  U.pattern_table || null,
+    bearing_deg:    bearing_u_to_d,
+    elevation_deg:  0
   });
   const d_dir = directionalErpAtBearing({
-    erp_kw:        Number(D.erp_kw),
-    pattern_table: D.pattern_table || null,
-    bearing_deg:   bearing_d_to_u
+    erp_kw:         Number(D.erp_kw),
+    pattern_table:  D.pattern_table || null,
+    bearing_deg:    bearing_d_to_u,
+    elevation_deg:  0
   });
   study.u_pattern_factor            = u_dir.pattern_factor;
   study.d_pattern_factor            = d_dir.pattern_factor;
   study.u_erp_effective_kw          = u_dir.erp_effective_kw;
   study.d_erp_effective_kw          = d_dir.erp_effective_kw;
   study.directional_pattern_applied = u_dir.pattern_applied || d_dir.pattern_applied;
+  study.pattern_dimensionality      = u_dir.pattern_dimensionality || d_dir.pattern_dimensionality || null;
+  study.elevation_deg               = 0;
 
   let rD;
   try {

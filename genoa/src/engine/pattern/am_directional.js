@@ -52,7 +52,7 @@
 //     §73.150 RTA (radiation theoretical analysis) is upstream of
 //     this module.
 
-import { patternFactor } from './factor.js';
+import { patternFactor, isPattern2D } from './factor.js';
 
 /**
  * Compute the effective ERP at a great-circle bearing for a
@@ -67,26 +67,31 @@ import { patternFactor } from './factor.js';
  *   erp_effective_kw, pattern_factor, bearing_deg, directional, pattern_applied
  * }}
  */
-export function directionalErpAtBearing({ erp_kw, pattern_table, bearing_deg }){
+export function directionalErpAtBearing({ erp_kw, pattern_table, bearing_deg, elevation_deg = 0 }){
   const erp = Number(erp_kw);
   const az  = Number(bearing_deg);
+  const el  = Number(elevation_deg);
   if (!Number.isFinite(erp) || erp < 0){
-    return { erp_effective_kw: null, pattern_factor: null, bearing_deg: az,
+    return { erp_effective_kw: null, pattern_factor: null, bearing_deg: az, elevation_deg: el,
              directional: false, pattern_applied: false,
              error: 'erp_kw must be non-negative finite' };
   }
   if (!Number.isFinite(az)){
-    return { erp_effective_kw: erp, pattern_factor: 1.0, bearing_deg: az,
+    return { erp_effective_kw: erp, pattern_factor: 1.0, bearing_deg: az, elevation_deg: el,
              directional: false, pattern_applied: false,
              error: 'bearing_deg must be finite' };
   }
-  const directional = Array.isArray(pattern_table) && pattern_table.length > 0;
-  const f = directional ? patternFactor(pattern_table, az) : 1.0;
+  const isArrayPattern = Array.isArray(pattern_table) && pattern_table.length > 0;
+  const is2DPattern    = isPattern2D(pattern_table);
+  const directional    = isArrayPattern || is2DPattern;
+  const f = directional ? patternFactor(pattern_table, az, Number.isFinite(el) ? el : 0) : 1.0;
   return {
     erp_effective_kw: Number((erp * f * f).toFixed(6)),
     pattern_factor:   Number(f.toFixed(6)),
     bearing_deg:      Number(((az % 360) + 360) % 360),
+    elevation_deg:    Number.isFinite(el) ? el : 0,
     directional,
+    pattern_dimensionality: is2DPattern ? '2D-az-el' : (isArrayPattern ? '1D-az-horizon' : null),
     pattern_applied:  directional
   };
 }
