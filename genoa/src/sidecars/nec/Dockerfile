@@ -79,9 +79,13 @@ COPY server.js     /app/server.js
 COPY nec_bridge.py /app/nec_bridge.py
 RUN chmod +x /app/nec_bridge.py
 
-# Express is the only Node dependency; vendor it locally.
-RUN npm init -y >/dev/null 2>&1 \
- && npm install --omit=dev express >/dev/null 2>&1
+# Express is the only Node dependency.  We write the package.json
+# explicitly with "type":"module" — `npm init -y` produces a CJS
+# package.json by default, which would break `import` statements in
+# server.js at boot.
+RUN echo '{ "name": "genoa-nec-sidecar", "version": "0.1.0", "type": "module", "private": true }' > /app/package.json \
+ && npm install --omit=dev express >/dev/null 2>&1 \
+ && node -e "import('express').then(()=>console.log('express OK'))"
 
 ENV SIDECAR_PORT=8085 \
     BRIDGE_TIMEOUT_MS=60000 \
