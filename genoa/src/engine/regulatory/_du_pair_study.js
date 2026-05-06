@@ -28,6 +28,7 @@
 
 import { fccDistanceKm, fccFieldDbuAtDistance } from '../curves/fcc/index.mjs';
 import { karneyInverse } from '../geometry/wgs84.js';
+import { directionalErpAtBearing } from '../pattern/am_directional.js';
 
 /**
  * Run a single contour-pair D/U study.
@@ -69,6 +70,16 @@ export function studyContourPair(U, D, {
     u_field_dbu_at_d_edge:             null,
     du_actual_db:                      null,
     inside_protected_contour:          false,
+    // Directional-pattern application (§73.62 / §73.316).  Reported
+    // verbatim regardless of whether either station carries a
+    // pattern_table — when both are non-directional the factors are
+    // 1.0 and bearings are still useful for narrative.
+    bearings:                          null,
+    u_pattern_factor:                  1.0,
+    d_pattern_factor:                  1.0,
+    u_erp_effective_kw:                null,
+    d_erp_effective_kw:                null,
+    directional_pattern_applied:       false,
     pass:                              null,
     skipped:                           false,
     skipped_reason:                    null
@@ -97,14 +108,42 @@ export function studyContourPair(U, D, {
     return study;
   }
 
-  study.separation_km = karneyInverse(lat2, lon2, lat1, lon1).distance_km;
+  // Inverse geodesic from D → U gives the bearing D→U directly.
+  const inv_du = karneyInverse(lat2, lon2, lat1, lon1);
+  study.separation_km = inv_du.distance_km;
+  // initial_bearing_deg is the azimuth from D toward U.
+  // The reciprocal U→D bearing is final_bearing_deg + 180 (mod 360).
+  const bearing_d_to_u = inv_du.initial_bearing_deg;
+  const bearing_u_to_d = ((inv_du.final_bearing_deg + 180) % 360 + 360) % 360;
+  study.bearings = {
+    u_to_d_deg: Number(bearing_u_to_d.toFixed(3)),
+    d_to_u_deg: Number(bearing_d_to_u.toFixed(3))
+  };
+
+  // Apply directional patterns (when supplied) on the great-circle
+  // bearing.  Pattern's effect on power: ERP_eff = ERP_omni · f(az)².
+  const u_dir = directionalErpAtBearing({
+    erp_kw:        Number(U.erp_kw),
+    pattern_table: U.pattern_table || null,
+    bearing_deg:   bearing_u_to_d
+  });
+  const d_dir = directionalErpAtBearing({
+    erp_kw:        Number(D.erp_kw),
+    pattern_table: D.pattern_table || null,
+    bearing_deg:   bearing_d_to_u
+  });
+  study.u_pattern_factor            = u_dir.pattern_factor;
+  study.d_pattern_factor            = d_dir.pattern_factor;
+  study.u_erp_effective_kw          = u_dir.erp_effective_kw;
+  study.d_erp_effective_kw          = d_dir.erp_effective_kw;
+  study.directional_pattern_applied = u_dir.pattern_applied || d_dir.pattern_applied;
 
   let rD;
   try {
     rD = fccDistanceKm({
       haat_m:        Number(D.haat_m),
       target_dBu:    protected_field_dbu,
-      erp_kw:        Number(D.erp_kw),
+      erp_kw:        d_dir.erp_effective_kw,        // directional toward U
       mode:          protected_mode,
       frequency_mhz: study.d_frequency_mhz
     }).distance_km;
@@ -127,7 +166,7 @@ export function studyContourPair(U, D, {
     uField = fccFieldDbuAtDistance({
       haat_m:        Number(U.haat_m),
       distance_km:   rEdge,
-      erp_kw:        Number(U.erp_kw),
+      erp_kw:        u_dir.erp_effective_kw,         // directional toward D
       mode:          interfering_mode,
       frequency_mhz: study.u_frequency_mhz
     }).field_dBu;

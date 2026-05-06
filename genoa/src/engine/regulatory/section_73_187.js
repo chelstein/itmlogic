@@ -71,6 +71,7 @@
 import { skywaveFieldAtPath } from '../curves/fcc/skywave.mjs';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { karneyInverse } from '../geometry/wgs84.js';
+import { directionalErpAtBearing } from '../pattern/am_directional.js';
 
 // AM channel classifier — co/1st/2nd-adjacent gating via 10 kHz grid.
 function classifyAmOffsetKhz(delta_khz){
@@ -286,6 +287,14 @@ function pairSkywaveStudy({ U, D, relationship, protected_field_mvm }){
     skipped:                false,
     skipped_reason:         null,
     inside_protected_contour: false,
+    // §73.62 / §73.45 directional pattern (when U.pattern_table or
+    // D.pattern_table supplied).  Reported verbatim regardless.
+    bearings:                null,
+    u_pattern_factor:        1.0,
+    d_pattern_factor:        1.0,
+    u_erp_effective_kw:      Number(U?.erp_kw),
+    d_erp_effective_kw:      Number(D?.erp_kw),
+    directional_pattern_applied: false,
     directional_rss_applied: !!U?.rss_erp_kw,
     skywave_method:         null
   };
@@ -304,21 +313,49 @@ function pairSkywaveStudy({ U, D, relationship, protected_field_mvm }){
     return study;
   }
 
-  // Separation
+  // Separation + bearings
   const inv = karneyInverse(Number(U.lat), Number(U.lon), Number(D.lat), Number(D.lon));
   study.separation_km = inv.distance_km;
+  // initial_bearing_deg is U → D azimuth (since karneyInverse(U,D)).
+  // Reciprocal D → U is final_bearing_deg + 180 mod 360.
+  const bearing_u_to_d = inv.initial_bearing_deg;
+  const bearing_d_to_u = ((inv.final_bearing_deg + 180) % 360 + 360) % 360;
+  study.bearings = {
+    u_to_d_deg: Number(bearing_u_to_d.toFixed(3)),
+    d_to_u_deg: Number(bearing_d_to_u.toFixed(3))
+  };
+
+  // §73.62 directional patterns (when pattern_table supplied).  When
+  // a station has rss_erp_kw set explicitly, that overrides the
+  // pattern computation (caller already did the RSS integration).
+  const u_dir = (Number(U.rss_erp_kw) > 0)
+    ? { erp_effective_kw: Number(U.rss_erp_kw), pattern_factor: null,
+        bearing_deg: bearing_u_to_d, directional: true, pattern_applied: false }
+    : directionalErpAtBearing({ erp_kw: Number(U.erp_kw),
+        pattern_table: U.pattern_table || null, bearing_deg: bearing_u_to_d });
+  const d_dir = (Number(D.rss_erp_kw) > 0)
+    ? { erp_effective_kw: Number(D.rss_erp_kw), pattern_factor: null,
+        bearing_deg: bearing_d_to_u, directional: true, pattern_applied: false }
+    : directionalErpAtBearing({ erp_kw: Number(D.erp_kw),
+        pattern_table: D.pattern_table || null, bearing_deg: bearing_d_to_u });
+  study.u_pattern_factor             = u_dir.pattern_factor;
+  study.d_pattern_factor             = d_dir.pattern_factor;
+  study.u_erp_effective_kw           = u_dir.erp_effective_kw;
+  study.d_erp_effective_kw           = d_dir.erp_effective_kw;
+  study.directional_pattern_applied  = u_dir.pattern_applied || d_dir.pattern_applied;
 
   // D's nighttime protected-contour distance.  For AM, this is a
   // groundwave distance — protection is at the GROUNDWAVE contour
   // where SS-1 must not exceed the protected field.  Use D's σ (M3
   // conductivity) when supplied, else assume σ = 8 mS/m as a
-  // mid-range conductivity for a US-typical site.
+  // mid-range conductivity for a US-typical site.  D's directional
+  // pattern factor (toward U) has already been applied to its ERP.
   let rD;
   try {
     const r = fccAmDistanceKm({
       frequency_khz:          Number(D.frequency_khz),
       target_field_mvm:       protected_field_mvm,
-      erp_kw:                 Number(D.erp_kw),
+      erp_kw:                 d_dir.erp_effective_kw,
       ground_sigma_mS_m:      Number(D.ground_sigma_msm) || 8
     });
     rD = r.distance_km;
@@ -341,14 +378,14 @@ function pairSkywaveStudy({ U, D, relationship, protected_field_mvm }){
   // protected-edge facing U", which is at range (separation_km − rD)
   // from U.  We compute the skywave field at THAT range.  This matches
   // the FCC's AM Skywave Engineering Tool and OET-12 §6 procedure.
-  const erpForSkywave = Number(U.rss_erp_kw) > 0 ? Number(U.rss_erp_kw) : Number(U.erp_kw);
+  // Use the directional ERP toward D for U's skywave field.
   const sky = skywaveFieldAtPath({
     tx_lat: Number(U.lat), tx_lon: Number(U.lon),
     rx_lat: Number(D.lat), rx_lon: Number(D.lon),    // skywave to D itself (~equiv at FCC scales)
-    erp_kw: erpForSkywave,
+    erp_kw: u_dir.erp_effective_kw,
     frequency_khz: Number(U.frequency_khz),
     percent: 50,
-    directional_rss_applied: study.directional_rss_applied
+    directional_rss_applied: study.directional_rss_applied || study.directional_pattern_applied
   });
   // Re-compute the field at the protected edge by scaling for
   // distance: (rEdge / separation)^(-α).  This keeps the pair study

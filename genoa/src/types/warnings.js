@@ -120,6 +120,10 @@ export const WARNING_CODES = Object.freeze({
     title: 'FM reserved-band TV ch.6 protection violation (47 CFR §73.525)',
     description: 'The reserved-band FM (88.1–91.9 MHz) fails the §73.525(b) D/U gate against one or more active TV channel 6 stations.  Filing requires reduced ERP / HAAT in the offending sector, a directional antenna pattern, or demonstration that no protected ch.6 contour reaches the proposed site (typical post-DTV-transition).' },
 
+  ASR_MISMATCH: { severity: 'warning', phase: 'evidence',
+    title: 'ASR / application data mismatch (47 CFR §17.4)',
+    description: 'The Antenna Structure Registration (ASR) record disagrees with the application\'s antenna data on one or more fields (coordinates, overall height AGL/AMSL).  Filing requires consistency between Form 302 / 301 and the ASR record on file with the FCC.  A minor mismatch may be a quantization artefact; a major mismatch indicates either the application or the ASR record needs to be corrected before filing.' },
+
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
     title: 'AM nighttime skywave protection violation (47 CFR §73.187)',
     description: 'The proposed AM station fails the bidirectional §73.187 nighttime-skywave protection study against one or more nearby AM stations.  The §73.190 SS-1 (50% nighttime skywave) field at a protected station\'s nighttime contour edge exceeds the §73.182 protected threshold for that station\'s class, or vice versa.  Filing requires §73.187(c) protection or a §73.182(g) waiver.' },

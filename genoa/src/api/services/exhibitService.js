@@ -129,6 +129,33 @@ export async function computeExhibit(req){
         // ZTR exposed the data under a name we don't yet recognise.
         else if (sdr) sdrResp = sdr;   // available=false + diagnostics
       }
+      // ASR (47 CFR §17.4) cross-check — extract tower-registration
+      // data from the same rich-station response.  Defensive against
+      // ZTR schema variants; falls through to ASR_SIDECAR_URL when
+      // ZTR rich payload doesn't carry asr_number.
+      try {
+        const { makeAsrClient, checkAsrAgainstApplication } = await import('../../evidence/asrClient.js');
+        const asrClient = makeAsrClient();
+        if (asrClient){
+          let asr = asrClient.extractFromRichStation(richStation);
+          if (!asr.available && asr.error?.includes('did not carry an asr_number') && inputs.asr_number){
+            asr = await asrClient.getByAsrNumber(inputs.asr_number);
+          }
+          const asrResult = checkAsrAgainstApplication({
+            asr,
+            application: {
+              asr_number:             inputs.asr_number || null,
+              lat:                    inputs.lat,
+              lon:                    inputs.lon,
+              overall_height_m:       inputs.overall_height_m || null,
+              overall_height_amsl_m:  inputs.overall_height_amsl_m || null
+            }
+          });
+          if (asr.available || asr.error){
+            evidence.asr = asrResult;
+          }
+        }
+      } catch { /* swallow — ASR is informational, not load-bearing */ }
     }
   }
 
@@ -810,6 +837,19 @@ export async function computeExhibit(req){
   }
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;
+  }
+  if (evidence.asr){
+    exhibit.evidence.asr = evidence.asr;
+    if (evidence.asr.cross_check?.matches === false){
+      const detail = evidence.asr.cross_check.mismatches
+        .map(m => `${m.field}: ASR=${m.asr_value} vs application=${m.app_value}${m.delta_arcsec ? ` (Δ ${m.delta_arcsec} arcsec)` : ''}${m.delta_m ? ` (Δ ${m.delta_m} m)` : ''}`)
+        .join(' | ');
+      const hasMajor = evidence.asr.cross_check.mismatches.some(m => m.severity === 'major');
+      let warnings = exhibit.warnings || [];
+      warnings.push(W.make('ASR_MISMATCH',
+        `ASR ${evidence.asr.asr_number}${hasMajor ? ' MAJOR' : ''} mismatch (${evidence.asr.cross_check.n_mismatches}): ${detail}`));
+      exhibit.warnings = warnings;
+    }
   }
   if (evidence.nearby_primaries_provenance){
     exhibit.evidence.nearby_primaries           = evidence.nearby_primaries;
