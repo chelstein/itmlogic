@@ -406,21 +406,104 @@ export function makeFacilityClient({
       };
     },
 
-    async getSdrEvidence({ stationId, rich = null }){
+    /**
+     * Pull SDR captures (signal-strength measurements at known
+     * receiver locations) from ZTR's rich-station response.
+     *
+     * Defensive on two axes:
+     *   1. Field-name variants — ZTR has shipped captures under several
+     *      keys across releases (_captures, captures, sdr_captures,
+     *      _sdr_captures, captures_am, _captures_am).  Try them all,
+     *      take the first non-empty array.
+     *   2. Service filter — when `service` is supplied, drop records
+     *      whose own service tag doesn't match.  ZTR's capture
+     *      coverage is currently AM-only and the default
+     *      SDR_EVIDENCE_SERVICES gate enforces that, but a station's
+     *      record bundle can carry mixed-service entries (e.g. an FM
+     *      sister station's captures grouped with an AM clear-channel)
+     *      and we don't want those crossing the wire to engine
+     *      evidence under an AM exhibit.
+     *
+     * Normalizes each record to ensure it carries at minimum:
+     *   { lat, lon, frequency_khz | frequency_mhz, field_strength | dbu | mvm }
+     * Records missing all of those are dropped (they can't drive a
+     * field-strength comparison anyway).
+     */
+    async getSdrEvidence({ stationId, rich = null, service = null } = {}){
       if (!stationId) return { available: false, source: null, error: 'stationId required' };
       const r = rich || await this.getRichStation(stationId);
       if (!r.available) return { available: false, source: null, error: r.error || 'rich station unavailable' };
-      const captures = Array.isArray(r.station?._captures) ? r.station._captures : [];
+      const s = r.station || {};
+
+      // 1. Defensive field-name lookup.
+      const captureCandidates = [
+        s._captures, s.captures,
+        s._sdr_captures, s.sdr_captures,
+        s._captures_am, s.captures_am,
+        s._sdr?.records, s.sdr?.records,
+        s._radiodns?.captures
+      ];
+      let captures = [];
+      let captures_field = null;
+      for (let i = 0; i < captureCandidates.length; i++){
+        const c = captureCandidates[i];
+        if (Array.isArray(c) && c.length > 0){
+          captures = c;
+          captures_field = ['_captures','captures','_sdr_captures','sdr_captures',
+                            '_captures_am','captures_am','_sdr.records','sdr.records',
+                            '_radiodns.captures'][i];
+          break;
+        }
+      }
+
+      if (captures.length === 0){
+        return {
+          available:    false,
+          source:       'zerotrustradio',
+          endpoint:     r.endpoint,
+          n_records:    0,
+          error:        'rich station response carried no captures (checked _captures/captures/sdr_captures/_sdr_captures/_captures_am/captures_am/_sdr.records/sdr.records/_radiodns.captures)'
+        };
+      }
+
+      // 2. Service filter.  Records that carry their own service tag
+      // are kept only when it matches.  Records with no service tag
+      // pass through (we cannot know what they belong to and AM is
+      // the default ZTR coverage today).
+      const wantedService = service ? String(service).toUpperCase() : null;
+      const filtered = !wantedService ? captures : captures.filter(c => {
+        const tag = c?.service || c?.service_type || c?.svc;
+        if (!tag) return true;
+        return String(tag).toUpperCase() === wantedService;
+      });
+
+      // 3. Light sanity: drop nullish entries and entries that are not
+      // plain objects.  Don't filter on per-field presence — the engine
+      // records the captures as provenance verbatim; missing optional
+      // fields (lat/lon/field_strength) are fine for evidence-of-
+      // existence, just not for in-engine field-strength math.  The
+      // record's own shape is up to ZTR's ingest pipeline.
+      const usable = filtered.filter(c => c != null && typeof c === 'object');
+
+      // Calibration metadata: a record set is calibrated only when
+      // every record carries a calibration tag (calibrated=true OR
+      // calibration block).  ZTR doesn't yet emit this, so the value
+      // is conservative — false until proven true.
+      const allCalibrated = usable.length > 0 && usable.every(c =>
+        c.calibrated === true || (c.calibration && Object.keys(c.calibration).length > 0));
+
       return {
-        available:    captures.length > 0,
-        source:       'zerotrustradio',
-        endpoint:     r.endpoint,
-        fetched_at:   r.fetched_at,
-        n_records:    captures.length,
-        // ZTR captures don't carry a calibration flag.  Until calibration
-        // metadata flows through the SDR ingest, treat them as raw.
-        calibrated:   false,
-        records:      captures
+        available:        usable.length > 0,
+        source:           'zerotrustradio',
+        endpoint:         r.endpoint,
+        fetched_at:       r.fetched_at,
+        captures_field,
+        n_records:        usable.length,
+        n_records_raw:    captures.length,
+        n_dropped_service_filter: filtered.length === captures.length ? 0 : (captures.length - filtered.length),
+        n_dropped_sanity_filter:  filtered.length - usable.length,
+        calibrated:       allCalibrated,
+        records:          usable
       };
     }
   };

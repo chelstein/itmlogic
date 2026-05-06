@@ -104,7 +104,11 @@ export async function computeExhibit(req){
       if (fc.available) fccContourResp = fc;
       // SDR evidence — gated by service.
       if (sdrEnabledForService){
-        const sdr = await sidecars.facility.getSdrEvidence({ stationId: ztrStationId, rich: richStation });
+        const sdr = await sidecars.facility.getSdrEvidence({
+          stationId: ztrStationId,
+          rich:      richStation,
+          service:   inputs.service     // AM filter for ZTR's mixed-service rich-station bundle
+        });
         if (sdr.available) sdrResp = sdr;
       }
     }
@@ -393,13 +397,21 @@ export async function computeExhibit(req){
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
   if (sdrResp?.available){
     evidence.measurements = {
-      available:  true,
-      source:     sdrResp.source,
-      endpoint:   sdrResp.endpoint,
-      fetched_at: sdrResp.fetched_at,
-      n_records:  sdrResp.n_records,
-      calibrated: !!sdrResp.calibrated,
-      records:    sdrResp.records
+      available:                true,
+      source:                   sdrResp.source,
+      endpoint:                 sdrResp.endpoint,
+      fetched_at:               sdrResp.fetched_at,
+      // captures_field exposes which ZTR field-name shape carried the
+      // records (_captures, captures, sdr_captures, …).  Useful for
+      // diagnosing schema drift across ZTR releases.
+      captures_field:           sdrResp.captures_field || '_captures',
+      n_records:                sdrResp.n_records,
+      n_records_raw:            sdrResp.n_records_raw ?? sdrResp.n_records,
+      n_dropped_service_filter: sdrResp.n_dropped_service_filter ?? 0,
+      n_dropped_sanity_filter:  sdrResp.n_dropped_sanity_filter ?? 0,
+      service_filter:           inputs.service ? String(inputs.service).toUpperCase() : null,
+      calibrated:               !!sdrResp.calibrated,
+      records:                  sdrResp.records
     };
   }
 
