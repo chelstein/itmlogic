@@ -110,6 +110,14 @@ export async function computeExhibit(req){
           service:   inputs.service     // AM filter for ZTR's mixed-service rich-station bundle
         });
         if (sdr.available) sdrResp = sdr;
+        // Even when the SDR pull found no captures, retain the probe
+        // result on evidence so the exhibit's measurements block can
+        // explain which field names were checked and which keys
+        // actually appear on the rich-station response.  This is
+        // crucial for diagnosing "we know KVLV has audio captures but
+        // they don't show up": the station_keys list reveals whether
+        // ZTR exposed the data under a name we don't yet recognise.
+        else if (sdr) sdrResp = sdr;   // available=false + diagnostics
       }
     }
   }
@@ -412,6 +420,20 @@ export async function computeExhibit(req){
       service_filter:           inputs.service ? String(inputs.service).toUpperCase() : null,
       calibrated:               !!sdrResp.calibrated,
       records:                  sdrResp.records
+    };
+  } else if (sdrResp){
+    // Probe ran but no captures landed.  Retain the diagnostic so
+    // operators can see why (which field names were checked, which
+    // keys ZTR actually exposed on the rich-station response).
+    evidence.measurements_probe = {
+      available:           false,
+      source:              sdrResp.source,
+      endpoint:            sdrResp.endpoint,
+      n_records:           0,
+      reason:              sdrResp.error || 'no captures returned',
+      checked_field_names: sdrResp.checked_field_names || null,
+      station_keys:        sdrResp.station_keys || null,
+      service_filter:      inputs.service ? String(inputs.service).toUpperCase() : null
     };
   }
 

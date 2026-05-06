@@ -435,13 +435,36 @@ export function makeFacilityClient({
       if (!r.available) return { available: false, source: null, error: r.error || 'rich station unavailable' };
       const s = r.station || {};
 
-      // 1. Defensive field-name lookup.
+      // 1. Defensive field-name lookup.  ZTR has shipped capture data
+      // under several keys across releases AND under both SDR (signal
+      // measurement) and audio (off-air recording) flavors.  We accept
+      // either as evidence — both are sourced measurements of the
+      // station's broadcast at a known location.
       const captureCandidates = [
-        s._captures, s.captures,
-        s._sdr_captures, s.sdr_captures,
-        s._captures_am, s.captures_am,
-        s._sdr?.records, s.sdr?.records,
-        s._radiodns?.captures
+        // SDR / signal-measurement flavors
+        s._captures,           s.captures,
+        s._sdr_captures,       s.sdr_captures,
+        s._captures_am,        s.captures_am,
+        s._sdr?.records,       s.sdr?.records,
+        s._radiodns?.captures,
+        // Audio / off-air recording flavors (KVLV-style audio captures)
+        s._audio_captures,     s.audio_captures,
+        s._audio?.captures,    s.audio?.captures,
+        s._audio?.records,     s.audio?.records,
+        s._recordings,         s.recordings,
+        s._captures_audio,     s.captures_audio
+      ];
+      const candidateNames = [
+        '_captures','captures',
+        '_sdr_captures','sdr_captures',
+        '_captures_am','captures_am',
+        '_sdr.records','sdr.records',
+        '_radiodns.captures',
+        '_audio_captures','audio_captures',
+        '_audio.captures','audio.captures',
+        '_audio.records','audio.records',
+        '_recordings','recordings',
+        '_captures_audio','captures_audio'
       ];
       let captures = [];
       let captures_field = null;
@@ -449,20 +472,24 @@ export function makeFacilityClient({
         const c = captureCandidates[i];
         if (Array.isArray(c) && c.length > 0){
           captures = c;
-          captures_field = ['_captures','captures','_sdr_captures','sdr_captures',
-                            '_captures_am','captures_am','_sdr.records','sdr.records',
-                            '_radiodns.captures'][i];
+          captures_field = candidateNames[i];
           break;
         }
       }
 
       if (captures.length === 0){
+        // Surface every key on the rich-station root so an operator
+        // can immediately see whether ZTR exposed captures under a
+        // name we didn't recognise (vs. truly carrying none).
+        const station_keys = Object.keys(s).slice(0, 50);
         return {
           available:    false,
           source:       'zerotrustradio',
           endpoint:     r.endpoint,
           n_records:    0,
-          error:        'rich station response carried no captures (checked _captures/captures/sdr_captures/_sdr_captures/_captures_am/captures_am/_sdr.records/sdr.records/_radiodns.captures)'
+          error:        `rich station response carried no captures under any known field name (checked ${candidateNames.length} variants)`,
+          checked_field_names: candidateNames,
+          station_keys
         };
       }
 
