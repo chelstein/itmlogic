@@ -108,25 +108,25 @@ export const WARNING_CODES = Object.freeze({
     title: 'FM translator interference (47 CFR §74.1204)',
     description: 'The translator fails one or more §74.1204 D/U interference gates against a nearby primary station.  Filing requires that all D/U ratios be satisfied.' },
 
-  FM_CONTOUR_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
-    title: 'FM short-spacing contour-protection violation (47 CFR §73.215)',
-    description: 'The full-service FM station fails the bidirectional §73.215 contour-protection short-spacing study against one or more nearby full-service FM stations.  The proposed station\'s F(50,10) interfering contour overlaps a nearby station\'s F(50,50) protected contour, or vice versa, at the §74.1204(c) D/U gate threshold for the channel relationship.  Filing requires either contour protection or §73.207 minimum-distance separation.' },
+  FM_CONTOUR_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'FM short-spacing contour-protection — simplified study flagged a violation (47 CFR §73.215)',
+    description: 'Genoa\'s simplified §73.215 study (single-bearing contour-edge methodology, see src/engine/regulatory/section_73_215.js header) detected D/U gate violations against one or more nearby full-service FM stations.  This is CONSERVATIVE relative to the FCC\'s actual polygon-vs-polygon contour-overlap test — a point-bearing failure can over-flag stations the licensed engineer\'s full polygon study would clear.  Required next step: licensed-engineer polygon-overlap review before filing-grade go/no-go.  Genoa surfaces the §73.215 study results on regulatory_compliance.studies for that review.' },
 
   FM_MINIMUM_SEPARATION_VIOLATION: { severity: 'warning', phase: 'engine',
     title: 'FM §73.207(b) minimum-distance separation not met',
     description: 'The proposed FM station fails the §73.207(b) Table A minimum-distance separation against one or more nearby full-service FM stations.  When §73.215 contour protection passes, this is informational — the filing can cite §73.215 instead.  When §73.215 also fails, the station does not qualify under either rule and the filing requires an alternative (e.g., a major-change application with reduced ERP / HAAT, or a directional antenna pattern).' },
 
-  FM_TV_CH6_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
-    title: 'FM reserved-band TV ch.6 protection violation (47 CFR §73.525)',
-    description: 'The reserved-band FM (88.1–91.9 MHz) fails the §73.525(b) D/U gate against one or more active TV channel 6 stations.  Filing requires reduced ERP / HAAT in the offending sector, a directional antenna pattern, or demonstration that no protected ch.6 contour reaches the proposed site (typical post-DTV-transition).' },
+  FM_TV_CH6_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'FM reserved-band TV ch.6 protection — simplified study flagged a violation (47 CFR §73.525)',
+    description: 'Genoa\'s simplified §73.525 study (single-bearing F(50,10)↔Grade B contour-edge methodology, same simplification as §73.215) detected a §73.525(b) D/U gate violation against one or more active TV channel 6 stations.  This is CONSERVATIVE relative to the FCC\'s actual polygon-vs-polygon overlap.  Required next step: licensed-engineer review with full polygon overlap before filing.  Most full-power ch.6 stations were repacked in the 2009 DTV transition; LPTV / Class A "Franken FM" residuals are the active concern.' },
 
   ASR_MISMATCH: { severity: 'warning', phase: 'evidence',
     title: 'ASR / application data mismatch (47 CFR §17.4)',
     description: 'The Antenna Structure Registration (ASR) record disagrees with the application\'s antenna data on one or more fields (coordinates, overall height AGL/AMSL).  Filing requires consistency between Form 302 / 301 and the ASR record on file with the FCC.  A minor mismatch may be a quantization artefact; a major mismatch indicates either the application or the ASR record needs to be corrected before filing.' },
 
-  AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
-    title: 'AM nighttime skywave protection violation (47 CFR §73.187)',
-    description: 'The proposed AM station fails the bidirectional §73.187 nighttime-skywave protection study against one or more nearby AM stations.  The §73.190 SS-1 (50% nighttime skywave) field at a protected station\'s nighttime contour edge exceeds the §73.182 protected threshold for that station\'s class, or vice versa.  Filing requires §73.187(c) protection or a §73.182(g) waiver.' },
+  AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.187)',
+    description: 'Genoa\'s simplified §73.187/§73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  This is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.187(b)(1) RSS analysis before filing.  Genoa surfaces the §73.187 study results on regulatory_compliance.studies for that review.' },
 
   OET65_NEAR_FIELD_REQUIRED: { severity: 'warning', phase: 'engine',
     title: 'OET-65 near-field analysis required (47 CFR §1.1310)',
