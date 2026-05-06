@@ -144,14 +144,29 @@ export async function computeExhibit(req){
       && FCC_CONTOUR_DBU_SERVICES.has(String(inputs.service || '').toUpperCase())){
     const step = Number(inputs.radial_step_deg) || 10;
     const haatBundle = extractHaatFromContour(fccContourResp, step);
-    if (haatBundle && haatBundle.radials.length > 0){
-      evidence.terrain_haat_per_radial = haatBundle.radials.map(r => ({
-        az:                     r.azimuth_deg,
-        haat_input_m:           Number(inputs.haat_m) || null,
-        haat_computed_m:        r.haat_m,
-        haat_source:            'fcc_contour_radial_haat',
-        terrain_profile_source: haatBundle.elevation_data_source
-      }));
+    if (haatBundle && haatBundle.n_finite > 0){
+      const flat_m = Number(inputs.haat_m);
+      let n_dem = 0, n_flat = 0;
+      evidence.terrain_haat_per_radial = haatBundle.radials.map(r => {
+        if (Number.isFinite(r.haat_m)){
+          n_dem++;
+          return {
+            az:                     r.azimuth_deg,
+            haat_input_m:           flat_m,
+            haat_computed_m:        r.haat_m,
+            haat_source:            'fcc_contour_radial_haat',
+            terrain_profile_source: haatBundle.elevation_data_source
+          };
+        }
+        n_flat++;
+        return {
+          az:                     r.azimuth_deg,
+          haat_input_m:           flat_m,
+          haat_computed_m:        flat_m,
+          haat_source:            'user_flat (no FCC HAAT for this radial)',
+          terrain_profile_source: null
+        };
+      });
       evidence.terrain = {
         available:  true,
         source:     'geo.fcc.gov',
@@ -160,6 +175,8 @@ export async function computeExhibit(req){
         dem:        { source: 'FCC NED', dataset: haatBundle.elevation_data_source },
         fetched_at: fccContourResp.fetched_at || new Date().toISOString(),
         n_radials:  haatBundle.radials.length,
+        n_radials_dem_sourced:   n_dem,
+        n_radials_flat_fallback: n_flat,
         rcamsl_m:   haatBundle.rcamsl,
         profiles:   haatBundle.radials.map(r => ({
           az:              r.azimuth_deg,
@@ -188,15 +205,33 @@ export async function computeExhibit(req){
     });
     if (terrainResp?.available && Array.isArray(terrainResp.radials) && terrainResp.radials.length){
       // Hand the engine its per-radial HAAT in the shape it expects.
-      evidence.terrain_haat_per_radial = terrainResp.radials
-        .filter(r => Number.isFinite(r.haat_m))
-        .map(r => ({
+      // Keep ALL radials (the engine requires strict length match with
+      // radials_deg).  For radials where the sidecar returned a null
+      // haat_m (no DEM coverage for that direction), fall back to the
+      // user-input flat HAAT for that radial and tag the source so the
+      // radial table shows exactly where coverage gapped.
+      const flat_m = Number(inputs.haat_m);
+      let n_dem = 0, n_flat = 0;
+      evidence.terrain_haat_per_radial = terrainResp.radials.map(r => {
+        if (Number.isFinite(r.haat_m)){
+          n_dem++;
+          return {
+            az:                     r.azimuth_deg,
+            haat_input_m:           flat_m,
+            haat_computed_m:        r.haat_m,
+            haat_source:            'arc_averaged_dem',
+            terrain_profile_source: terrainResp.dem?.source || 'zerotrustradio'
+          };
+        }
+        n_flat++;
+        return {
           az:                     r.azimuth_deg,
-          haat_input_m:           Number(inputs.haat_m) || null,
-          haat_computed_m:        r.haat_m,
-          haat_source:            'arc_averaged_dem',
-          terrain_profile_source: terrainResp.dem?.source || 'zerotrustradio'
-        }));
+          haat_input_m:           flat_m,
+          haat_computed_m:        flat_m,
+          haat_source:            'user_flat (no DEM coverage)',
+          terrain_profile_source: null
+        };
+      });
       evidence.terrain = {
         available:  true,
         source:     terrainResp.source || 'zerotrustradio',
@@ -205,6 +240,8 @@ export async function computeExhibit(req){
         dem:        terrainResp.dem,
         fetched_at: terrainResp.fetched_at,
         n_radials:  terrainResp.n_radials,
+        n_radials_dem_sourced:   n_dem,
+        n_radials_flat_fallback: n_flat,
         profiles:   terrainResp.radials.map(r => ({
           az:                r.azimuth_deg,
           haat_computed_m:   r.haat_m,
@@ -280,16 +317,36 @@ export async function computeExhibit(req){
         to_km:       16,
         samples:     27
       });
-      if (tr.haat_per_radial?.length){
-        evidence.terrain_haat_per_radial = tr.haat_per_radial
-          .filter(r => Number.isFinite(r.haat_m))
-          .map(r => ({
+      if (tr.haat_per_radial?.length === radials.length){
+        const flat_m = Number(inputs.haat_m);
+        let n_dem = 0, n_flat = 0;
+        // Keep ALL radials so the array length matches radials_deg.length
+        // (the engine requires strict equality to accept the bundle).
+        // For radials where the multi-source elevation client returned
+        // null (no DEM coverage — e.g. offshore samples), fall back to
+        // the user-input flat HAAT for that single radial and tag the
+        // source honestly so the radial table shows exactly where DEM
+        // coverage gapped.
+        evidence.terrain_haat_per_radial = tr.haat_per_radial.map(r => {
+          if (Number.isFinite(r.haat_m)){
+            n_dem++;
+            return {
+              az:                     r.az,
+              haat_input_m:           flat_m,
+              haat_computed_m:        r.haat_m,
+              haat_source:            'arc_averaged_dem_direct',
+              terrain_profile_source: tr.dem_source
+            };
+          }
+          n_flat++;
+          return {
             az:                     r.az,
-            haat_input_m:           Number(inputs.haat_m) || null,
-            haat_computed_m:        r.haat_m,
-            haat_source:            'arc_averaged_dem_direct',
-            terrain_profile_source: tr.dem_source
-          }));
+            haat_input_m:           flat_m,
+            haat_computed_m:        flat_m,
+            haat_source:            'user_flat (no DEM coverage)',
+            terrain_profile_source: null
+          };
+        });
         evidence.terrain = {
           available:                  true,
           source:                     tr.provider,
@@ -297,6 +354,8 @@ export async function computeExhibit(req){
           dem:                        { source: tr.provider, dataset: tr.dem_source },
           fetched_at:                 tr.fetched_at,
           n_radials:                  tr.haat_per_radial.length,
+          n_radials_dem_sourced:      n_dem,
+          n_radials_flat_fallback:    n_flat,
           cross_validated:            tr.cross_validated,
           cross_validate_tolerance_m: tr.cross_validate_tolerance_m,
           agreement_m:                tr.agreement_m,
