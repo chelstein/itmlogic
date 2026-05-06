@@ -204,15 +204,16 @@ export async function computeExhibit(req){
       radial_step_deg: step
     });
     if (terrainResp?.available && Array.isArray(terrainResp.radials) && terrainResp.radials.length){
-      // Hand the engine its per-radial HAAT in the shape it expects.
-      // Keep ALL radials (the engine requires strict length match with
-      // radials_deg).  For radials where the sidecar returned a null
-      // haat_m (no DEM coverage for that direction), fall back to the
-      // user-input flat HAAT for that radial and tag the source so the
-      // radial table shows exactly where coverage gapped.
+      // Count DEM-sourced radials BEFORE deciding whether to commit this
+      // path.  ZTR sometimes returns a 200 with all-null haat_m (its
+      // upstream DEM rate-limited or its facility lat/lon missing).  In
+      // that case we must NOT mark evidence.terrain available, otherwise
+      // step 3c (direct multi-source elevation) is skipped and the
+      // exhibit ships flat HAAT under a "OpenTopoData SRTM 30m" banner.
+      // Counting first lets step 3c rescue zero-coverage responses.
       const flat_m = Number(inputs.haat_m);
       let n_dem = 0, n_flat = 0;
-      evidence.terrain_haat_per_radial = terrainResp.radials.map(r => {
+      const candidate = terrainResp.radials.map(r => {
         if (Number.isFinite(r.haat_m)){
           n_dem++;
           return {
@@ -232,25 +233,42 @@ export async function computeExhibit(req){
           terrain_profile_source: null
         };
       });
-      evidence.terrain = {
-        available:  true,
-        source:     terrainResp.source || 'zerotrustradio',
-        endpoint:   terrainResp.endpoint,
-        method:     terrainResp.method,
-        dem:        terrainResp.dem,
-        fetched_at: terrainResp.fetched_at,
-        n_radials:  terrainResp.n_radials,
-        n_radials_dem_sourced:   n_dem,
-        n_radials_flat_fallback: n_flat,
-        profiles:   terrainResp.radials.map(r => ({
-          az:                r.azimuth_deg,
-          haat_computed_m:   r.haat_m,
-          avg_elev_m:        r.avg_elev_m,
-          min_elev_m:        r.min_elev_m,
-          max_elev_m:        r.max_elev_m,
-          samples:           r.samples
-        }))
-      };
+      if (n_dem > 0){
+        // Engine accepts the bundle; commit it to evidence.
+        evidence.terrain_haat_per_radial = candidate;
+        evidence.terrain = {
+          available:  true,
+          source:     terrainResp.source || 'zerotrustradio',
+          endpoint:   terrainResp.endpoint,
+          method:     terrainResp.method,
+          dem:        terrainResp.dem,
+          fetched_at: terrainResp.fetched_at,
+          n_radials:  terrainResp.n_radials,
+          n_radials_dem_sourced:   n_dem,
+          n_radials_flat_fallback: n_flat,
+          profiles:   terrainResp.radials.map(r => ({
+            az:                r.azimuth_deg,
+            haat_computed_m:   r.haat_m,
+            avg_elev_m:        r.avg_elev_m,
+            min_elev_m:        r.min_elev_m,
+            max_elev_m:        r.max_elev_m,
+            samples:           r.samples
+          }))
+        };
+      } else {
+        // ZTR returned a shape but no usable DEM data — leave
+        // evidence.terrain unset so step 3c can run the direct
+        // multi-source elevation client.  Mark request as attempted.
+        evidence.terrain_haat_requested = true;
+        evidence.terrain_ztr_attempted = {
+          available:  false,
+          source:     terrainResp.source || 'zerotrustradio',
+          endpoint:   terrainResp.endpoint,
+          n_radials:  terrainResp.n_radials,
+          reason:     'ZTR returned radials but none carried a finite haat_m (upstream DEM rate-limited, facility coordinates missing, or off-DEM-coverage)',
+          fetched_at: terrainResp.fetched_at
+        };
+      }
     } else {
       evidence.terrain_haat_requested = true;
     }
