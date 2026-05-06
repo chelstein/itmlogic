@@ -29,6 +29,8 @@ import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
 import { checkSection73215 }            from './regulatory/section_73_215.js';
+import { checkSection73207 }            from './regulatory/section_73_207.js';
+import { checkSection73525 }            from './regulatory/section_73_525.js';
 import { checkSection73187 }            from './regulatory/section_73_187.js';
 import { checkOet65, OET65_PROVENANCE } from './regulatory/oet65.js';
 import { W } from '../types/warnings.js';
@@ -262,6 +264,41 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     } else if (regulatory_compliance.pass === false){
       warnings.push(W.make('FM_CONTOUR_PROTECTION_VIOLATION',
         regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+    // 47 CFR §73.207 — minimum-distance separation table A.  Runs as
+    // a CROSS-REFERENCE alongside the §73.215 contour study.  A
+    // §73.207 failure with §73.215 pass is informational (the station
+    // qualifies via §73.215 contour protection); §73.207 failure
+    // with §73.215 also failing escalates the FM_CONTOUR_PROTECTION_VIOLATION
+    // by stamping FM_MINIMUM_SEPARATION_VIOLATION (warning, not blocker —
+    // the §73.215 blocker is the operative one when both fail).
+    const sep73_207 = checkSection73207({
+      subject: { lat, lon, fcc_class: inputs.fcc_class || null, frequency_mhz: freq,
+                 call: inputs.call || null, facility_id },
+      nearbyStations
+    });
+    regulatory_compliance.section_73_207 = sep73_207;
+    if (sep73_207.pass === false){
+      const sec73_215_pass = regulatory_compliance.pass === true;
+      warnings.push(W.make('FM_MINIMUM_SEPARATION_VIOLATION',
+        sec73_215_pass
+          ? `Station fails §73.207(b) minimum-distance separation but qualifies via §73.215 contour protection.  Filing must cite §73.215.  Failed pairs: ${sep73_207.violations.length}.`
+          : `Station fails BOTH §73.207(b) minimum-distance separation (${sep73_207.violations.length} pair(s)) AND §73.215 contour protection.  Filing requires either rule to clear.`));
+    }
+    // 47 CFR §73.525 — TV channel 6 protection (reserved-band FM 88.1-91.9 MHz).
+    // Skipped when frequency is outside reserved band; pass-by-default
+    // when no nearby ch.6 emitters are supplied.
+    const ch6Stations = Array.isArray(evidence.tv_ch6_stations) ? evidence.tv_ch6_stations : [];
+    const sec73_525 = checkSection73525({
+      subject: { erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+                 fcc_class: inputs.fcc_class || null,
+                 call: inputs.call || null, facility_id },
+      tvCh6Stations: ch6Stations
+    });
+    regulatory_compliance.section_73_525 = sec73_525;
+    if (sec73_525.pass === false){
+      warnings.push(W.make('FM_TV_CH6_PROTECTION_VIOLATION',
+        sec73_525.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
     }
   } else if (service === 'AM'){
     // 47 CFR §73.187 — AM nighttime skywave protection.

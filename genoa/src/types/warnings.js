@@ -112,6 +112,14 @@ export const WARNING_CODES = Object.freeze({
     title: 'FM short-spacing contour-protection violation (47 CFR §73.215)',
     description: 'The full-service FM station fails the bidirectional §73.215 contour-protection short-spacing study against one or more nearby full-service FM stations.  The proposed station\'s F(50,10) interfering contour overlaps a nearby station\'s F(50,50) protected contour, or vice versa, at the §74.1204(c) D/U gate threshold for the channel relationship.  Filing requires either contour protection or §73.207 minimum-distance separation.' },
 
+  FM_MINIMUM_SEPARATION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'FM §73.207(b) minimum-distance separation not met',
+    description: 'The proposed FM station fails the §73.207(b) Table A minimum-distance separation against one or more nearby full-service FM stations.  When §73.215 contour protection passes, this is informational — the filing can cite §73.215 instead.  When §73.215 also fails, the station does not qualify under either rule and the filing requires an alternative (e.g., a major-change application with reduced ERP / HAAT, or a directional antenna pattern).' },
+
+  FM_TV_CH6_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'FM reserved-band TV ch.6 protection violation (47 CFR §73.525)',
+    description: 'The reserved-band FM (88.1–91.9 MHz) fails the §73.525(b) D/U gate against one or more active TV channel 6 stations.  Filing requires reduced ERP / HAAT in the offending sector, a directional antenna pattern, or demonstration that no protected ch.6 contour reaches the proposed site (typical post-DTV-transition).' },
+
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
     title: 'AM nighttime skywave protection violation (47 CFR §73.187)',
     description: 'The proposed AM station fails the bidirectional §73.187 nighttime-skywave protection study against one or more nearby AM stations.  The §73.190 SS-1 (50% nighttime skywave) field at a protected station\'s nighttime contour edge exceeds the §73.182 protected threshold for that station\'s class, or vice versa.  Filing requires §73.187(c) protection or a §73.182(g) waiver.' },
