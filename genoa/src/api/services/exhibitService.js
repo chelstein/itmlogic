@@ -91,6 +91,11 @@ export async function computeExhibit(req){
   const budget = makeBudget(options.compute_budget_ms);
   const evidence = {};
   const facilityWarnings = [];
+  // The orchestrator's `warnings` array is declared HERE so pre-engine
+  // evidence steps (FCC LMS, NEC, etc.) can push to it.  After the
+  // engine compute the engine's own warnings are concatenated in;
+  // subsequent filter passes operate on the combined list.
+  let warnings = [];
   let facilityResolution = null;
   let richStation        = null;   // raw ZTR /api/radiodns/station/:id response
   let terrainResp        = null;   // raw ZTR /api/.../terrain-haat response
@@ -219,6 +224,93 @@ export async function computeExhibit(req){
       const fc = await sidecars.fccContours.getContour(inputs.facility_id, inputs.service);
       if (fc.available) fccContourResp = fc;
     } catch { /* ignore; cross-check stays null */ }
+  }
+
+  // ---- 2b-2. FCC LMS / public-files / FMQ-AMQ consolidated lookup ----
+  // Pull the FCC's authoritative-record fields (license expiration,
+  // status, last action, public-file folder index) to surface
+  // alongside the engine output.  Public upstreams (no auth);
+  // wrapped in budget so a slow upstream doesn't stall the exhibit.
+  let lmsResp = null;
+  if (sidecars.fccLms && (inputs.call || inputs.facility_id)){
+    lmsResp = await budget.withDeadline('fcc_lms',
+      () => sidecars.fccLms.getStationRecord({
+        call:        inputs.call         || null,
+        facility_id: inputs.facility_id  || null,
+        service:     inputs.service      || null
+      }), { minMs: 4_000 });
+    if (lmsResp?.available){
+      // Cross-check ZTR/inputs vs FCC LMS row.  Tolerances kept loose
+      // because FMQ rounds frequency to 0.1 MHz and ERP to 0.1 kW.
+      const license = lmsResp.license || {};
+      const mismatches = [];
+      const FREQ_TOL = 0.05;     // MHz (FMQ tabulates at 0.1)
+      const ERP_TOL  = 0.5;      // kW
+      const HAAT_TOL = 5;        // m
+      if (Number.isFinite(Number(inputs.frequency)) && Number.isFinite(license.frequency)){
+        const a = Number(inputs.frequency);
+        const b = Number(license.frequency);
+        // Inputs frequency is in MHz for FM/FX/LPFM, kHz for AM.  FMQ
+        // returns matching units.  Compare directly only when units agree.
+        if ((inputs.frequency_unit || (inputs.service === 'AM' ? 'kHz' : 'MHz'))
+              === (license.frequency_unit || 'MHz')){
+          const tol = license.frequency_unit === 'kHz' ? 5 : FREQ_TOL;
+          if (Math.abs(a - b) > tol)
+            mismatches.push({ field: 'frequency', input: a, fcc: b, delta: a - b, tolerance: tol });
+        }
+      }
+      if (Number.isFinite(Number(inputs.erp_kw)) && Number.isFinite(license.erp_kw)){
+        if (Math.abs(Number(inputs.erp_kw) - license.erp_kw) > ERP_TOL)
+          mismatches.push({ field: 'erp_kw', input: Number(inputs.erp_kw), fcc: license.erp_kw,
+                            delta: Number(inputs.erp_kw) - license.erp_kw, tolerance: ERP_TOL });
+      }
+      if (Number.isFinite(Number(inputs.haat_m)) && Number.isFinite(license.haat_m)){
+        if (Math.abs(Number(inputs.haat_m) - license.haat_m) > HAAT_TOL)
+          mismatches.push({ field: 'haat_m', input: Number(inputs.haat_m), fcc: license.haat_m,
+                            delta: Number(inputs.haat_m) - license.haat_m, tolerance: HAAT_TOL });
+      }
+      if (inputs.fcc_class && license.fcc_class
+          && String(inputs.fcc_class).toUpperCase() !== String(license.fcc_class).toUpperCase()){
+        mismatches.push({ field: 'fcc_class', input: inputs.fcc_class, fcc: license.fcc_class,
+                          tolerance: 'exact' });
+      }
+      lmsResp.cross_check = {
+        applicable:   mismatches.length > 0 || true,
+        match:        mismatches.length === 0,
+        n_mismatches: mismatches.length,
+        mismatches
+      };
+      evidence.fcc_lms = lmsResp;
+
+      // License expiration warnings.
+      if (license.expired){
+        warnings.push(W.make('LICENSE_EXPIRED',
+          `License expired ${Math.abs(license.days_to_expiration)} days ago (${license.license_expiration_date}).  Renewal under §73.1020 or a new application required.`));
+      } else if (license.expiring_soon){
+        warnings.push(W.make('LICENSE_EXPIRING_SOON',
+          `License expires in ${license.days_to_expiration} days (${license.license_expiration_date}).  File renewal under §73.1020.`));
+      }
+      // Cross-check warnings.
+      if (mismatches.length){
+        warnings.push(W.make('LMS_DATA_MISMATCH',
+          `${mismatches.length} field(s) differ from FCC FMQ/AMQ record: ${mismatches.map(m => `${m.field} ${m.input} vs ${m.fcc}`).join('; ')}`));
+      }
+      // Public-file completeness check.
+      if (lmsResp.public_file?.available
+          && lmsResp.public_file.required_folders?.missing?.length > 4){
+        warnings.push(W.make('PUBLIC_FILE_INCOMPLETE',
+          `Public-file folder at ${lmsResp.public_file.folder_url} appears to be missing ${lmsResp.public_file.required_folders.missing.length} of ${lmsResp.public_file.required_folders.required_total} §73.3526/§73.3527 sub-folders.`));
+      }
+    } else if (lmsResp){
+      // Reachable but produced nothing useful, OR budget timeout.
+      evidence.fcc_lms_attempt = {
+        ok: false,
+        sources_tried: lmsResp.sources_tried || null,
+        errors:        lmsResp.errors        || null
+      };
+      warnings.push(W.make('LMS_DATA_UNAVAILABLE',
+        `No FCC LMS / FMQ / public-file data could be sourced for ${inputs.call || inputs.facility_id || 'this station'}.`));
+    }
   }
 
   // ---- 2c. Per-radial HAAT directly from the FCC contour ----
@@ -976,6 +1068,11 @@ export async function computeExhibit(req){
   } else if (evidence.identity_probe){
     exhibit.evidence.identity_probe = evidence.identity_probe;
   }
+  if (evidence.fcc_lms){
+    exhibit.evidence.fcc_lms = evidence.fcc_lms;
+  } else if (evidence.fcc_lms_attempt){
+    exhibit.evidence.fcc_lms_attempt = evidence.fcc_lms_attempt;
+  }
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;
   }
@@ -1005,9 +1102,10 @@ export async function computeExhibit(req){
   // ---- 10. Reconcile warnings against actual evidence ----
   // The engine pre-emptively emits CONSTANT_HAAT_ASSUMED, FACILITY_LOOKUP_UNAVAILABLE,
   // SDR_MEASUREMENTS_MISSING, and CURVE_VALIDATION_MISSING based on its
-  // local view.  Now that we have real evidence, drop the ones that
-  // shouldn't apply.
-  let warnings = exhibit.warnings || [];
+  // local view.  Concat the engine's warnings onto our pre-engine
+  // collector (LMS, NEC, …), then run the existing filter passes that
+  // drop pre-emptive warnings now that real evidence is attached.
+  warnings = warnings.concat(exhibit.warnings || []);
 
   if (facilityResolution){
     warnings = warnings.filter(w => w.code !== 'FACILITY_LOOKUP_UNAVAILABLE');

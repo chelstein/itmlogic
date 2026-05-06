@@ -148,6 +148,26 @@ export const WARNING_CODES = Object.freeze({
     title: 'NEC evidence sourced from GPL-isolated external sidecar',
     description: 'NEC2++ is GPL v2.  This evidence was produced by an isolated sidecar process that Genoa talks to over HTTP only — Genoa\'s own codebase does not link or embed any GPL\'d code.  evidence.nec_model.provenance.license_boundary is stamped "external sidecar" so reviewers can verify the boundary is preserved.' },
 
+  LMS_DATA_UNAVAILABLE: { severity: 'warning', phase: 'evidence',
+    title: 'FCC LMS / public-file data unavailable',
+    description: 'Genoa could not reach the FCC FMQ/AMQ database or publicfiles.fcc.gov for this station.  Filing-grade exhibits should cross-reference the FCC\'s authoritative record (license expiration, status, last action, public-file folder presence).  Re-run the compute when the upstream is responsive, or pull the data manually from https://transition.fcc.gov/fcc-bin/fmq and https://publicfiles.fcc.gov/.' },
+
+  LICENSE_EXPIRING_SOON: { severity: 'warning', phase: 'evidence',
+    title: 'FCC license expires soon',
+    description: 'The FCC license for this station expires within the lookahead window (default 180 days; configurable via LICENSE_EXPIRING_SOON_DAYS).  License renewal under §73.1020 must be filed in the renewal window or the authorization may lapse.  See evidence.fcc_lms.license.license_expiration_date.' },
+
+  LICENSE_EXPIRED: { severity: 'blocker', phase: 'evidence',
+    title: 'FCC license has expired',
+    description: 'The FCC license for this station expired before the compute date.  No new exhibit can be filed against an expired authorization; renewal under §73.1020 or a new application is required.  See evidence.fcc_lms.license.license_expiration_date.' },
+
+  LMS_DATA_MISMATCH: { severity: 'warning', phase: 'evidence',
+    title: 'FCC LMS record disagrees with application data',
+    description: 'The FCC FMQ/AMQ row for this station carries values (ERP, HAAT, frequency, class, lat/lon) that do not match the application inputs.  Filing requires consistency between Form 302 / 301 and the FCC\'s authoritative record.  See evidence.fcc_lms.cross_check.mismatches for the specific field-level deltas.' },
+
+  PUBLIC_FILE_INCOMPLETE: { severity: 'warning', phase: 'evidence',
+    title: 'Public inspection file appears incomplete (47 CFR §73.3526 / §73.3527)',
+    description: 'Genoa\'s probe of the licensee\'s publicfiles.fcc.gov folder did not find one or more of the §73.3526 / §73.3527 required sub-folders (EEO Public File Report, Issues and Programs Lists, Political File, Authorizations, Citizen Agreements, etc.).  Reviewers may flag the application during routine inspection.  See evidence.fcc_lms.public_file.required_folders.missing.' },
+
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
     title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.187)',
     description: 'Genoa\'s simplified §73.187/§73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  This is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.187(b)(1) RSS analysis before filing.  Genoa surfaces the §73.187 study results on regulatory_compliance.studies for that review.' },

@@ -72,6 +72,7 @@ export async function probeAllSources(){
     ztrHealth, n8nHealth, popSidecar, terrainSidecar, splatSidecar, identitySidecar,
     necSidecar,
     fccFmq, fccAmq, fccContours, fccCensus,
+    publicFiles,
     usgsEpqs, openMeteo, openTopoData,
     censusBureau
   ] = await Promise.all([
@@ -89,6 +90,7 @@ export async function probeAllSources(){
     probe('https://transition.fcc.gov/fcc-bin/amq?list=4&call=KSLX'),
     probe('https://geo.fcc.gov/api/contours/entity.json?facilityId=53996&serviceType=FM&unit=km', { method: 'GET' }),
     probe('https://geo.fcc.gov/api/census/area?lat=33.33&lon=-112.06&censusYear=2020&format=json', { method: 'GET' }),
+    probe('https://publicfiles.fcc.gov/api/manager/folder/fm/53996/contents', { method: 'GET' }),
     probe('https://epqs.nationalmap.gov/v1/json?x=-112.06&y=33.33&wkid=4326&units=Meters', { method: 'GET' }),
     probe('https://api.open-meteo.com/v1/elevation?latitude=33.33&longitude=-112.06', { method: 'GET' }),
     probe('https://api.opentopodata.org/v1/srtm30m?locations=33.33,-112.06', { method: 'GET' }),
@@ -137,7 +139,11 @@ export async function probeAllSources(){
     ], 'ZTR /api/radiodns/station/:id carries PI/GCC/FQDN/bearer/service URLs as a 2nd-tier RadioDNS source'),
     antenna_modeling: pickFirst([
       { tier: 'primary', id: 'nec-sidecar (NEC2++/PyNEC, GPL-isolated)', health: necSidecar }
-    ], 'NEC2++ is GPL v2 — isolated as external sidecar; Genoa never links it.  Set NEC_SIDECAR_URL on the deploy to enable.')
+    ], 'NEC2++ is GPL v2 — isolated as external sidecar; Genoa never links it.  Set NEC_SIDECAR_URL on the deploy to enable.'),
+    fcc_lms: pickFirst([
+      { tier: 'primary',   id: 'fcc-fmq-amq',         health: bestOf([fccFmq, fccAmq]) },
+      { tier: 'secondary', id: 'publicfiles.fcc.gov', health: publicFiles }
+    ], 'FCC LMS authoritative-record cross-reference: license expiration / status / public-file folder.  No auth required; degraded but not broken when either upstream is rate-limited.')
   };
 
   // Surface ANY-CRITICAL — does every query have at least one reachable source?
@@ -156,6 +162,7 @@ export async function probeAllSources(){
       terrain_sidecar: terrainSidecar, splat_sidecar: splatSidecar, identity_sidecar: identitySidecar,
       nec_sidecar: necSidecar,
       fcc_fmq: fccFmq, fcc_amq: fccAmq, fcc_contours: fccContours, fcc_census: fccCensus,
+      publicfiles_fcc_gov: publicFiles,
       usgs_epqs: usgsEpqs, open_meteo: openMeteo, opentopodata: openTopoData,
       us_census_bureau: censusBureau
     }

@@ -727,6 +727,37 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.measurements.fetched_at || '—']
           ]
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
+      <SubHead title="FCC LMS / Public-File (47 CFR §73.3526 / §73.1620)" />
+      <SubKv kv={ev.fcc_lms?.available
+        ? [
+            ['Available',     'yes'],
+            ['Source',        ev.fcc_lms.source || '—'],
+            ['Sources tried', (ev.fcc_lms.sources_tried || []).join(', ') || '—'],
+            ['Call',          ev.fcc_lms.license?.call         || '—'],
+            ['Service',       ev.fcc_lms.license?.service      || '—'],
+            ['Class',         ev.fcc_lms.license?.fcc_class    || '—'],
+            ['Status',        ev.fcc_lms.license?.status       || '—'],
+            ['Last action',   ev.fcc_lms.license?.last_action  || '—'],
+            ['Licensee',      ev.fcc_lms.license?.licensee     || '—'],
+            ['Expiration',    ev.fcc_lms.license?.license_expiration_date
+                                ? `${ev.fcc_lms.license.license_expiration_date}  (${ev.fcc_lms.license.expired ? 'EXPIRED' : ev.fcc_lms.license.expiring_soon ? 'EXPIRING SOON' : 'current'}; ${ev.fcc_lms.license.days_to_expiration} days)`
+                                : '—'],
+            ['Cross-check',   ev.fcc_lms.cross_check?.match
+                                ? 'matches FCC FMQ/AMQ record'
+                                : `${ev.fcc_lms.cross_check?.n_mismatches ?? 0} mismatch(es) — see evidence.fcc_lms.cross_check`],
+            ['Public file',   ev.fcc_lms.public_file?.available
+                                ? `${ev.fcc_lms.public_file.required_folders?.present_count ?? 0} of ${ev.fcc_lms.public_file.required_folders?.required_total ?? 0} required folders present  ·  ${ev.fcc_lms.public_file.file_count ?? '—'} files`
+                                : 'not reachable'],
+            ['Public-file URL', ev.fcc_lms.public_file?.folder_url || '—'],
+            ['LMS deeper review', ev.fcc_lms.authorization_history?.deeper_review_url || '—']
+          ]
+        : ev.fcc_lms_attempt
+          ? [
+              ['Status', 'FCC LMS / public-file lookup ran but returned no usable record.'],
+              ['Sources tried', (ev.fcc_lms_attempt.sources_tried || []).join(', ') || '—'],
+              ['Errors',        (ev.fcc_lms_attempt.errors || []).slice(0, 3).join('; ') || '—']
+            ]
+          : [['Status', 'FCC LMS lookup not run (no call/facility_id supplied or FCC_LMS_DISABLE=1).']]} />
       <SubHead title="NEC Model (NEC2++ via GPL-isolated sidecar)" />
       <SubKv kv={ev.nec_model?.ok
         ? [

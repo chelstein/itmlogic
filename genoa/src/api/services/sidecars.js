@@ -12,6 +12,7 @@
 //   Nearby primaries     FCC FMQ direct          FCC AMQ direct          —
 //   Rich station / SDR   ZTR /api/radiodns       —                       — (vendor-locked)
 //   Identity / RadioDNS  identity sidecar        ZTR rich-station        — (massdns/EAS-Tools optional; ZTR is robust 2nd-tier)
+//   FCC LMS / pub. file  FCC FMQ/AMQ direct      publicfiles.fcc.gov     — (license expiration + public-file folder index)
 //
 // Every tier is independent — primary failure does NOT cascade.  The
 // orchestrator (exhibitService.js) walks each chain top-down and stops
@@ -27,6 +28,7 @@ import { makePopulationClient }  from '../../evidence/populationClient.js';
 import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
 import { makeNecClient }         from '../../evidence/nec/client.js';
+import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source)
@@ -68,7 +70,10 @@ export const sidecars = Object.freeze({
   // NEC2++ / PyNEC antenna-modeling sidecar.  GPL v2 isolated in a
   // separate process; Genoa only talks to it over HTTP.  Set
   // NEC_SIDECAR_URL on the deploy to enable; Genoa works without it.
-  nec:         makeNecClient({ baseUrl: process.env.NEC_SIDECAR_URL || null })
+  nec:         makeNecClient({ baseUrl: process.env.NEC_SIDECAR_URL || null }),
+  // FCC LMS / public-files / FMQ-AMQ consolidated client.  Public
+  // upstreams (no auth required); always on unless explicitly disabled.
+  fccLms:      process.env.FCC_LMS_DISABLE === '1' ? null : makeFccLmsClient()
 });
 
 export async function sidecarStatus(){
