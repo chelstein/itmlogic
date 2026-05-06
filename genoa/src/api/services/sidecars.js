@@ -11,7 +11,7 @@
 //   Population/Census    operator pop sidecar    geo.fcc.gov/api/census  —
 //   Nearby primaries     FCC FMQ direct          FCC AMQ direct          —
 //   Rich station / SDR   ZTR /api/radiodns       —                       — (vendor-locked)
-//   Identity / RadioDNS  identity sidecar        —                       — (optional)
+//   Identity / RadioDNS  identity sidecar        ZTR rich-station        — (massdns/EAS-Tools optional; ZTR is robust 2nd-tier)
 //
 // Every tier is independent — primary failure does NOT cascade.  The
 // orchestrator (exhibitService.js) walks each chain top-down and stops

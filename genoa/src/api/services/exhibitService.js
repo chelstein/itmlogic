@@ -403,17 +403,72 @@ export async function computeExhibit(req){
     };
   }
 
-  // ---- 5. Identity sidecar (best-effort) ----
+  // ---- 5. Identity (RadioDNS / RDS / EAS) — with ZTR fallback ----
+  // Identity has two tiers:
+  //   1. Identity sidecar (chelstein/massdns + EAS-Tools + audio-fp).
+  //      When wired, returns multi-source confirmations.
+  //   2. ZTR /api/radiodns/station/:id rich-station RadioDNS data.
+  //      ZTR's resolver carries PI/GCC/FQDN/bearer/service URLs directly
+  //      on the station object, so when the identity sidecar is down or
+  //      unwired we still get a RadioDNS confirmation from ZTR.
+  // The two tiers are not mutually exclusive — we prefer the sidecar
+  // when it returns confirmations, fall back to ZTR otherwise, and
+  // merge sources from both when both produce data.
+  let identityFromSidecar = null;
   if (sidecars.identity && (inputs.call || inputs.facility_id)){
     try {
-      const ident = await sidecars.identity.resolve({
+      identityFromSidecar = await sidecars.identity.resolve({
         call:           inputs.call,
         facility_id:    inputs.facility_id,
         frequency:      inputs.frequency,
         frequency_unit: inputs.service === 'AM' ? 'kHz' : 'MHz'
       });
-      evidence.identity = ident;
+    } catch {/* swallow; fall through to ZTR */}
+  }
+
+  let identityFromZtr = null;
+  if (ztrStationId && sidecars.facility?.getRadioDnsFromZtr){
+    try {
+      identityFromZtr = await sidecars.facility.getRadioDnsFromZtr({
+        stationId: ztrStationId,
+        rich:      richStation
+      });
     } catch {/* swallow; identity is best-effort */}
+  }
+
+  // Merge: sidecar takes precedence; ZTR contributes RadioDNS when
+  // the sidecar didn't.  At least one confirmed source → available.
+  const sidecarConfirmed = identityFromSidecar?.confirmations?.length > 0;
+  const ztrConfirmed     = identityFromZtr?.available;
+  if (sidecarConfirmed || ztrConfirmed){
+    const mergedSources       = [];
+    const mergedConfirmations = [];
+    if (identityFromSidecar){
+      mergedSources.push(...(identityFromSidecar.sources || []));
+      mergedConfirmations.push(...(identityFromSidecar.confirmations || []));
+    }
+    if (identityFromZtr?.available){
+      // Only add ZTR's RadioDNS if the sidecar didn't already produce
+      // a confirmed RadioDNS source — avoid duplicate kinds.
+      const haveRadioDns = mergedConfirmations.some(c => c.kind === 'radiodns' && c.status === 'confirmed');
+      if (!haveRadioDns){
+        mergedSources.push(...(identityFromZtr.sources || []));
+        mergedConfirmations.push(...(identityFromZtr.confirmations || []));
+      }
+    }
+    evidence.identity = {
+      available:    true,
+      requested_at: new Date().toISOString(),
+      sources:      mergedSources,
+      confirmations: mergedConfirmations,
+      tiers_used:   [
+        sidecarConfirmed ? 'identity-sidecar' : null,
+        ztrConfirmed && !sidecarConfirmed ? 'zerotrustradio-radiodns' : null
+      ].filter(Boolean)
+    };
+  } else if (identityFromSidecar){
+    // Sidecar reachable but no confirmations; preserve its detail.
+    evidence.identity = identityFromSidecar;
   }
 
   // ---- 6. Validation context ----

@@ -204,6 +204,101 @@ export function makeFacilityClient({
     },
 
     /**
+     * Extract RadioDNS evidence from ZTR's rich-station response.
+     *
+     * The ZTR endpoint at /api/radiodns/station/:id is RadioDNS-aware and
+     * carries the resolver's output (PI/GCC, FQDN, service provider,
+     * EPG/VIS/SI URLs, streaming URLs, etc.) directly on the station
+     * object.  This serves as a 2nd-tier RadioDNS source when the
+     * identity sidecar (chelstein/massdns) is unavailable or not yet
+     * wired.  Returns the same evidence shape as the identity sidecar
+     * so the engine's identity confirmation logic doesn't care which
+     * source produced the data.
+     *
+     * Defensive: pulls a wide set of common RadioDNS field names so
+     * minor schema differences across ZTR releases don't lose data.
+     */
+    async getRadioDnsFromZtr({ stationId, rich = null } = {}){
+      if (!stationId) return { available: false, source: null, error: 'stationId required' };
+      const r = rich || await this.getRichStation(stationId);
+      if (!r.available) return { available: false, source: null, error: r.error || 'rich station unavailable' };
+      const s = r.station || {};
+
+      // Pick first non-empty value across a list of candidate field names.
+      const pick = (...keys) => {
+        for (const k of keys){
+          const v = s[k];
+          if (v !== undefined && v !== null && v !== '') return v;
+        }
+        return null;
+      };
+      const radiodns = s._radiodns || s.radiodns || {};
+      const pickRdns = (...keys) => {
+        for (const k of keys){
+          const v = radiodns[k];
+          if (v !== undefined && v !== null && v !== '') return v;
+          const v2 = s[k];
+          if (v2 !== undefined && v2 !== null && v2 !== '') return v2;
+        }
+        return null;
+      };
+
+      const fields = {
+        pi:               pickRdns('pi', 'pi_code', 'rds_pi', 'rdsPi'),
+        gcc:              pickRdns('gcc', 'global_country_code'),
+        ecc:              pickRdns('ecc', 'extended_country_code'),
+        fqdn:             pickRdns('fqdn', 'radiodns_fqdn', 'authoritative_fqdn'),
+        service_identifier: pickRdns('service_identifier', 'serviceIdentifier', 'sid'),
+        service_provider: pickRdns('service_provider', 'serviceProvider', 'sp'),
+        epg_url:          pickRdns('epg_url', 'epg', 'epg_endpoint'),
+        visual_url:       pickRdns('visual_url', 'vis_url', 'visuals_endpoint'),
+        sis_url:          pickRdns('sis_url', 'si_url', 'sis_endpoint', 'station_info_url'),
+        streaming_urls:   pickRdns('streaming_urls', 'streams', 'stream_urls', 'icecast'),
+        bearer_uri:       pickRdns('bearer_uri', 'bearerUri', 'bearer'),
+        rds_ps:           pick('rds_ps', 'ps'),
+        rds_pty:          pick('rds_pty', 'pty')
+      };
+
+      // Source produced data only if at least one RadioDNS-meaningful
+      // field landed.  Otherwise the rich-station response had no
+      // RadioDNS content and we report unavailable.
+      const hasRadioDns = !!(fields.pi || fields.fqdn || fields.service_identifier || fields.bearer_uri);
+      if (!hasRadioDns){
+        return {
+          available: false,
+          source:    'zerotrustradio',
+          endpoint:  r.endpoint,
+          error:     'rich station response carried no RadioDNS-shaped fields'
+        };
+      }
+
+      // Shape into the identity-evidence contract: sources[] with
+      // status='confirmed' for the radiodns kind.  ZTR delivering a
+      // PI/FQDN/bearer is a confirmation that the station's identity
+      // record exists and resolves; it does NOT prove the signal at
+      // the measured location is that station (that would require
+      // RDS/audio-fp confirmations on top).
+      const fetched_at = new Date().toISOString();
+      const radioDnsConfirmation = {
+        kind:     'radiodns',
+        status:   'confirmed',
+        source:   'zerotrustradio',
+        endpoint: r.endpoint,
+        fields,
+        detail:   'RadioDNS resolver record present on ZTR rich-station response (PI/FQDN/bearer or service identifier)'
+      };
+
+      return {
+        available:     true,
+        source:        'zerotrustradio',
+        endpoint:      r.endpoint,
+        fetched_at,
+        sources:       [radioDnsConfirmation],
+        confirmations: [radioDnsConfirmation]
+      };
+    },
+
+    /**
      * 47 CFR §74.1204 nearby-primaries proximity search.
      *
      * Pulls every FM/LPFM/FX/FB/FS station from the FCC FMQ database

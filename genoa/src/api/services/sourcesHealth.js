@@ -15,7 +15,7 @@
 //   Population/Census       operator pop sidecar      geo.fcc.gov/api/census   — (api.census.gov probed; not wired)
 //   Nearby primaries        FCC FMQ direct            FCC AMQ direct           — (parallel sources)
 //   Rich station / SDR      ZTR /api/radiodns         —                         — (vendor-locked)
-//   Identity / RadioDNS     identity sidecar          —                         — (optional)
+//   Identity / RadioDNS     identity sidecar          ZTR rich-station          — (RadioDNS resolver record)
 //
 // Each probe is fire-and-forget, capped at 3-5s, and reports:
 //   { configured: bool, reachable: bool, endpoint, latency_ms, error? }
@@ -126,8 +126,9 @@ export async function probeAllSources(){
       { tier: 'primary',   id: 'zerotrustradio',  health: ztrHealth }
     ], 'vendor-locked: SDR captures have no public alternative'),
     identity_radiodns: pickFirst([
-      { tier: 'primary',   id: 'identity-sidecar', health: identitySidecar }
-    ], 'optional cosmetic source')
+      { tier: 'primary',   id: 'identity-sidecar',          health: identitySidecar },
+      { tier: 'secondary', id: 'zerotrustradio-radiodns',   health: ztrHealth }
+    ], 'ZTR /api/radiodns/station/:id carries PI/GCC/FQDN/bearer/service URLs as a 2nd-tier RadioDNS source')
   };
 
   // Surface ANY-CRITICAL — does every query have at least one reachable source?
