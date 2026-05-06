@@ -619,7 +619,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     json:        'pending',
     txt:         'pending',
     geojson:     'pending',
-    pdf:         'not_implemented',
+    pdf:         'pending',
     generated_at: null   // populated by exporters when they actually render
   };
   exhibit.narrative    = null; // rendered separately

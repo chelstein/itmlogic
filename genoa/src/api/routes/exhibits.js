@@ -6,7 +6,7 @@ import { asyncHandler } from '../middleware/errors.js';
 import { exportJson, JSON_CONTENT_TYPE }       from '../../exports/json/exporter.js';
 import { exportTxt,  TXT_CONTENT_TYPE  }       from '../../exports/txt/exporter.js';
 import { exportGeoJson, GEOJSON_CONTENT_TYPE } from '../../exports/geojson/exporter.js';
-import { exportPdf,  PDF_CONTENT_TYPE  }       from '../../exports/pdf/stub.js';
+import { exportPdf,  PDF_CONTENT_TYPE  }       from '../../exports/pdf/exporter.js';
 
 import { readiness } from '../../types/readiness.js';
 
@@ -136,22 +136,14 @@ r.get('/exhibits/:id/export/geojson', asyncHandler(async (req, res) => {
   res.send(body);
 }));
 
-// GET /api/exhibits/:id/export/pdf  — wired but explicitly 501 today.
+// GET /api/exhibits/:id/export/pdf  — filing-grade PDF via @pdfme/generator.
 r.get('/exhibits/:id/export/pdf', asyncHandler(async (req, res) => {
-  try {
-    const row = await getExhibit(req.params.id);
-    if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
-    const body = exportPdf(row.payload);
-    res.type(PDF_CONTENT_TYPE);
-    res.send(body);
-  } catch (err){
-    if (err.code === 'PDF_NOT_IMPLEMENTED'){
-      return res.status(err.http_status || 501).json({
-        error: err.code, message: err.message, warning: err.warning
-      });
-    }
-    throw err;
-  }
+  const row = await getExhibit(req.params.id);
+  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+  const body = await exportPdf(row.payload);
+  res.type(PDF_CONTENT_TYPE);
+  res.set('Content-Disposition', `attachment; filename="${stem(row)}.exhibit.pdf"`);
+  res.send(Buffer.from(body));
 }));
 
 // GET /api/validation  — current validation suite snapshot.

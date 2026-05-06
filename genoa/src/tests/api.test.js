@@ -76,10 +76,15 @@ test('Persistence routes return 503 when no DATABASE_URL is configured', async (
   assert.equal(r.status, 503);
 });
 
-test('PDF export route returns 501 (not implemented) with structured warning', async () => {
+test('PDF export route returns a PDF or 404/503 when the row is unavailable', async () => {
   const r = await fetch(baseUrl + '/api/exhibits/123/export/pdf');
-  // 503 (no DB) or 404 will happen first because we have no row; accept that as "not exercised here".
-  assert.ok([404, 501, 503].includes(r.status));
+  // 503 (no DB) or 404 (row not found) when persistence is unavailable;
+  // 200 + application/pdf when the row exists.  The PDF renderer is now
+  // wired via @pdfme/generator (no more 501).
+  assert.ok([200, 404, 503].includes(r.status));
+  if (r.status === 200){
+    assert.equal(r.headers.get('content-type'), 'application/pdf');
+  }
 });
 
 test('GET /api/facilities/search with no upstream configured -> 503 + FACILITY_LOOKUP_UNAVAILABLE', async () => {
