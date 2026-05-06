@@ -21,6 +21,7 @@ import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFcc
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
 import { W }                    from '../../types/warnings.js';
+import { computeHaatMultiSource } from '../../evidence/terrain/elevationClient.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -248,6 +249,68 @@ export async function computeExhibit(req){
     } catch (e){
       evidence.splat = { available: false, source: null, error: String(e.message) };
     }
+  }
+
+  // ---- 3c. Direct multi-source terrain HAAT fallback ----
+  // When terrain was requested but no HAAT has been sourced yet (sidecar
+  // unavailable, no ZTR terrain endpoint, no FCC contour), compute §73.313
+  // arc-averaged HAAT directly using three public elevation APIs:
+  //   1. USGS 3DEP EPQS  (same NED dataset FCC uses)
+  //   2. Open-Meteo Elevation API  (Copernicus DEM / SRTM3)
+  //   3. OpenTopoData SRTM-30m  (NASA SRTM 1-arcsec)
+  // Sources are tried in parallel; results are cross-validated.  This runs
+  // entirely without a sidecar so it degrades gracefully when sidecars are
+  // down or not yet provisioned.
+  if (options.use_terrain
+      && inputs.service !== 'AM'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && Number.isFinite(Number(inputs.haat_m))
+      && !evidence.terrain?.available){
+    const step      = Number(inputs.radial_step_deg) || 10;
+    const radials   = [];
+    for (let az = 0; az < 360; az += step) radials.push(az);
+    try {
+      const tr = await computeHaatMultiSource({
+        tx_lat:      Number(inputs.lat),
+        tx_lon:      Number(inputs.lon),
+        tx_amsl_m:   Number(inputs.haat_m),   // antenna AMSL (best available)
+        radials_deg: radials,
+        from_km:     3,
+        to_km:       16,
+        samples:     27
+      });
+      if (tr.haat_per_radial?.length){
+        evidence.terrain_haat_per_radial = tr.haat_per_radial
+          .filter(r => Number.isFinite(r.haat_m))
+          .map(r => ({
+            az:                     r.az,
+            haat_input_m:           Number(inputs.haat_m) || null,
+            haat_computed_m:        r.haat_m,
+            haat_source:            'arc_averaged_dem_direct',
+            terrain_profile_source: tr.dem_source
+          }));
+        evidence.terrain = {
+          available:                  true,
+          source:                     tr.provider,
+          method:                     '§73.313 arc-averaged HAAT via direct multi-source elevation API (no sidecar)',
+          dem:                        { source: tr.provider, dataset: tr.dem_source },
+          fetched_at:                 tr.fetched_at,
+          n_radials:                  tr.haat_per_radial.length,
+          cross_validated:            tr.cross_validated,
+          cross_validate_tolerance_m: tr.cross_validate_tolerance_m,
+          agreement_m:                tr.agreement_m,
+          terrain_sources:            tr.sources,
+          profiles:                   tr.haat_per_radial.map(r => ({
+            az:              r.az,
+            haat_computed_m: r.haat_m,
+            avg_elev_m:      r.avg_elev_m,
+            min_elev_m:      r.min_elev_m,
+            max_elev_m:      r.max_elev_m
+          }))
+        };
+      }
+    } catch { /* best-effort; sidecar-less path; swallow */ }
   }
 
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
