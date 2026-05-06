@@ -1252,6 +1252,71 @@ export async function computeExhibit(req){
     warnings.push(W.make('SIDECAR_UNAVAILABLE', 'TERRAIN_SIDECAR_URL configured but client construction failed.'));
   }
 
+  // ---- 7b. FCC parity report (opt-in, post-engine) ----
+  // Live comparison of Genoa's contour distances vs the FCC's public
+  // distance.json endpoint.  Opt-in via options.fcc_parity_report=true
+  // because each report makes up to FCC_PARITY_MAX_SAMPLES (24)
+  // upstream calls; defaults are conservative enough that a normal
+  // exhibit doesn't pay this cost unless asked.
+  if (options.fcc_parity_report === true){
+    try {
+      const { makeFccParityClient } = await import('../../evidence/fccParity/client.js');
+      const parityClient = makeFccParityClient();
+      if (parityClient){
+        const report = await budget.withDeadline('fcc_parity_report',
+          () => parityClient.report(exhibit), { minMs: 8_000 });
+        if (report){
+          exhibit.evidence.fcc_parity_report = report;
+          if (report.available){
+            if (report.overall_pass){
+              warnings.push(W.make('FCC_PARITY_VERIFIED',
+                `${report.n_pass}/${report.n_samples} samples within ${report.tolerance_km} km tolerance; max delta ${report.max_error_km} km.`));
+            } else {
+              warnings.push(W.make('FCC_PARITY_DELTA',
+                `${report.n_fail}/${report.n_samples} samples exceed ${report.tolerance_km} km tolerance; max delta ${report.max_error_km} km.`));
+            }
+          }
+        }
+      }
+    } catch (e){ /* silent — parity is opt-in, never fail compute on it */ }
+  }
+
+  // ---- 7c. SDR predicted-vs-measured residual table ----
+  // Always run when calibrated SDR captures are present.  The
+  // calibration metadata is extracted from the rich-station response
+  // (richStation.station.calibration / .receiver / etc.) AND from
+  // each capture record individually (per-record overrides win).
+  if (sdrResp?.available && Array.isArray(sdrResp.records) && sdrResp.records.length){
+    try {
+      const { extractCalibration, computeResidualTable } =
+        await import('../../evidence/sdrCalibration.js');
+      const calibration = extractCalibration(richStation?.station || {});
+      const tx = {
+        lat:           inputs.lat,
+        lon:           inputs.lon,
+        haat_m:        inputs.haat_m,
+        erp_kw:        inputs.erp_kw,
+        frequency:     inputs.frequency,
+        service:       inputs.service,
+        ground_sigma_mS_m: inputs.ground_sigma_mS_m
+      };
+      const residuals = computeResidualTable({
+        tx, calibration, captures: sdrResp.records
+      });
+      exhibit.evidence.measurements.residuals  = residuals;
+      exhibit.evidence.measurements.calibration = residuals.calibration;
+
+      if (!residuals.calibration?.calibrated && residuals.n_total > 0){
+        warnings.push(W.make('SDR_CALIBRATION_MISSING',
+          `${residuals.n_uncalibrated}/${residuals.n_total} captures are uncalibrated.  Add calibration metadata to lift to filing-grade.`));
+      }
+      if (residuals.rms_residual_dB != null && residuals.rms_residual_dB > 10){
+        warnings.push(W.make('SDR_RESIDUAL_LARGE',
+          `RMS residual ${residuals.rms_residual_dB} dB across ${residuals.n_evaluated} captures (${residuals.n_above_predicted} above / ${residuals.n_below_predicted} below predicted).`));
+      }
+    } catch (e){ /* silent — residuals are evidence, never fail compute */ }
+  }
+
   // Compute-budget summary.  When any network-bound evidence fetches
   // were skipped past the deadline, surface them as one warning with
   // the named steps + elapsed wall-clock so an operator can see

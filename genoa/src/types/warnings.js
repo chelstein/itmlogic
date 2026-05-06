@@ -168,6 +168,22 @@ export const WARNING_CODES = Object.freeze({
     title: 'Public inspection file appears incomplete (47 CFR §73.3526 / §73.3527)',
     description: 'Genoa\'s probe of the licensee\'s publicfiles.fcc.gov folder did not find one or more of the §73.3526 / §73.3527 required sub-folders (EEO Public File Report, Issues and Programs Lists, Political File, Authorizations, Citizen Agreements, etc.).  Reviewers may flag the application during routine inspection.  See evidence.fcc_lms.public_file.required_folders.missing.' },
 
+  FCC_PARITY_VERIFIED: { severity: 'info', phase: 'validation',
+    title: 'Genoa output verified bit-exact against FCC distance.json',
+    description: 'A live comparison between Genoa\'s computed contour distances and the FCC\'s public distance.json endpoint passed at every sampled (radial × contour) point within tolerance.  evidence.fcc_parity_report carries the per-sample table; reviewers can replay the FCC API calls themselves to verify.' },
+
+  FCC_PARITY_DELTA: { severity: 'warning', phase: 'validation',
+    title: 'Genoa contour distance differs from FCC distance.json',
+    description: 'One or more sampled (radial × contour) points differ from the FCC\'s public distance.json endpoint output beyond tolerance.  This is unusual — Genoa\'s vendored engine is the same code that backs the FCC endpoint.  Likely causes: upstream rate-limit returning stale data, DNS / proxy intercepting the call, or an engine-version drift.  See evidence.fcc_parity_report.samples for the per-sample deltas.' },
+
+  SDR_CALIBRATION_MISSING: { severity: 'warning', phase: 'evidence',
+    title: 'SDR captures present but receiver calibration metadata absent',
+    description: 'The SDR captures attached to this exhibit do not carry the receiver-calibration metadata required by §73.314 (FM) / §73.186 (AM) for filing-grade measurement evidence: antenna gain, cable loss, LNA gain, and the calibration date.  The captures still ship as provenance, but their measured field-strength values are uncalibrated and the predicted-vs-measured residual table reflects raw deltas only.  Add the calibration block to the ZTR rich-station response or to each capture record to lift this warning.' },
+
+  SDR_RESIDUAL_LARGE: { severity: 'warning', phase: 'evidence',
+    title: 'SDR predicted-vs-measured residual exceeds 10 dB',
+    description: 'The RMS residual between Genoa\'s predicted field strength (FCC §73.333 / §73.184 curves) and the calibrated SDR-measured field exceeds 10 dB across the captured locations.  This typically indicates terrain shadowing or multipath that the simplified §73.333 model does not capture (use options.use_itm = true for terrain-aware coverage), or a calibration error in the receiver chain.  See evidence.measurements.residuals for the per-row table.' },
+
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
     title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.187)',
     description: 'Genoa\'s simplified §73.187/§73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  This is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.187(b)(1) RSS analysis before filing.  Genoa surfaces the §73.187 study results on regulatory_compliance.studies for that review.' },

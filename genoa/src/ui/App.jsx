@@ -727,6 +727,43 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.measurements.fetched_at || '—']
           ]
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
+      <SubHead title="FCC Parity Report (live geo.fcc.gov bit-exact comparison)" />
+      <SubKv kv={ev.fcc_parity_report?.available
+        ? [
+            ['Available',     'yes'],
+            ['Source',        ev.fcc_parity_report.source || '—'],
+            ['Samples',       `${ev.fcc_parity_report.n_pass}/${ev.fcc_parity_report.n_samples} within ${ev.fcc_parity_report.tolerance_km} km`],
+            ['Max delta',     `${ev.fcc_parity_report.max_error_km ?? '—'} km`],
+            ['Mean delta',    `${ev.fcc_parity_report.mean_error_km ?? '—'} km`],
+            ['Overall pass',  ev.fcc_parity_report.overall_pass === true ? 'YES' : ev.fcc_parity_report.overall_pass === false ? 'NO' : '—'],
+            ['FCC commit',    (ev.fcc_parity_report.provenance?.upstream_commit || '').slice(0, 16)],
+            ['Genoa engine',  ev.fcc_parity_report.provenance?.genoa_engine || '—']
+          ]
+        : ev.fcc_parity_report?.reason
+          ? [['Status', ev.fcc_parity_report.reason]]
+          : [['Status', 'Parity report not run.  Set options.fcc_parity_report=true to enable a live bit-exact comparison vs FCC distance.json.']]} />
+
+      <SubHead title="SDR Residuals (predicted vs measured, 47 CFR §73.314 / §73.186)" />
+      <SubKv kv={ev.measurements?.residuals
+        ? [
+            ['Captures',       ev.measurements.residuals.n_total],
+            ['Evaluated',      ev.measurements.residuals.n_evaluated],
+            ['Calibrated',     `${ev.measurements.residuals.n_calibrated}/${ev.measurements.residuals.n_total}`],
+            ['RMS residual',   `${ev.measurements.residuals.rms_residual_dB ?? '—'} dB`],
+            ['Mean residual',  `${ev.measurements.residuals.mean_residual_dB ?? '—'} dB`],
+            ['Above predicted',ev.measurements.residuals.n_above_predicted],
+            ['Below predicted',ev.measurements.residuals.n_below_predicted],
+            ['Calibration',    ev.measurements.calibration?.calibrated ? 'YES' : 'NO'],
+            ['Cal date',       ev.measurements.calibration?.last_calibration_date || '—'],
+            ['Cal method',     ev.measurements.calibration?.calibration_method    || '—'],
+            ['Antenna gain',   `${ev.measurements.calibration?.antenna_gain_dbi ?? '—'} dBi`],
+            ['Cable loss',     `${ev.measurements.calibration?.cable_loss_db    ?? '—'} dB`],
+            ['LNA gain',       `${ev.measurements.calibration?.lna_gain_db      ?? '—'} dB`]
+          ]
+        : ev.measurements?.available
+          ? [['Status', 'SDR captures present but no residual table computed (no tx geometry?).']]
+          : [['Status', 'No SDR captures attached.  See evidence.measurements_probe for diagnostics.']]} />
+
       <SubHead title="FCC LMS / Public-File (47 CFR §73.3526 / §73.1620)" />
       <SubKv kv={ev.fcc_lms?.available
         ? [
