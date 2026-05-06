@@ -26,6 +26,7 @@ import { makeFacilityClient }    from './facilityClient.js';
 import { makePopulationClient }  from '../../evidence/populationClient.js';
 import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
+import { makeNecClient }         from '../../evidence/nec/client.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source)
@@ -63,7 +64,11 @@ export const sidecars = Object.freeze({
   // FCC Contours direct fallback: used when ZTR doesn't have _fcc_contour
   // or ZTR is not configured.  Always on (geo.fcc.gov is public / no auth).
   // Disable with FCC_CONTOURS_DISABLE=1.
-  fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient()
+  fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient(),
+  // NEC2++ / PyNEC antenna-modeling sidecar.  GPL v2 isolated in a
+  // separate process; Genoa only talks to it over HTTP.  Set
+  // NEC_SIDECAR_URL on the deploy to enable; Genoa works without it.
+  nec:         makeNecClient({ baseUrl: process.env.NEC_SIDECAR_URL || null })
 });
 
 export async function sidecarStatus(){

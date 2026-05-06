@@ -700,6 +700,34 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.measurements.fetched_at || '—']
           ]
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
+      <SubHead title="NEC Model (NEC2++ via GPL-isolated sidecar)" />
+      <SubKv kv={ev.nec_model?.ok
+        ? [
+            ['Available',     'yes'],
+            ['Engine',        ev.nec_model.provenance?.engine || 'necpp/PyNEC'],
+            ['License boundary', ev.nec_model.provenance?.license_boundary || 'external sidecar'],
+            ['Frequency',     (ev.nec_model.frequency_mhz ?? '—') + ' MHz'],
+            ['Ground',        ev.nec_model.ground?.type || '—'],
+            ['Wires',         ev.nec_model.geometry?.n_wires ?? '—'],
+            ['Total length',  (ev.nec_model.geometry?.total_length_m ?? '—') + ' m'],
+            ['Feedpoint Z',   ev.nec_model.feedpoint
+                                ? `${ev.nec_model.feedpoint.r_ohm} + j${ev.nec_model.feedpoint.x_ohm} Ω  (VSWR50 ${ev.nec_model.feedpoint.vswr_50 ?? '—'})`
+                                : '—'],
+            ['Pattern samples', ev.nec_model.pattern
+                                ? `${(ev.nec_model.pattern.theta_deg || []).length} θ × ${(ev.nec_model.pattern.phi_deg || []).length} φ`
+                                : '—'],
+            ['Near-field samples', (ev.nec_model.near_field || []).length],
+            ['Warnings',      (ev.nec_model.warnings || []).length],
+            ['Model hash',    ev.nec_model.provenance?.model_hash?.slice(0, 16) || '—'],
+            ['Generated',     ev.nec_model.provenance?.generated_at || '—']
+          ]
+        : ev.nec_model_attempt
+          ? [
+              ['Status',  'NEC sidecar reachable but request failed.'],
+              ['Error',   ev.nec_model_attempt.error || '—'],
+              ['Detail',  (ev.nec_model_attempt.detail || '—').slice(0, 120)]
+            ]
+          : [['Status', 'NEC sidecar not configured (set NEC_SIDECAR_URL) or no antenna geometry supplied.']]} />
       <SubHead title="Identity (RDS / RadioDNS / EAS / audio)" />
       <SubKv kv={ev.identity?.available
         ? [

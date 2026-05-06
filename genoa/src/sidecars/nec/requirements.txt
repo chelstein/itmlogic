@@ -1,0 +1,8 @@
+# Genoa NEC sidecar — Python dependencies.
+#
+# License boundary: NEC2++ / PyNEC are GPL v2.  These dependencies are
+# only used inside this sidecar process — no Genoa code outside of
+# sidecars/nec/* may import them.
+
+PyNEC>=1.7.4
+numpy>=1.26.0

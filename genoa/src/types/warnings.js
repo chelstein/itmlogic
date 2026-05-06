@@ -128,6 +128,26 @@ export const WARNING_CODES = Object.freeze({
     title: 'Compute completed with partial evidence (budget exceeded)',
     description: 'One or more network-bound evidence fetches were skipped because the per-request compute budget (COMPUTE_BUDGET_MS, default 4.5 minutes) was exhausted.  The exhibit numbers are still correct — the engine math is local and runs unconditionally — but the named evidence steps did not complete and their warnings (e.g. CONSTANT_HAAT_ASSUMED, MISSING_NEARBY_STATIONS) may be elevated as a result.  Re-run the compute when upstreams are responsive, or raise COMPUTE_BUDGET_MS / DigitalOcean App Platform http_request_timeout if the underlying source is consistently slow.' },
 
+  NEC_MODEL_UNAVAILABLE: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC2++ antenna model unavailable',
+    description: 'The Genoa NEC sidecar (NEC2++ / PyNEC, GPL v2 isolated) was not reachable, returned an error, or the PyNEC dependency is missing on the sidecar host.  Compute proceeded without the NEC evidence section.  When the sidecar is healthy, the exhibit gains directional pattern + feedpoint impedance + near-field RF exposure for §73.62 / §73.150 / §73.45 / OET-65 reviews.  Set NEC_SIDECAR_URL or check the sidecar /health endpoint.' },
+
+  NEC_MODEL_INVALID_GEOMETRY: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC antenna model rejected (invalid geometry)',
+    description: 'The supplied antenna geometry failed the sidecar\'s schema or sanity checks (zero-length wire, non-numeric field, segment-vs-radius proportions, unsupported ground type, missing excitation).  See evidence.nec_model.detail for the specific failure and correct the input.' },
+
+  NEC_GROUND_MODEL_LIMITATION: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC ground model is PEC (perfect conductor)',
+    description: 'The model used a perfect-electrical-conductor (PEC) ground assumption.  PEC overestimates ground efficiency for AM towers over real soil; use type=sommerfeld with conductivity_s_m + dielectric_constant for filing-grade analysis.  The §73.62 / §73.150 RTA the FCC accepts uses Sommerfeld real ground.' },
+
+  NEC_NEAR_FIELD_APPROXIMATION: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC near-field uses MoM current distribution',
+    description: 'NEC2++ near-field is computed at sample points using the assumed wire-current distribution from the MoM solve.  Accuracy degrades within roughly λ/8 of the conductors.  For OET-65 monitor-point analysis at AM frequencies, place sample points outside that radius or supply additional measured-current data.' },
+
+  NEC_LICENSE_BOUNDARY_EXTERNAL: { severity: 'info', phase: 'sidecar',
+    title: 'NEC evidence sourced from GPL-isolated external sidecar',
+    description: 'NEC2++ is GPL v2.  This evidence was produced by an isolated sidecar process that Genoa talks to over HTTP only — Genoa\'s own codebase does not link or embed any GPL\'d code.  evidence.nec_model.provenance.license_boundary is stamped "external sidecar" so reviewers can verify the boundary is preserved.' },
+
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
     title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.187)',
     description: 'Genoa\'s simplified §73.187/§73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  This is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.187(b)(1) RSS analysis before filing.  Genoa surfaces the §73.187 study results on regulatory_compliance.studies for that review.' },

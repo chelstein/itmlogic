@@ -28,6 +28,38 @@ let _validationCache = null;
 let _validationCachedAt = 0;
 const VALIDATION_TTL_MS = 5 * 60 * 1000;
 
+// Synthesize a default single-monopole AM model when the caller
+// flags options.use_nec=true but didn't provide an explicit
+// antenna_geometry.  Uses haat_m as the tower-height proxy and
+// Sommerfeld real-ground defaults consistent with §73.182 typical
+// values (sigma = 8 mS/m, εr = 13).  This is a STARTING POINT for
+// reviewers — filings should supply the real tower-array geometry.
+function synthDefaultAmArray(inputs){
+  return {
+    frequency_khz: Number(inputs.frequency),
+    ground: {
+      type:                 'sommerfeld',
+      conductivity_s_m:     (Number(inputs.ground_sigma_mS_m) || 8) / 1000,
+      dielectric_constant:  13
+    },
+    towers: [
+      {
+        tag:        1,
+        x_m:        0,
+        y_m:        0,
+        height_m:   Number(inputs.haat_m),
+        radius_m:   0.25,
+        segments:   21,
+        drive:      { amplitude: 1.0, phase_deg: 0 }
+      }
+    ],
+    pattern: {
+      theta_start: 90, theta_stop: 90, theta_step: 1,
+      phi_start:   0,  phi_stop: 359,  phi_step:  1
+    }
+  };
+}
+
 // FM service-contour threshold per §73.211 — used by §73.215 and the
 // ITM-aware coverage analysis.  Returns null for non-FM services.
 function service73215Threshold(klass){
@@ -361,6 +393,72 @@ export async function computeExhibit(req){
     } catch (e){
       evidence.splat = { available: false, source: null, error: String(e.message) };
     }
+  }
+
+  // ---- 3b-2. NEC2++ antenna model evidence (GPL-isolated sidecar) ----
+  // Runs ONLY when:
+  //   - sidecars.nec is configured (NEC_SIDECAR_URL set), AND
+  //   - the caller supplies inputs.antenna_geometry OR inputs.am_array
+  //     (the convenience high-level vertical-tower spec), OR
+  //   - options.use_nec === true AND we have enough info to synthesize
+  //     a single-monopole default (AM service + frequency + tower
+  //     height inferred from haat_m).
+  //
+  // License boundary: this code does NOT import any GPL'd module.  It
+  // makes a single HTTP call to the sidecar and stamps the result on
+  // evidence.nec_model with provenance.license_boundary = 'external sidecar'.
+  if (sidecars.nec){
+    const explicit_geom = inputs.antenna_geometry;
+    const explicit_arr  = inputs.am_array;
+    const can_synth     = options.use_nec === true
+                          && String(inputs.service || '').toUpperCase() === 'AM'
+                          && Number.isFinite(Number(inputs.frequency))
+                          && Number.isFinite(Number(inputs.haat_m));
+    if (explicit_geom || explicit_arr || can_synth){
+      const necReq = explicit_geom
+        ? { kind: 'run',      payload: explicit_geom }
+        : explicit_arr
+          ? { kind: 'array',  payload: explicit_arr }
+          : { kind: 'array',  payload: synthDefaultAmArray(inputs) };
+      const necResp = await budget.withDeadline('nec_sidecar',
+        () => necReq.kind === 'array'
+          ? sidecars.nec.runAmArray(necReq.payload, { timeoutMs: 90_000 })
+          : sidecars.nec.run     (necReq.payload, { timeoutMs: 90_000 }),
+        { minMs: 5_000 });
+      if (necResp?.ok){
+        evidence.nec_model = necResp;
+        // license-boundary disclosure is informational; always emitted
+        // when NEC evidence is present so reviewers see the boundary.
+        warnings.push(W.make('NEC_LICENSE_BOUNDARY_EXTERNAL'));
+        if (necResp.ground?.type === 'pec'){
+          warnings.push(W.make('NEC_GROUND_MODEL_LIMITATION'));
+        }
+        if (Array.isArray(necResp.near_field) && necResp.near_field.length){
+          warnings.push(W.make('NEC_NEAR_FIELD_APPROXIMATION'));
+        }
+      } else if (necResp){
+        // Sidecar reachable but the request failed — record diagnostics.
+        evidence.nec_model_attempt = { ok: false, error: necResp.error, detail: necResp.detail, http_status: necResp.http_status };
+        if (necResp.error === 'NEC_BRIDGE_TIMEOUT' || necResp.error === 'NEC_SIDECAR_UNREACHABLE' || necResp.error === 'PYNEC_NOT_INSTALLED'){
+          warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+            `${necResp.error}: ${(necResp.detail || '').slice(0, 200)}`));
+        } else if (necResp.error === 'INVALID_INPUT' || necResp.error === 'NEC_MODEL_INVALID_GEOMETRY'){
+          warnings.push(W.make('NEC_MODEL_INVALID_GEOMETRY',
+            (necResp.detail || '').slice(0, 200)));
+        } else {
+          warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+            `${necResp.error}: ${(necResp.detail || '').slice(0, 200)}`));
+        }
+      }
+      // If necResp is null the budget skipped it — already accounted
+      // for in the COMPUTE_TIMEOUT_PARTIAL summary.
+    } else if (options.use_nec === true){
+      warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+        'options.use_nec=true but no inputs.antenna_geometry / inputs.am_array supplied AND service+frequency+haat_m not enough to synthesize a default model.'));
+    }
+  } else if (options.use_nec === true){
+    warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+      'NEC_SIDECAR_URL not configured.  Stand up the GPL-isolated sidecar (src/sidecars/nec/) and set NEC_SIDECAR_URL.'));
   }
 
   // ---- 3c. Direct multi-source terrain HAAT fallback ----
@@ -880,6 +978,11 @@ export async function computeExhibit(req){
   }
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;
+  }
+  if (evidence.nec_model){
+    exhibit.evidence.nec_model = evidence.nec_model;
+  } else if (evidence.nec_model_attempt){
+    exhibit.evidence.nec_model_attempt = evidence.nec_model_attempt;
   }
   if (evidence.asr){
     exhibit.evidence.asr = evidence.asr;
