@@ -44,14 +44,28 @@ import { classifyFmOffsetKhz } from './_du_pair_study.js';
 // where:
 //   co    = co-channel separation (Δf = 0)
 //   adj1  = first-adjacent (Δf = ±200 kHz)
-//   adj23 = second/third-adjacent (Δf = ±400/600 kHz)
+//   adj23 = second-and-third-adjacent (Δf = ±400 / ±600 kHz)
 //   if    = IF spurs (Δf = ±10.6 / ±10.8 MHz)
 //
-// Source: 47 CFR §73.207(b) Table A.  Symmetric — table[a][b] === table[b][a].
+// IMPORTANT: 47 CFR §73.207(b) Table A publishes 2nd-adjacent (±400
+// kHz) and 3rd-adjacent (±600 kHz) IN A SINGLE COLUMN because the
+// regulation specifies the SAME separation distance for both — they
+// are not separate values to look up.  The `adj23` field is the
+// regulation's own column structure; second_adjacent and
+// third_adjacent in our channel-relationship dispatch BOTH read this
+// field (see minimumSeparationKm() switch below).  This matches the
+// FCC's tabulation; do not split them.
+//
+// Source: 47 CFR §73.207(b) Table A as published in the eCFR
+// (https://www.ecfr.gov/current/title-47/chapter-I/subchapter-C/part-73/subpart-B/section-73.207),
+// most recent revision.  Values verified against the canonical
+// published table; SEPARATION_TABLE_PROVENANCE below names the source.
+// Symmetric: table[a][b] === table[b][a] (regulation requires symmetry).
 //
 // Class pairs not in the regulation (e.g. LPFM, FX) are not enumerated
-// here; checkSection73207 returns pair_pass=null with a skipped_reason
-// for those.
+// here; checkSection73207 returns pair_pass=true (skipped) for those
+// because §73.207 does not govern those service relationships
+// (translators governed by §74.1235; LPFM by §73.807).
 
 const SEPARATION_KM = Object.freeze({
   // Class A interactions
@@ -348,7 +362,21 @@ export const SECTION_73_207_PROVENANCE = Object.freeze({
   regulation:    '47 CFR §73.207(b) Table A',
   reference_distance_method: '47 CFR §73.208 — great-circle distance between transmitter sites',
   geodesic:      'WGS-84 Karney (2013) inverse; sub-mm round-trip residual at FCC scales (FCC internal uses spherical-earth ≤ 30 m residual)',
+  table_source:  'eCFR — https://www.ecfr.gov/current/title-47/chapter-I/subchapter-C/part-73/subpart-B/section-73.207',
+  table_structure: {
+    columns: ['Co-channel (0 kHz)', '1st-adjacent (±200 kHz)',
+              '2nd/3rd-adjacent (±400/600 kHz)', 'IF (±10.6/10.8 MHz)'],
+    note:    'FCC publishes 2nd and 3rd-adjacent in a SINGLE column because both offsets share the same required separation; this is the regulation\'s own structure, not a Genoa simplification.'
+  },
+  channel_relationships: {
+    cochannel:        '0 kHz   (Δf = 0)',
+    first_adjacent:   '±200 kHz',
+    second_adjacent:  '±400 kHz   (shares column with third-adjacent per §73.207(b) Table A)',
+    third_adjacent:   '±600 kHz   (shares column with second-adjacent per §73.207(b) Table A)',
+    if_offset:        '±10.6 MHz / ±10.8 MHz  (FM IF image at 10.7 MHz nominal)'
+  },
   classes_in_table: KNOWN_CLASSES,
+  classes_not_governed: ['LPFM (governed by §73.807)', 'FX/translator (governed by §74.1235)'],
   separation_table: SEPARATION_KM,
   alternative:   '47 CFR §73.215 — contour-protection short-spacing demonstration (may qualify shorter spacing)',
   license_basis: '17 U.S.C. § 105 — separation table data from §73.207(b), US Government public domain'

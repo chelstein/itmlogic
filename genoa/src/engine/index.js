@@ -33,6 +33,7 @@ import { checkSection73207 }            from './regulatory/section_73_207.js';
 import { checkSection73525 }            from './regulatory/section_73_525.js';
 import { checkSection73187 }            from './regulatory/section_73_187.js';
 import { checkOet65, OET65_PROVENANCE } from './regulatory/oet65.js';
+import { buildInterferenceStudy }       from './regulatory/interferenceStudy.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -446,12 +447,19 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // operator-configured POPULATION_EVIDENCE_URL sidecar.  If neither is
   // reachable, primary/protected stay null and POPULATION_PLACEHOLDER
   // persists so reviewers see exactly what's missing.
+  // Population is INFORMATIONAL ONLY — FCC §73.x compliance never
+  // depends on a population number computed by Genoa or anyone else.
+  // The contour rules (§73.207, §73.215, §74.1204, §73.187) are
+  // distance/field-strength tests; the population estimate exists for
+  // operator/reviewer context (audience reach), not as a filing gate.
   const population_estimate = {
     primary:           null,
     protected:         null,
     model:             null,
     method:            'placeholder',
-    source:            null
+    source:            null,
+    informational_only: true,
+    disclaimer:        'INFORMATIONAL ONLY.  FCC broadcast filings (§73.207, §73.215, §74.1204, §73.187, §73.811) do not require population data; compliance is determined by distance and field-strength tests.  Where a Census/ACS dispatch is supplied, the persons figure is the licensee\'s best estimate of audience reach within the protected contour and is not a regulatory determination.'
   };
   warnings.push(W.make('POPULATION_PLACEHOLDER'));
 
@@ -613,6 +621,27 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
+
+  // Formal interference study — H&D-grade per-station table consolidating
+  // §73.207 / §73.215 / §74.1204 / §73.187 results into one filing-grade
+  // table with rule, distance, required vs actual, D/U, pass/fail per
+  // station.  This is the deliverable structure broadcast engineers
+  // expect; warnings are not a "study".
+  exhibit.interference_study = buildInterferenceStudy({
+    subject: {
+      call:           inputs.call,
+      facility_id,
+      fcc_class:      inputs.fcc_class,
+      frequency_mhz:  service === 'AM' ? null : Number(freq),
+      frequency_khz:  service === 'AM' ? Number(freq) : null,
+      erp_kw:         erp_kW,
+      haat_m,
+      lat, lon
+    },
+    regulatory_compliance,
+    service
+  });
+
   // OET-65 / §1.1310 RF exposure compliance — universal across services.
   exhibit.oet65 = oet65;
   exhibit.exports      = {

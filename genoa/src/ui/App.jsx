@@ -623,17 +623,113 @@ function PaneFcc({ exhibit }){
     ['Pattern factor',  trS.pattern_factor_applied ? 'applied' : 'non-directional'],
     ['Formula',         trS.formula_summary]
   ];
+  const isr = exhibit.interference_study;
   return (
-    <table className="telemetry">
-      <tbody>
-        {rows.map(([k, v]) => (
-          <tr key={k}>
-            <th className="w-[35%]">{k}</th>
-            <td className="text-right text-cream">{v || <span className="text-textDim">—</span>}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="space-y-3">
+      <table className="telemetry">
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k}>
+              <th className="w-[35%]">{k}</th>
+              <td className="text-right text-cream">{v || <span className="text-textDim">—</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {isr ? <InterferenceStudyTable study={isr} /> : null}
+    </div>
+  );
+}
+
+function InterferenceStudyTable({ study }){
+  const stations = study.stations || [];
+  return (
+    <div className="rounded-md border border-rule">
+      <div className="bg-cream/5 px-3 py-2 font-mono text-[11px]">
+        <div className="text-cream">
+          Interference Study — {(study.rules_evaluated || []).join(' · ')}
+        </div>
+        <div className="text-textDim">
+          {study.n_stations} station(s); {study.n_pass} pass / {study.n_fail} fail ·{' '}
+          filing_qualifies =
+          <span className={
+            study.filing_qualifies === true  ? ' text-green'  :
+            study.filing_qualifies === false ? ' text-red'    : ' text-amber'}>
+            {' '}{String(study.filing_qualifies)}
+          </span>
+          {study.blocking_rule ? <span className="text-amber"> · blocked by {study.blocking_rule}</span> : null}
+        </div>
+      </div>
+      {stations.length === 0
+        ? <div className="px-3 py-3 font-mono text-[11px] text-textDim">No nearby stations evaluated (no nearby_primaries attached).</div>
+        : (
+          <div className="overflow-auto max-h-[420px]">
+            <table className="telemetry">
+              <thead>
+                <tr>
+                  <th>Call</th>
+                  <th>Class</th>
+                  <th>Δf kHz</th>
+                  <th>Rel.</th>
+                  <th className="text-right">Dist km</th>
+                  <th className="text-right">§73.207 req</th>
+                  <th className="text-right">§73.215 D/U</th>
+                  <th>Polygon</th>
+                  <th>Pass</th>
+                  <th>Via</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stations.map((s, i) => {
+                  const r207 = s.rules.section_73_207;
+                  const r215 = s.rules.section_73_215;
+                  const r1204 = s.rules.section_74_1204;
+                  const r187  = s.rules.section_73_187;
+                  const polygon = r215
+                    ? (r215.polygon_pass === true  ? 'no overlap'
+                       : r215.polygon_pass === false ? 'OVERLAP' : '—')
+                    : '—';
+                  return (
+                    <tr key={s.facility_id || s.call || i}
+                        className={s.pass_overall === false ? 'bg-red/10' : undefined}>
+                      <td>{s.call || s.facility_id || '—'}</td>
+                      <td>{s.fcc_class || '—'}</td>
+                      <td className="text-right">{s.frequency_offset_khz ?? '—'}</td>
+                      <td>{s.channel_relationship || '—'}</td>
+                      <td className="text-right">{s.distance_km != null ? s.distance_km.toFixed(2) : '—'}</td>
+                      <td className="text-right">
+                        {r207
+                          ? <span className={r207.pass === true ? 'text-green' : r207.pass === false ? 'text-red' : ''}>
+                              {r207.required_separation_km}/{r207.actual_separation_km}
+                            </span>
+                          : '—'}
+                      </td>
+                      <td className="text-right">
+                        {r215 && r215.du_required_db != null
+                          ? <span className={r215.du_pass === true ? 'text-green' : r215.du_pass === false ? 'text-red' : ''}>
+                              {r215.du_required_db}/{r215.du_actual_db_forward?.toFixed?.(1) ?? '—'}
+                            </span>
+                          : r1204 || r187 ? '—'
+                          : '—'}
+                      </td>
+                      <td className={polygon === 'OVERLAP' ? 'text-red' : polygon === 'no overlap' ? 'text-green' : ''}>{polygon}</td>
+                      <td className={
+                        s.pass_overall === true  ? 'text-green' :
+                        s.pass_overall === false ? 'text-red'   : 'text-amber'
+                      }>{s.pass_overall === true ? 'PASS' : s.pass_overall === false ? 'FAIL' : '—'}</td>
+                      <td className="text-textDim">{(s.qualified_via || []).join(', ')}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      <div className="px-3 py-2 font-mono text-[10px] text-textDim border-t border-rule">
+        Distance per §73.208 (great-circle, WGS-84 Karney). Polygon overlap via Sutherland-Hodgman + Karney WGS-84 PolygonArea.
+        A station qualifies if AT LEAST ONE applicable rule passes (e.g., §73.215 contour protection clears a §73.207 short-spacing).
+      </div>
+    </div>
   );
 }
 
@@ -696,9 +792,10 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.terrain.fetched_at || '—']
           ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
-      <SubHead title="Population (US Census 2020 via FCC Census Block API)" />
+      <SubHead title="Population (INFORMATIONAL ONLY — not used for §73.x compliance)" />
       <SubKv kv={pop.source && pop.vintage
         ? [
+            ['Disclaimer', 'INFORMATIONAL ONLY. FCC §73.x compliance is determined by distance and field-strength tests, not population.'],
             ['Persons',    Number(pop.primary).toLocaleString()],
             ['Contour',    pop.contour_label || '—'],
             ['Source',     pop.source],

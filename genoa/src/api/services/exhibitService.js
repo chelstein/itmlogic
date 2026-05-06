@@ -1009,7 +1009,12 @@ export async function computeExhibit(req){
       endpoint:      populationResp.endpoint,
       fetched_at:    populationResp.fetched_at,
       sha256:        populationResp.sha256,
-      contour_label: populationResp.contour_label
+      contour_label: populationResp.contour_label,
+      // Population is INFORMATIONAL ONLY — FCC §73.x compliance never
+      // depends on a population number.  The contour rules (§73.207,
+      // §73.215, §74.1204, §73.187) are distance/field-strength tests.
+      informational_only: true,
+      disclaimer:    'INFORMATIONAL ONLY.  FCC broadcast filings do not require population data; compliance is determined by distance and field-strength tests.  This is the licensee\'s best estimate of audience reach within the protected contour, not a regulatory determination.'
     };
   } else if (populationResp){
     // Reachable but malformed/HTTP error: stamp the failure reason on
