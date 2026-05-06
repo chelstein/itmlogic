@@ -27,6 +27,16 @@ let _validationCache = null;
 let _validationCachedAt = 0;
 const VALIDATION_TTL_MS = 5 * 60 * 1000;
 
+// FM service-contour threshold per §73.211 — used by §73.215 and the
+// ITM-aware coverage analysis.  Returns null for non-FM services.
+function service73215Threshold(klass){
+  if (!klass) return 60;                  // default to Class A 60 dBu
+  const k = String(klass).toUpperCase().replace(/\s+/g, '').replace('CLASS', '');
+  // Class A / LPFM / FX → 60 dBu protected; others → 54 dBu.
+  if (['A', 'LP100', 'LP10', 'D', 'FX'].includes(k)) return 60;
+  return 54;
+}
+
 export async function getOrRunValidation(){
   const now = Date.now();
   if (_validationCache && (now - _validationCachedAt) < VALIDATION_TTL_MS){
@@ -400,6 +410,100 @@ export async function computeExhibit(req){
         };
       }
     } catch { /* best-effort; sidecar-less path; swallow */ }
+  }
+
+  // ---- 3d. ITM-aware coverage analysis (terrain path-loss) ----
+  // Optional, opt-in via options.use_itm.  Two-tier fallback:
+  //   1. SPLAT sidecar via predictItmCoverage() — full Longley-Rice
+  //      ITM v1.2.2 fidelity when the sidecar has DEM tiles
+  //      provisioned and exposes /api/v1/splat/run-inline.
+  //   2. JS Bullington + ITU-R P.526 engine via computeItmCoverage()
+  //      — uses the multi-source DEM client (USGS/Open-Meteo/
+  //      OpenTopoData) directly; works without a sidecar.
+  // Reports per-radial terrain-vs-FCC contour delta on
+  // evidence.itm_coverage so the exhibit can render a "terrain map"
+  // alongside the §73.333 baseline.
+  //
+  // Slow (~30-90s for 36 radials × 40 samples).  Off by default; set
+  // options.use_itm = true to opt in.
+  if (options.use_itm
+      && inputs.service !== 'AM'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && Number.isFinite(Number(inputs.haat_m))
+      && Number.isFinite(Number(inputs.frequency))
+      && Number.isFinite(Number(inputs.erp_kw))){
+    const step = Number(inputs.radial_step_deg) || 10;
+    const radials = [];
+    for (let az = 0; az < 360; az += step) radials.push(az);
+    const target = service73215Threshold(inputs.fcc_class) || 60;
+
+    // Tier 1: SPLAT sidecar (high-fidelity).
+    let splatAttempt = null;
+    if (sidecars.splat && options.itm_engine !== 'js'){
+      try {
+        splatAttempt = await sidecars.splat.predictItmCoverage({
+          tx: {
+            call:              inputs.call || null,
+            lat:               Number(inputs.lat),
+            lon:               Number(inputs.lon),
+            amsl_m:            Number(inputs.haat_m),
+            antenna_height_m:  Number(inputs.haat_m),
+            frequency_mhz:     Number(inputs.frequency),
+            erp_kw:            Number(inputs.erp_kw),
+            polarization:      inputs.polarization || 'V'
+          },
+          max_distance_km:  Number(options.itm_to_km)   || 80,
+          target_field_dbu: target,
+          radial_step_deg:  step
+        });
+        if (splatAttempt?.available){
+          evidence.itm_coverage = {
+            ...splatAttempt,
+            engine: 'splat-itm-v1.2.2',
+            tier:   'high-fidelity'
+          };
+        }
+      } catch (err){
+        splatAttempt = { available: false, error: String(err.message) };
+      }
+    }
+
+    // Tier 2: JS Bullington + ITU-R P.526 (fallback).
+    if (!evidence.itm_coverage){
+      try {
+        const { computeItmCoverage } = await import('../../engine/coverage/itm_radial.js');
+        const itm = await computeItmCoverage({
+          tx_lat:           Number(inputs.lat),
+          tx_lon:           Number(inputs.lon),
+          tx_amsl_m:        Number(inputs.haat_m),
+          erp_kw:           Number(inputs.erp_kw),
+          haat_m:           Number(inputs.haat_m),
+          frequency_mhz:    Number(inputs.frequency),
+          radials_deg:      radials,
+          target_field_dbu: target,
+          from_km:          Number(options.itm_from_km) || 1,
+          to_km:            Number(options.itm_to_km)   || 80,
+          samples:          Number(options.itm_samples) || 40,
+          fcc_mode:         options.itm_fcc_mode || '50,50'
+        });
+        if (itm.available){
+          evidence.itm_coverage = {
+            ...itm,
+            engine: 'genoa-bullington-p526',
+            tier:   'js-fallback',
+            splat_sidecar_attempted: splatAttempt
+              ? { available: splatAttempt.available, error: splatAttempt.error || null,
+                  sidecar_enhancement_required: splatAttempt.sidecar_enhancement_required || null }
+              : { available: false, error: 'SPLAT sidecar not configured' }
+          };
+        } else {
+          evidence.itm_coverage_attempted = { available: false, error: itm.error };
+        }
+      } catch (err){
+        evidence.itm_coverage_attempted = { available: false, error: String(err.message) };
+      }
+    }
   }
 
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
