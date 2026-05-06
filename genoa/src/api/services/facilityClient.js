@@ -462,6 +462,96 @@ export function makeFacilityClient({
     },
 
     /**
+     * Enrich a list of nearby primaries (from FCC FMQ/AMQ) with
+     * per-station environmental data sourced from ZTR.  Used by
+     * §73.215 (FM contour-protection) and §73.187 (AM nighttime
+     * skywave) to lift study accuracy beyond conservative defaults.
+     *
+     * Fields pulled (when present on the ZTR row, defensive against
+     * schema drift across releases):
+     *   ground_sigma_msm    — M3 conductivity at the station's site
+     *                          (improves D's groundwave protected-
+     *                          contour distance in §73.187)
+     *   rss_erp_kw          — directional-pattern RSS-equivalent ERP
+     *                          along the inter-station bearing
+     *                          (improves U's skywave/contour field)
+     *   sunrise_offset_min  — §73.187(a) PSRA timing for Class D
+     *   sunset_offset_min   — §73.187(a) PSSA timing for Class D
+     *
+     * Concurrency-capped (default 10 parallel) to avoid hammering ZTR
+     * when the AM nighttime nearby list runs into the dozens-to-hundreds
+     * of stations.  Stations not in ZTR are passed through untouched.
+     * Each enriched row carries `enriched_from_ztr: true` and
+     * `ztr_endpoint` provenance.
+     *
+     * @param {Array<object>} primaries  rows from getNearbyPrimaries
+     * @param {object} [opts]
+     * @param {number} [opts.concurrency=10]
+     * @param {number} [opts.timeoutMs=5000]
+     * @returns {{ primaries, n_enriched, n_total, errors }}
+     */
+    async enrichNearbyFromZtr(primaries, { concurrency = 10, timeoutMs = 5000 } = {}){
+      if (!ztrUrl || !Array.isArray(primaries) || primaries.length === 0){
+        return { primaries: primaries || [], n_enriched: 0, n_total: (primaries || []).length, errors: [] };
+      }
+      const errors = [];
+
+      const enrichOne = async (p) => {
+        if (!p || !p.facility_id) return p;
+        try {
+          const u = joinUrl(ztrUrl, `/api/broadcast/stations?facility_id=${encodeURIComponent(p.facility_id)}&limit=1`);
+          const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+          if (!r.ok) return p;
+          const j = await r.json();
+          const row = (j.rows || [])[0];
+          if (!row) return p;
+          // Defensive field-name lookup — try a wide set of common
+          // names so minor ZTR schema changes don't drop enrichment.
+          const sigma = pickEnvNumeric(row,
+            ['ground_sigma_msm', 'm3_conductivity_msm', 'soil_conductivity_msm',
+             'ground_sigma_mS_m', 'sigma_mS_m', 'conductivity_mS_m',
+             'ground_sigma', 'm3_conductivity']);
+          const rss   = pickEnvNumeric(row,
+            ['rss_erp_kw', 'rss_power_kw', 'effective_erp_kw',
+             'directional_rss_erp_kw', 'pattern_rss_kw']);
+          const sr    = pickEnvNumeric(row,
+            ['sunrise_offset_min', 'sunrise_offset', 'psra_sunrise_offset_min']);
+          const ss    = pickEnvNumeric(row,
+            ['sunset_offset_min',  'sunset_offset',  'pssa_sunset_offset_min']);
+          const enrichments = {};
+          if (sigma != null) enrichments.ground_sigma_msm   = sigma;
+          if (rss   != null) enrichments.rss_erp_kw         = rss;
+          if (sr    != null) enrichments.sunrise_offset_min = sr;
+          if (ss    != null) enrichments.sunset_offset_min  = ss;
+          if (Object.keys(enrichments).length === 0) return p;
+          return {
+            ...p,
+            ...enrichments,
+            enriched_from_ztr: true,
+            ztr_endpoint:      u
+          };
+        } catch (e){
+          errors.push(`facility_id=${p.facility_id}: ${e.message}`);
+          return p;
+        }
+      };
+
+      // Concurrency cap.
+      const results = new Array(primaries.length);
+      let cursor = 0;
+      async function worker(){
+        while (true){
+          const i = cursor++;
+          if (i >= primaries.length) return;
+          results[i] = await enrichOne(primaries[i]);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(concurrency, primaries.length) }, worker));
+      const n_enriched = results.filter(p => p?.enriched_from_ztr).length;
+      return { primaries: results, n_enriched, n_total: primaries.length, errors };
+    },
+
+    /**
      * Pull SDR captures (signal-strength measurements at known
      * receiver locations) from ZTR's rich-station response.
      *
@@ -689,6 +779,27 @@ function num(v){
   if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+// Pick the first numeric value from an object across a list of candidate
+// keys.  Used by enrichNearbyFromZtr for defensive field-name lookup
+// across ZTR schema variants.  Also probes nested .env, .station, and
+// ._radiodns sub-objects which some ZTR releases use.
+function pickEnvNumeric(obj, keys){
+  if (!obj || typeof obj !== 'object') return null;
+  const probe = (target) => {
+    if (!target || typeof target !== 'object') return null;
+    for (const k of keys){
+      const v = num(target[k]);
+      if (v != null) return v;
+    }
+    return null;
+  };
+  return probe(obj)
+      ?? probe(obj.env)
+      ?? probe(obj.environmental)
+      ?? probe(obj.station)
+      ?? probe(obj._radiodns);
 }
 
 function joinUrl(base, suffix){

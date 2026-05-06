@@ -53,18 +53,20 @@
 //     bearing — same simplification used in §74.1204 / §73.215 and
 //     consistent with the FCC's own AM Skywave Engineering Tool.
 //
-// ENRICHMENT HOOKS (future)
-//   The orchestrator can enrich each nearbyStations entry with
-//   per-station environmental data sourced from ZTR or other repos:
+// ENRICHMENT (active — wired via facilityClient.enrichNearbyFromZtr)
+//   The orchestrator merges per-station environmental data sourced
+//   from ZTR rich-station rows into each nearbyStations entry:
 //     - ground_sigma_msm  → M3 conductivity at the station's site
 //                            (improves D's groundwave protected distance)
 //     - rss_erp_kw        → directional pattern's RSS-equivalent ERP
 //                            for the great-circle bearing (improves U)
 //     - sunrise_offset_min, sunset_offset_min → §73.187(a) time-of-day
 //                            classifications (Class D PSRA / PSSA)
-//   When supplied, the study uses them verbatim.  When omitted, the
-//   §73.187 study uses defaults (σ = 8 mS/m, omnidirectional ERP, all-
-//   night protection) and tags the study fields accordingly.
+//   When ZTR carries the field, the study uses it verbatim and tags
+//   the row with `enriched_from_ztr: true`.  When ZTR doesn't have the
+//   station or the field, the study falls back to defaults
+//   (σ = 8 mS/m, omnidirectional ERP, all-night protection).
+//   Disable via NEARBY_ZTR_ENRICH_DISABLE=1.
 
 import { skywaveFieldAtPath } from '../curves/fcc/skywave.mjs';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';

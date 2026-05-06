@@ -566,7 +566,33 @@ export async function computeExhibit(req){
       };
       const nb = await sidecars.facility.getNearbyPrimaries(nbArgs);
       if (nb?.available){
-        evidence.nearby_primaries = nb.primaries;
+        let primaries = nb.primaries;
+        let enrichment = null;
+        // Per-station environmental enrichment from ZTR rich-station
+        // data (M3 conductivity, RSS-equivalent ERP for directional,
+        // sunrise/sunset offsets).  Lifts §73.215 and §73.187 study
+        // accuracy beyond conservative defaults.  Concurrency-capped
+        // and fail-soft: stations not in ZTR pass through unchanged.
+        if (sidecars.facility?.enrichNearbyFromZtr
+            && process.env.NEARBY_ZTR_ENRICH_DISABLE !== '1'
+            && primaries.length > 0){
+          try {
+            const e = await sidecars.facility.enrichNearbyFromZtr(primaries, {
+              concurrency: Number(process.env.NEARBY_ZTR_ENRICH_CONCURRENCY) || 10
+            });
+            primaries  = e.primaries;
+            enrichment = {
+              n_enriched: e.n_enriched,
+              n_total:    e.n_total,
+              fields:     ['ground_sigma_msm', 'rss_erp_kw', 'sunrise_offset_min', 'sunset_offset_min'],
+              source:     'zerotrustradio',
+              errors:     e.errors?.length ? e.errors.slice(0, 5) : null
+            };
+          } catch (err){
+            enrichment = { n_enriched: 0, n_total: primaries.length, error: String(err.message), source: 'zerotrustradio' };
+          }
+        }
+        evidence.nearby_primaries = primaries;
         evidence.nearby_primaries_provenance = {
           source:       nb.source,
           method:       nb.method,
@@ -575,7 +601,8 @@ export async function computeExhibit(req){
           n_queries:    nb.n_queries,
           n_in_radius:  nb.n_in_radius,
           fetched_at:   nb.fetched_at,
-          errors:       nb.errors
+          errors:       nb.errors,
+          ztr_enrichment: enrichment
         };
       }
     } catch { /* swallow; engine emits MISSING_NEARBY_STATIONS honestly */ }
