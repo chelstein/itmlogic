@@ -1,5 +1,23 @@
 // Resolves environment-configured sidecars into ready-to-use clients.
 // Missing sidecar URL → null client → engine still runs.
+//
+// CANONICAL FALLBACK MATRIX (probed live at /api/sources/health)
+//
+//   Query                Primary                 Secondary               Tertiary
+//   ----------------     -----------------       ------------------      ---------------------------
+//   Facility metadata    ZTR /api/broadcast      FCC FMQ/AMQ direct      n8n station/analyze
+//   FCC contour          ZTR _fcc_contour        geo.fcc.gov direct      engine self-computes
+//   Per-radial HAAT      FCC contour HAAT        ZTR terrain-haat        USGS + OpenMeteo + OpenTopoData
+//   Population/Census    operator pop sidecar    geo.fcc.gov/api/census  —
+//   Nearby primaries     FCC FMQ direct          FCC AMQ direct          —
+//   Rich station / SDR   ZTR /api/radiodns       —                       — (vendor-locked)
+//   Identity / RadioDNS  identity sidecar        —                       — (optional)
+//
+// Every tier is independent — primary failure does NOT cascade.  The
+// orchestrator (exhibitService.js) walks each chain top-down and stops
+// at the first tier that returns usable data.  Failed tiers are
+// recorded as evidence (e.g., evidence.terrain_ztr_attempted) so the
+// exhibit's provenance shows exactly which fallback won.
 
 import { makeTerrainClient }     from '../../evidence/terrain/client.js';
 import { makeSplatClient }       from '../../evidence/terrain/splatClient.js';
