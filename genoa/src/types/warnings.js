@@ -108,6 +108,14 @@ export const WARNING_CODES = Object.freeze({
     title: 'FM translator interference (47 CFR §74.1204)',
     description: 'The translator fails one or more §74.1204 D/U interference gates against a nearby primary station.  Filing requires that all D/U ratios be satisfied.' },
 
+  FM_CONTOUR_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'FM short-spacing contour-protection violation (47 CFR §73.215)',
+    description: 'The full-service FM station fails the bidirectional §73.215 contour-protection short-spacing study against one or more nearby full-service FM stations.  The proposed station\'s F(50,10) interfering contour overlaps a nearby station\'s F(50,50) protected contour, or vice versa, at the §74.1204(c) D/U gate threshold for the channel relationship.  Filing requires either contour protection or §73.207 minimum-distance separation.' },
+
+  AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'AM nighttime skywave protection violation (47 CFR §73.187)',
+    description: 'The proposed AM station fails the bidirectional §73.187 nighttime-skywave protection study against one or more nearby AM stations.  The §73.190 SS-1 (50% nighttime skywave) field at a protected station\'s nighttime contour edge exceeds the §73.182 protected threshold for that station\'s class, or vice versa.  Filing requires §73.187(c) protection or a §73.182(g) waiver.' },
+
   MISSING_NEARBY_STATIONS: { severity: 'warning', phase: 'evidence',
     title: 'Nearby-stations list missing',
     description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' }

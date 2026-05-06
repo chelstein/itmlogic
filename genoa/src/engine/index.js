@@ -28,6 +28,8 @@ import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, FX_REGULATORY_METADATA, 
 import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.js';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
+import { checkSection73215 }            from './regulatory/section_73_215.js';
+import { checkSection73187 }            from './regulatory/section_73_187.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -231,6 +233,63 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       warnings.push(W.make('MISSING_NEARBY_STATIONS'));
     } else if (regulatory_compliance.pass === false){
       warnings.push(W.make('TRANSLATOR_INTERFERENCE',
+        regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+  } else if (service === 'FM'){
+    // 47 CFR §73.215 — full-service FM contour-protection short-spacing.
+    // Only runs when nearby full-service FM stations are supplied via
+    // evidence.nearby_primaries.  When the list is missing, the engine
+    // emits MISSING_NEARBY_STATIONS — same convention as §74.1204 above.
+    const allNearby = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
+    // §73.215 governs full-service FM ↔ full-service FM only.  Strip
+    // translators (FX) and LPFM out of the list so a mis-classified
+    // entry can't generate a spurious §73.215 violation.
+    const nearbyStations = allNearby.filter(p => {
+      const svc = String(p?.service || '').toUpperCase();
+      return svc === 'FM' || svc === '';
+    });
+    regulatory_compliance = checkSection73215({
+      subject: {
+        erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+        fcc_class: inputs.fcc_class || null,
+        call: inputs.call || null, facility_id
+      },
+      nearbyStations
+    });
+    if (regulatory_compliance.missing_nearby_stations){
+      warnings.push(W.make('MISSING_NEARBY_STATIONS'));
+    } else if (regulatory_compliance.pass === false){
+      warnings.push(W.make('FM_CONTOUR_PROTECTION_VIOLATION',
+        regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+  } else if (service === 'AM'){
+    // 47 CFR §73.187 — AM nighttime skywave protection.
+    // Runs only when nearby AM stations are supplied via
+    // evidence.nearby_primaries.  Without the list the engine emits
+    // MISSING_NEARBY_STATIONS — same convention as §74.1204 / §73.215.
+    const allNearby = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
+    // §73.187 governs AM ↔ AM only.
+    const nearbyAm = allNearby.filter(p => {
+      const svc = String(p?.service || '').toUpperCase();
+      return svc === 'AM' || svc === '';
+    });
+    regulatory_compliance = checkSection73187({
+      subject: {
+        erp_kw:           erp_kW,
+        frequency_khz:    Number(freq),       // AM uses kHz at engine boundary
+        lat, lon,
+        fcc_class:        inputs.fcc_class || null,
+        ground_sigma_msm: Number(inputs.ground_sigma_mS_m) || Number(sigma) || null,
+        rss_erp_kw:       Number(inputs.rss_erp_kw) || null,
+        call:             inputs.call || null,
+        facility_id
+      },
+      nearbyStations: nearbyAm
+    });
+    if (regulatory_compliance.missing_nearby_stations){
+      warnings.push(W.make('MISSING_NEARBY_STATIONS'));
+    } else if (regulatory_compliance.pass === false){
+      warnings.push(W.make('AM_NIGHTTIME_PROTECTION_VIOLATION',
         regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
     }
   }

@@ -52,6 +52,7 @@
 
 import { fccDistanceKm, fccFieldDbuAtDistance } from '../curves/fcc/index.mjs';
 import { karneyInverse } from '../geometry/wgs84.js';
+import { studyContourPair, classifyFmOffsetKhz } from './_du_pair_study.js';
 
 // §74.1204(a) D/U gates per channel relationship.  Values are dB.
 export const TRANSLATOR_DU_GATES = Object.freeze({
@@ -78,16 +79,19 @@ export const TRANSLATOR_DEFAULT_PROTECTED_FIELD_DBU_BY_CLASS = Object.freeze({
 });
 
 // 1st-adjacent FM is exactly 200 kHz; FM grid is 200 kHz.  The IF
-// frequencies are 10.6 and 10.8 MHz from the carrier.
+// frequencies are 10.6 and 10.8 MHz from the carrier.  Resolves the
+// shared FM offset classifier with this rule's D/U gate table.
 function classifyChannelOffset(delta_khz){
-  const d = Math.abs(Math.round(delta_khz));
-  if (d === 0)             return { rel: 'cochannel',         label: 'co-channel',     du_db: TRANSLATOR_DU_GATES.cochannel };
-  if (d === 200)           return { rel: 'first_adjacent',    label: '1st-adjacent',   du_db: TRANSLATOR_DU_GATES.first_adjacent };
-  if (d === 400)           return { rel: 'second_adjacent',   label: '2nd-adjacent',   du_db: TRANSLATOR_DU_GATES.second_adjacent };
-  if (d === 600)           return { rel: 'third_adjacent',    label: '3rd-adjacent',   du_db: TRANSLATOR_DU_GATES.third_adjacent };
-  if (d === 10600 || d === 10800)
-                           return { rel: 'if_offset',         label: 'IF (10.6/10.8 MHz)', du_db: TRANSLATOR_DU_GATES.if_offset };
-  return                          { rel: 'non_restricted',    label: 'non-restricted',  du_db: null };
+  const c = classifyFmOffsetKhz(delta_khz);
+  const gateMap = {
+    cochannel:        TRANSLATOR_DU_GATES.cochannel,
+    first_adjacent:   TRANSLATOR_DU_GATES.first_adjacent,
+    second_adjacent:  TRANSLATOR_DU_GATES.second_adjacent,
+    third_adjacent:   TRANSLATOR_DU_GATES.third_adjacent,
+    if_offset:        TRANSLATOR_DU_GATES.if_offset,
+    non_restricted:   null
+  };
+  return { ...c, du_db: gateMap[c.rel] };
 }
 
 function protectedFieldDbu(klass){
@@ -193,113 +197,62 @@ export function checkTranslatorInterference({ translator, primaries = [] } = {})
 }
 
 function studyOnePrimary(translator, primary){
-  const study = {
-    primary_call:                            primary.call || null,
-    primary_facility_id:                     primary.facility_id || null,
-    primary_class:                           primary.fcc_class || null,
-    primary_frequency_mhz:                   Number(primary.frequency_mhz),
-    translator_frequency_mhz:                Number(translator.frequency_mhz),
-    delta_khz:                               null,
-    relationship:                            null,
-    du_threshold_db:                         null,
-    primary_protected_field_dbu:             null,
-    separation_km:                           null,
-    primary_protected_distance_km:           null,
-    translator_distance_to_protected_edge_km:null,
-    translator_field_dbu_at_edge:            null,
-    du_actual_db:                            null,
-    pass:                                    null,
-    skipped:                                 false,
-    skipped_reason:                          null
-  };
-
+  // Pre-compute channel relationship; non-restricted offsets are auto-pass.
   const fT = Number(translator.frequency_mhz);
   const fP = Number(primary.frequency_mhz);
-  if (!Number.isFinite(fT) || !Number.isFinite(fP)){
-    study.skipped        = true;
-    study.skipped_reason = 'translator or primary frequency missing';
-    return study;
-  }
-
-  const delta_khz = Math.round((fT - fP) * 1000);
-  study.delta_khz = delta_khz;
-  const cls = classifyChannelOffset(delta_khz);
-  study.relationship    = cls.label;
-  study.du_threshold_db = cls.du_db;
+  const delta_khz = Number.isFinite(fT) && Number.isFinite(fP)
+    ? Math.round((fT - fP) * 1000) : null;
+  const cls = delta_khz != null ? classifyChannelOffset(delta_khz)
+                                : { rel: null, label: null, du_db: null };
   if (cls.rel === 'non_restricted'){
-    study.skipped        = true;
-    study.skipped_reason = `channel offset ${delta_khz} kHz is not restricted by §74.1204(a).`;
-    study.pass           = true;
-    return study;
+    return {
+      primary_call:                            primary.call || null,
+      primary_facility_id:                     primary.facility_id || null,
+      primary_class:                           primary.fcc_class || null,
+      primary_frequency_mhz:                   fP,
+      translator_frequency_mhz:                fT,
+      delta_khz,
+      relationship:                            cls.label,
+      du_threshold_db:                         null,
+      primary_protected_field_dbu:             null,
+      separation_km:                           null,
+      primary_protected_distance_km:           null,
+      translator_distance_to_protected_edge_km:null,
+      translator_field_dbu_at_edge:            null,
+      du_actual_db:                            null,
+      pass:                                    true,
+      skipped:                                 true,
+      skipped_reason:                          `channel offset ${delta_khz} kHz is not restricted by §74.1204(a).`
+    };
   }
 
   const D_dbu = protectedFieldDbu(primary.fcc_class);
-  study.primary_protected_field_dbu = D_dbu;
+  const pair  = studyContourPair(translator, primary, {
+    relationship:        cls.label,
+    du_threshold_db:     cls.du_db,
+    protected_field_dbu: D_dbu
+  });
 
-  const lat1 = Number(translator.lat);
-  const lon1 = Number(translator.lon);
-  const lat2 = Number(primary.lat);
-  const lon2 = Number(primary.lon);
-  if (![lat1, lon1, lat2, lon2].every(Number.isFinite)){
-    study.skipped        = true;
-    study.skipped_reason = 'translator or primary coordinates missing';
-    return study;
-  }
-
-  const inv = karneyInverse(lat2, lon2, lat1, lon1);
-  study.separation_km = inv.distance_km;
-
-  // r_primary: distance from primary's Tx to its protected contour
-  // along the bearing toward the translator (worst case for §74.1204).
-  let rPrimary;
-  try {
-    const r = fccDistanceKm({
-      haat_m:        Number(primary.haat_m),
-      target_dBu:    D_dbu,
-      erp_kw:        Number(primary.erp_kw),
-      mode:          '50,50',
-      frequency_mhz: fP
-    });
-    rPrimary = r.distance_km;
-  } catch (e){
-    study.skipped        = true;
-    study.skipped_reason = `primary protected-contour distance failed: ${e.message}`;
-    return study;
-  }
-  study.primary_protected_distance_km = rPrimary;
-
-  // Closest point of primary's protected contour to the translator.
-  // If the translator is INSIDE the primary's protected contour
-  // (separation < rPrimary), the relevant range is essentially zero —
-  // i.e. the translator's own transmitter is inside the primary's
-  // protected contour, which is an automatic §74.1204 failure.
-  let rEdge = inv.distance_km - rPrimary;
-  if (!Number.isFinite(rEdge) || rEdge <= 0){
-    rEdge = 0.001;                    // 1 m — avoid log-domain blow-ups
-    study.notes_internal_translator_inside_primary = true;
-  }
-  study.translator_distance_to_protected_edge_km = rEdge;
-
-  // F(50,10) of the translator at that range — that is U_dBu.
-  let uField;
-  try {
-    const u = fccFieldDbuAtDistance({
-      haat_m:        Number(translator.haat_m),
-      distance_km:   rEdge,
-      erp_kw:        Number(translator.erp_kw),
-      mode:          '50,10',
-      frequency_mhz: fT
-    });
-    uField = u.field_dBu;
-  } catch (e){
-    study.skipped        = true;
-    study.skipped_reason = `translator F(50,10) field at edge failed: ${e.message}`;
-    return study;
-  }
-  study.translator_field_dbu_at_edge = uField;
-
-  const du = D_dbu - uField;
-  study.du_actual_db = du;
-  study.pass = du >= cls.du_db;
-  return study;
+  // Re-shape pair-study output into the §74.1204 study schema.
+  // Translator is U; primary is D.
+  return {
+    primary_call:                            pair.d_call,
+    primary_facility_id:                     pair.d_facility_id,
+    primary_class:                           pair.d_class,
+    primary_frequency_mhz:                   pair.d_frequency_mhz,
+    translator_frequency_mhz:                pair.u_frequency_mhz,
+    delta_khz,
+    relationship:                            pair.relationship,
+    du_threshold_db:                         pair.du_threshold_db,
+    primary_protected_field_dbu:             pair.d_protected_field_dbu,
+    separation_km:                           pair.separation_km,
+    primary_protected_distance_km:           pair.d_protected_distance_km,
+    translator_distance_to_protected_edge_km:pair.u_distance_to_d_protected_edge_km,
+    translator_field_dbu_at_edge:            pair.u_field_dbu_at_d_edge,
+    du_actual_db:                            pair.du_actual_db,
+    pass:                                    pair.pass,
+    skipped:                                 pair.skipped,
+    skipped_reason:                          pair.skipped_reason,
+    notes_internal_translator_inside_primary:pair.inside_protected_contour || undefined
+  };
 }

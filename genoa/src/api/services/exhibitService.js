@@ -534,20 +534,37 @@ export async function computeExhibit(req){
   // engine's checkTranslatorInterference consumes verbatim to run the
   // per-station D/U study.  Without this attach, the engine emits
   // MISSING_NEARBY_STATIONS — honest, but the study can't run.
-  if (String(inputs.service || '').toUpperCase() === 'FX'
+  // FM (full-service) also needs nearby_primaries for the §73.215
+  // contour-protection short-spacing study.  Same FCC FMQ source, same
+  // §74.1204-style channel-offset queries (co + ±200/400/600 kHz, IF).
+  // The engine filters the list to FM-only inside checkSection73215.
+  // AM nighttime §73.187 also pulls a list — same upstream (FCC AMQ
+  // direct), wider default radius (1500 km vs 300 km) for skywave reach.
+  const svc = String(inputs.service || '').toUpperCase();
+  const wantsNearby = ['FX', 'FM', 'AM'].includes(svc);
+  if (wantsNearby
       && Number.isFinite(Number(inputs.lat))
       && Number.isFinite(Number(inputs.lon))
       && Number.isFinite(Number(inputs.frequency))
       && sidecars.facility?.getNearbyPrimaries
       && process.env.TRANSLATOR_NEARBY_DISABLE !== '1'){
     try {
-      const nb = await sidecars.facility.getNearbyPrimaries({
+      const nbArgs = svc === 'AM' ? {
+        lat:                 Number(inputs.lat),
+        lon:                 Number(inputs.lon),
+        frequency_khz:       Number(inputs.frequency),    // engine takes AM in kHz
+        service:             'AM',
+        radius_km:           Number(process.env.AM_NEARBY_RADIUS_KM) || 1500,
+        exclude_facility_id: inputs.facility_id || null
+      } : {
         lat:                 Number(inputs.lat),
         lon:                 Number(inputs.lon),
         frequency_mhz:       Number(inputs.frequency),
+        service:             svc,
         radius_km:           Number(process.env.TRANSLATOR_NEARBY_RADIUS_KM) || 300,
         exclude_facility_id: inputs.facility_id || null
-      });
+      };
+      const nb = await sidecars.facility.getNearbyPrimaries(nbArgs);
       if (nb?.available){
         evidence.nearby_primaries = nb.primaries;
         evidence.nearby_primaries_provenance = {

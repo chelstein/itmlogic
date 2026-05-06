@@ -312,29 +312,46 @@ export function makeFacilityClient({
      * consumes that array verbatim and runs the per-station D/U study.
      *
      * @param {object} args
-     * @param {number} args.lat,lon            translator coordinates
-     * @param {number} args.frequency_mhz      translator carrier
-     * @param {number} args.radius_km          search radius (default 300)
+     * @param {number} args.lat,lon            transmitter coordinates
+     * @param {number} [args.frequency_mhz]    FM carrier (FM/FX/LPFM); use one of frequency_mhz | frequency_khz
+     * @param {number} [args.frequency_khz]    AM carrier (when args.service === 'AM')
+     * @param {string} [args.service='FX']     'FX' / 'FM' / 'LPFM' (default) for §74.1204 / §73.215, 'AM' for §73.187
+     * @param {number} [args.radius_km]        search radius (default 300 for FM, 1500 for AM nighttime skywave)
      * @param {string} [args.exclude_facility_id]  drop self from results
      */
-    async getNearbyPrimaries({ lat, lon, frequency_mhz, radius_km = 300, exclude_facility_id = null } = {}){
-      if (lat == null || lon == null || frequency_mhz == null){
+    async getNearbyPrimaries({ lat, lon, frequency_mhz, frequency_khz, service = 'FX', radius_km, exclude_facility_id = null } = {}){
+      const isAM    = String(service).toUpperCase() === 'AM';
+      const lat0    = Number(lat), lon0 = Number(lon);
+      const f0_mhz  = isAM ? null : Number(frequency_mhz);
+      const f0_khz  = isAM ? Number(frequency_khz) : null;
+      // Input guard.  Preserve the original FM-path error wording for
+      // backwards compatibility with callers / tests that match against
+      // /lat, lon, and frequency_mhz required/.
+      if (lat == null || lon == null || (!isAM && frequency_mhz == null) || (isAM && frequency_khz == null)){
         return { available: false, source: null,
-                 error: 'lat, lon, and frequency_mhz required for §74.1204 nearby-primaries search' };
+                 error: isAM
+                   ? 'lat, lon, and frequency_khz required for §73.187 nearby-AM-primaries search'
+                   : 'lat, lon, and frequency_mhz required for §74.1204 nearby-primaries search' };
       }
-      const lat0 = Number(lat), lon0 = Number(lon), f0 = Number(frequency_mhz);
-      if (![lat0, lon0, f0].every(Number.isFinite)){
-        return { available: false, source: null,
-                 error: 'lat, lon, and frequency_mhz must be finite numbers' };
+      if (![lat0, lon0].every(Number.isFinite)){
+        return { available: false, source: null, error: 'lat, lon must be finite numbers' };
+      }
+      if (!isAM && !Number.isFinite(f0_mhz)){
+        return { available: false, source: null, error: 'frequency_mhz must be finite' };
+      }
+      if (isAM && !Number.isFinite(f0_khz)){
+        return { available: false, source: null, error: 'frequency_khz must be finite' };
       }
       if (!fmqClient){
         return { available: false, source: null,
                  error: 'FCC FMQ client unavailable (FACILITY_DISABLE_FCC_FMQ=1)' };
       }
-      // §74.1204(a)+(c) channel relationships — every offset whose D/U
-      // gate the translator must satisfy.  ±10.6 / ±10.8 MHz are the
-      // FCC IF-image frequencies of FM receivers (10.7 MHz IF center).
-      const RELATIONSHIPS = [
+      const radius = Number.isFinite(radius_km) ? Number(radius_km) : (isAM ? 1500 : 300);
+
+      // Channel relationships per service.
+      // FM:  §74.1204(a) co + ±200/400/600 kHz + ±10.6/10.8 MHz IF
+      // AM:  §73.187     co + ±10/20 kHz on 10 kHz grid
+      const FM_RELATIONSHIPS = [
         { rel: 'cochannel',         delta_mhz:  0.0  },
         { rel: 'first_adjacent',    delta_mhz: +0.2  },
         { rel: 'first_adjacent',    delta_mhz: -0.2  },
@@ -347,9 +364,20 @@ export function makeFacilityClient({
         { rel: 'if_offset',         delta_mhz: +10.8 },
         { rel: 'if_offset',         delta_mhz: -10.8 }
       ];
-      const queries = RELATIONSHIPS
-        .map(r => ({ rel: r.rel, f: +(f0 + r.delta_mhz).toFixed(1) }))
-        .filter(q => q.f >= 88.0 && q.f <= 108.0);
+      const AM_RELATIONSHIPS = [
+        { rel: 'cochannel',         delta_khz:   0   },
+        { rel: 'first_adjacent',    delta_khz: +10   },
+        { rel: 'first_adjacent',    delta_khz: -10   },
+        { rel: 'second_adjacent',   delta_khz: +20   },
+        { rel: 'second_adjacent',   delta_khz: -20   }
+      ];
+      const queries = isAM
+        ? AM_RELATIONSHIPS
+            .map(r => ({ rel: r.rel, f: +((f0_khz + r.delta_khz) / 1000).toFixed(3) /* MHz for FMQ uniform grid */ }))
+            .filter(q => q.f >= 0.530 && q.f <= 1.710)
+        : FM_RELATIONSHIPS
+            .map(r => ({ rel: r.rel, f: +(f0_mhz + r.delta_mhz).toFixed(1) }))
+            .filter(q => q.f >= 88.0 && q.f <= 108.0);
 
       const settled = await Promise.all(queries.map(q =>
         fmqClient.searchByFrequencyRange(q.f, q.f).then(r => ({ ...q, ...r }))
@@ -364,10 +392,19 @@ export function makeFacilityClient({
           if (!row || !row.facility_id) continue;
           if (exclude_facility_id && String(row.facility_id) === String(exclude_facility_id)) continue;
           if (!Number.isFinite(row.lat) || !Number.isFinite(row.lon)) continue;
-          if (row.frequency_unit !== 'MHz' || !Number.isFinite(row.frequency)) continue;
+          // Service filter: AM-targeted query keeps AM rows; FM-targeted
+          // keeps MHz rows.  Without this an AM band query would pick
+          // up FM rows whose frequencies happen to match the kHz/1000
+          // grid (rare but possible at radio-frequency edge cases).
+          if (isAM){
+            if (String(row.service || '').toUpperCase() !== 'AM') continue;
+            if (row.frequency_unit !== 'kHz' || !Number.isFinite(row.frequency)) continue;
+          } else {
+            if (row.frequency_unit !== 'MHz' || !Number.isFinite(row.frequency)) continue;
+          }
           let inv;
           try { inv = karneyInverse(lat0, lon0, row.lat, row.lon); } catch { continue; }
-          if (!Number.isFinite(inv.distance_km) || inv.distance_km > radius_km) continue;
+          if (!Number.isFinite(inv.distance_km) || inv.distance_km > radius) continue;
           const prior = collected.get(row.facility_id);
           if (prior && prior.distance_km <= inv.distance_km) continue;
           collected.set(row.facility_id, { ...row, distance_km: inv.distance_km, channel_relationship: r.rel });
@@ -376,7 +413,21 @@ export function makeFacilityClient({
 
       const primaries = [...collected.values()]
         .sort((a, b) => a.distance_km - b.distance_km)
-        .map(r => ({
+        .map(r => isAM ? ({
+          call:                  r.call,
+          facility_id:           r.facility_id,
+          fcc_class:             r.fcc_class,
+          service:               r.service,
+          frequency_khz:         r.frequency,
+          erp_kw:                r.erp_kw,
+          haat_m:                r.haat_m ?? null,
+          lat:                   r.lat,
+          lon:                   r.lon,
+          distance_km:           +r.distance_km.toFixed(3),
+          channel_relationship:  r.channel_relationship,
+          source:                'fcc-amq',
+          endpoint:              r.facility_lookup_source?.endpoint || null
+        }) : ({
           call:                  r.call,
           facility_id:           r.facility_id,
           fcc_class:             r.fcc_class,
@@ -394,11 +445,15 @@ export function makeFacilityClient({
 
       return {
         available:    true,
-        source:       'fcc-fmq',
-        method:       '47 CFR §74.1204(a) channel-relationship FMQ search + WGS-84 Karney (2013) geodesic proximity filter',
-        upstream_api: 'https://transition.fcc.gov/fcc-bin/fmq',
+        source:       isAM ? 'fcc-amq' : 'fcc-fmq',
+        method:       isAM
+          ? '47 CFR §73.187 channel-relationship AMQ search (co + ±10/20 kHz) + WGS-84 Karney (2013) geodesic proximity filter'
+          : '47 CFR §74.1204(a) channel-relationship FMQ search + WGS-84 Karney (2013) geodesic proximity filter',
+        upstream_api: isAM
+          ? 'https://transition.fcc.gov/fcc-bin/amq'
+          : 'https://transition.fcc.gov/fcc-bin/fmq',
         fetched_at:   new Date().toISOString(),
-        radius_km,
+        radius_km:    radius,
         n_queries:    queries.length,
         n_in_radius:  primaries.length,
         primaries,
