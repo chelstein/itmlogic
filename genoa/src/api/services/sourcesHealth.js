@@ -16,6 +16,7 @@
 //   Nearby primaries        FCC FMQ direct            FCC AMQ direct           — (parallel sources)
 //   Rich station / SDR      ZTR /api/radiodns         —                         — (vendor-locked)
 //   Identity / RadioDNS     identity sidecar          ZTR rich-station          — (RadioDNS resolver record)
+//   Antenna modeling        NEC sidecar               —                         — (GPL-isolated; NEC2++/PyNEC)
 //
 // Each probe is fire-and-forget, capped at 3-5s, and reports:
 //   { configured: bool, reachable: bool, endpoint, latency_ms, error? }
@@ -64,10 +65,12 @@ export async function probeAllSources(){
   const terrainUrl   = process.env.TERRAIN_SIDECAR_URL           || null;
   const splatUrl     = process.env.SPLAT_SIDECAR_URL             || null;
   const identityUrl  = process.env.IDENTITY_SIDECAR_URL          || null;
+  const necUrl       = process.env.NEC_SIDECAR_URL               || null;
 
   // Probe each independently and in parallel.
   const [
     ztrHealth, n8nHealth, popSidecar, terrainSidecar, splatSidecar, identitySidecar,
+    necSidecar,
     fccFmq, fccAmq, fccContours, fccCensus,
     usgsEpqs, openMeteo, openTopoData,
     censusBureau
@@ -78,6 +81,9 @@ export async function probeAllSources(){
     probe(terrainUrl   ? terrainUrl   + '/health'  : null),
     probe(splatUrl     ? splatUrl     + '/healthz' : null),
     probe(identityUrl  ? identityUrl  + '/health'  : null),
+    // NEC sidecar /health must be GET (not HEAD) because the body
+    // carries the actionable pynec_available + pynec_version fields.
+    probe(necUrl       ? necUrl       + '/health'  : null, { method: 'GET' }),
     // Always-on public upstreams (no env gate).  HEAD on the index host.
     probe('https://transition.fcc.gov/fcc-bin/fmq?list=4&service=FM&call=KSLX'),
     probe('https://transition.fcc.gov/fcc-bin/amq?list=4&call=KSLX'),
@@ -128,7 +134,10 @@ export async function probeAllSources(){
     identity_radiodns: pickFirst([
       { tier: 'primary',   id: 'identity-sidecar',          health: identitySidecar },
       { tier: 'secondary', id: 'zerotrustradio-radiodns',   health: ztrHealth }
-    ], 'ZTR /api/radiodns/station/:id carries PI/GCC/FQDN/bearer/service URLs as a 2nd-tier RadioDNS source')
+    ], 'ZTR /api/radiodns/station/:id carries PI/GCC/FQDN/bearer/service URLs as a 2nd-tier RadioDNS source'),
+    antenna_modeling: pickFirst([
+      { tier: 'primary', id: 'nec-sidecar (NEC2++/PyNEC, GPL-isolated)', health: necSidecar }
+    ], 'NEC2++ is GPL v2 — isolated as external sidecar; Genoa never links it.  Set NEC_SIDECAR_URL on the deploy to enable.')
   };
 
   // Surface ANY-CRITICAL — does every query have at least one reachable source?
@@ -145,6 +154,7 @@ export async function probeAllSources(){
     raw_probes: {
       ztr: ztrHealth, n8n: n8nHealth, population_sidecar: popSidecar,
       terrain_sidecar: terrainSidecar, splat_sidecar: splatSidecar, identity_sidecar: identitySidecar,
+      nec_sidecar: necSidecar,
       fcc_fmq: fccFmq, fcc_amq: fccAmq, fcc_contours: fccContours, fcc_census: fccCensus,
       usgs_epqs: usgsEpqs, open_meteo: openMeteo, opentopodata: openTopoData,
       us_census_bureau: censusBureau
