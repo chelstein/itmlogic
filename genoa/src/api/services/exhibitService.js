@@ -22,6 +22,7 @@ import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
 import { W }                    from '../../types/warnings.js';
 import { computeHaatMultiSource } from '../../evidence/terrain/elevationClient.js';
+import { makeBudget }              from './computeBudget.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -50,6 +51,12 @@ export async function getOrRunValidation(){
 export async function computeExhibit(req){
   const inputs   = { ...(req.inputs   || {}) };
   const options  = req.options  || {};
+  // Wall-clock budget for ALL network-bound evidence fetches.  Default
+  // 4.5 min (env COMPUTE_BUDGET_MS).  Slow / unreachable upstreams are
+  // skipped past the deadline and surface as a COMPUTE_TIMEOUT_PARTIAL
+  // warning naming each step that ran out of time.  The engine compute
+  // itself (radial table + polygons + GeoJSON) is not budgeted.
+  const budget = makeBudget(options.compute_budget_ms);
   const evidence = {};
   const facilityWarnings = [];
   let facilityResolution = null;
@@ -248,10 +255,11 @@ export async function computeExhibit(req){
       && inputs.service !== 'AM'
       && sidecars.facility?.getTerrainHaatRadials){
     const step = Number(inputs.radial_step_deg) || 10;
-    terrainResp = await sidecars.facility.getTerrainHaatRadials({
-      facility_id:     String(inputs.facility_id),
-      radial_step_deg: step
-    });
+    terrainResp = await budget.withDeadline('ztr_terrain_haat',
+      () => sidecars.facility.getTerrainHaatRadials({
+        facility_id:     String(inputs.facility_id),
+        radial_step_deg: step
+      }), { minMs: 5_000 });
     if (terrainResp?.available && Array.isArray(terrainResp.radials) && terrainResp.radials.length){
       // Count DEM-sourced radials BEFORE deciding whether to commit this
       // path.  ZTR sometimes returns a 200 with all-null haat_m (its
@@ -375,16 +383,17 @@ export async function computeExhibit(req){
     const radials   = [];
     for (let az = 0; az < 360; az += step) radials.push(az);
     try {
-      const tr = await computeHaatMultiSource({
-        tx_lat:      Number(inputs.lat),
-        tx_lon:      Number(inputs.lon),
-        tx_amsl_m:   Number(inputs.haat_m),   // antenna AMSL (best available)
-        radials_deg: radials,
-        from_km:     3,
-        to_km:       16,
-        samples:     27
-      });
-      if (tr.haat_per_radial?.length === radials.length){
+      const tr = await budget.withDeadline('multi_source_dem',
+        () => computeHaatMultiSource({
+          tx_lat:      Number(inputs.lat),
+          tx_lon:      Number(inputs.lon),
+          tx_amsl_m:   Number(inputs.haat_m),   // antenna AMSL (best available)
+          radials_deg: radials,
+          from_km:     3,
+          to_km:       16,
+          samples:     27
+        }), { minMs: 10_000 });
+      if (tr?.haat_per_radial?.length === radials.length){
         const flat_m = Number(inputs.haat_m);
         let n_dem = 0, n_flat = 0;
         // Keep ALL radials so the array length matches radials_deg.length
@@ -469,21 +478,22 @@ export async function computeExhibit(req){
     let splatAttempt = null;
     if (sidecars.splat && options.itm_engine !== 'js'){
       try {
-        splatAttempt = await sidecars.splat.predictItmCoverage({
-          tx: {
-            call:              inputs.call || null,
-            lat:               Number(inputs.lat),
-            lon:               Number(inputs.lon),
-            amsl_m:            Number(inputs.haat_m),
-            antenna_height_m:  Number(inputs.haat_m),
-            frequency_mhz:     Number(inputs.frequency),
-            erp_kw:            Number(inputs.erp_kw),
-            polarization:      inputs.polarization || 'V'
-          },
-          max_distance_km:  Number(options.itm_to_km)   || 80,
-          target_field_dbu: target,
-          radial_step_deg:  step
-        });
+        splatAttempt = await budget.withDeadline('splat_itm_sidecar',
+          () => sidecars.splat.predictItmCoverage({
+            tx: {
+              call:              inputs.call || null,
+              lat:               Number(inputs.lat),
+              lon:               Number(inputs.lon),
+              amsl_m:            Number(inputs.haat_m),
+              antenna_height_m:  Number(inputs.haat_m),
+              frequency_mhz:     Number(inputs.frequency),
+              erp_kw:            Number(inputs.erp_kw),
+              polarization:      inputs.polarization || 'V'
+            },
+            max_distance_km:  Number(options.itm_to_km)   || 80,
+            target_field_dbu: target,
+            radial_step_deg:  step
+          }), { minMs: 15_000 });
         if (splatAttempt?.available){
           evidence.itm_coverage = {
             ...splatAttempt,
@@ -500,21 +510,22 @@ export async function computeExhibit(req){
     if (!evidence.itm_coverage){
       try {
         const { computeItmCoverage } = await import('../../engine/coverage/itm_radial.js');
-        const itm = await computeItmCoverage({
-          tx_lat:           Number(inputs.lat),
-          tx_lon:           Number(inputs.lon),
-          tx_amsl_m:        Number(inputs.haat_m),
-          erp_kw:           Number(inputs.erp_kw),
-          haat_m:           Number(inputs.haat_m),
-          frequency_mhz:    Number(inputs.frequency),
-          radials_deg:      radials,
-          target_field_dbu: target,
-          from_km:          Number(options.itm_from_km) || 1,
-          to_km:            Number(options.itm_to_km)   || 80,
-          samples:          Number(options.itm_samples) || 40,
-          fcc_mode:         options.itm_fcc_mode || '50,50'
-        });
-        if (itm.available){
+        const itm = await budget.withDeadline('itm_coverage_js',
+          () => computeItmCoverage({
+            tx_lat:           Number(inputs.lat),
+            tx_lon:           Number(inputs.lon),
+            tx_amsl_m:        Number(inputs.haat_m),
+            erp_kw:           Number(inputs.erp_kw),
+            haat_m:           Number(inputs.haat_m),
+            frequency_mhz:    Number(inputs.frequency),
+            radials_deg:      radials,
+            target_field_dbu: target,
+            from_km:          Number(options.itm_from_km) || 1,
+            to_km:            Number(options.itm_to_km)   || 80,
+            samples:          Number(options.itm_samples) || 40,
+            fcc_mode:         options.itm_fcc_mode || '50,50'
+          }), { minMs: 15_000 });
+        if (itm?.available){
           evidence.itm_coverage = {
             ...itm,
             engine: 'genoa-bullington-p526',
@@ -695,7 +706,9 @@ export async function computeExhibit(req){
         radius_km:           Number(process.env.TRANSLATOR_NEARBY_RADIUS_KM) || 300,
         exclude_facility_id: inputs.facility_id || null
       };
-      const nb = await sidecars.facility.getNearbyPrimaries(nbArgs);
+      const nb = await budget.withDeadline('nearby_primaries_fmq',
+        () => sidecars.facility.getNearbyPrimaries(nbArgs),
+        { minMs: 15_000 });
       if (nb?.available){
         let primaries = nb.primaries;
         let enrichment = null;
@@ -708,17 +721,20 @@ export async function computeExhibit(req){
             && process.env.NEARBY_ZTR_ENRICH_DISABLE !== '1'
             && primaries.length > 0){
           try {
-            const e = await sidecars.facility.enrichNearbyFromZtr(primaries, {
-              concurrency: Number(process.env.NEARBY_ZTR_ENRICH_CONCURRENCY) || 10
-            });
-            primaries  = e.primaries;
-            enrichment = {
-              n_enriched: e.n_enriched,
-              n_total:    e.n_total,
-              fields:     ['ground_sigma_msm', 'rss_erp_kw', 'sunrise_offset_min', 'sunset_offset_min'],
-              source:     'zerotrustradio',
-              errors:     e.errors?.length ? e.errors.slice(0, 5) : null
-            };
+            const e = await budget.withDeadline('nearby_ztr_enrichment',
+              () => sidecars.facility.enrichNearbyFromZtr(primaries, {
+                concurrency: Number(process.env.NEARBY_ZTR_ENRICH_CONCURRENCY) || 10
+              }), { minMs: 5_000 });
+            if (e){
+              primaries  = e.primaries;
+              enrichment = {
+                n_enriched: e.n_enriched,
+                n_total:    e.n_total,
+                fields:     ['ground_sigma_msm', 'rss_erp_kw', 'sunrise_offset_min', 'sunset_offset_min'],
+                source:     'zerotrustradio',
+                errors:     e.errors?.length ? e.errors.slice(0, 5) : null
+              };
+            }
           } catch (err){
             enrichment = { n_enriched: 0, n_total: primaries.length, error: String(err.message), source: 'zerotrustradio' };
           }
@@ -1007,6 +1023,21 @@ export async function computeExhibit(req){
   if (process.env.TERRAIN_SIDECAR_URL && !sidecars.terrain){
     warnings.push(W.make('SIDECAR_UNAVAILABLE', 'TERRAIN_SIDECAR_URL configured but client construction failed.'));
   }
+
+  // Compute-budget summary.  When any network-bound evidence fetches
+  // were skipped past the deadline, surface them as one warning with
+  // the named steps + elapsed wall-clock so an operator can see
+  // exactly which upstreams ran out of time.
+  const skipped = budget.skipped();
+  if (skipped.length > 0){
+    warnings.push(W.make('COMPUTE_TIMEOUT_PARTIAL',
+      `Skipped ${skipped.length} fetch(es) past the ${budget.budget_ms} ms budget at ${budget.elapsed_ms()} ms elapsed: ${skipped.map(s => s.name).join(', ')}.  Raise COMPUTE_BUDGET_MS or the deploy's HTTP gateway timeout if a particular source is consistently slow.`));
+  }
+  exhibit.compute_budget = {
+    budget_ms:   budget.budget_ms,
+    elapsed_ms:  budget.elapsed_ms(),
+    skipped
+  };
 
   exhibit.warnings         = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');

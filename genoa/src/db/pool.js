@@ -86,12 +86,27 @@ export async function dbHealthy(){
   catch { return false; }
 }
 
+// Tables that migrations 001 + 002 create.  /health/db verifies all
+// of these are present so an operator can detect "we connected to the
+// wrong database" or "migrations didn't run" in one HTTP call.
+const EXPECTED_TABLES = Object.freeze([
+  'genoa_exhibit',
+  'genoa_exhibit_version',
+  'genoa_validation_run',
+  'genoa_facility_cache',
+  'genoa_terrain_cache'
+]);
+
 /**
  * Detailed DB probe — runs a small introspection query against the
  * shared pool.  Returns provenance an operator can use to confirm
  * SSL is working without leaking credentials (no host, no password,
  * no DSN).  Database name and current_user ARE returned because they
  * confirm the pool is bound to the expected DB and role.
+ *
+ * Also verifies the expected schema tables are present (migrations
+ * applied) so a single HTTP call confirms both connectivity AND
+ * schema state.
  */
 export async function dbProbe(){
   if (!_pool){
@@ -108,18 +123,32 @@ export async function dbProbe(){
     const t0 = Date.now();
     const r = await _pool.query('SELECT current_database() AS db, current_user AS usr, now() AS ts, version() AS v');
     const row = r.rows[0] || {};
+    // Schema verification — find which expected tables are present.
+    // Single round-trip via information_schema lookup.
+    const t = await _pool.query(
+      `SELECT table_name FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
+      [EXPECTED_TABLES]
+    );
+    const present = new Set((t.rows || []).map(x => x.table_name));
+    const tables  = EXPECTED_TABLES.map(name => ({ name, present: present.has(name) }));
+    const missing = tables.filter(x => !x.present).map(x => x.name);
     return {
-      ok:                  true,
+      ok:                  missing.length === 0,
       db_configured:       true,
       ssl:                 POOL_CONFIG.ssl !== false,
       reject_unauthorized: POOL_CONFIG.ssl && POOL_CONFIG.ssl.rejectUnauthorized === true,
       database:            row.db,
       user:                row.usr,
       server_time:         row.ts,
-      server_version:      String(row.v || '').split(' ')[0],   // 'PostgreSQL' bare-version prefix
+      server_version:      String(row.v || '').split(' ').slice(0, 2).join(' '),   // "PostgreSQL 18.x"
       latency_ms:          Date.now() - t0,
       pool_max:            POOL_CONFIG.max,
-      application_name:    POOL_CONFIG.application_name
+      application_name:    POOL_CONFIG.application_name,
+      schema:              { tables, missing, expected: EXPECTED_TABLES.length, present: tables.filter(x => x.present).length },
+      hint:                missing.length === 0
+                             ? null
+                             : `Missing ${missing.length} table(s): ${missing.join(', ')}.  Run \`npm run migrate\` against this DATABASE_URL.`
     };
   } catch (e){
     return {

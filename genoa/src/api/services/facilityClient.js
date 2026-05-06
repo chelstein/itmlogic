@@ -155,8 +155,13 @@ export function makeFacilityClient({
       if (!ztrUrl || !facility_id) return { available: false, source: null, error: 'ztrUrl or facility_id missing' };
       try {
         const u = joinUrl(ztrUrl, `/api/broadcast/stations/${encodeURIComponent(facility_id)}/terrain-haat?radial_step_deg=${radial_step_deg}`);
-        // Terrain calls are slow (DEM batched at 1 req/sec); allow up to 60s.
-        const r = await fetch(u, { signal: AbortSignal.timeout(60_000) });
+        // Terrain calls are slow (DEM batched at 1 req/sec on ZTR's
+        // upstream).  Bound the per-fetch to 90 s so a hung connection
+        // doesn't pin the orchestrator's compute budget.  When the
+        // orchestrator wraps this call in budget.withDeadline, the
+        // smaller of (90 s, remaining budget) wins.
+        const ms = Number(process.env.ZTR_TERRAIN_HAAT_TIMEOUT_MS) || 90_000;
+        const r = await fetch(u, { signal: AbortSignal.timeout(ms) });
         if (!r.ok) return { available: false, source: null, error: `HTTP ${r.status}` };
         const j = await r.json();
         if (!Array.isArray(j.radials) || !j.radials.length){
