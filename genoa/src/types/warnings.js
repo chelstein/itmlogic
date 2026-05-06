@@ -116,6 +116,14 @@ export const WARNING_CODES = Object.freeze({
     title: 'AM nighttime skywave protection violation (47 CFR §73.187)',
     description: 'The proposed AM station fails the bidirectional §73.187 nighttime-skywave protection study against one or more nearby AM stations.  The §73.190 SS-1 (50% nighttime skywave) field at a protected station\'s nighttime contour edge exceeds the §73.182 protected threshold for that station\'s class, or vice versa.  Filing requires §73.187(c) protection or a §73.182(g) waiver.' },
 
+  OET65_NEAR_FIELD_REQUIRED: { severity: 'warning', phase: 'engine',
+    title: 'OET-65 near-field analysis required (47 CFR §1.1310)',
+    description: 'The far-field §1.1310 compliance distance falls inside the near-field boundary λ/(2π) at this frequency.  The far-field power-density formula is not accurate inside that zone; OET-65 §3.B near-field analysis using the antenna current distribution is required for filing-grade compliance.  Common at AM frequencies where λ/(2π) reaches tens of meters.' },
+
+  OET65_BOUNDARY_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'OET-65 / §1.1310 site-boundary MPE violation',
+    description: 'The §1.1310 power density at the site boundary exceeds the uncontrolled (general-population) MPE limit at the operating frequency.  Filing requires either restricting public access out to the OET-65 compliance distance, demonstrating pattern downtilt that reduces the field at ground-level public-access points, or a §1.1310(d) waiver.' },
+
   MISSING_NEARBY_STATIONS: { severity: 'warning', phase: 'evidence',
     title: 'Nearby-stations list missing',
     description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' }

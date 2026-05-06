@@ -30,6 +30,7 @@ import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
 import { checkSection73215 }            from './regulatory/section_73_215.js';
 import { checkSection73187 }            from './regulatory/section_73_187.js';
+import { checkOet65, OET65_PROVENANCE } from './regulatory/oet65.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -294,6 +295,48 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
+  // ---- OET-65 / §1.1310 RF exposure compliance --------------------
+  // Universal — runs for every service (FM/LPFM/FX/AM) whenever ERP
+  // and frequency are present.  The §1.1310 MPE limits cover the
+  // 0.3 MHz – 100 GHz band so the analysis applies to all broadcast.
+  // Frequency input convention: AM in kHz at the engine boundary; we
+  // convert to MHz for the OET-65 lookup which is published in MHz.
+  let oet65 = null;
+  const freq_mhz_for_oet65 = service === 'AM' ? Number(freq) / 1000 : Number(freq);
+  if (Number.isFinite(erp_kW) && erp_kW > 0
+      && Number.isFinite(freq_mhz_for_oet65) && freq_mhz_for_oet65 > 0){
+    oet65 = checkOet65({
+      erp_kw:           erp_kW,
+      frequency_mhz:    freq_mhz_for_oet65,
+      service,
+      // Pattern factor and ground-reflection are caller-overridable
+      // via inputs.oet65_*; defaults are the conservative OET-65
+      // worst-case (main lobe, free space).
+      pattern_factor:   Number.isFinite(Number(inputs.oet65_pattern_factor))
+                          ? Number(inputs.oet65_pattern_factor) : 1.0,
+      ground_reflection: !!inputs.oet65_ground_reflection,
+      site_boundary_m:   Number.isFinite(Number(inputs.site_boundary_m))
+                          ? Number(inputs.site_boundary_m) : null,
+      site_height_m:     Number.isFinite(Number(inputs.site_height_m))
+                          ? Number(inputs.site_height_m)   : null
+    });
+    if (oet65.near_field?.required_for_filing){
+      warnings.push(W.make('OET65_NEAR_FIELD_REQUIRED',
+        `Far-field compliance distance ${oet65.compliance.uncontrolled.distance_m} m at ${freq_mhz_for_oet65.toFixed(3)} MHz is inside the near-field boundary λ/(2π) = ${oet65.near_field.boundary_m} m.  OET-65 §3.B near-field analysis required for filing-grade compliance.`));
+    }
+    if (oet65.compliance?.boundary_check?.pass === false){
+      warnings.push(W.make('OET65_BOUNDARY_VIOLATION',
+        `Power density ${oet65.compliance.boundary_check.power_density_mw_cm2} mW/cm² at site boundary (slant ${oet65.compliance.boundary_check.slant_distance_m} m) exceeds §1.1310 uncontrolled MPE ${oet65.compliance.boundary_check.mpe_uncontrolled_mw_cm2} mW/cm².  Public access must be restricted out to ${oet65.compliance.uncontrolled.distance_m} m or pattern downtilt / ground-reflection assumptions revisited.`));
+    }
+  } else {
+    oet65 = {
+      cite:    '47 CFR §1.1310',
+      pass:    null,
+      study_inputs: { erp_kw: erp_kW, frequency_mhz: freq_mhz_for_oet65 },
+      notes:   ['OET-65 study skipped: erp_kw and frequency required.']
+    };
+  }
+
   // ---- Polygons + GeoJSON ------------------------------------------
   // If lat/lon are missing, polygons and GeoJSON cannot be built.
   // The radial table (azimuth + contour distances) is still produced;
@@ -533,6 +576,8 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
+  // OET-65 / §1.1310 RF exposure compliance — universal across services.
+  exhibit.oet65 = oet65;
   exhibit.exports      = {
     json:        'pending',
     txt:         'pending',
