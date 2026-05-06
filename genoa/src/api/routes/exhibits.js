@@ -146,6 +146,28 @@ r.get('/exhibits/:id/export/pdf', asyncHandler(async (req, res) => {
   res.send(Buffer.from(body));
 }));
 
+// POST /api/exhibits/export/pdf  — stateless PDF render.
+// Accepts the exhibit JSON in the request body; returns the PDF.
+// Used by the UI in stateless mode (no DATABASE_URL, or user hasn't
+// clicked Save).  Same renderer as the GET path above; just no
+// persistence step.  Body shape:
+//   { "exhibit": <full genoa.exhibit.v2 object> }
+r.post('/exhibits/export/pdf', asyncHandler(async (req, res) => {
+  const exhibit = req.body?.exhibit || req.body;
+  if (!exhibit || typeof exhibit !== 'object'){
+    return res.status(400).json({
+      error:   'BAD_REQUEST',
+      message: 'POST body must be an exhibit object (or { exhibit: <object> })'
+    });
+  }
+  const body = await exportPdf(exhibit);
+  res.type(PDF_CONTENT_TYPE);
+  const call = (exhibit.station_inputs?.call || 'exhibit')
+                 .toString().replace(/[^A-Za-z0-9]/g, '_');
+  res.set('Content-Disposition', `attachment; filename="${call}.exhibit.pdf"`);
+  res.send(Buffer.from(body));
+}));
+
 // GET /api/validation  — current validation suite snapshot.
 r.get('/validation', asyncHandler(async (_req, res) => {
   const v = await getOrRunValidation();

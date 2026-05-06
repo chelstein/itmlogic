@@ -374,11 +374,18 @@ export default function App() {
   function downloadExport(format){
     if (!exhibit){ setStatusMsg('Run a compute first.'); return; }
     if (!exhibit.id){
-      // stateless: synthesize from in-memory exhibit
+      // stateless mode: synthesize JSON / GeoJSON in-browser; PDF needs
+      // server-side rendering, so POST the exhibit to the stateless
+      // /api/exhibits/export/pdf route which returns the PDF body.
       const map = {
         json:    () => [JSON.stringify(exhibit, null, 2),         'application/json',     'exhibit.json'],
         geojson: () => [JSON.stringify(exhibit.geojson, null, 2), 'application/geo+json', 'contours.geojson']
       };
+      if (format === 'pdf'){
+        statelessPdfDownload(exhibit).catch(e =>
+          setStatusMsg(`PDF export failed: ${e.message || e}`));
+        return;
+      }
       const fn = map[format];
       if (!fn){ setStatusMsg('TXT export requires a saved exhibit; click Save first.'); return; }
       const [body, type, suffix] = fn();
@@ -390,6 +397,26 @@ export default function App() {
       return;
     }
     window.location = `/api/exhibits/${exhibit.id}/export/${format}`;
+  }
+
+  async function statelessPdfDownload(ex){
+    setStatusMsg('Rendering PDF…');
+    const cleaned = stripDomAndReact(ex);
+    const r = await fetch('/api/exhibits/export/pdf', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ exhibit: cleaned })
+    });
+    if (!r.ok){
+      const txt = await r.text().catch(() => '');
+      throw new Error(`HTTP ${r.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_')}_exhibit.pdf`;
+    a.click();
+    setStatusMsg('PDF downloaded.');
   }
 
   /* ---------------- HISTORY ---------------- */
