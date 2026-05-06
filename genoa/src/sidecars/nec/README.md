@@ -92,26 +92,76 @@ result is treated as external evidence carrying
 
 ## Local development
 
-```bash
-# Install NEC2++ and PyNEC
-sudo apt-get install -y nec
-pip3 install -r requirements.txt
+⚠️ Two install gotchas on Debian/Ubuntu:
 
-# Run the sidecar
+1. There is **no `nec` apt package** on Bookworm / Jammy any more.
+2. The PyPI `PyNEC` sdist is **broken** — it ships without the
+   `necpp_src/` subdirectory the build needs, so `pip install PyNEC`
+   produces a stub `.so` with no `PyInit__PyNEC` symbol and you get
+   `ImportError: dynamic module does not define module export function`
+   on import.
+
+**The reliable path** (what the Dockerfile in this repo does):
+
+```bash
+# Build deps
+sudo apt-get install -y \
+    git build-essential autoconf automake libtool \
+    swig pkg-config python3 python3-pip python3-numpy python3-dev
+
+# Clone the real source repo (NOT pip).  --recurse-submodules pulls
+# the necpp_src C++ engine.
+git clone --depth=1 --recurse-submodules \
+    https://github.com/tmolteno/python-necpp.git
+cd python-necpp/necpp_src
+make -f Makefile.git
+./configure --without-lapack
+make -j$(nproc)
+sudo make install
+sudo ldconfig
+
+cd ../PyNEC
+ln -s ../necpp_src .
+swig -Wall -c++ -python PyNEC.i
+sudo pip3 install --no-build-isolation --break-system-packages .
+
+# Verify
+python3 -c "import PyNEC; print(PyNEC.__file__)"
+
+# Run the sidecar (back in genoa repo)
+cd ~/genoa/src/sidecars/nec
 SIDECAR_PORT=8085 node server.js
 ```
 
-## Docker
+Smoke-test:
+
+```bash
+curl -s http://localhost:8085/health | jq
+# expect { "pynec_available": true, ... }
+
+curl -s -X POST -H 'content-type: application/json' \
+  -d '{"frequency_mhz":1.0,"ground":{"type":"pec"},
+       "wires":[{"tag":1,"segments":21,"x1":0,"y1":0,"z1":0,
+                  "x2":0,"y2":0,"z2":75,"radius_m":0.25}],
+       "excitations":[{"tag":1,"segment":1,"voltage_real":1,"voltage_imag":0}],
+       "pattern":{"theta_start":90,"theta_stop":90,"theta_step":1,
+                  "phi_start":0,"phi_stop":355,"phi_step":45}}' \
+  http://localhost:8085/model/run | jq '.pattern.gain_dbi[0]'
+# expect: a row of ~5.08 dBi (textbook quarter-wave monopole gain)
+```
+
+## Docker (recommended)
+
+The Dockerfile uses a multi-stage build that compiles NEC2++ + PyNEC
+from the `tmolteno/python-necpp` source repo (avoiding both the
+missing `nec` apt package and the broken PyPI sdist).
 
 ```bash
 docker build -t genoa-nec-sidecar:0.1.0 .
 docker run --rm -p 8085:8085 genoa-nec-sidecar:0.1.0
+# HEALTHCHECK verifies pynec_available:true at boot.
 
-# Quick smoke-test
 curl -s http://localhost:8085/health | jq
-curl -s -X POST -H 'content-type: application/json' \
-  -d '{"frequency_mhz":1.0,"ground":{"type":"pec"},"wires":[{"tag":1,"segments":21,"x1":0,"y1":0,"z1":0,"x2":0,"y2":0,"z2":75,"radius_m":0.25}],"excitations":[{"tag":1,"segment":1,"voltage_real":1,"voltage_imag":0}]}' \
-  http://localhost:8085/model/run | jq
 ```
 
 ## Genoa API integration
