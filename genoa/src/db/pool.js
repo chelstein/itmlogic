@@ -6,9 +6,9 @@
 //
 //   PG_SSL                       — 'true' (default) | 'false'
 //                                  When 'false', SSL is disabled in the pool
-//                                  config (overrides any sslmode=require in
-//                                  the URL).  Useful for local docker-compose
-//                                  without TLS.
+//                                  config (overrides any sslmode=... in
+//                                  DATABASE_URL).  Useful for local
+//                                  docker-compose without TLS.
 //
 //   PG_SSL_REJECT_UNAUTHORIZED   — 'true' | 'false' (default 'false')
 //                                  Default 'false' is required for managed
@@ -18,18 +18,22 @@
 //                                  Postgres.  Set 'true' when you've supplied
 //                                  the provider's CA bundle via NODE_EXTRA_CA_CERTS.
 //
-// CONNECTION STRING
+// WHY WE DO NOT PASS connectionString
 //
-//   The DATABASE_URL connection string's sslmode=require suffix tells the
-//   pg driver to negotiate SSL — but it does NOT control certificate
-//   validation.  When the driver negotiates SSL, Node's TLS layer kicks in
-//   and rejects self-signed CAs unless { rejectUnauthorized: false } is
-//   passed.  This module reconciles that by always passing an explicit ssl
-//   object derived from PG_SSL_REJECT_UNAUTHORIZED.
+//   pg-connection-string v2.7+ upgrades sslmode=require/prefer/verify-ca in a
+//   connection string to "verify-full" semantics, which silently overrides
+//   the pool-level `ssl: { rejectUnauthorized: false }` object.  DO / Heroku
+//   / Render managed Postgres present a self-signed CA chain, so verify-full
+//   rejects every connection with "self-signed certificate in certificate
+//   chain" — migrations skipped at startup, every saveExhibit query fails.
 //
-//   Do NOT trust sslmode=require alone — DO managed Postgres needs the
-//   explicit ssl.rejectUnauthorized override or you'll see
-//   "self-signed certificate in certificate chain" on every query.
+//   The pg warning recommends `uselibpqcompat=true` to restore the previous
+//   behaviour, but in practice this flag does not always relax the override
+//   at runtime (observed on DO App Platform with pg 8.x).  The reliable fix
+//   is to NOT pass connectionString at all: parse DATABASE_URL into discrete
+//   host/port/user/password/database fields with the WHATWG URL API and
+//   provide our own explicit `ssl` object — which is then the single source
+//   of truth for TLS verification.
 
 import pg from 'pg';
 
@@ -42,8 +46,30 @@ function buildSslConfig(){
   };
 }
 
-const POOL_CONFIG = {
-  connectionString:        process.env.DATABASE_URL,
+// Returns { host, port, user, password, database } or null on parse failure.
+// We deliberately ignore the URL's query string (sslmode, uselibpqcompat,
+// etc.) — SSL is configured exclusively through buildSslConfig() above.
+function parseDatabaseUrl(raw){
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (!/^postgres(ql)?:$/.test(u.protocol)) return null;
+    return {
+      host:     u.hostname || undefined,
+      port:     u.port ? Number(u.port) : undefined,
+      user:     u.username ? decodeURIComponent(u.username) : undefined,
+      password: u.password ? decodeURIComponent(u.password) : undefined,
+      database: u.pathname && u.pathname !== '/' ? u.pathname.slice(1) : undefined
+    };
+  } catch {
+    return null;
+  }
+}
+
+const PARSED = parseDatabaseUrl(process.env.DATABASE_URL);
+
+const POOL_CONFIG = PARSED && {
+  ...PARSED,
   ssl:                     buildSslConfig(),
   max:                     Number(process.env.PG_POOL_MAX || 10),
   idleTimeoutMillis:       Number(process.env.PG_IDLE_TIMEOUT_MS    || 30_000),
@@ -58,22 +84,27 @@ let _pool = null;
 let _initErr = null;
 
 if (process.env.DATABASE_URL){
-  try {
-    _pool = new pg.Pool(POOL_CONFIG);
-    _pool.on('error', (err) => console.warn('[genoa] pg pool error:', err.message));
-    // Logged once at startup.  No credentials, no host, no DB name —
-    // just the SSL policy and pool sizing.
-    console.log('[genoa] pg pool constructed', {
-      dbConfigured:       Boolean(process.env.DATABASE_URL),
-      ssl:                POOL_CONFIG.ssl !== false,
-      rejectUnauthorized: POOL_CONFIG.ssl && POOL_CONFIG.ssl.rejectUnauthorized === true,
-      poolMax:            POOL_CONFIG.max,
-      applicationName:    POOL_CONFIG.application_name
-    });
-  } catch (e){
-    _initErr = e;
-    console.warn('[genoa] pg pool construction failed:', e.message);
-    _pool = null;
+  if (!POOL_CONFIG){
+    _initErr = new Error('DATABASE_URL is set but could not be parsed as a postgres URL');
+    console.warn('[genoa] pg pool construction failed:', _initErr.message);
+  } else {
+    try {
+      _pool = new pg.Pool(POOL_CONFIG);
+      _pool.on('error', (err) => console.warn('[genoa] pg pool error:', err.message));
+      // Logged once at startup.  No credentials, no host, no DB name —
+      // just the SSL policy and pool sizing.
+      console.log('[genoa] pg pool constructed', {
+        dbConfigured:       true,
+        ssl:                POOL_CONFIG.ssl !== false,
+        rejectUnauthorized: POOL_CONFIG.ssl && POOL_CONFIG.ssl.rejectUnauthorized === true,
+        poolMax:            POOL_CONFIG.max,
+        applicationName:    POOL_CONFIG.application_name
+      });
+    } catch (e){
+      _initErr = e;
+      console.warn('[genoa] pg pool construction failed:', e.message);
+      _pool = null;
+    }
   }
 }
 
@@ -113,7 +144,7 @@ export async function dbProbe(){
     return {
       ok:           false,
       db_configured: Boolean(process.env.DATABASE_URL),
-      ssl:           POOL_CONFIG.ssl !== false,
+      ssl:           POOL_CONFIG ? POOL_CONFIG.ssl !== false : null,
       reason:       process.env.DATABASE_URL
         ? 'pool construction failed at startup (see logs)'
         : 'DATABASE_URL not set'
@@ -141,7 +172,7 @@ export async function dbProbe(){
       database:            row.db,
       user:                row.usr,
       server_time:         row.ts,
-      server_version:      String(row.v || '').split(' ').slice(0, 2).join(' '),   // "PostgreSQL 18.x"
+      server_version:      String(row.v || '').split(' ').slice(0, 2).join(' '),
       latency_ms:          Date.now() - t0,
       pool_max:            POOL_CONFIG.max,
       application_name:    POOL_CONFIG.application_name,
@@ -156,9 +187,6 @@ export async function dbProbe(){
       db_configured:       true,
       ssl:                 POOL_CONFIG.ssl !== false,
       reject_unauthorized: POOL_CONFIG.ssl && POOL_CONFIG.ssl.rejectUnauthorized === true,
-      // Never echo the error.message verbatim if it could contain DSN
-      // — pg errors do not include credentials, but stack traces can
-      // include hostnames.  We surface the bare message only.
       error: String(e.message || e).slice(0, 200)
     };
   }
