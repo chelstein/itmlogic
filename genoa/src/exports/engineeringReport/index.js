@@ -17,6 +17,7 @@ import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
 import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
+import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -32,6 +33,7 @@ export function buildEngineeringReport(exhibit, options){
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
   push(buildEngineeringConsiderationsSection(exhibit, opt));
+  push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));

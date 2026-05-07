@@ -35,6 +35,7 @@ import { checkSection73187 }            from './regulatory/section_73_187.js';
 import { checkOet65, OET65_PROVENANCE } from './regulatory/oet65.js';
 import { buildInterferenceStudy }       from './regulatory/interferenceStudy.js';
 import { analyzeTerrainConfidence }     from '../analysis/terrainConfidence/index.js';
+import { interpretResiduals }           from '../analysis/residualInterpretation/index.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -651,6 +652,11 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // produces a HIGH/MODERATE/LOW disposition with reason codes.
   // Does NOT modify FCC curve outputs or compliance results.
   exhibit.engineering_confidence = analyzeTerrainConfidence(exhibit);
+
+  // SDR residual interpretation — engineering-narrative summary of the
+  // measured-vs-predicted residual table.  Advisory only; does not modify
+  // FCC curve outputs or compliance results.
+  exhibit.residual_interpretation = interpretResiduals(exhibit);
   exhibit.exports      = {
     json:        'pending',
     txt:         'pending',
