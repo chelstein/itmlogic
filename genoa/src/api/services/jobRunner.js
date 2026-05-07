@@ -53,11 +53,22 @@ export function scheduleJob(id){
   setImmediate(() => { runJob(id).catch(() => { /* failJob already ran */ }); });
 }
 
+// Wrap the job record's POST body into the shape computeExhibit expects.
+// The HTTP body the UI POSTs is `{ kind, input: {...form fields}, options }`.
+// The job store keeps `r.input` as the form fields and `r.options` as
+// the option bag — both flat.  computeExhibit reads `req.inputs` (plural)
+// and `req.options`, so without this re-wrap the engine would run with
+// an empty inputs map and produce the FACILITY_COORDINATES_MISSING /
+// FCC_METHOD_MISSING blockers despite a fully populated form.
+function computeReq(r){
+  return { inputs: r.input || {}, options: r.options || {} };
+}
+
 // ─────────── kind dispatchers ───────────
 
 async function runExhibitJob(r){
   setProgress(r.id, PROGRESS.COMPUTING);
-  const exhibit = await computeExhibit(r.input || {});
+  const exhibit = await computeExhibit(computeReq(r));
   setProgress(r.id, PROGRESS.FINALIZING);
   completeJob(r.id, {
     result:       { exhibit },
@@ -71,7 +82,7 @@ async function runReportJob(r, ext){
   setProgress(r.id, PROGRESS.COMPUTING);
   const exhibit = (r.input && r.input.exhibit && typeof r.input.exhibit === 'object')
     ? r.input.exhibit
-    : await computeExhibit(r.input || {});
+    : await computeExhibit(computeReq(r));
 
   // 2. Validation pass — exhibitService.computeExhibit already runs the
   //    standard validation.  Surfacing the milestone separately is
