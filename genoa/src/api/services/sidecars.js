@@ -8,7 +8,7 @@
 //   Facility metadata    ZTR /api/broadcast      FCC FMQ/AMQ direct      n8n station/analyze
 //   FCC contour          ZTR _fcc_contour        geo.fcc.gov direct      engine self-computes
 //   Per-radial HAAT      FCC contour HAAT        ZTR terrain-haat        USGS + OpenMeteo + OpenTopoData
-//   Population/Census    operator pop sidecar    geo.fcc.gov/api/census  —
+//   Population/Census    operator pop sidecar    ACS 5-year (opt-in)     geo.fcc.gov/api/census (decennial)
 //   Nearby primaries     FCC FMQ direct          FCC AMQ direct          —
 //   Rich station / SDR   ZTR /api/radiodns       —                       — (vendor-locked)
 //   Identity / RadioDNS  identity sidecar        ZTR rich-station        — (massdns/EAS-Tools optional; ZTR is robust 2nd-tier)
@@ -25,20 +25,31 @@ import { makeSplatClient }       from '../../evidence/terrain/splatClient.js';
 import { makeIdentityClient }    from '../../evidence/identity/index.js';
 import { makeFacilityClient }    from './facilityClient.js';
 import { makePopulationClient }  from '../../evidence/populationClient.js';
+import { makeAcsCensusClient }   from '../../evidence/acsCensusClient.js';
 import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
 import { makeNecClient }         from '../../evidence/nec/client.js';
 import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 
 // Population evidence priority:
-//   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source)
-//   2. FCC Census Block API direct — geo.fcc.gov/api/census/area, no
-//      sidecar required (default ON; disable with
-//      POPULATION_DISABLE_FCC_CENSUS=1).
-//   3. null — POPULATION_PLACEHOLDER warning persists.
+//   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
+//   2. ACS 5-year (opt-in via POPULATION_USE_ACS=1)
+//      — most recent demographics, more API calls.
+//   3. FCC Census Block API decennial — default fallback,
+//      single API per sample, no key required
+//      (disable with POPULATION_DISABLE_FCC_CENSUS=1).
+//   4. null — POPULATION_PLACEHOLDER warning persists.
 function buildPopulationClient(){
   const sidecar = makePopulationClient();
   if (sidecar) return sidecar;
+  if (process.env.POPULATION_USE_ACS === '1'){
+    const acs = makeAcsCensusClient({
+      acsYear:     Number(process.env.POPULATION_ACS_VINTAGE) || undefined,
+      samples:     Number(process.env.POPULATION_SAMPLES)     || undefined,
+      concurrency: Number(process.env.POPULATION_CONCURRENCY) || undefined
+    });
+    if (acs) return acs;
+  }
   if (process.env.POPULATION_DISABLE_FCC_CENSUS === '1') return null;
   return makeFccCensusClient({
     censusYear:  Number(process.env.POPULATION_CENSUS_YEAR) || 2020,
@@ -60,8 +71,8 @@ export const sidecars = Object.freeze({
   // n8n station/analyze webhook).  Lives here so the same /readyz block
   // can report all upstreams.
   facility:    makeFacilityClient(),
-  // Population evidence: operator sidecar first, FCC Census API
-  // fallback (always available unless explicitly disabled).
+  // Population evidence: operator sidecar first, ACS 5-year (opt-in),
+  // FCC Census Block API decennial fallback (default).
   population:  buildPopulationClient(),
   // FCC Contours direct fallback: used when ZTR doesn't have _fcc_contour
   // or ZTR is not configured.  Always on (geo.fcc.gov is public / no auth).
