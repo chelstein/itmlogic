@@ -1444,7 +1444,21 @@ export async function computeExhibit(req){
   exhibit.degraded_mode    = exhibit.warnings.length > 0;
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
 
-  // Re-run readiness now that warnings/blockers are accurate.
+  // Classify the regulatory context so downstream readiness scoring +
+  // engineering-report rendering can distinguish licensed-existing
+  // vs proposed-new vs modification scenarios.  See
+  // src/engine/regulatory/context.js — purely interpretive; does NOT
+  // weaken §73.207 / §73.215 engineering math.
+  const { classifyRegulatoryContext } = await import('../../engine/regulatory/context.js');
+  exhibit.regulatoryContext = classifyRegulatoryContext(
+    inputs,
+    exhibit.evidence || {},
+    exhibit
+  );
+
+  // Re-run readiness now that warnings/blockers AND regulatoryContext
+  // are accurate.  Readiness reads exhibit.regulatoryContext to apply
+  // licensed_legacy_review / modification_high_risk caps.
   const { readiness } = await import('../../types/readiness.js');
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
 
