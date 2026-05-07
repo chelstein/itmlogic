@@ -252,13 +252,18 @@ export const FCC_PROVENANCE = Object.freeze({
 //   target_mvm            — target field strength in mV/m
 //   fs1km_mvm             — reference field at 1 km = 100·sqrt(P_kW)
 //
-// Returns distance in km on success.  On any error or out-of-range
-// input the FCC routine throws or returns NaN; we surface that as a
-// structured Error with code 'FCC_AM_*'.
+// Returns distance in km on success.  Out-of-grid sigma values are
+// clamped to the M3 boundary (1..8) and the clamped value is reported
+// in `inputs.conductivity_clamp` for traceability — wet/marine soils
+// commonly run 10..30 mS/m and we don't want the engine to hard-fail
+// on those.  Other invalid inputs (frequency, ERP, target field) still
+// throw FCC_AM_* codes because they have no sensible default.
 
 const AM_DEFAULT_DIELECTRIC = 15;          // §73.184 standard ε_r
 const AM_FREQ_MIN_KHZ = 530;
 const AM_FREQ_MAX_KHZ = 1700;
+const FCC_M3_SIGMA_MIN = 1;
+const FCC_M3_SIGMA_MAX = 8;
 
 export function fccAmDistanceKm({
   frequency_khz,
@@ -269,7 +274,7 @@ export function fccAmDistanceKm({
 }){
   const freq = Number(frequency_khz);
   const f    = Number(target_mvm);
-  const sigma = Number(conductivity_msm);
+  const sigmaRaw = Number(conductivity_msm);
   const epsilon = Number(dielectric);
   const erp = Number(erp_kw);
 
@@ -284,17 +289,25 @@ export function fccAmDistanceKm({
     throw Object.assign(new Error('FCC AM: target_mvm must be positive'),
       { code: 'FCC_AM_FIELD_INVALID' });
   }
-  if (!Number.isFinite(sigma) || sigma < 1 || sigma > 8){
-    throw Object.assign(new Error(`FCC AM: conductivity ${sigma} mS/m out of FCC M3 range 1..8`),
-      { code: 'FCC_AM_SIGMA_OUT_OF_RANGE' });
-  }
   if (!Number.isFinite(erp) || erp <= 0){
     throw Object.assign(new Error('FCC AM: erp_kw must be positive'),
       { code: 'FCC_AM_ERP_INVALID' });
   }
+  if (!Number.isFinite(sigmaRaw)){
+    throw Object.assign(new Error('FCC AM: conductivity_msm must be a finite number'),
+      { code: 'FCC_AM_SIGMA_INVALID' });
+  }
 
-  // FCC M3 sigma is keyed by integer (1..8).  Round to nearest.
-  const sigmaInt = Math.max(1, Math.min(8, Math.round(sigma)));
+  // FCC M3 sigma is keyed by integer (1..8).  Clamp out-of-grid values
+  // to the boundary instead of throwing — wet/marine soils run higher
+  // than 8 mS/m and the §73.184 boundary curve is the closest defined
+  // approximation.  The clamp direction is reported so the validator
+  // can surface a recommendation.
+  let sigma_clamp = null;
+  let sigmaInt    = Math.round(sigmaRaw);
+  if (sigmaInt < FCC_M3_SIGMA_MIN){ sigmaInt = FCC_M3_SIGMA_MIN; sigma_clamp = 'low';  }
+  else if (sigmaInt > FCC_M3_SIGMA_MAX){ sigmaInt = FCC_M3_SIGMA_MAX; sigma_clamp = 'high'; }
+
   const fs1km    = 100 * Math.sqrt(erp);   // 100·sqrt(P_kW) mV/m at 1 km
 
   let distance;
@@ -315,11 +328,13 @@ export function fccAmDistanceKm({
     source:      'fcc-gwave',
     method:      '47 CFR §73.184 groundwave (Sommerfeld-Norton)',
     inputs: {
-      frequency_khz_grid: freqGrid,
-      conductivity_msm:   sigmaInt,
-      dielectric:         epsilon,
-      target_mvm:         f,
-      fs1km_mvm:          fs1km
+      frequency_khz_grid:   freqGrid,
+      conductivity_msm:     sigmaInt,
+      conductivity_msm_raw: sigmaRaw,
+      conductivity_clamp:   sigma_clamp,
+      dielectric:           epsilon,
+      target_mvm:           f,
+      fs1km_mvm:            fs1km
     },
     upstream: {
       repo:   'github.com/fcc/contours-api-node',
@@ -349,7 +364,11 @@ export function fccAmFieldMvmAtDistance({
       { code: 'FCC_AM_FREQ_OUT_OF_RANGE' });
   }
   const freqGrid = Math.round(freq / 10) * 10;
-  const sigmaInt = Math.max(1, Math.min(8, Math.round(sigma)));
+  // Same M3 clamp behavior as fccAmDistanceKm — never hard-fail on
+  // out-of-grid sigma; clamp to the boundary instead.
+  let sigmaInt = Number.isFinite(sigma) ? Math.round(sigma) : FCC_M3_SIGMA_MAX;
+  if (sigmaInt < FCC_M3_SIGMA_MIN) sigmaInt = FCC_M3_SIGMA_MIN;
+  else if (sigmaInt > FCC_M3_SIGMA_MAX) sigmaInt = FCC_M3_SIGMA_MAX;
   const fs1km    = 100 * Math.sqrt(Math.max(0, erp));
 
   let mvm;
