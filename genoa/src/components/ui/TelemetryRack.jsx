@@ -5,12 +5,25 @@ import WarningConsole        from './WarningConsole.jsx';
 import ContourResults        from './ContourResults.jsx';
 import EngineProvenance      from './EngineProvenance.jsx';
 import MetricReadout         from './MetricReadout.jsx';
+import RegulatoryContextCard from './RegulatoryContextCard.jsx';
 
 export default function TelemetryRack({ exhibit }) {
   const fr   = exhibit?.filing_readiness || {};
   const polys = exhibit?.polygons || [];
   const s     = exhibit?.station_inputs || {};
   const pop  = exhibit?.population_estimate || {};
+  // Regulatory-context classifier output (see src/engine/regulatory/
+  // context.js).  When present, it drives a new card and is forwarded
+  // to WarningConsole so protection-warning display text can be
+  // softened on existing licensed facilities (warningsToDowngrade).
+  const regCtx = exhibit?.regulatoryContext || null;
+  // Tone the regulatory-context panel by the classifier's filing risk
+  // so the rack matches the rest of the UI's color taxonomy.
+  const regTone = regCtx?.filingRisk === 'high'   ? 'danger'
+                : regCtx?.filingRisk === 'medium' ? 'amber'
+                : regCtx?.filingRisk === 'low'    ? 'cyan'
+                : 'default';
+
   return (
     <div className="space-y-4">
 
@@ -31,6 +44,12 @@ export default function TelemetryRack({ exhibit }) {
           </ul>
         )}
       </RackPanel>
+
+      {regCtx && (
+        <RackPanel eyebrow="Channel A2" title="Regulatory Context" tone={regTone}>
+          <RegulatoryContextCard ctx={regCtx} />
+        </RackPanel>
+      )}
 
       <RackPanel eyebrow="Channel B" title="Telemetry" dense>
         <MetricReadout label="Call"        value={s.call || '—'}        led={exhibit ? 'amber' : null} />
@@ -76,6 +95,8 @@ export default function TelemetryRack({ exhibit }) {
           blockers={exhibit?.blockers || []}
           warnings={exhibit?.warnings || []}
           recommendations={fr.recommendations || []}
+          warningsToDowngrade={regCtx?.warningsToDowngrade || []}
+          regulatoryContext={regCtx}
         />
       </RackPanel>
 
