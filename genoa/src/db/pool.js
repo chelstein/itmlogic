@@ -46,39 +46,25 @@ function buildSslConfig(){
   };
 }
 
-// Returns { host, port, user, password, database } or null on parse failure.
+// pg-connection-string v2.7+ upgrades sslmode=require/prefer/verify-ca in the
+// connection string to "verify-full" semantics, which silently overrides our
+// pool-level `ssl: { rejectUnauthorized: false }`.  DO / Heroku / Render
+// managed Postgres present a self-signed CA chain, so verify-full rejects
+// every connection with "self-signed certificate in certificate chain" —
+// migrations skipped at startup, every saveExhibit query fails.
 //
-// Query-string handling: we honor libpq-style `host=` and `port=` overrides
-// so Unix-socket DSNs of the form
-//     postgresql:///dbname?host=/var/run/postgresql
-// continue to bind to the socket rather than silently falling back to TCP
-// localhost.  All other query parameters — `sslmode`, `uselibpqcompat`, etc.
-// — are deliberately ignored, because they are exactly the parameters whose
-// pg-connection-string-driven semantics this module is designed to bypass
-// (SSL is configured exclusively through buildSslConfig()).
-function parseDatabaseUrl(raw){
-  if (!raw) return null;
-  try {
-    const u = new URL(raw);
-    if (!/^postgres(ql)?:$/.test(u.protocol)) return null;
-    const queryHost = u.searchParams.get('host') || undefined;
-    const queryPort = u.searchParams.get('port') || undefined;
-    return {
-      host:     u.hostname || queryHost,
-      port:     u.port ? Number(u.port) : (queryPort ? Number(queryPort) : undefined),
-      user:     u.username ? decodeURIComponent(u.username) : undefined,
-      password: u.password ? decodeURIComponent(u.password) : undefined,
-      database: u.pathname && u.pathname !== '/' ? u.pathname.slice(1) : undefined
-    };
-  } catch {
-    return null;
-  }
+// The pg warning itself recommends `uselibpqcompat=true` to restore the
+// previous behaviour.  This helper appends that flag exactly once when an
+// sslmode is present in the URL.
+function applyLibpqCompat(url){
+  if (!url) return url;
+  if (!/(\?|&)sslmode=/.test(url))      return url;   // no sslmode → nothing to relax
+  if (/(\?|&)uselibpqcompat=/.test(url)) return url;  // already set
+  return url + (url.includes('?') ? '&' : '?') + 'uselibpqcompat=true';
 }
 
-const PARSED = parseDatabaseUrl(process.env.DATABASE_URL);
-
-const POOL_CONFIG = PARSED && {
-  ...PARSED,
+const POOL_CONFIG = {
+  connectionString:        applyLibpqCompat(process.env.DATABASE_URL),
   ssl:                     buildSslConfig(),
   max:                     Number(process.env.PG_POOL_MAX || 10),
   idleTimeoutMillis:       Number(process.env.PG_IDLE_TIMEOUT_MS    || 30_000),

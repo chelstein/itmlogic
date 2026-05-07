@@ -10,11 +10,21 @@ r.get('/healthz', (_req, res) => res.type('text').send('ok'));
 r.get('/health',  (_req, res) => res.type('text').send('ok'));
 
 // Readiness — DB is required, sidecars are optional.
+//
+// HTTP CODE NOTE
+//   Returns 200 even when the underlying DB is unreachable.  Health
+//   state is conveyed by `ok` in the JSON body.  Why: App Platform's
+//   edge proxy intercepts upstream 5xx responses and substitutes its
+//   own HTML error page — so a 503 here would prevent the operator
+//   from ever reading the diagnostic body that explains *why* the
+//   readiness probe failed.  Liveness (the container is up) is the
+//   appropriate semantic for this status code; readiness (the app is
+//   wired correctly) is the body.
 r.get('/readyz', async (_req, res) => {
   const db = await dbHealthy();
   const sc = await sidecarStatus();
   const ok = db || !poolReady();   // stateless mode is also "ready"
-  res.status(ok ? 200 : 503).json({
+  res.status(200).json({
     ok,
     db_configured: poolReady(),
     db_healthy:    db,
@@ -24,14 +34,15 @@ r.get('/readyz', async (_req, res) => {
 
 // /health/db — detailed DB probe.  Runs SELECT current_database(),
 // current_user, now(), version() through the SHARED pool, surfacing
-// SSL policy and connection latency.  Returns 503 when the pool is
-// configured but unreachable (most common cause: SSL self-signed
-// certificate failure on managed Postgres providers — set
+// SSL policy and connection latency.  Same 200-always semantics as
+// /readyz so the operator can read the diagnostic body even when the
+// pool is misconfigured (most common cause: SSL self-signed certificate
+// failure on managed Postgres providers — set
 // PG_SSL_REJECT_UNAUTHORIZED=false).  No credentials, no host, no
 // password are echoed.
 r.get('/health/db', async (_req, res) => {
   const probe = await dbProbe();
-  res.status(probe.ok ? 200 : 503).json(probe);
+  res.status(200).json(probe);
 });
 
 // Per-source fallback-chain health — probes every primary, secondary,

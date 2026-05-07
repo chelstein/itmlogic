@@ -17,7 +17,7 @@ import { asyncHandler } from '../middleware/errors.js';
 
 import {
   JOB_KIND, JOB_STATUS,
-  createJob, getJob, listJobs, toView
+  createJob, getJob, getJobAsync, listJobs, toView
 } from '../services/jobStore.js';
 import { scheduleJob } from '../services/jobRunner.js';
 
@@ -53,8 +53,13 @@ r.get('/exhibit/jobs', asyncHandler(async (_req, res) => {
 }));
 
 // GET /api/exhibit/jobs/:id  — poll endpoint (cheap; UI hits every 2 s).
+//
+// Uses getJobAsync so a poll routed to a sibling instance (App Platform
+// load-balances across instances; the job may have been created on the
+// instance that handled the POST) finds the job in the DB mirror
+// instead of returning 404.
 r.get('/exhibit/jobs/:id', asyncHandler(async (req, res) => {
-  const job = getJob(req.params.id);
+  const job = await getJobAsync(req.params.id);
   if (!job) return res.status(404).json({ error: 'NOT_FOUND', message: 'job not found' });
   // Include progress_message + (when complete) the structured result so
   // the UI doesn't need a second round-trip for the exhibit JSON case.
@@ -66,9 +71,10 @@ r.get('/exhibit/jobs/:id', asyncHandler(async (req, res) => {
 }));
 
 // GET /api/exhibit/jobs/:id/artifact  — streams the rendered artifact
-// (PDF / TXT) or the exhibit JSON.
+// (PDF / TXT) or the exhibit JSON.  Same cross-instance fallback as the
+// poll endpoint.
 r.get('/exhibit/jobs/:id/artifact', asyncHandler(async (req, res) => {
-  const job = getJob(req.params.id);
+  const job = await getJobAsync(req.params.id);
   if (!job) return res.status(404).json({ error: 'NOT_FOUND', message: 'job not found' });
   if (job.status === JOB_STATUS.FAILED){
     return res.status(500).json({ error: 'JOB_FAILED', detail: job.error || null });
