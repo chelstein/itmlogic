@@ -109,6 +109,15 @@ function renderSection(pdf, s, meta){
     case 'verdict':
       renderVerdict(pdf, s.verdict);
       break;
+    case 'considerations':
+      if (s.preface){ renderParagraphs(pdf, [s.preface]); pdf.moveDown(0.5); }
+      if (Array.isArray(s.kvRows) && s.kvRows.length){
+        renderKv(pdf, s.kvRows);
+        pdf.moveDown(0.5);
+      }
+      if (s.summary){ renderParagraphs(pdf, [s.summary]); pdf.moveDown(0.5); }
+      if (s.table) renderTable(pdf, s.table);
+      break;
     case 'conclusion':
       renderConclusion(pdf, s);
       break;

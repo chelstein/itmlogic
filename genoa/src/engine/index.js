@@ -34,6 +34,7 @@ import { checkSection73525 }            from './regulatory/section_73_525.js';
 import { checkSection73187 }            from './regulatory/section_73_187.js';
 import { checkOet65, OET65_PROVENANCE } from './regulatory/oet65.js';
 import { buildInterferenceStudy }       from './regulatory/interferenceStudy.js';
+import { analyzeTerrainConfidence }     from '../analysis/terrainConfidence/index.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -644,6 +645,12 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
 
   // OET-65 / §1.1310 RF exposure compliance — universal across services.
   exhibit.oet65 = oet65;
+
+  // Terrain-aware engineering confidence — pure analysis layer.
+  // Reads radial table + any attached SDR / ITM cross-check residuals;
+  // produces a HIGH/MODERATE/LOW disposition with reason codes.
+  // Does NOT modify FCC curve outputs or compliance results.
+  exhibit.engineering_confidence = analyzeTerrainConfidence(exhibit);
   exhibit.exports      = {
     json:        'pending',
     txt:         'pending',

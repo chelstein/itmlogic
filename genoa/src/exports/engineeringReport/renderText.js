@@ -76,6 +76,15 @@ function renderSection(s){
     case 'verdict':
       buf.push(renderVerdict(s.verdict));
       break;
+    case 'considerations':
+      if (s.preface){ buf.push(wrap(s.preface, PAGE_WIDTH)); buf.push(''); }
+      if (Array.isArray(s.kvRows) && s.kvRows.length){
+        buf.push(renderKv(s.kvRows));
+        buf.push('');
+      }
+      if (s.summary){ buf.push(wrap(s.summary, PAGE_WIDTH)); buf.push(''); }
+      if (s.table) buf.push(renderTable(s.table));
+      break;
     case 'conclusion':
       buf.push(`Conclusion: ${s.status}`);
       buf.push('');

@@ -23,6 +23,12 @@ export function buildMethodologySection(exhibit){
   paragraphs.push(
     'Genoa uses a bivariate cubic surface interpolation consistent with the FCC contours implementation and records the curve dataset hash for reproducibility.'
   );
+  if (exhibit.engineering_confidence){
+    paragraphs.push(
+      'A terrain-aware engineering-confidence layer assesses each radial against the curve prediction using terrain metrics and any attached SDR or ITM residuals.  ' +
+      'This assessment is advisory only; it does not modify FCC curve outputs or §73.207 / §73.215 compliance results.'
+    );
+  }
 
   return {
     id:      'methodology',

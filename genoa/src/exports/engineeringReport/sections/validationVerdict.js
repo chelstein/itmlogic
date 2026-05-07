@@ -84,6 +84,30 @@ export function buildValidationVerdictSection(exhibit){
               : 'CONSTANT_HAAT_ASSUMED — flat HAAT used (terrain sidecar not available)'
   });
 
+  // Engineering confidence (terrain-aware advisory layer).
+  const ec = exhibit.engineering_confidence;
+  if (ec){
+    const status = ec.level === 'HIGH'     ? 'PASS'
+                 : ec.level === 'MODERATE' ? 'WARN'
+                 : ec.level === 'LOW'      ? 'FAIL'
+                 : 'NOT_RUN';
+    const detail = `${ec.percent_high ?? 0}% radials HIGH / ${ec.percent_low ?? 0}% LOW; ` +
+                   `RMS residual ${ec.rms_residual_db != null ? ec.rms_residual_db + ' dB' : 'n/a'}; ` +
+                   `terrain severity ${Number.isFinite(ec.terrain_severity_score) ? Number(ec.terrain_severity_score).toFixed(2) : '—'}.  ` +
+                   'Advisory only — does not gate compliance.';
+    components.push({
+      name:   'Engineering confidence (terrain-aware, advisory)',
+      status,
+      detail
+    });
+  } else {
+    components.push({
+      name:   'Engineering confidence (terrain-aware, advisory)',
+      status: 'NOT_RUN',
+      detail: 'terrain-aware confidence analysis not attached to this exhibit'
+    });
+  }
+
   // Interference rules
   const isr = exhibit.interference_study;
   components.push({
