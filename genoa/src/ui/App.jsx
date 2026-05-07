@@ -147,6 +147,41 @@ export default function App() {
 
   // `overrideInputs` lets preset loaders pass freshly-merged inputs
   // directly without depending on React state having flushed.
+  // Run an async export job: POST → poll every 2 s → return the
+  // completed job view.  Throws with the actual job error on failure
+  // (no more naked HTTP 504 from the proxy).  onProgress(message) lets
+  // the caller stream progress strings into the status line.
+  async function runJobAndWait(kind, { input, options } = {}, onProgress){
+    const post = await fetch('/api/exhibit/jobs', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ kind, input: input || {}, options: options || {} })
+    });
+    if (!post.ok){
+      const txt = await post.text().catch(() => '');
+      throw new Error(`Job submission failed: HTTP ${post.status}${txt ? ' — ' + txt.slice(0, 200) : ''}`);
+    }
+    const { job_id } = await post.json();
+    if (!job_id) throw new Error('Job submission returned no job_id');
+
+    while (true){
+      await new Promise(r => setTimeout(r, 2000));
+      const r = await fetch(`/api/exhibit/jobs/${job_id}`);
+      if (!r.ok){
+        throw new Error(`Job poll failed: HTTP ${r.status}`);
+      }
+      const view = await r.json();
+      if (typeof onProgress === 'function' && view.progress_message){
+        onProgress(view.progress_message);
+      }
+      if (view.status === 'complete') return view;
+      if (view.status === 'failed'){
+        const e = view.error || {};
+        throw new Error(e.message || e.code || 'Job failed');
+      }
+    }
+  }
+
   async function compute(overrideInputs = null){
     // Defense: a careless `onClick={compute}` would pass a React
     // SyntheticEvent here.  The wrapper bindings below already shield
@@ -158,9 +193,7 @@ export default function App() {
     }
     const i = overrideInputs || inputs;
     setComputing(true);
-    setStatusMsg(i.use_terrain
-      ? 'Computing… (DEM fetch may take ~30s on cold cache)'
-      : 'Computing…');
+    setStatusMsg('Computing exhibit…');
     try {
       const payload = {
         inputs: {
@@ -187,12 +220,15 @@ export default function App() {
       // snuck into the payload (would crash JSON.stringify with
       // "Converting circular structure to JSON ... HTMLButtonElement").
       const cleanPayload = stripDomAndReact(payload);
-      const r = await fetch('/api/exhibits/compute', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body:    JSON.stringify(cleanPayload)
-      });
-      const j = await readJsonOrThrow(r);
+
+      // Async job — the proxy used to 504 here when DEM fetch ran cold.
+      const view = await runJobAndWait(
+        'exhibit',
+        { input: cleanPayload.inputs, options: cleanPayload.options },
+        (msg) => setStatusMsg(msg)
+      );
+      const j = view.result?.exhibit;
+      if (!j) throw new Error('Job completed without exhibit payload');
       setExhibit(j);
       const fr = j.filing_readiness || {};
       setStatusMsg(j.degraded_mode
@@ -406,18 +442,22 @@ export default function App() {
   }
 
   async function statelessEngineeringReportDownload(ex, ext){
-    setStatusMsg(`Rendering Engineering Statement ${ext.toUpperCase()}…`);
+    const kind = ext === 'pdf' ? 'engineering_report_pdf' : 'engineering_report_txt';
+    setStatusMsg(`Submitting Engineering Statement ${ext.toUpperCase()} job…`);
     const cleaned = stripDomAndReact(ex);
-    const r = await fetch(`/api/exhibits/export/engineering-report.${ext}`, {
-      method:  'POST',
-      headers: { 'content-type': 'application/json' },
-      body:    JSON.stringify({ exhibit: cleaned })
-    });
-    if (!r.ok){
-      const txt = await r.text().catch(() => '');
-      throw new Error(`HTTP ${r.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+    const view = await runJobAndWait(
+      kind,
+      { input: { exhibit: cleaned } },
+      (msg) => setStatusMsg(msg)
+    );
+    if (!view.artifact_url) throw new Error('Job completed without artifact');
+    setStatusMsg(`Downloading ${ext.toUpperCase()} artifact…`);
+    const ar = await fetch(view.artifact_url);
+    if (!ar.ok){
+      const txt = await ar.text().catch(() => '');
+      throw new Error(`Artifact fetch failed: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
     }
-    const blob = await r.blob();
+    const blob = await ar.blob();
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     const call = (ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_');
