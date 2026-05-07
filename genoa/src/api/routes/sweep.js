@@ -31,6 +31,15 @@
 //   nearby_primaries / FCC LMS / etc., then sweeps with that evidence
 //   reused for every combo.  Per-combo runtime is dominated by curve
 //   table interpolation, not network I/O.
+//
+//   IMPORTANT — the engine consumes evidence.terrain_haat_per_radial
+//   in PREFERENCE to inputs.haat_m (engine/index.js HAAT-per-radial
+//   block).  If we passed the base exhibit's terrain block straight
+//   through, every combo's haat_m would be silently ignored and the
+//   sweep would rank against a single fixed HAAT profile.  We strip
+//   the per-radial array so each combo's haat_m drives a flat HAAT
+//   profile via flatHaatPerRadial(); other evidence categories are
+//   preserved.
 
 import express from 'express';
 import { sweepParameters } from '../../engine/parameterSweep/sweepEngine.js';
@@ -58,6 +67,18 @@ r.post('/exhibits/sweep', asyncHandler(async (req, res) => {
     });
   }
 
+  // Guard malformed max_combinations early so the client gets a 400
+  // rather than the engine's raw Error -> 500.
+  if (body.max_combinations != null){
+    const m = Number(body.max_combinations);
+    if (!Number.isFinite(m) || m < 1){
+      return res.status(400).json({
+        error: 'BAD_REQUEST',
+        detail: `max_combinations must be a positive integer (got ${body.max_combinations})`
+      });
+    }
+  }
+
   // Resolve evidence + validation ONCE for the base station.  We run
   // the full orchestrator so nearby_primaries / FCC LMS / terrain are
   // populated; then the sweep reuses that evidence for every combo.
@@ -73,7 +94,14 @@ r.post('/exhibits/sweep', asyncHandler(async (req, res) => {
     });
   }
 
-  const evidence = baseExhibit?.evidence || {};
+  // Strip per-radial terrain HAAT (and the request flag) — see file
+  // header for the full reasoning.  All other evidence (nearby_primaries,
+  // fcc_lms, measurements, identity, terrain provenance metadata) is
+  // preserved so §73.207 / §73.215 / OET-65 still see the right inputs.
+  const fullEvidence = baseExhibit?.evidence || {};
+  // eslint-disable-next-line no-unused-vars
+  const { terrain_haat_per_radial, terrain_haat_requested, ...evidence } = fullEvidence;
+
   const curveRefRun = await runCurveReferenceValidation();
   const legacyRun   = await getOrRunValidation();
   const validation  = {
