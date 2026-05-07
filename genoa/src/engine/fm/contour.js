@@ -8,6 +8,14 @@
 //     (13 HAAT × 25 distance, 13 HAAT × 31 distance).  Identical
 //     output to geo.fcc.gov/api/contours/distance.json.
 //
+//     The bivariate fit is undefined past the table edges.  At very
+//     high ERP × HAAT the 40 dBu protected contour exceeds the 300 km
+//     F(50,50) tabulation boundary and tvfmfs_metric returns NaN
+//     (FCC_NO_RESULT).  We catch that one specific failure and
+//     transparently fall through to the v0.2-legacy path so the radial
+//     table still reports a finite contour distance.  The fallback is
+//     logged once per call so an operator can see when it fired.
+//
 //   'v0.2-legacy'
 //     Genoa's earlier coarse linear-log10 interpolation over a 9 × 20
 //     grid.  Kept as a fallback / regression reference.  Produces
@@ -48,8 +56,27 @@ export async function fmContourDistance_km({
   engine = FM_ENGINE_DEFAULT
 }){
   if (engine === 'fcc-canonical'){
-    const r = fccDistanceKm({ haat_m, target_dBu, erp_kw: erp_kW, mode, frequency_mhz });
-    return r.distance_km;
+    try {
+      const r = fccDistanceKm({ haat_m, target_dBu, erp_kw: erp_kW, mode, frequency_mhz });
+      return r.distance_km;
+    } catch (fccErr){
+      // FCC_NO_RESULT means the bivariate cubic fit walked past the
+      // table edge (typically the 40 dBu protected contour for
+      // high-ERP / high-HAAT FM stations: F(50,50) tabulation tops
+      // out at 300 km and the fit is undefined beyond).  Fall through
+      // to the legacy linear-log10 interpolator so the radial table
+      // still reports a finite distance.  Re-throw any other FCC
+      // error (channel range, fs_or_dist) — those are real input
+      // errors that the caller needs to see.
+      if (fccErr && fccErr.code === 'FCC_NO_RESULT' && datasetByName){
+        console.warn(
+          `[fm/contour] fcc-canonical NaN at target_dBu=${target_dBu} erp_kW=${erp_kW} haat_m=${haat_m} mode=${mode}; falling back to v0.2-legacy`
+        );
+        // fall through to legacy block
+      } else {
+        throw fccErr;
+      }
+    }
   }
 
   // ---- legacy v0.2 path (kept for regression reference) ----
