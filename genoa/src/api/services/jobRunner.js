@@ -14,6 +14,7 @@ import {
   getJob, setProgress, completeJob, failJob, updateJob
 } from './jobStore.js';
 import { computeExhibit }                  from './exhibitService.js';
+import { applyComputeOptionDefaults }      from './computeOptionDefaults.js';
 import { buildEngineeringReport }          from '../../exports/engineeringReport/index.js';
 import { renderEngineeringReportText }     from '../../exports/engineeringReport/renderText.js';
 import { renderEngineeringReportPdf }      from '../../exports/engineeringReport/renderPdf.js';
@@ -60,8 +61,15 @@ export function scheduleJob(id){
 // and `req.options`, so without this re-wrap the engine would run with
 // an empty inputs map and produce the FACILITY_COORDINATES_MISSING /
 // FCC_METHOD_MISSING blockers despite a fully populated form.
+//
+// applyComputeOptionDefaults() is then called to fill in server-side
+// defaults the caller didn't set (e.g. options.use_terrain = true for
+// non-AM stations).  See computeOptionDefaults.js for the full table.
 function computeReq(r){
-  return { inputs: r.input || {}, options: r.options || {} };
+  return applyComputeOptionDefaults({
+    inputs:  r.input   || {},
+    options: r.options || {}
+  });
 }
 
 // ─────────── kind dispatchers ───────────
