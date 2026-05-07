@@ -46,8 +46,19 @@ export function buildValidationVerdictSection(exhibit){
                 : (cr.detail || cr.error || 'curve validation did not pass')
     });
   } else {
-    components.push({ name: 'Curve validation (golden suite)', status: 'FALLBACK',
-                      detail: 'tier-3 deterministic: no validation_context attached; engine signature pinned via vendored fcc/contours-api-node@b55870d guarantees the suite would pass against the same dataset' });
+    // Absent record is NOT a deterministic fallback.  Exhibits produced
+    // by the current orchestrator always carry a curve_reference_validation
+    // record (live tier-1 from runCurveReferenceValidation, or tier-3
+    // deterministic engine-signature pin).  When `cr` is null here the
+    // data never reached us — possible orchestrator-attachment bug,
+    // stale exhibit from before the 3-tier change, or a test fixture
+    // that bypassed compute().  Surface as FAIL so the verdict reads
+    // UNVERIFIED, NOT silently promoted to VERIFIED via tier-3.
+    components.push({
+      name:   'Curve validation (golden suite)',
+      status: 'FAIL',
+      detail: 'no curve_reference_validation record attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 or deterministic tier-3 fallback).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+    });
   }
 
   // ----- FCC contour cross-check -----
@@ -68,9 +79,13 @@ export function buildValidationVerdictSection(exhibit){
       detail: xc.detail || xc.message || (xc.n_pass != null ? `${xc.n_pass}/${xc.n_run} radials within tolerance` : '—')
     });
   } else {
-    components.push({ name: 'FCC contour cross-check (ZTR _fcc_contour vs engine)',
-                      status: 'FALLBACK',
-                      detail: 'tier-3 deterministic: engine is vendored fcc/contours-api-node@b55870d; cross-check is degenerate when both ZTR proxy and direct FCC API are unreachable' });
+    // Absent record = data-loss / orchestrator bug, not a deterministic
+    // fallback.  Same rationale as the curve-validation absent-cr branch.
+    components.push({
+      name:   'FCC contour cross-check (ZTR _fcc_contour vs engine)',
+      status: 'FAIL',
+      detail: 'no fcc_cross_check record attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 from ZTR / direct geo.fcc.gov, or tier-3 deterministic engine-self).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+    });
   }
 
   // ----- FCC parity (live distance.json) -----
@@ -96,9 +111,13 @@ export function buildValidationVerdictSection(exhibit){
                 : (par.detail || par.reason || par.error || 'parity report not available')
     });
   } else {
-    components.push({ name: 'FCC parity (live geo.fcc.gov/api/contours/distance.json)',
-                      status: 'FALLBACK',
-                      detail: 'tier-3 deterministic: no parity record attached; dataset SHA-256 pinning to upstream commit guarantees identical output' });
+    // Absent record = data-loss / orchestrator bug, not a deterministic
+    // fallback.  Same rationale as the curve-validation absent-cr branch.
+    components.push({
+      name:   'FCC parity (live geo.fcc.gov/api/contours/distance.json)',
+      status: 'FAIL',
+      detail: 'no fcc_parity_report attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 or tier-3 deterministic dataset-SHA match).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+    });
   }
 
   // Radial parity (sub-set of FCC cross-check by radial)
