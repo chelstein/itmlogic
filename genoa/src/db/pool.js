@@ -47,16 +47,25 @@ function buildSslConfig(){
 }
 
 // Returns { host, port, user, password, database } or null on parse failure.
-// We deliberately ignore the URL's query string (sslmode, uselibpqcompat,
-// etc.) — SSL is configured exclusively through buildSslConfig() above.
+//
+// Query-string handling: we honor libpq-style `host=` and `port=` overrides
+// so Unix-socket DSNs of the form
+//     postgresql:///dbname?host=/var/run/postgresql
+// continue to bind to the socket rather than silently falling back to TCP
+// localhost.  All other query parameters — `sslmode`, `uselibpqcompat`, etc.
+// — are deliberately ignored, because they are exactly the parameters whose
+// pg-connection-string-driven semantics this module is designed to bypass
+// (SSL is configured exclusively through buildSslConfig()).
 function parseDatabaseUrl(raw){
   if (!raw) return null;
   try {
     const u = new URL(raw);
     if (!/^postgres(ql)?:$/.test(u.protocol)) return null;
+    const queryHost = u.searchParams.get('host') || undefined;
+    const queryPort = u.searchParams.get('port') || undefined;
     return {
-      host:     u.hostname || undefined,
-      port:     u.port ? Number(u.port) : undefined,
+      host:     u.hostname || queryHost,
+      port:     u.port ? Number(u.port) : (queryPort ? Number(queryPort) : undefined),
       user:     u.username ? decodeURIComponent(u.username) : undefined,
       password: u.password ? decodeURIComponent(u.password) : undefined,
       database: u.pathname && u.pathname !== '/' ? u.pathname.slice(1) : undefined
