@@ -6,7 +6,11 @@ import { asyncHandler } from '../middleware/errors.js';
 import { exportJson, JSON_CONTENT_TYPE }       from '../../exports/json/exporter.js';
 import { exportTxt,  TXT_CONTENT_TYPE  }       from '../../exports/txt/exporter.js';
 import { exportGeoJson, GEOJSON_CONTENT_TYPE } from '../../exports/geojson/exporter.js';
-import { exportPdf,  PDF_CONTENT_TYPE  }       from '../../exports/pdf/stub.js';
+import { exportPdf,  PDF_CONTENT_TYPE  }       from '../../exports/pdf/exporter.js';
+
+import { buildEngineeringReport }           from '../../exports/engineeringReport/index.js';
+import { renderEngineeringReportText }      from '../../exports/engineeringReport/renderText.js';
+import { renderEngineeringReportPdf }       from '../../exports/engineeringReport/renderPdf.js';
 
 import { readiness } from '../../types/readiness.js';
 
@@ -136,23 +140,81 @@ r.get('/exhibits/:id/export/geojson', asyncHandler(async (req, res) => {
   res.send(body);
 }));
 
-// GET /api/exhibits/:id/export/pdf  — wired but explicitly 501 today.
+// GET /api/exhibits/:id/export/pdf  — filing-grade PDF via @pdfme/generator.
 r.get('/exhibits/:id/export/pdf', asyncHandler(async (req, res) => {
-  try {
-    const row = await getExhibit(req.params.id);
-    if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
-    const body = exportPdf(row.payload);
-    res.type(PDF_CONTENT_TYPE);
-    res.send(body);
-  } catch (err){
-    if (err.code === 'PDF_NOT_IMPLEMENTED'){
-      return res.status(err.http_status || 501).json({
-        error: err.code, message: err.message, warning: err.warning
-      });
-    }
-    throw err;
-  }
+  const row = await getExhibit(req.params.id);
+  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+  const body = await exportPdf(row.payload);
+  res.type(PDF_CONTENT_TYPE);
+  res.set('Content-Disposition', `attachment; filename="${stem(row)}.exhibit.pdf"`);
+  res.send(Buffer.from(body));
 }));
+
+// POST /api/exhibits/export/pdf  — stateless PDF render.
+// Accepts the exhibit JSON in the request body; returns the PDF.
+// Used by the UI in stateless mode (no DATABASE_URL, or user hasn't
+// clicked Save).  Same renderer as the GET path above; just no
+// persistence step.  Body shape:
+//   { "exhibit": <full genoa.exhibit.v2 object> }
+r.post('/exhibits/export/pdf', asyncHandler(async (req, res) => {
+  const exhibit = req.body?.exhibit || req.body;
+  if (!exhibit || typeof exhibit !== 'object'){
+    return res.status(400).json({
+      error:   'BAD_REQUEST',
+      message: 'POST body must be an exhibit object (or { exhibit: <object> })'
+    });
+  }
+  const body = await exportPdf(exhibit);
+  res.type(PDF_CONTENT_TYPE);
+  const call = (exhibit.station_inputs?.call || 'exhibit')
+                 .toString().replace(/[^A-Za-z0-9]/g, '_');
+  res.set('Content-Disposition', `attachment; filename="${call}.exhibit.pdf"`);
+  res.send(Buffer.from(body));
+}));
+
+// POST /api/exhibits/export/engineering-report.txt  — consulting-grade TXT.
+// Accepts an exhibit object (or { exhibit: <object> }) and returns the
+// "Engineering Statement" plain-text rendering.  Stateless; never mutates
+// the exhibit.
+r.post('/exhibits/export/engineering-report.txt', asyncHandler(async (req, res) => {
+  const exhibit = req.body?.exhibit || req.body;
+  if (!exhibit || typeof exhibit !== 'object'){
+    return res.status(400).json({
+      error:   'BAD_REQUEST',
+      message: 'POST body must be an exhibit object (or { exhibit: <object> })'
+    });
+  }
+  const options = req.body?.options || {};
+  const doc  = buildEngineeringReport(exhibit, options);
+  const body = renderEngineeringReportText(doc);
+  res.type(TXT_CONTENT_TYPE);
+  res.set('Content-Disposition', `attachment; filename="${reportFilename(exhibit, 'txt')}"`);
+  res.send(body);
+}));
+
+// POST /api/exhibits/export/engineering-report.pdf  — consulting-grade PDF.
+r.post('/exhibits/export/engineering-report.pdf', asyncHandler(async (req, res) => {
+  const exhibit = req.body?.exhibit || req.body;
+  if (!exhibit || typeof exhibit !== 'object'){
+    return res.status(400).json({
+      error:   'BAD_REQUEST',
+      message: 'POST body must be an exhibit object (or { exhibit: <object> })'
+    });
+  }
+  const options = req.body?.options || {};
+  const doc  = buildEngineeringReport(exhibit, options);
+  const body = await renderEngineeringReportPdf(doc);
+  res.type(PDF_CONTENT_TYPE);
+  res.set('Content-Disposition', `attachment; filename="${reportFilename(exhibit, 'pdf')}"`);
+  res.send(body);
+}));
+
+function reportFilename(exhibit, ext){
+  const call = (exhibit?.station_inputs?.call || 'exhibit')
+                 .toString().replace(/[^A-Za-z0-9]/g, '_');
+  const ts   = new Date().toISOString().slice(0, 10);
+  return `genoa-engineering-statement-${call}-${ts}.${ext}`;
+}
 
 // GET /api/validation  — current validation suite snapshot.
 r.get('/validation', asyncHandler(async (_req, res) => {

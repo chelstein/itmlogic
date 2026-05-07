@@ -1,5 +1,24 @@
 // Resolves environment-configured sidecars into ready-to-use clients.
 // Missing sidecar URL → null client → engine still runs.
+//
+// CANONICAL FALLBACK MATRIX (probed live at /api/sources/health)
+//
+//   Query                Primary                 Secondary               Tertiary
+//   ----------------     -----------------       ------------------      ---------------------------
+//   Facility metadata    ZTR /api/broadcast      FCC FMQ/AMQ direct      n8n station/analyze
+//   FCC contour          ZTR _fcc_contour        geo.fcc.gov direct      engine self-computes
+//   Per-radial HAAT      FCC contour HAAT        ZTR terrain-haat        USGS + OpenMeteo + OpenTopoData
+//   Population/Census    operator pop sidecar    geo.fcc.gov/api/census  —
+//   Nearby primaries     FCC FMQ direct          FCC AMQ direct          —
+//   Rich station / SDR   ZTR /api/radiodns       —                       — (vendor-locked)
+//   Identity / RadioDNS  identity sidecar        ZTR rich-station        — (massdns/EAS-Tools optional; ZTR is robust 2nd-tier)
+//   FCC LMS / pub. file  FCC FMQ/AMQ direct      publicfiles.fcc.gov     — (license expiration + public-file folder index)
+//
+// Every tier is independent — primary failure does NOT cascade.  The
+// orchestrator (exhibitService.js) walks each chain top-down and stops
+// at the first tier that returns usable data.  Failed tiers are
+// recorded as evidence (e.g., evidence.terrain_ztr_attempted) so the
+// exhibit's provenance shows exactly which fallback won.
 
 import { makeTerrainClient }     from '../../evidence/terrain/client.js';
 import { makeSplatClient }       from '../../evidence/terrain/splatClient.js';
@@ -8,6 +27,8 @@ import { makeFacilityClient }    from './facilityClient.js';
 import { makePopulationClient }  from '../../evidence/populationClient.js';
 import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
+import { makeNecClient }         from '../../evidence/nec/client.js';
+import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source)
@@ -45,7 +66,14 @@ export const sidecars = Object.freeze({
   // FCC Contours direct fallback: used when ZTR doesn't have _fcc_contour
   // or ZTR is not configured.  Always on (geo.fcc.gov is public / no auth).
   // Disable with FCC_CONTOURS_DISABLE=1.
-  fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient()
+  fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient(),
+  // NEC2++ / PyNEC antenna-modeling sidecar.  GPL v2 isolated in a
+  // separate process; Genoa only talks to it over HTTP.  Set
+  // NEC_SIDECAR_URL on the deploy to enable; Genoa works without it.
+  nec:         makeNecClient({ baseUrl: process.env.NEC_SIDECAR_URL || null }),
+  // FCC LMS / public-files / FMQ-AMQ consolidated client.  Public
+  // upstreams (no auth required); always on unless explicitly disabled.
+  fccLms:      process.env.FCC_LMS_DISABLE === '1' ? null : makeFccLmsClient()
 });
 
 export async function sidecarStatus(){

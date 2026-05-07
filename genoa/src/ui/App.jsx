@@ -147,6 +147,41 @@ export default function App() {
 
   // `overrideInputs` lets preset loaders pass freshly-merged inputs
   // directly without depending on React state having flushed.
+  // Run an async export job: POST → poll every 2 s → return the
+  // completed job view.  Throws with the actual job error on failure
+  // (no more naked HTTP 504 from the proxy).  onProgress(message) lets
+  // the caller stream progress strings into the status line.
+  async function runJobAndWait(kind, { input, options } = {}, onProgress){
+    const post = await fetch('/api/exhibit/jobs', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ kind, input: input || {}, options: options || {} })
+    });
+    if (!post.ok){
+      const txt = await post.text().catch(() => '');
+      throw new Error(`Job submission failed: HTTP ${post.status}${txt ? ' — ' + txt.slice(0, 200) : ''}`);
+    }
+    const { job_id } = await post.json();
+    if (!job_id) throw new Error('Job submission returned no job_id');
+
+    while (true){
+      await new Promise(r => setTimeout(r, 2000));
+      const r = await fetch(`/api/exhibit/jobs/${job_id}`);
+      if (!r.ok){
+        throw new Error(`Job poll failed: HTTP ${r.status}`);
+      }
+      const view = await r.json();
+      if (typeof onProgress === 'function' && view.progress_message){
+        onProgress(view.progress_message);
+      }
+      if (view.status === 'complete') return view;
+      if (view.status === 'failed'){
+        const e = view.error || {};
+        throw new Error(e.message || e.code || 'Job failed');
+      }
+    }
+  }
+
   async function compute(overrideInputs = null){
     // Defense: a careless `onClick={compute}` would pass a React
     // SyntheticEvent here.  The wrapper bindings below already shield
@@ -158,9 +193,7 @@ export default function App() {
     }
     const i = overrideInputs || inputs;
     setComputing(true);
-    setStatusMsg(i.use_terrain
-      ? 'Computing… (DEM fetch may take ~30s on cold cache)'
-      : 'Computing…');
+    setStatusMsg('Computing exhibit…');
     try {
       const payload = {
         inputs: {
@@ -187,12 +220,15 @@ export default function App() {
       // snuck into the payload (would crash JSON.stringify with
       // "Converting circular structure to JSON ... HTMLButtonElement").
       const cleanPayload = stripDomAndReact(payload);
-      const r = await fetch('/api/exhibits/compute', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body:    JSON.stringify(cleanPayload)
-      });
-      const j = await readJsonOrThrow(r);
+
+      // Async job — the proxy used to 504 here when DEM fetch ran cold.
+      const view = await runJobAndWait(
+        'exhibit',
+        { input: cleanPayload.inputs, options: cleanPayload.options },
+        (msg) => setStatusMsg(msg)
+      );
+      const j = view.result?.exhibit;
+      if (!j) throw new Error('Job completed without exhibit payload');
       setExhibit(j);
       const fr = j.filing_readiness || {};
       setStatusMsg(j.degraded_mode
@@ -373,12 +409,25 @@ export default function App() {
 
   function downloadExport(format){
     if (!exhibit){ setStatusMsg('Run a compute first.'); return; }
+    if (format === 'engineering-txt' || format === 'engineering-pdf'){
+      const ext = format === 'engineering-txt' ? 'txt' : 'pdf';
+      statelessEngineeringReportDownload(exhibit, ext).catch(e =>
+        setStatusMsg(`Engineering Statement export failed: ${e.message || e}`));
+      return;
+    }
     if (!exhibit.id){
-      // stateless: synthesize from in-memory exhibit
+      // stateless mode: synthesize JSON / GeoJSON in-browser; PDF needs
+      // server-side rendering, so POST the exhibit to the stateless
+      // /api/exhibits/export/pdf route which returns the PDF body.
       const map = {
         json:    () => [JSON.stringify(exhibit, null, 2),         'application/json',     'exhibit.json'],
         geojson: () => [JSON.stringify(exhibit.geojson, null, 2), 'application/geo+json', 'contours.geojson']
       };
+      if (format === 'pdf'){
+        statelessPdfDownload(exhibit).catch(e =>
+          setStatusMsg(`PDF export failed: ${e.message || e}`));
+        return;
+      }
       const fn = map[format];
       if (!fn){ setStatusMsg('TXT export requires a saved exhibit; click Save first.'); return; }
       const [body, type, suffix] = fn();
@@ -390,6 +439,52 @@ export default function App() {
       return;
     }
     window.location = `/api/exhibits/${exhibit.id}/export/${format}`;
+  }
+
+  async function statelessEngineeringReportDownload(ex, ext){
+    const kind = ext === 'pdf' ? 'engineering_report_pdf' : 'engineering_report_txt';
+    setStatusMsg(`Submitting Engineering Statement ${ext.toUpperCase()} job…`);
+    const cleaned = stripDomAndReact(ex);
+    const view = await runJobAndWait(
+      kind,
+      { input: { exhibit: cleaned } },
+      (msg) => setStatusMsg(msg)
+    );
+    if (!view.artifact_url) throw new Error('Job completed without artifact');
+    setStatusMsg(`Downloading ${ext.toUpperCase()} artifact…`);
+    const ar = await fetch(view.artifact_url);
+    if (!ar.ok){
+      const txt = await ar.text().catch(() => '');
+      throw new Error(`Artifact fetch failed: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+    }
+    const blob = await ar.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    const call = (ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_');
+    const ts   = new Date().toISOString().slice(0, 10);
+    a.download = `genoa-engineering-statement-${call}-${ts}.${ext}`;
+    a.click();
+    setStatusMsg(`Engineering Statement ${ext.toUpperCase()} downloaded.`);
+  }
+
+  async function statelessPdfDownload(ex){
+    setStatusMsg('Rendering PDF…');
+    const cleaned = stripDomAndReact(ex);
+    const r = await fetch('/api/exhibits/export/pdf', {
+      method:  'POST',
+      headers: { 'content-type': 'application/json' },
+      body:    JSON.stringify({ exhibit: cleaned })
+    });
+    if (!r.ok){
+      const txt = await r.text().catch(() => '');
+      throw new Error(`HTTP ${r.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+    }
+    const blob = await r.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(ex.station_inputs?.call || 'exhibit').replace(/[^A-Z0-9]/gi,'_')}_exhibit.pdf`;
+    a.click();
+    setStatusMsg('PDF downloaded.');
   }
 
   /* ---------------- HISTORY ---------------- */
@@ -596,17 +691,113 @@ function PaneFcc({ exhibit }){
     ['Pattern factor',  trS.pattern_factor_applied ? 'applied' : 'non-directional'],
     ['Formula',         trS.formula_summary]
   ];
+  const isr = exhibit.interference_study;
   return (
-    <table className="telemetry">
-      <tbody>
-        {rows.map(([k, v]) => (
-          <tr key={k}>
-            <th className="w-[35%]">{k}</th>
-            <td className="text-right text-cream">{v || <span className="text-textDim">—</span>}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="space-y-3">
+      <table className="telemetry">
+        <tbody>
+          {rows.map(([k, v]) => (
+            <tr key={k}>
+              <th className="w-[35%]">{k}</th>
+              <td className="text-right text-cream">{v || <span className="text-textDim">—</span>}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {isr ? <InterferenceStudyTable study={isr} /> : null}
+    </div>
+  );
+}
+
+function InterferenceStudyTable({ study }){
+  const stations = study.stations || [];
+  return (
+    <div className="rounded-md border border-rule">
+      <div className="bg-cream/5 px-3 py-2 font-mono text-[11px]">
+        <div className="text-cream">
+          Interference Study — {(study.rules_evaluated || []).join(' · ')}
+        </div>
+        <div className="text-textDim">
+          {study.n_stations} station(s); {study.n_pass} pass / {study.n_fail} fail ·{' '}
+          filing_qualifies =
+          <span className={
+            study.filing_qualifies === true  ? ' text-green'  :
+            study.filing_qualifies === false ? ' text-red'    : ' text-amber'}>
+            {' '}{String(study.filing_qualifies)}
+          </span>
+          {study.blocking_rule ? <span className="text-amber"> · blocked by {study.blocking_rule}</span> : null}
+        </div>
+      </div>
+      {stations.length === 0
+        ? <div className="px-3 py-3 font-mono text-[11px] text-textDim">No nearby stations evaluated (no nearby_primaries attached).</div>
+        : (
+          <div className="overflow-auto max-h-[420px]">
+            <table className="telemetry">
+              <thead>
+                <tr>
+                  <th>Call</th>
+                  <th>Class</th>
+                  <th>Δf kHz</th>
+                  <th>Rel.</th>
+                  <th className="text-right">Dist km</th>
+                  <th className="text-right">§73.207 req</th>
+                  <th className="text-right">§73.215 D/U</th>
+                  <th>Polygon</th>
+                  <th>Pass</th>
+                  <th>Via</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stations.map((s, i) => {
+                  const r207 = s.rules.section_73_207;
+                  const r215 = s.rules.section_73_215;
+                  const r1204 = s.rules.section_74_1204;
+                  const r187  = s.rules.section_73_187;
+                  const polygon = r215
+                    ? (r215.polygon_pass === true  ? 'no overlap'
+                       : r215.polygon_pass === false ? 'OVERLAP' : '—')
+                    : '—';
+                  return (
+                    <tr key={s.facility_id || s.call || i}
+                        className={s.pass_overall === false ? 'bg-red/10' : undefined}>
+                      <td>{s.call || s.facility_id || '—'}</td>
+                      <td>{s.fcc_class || '—'}</td>
+                      <td className="text-right">{s.frequency_offset_khz ?? '—'}</td>
+                      <td>{s.channel_relationship || '—'}</td>
+                      <td className="text-right">{s.distance_km != null ? s.distance_km.toFixed(2) : '—'}</td>
+                      <td className="text-right">
+                        {r207
+                          ? <span className={r207.pass === true ? 'text-green' : r207.pass === false ? 'text-red' : ''}>
+                              {r207.required_separation_km}/{r207.actual_separation_km}
+                            </span>
+                          : '—'}
+                      </td>
+                      <td className="text-right">
+                        {r215 && r215.du_required_db != null
+                          ? <span className={r215.du_pass === true ? 'text-green' : r215.du_pass === false ? 'text-red' : ''}>
+                              {r215.du_required_db}/{r215.du_actual_db_forward?.toFixed?.(1) ?? '—'}
+                            </span>
+                          : r1204 || r187 ? '—'
+                          : '—'}
+                      </td>
+                      <td className={polygon === 'OVERLAP' ? 'text-red' : polygon === 'no overlap' ? 'text-green' : ''}>{polygon}</td>
+                      <td className={
+                        s.pass_overall === true  ? 'text-green' :
+                        s.pass_overall === false ? 'text-red'   : 'text-amber'
+                      }>{s.pass_overall === true ? 'PASS' : s.pass_overall === false ? 'FAIL' : '—'}</td>
+                      <td className="text-textDim">{(s.qualified_via || []).join(', ')}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      <div className="px-3 py-2 font-mono text-[10px] text-textDim border-t border-rule">
+        Distance per §73.208 (great-circle, WGS-84 Karney). Polygon overlap via Sutherland-Hodgman + Karney WGS-84 PolygonArea.
+        A station qualifies if AT LEAST ONE applicable rule passes (e.g., §73.215 contour protection clears a §73.207 short-spacing).
+      </div>
+    </div>
   );
 }
 
@@ -669,9 +860,10 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.terrain.fetched_at || '—']
           ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
-      <SubHead title="Population (US Census 2020 via FCC Census Block API)" />
+      <SubHead title="Population (INFORMATIONAL ONLY — not used for §73.x compliance)" />
       <SubKv kv={pop.source && pop.vintage
         ? [
+            ['Disclaimer', 'INFORMATIONAL ONLY. FCC §73.x compliance is determined by distance and field-strength tests, not population.'],
             ['Persons',    Number(pop.primary).toLocaleString()],
             ['Contour',    pop.contour_label || '—'],
             ['Source',     pop.source],
@@ -700,10 +892,119 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.measurements.fetched_at || '—']
           ]
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
+      <SubHead title="FCC Parity Report (live geo.fcc.gov bit-exact comparison)" />
+      <SubKv kv={ev.fcc_parity_report?.available
+        ? [
+            ['Available',     'yes'],
+            ['Source',        ev.fcc_parity_report.source || '—'],
+            ['Samples',       `${ev.fcc_parity_report.n_pass}/${ev.fcc_parity_report.n_samples} within ${ev.fcc_parity_report.tolerance_km} km`],
+            ['Max delta',     `${ev.fcc_parity_report.max_error_km ?? '—'} km`],
+            ['Mean delta',    `${ev.fcc_parity_report.mean_error_km ?? '—'} km`],
+            ['Overall pass',  ev.fcc_parity_report.overall_pass === true ? 'YES' : ev.fcc_parity_report.overall_pass === false ? 'NO' : '—'],
+            ['FCC commit',    (ev.fcc_parity_report.provenance?.upstream_commit || '').slice(0, 16)],
+            ['Genoa engine',  ev.fcc_parity_report.provenance?.genoa_engine || '—']
+          ]
+        : ev.fcc_parity_report?.reason
+          ? [['Status', ev.fcc_parity_report.reason]]
+          : [['Status', 'Parity report not run.  Set options.fcc_parity_report=true to enable a live bit-exact comparison vs FCC distance.json.']]} />
+
+      <SubHead title="SDR Residuals (predicted vs measured, 47 CFR §73.314 / §73.186)" />
+      <SubKv kv={ev.measurements?.residuals
+        ? [
+            ['Captures',       ev.measurements.residuals.n_total],
+            ['Evaluated',      ev.measurements.residuals.n_evaluated],
+            ['Calibrated',     `${ev.measurements.residuals.n_calibrated}/${ev.measurements.residuals.n_total}`],
+            ['RMS residual',   `${ev.measurements.residuals.rms_residual_dB ?? '—'} dB`],
+            ['Mean residual',  `${ev.measurements.residuals.mean_residual_dB ?? '—'} dB`],
+            ['Above predicted',ev.measurements.residuals.n_above_predicted],
+            ['Below predicted',ev.measurements.residuals.n_below_predicted],
+            ['Calibration',    ev.measurements.calibration?.calibrated ? 'YES' : 'NO'],
+            ['Cal date',       ev.measurements.calibration?.last_calibration_date || '—'],
+            ['Cal method',     ev.measurements.calibration?.calibration_method    || '—'],
+            ['Antenna gain',   `${ev.measurements.calibration?.antenna_gain_dbi ?? '—'} dBi`],
+            ['Cable loss',     `${ev.measurements.calibration?.cable_loss_db    ?? '—'} dB`],
+            ['LNA gain',       `${ev.measurements.calibration?.lna_gain_db      ?? '—'} dB`]
+          ]
+        : ev.measurements?.available
+          ? [['Status', 'SDR captures present but no residual table computed (no tx geometry?).']]
+          : [['Status', 'No SDR captures attached.  See evidence.measurements_probe for diagnostics.']]} />
+
+      <SubHead title="FCC LMS / Public-File (47 CFR §73.3526 / §73.1620)" />
+      <SubKv kv={ev.fcc_lms?.available
+        ? [
+            ['Available',     'yes'],
+            ['Source',        ev.fcc_lms.source || '—'],
+            ['Sources tried', (ev.fcc_lms.sources_tried || []).join(', ') || '—'],
+            ['Call',          ev.fcc_lms.license?.call         || '—'],
+            ['Service',       ev.fcc_lms.license?.service      || '—'],
+            ['Class',         ev.fcc_lms.license?.fcc_class    || '—'],
+            ['Status',        ev.fcc_lms.license?.status       || '—'],
+            ['Last action',   ev.fcc_lms.license?.last_action  || '—'],
+            ['Licensee',      ev.fcc_lms.license?.licensee     || '—'],
+            ['Expiration',    ev.fcc_lms.license?.license_expiration_date
+                                ? `${ev.fcc_lms.license.license_expiration_date}  (${ev.fcc_lms.license.expired ? 'EXPIRED' : ev.fcc_lms.license.expiring_soon ? 'EXPIRING SOON' : 'current'}; ${ev.fcc_lms.license.days_to_expiration} days)`
+                                : '—'],
+            ['Cross-check',   ev.fcc_lms.cross_check?.match
+                                ? 'matches FCC FMQ/AMQ record'
+                                : `${ev.fcc_lms.cross_check?.n_mismatches ?? 0} mismatch(es) — see evidence.fcc_lms.cross_check`],
+            ['Public file',   ev.fcc_lms.public_file?.available
+                                ? `${ev.fcc_lms.public_file.required_folders?.present_count ?? 0} of ${ev.fcc_lms.public_file.required_folders?.required_total ?? 0} required folders present  ·  ${ev.fcc_lms.public_file.file_count ?? '—'} files`
+                                : 'not reachable'],
+            ['Public-file URL', ev.fcc_lms.public_file?.folder_url || '—'],
+            ['LMS deeper review', ev.fcc_lms.authorization_history?.deeper_review_url || '—']
+          ]
+        : ev.fcc_lms_attempt
+          ? [
+              ['Status', 'FCC LMS / public-file lookup ran but returned no usable record.'],
+              ['Sources tried', (ev.fcc_lms_attempt.sources_tried || []).join(', ') || '—'],
+              ['Errors',        (ev.fcc_lms_attempt.errors || []).slice(0, 3).join('; ') || '—']
+            ]
+          : [['Status', 'FCC LMS lookup not run (no call/facility_id supplied or FCC_LMS_DISABLE=1).']]} />
+      <SubHead title="NEC Model (NEC2++ via GPL-isolated sidecar)" />
+      <SubKv kv={ev.nec_model?.ok
+        ? [
+            ['Available',     'yes'],
+            ['Engine',        ev.nec_model.provenance?.engine || 'necpp/PyNEC'],
+            ['License boundary', ev.nec_model.provenance?.license_boundary || 'external sidecar'],
+            ['Frequency',     (ev.nec_model.frequency_mhz ?? '—') + ' MHz'],
+            ['Ground',        ev.nec_model.ground?.type || '—'],
+            ['Wires',         ev.nec_model.geometry?.n_wires ?? '—'],
+            ['Total length',  (ev.nec_model.geometry?.total_length_m ?? '—') + ' m'],
+            ['Feedpoint Z',   ev.nec_model.feedpoint
+                                ? `${ev.nec_model.feedpoint.r_ohm} + j${ev.nec_model.feedpoint.x_ohm} Ω  (VSWR50 ${ev.nec_model.feedpoint.vswr_50 ?? '—'})`
+                                : '—'],
+            ['Pattern samples', ev.nec_model.pattern
+                                ? `${(ev.nec_model.pattern.theta_deg || []).length} θ × ${(ev.nec_model.pattern.phi_deg || []).length} φ`
+                                : '—'],
+            ['Near-field samples', (ev.nec_model.near_field || []).length],
+            ['Warnings',      (ev.nec_model.warnings || []).length],
+            ['Model hash',    ev.nec_model.provenance?.model_hash?.slice(0, 16) || '—'],
+            ['Generated',     ev.nec_model.provenance?.generated_at || '—']
+          ]
+        : ev.nec_model_attempt
+          ? [
+              ['Status',  'NEC sidecar reachable but request failed.'],
+              ['Error',   ev.nec_model_attempt.error || '—'],
+              ['Detail',  (ev.nec_model_attempt.detail || '—').slice(0, 120)]
+            ]
+          : [['Status', 'NEC sidecar not configured (set NEC_SIDECAR_URL) or no antenna geometry supplied.']]} />
       <SubHead title="Identity (RDS / RadioDNS / EAS / audio)" />
       <SubKv kv={ev.identity?.available
-        ? [['Available', 'yes'], ['Confirmations', (ev.identity.confirmations || []).length], ['Sources', (ev.identity.sources || []).map(s => s.kind + ':' + s.status).join(', ')]]
-        : [['Status', 'Identity sidecar not attached or no confirmations returned.']]} />
+        ? [
+            ['Available',     'yes'],
+            ['Tiers used',    (ev.identity.tiers_used || []).join(', ') || '—'],
+            ['Confirmations', (ev.identity.confirmations || []).length],
+            ['Sources',       (ev.identity.sources || []).map(s => s.kind + ':' + s.status).join(', ')]
+          ]
+        : ev.identity_probe
+          ? [
+              ['Status', 'No identity confirmations attached. ZTR rich-station response was probed but carried no RadioDNS resolver fields and no station_record fields.'],
+              ['Sidecar configured',     ev.identity_probe.sidecar?.configured ? 'yes' : 'no'],
+              ['ZTR endpoint probed',    ev.identity_probe.ztr_radiodns?.endpoint || '—'],
+              ['ZTR station_keys (first 10)', (ev.identity_probe.ztr_radiodns?.station_keys || []).slice(0, 10).join(', ') || '—'],
+              ['Diagnostic',             'evidence.identity_probe carries the full list of checked field names and the actual ZTR station keys, so a missing variant can be added in one line.']
+            ]
+          : [['Status', 'Identity sidecar not attached and ZTR rich-station unavailable.']]} />
     </div>
   );
 }
@@ -713,8 +1014,6 @@ function PaneProvenance({ exhibit }){
   const fm  = exhibit.facility_metadata || {};
   const ev  = exhibit.evidence || {};
   const sig = exhibit.engine_signature || {};
-  const v   = exhibit.validation || {};
-  const last = v.runs?.slice(-1)[0] || null;
   return (
     <div className="space-y-3">
       <SubHead title="Engine signature" />

@@ -24,10 +24,18 @@ import { flatHaatPerRadial } from './haat/flat.js';
 import { fmRadialTable, FM_DEFAULT_CONTOURS, FM_INTERP, FM_INTERP_FCC, FM_CONTOUR_METHODS, FM_ENGINE_DEFAULT } from './fm/contour.js';
 import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
-import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, fxInputGuards } from './translators/contour.js';
+import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, FX_REGULATORY_METADATA, fxInputGuards } from './translators/contour.js';
 import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.js';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
+import { checkSection73215 }            from './regulatory/section_73_215.js';
+import { checkSection73207 }            from './regulatory/section_73_207.js';
+import { checkSection73525 }            from './regulatory/section_73_525.js';
+import { checkSection73187 }            from './regulatory/section_73_187.js';
+import { checkOet65, OET65_PROVENANCE } from './regulatory/oet65.js';
+import { buildInterferenceStudy }       from './regulatory/interferenceStudy.js';
+import { analyzeTerrainConfidence }     from '../analysis/terrainConfidence/index.js';
+import { interpretResiduals }           from '../analysis/residualInterpretation/index.js';
 import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
@@ -170,6 +178,10 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       });
       break;
     case 'FX':
+      // Per-contour `mode` selects F(50,50) for the service contour and
+      // F(50,10) for the §74.1204(a)+(c) interfering contours.  The
+      // top-level mode here is the legacy default for any callers that
+      // pass a contour entry without its own mode field.
       contours     = FX_DEFAULT_CONTOURS;
       radial_table = await fxRadialTable({
         datasetByName: loadDataset, mode: '50,50', contours,
@@ -217,12 +229,152 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       },
       primaries
     });
+    // Stamp the §74.1204(c) D/U gate table + interfering-contour
+    // derivations onto the compliance block so the JSON exhibit / TXT
+    // export / UI can render the regulatory thresholds alongside the
+    // study results.  This is sourced data (47 CFR §74.1204), not a
+    // computed assumption.
+    regulatory_compliance.regulatory_metadata = FX_REGULATORY_METADATA;
     if (regulatory_compliance.missing_nearby_stations){
       warnings.push(W.make('MISSING_NEARBY_STATIONS'));
     } else if (regulatory_compliance.pass === false){
       warnings.push(W.make('TRANSLATOR_INTERFERENCE',
         regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
     }
+  } else if (service === 'FM'){
+    // 47 CFR §73.215 — full-service FM contour-protection short-spacing.
+    // Only runs when nearby full-service FM stations are supplied via
+    // evidence.nearby_primaries.  When the list is missing, the engine
+    // emits MISSING_NEARBY_STATIONS — same convention as §74.1204 above.
+    const allNearby = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
+    // §73.215 governs full-service FM ↔ full-service FM only.  Strip
+    // translators (FX) and LPFM out of the list so a mis-classified
+    // entry can't generate a spurious §73.215 violation.
+    const nearbyStations = allNearby.filter(p => {
+      const svc = String(p?.service || '').toUpperCase();
+      return svc === 'FM' || svc === '';
+    });
+    regulatory_compliance = checkSection73215({
+      subject: {
+        erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+        fcc_class: inputs.fcc_class || null,
+        call: inputs.call || null, facility_id
+      },
+      nearbyStations
+    });
+    if (regulatory_compliance.missing_nearby_stations){
+      warnings.push(W.make('MISSING_NEARBY_STATIONS'));
+    } else if (regulatory_compliance.pass === false){
+      warnings.push(W.make('FM_CONTOUR_PROTECTION_VIOLATION',
+        regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+    // 47 CFR §73.207 — minimum-distance separation table A.  Runs as
+    // a CROSS-REFERENCE alongside the §73.215 contour study.  A
+    // §73.207 failure with §73.215 pass is informational (the station
+    // qualifies via §73.215 contour protection); §73.207 failure
+    // with §73.215 also failing escalates the FM_CONTOUR_PROTECTION_VIOLATION
+    // by stamping FM_MINIMUM_SEPARATION_VIOLATION (warning, not blocker —
+    // the §73.215 blocker is the operative one when both fail).
+    const sep73_207 = checkSection73207({
+      subject: { lat, lon, fcc_class: inputs.fcc_class || null, frequency_mhz: freq,
+                 call: inputs.call || null, facility_id },
+      nearbyStations
+    });
+    regulatory_compliance.section_73_207 = sep73_207;
+    if (sep73_207.pass === false){
+      const sec73_215_pass = regulatory_compliance.pass === true;
+      warnings.push(W.make('FM_MINIMUM_SEPARATION_VIOLATION',
+        sec73_215_pass
+          ? `Station fails §73.207(b) minimum-distance separation but qualifies via §73.215 contour protection.  Filing must cite §73.215.  Failed pairs: ${sep73_207.violations.length}.`
+          : `Station fails BOTH §73.207(b) minimum-distance separation (${sep73_207.violations.length} pair(s)) AND §73.215 contour protection.  Filing requires either rule to clear.`));
+    }
+    // 47 CFR §73.525 — TV channel 6 protection (reserved-band FM 88.1-91.9 MHz).
+    // Skipped when frequency is outside reserved band; pass-by-default
+    // when no nearby ch.6 emitters are supplied.
+    const ch6Stations = Array.isArray(evidence.tv_ch6_stations) ? evidence.tv_ch6_stations : [];
+    const sec73_525 = checkSection73525({
+      subject: { erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+                 fcc_class: inputs.fcc_class || null,
+                 call: inputs.call || null, facility_id },
+      tvCh6Stations: ch6Stations
+    });
+    regulatory_compliance.section_73_525 = sec73_525;
+    if (sec73_525.pass === false){
+      warnings.push(W.make('FM_TV_CH6_PROTECTION_VIOLATION',
+        sec73_525.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+  } else if (service === 'AM'){
+    // 47 CFR §73.187 — AM nighttime skywave protection.
+    // Runs only when nearby AM stations are supplied via
+    // evidence.nearby_primaries.  Without the list the engine emits
+    // MISSING_NEARBY_STATIONS — same convention as §74.1204 / §73.215.
+    const allNearby = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
+    // §73.187 governs AM ↔ AM only.
+    const nearbyAm = allNearby.filter(p => {
+      const svc = String(p?.service || '').toUpperCase();
+      return svc === 'AM' || svc === '';
+    });
+    regulatory_compliance = checkSection73187({
+      subject: {
+        erp_kw:           erp_kW,
+        frequency_khz:    Number(freq),       // AM uses kHz at engine boundary
+        lat, lon,
+        fcc_class:        inputs.fcc_class || null,
+        ground_sigma_msm: Number(inputs.ground_sigma_mS_m) || Number(sigma) || null,
+        rss_erp_kw:       Number(inputs.rss_erp_kw) || null,
+        call:             inputs.call || null,
+        facility_id
+      },
+      nearbyStations: nearbyAm
+    });
+    if (regulatory_compliance.missing_nearby_stations){
+      warnings.push(W.make('MISSING_NEARBY_STATIONS'));
+    } else if (regulatory_compliance.pass === false){
+      warnings.push(W.make('AM_NIGHTTIME_PROTECTION_VIOLATION',
+        regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
+    }
+  }
+
+  // ---- OET-65 / §1.1310 RF exposure compliance --------------------
+  // Universal — runs for every service (FM/LPFM/FX/AM) whenever ERP
+  // and frequency are present.  The §1.1310 MPE limits cover the
+  // 0.3 MHz – 100 GHz band so the analysis applies to all broadcast.
+  // Frequency input convention: AM in kHz at the engine boundary; we
+  // convert to MHz for the OET-65 lookup which is published in MHz.
+  let oet65 = null;
+  const freq_mhz_for_oet65 = service === 'AM' ? Number(freq) / 1000 : Number(freq);
+  if (Number.isFinite(erp_kW) && erp_kW > 0
+      && Number.isFinite(freq_mhz_for_oet65) && freq_mhz_for_oet65 > 0){
+    oet65 = checkOet65({
+      erp_kw:           erp_kW,
+      frequency_mhz:    freq_mhz_for_oet65,
+      service,
+      // Pattern factor and ground-reflection are caller-overridable
+      // via inputs.oet65_*; defaults are the conservative OET-65
+      // worst-case (main lobe, free space).
+      pattern_factor:   Number.isFinite(Number(inputs.oet65_pattern_factor))
+                          ? Number(inputs.oet65_pattern_factor) : 1.0,
+      ground_reflection: !!inputs.oet65_ground_reflection,
+      site_boundary_m:   Number.isFinite(Number(inputs.site_boundary_m))
+                          ? Number(inputs.site_boundary_m) : null,
+      site_height_m:     Number.isFinite(Number(inputs.site_height_m))
+                          ? Number(inputs.site_height_m)   : null
+    });
+    if (oet65.near_field?.required_for_filing){
+      warnings.push(W.make('OET65_NEAR_FIELD_REQUIRED',
+        `Far-field compliance distance ${oet65.compliance.uncontrolled.distance_m} m at ${freq_mhz_for_oet65.toFixed(3)} MHz is inside the near-field boundary λ/(2π) = ${oet65.near_field.boundary_m} m.  OET-65 §3.B near-field analysis required for filing-grade compliance.`));
+    }
+    if (oet65.compliance?.boundary_check?.pass === false){
+      warnings.push(W.make('OET65_BOUNDARY_VIOLATION',
+        `Power density ${oet65.compliance.boundary_check.power_density_mw_cm2} mW/cm² at site boundary (slant ${oet65.compliance.boundary_check.slant_distance_m} m) exceeds §1.1310 uncontrolled MPE ${oet65.compliance.boundary_check.mpe_uncontrolled_mw_cm2} mW/cm².  Public access must be restricted out to ${oet65.compliance.uncontrolled.distance_m} m or pattern downtilt / ground-reflection assumptions revisited.`));
+    }
+  } else {
+    oet65 = {
+      cite:    '47 CFR §1.1310',
+      pass:    null,
+      study_inputs: { erp_kw: erp_kW, frequency_mhz: freq_mhz_for_oet65 },
+      notes:   ['OET-65 study skipped: erp_kw and frequency required.']
+    };
   }
 
   // ---- Polygons + GeoJSON ------------------------------------------
@@ -231,11 +383,17 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // exhibits without coordinates remain useful as an engineering view
   // of the contour distance solver but cannot be plotted on a map.
   //
-  // Projection.  Default 'wgs84-vincenty' (Genoa's PR A path, sub-mm
-  // ellipsoid error).  Set options.projection = 'fcc-spherical' for
-  // byte-equivalent vertex coordinates with FCC contours.js
-  // (great-circle on a sphere of radius 6371 km).
-  const projection = options.projection === 'fcc-spherical' ? 'fcc-spherical' : 'wgs84-vincenty';
+  // Projection.  Default 'wgs84-karney' (Karney 2013 geodesic on the
+  // WGS-84 ellipsoid; sub-nanometre round-trip residual at FCC scales).
+  // Set options.projection = 'fcc-spherical' for byte-equivalent vertex
+  // coordinates with FCC contours.js (great-circle on a sphere of
+  // radius 6371 km).
+  // Accepts the legacy alias 'wgs84-vincenty' for backwards-compatibility;
+  // both map to the Karney path.
+  const projection =
+    options.projection === 'fcc-spherical'  ? 'fcc-spherical' :
+    options.projection === 'wgs84-vincenty' ? 'wgs84-karney'  :
+                                              'wgs84-karney';
   const projectVertex = projection === 'fcc-spherical'
     ? (lt, ln, az, d) => fccSphericalDestPoint(lt, ln, az, d)
     : (lt, ln, az, d) => destPoint(lt, ln, az, d);
@@ -284,16 +442,26 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   }
   const geojson = featureCollection(features);
 
-  // ---- Population (placeholder, by design) --------------------------
-  const POP_DENSITY_KM2 = 80;
-  const primary  = polygons[0]?.area_km2 || 0;
-  const protectedA = polygons[polygons.length-1]?.area_km2 || 0;
+  // ---- Population (null until orchestrator attaches sourced evidence) -
+  // The engine does NOT fabricate a population number.  The orchestrator
+  // (exhibitService.js step 8a) replaces this with a sourced estimate
+  // from the FCC Census Block API (geo.fcc.gov/api/census/area) or an
+  // operator-configured POPULATION_EVIDENCE_URL sidecar.  If neither is
+  // reachable, primary/protected stay null and POPULATION_PLACEHOLDER
+  // persists so reviewers see exactly what's missing.
+  // Population is INFORMATIONAL ONLY — FCC §73.x compliance never
+  // depends on a population number computed by Genoa or anyone else.
+  // The contour rules (§73.207, §73.215, §74.1204, §73.187) are
+  // distance/field-strength tests; the population estimate exists for
+  // operator/reviewer context (audience reach), not as a filing gate.
   const population_estimate = {
-    primary:           Math.round(primary * POP_DENSITY_KM2),
-    protected:         Math.round(protectedA * POP_DENSITY_KM2),
-    model:             `uniform ${POP_DENSITY_KM2} /km² placeholder`,
+    primary:           null,
+    protected:         null,
+    model:             null,
     method:            'placeholder',
-    source:            null
+    source:            null,
+    informational_only: true,
+    disclaimer:        'INFORMATIONAL ONLY.  FCC broadcast filings (§73.207, §73.215, §74.1204, §73.187, §73.811) do not require population data; compliance is determined by distance and field-strength tests.  Where a Census/ACS dispatch is supplied, the persons figure is the licensee\'s best estimate of audience reach within the protected contour and is not a regulatory determination.'
   };
   warnings.push(W.make('POPULATION_PLACEHOLDER'));
 
@@ -406,24 +574,28 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       haat_m:         haat_m ?? null,
       haat_source:    haatPerRadial[0]?.haat_source || 'unknown',
       pattern_factor_applied: !!pattern,
-      curve_engine:   service === 'AM' ? null : fmEngine,
+      curve_engine:   service === 'AM' ? 'fcc-canonical' : fmEngine,
       interpolation:  service === 'AM'
-        ? 'n/a'
+        ? 'FCC groundwave field-grid lookup (Sommerfeld-Norton) — discrete σ {1..8} mS/m × 10 kHz frequency steps; no interpolation across σ'
         : (fmEngine === 'fcc-canonical'
             ? 'FCC bivariate cubic surface fit (ITPLBV) — vendored from contours-api-node'
             : 'log10-distance vs ascending field; linear along HAAT'),
-      dataset:        fmEngine === 'fcc-canonical'
-        ? 'fcc/contours-api-node@b55870d (tvfm_curves.js)'
-        : curve_prov.curve_version,
-      dataset_meta_sha256: fmEngine === 'fcc-canonical'
-        ? '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a'
-        : curve_prov.meta_sha256,
+      dataset:        service === 'AM'
+        ? 'fcc/contours-api-node@b55870d (gwave.js + data/gwave_field.json)'
+        : (fmEngine === 'fcc-canonical'
+            ? 'fcc/contours-api-node@b55870d (tvfm_curves.js)'
+            : curve_prov.curve_version),
+      dataset_meta_sha256: service === 'AM'
+        ? '0ba81eca1bda166e36d34906dfdbc72c730a976d91a3356c12b1ccde2a8b059f'
+        : (fmEngine === 'fcc-canonical'
+            ? '58a0cd0eed98353509f39ea56e6f3a1e9ec94e6882a412be4c97bdf79cb6c28a'
+            : curve_prov.meta_sha256),
       engine_module:  service === 'AM' ? 'src/engine/am/groundwave.js' :
                       service === 'LPFM' ? 'src/engine/lpfm/contour.js' :
                       service === 'FX'   ? 'src/engine/translators/contour.js' :
                                             'src/engine/fm/contour.js',
       formula_summary: service === 'AM'
-        ? 'unattenuated reference E0 = 100·sqrt(P_kW) mV/m at 1 km; per-distance attenuation NOT YET IMPLEMENTED.'
+        ? 'FCC amDistance(sigma, dielectric, freq_kHz, target_mV/m, fs1km) — vendored Sommerfeld-Norton groundwave from contours-api-node@b55870d (gwave.js); fs1km = 100·sqrt(P_kW) mV/m at 1 km; identical output to geo.fcc.gov/api/contours/amDistance.json.'
         : (fmEngine === 'fcc-canonical'
             ? 'FCC tvfmfs_metric(erp, haat, channel, target_dBu, fs_or_dist=2, curve) — vendored bivariate cubic surface fit over the FCC §73.333 tabulation; identical output to geo.fcc.gov/api/contours/distance.json.'
             : 'effective_dBu = target_dBu − 10·log10(ERP_kW); look up log10(distance) vs effective field at each HAAT row, then interpolate the per-row distances along the HAAT axis.')
@@ -451,11 +623,45 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
+
+  // Formal interference study — H&D-grade per-station table consolidating
+  // §73.207 / §73.215 / §74.1204 / §73.187 results into one filing-grade
+  // table with rule, distance, required vs actual, D/U, pass/fail per
+  // station.  This is the deliverable structure broadcast engineers
+  // expect; warnings are not a "study".
+  exhibit.interference_study = buildInterferenceStudy({
+    subject: {
+      call:           inputs.call,
+      facility_id,
+      fcc_class:      inputs.fcc_class,
+      frequency_mhz:  service === 'AM' ? null : Number(freq),
+      frequency_khz:  service === 'AM' ? Number(freq) : null,
+      erp_kw:         erp_kW,
+      haat_m,
+      lat, lon
+    },
+    regulatory_compliance,
+    service
+  });
+
+  // OET-65 / §1.1310 RF exposure compliance — universal across services.
+  exhibit.oet65 = oet65;
+
+  // Terrain-aware engineering confidence — pure analysis layer.
+  // Reads radial table + any attached SDR / ITM cross-check residuals;
+  // produces a HIGH/MODERATE/LOW disposition with reason codes.
+  // Does NOT modify FCC curve outputs or compliance results.
+  exhibit.engineering_confidence = analyzeTerrainConfidence(exhibit);
+
+  // SDR residual interpretation — engineering-narrative summary of the
+  // measured-vs-predicted residual table.  Advisory only; does not modify
+  // FCC curve outputs or compliance results.
+  exhibit.residual_interpretation = interpretResiduals(exhibit);
   exhibit.exports      = {
     json:        'pending',
     txt:         'pending',
     geojson:     'pending',
-    pdf:         'not_implemented',
+    pdf:         'pending',
     generated_at: null   // populated by exporters when they actually render
   };
   exhibit.narrative    = null; // rendered separately

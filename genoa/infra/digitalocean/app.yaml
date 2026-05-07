@@ -62,6 +62,41 @@ services:
       - { key: IDENTITY_SIDECAR_URL,        scope: RUN_TIME, value: "" }
       - { key: ZERO_TRUST_RADIO_READONLY_URL, scope: RUN_TIME, value: "" }
       - { key: RADIODNS_RESOLVER_URL,       scope: RUN_TIME, value: "" }
+      # NEC2++/PyNEC antenna sidecar.  Internal hostname matches the
+      # component name below.  GPL v2 isolated as a separate process.
+      - { key: NEC_SIDECAR_URL,             scope: RUN_TIME, value: "http://genoa-nec:8085" }
+
+  # ---- NEC2++ / PyNEC antenna-modeling sidecar (GPL-isolated) ----
+  #
+  # NEC2++ (https://github.com/tmolteno/necpp) is GPL v2.  Genoa's main
+  # API does NOT link or import it; this is a separate App Platform
+  # internal service that the API talks to over HTTP.  The sidecar's
+  # /health and /model/* endpoints are NOT exposed publicly — leave
+  # `internal_ports` set and `routes` empty so the ingress doesn't
+  # publish it.  The API reaches it at http://genoa-nec:8085 inside
+  # the app's internal network.
+  - name: genoa-nec
+    dockerfile_path: src/sidecars/nec/Dockerfile
+    source_dir: src/sidecars/nec
+    github:
+      repo: chelstein/itmlogic
+      branch: master
+      deploy_on_push: true
+    instance_size_slug: apps-s-1vcpu-1gb        # PyNEC + numpy memory + MoM solve
+    instance_count: 1
+    internal_ports:
+      - 8085
+    health_check:
+      http_path: /health
+      initial_delay_seconds: 30                  # PyNEC import on cold start
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - { key: SIDECAR_PORT,        scope: RUN_TIME, value: "8085" }
+      - { key: BRIDGE_TIMEOUT_MS,   scope: RUN_TIME, value: "60000" }
+      - { key: PYNEC_PYTHON_BIN,    scope: RUN_TIME, value: "python3" }
 
 # ---- Worker (App Platform 'workers' component, no HTTP) ----
 workers:

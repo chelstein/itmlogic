@@ -98,6 +98,50 @@ export function makeFccFmqClient({
   return {
     fmqUrl, amqUrl,
 
+    /**
+     * Frequency-range search for FM-band stations.
+     *
+     * Hits FMQ with `lower_freq=X&upper_freq=Y` to retrieve every
+     * FM/LPFM/translator/booster/auxiliary station whose carrier falls
+     * in the range.  Used by the §74.1204 nearby-primaries proximity
+     * search — the channel-relationship gate (co-channel / 1st-adj /
+     * IF) is enforced by the caller via narrow [f, f] queries.
+     *
+     * @param {number} lowerMhz   inclusive
+     * @param {number} upperMhz   inclusive
+     * @param {string} services   comma-separated FMQ service codes;
+     *                            default covers FM + FX + FB + FS + FL + L1
+     * @returns { rows, source, endpoint, error? }
+     */
+    async searchByFrequencyRange(lowerMhz, upperMhz, { services = 'FM,FX,LPFM' } = {}){
+      const lo = Number(lowerMhz), hi = Number(upperMhz);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi){
+        return { rows: [], source: null, error: 'invalid frequency range' };
+      }
+      // FM band runs 88.0..107.9 MHz.  Out-of-band requests are no-ops
+      // (e.g. f0 - 10.8 MHz for f0 near 88).
+      if (hi < 88 || lo > 108){
+        return { rows: [], source: 'fcc-fmq', endpoint: null,
+                 note: `frequency range [${lo}, ${hi}] MHz outside FM band` };
+      }
+      const url = `${fmqUrl}?lower_freq=${lo}&upper_freq=${hi}&list=4`;
+      try {
+        const r = await fetchFn(url, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok) return { rows: [], source: null, endpoint: url, error: `HTTP ${r.status} from FMQ` };
+        const text = await r.text();
+        // `services` is a CSV of normalized Genoa service codes (FM, FX,
+        // LPFM, AM).  parseRow has already mapped FMQ-internal codes
+        // (FB, FS, FL, L1, FT) to these.
+        const allowed = new Set(String(services).split(',').map(s => s.trim().toUpperCase()).filter(Boolean));
+        const rows = text.split(/\r?\n/)
+          .map(line => parseRow(line, /* isAm = */ false, url))
+          .filter(row => row && (allowed.size === 0 || allowed.has(row.service)));
+        return { rows, count: rows.length, source: 'fcc-fmq', endpoint: url };
+      } catch (e){
+        return { rows: [], source: null, endpoint: url, error: `FMQ range search failed: ${e.message}` };
+      }
+    },
+
     async searchByCallsign(call){
       const cs = String(call || '').trim().toUpperCase();
       if (cs.length < 2){

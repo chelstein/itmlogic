@@ -108,6 +108,94 @@ export const WARNING_CODES = Object.freeze({
     title: 'FM translator interference (47 CFR §74.1204)',
     description: 'The translator fails one or more §74.1204 D/U interference gates against a nearby primary station.  Filing requires that all D/U ratios be satisfied.' },
 
+  FM_CONTOUR_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'FM short-spacing contour-protection — simplified study flagged a violation (47 CFR §73.215)',
+    description: 'Genoa\'s simplified §73.215 study (single-bearing contour-edge methodology, see src/engine/regulatory/section_73_215.js header) detected D/U gate violations against one or more nearby full-service FM stations.  This is CONSERVATIVE relative to the FCC\'s actual polygon-vs-polygon contour-overlap test — a point-bearing failure can over-flag stations the licensed engineer\'s full polygon study would clear.  Required next step: licensed-engineer polygon-overlap review before filing-grade go/no-go.  Genoa surfaces the §73.215 study results on regulatory_compliance.studies for that review.' },
+
+  FM_MINIMUM_SEPARATION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'FM §73.207(b) minimum-distance separation not met',
+    description: 'The proposed FM station fails the §73.207(b) Table A minimum-distance separation against one or more nearby full-service FM stations.  When §73.215 contour protection passes, this is informational — the filing can cite §73.215 instead.  When §73.215 also fails, the station does not qualify under either rule and the filing requires an alternative (e.g., a major-change application with reduced ERP / HAAT, or a directional antenna pattern).' },
+
+  FM_TV_CH6_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'FM reserved-band TV ch.6 protection — simplified study flagged a violation (47 CFR §73.525)',
+    description: 'Genoa\'s simplified §73.525 study (single-bearing F(50,10)↔Grade B contour-edge methodology, same simplification as §73.215) detected a §73.525(b) D/U gate violation against one or more active TV channel 6 stations.  This is CONSERVATIVE relative to the FCC\'s actual polygon-vs-polygon overlap.  Required next step: licensed-engineer review with full polygon overlap before filing.  Most full-power ch.6 stations were repacked in the 2009 DTV transition; LPTV / Class A "Franken FM" residuals are the active concern.' },
+
+  ASR_MISMATCH: { severity: 'warning', phase: 'evidence',
+    title: 'ASR / application data mismatch (47 CFR §17.4)',
+    description: 'The Antenna Structure Registration (ASR) record disagrees with the application\'s antenna data on one or more fields (coordinates, overall height AGL/AMSL).  Filing requires consistency between Form 302 / 301 and the ASR record on file with the FCC.  A minor mismatch may be a quantization artefact; a major mismatch indicates either the application or the ASR record needs to be corrected before filing.' },
+
+  COMPUTE_TIMEOUT_PARTIAL: { severity: 'warning', phase: 'evidence',
+    title: 'Compute completed with partial evidence (budget exceeded)',
+    description: 'One or more network-bound evidence fetches were skipped because the per-request compute budget (COMPUTE_BUDGET_MS, default 4.5 minutes) was exhausted.  The exhibit numbers are still correct — the engine math is local and runs unconditionally — but the named evidence steps did not complete and their warnings (e.g. CONSTANT_HAAT_ASSUMED, MISSING_NEARBY_STATIONS) may be elevated as a result.  Re-run the compute when upstreams are responsive, or raise COMPUTE_BUDGET_MS / DigitalOcean App Platform http_request_timeout if the underlying source is consistently slow.' },
+
+  NEC_MODEL_UNAVAILABLE: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC2++ antenna model unavailable',
+    description: 'The Genoa NEC sidecar (NEC2++ / PyNEC, GPL v2 isolated) was not reachable, returned an error, or the PyNEC dependency is missing on the sidecar host.  Compute proceeded without the NEC evidence section.  When the sidecar is healthy, the exhibit gains directional pattern + feedpoint impedance + near-field RF exposure for §73.62 / §73.150 / §73.45 / OET-65 reviews.  Set NEC_SIDECAR_URL or check the sidecar /health endpoint.' },
+
+  NEC_MODEL_INVALID_GEOMETRY: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC antenna model rejected (invalid geometry)',
+    description: 'The supplied antenna geometry failed the sidecar\'s schema or sanity checks (zero-length wire, non-numeric field, segment-vs-radius proportions, unsupported ground type, missing excitation).  See evidence.nec_model.detail for the specific failure and correct the input.' },
+
+  NEC_GROUND_MODEL_LIMITATION: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC ground model is PEC (perfect conductor)',
+    description: 'The model used a perfect-electrical-conductor (PEC) ground assumption.  PEC overestimates ground efficiency for AM towers over real soil; use type=sommerfeld with conductivity_s_m + dielectric_constant for filing-grade analysis.  The §73.62 / §73.150 RTA the FCC accepts uses Sommerfeld real ground.' },
+
+  NEC_NEAR_FIELD_APPROXIMATION: { severity: 'warning', phase: 'sidecar',
+    title: 'NEC near-field uses MoM current distribution',
+    description: 'NEC2++ near-field is computed at sample points using the assumed wire-current distribution from the MoM solve.  Accuracy degrades within roughly λ/8 of the conductors.  For OET-65 monitor-point analysis at AM frequencies, place sample points outside that radius or supply additional measured-current data.' },
+
+  NEC_LICENSE_BOUNDARY_EXTERNAL: { severity: 'info', phase: 'sidecar',
+    title: 'NEC evidence sourced from GPL-isolated external sidecar',
+    description: 'NEC2++ is GPL v2.  This evidence was produced by an isolated sidecar process that Genoa talks to over HTTP only — Genoa\'s own codebase does not link or embed any GPL\'d code.  evidence.nec_model.provenance.license_boundary is stamped "external sidecar" so reviewers can verify the boundary is preserved.' },
+
+  LMS_DATA_UNAVAILABLE: { severity: 'warning', phase: 'evidence',
+    title: 'FCC LMS / public-file data unavailable',
+    description: 'Genoa could not reach the FCC FMQ/AMQ database or publicfiles.fcc.gov for this station.  Filing-grade exhibits should cross-reference the FCC\'s authoritative record (license expiration, status, last action, public-file folder presence).  Re-run the compute when the upstream is responsive, or pull the data manually from https://transition.fcc.gov/fcc-bin/fmq and https://publicfiles.fcc.gov/.' },
+
+  LICENSE_EXPIRING_SOON: { severity: 'warning', phase: 'evidence',
+    title: 'FCC license expires soon',
+    description: 'The FCC license for this station expires within the lookahead window (default 180 days; configurable via LICENSE_EXPIRING_SOON_DAYS).  License renewal under §73.1020 must be filed in the renewal window or the authorization may lapse.  See evidence.fcc_lms.license.license_expiration_date.' },
+
+  LICENSE_EXPIRED: { severity: 'blocker', phase: 'evidence',
+    title: 'FCC license has expired',
+    description: 'The FCC license for this station expired before the compute date.  No new exhibit can be filed against an expired authorization; renewal under §73.1020 or a new application is required.  See evidence.fcc_lms.license.license_expiration_date.' },
+
+  LMS_DATA_MISMATCH: { severity: 'warning', phase: 'evidence',
+    title: 'FCC LMS record disagrees with application data',
+    description: 'The FCC FMQ/AMQ row for this station carries values (ERP, HAAT, frequency, class, lat/lon) that do not match the application inputs.  Filing requires consistency between Form 302 / 301 and the FCC\'s authoritative record.  See evidence.fcc_lms.cross_check.mismatches for the specific field-level deltas.' },
+
+  PUBLIC_FILE_INCOMPLETE: { severity: 'warning', phase: 'evidence',
+    title: 'Public inspection file appears incomplete (47 CFR §73.3526 / §73.3527)',
+    description: 'Genoa\'s probe of the licensee\'s publicfiles.fcc.gov folder did not find one or more of the §73.3526 / §73.3527 required sub-folders (EEO Public File Report, Issues and Programs Lists, Political File, Authorizations, Citizen Agreements, etc.).  Reviewers may flag the application during routine inspection.  See evidence.fcc_lms.public_file.required_folders.missing.' },
+
+  FCC_PARITY_VERIFIED: { severity: 'info', phase: 'validation',
+    title: 'Genoa output verified bit-exact against FCC distance.json',
+    description: 'A live comparison between Genoa\'s computed contour distances and the FCC\'s public distance.json endpoint passed at every sampled (radial × contour) point within tolerance.  evidence.fcc_parity_report carries the per-sample table; reviewers can replay the FCC API calls themselves to verify.' },
+
+  FCC_PARITY_DELTA: { severity: 'warning', phase: 'validation',
+    title: 'Genoa contour distance differs from FCC distance.json',
+    description: 'One or more sampled (radial × contour) points differ from the FCC\'s public distance.json endpoint output beyond tolerance.  This is unusual — Genoa\'s vendored engine is the same code that backs the FCC endpoint.  Likely causes: upstream rate-limit returning stale data, DNS / proxy intercepting the call, or an engine-version drift.  See evidence.fcc_parity_report.samples for the per-sample deltas.' },
+
+  SDR_CALIBRATION_MISSING: { severity: 'warning', phase: 'evidence',
+    title: 'SDR captures present but receiver calibration metadata absent',
+    description: 'The SDR captures attached to this exhibit do not carry the receiver-calibration metadata required by §73.314 (FM) / §73.186 (AM) for filing-grade measurement evidence: antenna gain, cable loss, LNA gain, and the calibration date.  The captures still ship as provenance, but their measured field-strength values are uncalibrated and the predicted-vs-measured residual table reflects raw deltas only.  Add the calibration block to the ZTR rich-station response or to each capture record to lift this warning.' },
+
+  SDR_RESIDUAL_LARGE: { severity: 'warning', phase: 'evidence',
+    title: 'SDR predicted-vs-measured residual exceeds 10 dB',
+    description: 'The RMS residual between Genoa\'s predicted field strength (FCC §73.333 / §73.184 curves) and the calibrated SDR-measured field exceeds 10 dB across the captured locations.  This typically indicates terrain shadowing or multipath that the simplified §73.333 model does not capture (use options.use_itm = true for terrain-aware coverage), or a calibration error in the receiver chain.  See evidence.measurements.residuals for the per-row table.' },
+
+  AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
+    title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.187)',
+    description: 'Genoa\'s simplified §73.187/§73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  This is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.187(b)(1) RSS analysis before filing.  Genoa surfaces the §73.187 study results on regulatory_compliance.studies for that review.' },
+
+  OET65_NEAR_FIELD_REQUIRED: { severity: 'warning', phase: 'engine',
+    title: 'OET-65 near-field analysis required (47 CFR §1.1310)',
+    description: 'The far-field §1.1310 compliance distance falls inside the near-field boundary λ/(2π) at this frequency.  The far-field power-density formula is not accurate inside that zone; OET-65 §3.B near-field analysis using the antenna current distribution is required for filing-grade compliance.  Common at AM frequencies where λ/(2π) reaches tens of meters.' },
+
+  OET65_BOUNDARY_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'OET-65 / §1.1310 site-boundary MPE violation',
+    description: 'The §1.1310 power density at the site boundary exceeds the uncontrolled (general-population) MPE limit at the operating frequency.  Filing requires either restricting public access out to the OET-65 compliance distance, demonstrating pattern downtilt that reduces the field at ground-level public-access points, or a §1.1310(d) waiver.' },
+
   MISSING_NEARBY_STATIONS: { severity: 'warning', phase: 'evidence',
     title: 'Nearby-stations list missing',
     description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' }

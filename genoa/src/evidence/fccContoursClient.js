@@ -122,17 +122,25 @@ export function extractHaatFromContour(fccResp, stepDeg = 10){
   if (!Array.isArray(contourData) || contourData.length === 0) return null;
   const step = Number(stepDeg) || 10;
   // FCC azimuths are integers 0..359.  Engine radials at step S are
-  // [0, S, 2S, ...].  Subsample by az % step === 0.
-  const radials = [];
+  // [0, S, 2S, ...].  Subsample by az % step === 0.  Keep entries whose
+  // haat field is non-finite — caller will fall back per-radial so the
+  // engine sees a length-matched bundle.
+  const byAz = new Map();
   for (const pt of contourData){
     if (typeof pt.azimuth !== 'number') continue;
     if (pt.azimuth % step !== 0) continue;
-    if (!Number.isFinite(pt.haat)) continue;
-    radials.push({ azimuth_deg: pt.azimuth, haat_m: pt.haat });
+    byAz.set(pt.azimuth, Number.isFinite(pt.haat) ? pt.haat : null);
   }
-  if (radials.length === 0) return null;
+  // Emit one row per engine radial [0, S, 2S, ..., 360-S].
+  const radials = [];
+  for (let az = 0; az < 360; az += step){
+    radials.push({ azimuth_deg: az, haat_m: byAz.has(az) ? byAz.get(az) : null });
+  }
+  const n_finite = radials.filter(r => Number.isFinite(r.haat_m)).length;
+  if (n_finite === 0) return null;
   return {
     radials,
+    n_finite,
     rcamsl:                props.rcamsl ?? null,
     elevation_data_source: props.elevation_data_source || 'ned_1',
     nradial:               props.nradial || radials.length,

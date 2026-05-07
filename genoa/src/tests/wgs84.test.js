@@ -96,22 +96,25 @@ test('WGS-84 ellipsoid constants', () => {
 
 /* ---------- Karney spherical-excess area ---------- */
 
-test('Bevis-Cambareri area: 1° × 1° square at equator ≈ 12361 km² (analytic)', () => {
-  // ANALYTIC: A = R² · sin(1°) · (1°·π/180) on the unit sphere ×
-  //               R² gives the exact spherical-cap "strip" area for the
-  //               equator-square's longitudinal sweep.
-  // R_authalic ≈ 6371.0 km → A ≈ 6371² · 0.017452 · 0.017452 ≈ 12361 km².
+/* ---------- Karney ellipsoidal area ---------- */
+
+test('Karney PolygonArea: 1° × 1° square at equator ≈ 12308.78 km² (WGS-84 ellipsoidal)', () => {
+  // TRUE WGS-84 ellipsoidal area for 1°×1° square at equator.
+  // The analytic value (computed directly by Karney's PolygonArea) is
+  // 12308.778361 km².  The prior Bevis-Cambareri spherical approximation
+  // gave ~12361 km² (~0.4% high due to authalic-sphere bias).
   const square = [[0,0],[0,1],[1,1],[1,0],[0,0]];
   const A = ringArea_km2(square);
-  assert.ok(Math.abs(A - 12361) < 50,
-    `expected ~12361 km² (analytic), got ${A.toFixed(2)}`);
+  assert.ok(Math.abs(A - 12308.778) < 1.0,
+    `expected ~12308.778 km² (WGS-84 ellipsoidal), got ${A.toFixed(3)}`);
 });
 
-test('Bevis-Cambareri area: KSLX-FM 90 km circular ring → ~25,400 km² (analytic π·r²)', () => {
-  // The exact area of a spherical cap of geodesic radius r is
-  // 2π·R²·(1 − cos(r/R)); for r ≪ R that's ~ π·r²(1 + r²/12R² + …).
-  // For r = 90 km, R = 6371 km: π·90² ≈ 25447 km², within +0.005 %.
-  // Inscribed 36-gon undershoots vs. the smooth circle by ~0.4%.
+test('Karney PolygonArea: KSLX-FM 90 km circular ring → ~25,318 km² (WGS-84 inscribed 36-gon)', () => {
+  // True WGS-84 ellipsoidal area for a 36-vertex inscribed polygon at
+  // 33.33°N, 90 km geodesic radius.  Karney PolygonArea gives 25317.50 km².
+  // Analytic π·r² = 25446.90 km²; the 0.51% undershoot is from the 36-vertex
+  // polygon approximating the smooth circle.  FCC production rings use
+  // 360 vertices (1° step) and undershoot by < 0.005%.
   const tx_lat = 33.33144;
   const tx_lon = -112.06375;
   const ring   = [];
@@ -120,12 +123,10 @@ test('Bevis-Cambareri area: KSLX-FM 90 km circular ring → ~25,400 km² (analyt
     ring.push([la, lo]);
   }
   const A = ringArea_km2(ring);
-  // Accept 0.5% inscribed-polygon undershoot; FCC contour rings always
-  // sample more densely than 36 vertices in production.
-  assert.ok(A > 25200 && A < 25500, `expected ~25,400 km², got ${A.toFixed(0)}`);
+  assert.ok(A > 25250 && A < 25400, `expected ~25,318 km² (WGS-84 inscribed 36-gon), got ${A.toFixed(0)}`);
 });
 
-test('Bevis-Cambareri area: orientation-independent (CW ring same area as CCW)', () => {
+test('Karney PolygonArea: orientation-independent (CW ring same area as CCW)', () => {
   const ccw = [[0,0],[0,1],[1,1],[1,0],[0,0]];
   const cw  = [[0,0],[1,0],[1,1],[0,1],[0,0]];
   assert.equal(
@@ -135,20 +136,23 @@ test('Bevis-Cambareri area: orientation-independent (CW ring same area as CCW)',
   );
 });
 
-test('Bevis-Cambareri area: latitude-shrinkage on a fixed-Δλ band', () => {
+test('Karney PolygonArea: latitude-shrinkage on a fixed-Δλ band', () => {
   // A longitudinal strip 0.1° wide between two parallels of latitude
   // shrinks with cos(φ_mid).  Compare a 0.1° × 0.1° box at the equator
   // vs at 30°N: ratio should approach cos(30°) ≈ 0.866 for very narrow
-  // strips.  (Wider strips include sin(φ_top)−sin(φ_bot) corrections.)
+  // strips.  Karney gives 0.8685 (WGS-84 ellipsoidal compression factor).
   const eq  = ringArea_km2([[0, 0],[0, 0.1],[0.1, 0.1],[0.1, 0],[0, 0]]);
   const n30 = ringArea_km2([[30, 0],[30, 0.1],[30.1, 0.1],[30.1, 0],[30, 0]]);
   const ratio = n30 / eq;
   assert.ok(ratio > 0.85 && ratio < 0.88,
-    `expected ratio ≈ cos(30°) = 0.866, got ${ratio.toFixed(4)}`);
+    `expected ratio ≈ cos(30°) ≈ 0.866, got ${ratio.toFixed(4)}`);
 });
 
-test('Bevis-Cambareri area: degenerate ring (< 4 vertices) is 0', () => {
+test('Karney PolygonArea: degenerate ring (< 3 unique vertices) is 0', () => {
   assert.equal(ringArea_km2([]), 0);
   assert.equal(ringArea_km2([[0,0]]), 0);
   assert.equal(ringArea_km2([[0,0],[0,1]]), 0);
+  // 3-vertex closed ring (triangle) — not degenerate, should return area
+  const triangle = [[0,0],[0,1],[1,0],[0,0]];
+  assert.ok(ringArea_km2(triangle) > 0);
 });

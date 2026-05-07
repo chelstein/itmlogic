@@ -39,7 +39,16 @@ RUN cd /tmp/python-necpp/PyNEC && \
 
 # ---- app ----
 WORKDIR /app
-COPY server.js .
+COPY server.js     .
+COPY nec_bridge.py .
+RUN chmod +x nec_bridge.py
+
+# server.js is ESM (uses `import`) and depends on express; both must be
+# satisfied or `node server.js` exits with SyntaxError or
+# Cannot-find-module 'express'.
+RUN echo '{ "name": "genoa-nec-sidecar", "version": "0.1.0", "type": "module", "private": true }' > package.json \
+ && npm install --omit=dev express \
+ && node -e "import('express').then(()=>console.log('express OK'))"
 
 EXPOSE 8085
 

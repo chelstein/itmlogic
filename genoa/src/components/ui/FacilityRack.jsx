@@ -218,6 +218,8 @@ export default function FacilityRack({
         <HardwareButton variant="secondary" onClick={() => onExport('json')}    disabled={busy}>JSON</HardwareButton>
         <HardwareButton variant="secondary" onClick={() => onExport('txt')}     disabled={busy}>TXT</HardwareButton>
         <HardwareButton variant="secondary" onClick={() => onExport('geojson')} disabled={busy}>GeoJSON</HardwareButton>
+        <HardwareButton variant="secondary" onClick={() => onExport('engineering-txt')} disabled={busy}>Engineering Statement TXT</HardwareButton>
+        <HardwareButton variant="secondary" onClick={() => onExport('engineering-pdf')} disabled={busy}>Engineering Statement PDF</HardwareButton>
         <HardwareButton variant="ghost"     onClick={onReset}              disabled={busy}>Reset</HardwareButton>
       </div>
     </RackPanel>

@@ -210,11 +210,18 @@ test('extractHaatFromContour: returns null when contourData missing', () => {
   assert.equal(extractHaatFromContour(fc, 45), null);
 });
 
-test('extractHaatFromContour: skips entries with non-finite haat', () => {
+test('extractHaatFromContour: keeps all radials at step pattern; non-finite haat → null', () => {
+  // Length-matched bundles are required by the engine (engine/index.js
+  // strict equality at the terrain HAAT branch).  When the FCC response
+  // is missing a haat for a given radial, the bundle still emits an
+  // entry with haat_m=null so the orchestrator can pad with flat HAAT
+  // and preserve the array length.
   const fc = fcWithContourData();
-  // Corrupt the entry at azimuth 0.
   fc.contour.features[0].properties.contourData[0].haat = NaN;
   const out = extractHaatFromContour(fc, 45);
-  assert.equal(out.radials.length, 7, 'azimuth 0 dropped (NaN haat)');
-  assert.equal(out.radials[0].azimuth_deg, 45);
+  assert.equal(out.radials.length, 8, 'all step-pattern azimuths emitted');
+  assert.equal(out.radials[0].azimuth_deg, 0);
+  assert.equal(out.radials[0].haat_m, null, 'NaN haat surfaces as null, not dropped');
+  assert.equal(out.n_finite, 7);
+  assert.ok(Number.isFinite(out.radials[1].haat_m));
 });

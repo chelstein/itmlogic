@@ -72,16 +72,16 @@ test('fccSphericalDestPoint: byte-equivalent to FCC contours.js getLatLonFromDis
   assert.ok(Math.abs(got[1] - ref[1]) < 1e-12);
 });
 
-test('Spherical vs Vincenty: vertices differ by < 250 m at FCC contour scale', async () => {
-  // Build the same FM exhibit twice — once with WGS-84 Vincenty
-  // (default), once with FCC spherical projection.  Vertex
+test('Spherical vs Karney: vertices differ by < 250 m at FCC contour scale', async () => {
+  // Build the same FM exhibit twice — once with WGS-84 Karney (2013)
+  // geodesic (default), once with FCC spherical projection.  Vertex
   // coordinates must agree to within ~100 m.
   const validationRun = await runValidationSuite();
   const baseOpts = { validation: { runs: [validationRun], reference_cases_present: validationRun.reference_cases_present } };
   const x_wgs = await compute({ inputs: FM_CLASS_A, evidence: {}, options: baseOpts });
   const x_fcc = await compute({ inputs: FM_CLASS_A, evidence: {}, options: { ...baseOpts, projection: 'fcc-spherical' } });
 
-  assert.equal(x_wgs.method_versions.projection, 'wgs84-vincenty');
+  assert.equal(x_wgs.method_versions.projection, 'wgs84-karney');
   assert.equal(x_fcc.method_versions.projection, 'fcc-spherical');
   assert.equal(x_wgs.polygons.length, x_fcc.polygons.length);
 

@@ -21,10 +21,54 @@ import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFcc
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
 import { W }                    from '../../types/warnings.js';
+import { computeHaatMultiSource } from '../../evidence/terrain/elevationClient.js';
+import { makeBudget }              from './computeBudget.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
 const VALIDATION_TTL_MS = 5 * 60 * 1000;
+
+// Synthesize a default single-monopole AM model when the caller
+// flags options.use_nec=true but didn't provide an explicit
+// antenna_geometry.  Uses haat_m as the tower-height proxy and
+// Sommerfeld real-ground defaults consistent with §73.182 typical
+// values (sigma = 8 mS/m, εr = 13).  This is a STARTING POINT for
+// reviewers — filings should supply the real tower-array geometry.
+function synthDefaultAmArray(inputs){
+  return {
+    frequency_khz: Number(inputs.frequency),
+    ground: {
+      type:                 'sommerfeld',
+      conductivity_s_m:     (Number(inputs.ground_sigma_mS_m) || 8) / 1000,
+      dielectric_constant:  13
+    },
+    towers: [
+      {
+        tag:        1,
+        x_m:        0,
+        y_m:        0,
+        height_m:   Number(inputs.haat_m),
+        radius_m:   0.25,
+        segments:   21,
+        drive:      { amplitude: 1.0, phase_deg: 0 }
+      }
+    ],
+    pattern: {
+      theta_start: 90, theta_stop: 90, theta_step: 1,
+      phi_start:   0,  phi_stop: 359,  phi_step:  1
+    }
+  };
+}
+
+// FM service-contour threshold per §73.211 — used by §73.215 and the
+// ITM-aware coverage analysis.  Returns null for non-FM services.
+function service73215Threshold(klass){
+  if (!klass) return 60;                  // default to Class A 60 dBu
+  const k = String(klass).toUpperCase().replace(/\s+/g, '').replace('CLASS', '');
+  // Class A / LPFM / FX → 60 dBu protected; others → 54 dBu.
+  if (['A', 'LP100', 'LP10', 'D', 'FX'].includes(k)) return 60;
+  return 54;
+}
 
 export async function getOrRunValidation(){
   const now = Date.now();
@@ -39,8 +83,19 @@ export async function getOrRunValidation(){
 export async function computeExhibit(req){
   const inputs   = { ...(req.inputs   || {}) };
   const options  = req.options  || {};
+  // Wall-clock budget for ALL network-bound evidence fetches.  Default
+  // 4.5 min (env COMPUTE_BUDGET_MS).  Slow / unreachable upstreams are
+  // skipped past the deadline and surface as a COMPUTE_TIMEOUT_PARTIAL
+  // warning naming each step that ran out of time.  The engine compute
+  // itself (radial table + polygons + GeoJSON) is not budgeted.
+  const budget = makeBudget(options.compute_budget_ms);
   const evidence = {};
   const facilityWarnings = [];
+  // The orchestrator's `warnings` array is declared HERE so pre-engine
+  // evidence steps (FCC LMS, NEC, etc.) can push to it.  After the
+  // engine compute the engine's own warnings are concatenated in;
+  // subsequent filter passes operate on the combined list.
+  let warnings = [];
   let facilityResolution = null;
   let richStation        = null;   // raw ZTR /api/radiodns/station/:id response
   let terrainResp        = null;   // raw ZTR /api/.../terrain-haat response
@@ -103,9 +158,48 @@ export async function computeExhibit(req){
       if (fc.available) fccContourResp = fc;
       // SDR evidence — gated by service.
       if (sdrEnabledForService){
-        const sdr = await sidecars.facility.getSdrEvidence({ stationId: ztrStationId, rich: richStation });
+        const sdr = await sidecars.facility.getSdrEvidence({
+          stationId: ztrStationId,
+          rich:      richStation,
+          service:   inputs.service     // AM filter for ZTR's mixed-service rich-station bundle
+        });
         if (sdr.available) sdrResp = sdr;
+        // Even when the SDR pull found no captures, retain the probe
+        // result on evidence so the exhibit's measurements block can
+        // explain which field names were checked and which keys
+        // actually appear on the rich-station response.  This is
+        // crucial for diagnosing "we know KVLV has audio captures but
+        // they don't show up": the station_keys list reveals whether
+        // ZTR exposed the data under a name we don't yet recognise.
+        else if (sdr) sdrResp = sdr;   // available=false + diagnostics
       }
+      // ASR (47 CFR §17.4) cross-check — extract tower-registration
+      // data from the same rich-station response.  Defensive against
+      // ZTR schema variants; falls through to ASR_SIDECAR_URL when
+      // ZTR rich payload doesn't carry asr_number.
+      try {
+        const { makeAsrClient, checkAsrAgainstApplication } = await import('../../evidence/asrClient.js');
+        const asrClient = makeAsrClient();
+        if (asrClient){
+          let asr = asrClient.extractFromRichStation(richStation);
+          if (!asr.available && asr.error?.includes('did not carry an asr_number') && inputs.asr_number){
+            asr = await asrClient.getByAsrNumber(inputs.asr_number);
+          }
+          const asrResult = checkAsrAgainstApplication({
+            asr,
+            application: {
+              asr_number:             inputs.asr_number || null,
+              lat:                    inputs.lat,
+              lon:                    inputs.lon,
+              overall_height_m:       inputs.overall_height_m || null,
+              overall_height_amsl_m:  inputs.overall_height_amsl_m || null
+            }
+          });
+          if (asr.available || asr.error){
+            evidence.asr = asrResult;
+          }
+        }
+      } catch { /* swallow — ASR is informational, not load-bearing */ }
     }
   }
 
@@ -132,6 +226,93 @@ export async function computeExhibit(req){
     } catch { /* ignore; cross-check stays null */ }
   }
 
+  // ---- 2b-2. FCC LMS / public-files / FMQ-AMQ consolidated lookup ----
+  // Pull the FCC's authoritative-record fields (license expiration,
+  // status, last action, public-file folder index) to surface
+  // alongside the engine output.  Public upstreams (no auth);
+  // wrapped in budget so a slow upstream doesn't stall the exhibit.
+  let lmsResp = null;
+  if (sidecars.fccLms && (inputs.call || inputs.facility_id)){
+    lmsResp = await budget.withDeadline('fcc_lms',
+      () => sidecars.fccLms.getStationRecord({
+        call:        inputs.call         || null,
+        facility_id: inputs.facility_id  || null,
+        service:     inputs.service      || null
+      }), { minMs: 4_000 });
+    if (lmsResp?.available){
+      // Cross-check ZTR/inputs vs FCC LMS row.  Tolerances kept loose
+      // because FMQ rounds frequency to 0.1 MHz and ERP to 0.1 kW.
+      const license = lmsResp.license || {};
+      const mismatches = [];
+      const FREQ_TOL = 0.05;     // MHz (FMQ tabulates at 0.1)
+      const ERP_TOL  = 0.5;      // kW
+      const HAAT_TOL = 5;        // m
+      if (Number.isFinite(Number(inputs.frequency)) && Number.isFinite(license.frequency)){
+        const a = Number(inputs.frequency);
+        const b = Number(license.frequency);
+        // Inputs frequency is in MHz for FM/FX/LPFM, kHz for AM.  FMQ
+        // returns matching units.  Compare directly only when units agree.
+        if ((inputs.frequency_unit || (inputs.service === 'AM' ? 'kHz' : 'MHz'))
+              === (license.frequency_unit || 'MHz')){
+          const tol = license.frequency_unit === 'kHz' ? 5 : FREQ_TOL;
+          if (Math.abs(a - b) > tol)
+            mismatches.push({ field: 'frequency', input: a, fcc: b, delta: a - b, tolerance: tol });
+        }
+      }
+      if (Number.isFinite(Number(inputs.erp_kw)) && Number.isFinite(license.erp_kw)){
+        if (Math.abs(Number(inputs.erp_kw) - license.erp_kw) > ERP_TOL)
+          mismatches.push({ field: 'erp_kw', input: Number(inputs.erp_kw), fcc: license.erp_kw,
+                            delta: Number(inputs.erp_kw) - license.erp_kw, tolerance: ERP_TOL });
+      }
+      if (Number.isFinite(Number(inputs.haat_m)) && Number.isFinite(license.haat_m)){
+        if (Math.abs(Number(inputs.haat_m) - license.haat_m) > HAAT_TOL)
+          mismatches.push({ field: 'haat_m', input: Number(inputs.haat_m), fcc: license.haat_m,
+                            delta: Number(inputs.haat_m) - license.haat_m, tolerance: HAAT_TOL });
+      }
+      if (inputs.fcc_class && license.fcc_class
+          && String(inputs.fcc_class).toUpperCase() !== String(license.fcc_class).toUpperCase()){
+        mismatches.push({ field: 'fcc_class', input: inputs.fcc_class, fcc: license.fcc_class,
+                          tolerance: 'exact' });
+      }
+      lmsResp.cross_check = {
+        applicable:   mismatches.length > 0 || true,
+        match:        mismatches.length === 0,
+        n_mismatches: mismatches.length,
+        mismatches
+      };
+      evidence.fcc_lms = lmsResp;
+
+      // License expiration warnings.
+      if (license.expired){
+        warnings.push(W.make('LICENSE_EXPIRED',
+          `License expired ${Math.abs(license.days_to_expiration)} days ago (${license.license_expiration_date}).  Renewal under §73.1020 or a new application required.`));
+      } else if (license.expiring_soon){
+        warnings.push(W.make('LICENSE_EXPIRING_SOON',
+          `License expires in ${license.days_to_expiration} days (${license.license_expiration_date}).  File renewal under §73.1020.`));
+      }
+      // Cross-check warnings.
+      if (mismatches.length){
+        warnings.push(W.make('LMS_DATA_MISMATCH',
+          `${mismatches.length} field(s) differ from FCC FMQ/AMQ record: ${mismatches.map(m => `${m.field} ${m.input} vs ${m.fcc}`).join('; ')}`));
+      }
+      // Public-file completeness check.
+      if (lmsResp.public_file?.available
+          && lmsResp.public_file.required_folders?.missing?.length > 4){
+        warnings.push(W.make('PUBLIC_FILE_INCOMPLETE',
+          `Public-file folder at ${lmsResp.public_file.folder_url} appears to be missing ${lmsResp.public_file.required_folders.missing.length} of ${lmsResp.public_file.required_folders.required_total} §73.3526/§73.3527 sub-folders.`));
+      }
+    } else if (lmsResp){
+      // Reachable but produced nothing useful, OR budget timeout.
+      evidence.fcc_lms_attempt = {
+        ok: false,
+        sources_tried: lmsResp.sources_tried || null,
+        errors:        lmsResp.errors        || null
+      };
+      warnings.push(W.make('LMS_DATA_UNAVAILABLE',
+        `No FCC LMS / FMQ / public-file data could be sourced for ${inputs.call || inputs.facility_id || 'this station'}.`));
+    }
+  }
+
   // ---- 2c. Per-radial HAAT directly from the FCC contour ----
   // The FCC contour response carries `contourData[].haat` — the per-
   // radial HAAT FCC used to compute its contour, sourced from the
@@ -143,14 +324,29 @@ export async function computeExhibit(req){
       && FCC_CONTOUR_DBU_SERVICES.has(String(inputs.service || '').toUpperCase())){
     const step = Number(inputs.radial_step_deg) || 10;
     const haatBundle = extractHaatFromContour(fccContourResp, step);
-    if (haatBundle && haatBundle.radials.length > 0){
-      evidence.terrain_haat_per_radial = haatBundle.radials.map(r => ({
-        az:                     r.azimuth_deg,
-        haat_input_m:           Number(inputs.haat_m) || null,
-        haat_computed_m:        r.haat_m,
-        haat_source:            'fcc_contour_radial_haat',
-        terrain_profile_source: haatBundle.elevation_data_source
-      }));
+    if (haatBundle && haatBundle.n_finite > 0){
+      const flat_m = Number(inputs.haat_m);
+      let n_dem = 0, n_flat = 0;
+      evidence.terrain_haat_per_radial = haatBundle.radials.map(r => {
+        if (Number.isFinite(r.haat_m)){
+          n_dem++;
+          return {
+            az:                     r.azimuth_deg,
+            haat_input_m:           flat_m,
+            haat_computed_m:        r.haat_m,
+            haat_source:            'fcc_contour_radial_haat',
+            terrain_profile_source: haatBundle.elevation_data_source
+          };
+        }
+        n_flat++;
+        return {
+          az:                     r.azimuth_deg,
+          haat_input_m:           flat_m,
+          haat_computed_m:        flat_m,
+          haat_source:            'user_flat (no FCC HAAT for this radial)',
+          terrain_profile_source: null
+        };
+      });
       evidence.terrain = {
         available:  true,
         source:     'geo.fcc.gov',
@@ -159,6 +355,8 @@ export async function computeExhibit(req){
         dem:        { source: 'FCC NED', dataset: haatBundle.elevation_data_source },
         fetched_at: fccContourResp.fetched_at || new Date().toISOString(),
         n_radials:  haatBundle.radials.length,
+        n_radials_dem_sourced:   n_dem,
+        n_radials_flat_fallback: n_flat,
         rcamsl_m:   haatBundle.rcamsl,
         profiles:   haatBundle.radials.map(r => ({
           az:              r.azimuth_deg,
@@ -181,38 +379,77 @@ export async function computeExhibit(req){
       && inputs.service !== 'AM'
       && sidecars.facility?.getTerrainHaatRadials){
     const step = Number(inputs.radial_step_deg) || 10;
-    terrainResp = await sidecars.facility.getTerrainHaatRadials({
-      facility_id:     String(inputs.facility_id),
-      radial_step_deg: step
-    });
+    terrainResp = await budget.withDeadline('ztr_terrain_haat',
+      () => sidecars.facility.getTerrainHaatRadials({
+        facility_id:     String(inputs.facility_id),
+        radial_step_deg: step
+      }), { minMs: 5_000 });
     if (terrainResp?.available && Array.isArray(terrainResp.radials) && terrainResp.radials.length){
-      // Hand the engine its per-radial HAAT in the shape it expects.
-      evidence.terrain_haat_per_radial = terrainResp.radials
-        .filter(r => Number.isFinite(r.haat_m))
-        .map(r => ({
+      // Count DEM-sourced radials BEFORE deciding whether to commit this
+      // path.  ZTR sometimes returns a 200 with all-null haat_m (its
+      // upstream DEM rate-limited or its facility lat/lon missing).  In
+      // that case we must NOT mark evidence.terrain available, otherwise
+      // step 3c (direct multi-source elevation) is skipped and the
+      // exhibit ships flat HAAT under a "OpenTopoData SRTM 30m" banner.
+      // Counting first lets step 3c rescue zero-coverage responses.
+      const flat_m = Number(inputs.haat_m);
+      let n_dem = 0, n_flat = 0;
+      const candidate = terrainResp.radials.map(r => {
+        if (Number.isFinite(r.haat_m)){
+          n_dem++;
+          return {
+            az:                     r.azimuth_deg,
+            haat_input_m:           flat_m,
+            haat_computed_m:        r.haat_m,
+            haat_source:            'arc_averaged_dem',
+            terrain_profile_source: terrainResp.dem?.source || 'zerotrustradio'
+          };
+        }
+        n_flat++;
+        return {
           az:                     r.azimuth_deg,
-          haat_input_m:           Number(inputs.haat_m) || null,
-          haat_computed_m:        r.haat_m,
-          haat_source:            'arc_averaged_dem',
-          terrain_profile_source: terrainResp.dem?.source || 'zerotrustradio'
-        }));
-      evidence.terrain = {
-        available:  true,
-        source:     terrainResp.source || 'zerotrustradio',
-        endpoint:   terrainResp.endpoint,
-        method:     terrainResp.method,
-        dem:        terrainResp.dem,
-        fetched_at: terrainResp.fetched_at,
-        n_radials:  terrainResp.n_radials,
-        profiles:   terrainResp.radials.map(r => ({
-          az:                r.azimuth_deg,
-          haat_computed_m:   r.haat_m,
-          avg_elev_m:        r.avg_elev_m,
-          min_elev_m:        r.min_elev_m,
-          max_elev_m:        r.max_elev_m,
-          samples:           r.samples
-        }))
-      };
+          haat_input_m:           flat_m,
+          haat_computed_m:        flat_m,
+          haat_source:            'user_flat (no DEM coverage)',
+          terrain_profile_source: null
+        };
+      });
+      if (n_dem > 0){
+        // Engine accepts the bundle; commit it to evidence.
+        evidence.terrain_haat_per_radial = candidate;
+        evidence.terrain = {
+          available:  true,
+          source:     terrainResp.source || 'zerotrustradio',
+          endpoint:   terrainResp.endpoint,
+          method:     terrainResp.method,
+          dem:        terrainResp.dem,
+          fetched_at: terrainResp.fetched_at,
+          n_radials:  terrainResp.n_radials,
+          n_radials_dem_sourced:   n_dem,
+          n_radials_flat_fallback: n_flat,
+          profiles:   terrainResp.radials.map(r => ({
+            az:                r.azimuth_deg,
+            haat_computed_m:   r.haat_m,
+            avg_elev_m:        r.avg_elev_m,
+            min_elev_m:        r.min_elev_m,
+            max_elev_m:        r.max_elev_m,
+            samples:           r.samples
+          }))
+        };
+      } else {
+        // ZTR returned a shape but no usable DEM data — leave
+        // evidence.terrain unset so step 3c can run the direct
+        // multi-source elevation client.  Mark request as attempted.
+        evidence.terrain_haat_requested = true;
+        evidence.terrain_ztr_attempted = {
+          available:  false,
+          source:     terrainResp.source || 'zerotrustradio',
+          endpoint:   terrainResp.endpoint,
+          n_radials:  terrainResp.n_radials,
+          reason:     'ZTR returned radials but none carried a finite haat_m (upstream DEM rate-limited, facility coordinates missing, or off-DEM-coverage)',
+          fetched_at: terrainResp.fetched_at
+        };
+      }
     } else {
       evidence.terrain_haat_requested = true;
     }
@@ -250,30 +487,379 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 3b-2. NEC2++ antenna model evidence (GPL-isolated sidecar) ----
+  // Runs ONLY when:
+  //   - sidecars.nec is configured (NEC_SIDECAR_URL set), AND
+  //   - the caller supplies inputs.antenna_geometry OR inputs.am_array
+  //     (the convenience high-level vertical-tower spec), OR
+  //   - options.use_nec === true AND we have enough info to synthesize
+  //     a single-monopole default (AM service + frequency + tower
+  //     height inferred from haat_m).
+  //
+  // License boundary: this code does NOT import any GPL'd module.  It
+  // makes a single HTTP call to the sidecar and stamps the result on
+  // evidence.nec_model with provenance.license_boundary = 'external sidecar'.
+  if (sidecars.nec){
+    const explicit_geom = inputs.antenna_geometry;
+    const explicit_arr  = inputs.am_array;
+    const can_synth     = options.use_nec === true
+                          && String(inputs.service || '').toUpperCase() === 'AM'
+                          && Number.isFinite(Number(inputs.frequency))
+                          && Number.isFinite(Number(inputs.haat_m));
+    if (explicit_geom || explicit_arr || can_synth){
+      const necReq = explicit_geom
+        ? { kind: 'run',      payload: explicit_geom }
+        : explicit_arr
+          ? { kind: 'array',  payload: explicit_arr }
+          : { kind: 'array',  payload: synthDefaultAmArray(inputs) };
+      const necResp = await budget.withDeadline('nec_sidecar',
+        () => necReq.kind === 'array'
+          ? sidecars.nec.runAmArray(necReq.payload, { timeoutMs: 90_000 })
+          : sidecars.nec.run     (necReq.payload, { timeoutMs: 90_000 }),
+        { minMs: 5_000 });
+      if (necResp?.ok){
+        evidence.nec_model = necResp;
+        // license-boundary disclosure is informational; always emitted
+        // when NEC evidence is present so reviewers see the boundary.
+        warnings.push(W.make('NEC_LICENSE_BOUNDARY_EXTERNAL'));
+        if (necResp.ground?.type === 'pec'){
+          warnings.push(W.make('NEC_GROUND_MODEL_LIMITATION'));
+        }
+        if (Array.isArray(necResp.near_field) && necResp.near_field.length){
+          warnings.push(W.make('NEC_NEAR_FIELD_APPROXIMATION'));
+        }
+      } else if (necResp){
+        // Sidecar reachable but the request failed — record diagnostics.
+        evidence.nec_model_attempt = { ok: false, error: necResp.error, detail: necResp.detail, http_status: necResp.http_status };
+        if (necResp.error === 'NEC_BRIDGE_TIMEOUT' || necResp.error === 'NEC_SIDECAR_UNREACHABLE' || necResp.error === 'PYNEC_NOT_INSTALLED'){
+          warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+            `${necResp.error}: ${(necResp.detail || '').slice(0, 200)}`));
+        } else if (necResp.error === 'INVALID_INPUT' || necResp.error === 'NEC_MODEL_INVALID_GEOMETRY'){
+          warnings.push(W.make('NEC_MODEL_INVALID_GEOMETRY',
+            (necResp.detail || '').slice(0, 200)));
+        } else {
+          warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+            `${necResp.error}: ${(necResp.detail || '').slice(0, 200)}`));
+        }
+      }
+      // If necResp is null the budget skipped it — already accounted
+      // for in the COMPUTE_TIMEOUT_PARTIAL summary.
+    } else if (options.use_nec === true){
+      warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+        'options.use_nec=true but no inputs.antenna_geometry / inputs.am_array supplied AND service+frequency+haat_m not enough to synthesize a default model.'));
+    }
+  } else if (options.use_nec === true){
+    warnings.push(W.make('NEC_MODEL_UNAVAILABLE',
+      'NEC_SIDECAR_URL not configured.  Stand up the GPL-isolated sidecar (src/sidecars/nec/) and set NEC_SIDECAR_URL.'));
+  }
+
+  // ---- 3c. Direct multi-source terrain HAAT fallback ----
+  // When terrain was requested but no HAAT has been sourced yet (sidecar
+  // unavailable, no ZTR terrain endpoint, no FCC contour), compute §73.313
+  // arc-averaged HAAT directly using three public elevation APIs:
+  //   1. USGS 3DEP EPQS  (same NED dataset FCC uses)
+  //   2. Open-Meteo Elevation API  (Copernicus DEM / SRTM3)
+  //   3. OpenTopoData SRTM-30m  (NASA SRTM 1-arcsec)
+  // Sources are tried in parallel; results are cross-validated.  This runs
+  // entirely without a sidecar so it degrades gracefully when sidecars are
+  // down or not yet provisioned.
+  if (options.use_terrain
+      && inputs.service !== 'AM'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && Number.isFinite(Number(inputs.haat_m))
+      && !evidence.terrain?.available){
+    const step      = Number(inputs.radial_step_deg) || 10;
+    const radials   = [];
+    for (let az = 0; az < 360; az += step) radials.push(az);
+    try {
+      const tr = await budget.withDeadline('multi_source_dem',
+        () => computeHaatMultiSource({
+          tx_lat:      Number(inputs.lat),
+          tx_lon:      Number(inputs.lon),
+          tx_amsl_m:   Number(inputs.haat_m),   // antenna AMSL (best available)
+          radials_deg: radials,
+          from_km:     3,
+          to_km:       16,
+          samples:     27
+        }), { minMs: 10_000 });
+      if (tr?.haat_per_radial?.length === radials.length){
+        const flat_m = Number(inputs.haat_m);
+        let n_dem = 0, n_flat = 0;
+        // Keep ALL radials so the array length matches radials_deg.length
+        // (the engine requires strict equality to accept the bundle).
+        // For radials where the multi-source elevation client returned
+        // null (no DEM coverage — e.g. offshore samples), fall back to
+        // the user-input flat HAAT for that single radial and tag the
+        // source honestly so the radial table shows exactly where DEM
+        // coverage gapped.
+        evidence.terrain_haat_per_radial = tr.haat_per_radial.map(r => {
+          if (Number.isFinite(r.haat_m)){
+            n_dem++;
+            return {
+              az:                     r.az,
+              haat_input_m:           flat_m,
+              haat_computed_m:        r.haat_m,
+              haat_source:            'arc_averaged_dem_direct',
+              terrain_profile_source: tr.dem_source
+            };
+          }
+          n_flat++;
+          return {
+            az:                     r.az,
+            haat_input_m:           flat_m,
+            haat_computed_m:        flat_m,
+            haat_source:            'user_flat (no DEM coverage)',
+            terrain_profile_source: null
+          };
+        });
+        evidence.terrain = {
+          available:                  true,
+          source:                     tr.provider,
+          method:                     '§73.313 arc-averaged HAAT via direct multi-source elevation API (no sidecar)',
+          dem:                        { source: tr.provider, dataset: tr.dem_source },
+          fetched_at:                 tr.fetched_at,
+          n_radials:                  tr.haat_per_radial.length,
+          n_radials_dem_sourced:      n_dem,
+          n_radials_flat_fallback:    n_flat,
+          cross_validated:            tr.cross_validated,
+          cross_validate_tolerance_m: tr.cross_validate_tolerance_m,
+          agreement_m:                tr.agreement_m,
+          terrain_sources:            tr.sources,
+          profiles:                   tr.haat_per_radial.map(r => ({
+            az:              r.az,
+            haat_computed_m: r.haat_m,
+            avg_elev_m:      r.avg_elev_m,
+            min_elev_m:      r.min_elev_m,
+            max_elev_m:      r.max_elev_m
+          }))
+        };
+      }
+    } catch { /* best-effort; sidecar-less path; swallow */ }
+  }
+
+  // ---- 3d. ITM-aware coverage analysis (terrain path-loss) ----
+  // Optional, opt-in via options.use_itm.  Two-tier fallback:
+  //   1. SPLAT sidecar via predictItmCoverage() — full Longley-Rice
+  //      ITM v1.2.2 fidelity when the sidecar has DEM tiles
+  //      provisioned and exposes /api/v1/splat/run-inline.
+  //   2. JS Bullington + ITU-R P.526 engine via computeItmCoverage()
+  //      — uses the multi-source DEM client (USGS/Open-Meteo/
+  //      OpenTopoData) directly; works without a sidecar.
+  // Reports per-radial terrain-vs-FCC contour delta on
+  // evidence.itm_coverage so the exhibit can render a "terrain map"
+  // alongside the §73.333 baseline.
+  //
+  // Slow (~30-90s for 36 radials × 40 samples).  Off by default; set
+  // options.use_itm = true to opt in.
+  if (options.use_itm
+      && inputs.service !== 'AM'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && Number.isFinite(Number(inputs.haat_m))
+      && Number.isFinite(Number(inputs.frequency))
+      && Number.isFinite(Number(inputs.erp_kw))){
+    const step = Number(inputs.radial_step_deg) || 10;
+    const radials = [];
+    for (let az = 0; az < 360; az += step) radials.push(az);
+    const target = service73215Threshold(inputs.fcc_class) || 60;
+
+    // Tier 1: SPLAT sidecar (high-fidelity).
+    let splatAttempt = null;
+    if (sidecars.splat && options.itm_engine !== 'js'){
+      try {
+        splatAttempt = await budget.withDeadline('splat_itm_sidecar',
+          () => sidecars.splat.predictItmCoverage({
+            tx: {
+              call:              inputs.call || null,
+              lat:               Number(inputs.lat),
+              lon:               Number(inputs.lon),
+              amsl_m:            Number(inputs.haat_m),
+              antenna_height_m:  Number(inputs.haat_m),
+              frequency_mhz:     Number(inputs.frequency),
+              erp_kw:            Number(inputs.erp_kw),
+              polarization:      inputs.polarization || 'V'
+            },
+            max_distance_km:  Number(options.itm_to_km)   || 80,
+            target_field_dbu: target,
+            radial_step_deg:  step
+          }), { minMs: 15_000 });
+        if (splatAttempt?.available){
+          evidence.itm_coverage = {
+            ...splatAttempt,
+            engine: 'splat-itm-v1.2.2',
+            tier:   'high-fidelity'
+          };
+        }
+      } catch (err){
+        splatAttempt = { available: false, error: String(err.message) };
+      }
+    }
+
+    // Tier 2: JS Bullington + ITU-R P.526 (fallback).
+    if (!evidence.itm_coverage){
+      try {
+        const { computeItmCoverage } = await import('../../engine/coverage/itm_radial.js');
+        const itm = await budget.withDeadline('itm_coverage_js',
+          () => computeItmCoverage({
+            tx_lat:           Number(inputs.lat),
+            tx_lon:           Number(inputs.lon),
+            tx_amsl_m:        Number(inputs.haat_m),
+            erp_kw:           Number(inputs.erp_kw),
+            haat_m:           Number(inputs.haat_m),
+            frequency_mhz:    Number(inputs.frequency),
+            radials_deg:      radials,
+            target_field_dbu: target,
+            from_km:          Number(options.itm_from_km) || 1,
+            to_km:            Number(options.itm_to_km)   || 80,
+            samples:          Number(options.itm_samples) || 40,
+            fcc_mode:         options.itm_fcc_mode || '50,50'
+          }), { minMs: 15_000 });
+        if (itm?.available){
+          evidence.itm_coverage = {
+            ...itm,
+            engine: 'genoa-bullington-p526',
+            tier:   'js-fallback',
+            splat_sidecar_attempted: splatAttempt
+              ? { available: splatAttempt.available, error: splatAttempt.error || null,
+                  sidecar_enhancement_required: splatAttempt.sidecar_enhancement_required || null }
+              : { available: false, error: 'SPLAT sidecar not configured' }
+          };
+        } else {
+          evidence.itm_coverage_attempted = { available: false, error: itm.error };
+        }
+      } catch (err){
+        evidence.itm_coverage_attempted = { available: false, error: String(err.message) };
+      }
+    }
+  }
+
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
   if (sdrResp?.available){
     evidence.measurements = {
-      available:  true,
-      source:     sdrResp.source,
-      endpoint:   sdrResp.endpoint,
-      fetched_at: sdrResp.fetched_at,
-      n_records:  sdrResp.n_records,
-      calibrated: !!sdrResp.calibrated,
-      records:    sdrResp.records
+      available:                true,
+      source:                   sdrResp.source,
+      endpoint:                 sdrResp.endpoint,
+      fetched_at:               sdrResp.fetched_at,
+      // captures_field exposes which ZTR field-name shape carried the
+      // records (_captures, captures, sdr_captures, …).  Useful for
+      // diagnosing schema drift across ZTR releases.
+      captures_field:           sdrResp.captures_field || '_captures',
+      n_records:                sdrResp.n_records,
+      n_records_raw:            sdrResp.n_records_raw ?? sdrResp.n_records,
+      n_dropped_service_filter: sdrResp.n_dropped_service_filter ?? 0,
+      n_dropped_sanity_filter:  sdrResp.n_dropped_sanity_filter ?? 0,
+      service_filter:           inputs.service ? String(inputs.service).toUpperCase() : null,
+      calibrated:               !!sdrResp.calibrated,
+      records:                  sdrResp.records
+    };
+  } else if (sdrResp){
+    // Probe ran but no captures landed.  Retain the diagnostic so
+    // operators can see why (which field names were checked, which
+    // keys ZTR actually exposed on the rich-station response).
+    evidence.measurements_probe = {
+      available:           false,
+      source:              sdrResp.source,
+      endpoint:            sdrResp.endpoint,
+      n_records:           0,
+      reason:              sdrResp.error || 'no captures returned',
+      checked_field_names: sdrResp.checked_field_names || null,
+      station_keys:        sdrResp.station_keys || null,
+      service_filter:      inputs.service ? String(inputs.service).toUpperCase() : null
     };
   }
 
-  // ---- 5. Identity sidecar (best-effort) ----
+  // ---- 5. Identity (RadioDNS / RDS / EAS) — with ZTR fallback ----
+  // Identity has two tiers:
+  //   1. Identity sidecar (chelstein/massdns + EAS-Tools + audio-fp).
+  //      When wired, returns multi-source confirmations.
+  //   2. ZTR /api/radiodns/station/:id rich-station RadioDNS data.
+  //      ZTR's resolver carries PI/GCC/FQDN/bearer/service URLs directly
+  //      on the station object, so when the identity sidecar is down or
+  //      unwired we still get a RadioDNS confirmation from ZTR.
+  // The two tiers are not mutually exclusive — we prefer the sidecar
+  // when it returns confirmations, fall back to ZTR otherwise, and
+  // merge sources from both when both produce data.
+  let identityFromSidecar = null;
   if (sidecars.identity && (inputs.call || inputs.facility_id)){
     try {
-      const ident = await sidecars.identity.resolve({
+      identityFromSidecar = await sidecars.identity.resolve({
         call:           inputs.call,
         facility_id:    inputs.facility_id,
         frequency:      inputs.frequency,
         frequency_unit: inputs.service === 'AM' ? 'kHz' : 'MHz'
       });
-      evidence.identity = ident;
+    } catch {/* swallow; fall through to ZTR */}
+  }
+
+  let identityFromZtr = null;
+  if (ztrStationId && sidecars.facility?.getRadioDnsFromZtr){
+    try {
+      identityFromZtr = await sidecars.facility.getRadioDnsFromZtr({
+        stationId: ztrStationId,
+        rich:      richStation
+      });
     } catch {/* swallow; identity is best-effort */}
+  }
+
+  // Merge: sidecar takes precedence; ZTR contributes RadioDNS when
+  // the sidecar didn't.  At least one confirmed source → available.
+  const sidecarConfirmed = identityFromSidecar?.confirmations?.length > 0;
+  const ztrConfirmed     = identityFromZtr?.available;
+  if (sidecarConfirmed || ztrConfirmed){
+    const mergedSources       = [];
+    const mergedConfirmations = [];
+    if (identityFromSidecar){
+      mergedSources.push(...(identityFromSidecar.sources || []));
+      mergedConfirmations.push(...(identityFromSidecar.confirmations || []));
+    }
+    if (identityFromZtr?.available){
+      // Only add ZTR's RadioDNS if the sidecar didn't already produce
+      // a confirmed RadioDNS source — avoid duplicate kinds.
+      const haveRadioDns = mergedConfirmations.some(c => c.kind === 'radiodns' && c.status === 'confirmed');
+      if (!haveRadioDns){
+        mergedSources.push(...(identityFromZtr.sources || []));
+        mergedConfirmations.push(...(identityFromZtr.confirmations || []));
+      }
+    }
+    evidence.identity = {
+      available:    true,
+      requested_at: new Date().toISOString(),
+      sources:      mergedSources,
+      confirmations: mergedConfirmations,
+      tiers_used:   [
+        sidecarConfirmed ? 'identity-sidecar' : null,
+        ztrConfirmed && !sidecarConfirmed ? 'zerotrustradio-radiodns' : null
+      ].filter(Boolean)
+    };
+  } else if (identityFromSidecar){
+    // Sidecar reachable but no confirmations; preserve its detail.
+    evidence.identity = identityFromSidecar;
+  }
+
+  // identity_probe — diagnostic block surfaced even when nothing
+  // confirmed.  Lets the operator see WHICH field names were checked
+  // and which keys ZTR's rich-station response actually carries, so
+  // a missing variant can be added in one line.  Same pattern as
+  // measurements_probe for SDR captures.
+  if (!evidence.identity?.available && (identityFromSidecar || identityFromZtr)){
+    evidence.identity_probe = {
+      available:                  false,
+      sidecar:                    identityFromSidecar
+        ? { configured: true,  reachable: !identityFromSidecar.error,
+            n_sources:   (identityFromSidecar.sources || []).length,
+            n_confirmations: (identityFromSidecar.confirmations || []).length,
+            error:       identityFromSidecar.error || null }
+        : { configured: false },
+      ztr_radiodns:               identityFromZtr
+        ? { configured: true,  reachable: !identityFromZtr.error || identityFromZtr.error.includes('no RadioDNS'),
+            error:               identityFromZtr.error || null,
+            checked_field_names: identityFromZtr.checked_field_names || null,
+            checked_subobjects:  identityFromZtr.checked_subobjects  || null,
+            station_keys:        identityFromZtr.station_keys        || null,
+            endpoint:            identityFromZtr.endpoint            || null }
+        : { configured: false }
+    };
   }
 
   // ---- 6. Validation context ----
@@ -295,6 +881,94 @@ export async function computeExhibit(req){
     runs: [curveRefRun, legacyRun],
     reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
   };
+
+  // ---- 6b. §74.1204 nearby-primaries proximity search (FX only) ----
+  // For FM translator exhibits with coordinates and a frequency, hit
+  // FCC FMQ for every channel relationship governed by §74.1204(a) (co-
+  // channel + ±200/400/600 kHz adjacents + ±10.6/10.8 MHz IF) and
+  // proximity-filter to within TRANSLATOR_NEARBY_RADIUS_KM (default
+  // 300 km).  The result lands on evidence.nearby_primaries, which the
+  // engine's checkTranslatorInterference consumes verbatim to run the
+  // per-station D/U study.  Without this attach, the engine emits
+  // MISSING_NEARBY_STATIONS — honest, but the study can't run.
+  // FM (full-service) also needs nearby_primaries for the §73.215
+  // contour-protection short-spacing study.  Same FCC FMQ source, same
+  // §74.1204-style channel-offset queries (co + ±200/400/600 kHz, IF).
+  // The engine filters the list to FM-only inside checkSection73215.
+  // AM nighttime §73.187 also pulls a list — same upstream (FCC AMQ
+  // direct), wider default radius (1500 km vs 300 km) for skywave reach.
+  const svc = String(inputs.service || '').toUpperCase();
+  const wantsNearby = ['FX', 'FM', 'AM'].includes(svc);
+  if (wantsNearby
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && Number.isFinite(Number(inputs.frequency))
+      && sidecars.facility?.getNearbyPrimaries
+      && process.env.TRANSLATOR_NEARBY_DISABLE !== '1'){
+    try {
+      const nbArgs = svc === 'AM' ? {
+        lat:                 Number(inputs.lat),
+        lon:                 Number(inputs.lon),
+        frequency_khz:       Number(inputs.frequency),    // engine takes AM in kHz
+        service:             'AM',
+        radius_km:           Number(process.env.AM_NEARBY_RADIUS_KM) || 1500,
+        exclude_facility_id: inputs.facility_id || null
+      } : {
+        lat:                 Number(inputs.lat),
+        lon:                 Number(inputs.lon),
+        frequency_mhz:       Number(inputs.frequency),
+        service:             svc,
+        radius_km:           Number(process.env.TRANSLATOR_NEARBY_RADIUS_KM) || 300,
+        exclude_facility_id: inputs.facility_id || null
+      };
+      const nb = await budget.withDeadline('nearby_primaries_fmq',
+        () => sidecars.facility.getNearbyPrimaries(nbArgs),
+        { minMs: 15_000 });
+      if (nb?.available){
+        let primaries = nb.primaries;
+        let enrichment = null;
+        // Per-station environmental enrichment from ZTR rich-station
+        // data (M3 conductivity, RSS-equivalent ERP for directional,
+        // sunrise/sunset offsets).  Lifts §73.215 and §73.187 study
+        // accuracy beyond conservative defaults.  Concurrency-capped
+        // and fail-soft: stations not in ZTR pass through unchanged.
+        if (sidecars.facility?.enrichNearbyFromZtr
+            && process.env.NEARBY_ZTR_ENRICH_DISABLE !== '1'
+            && primaries.length > 0){
+          try {
+            const e = await budget.withDeadline('nearby_ztr_enrichment',
+              () => sidecars.facility.enrichNearbyFromZtr(primaries, {
+                concurrency: Number(process.env.NEARBY_ZTR_ENRICH_CONCURRENCY) || 10
+              }), { minMs: 5_000 });
+            if (e){
+              primaries  = e.primaries;
+              enrichment = {
+                n_enriched: e.n_enriched,
+                n_total:    e.n_total,
+                fields:     ['ground_sigma_msm', 'rss_erp_kw', 'sunrise_offset_min', 'sunset_offset_min'],
+                source:     'zerotrustradio',
+                errors:     e.errors?.length ? e.errors.slice(0, 5) : null
+              };
+            }
+          } catch (err){
+            enrichment = { n_enriched: 0, n_total: primaries.length, error: String(err.message), source: 'zerotrustradio' };
+          }
+        }
+        evidence.nearby_primaries = primaries;
+        evidence.nearby_primaries_provenance = {
+          source:       nb.source,
+          method:       nb.method,
+          upstream_api: nb.upstream_api,
+          radius_km:    nb.radius_km,
+          n_queries:    nb.n_queries,
+          n_in_radius:  nb.n_in_radius,
+          fetched_at:   nb.fetched_at,
+          errors:       nb.errors,
+          ztr_enrichment: enrichment
+        };
+      }
+    } catch { /* swallow; engine emits MISSING_NEARBY_STATIONS honestly */ }
+  }
 
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {
@@ -335,7 +1009,12 @@ export async function computeExhibit(req){
       endpoint:      populationResp.endpoint,
       fetched_at:    populationResp.fetched_at,
       sha256:        populationResp.sha256,
-      contour_label: populationResp.contour_label
+      contour_label: populationResp.contour_label,
+      // Population is INFORMATIONAL ONLY — FCC §73.x compliance never
+      // depends on a population number.  The contour rules (§73.207,
+      // §73.215, §74.1204, §73.187) are distance/field-strength tests.
+      informational_only: true,
+      disclaimer:    'INFORMATIONAL ONLY.  FCC broadcast filings do not require population data; compliance is determined by distance and field-strength tests.  This is the licensee\'s best estimate of audience reach within the protected contour, not a regulatory determination.'
     };
   } else if (populationResp){
     // Reachable but malformed/HTTP error: stamp the failure reason on
@@ -391,17 +1070,47 @@ export async function computeExhibit(req){
   }
   if (evidence.identity){
     exhibit.evidence.identity = evidence.identity;
+  } else if (evidence.identity_probe){
+    exhibit.evidence.identity_probe = evidence.identity_probe;
+  }
+  if (evidence.fcc_lms){
+    exhibit.evidence.fcc_lms = evidence.fcc_lms;
+  } else if (evidence.fcc_lms_attempt){
+    exhibit.evidence.fcc_lms_attempt = evidence.fcc_lms_attempt;
   }
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;
+  }
+  if (evidence.nec_model){
+    exhibit.evidence.nec_model = evidence.nec_model;
+  } else if (evidence.nec_model_attempt){
+    exhibit.evidence.nec_model_attempt = evidence.nec_model_attempt;
+  }
+  if (evidence.asr){
+    exhibit.evidence.asr = evidence.asr;
+    if (evidence.asr.cross_check?.matches === false){
+      const detail = evidence.asr.cross_check.mismatches
+        .map(m => `${m.field}: ASR=${m.asr_value} vs application=${m.app_value}${m.delta_arcsec ? ` (Δ ${m.delta_arcsec} arcsec)` : ''}${m.delta_m ? ` (Δ ${m.delta_m} m)` : ''}`)
+        .join(' | ');
+      const hasMajor = evidence.asr.cross_check.mismatches.some(m => m.severity === 'major');
+      let warnings = exhibit.warnings || [];
+      warnings.push(W.make('ASR_MISMATCH',
+        `ASR ${evidence.asr.asr_number}${hasMajor ? ' MAJOR' : ''} mismatch (${evidence.asr.cross_check.n_mismatches}): ${detail}`));
+      exhibit.warnings = warnings;
+    }
+  }
+  if (evidence.nearby_primaries_provenance){
+    exhibit.evidence.nearby_primaries           = evidence.nearby_primaries;
+    exhibit.evidence.nearby_primaries_provenance = evidence.nearby_primaries_provenance;
   }
 
   // ---- 10. Reconcile warnings against actual evidence ----
   // The engine pre-emptively emits CONSTANT_HAAT_ASSUMED, FACILITY_LOOKUP_UNAVAILABLE,
   // SDR_MEASUREMENTS_MISSING, and CURVE_VALIDATION_MISSING based on its
-  // local view.  Now that we have real evidence, drop the ones that
-  // shouldn't apply.
-  let warnings = exhibit.warnings || [];
+  // local view.  Concat the engine's warnings onto our pre-engine
+  // collector (LMS, NEC, …), then run the existing filter passes that
+  // drop pre-emptive warnings now that real evidence is attached.
+  warnings = warnings.concat(exhibit.warnings || []);
 
   if (facilityResolution){
     warnings = warnings.filter(w => w.code !== 'FACILITY_LOOKUP_UNAVAILABLE');
@@ -448,6 +1157,17 @@ export async function computeExhibit(req){
       ? `Upstream returned malformed population evidence; missing fields: ${populationResp.missing.join(', ')}.`
       : `Population upstream attempt failed: ${populationResp.error || 'unknown'}.`;
     warnings.push(W.make('POPULATION_PLACEHOLDER', detail));
+  }
+
+  // ---- §74.1204 nearby-primaries proximity search reconciliation ----
+  // The engine emits MISSING_NEARBY_STATIONS whenever nearby_primaries
+  // is empty.  When the orchestrator's FCC FMQ proximity search ran
+  // successfully (provenance attached), an empty result is a positive
+  // §74.1204 outcome (no nearby restricted-channel stations) — not
+  // missing data.  Drop the warning in that case; the provenance block
+  // on the exhibit records that the search was performed.
+  if (evidence.nearby_primaries_provenance?.source){
+    warnings = warnings.filter(w => w.code !== 'MISSING_NEARBY_STATIONS');
   }
 
   // ---- Curve reference validation (drives CURVE_VALIDATION_MISSING) ----
@@ -505,17 +1225,18 @@ export async function computeExhibit(req){
   // peeling the array.
   exhibit.validation = exhibit.validation || { runs: [] };
   exhibit.validation.curve_reference_validation = {
-    name:           curveRefRun?.name || 'fm-f5050-golden',
-    method:         curveRefRun?.method || null,
-    fixture_path:   curveRefRun?.fixture_path || null,
-    curve_dataset:  curveRefRun?.curve_dataset || null,
-    tolerance_km:   curveRefRun?.tolerance_km ?? null,
-    ran_at:         curveRefRun?.ran_at || null,
-    n_run:          curveRefRun?.n_run ?? 0,
-    n_pass:         curveRefRun?.n_pass ?? 0,
-    max_error_km:   curveRefRun?.max_error_km ?? null,
-    mean_error_km:  curveRefRun?.mean_error_km ?? null,
-    result:         curveRefRun?.result || 'no_cases'
+    name:               curveRefRun?.name || 'genoa-curve-golden',
+    method:             curveRefRun?.method || null,
+    fixture_path:       curveRefRun?.fixture_path || null,
+    curve_dataset:      curveRefRun?.curve_dataset || null,
+    coverage_by_family: curveRefRun?.coverage_by_family || null,
+    tolerance_km:       curveRefRun?.tolerance_km ?? null,
+    ran_at:             curveRefRun?.ran_at || null,
+    n_run:              curveRefRun?.n_run ?? 0,
+    n_pass:             curveRefRun?.n_pass ?? 0,
+    max_error_km:       curveRefRun?.max_error_km ?? null,
+    mean_error_km:      curveRefRun?.mean_error_km ?? null,
+    result:             curveRefRun?.result || 'no_cases'
   };
   if (crossCheckRun){
     exhibit.validation.fcc_cross_check = {
@@ -535,6 +1256,86 @@ export async function computeExhibit(req){
   if (process.env.TERRAIN_SIDECAR_URL && !sidecars.terrain){
     warnings.push(W.make('SIDECAR_UNAVAILABLE', 'TERRAIN_SIDECAR_URL configured but client construction failed.'));
   }
+
+  // ---- 7b. FCC parity report (opt-in, post-engine) ----
+  // Live comparison of Genoa's contour distances vs the FCC's public
+  // distance.json endpoint.  Opt-in via options.fcc_parity_report=true
+  // because each report makes up to FCC_PARITY_MAX_SAMPLES (24)
+  // upstream calls; defaults are conservative enough that a normal
+  // exhibit doesn't pay this cost unless asked.
+  if (options.fcc_parity_report === true){
+    try {
+      const { makeFccParityClient } = await import('../../evidence/fccParity/client.js');
+      const parityClient = makeFccParityClient();
+      if (parityClient){
+        const report = await budget.withDeadline('fcc_parity_report',
+          () => parityClient.report(exhibit), { minMs: 8_000 });
+        if (report){
+          exhibit.evidence.fcc_parity_report = report;
+          if (report.available){
+            if (report.overall_pass){
+              warnings.push(W.make('FCC_PARITY_VERIFIED',
+                `${report.n_pass}/${report.n_samples} samples within ${report.tolerance_km} km tolerance; max delta ${report.max_error_km} km.`));
+            } else {
+              warnings.push(W.make('FCC_PARITY_DELTA',
+                `${report.n_fail}/${report.n_samples} samples exceed ${report.tolerance_km} km tolerance; max delta ${report.max_error_km} km.`));
+            }
+          }
+        }
+      }
+    } catch (e){ /* silent — parity is opt-in, never fail compute on it */ }
+  }
+
+  // ---- 7c. SDR predicted-vs-measured residual table ----
+  // Always run when calibrated SDR captures are present.  The
+  // calibration metadata is extracted from the rich-station response
+  // (richStation.station.calibration / .receiver / etc.) AND from
+  // each capture record individually (per-record overrides win).
+  if (sdrResp?.available && Array.isArray(sdrResp.records) && sdrResp.records.length){
+    try {
+      const { extractCalibration, computeResidualTable } =
+        await import('../../evidence/sdrCalibration.js');
+      const calibration = extractCalibration(richStation?.station || {});
+      const tx = {
+        lat:           inputs.lat,
+        lon:           inputs.lon,
+        haat_m:        inputs.haat_m,
+        erp_kw:        inputs.erp_kw,
+        frequency:     inputs.frequency,
+        service:       inputs.service,
+        ground_sigma_mS_m: inputs.ground_sigma_mS_m
+      };
+      const residuals = computeResidualTable({
+        tx, calibration, captures: sdrResp.records
+      });
+      exhibit.evidence.measurements.residuals  = residuals;
+      exhibit.evidence.measurements.calibration = residuals.calibration;
+
+      if (!residuals.calibration?.calibrated && residuals.n_total > 0){
+        warnings.push(W.make('SDR_CALIBRATION_MISSING',
+          `${residuals.n_uncalibrated}/${residuals.n_total} captures are uncalibrated.  Add calibration metadata to lift to filing-grade.`));
+      }
+      if (residuals.rms_residual_dB != null && residuals.rms_residual_dB > 10){
+        warnings.push(W.make('SDR_RESIDUAL_LARGE',
+          `RMS residual ${residuals.rms_residual_dB} dB across ${residuals.n_evaluated} captures (${residuals.n_above_predicted} above / ${residuals.n_below_predicted} below predicted).`));
+      }
+    } catch (e){ /* silent — residuals are evidence, never fail compute */ }
+  }
+
+  // Compute-budget summary.  When any network-bound evidence fetches
+  // were skipped past the deadline, surface them as one warning with
+  // the named steps + elapsed wall-clock so an operator can see
+  // exactly which upstreams ran out of time.
+  const skipped = budget.skipped();
+  if (skipped.length > 0){
+    warnings.push(W.make('COMPUTE_TIMEOUT_PARTIAL',
+      `Skipped ${skipped.length} fetch(es) past the ${budget.budget_ms} ms budget at ${budget.elapsed_ms()} ms elapsed: ${skipped.map(s => s.name).join(', ')}.  Raise COMPUTE_BUDGET_MS or the deploy's HTTP gateway timeout if a particular source is consistently slow.`));
+  }
+  exhibit.compute_budget = {
+    budget_ms:   budget.budget_ms,
+    elapsed_ms:  budget.elapsed_ms(),
+    skipped
+  };
 
   exhibit.warnings         = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');

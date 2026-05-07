@@ -5,7 +5,7 @@ node_modules/
 *.log
 .DS_Store
 /tmp/
-coverage/
+/coverage/                # test coverage reports (root-level only — src/engine/coverage/ is engine code)
 
 # Vite build output (generated; do not commit)
 src/ui/dist/

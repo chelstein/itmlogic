@@ -74,9 +74,21 @@ export function exportTxt(exhibit){
   L.push('');
 
   L.push('-- POPULATION ESTIMATE --');
-  L.push(`Primary:          ~${(pop.primary || 0).toLocaleString()}  (${pop.model || '—'})`);
-  L.push(`Protected:        ~${(pop.protected || 0).toLocaleString()}`);
-  L.push(`** PLACEHOLDER. A Census/ACS dispatch is required for any filing-grade population claim. **`);
+  if (pop.source){
+    L.push(`Persons:          ~${(pop.primary || 0).toLocaleString()}`);
+    if (pop.protected != null) L.push(`Protected:        ~${(pop.protected || 0).toLocaleString()}`);
+    L.push(`Source:           ${pop.source}`);
+    if (pop.dataset)  L.push(`Dataset:          ${pop.dataset}`);
+    if (pop.vintage)  L.push(`Census vintage:   ${pop.vintage}`);
+    if (pop.method)   L.push(`Method:           ${pop.method}`);
+    if (pop.endpoint) L.push(`Endpoint:         ${pop.endpoint}`);
+    if (pop.fetched_at) L.push(`Fetched at:       ${pop.fetched_at}`);
+  } else {
+    L.push(`Primary:          ~${(pop.primary || 0).toLocaleString()}  (${pop.model || '—'})`);
+    L.push(`Protected:        ~${(pop.protected || 0).toLocaleString()}`);
+    L.push(`** PLACEHOLDER — population sourced from model estimate only. **`);
+    L.push(`** A Census/ACS dispatch is required for any filing-grade population claim. **`);
+  }
   L.push('');
 
   L.push('-- EVIDENCE --');

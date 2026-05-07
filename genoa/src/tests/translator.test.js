@@ -122,6 +122,65 @@ test('Engine integration: FX exhibit without primaries has MISSING_NEARBY_STATIO
     'must not assert §74.1204 violation when the study did not run');
 });
 
+test('Engine integration: FX exhibit emits §74.1204(c) D/U gate table', async () => {
+  const x = await buildExhibit({
+    call: 'W250FX', facility_id: '60002',
+    service: 'FX', fcc_class: 'D',
+    frequency: 100.1, erp_kw: 0.25, haat_m: 30,
+    lat: 37.0902, lon: -95.7129,
+    radial_step_deg: 30
+  });
+  const meta = x.regulatory_compliance?.regulatory_metadata;
+  assert.ok(meta, 'regulatory_metadata must be stamped on FX exhibits');
+  assert.equal(meta.cite, '47 CFR §74.1204');
+  // §74.1204(c) D/U gates — sourced regulatory constants.
+  assert.equal(meta.du_gates_db.cochannel,        20);
+  assert.equal(meta.du_gates_db.first_adjacent,    6);
+  assert.equal(meta.du_gates_db.second_adjacent, -40);
+  assert.equal(meta.du_gates_db.third_adjacent,  -40);
+  assert.equal(meta.du_gates_db.if_offset,       -40);
+  // Class-dependent protected field thresholds.
+  assert.equal(meta.protected_field_thresholds_dbu.A,  60);
+  assert.equal(meta.protected_field_thresholds_dbu.B,  54);
+  assert.equal(meta.protected_field_thresholds_dbu.C,  54);
+  assert.equal(meta.protected_field_thresholds_dbu.LP100, 60);
+});
+
+test('Engine integration: FX exhibit emits F(50,50) service + F(50,10) interfering contours', async () => {
+  const x = await buildExhibit({
+    call: 'W250FX', facility_id: '60002',
+    service: 'FX', fcc_class: 'D',
+    frequency: 100.1, erp_kw: 0.25, haat_m: 30,
+    lat: 37.0902, lon: -95.7129,
+    radial_step_deg: 30
+  });
+  const ids = (x.contour_definitions || []).map(c => c.id);
+  // Service contour (F(50,50)).
+  assert.ok(ids.includes('service_60dbu'),     'must emit 60 dBu F(50,50) service contour');
+  // §74.1204(a)+(c) interfering contours (F(50,10)).
+  assert.ok(ids.includes('interfering_40dbu'), 'must emit 40 dBu F(50,10) — co-channel vs 60 dBu D/U=20');
+  assert.ok(ids.includes('interfering_34dbu'), 'must emit 34 dBu F(50,10) — co-channel vs 54 dBu D/U=20');
+  assert.ok(ids.includes('interfering_54dbu'), 'must emit 54 dBu F(50,10) — 1st-adj vs 60 dBu D/U=6');
+  assert.ok(ids.includes('interfering_48dbu'), 'must emit 48 dBu F(50,10) — 1st-adj vs 54 dBu D/U=6');
+  // Each radial must carry distances for every contour id (no silent drops).
+  for (const r of x.radial_table){
+    for (const id of ids){
+      assert.ok(Number.isFinite(r.contour_distances_km[id]),
+        `radial ${r.azimuth_deg}° must have finite distance for ${id}`);
+    }
+  }
+  // Interfering 40 dBu (D=60, G=20) is at a LOWER field strength than the
+  // service 60 dBu, so its distance must be GREATER on every radial.  This
+  // is the geometric heart of §74.1204: the interference exclusion zone
+  // extends beyond the service contour.
+  for (const r of x.radial_table){
+    const service = r.contour_distances_km.service_60dbu;
+    const co_60   = r.contour_distances_km.interfering_40dbu;
+    assert.ok(co_60 > service,
+      `co-channel 40 dBu interfering contour must extend past 60 dBu service at ${r.azimuth_deg}° (got ${co_60.toFixed(2)} vs service ${service.toFixed(2)} km)`);
+  }
+});
+
 test('Engine integration: FX exhibit with violating primary blocks via TRANSLATOR_INTERFERENCE', async () => {
   const { compute } = await import('../engine/index.js');
   const { runValidationSuite } = await import('../engine/validation/runner.js');
