@@ -42,8 +42,25 @@ function buildSslConfig(){
   };
 }
 
+// pg-connection-string v2.7+ upgrades sslmode=require/prefer/verify-ca in the
+// connection string to "verify-full" semantics, which silently overrides our
+// pool-level `ssl: { rejectUnauthorized: false }`.  DO / Heroku / Render
+// managed Postgres present a self-signed CA chain, so verify-full rejects
+// every connection with "self-signed certificate in certificate chain" —
+// migrations skipped at startup, every saveExhibit query fails.
+//
+// The pg warning itself recommends `uselibpqcompat=true` to restore the
+// previous behaviour.  This helper appends that flag exactly once when an
+// sslmode is present in the URL.
+function applyLibpqCompat(url){
+  if (!url) return url;
+  if (!/(\?|&)sslmode=/.test(url))      return url;   // no sslmode → nothing to relax
+  if (/(\?|&)uselibpqcompat=/.test(url)) return url;  // already set
+  return url + (url.includes('?') ? '&' : '?') + 'uselibpqcompat=true';
+}
+
 const POOL_CONFIG = {
-  connectionString:        process.env.DATABASE_URL,
+  connectionString:        applyLibpqCompat(process.env.DATABASE_URL),
   ssl:                     buildSslConfig(),
   max:                     Number(process.env.PG_POOL_MAX || 10),
   idleTimeoutMillis:       Number(process.env.PG_IDLE_TIMEOUT_MS    || 30_000),
