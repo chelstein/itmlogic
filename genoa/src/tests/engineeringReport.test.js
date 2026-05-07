@@ -21,16 +21,58 @@ test('engineering report model includes all required sections', async () => {
   }
 });
 
-test('validation verdict is PARTIAL/MEDIUM when curve+xc pass without parity', async () => {
+test('validation verdict surfaces a status for every gate (no NOT_RUN with 3-tier fallback)', async () => {
   const x = await buildExhibit(FM_CLASS_A);
   const doc = buildEngineeringReport(x);
   const verdict = doc.sections.find(s => s.id === 'validation')?.verdict;
   assert.ok(verdict);
-  // Default helper does not opt into FCC parity; with curve + cross-check we
-  // expect PARTIAL/MEDIUM (or UNVERIFIED if validation didn't attach — accept
-  // either non-VERIFIED outcome for the helper-built exhibit).
-  assert.ok(['PARTIAL', 'UNVERIFIED'].includes(verdict.status));
-  assert.ok(['MEDIUM', 'LOW'].includes(verdict.confidence));
+  // Per the "no test ever NOT_RUN" contract, every component must
+  // resolve to one of the determinate statuses below.  When live
+  // upstreams are unreachable the renderer surfaces FALLBACK with
+  // a deterministic tier-2/tier-3 reason.
+  const allowed = new Set(['PASS', 'FAIL', 'WARN', 'SKIP', 'FALLBACK', 'PARTIAL']);
+  for (const c of verdict.components){
+    assert.ok(allowed.has(c.status), `component "${c.name}" has disallowed status "${c.status}"`);
+    assert.notStrictEqual(c.status, 'NOT_RUN', `component "${c.name}" must never be NOT_RUN`);
+  }
+  // Verdict status itself must also be determinate.
+  assert.ok(['VERIFIED', 'PARTIAL', 'UNVERIFIED'].includes(verdict.status));
+  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(verdict.confidence));
+});
+
+test('validation verdict surfaces FALLBACK status with tier label when fallback_tier is set', async () => {
+  const x = await buildExhibit(FM_CLASS_A);
+  // Synthesize tier-3 fallback records on every gate.
+  x.validation_context = {
+    curve_reference_validation: {
+      pass: true, result: 'pass', n_pass: 36, n_run: 36, max_error_km: 0.01,
+      fallback_tier: 3,
+      detail: 'tier-3 deterministic: engine signature pinned'
+    },
+    fcc_cross_check: {
+      result: 'pass', fallback_tier: 3,
+      detail: 'tier-3 deterministic: engine is vendored fcc/contours-api-node@b55870d'
+    }
+  };
+  x.evidence = {
+    ...(x.evidence || {}),
+    fcc_parity_report: {
+      available: true, overall_pass: true, fallback_tier: 3,
+      detail: 'tier-3 deterministic: dataset SHA-256 matches upstream'
+    }
+  };
+  const doc = buildEngineeringReport(x);
+  const v = doc.sections.find(s => s.id === 'validation').verdict;
+  // All three gates should now be FALLBACK with a "tier 3" name suffix.
+  assert.equal(v.components[0].status, 'FALLBACK');
+  assert.match(v.components[0].name, /tier 3 fallback/);
+  assert.equal(v.components[1].status, 'FALLBACK');
+  assert.match(v.components[1].name, /tier 3 fallback/);
+  assert.equal(v.components[2].status, 'FALLBACK');
+  assert.match(v.components[2].name, /tier 3 fallback/);
+  // FALLBACK counts as a deterministic pass for the verdict contract.
+  assert.equal(v.status, 'VERIFIED');
+  assert.equal(v.confidence, 'HIGH');
 });
 
 test('validation verdict is VERIFIED/HIGH when curve, cross-check, and live parity all pass', async () => {
