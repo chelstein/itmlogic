@@ -120,13 +120,30 @@ export function completeJob(id, { result = null, artifact = null, artifact_url =
   });
 }
 
+// Error fields handled explicitly by failJob.  Any other own-enumerable
+// property on the Error (e.g. the FCC engine's `flag` array, or upstream
+// HTTP `status` and `body`) is preserved under `error.details` so the
+// failed-job record carries enough diagnostic context for an operator
+// to root-cause without rerunning the job.
+const FAIL_ERR_STD_FIELDS = new Set(['name', 'message', 'stack', 'code', 'cause']);
+
 export function failJob(id, err){
   const message = (err && (err.message || err.toString())) || 'unknown error';
   const code    = (err && err.code) || 'JOB_FAILED';
+  const stack   = (err && err.stack) || null;
+  const details = {};
+  if (err && typeof err === 'object'){
+    for (const k of Object.keys(err)){
+      if (FAIL_ERR_STD_FIELDS.has(k)) continue;
+      details[k] = err[k];
+    }
+  }
+  const error = { code, message, stack };
+  if (Object.keys(details).length) error.details = details;
   return updateJob(id, {
     status:           JOB_STATUS.FAILED,
     progress_message: 'Failed',
-    error:            { code, message, stack: (err && err.stack) || null }
+    error
   });
 }
 
