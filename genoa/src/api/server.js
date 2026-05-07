@@ -11,6 +11,7 @@ import curveRoutes     from './routes/curves.js';
 import exhibitRoutes    from './routes/exhibits.js';
 import exhibitJobRoutes from './routes/exhibitJobs.js';
 import facilityRoutes   from './routes/facilities.js';
+import sweepRoutes      from './routes/sweep.js';
 import { errorHandler } from './middleware/errors.js';
 import { migrate }   from '../db/migrate.js';
 import { poolReady } from '../db/pool.js';
@@ -47,6 +48,7 @@ app.use(express.static(uiRoot, {
 app.use('/api', curveRoutes);
 app.use('/api', facilityRoutes);
 app.use('/api', exhibitJobRoutes);   // async job endpoints (mount before exhibitRoutes is harmless; paths don't collide)
+app.use('/api', sweepRoutes);        // parameter-sweep endpoint (POST /api/exhibits/sweep)
 app.use('/api', exhibitRoutes);
 
 // Last-resort error handler
