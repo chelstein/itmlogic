@@ -13,6 +13,7 @@ import Login         from '@components/ui/Login.jsx';
 import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
 import PeSealCard     from '@components/ui/PeSealCard.jsx';
 import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
+import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
 
 /* =========================================================================
    App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
@@ -52,6 +53,7 @@ const TABS = [
   { id: 'validation', label: 'Validation' },
   { id: 'sweep',      label: 'Find best config' },
   { id: 'am_da',      label: 'AM DA designer' },
+  { id: 'filing',     label: 'Filing package' },
   { id: 'provenance', label: 'Provenance' },
   { id: 'narrative',  label: 'AI narrative' },
   { id: 'exports',    label: 'Exports' },
@@ -185,6 +187,8 @@ function MainApp({ onLogout }) {
 
   /* ---------------- COMPUTE ---------------- */
 
+  // `overrideInputs` lets preset loaders pass freshly-merged inputs
+  // directly without depending on React state having flushed.
   // Run an async export job: POST → poll every 2 s → return the
   // completed job view.  Throws with the actual job error on failure
   // (no more naked HTTP 504 from the proxy).  onProgress(message) lets
@@ -279,6 +283,10 @@ function MainApp({ onLogout }) {
 
   /* ---------------- PRESETS ---------------- */
 
+  // Load KSLX-FM, resolve via ZTR, compute against the resolved row.
+  // We thread the merged inputs through compute() to dodge React's
+  // stale-closure on `inputs` — setInputs queues a render but compute
+  // would otherwise still see the previous state.
   async function loadKslx(){
     setInputs(PRESET_KSLX);
     setFacilitySource('Looking up KSLX-FM (facility 11282)…');
@@ -290,11 +298,16 @@ function MainApp({ onLogout }) {
         setInputs(merged);
       }
     }
+    // Thread the merged inputs into compute() directly so the request
+    // body matches what the user just loaded — no React render delay.
     await compute(merged);
   }
 
   /* ---------------- STATION SEARCH ---------------- */
 
+  // Debounced search against /api/facilities/search.  Returns up to 10
+  // matches.  No business logic in the UI — just hit the endpoint and
+  // render the rows.
   async function searchStations(q){
     const qs = String(q || '').trim();
     if (qs.length < 2){
@@ -335,20 +348,35 @@ function MainApp({ onLogout }) {
     stationDebounceRef.current = setTimeout(() => searchStations(q), 250);
   }
 
+  // Click handler for a station search result.  Fills inputs from the
+  // row, clears the search, then computes — same threading trick as
+  // loadKslx so the compute body matches what just got loaded.
   async function loadStationRow(row){
     if (!row) return;
+    // Build a clean base where every FCC-sourced field is empty so
+    // mergeFacility's "fill if empty" actually fills from the row.
+    // Operator-only UI choices (radial step, terrain toggle) carry
+    // forward; engineering inputs (call/service/freq/erp/haat/lat/lon/
+    // class/pattern) are reset.  Without this reset, picking a new
+    // station leaves the previous lat/lon, ERP, HAAT, etc. visible
+    // because mergeFacility is conservative ("fill if empty").
     const base = {
       ...PRESET_SYNTHETIC,
       _synthetic: false,
       radial_step_deg: inputs.radial_step_deg || 10,
       use_terrain:     !!inputs.use_terrain,
+      // Engineering fields — reset so the row's values show through.
       lat: '', lon: '',
       facility_id: '', call: '',
       service:    '', fcc_class: '',
       frequency:  '', erp_kw: '', haat_m: '',
-      pattern_mode: ''
+      pattern_mode: ''                      // mergeFacility falls back to
+                                            // base when row.pattern_mode is null
     };
     const merged = mergeFacility(base, row);
+    // mergeFacility leaves pattern_mode='' (from base) when the row
+    // doesn't carry pattern (e.g. ZTR rows) — coerce that to 'ND' so
+    // the dropdown shows a sensible default.
     if (!merged.pattern_mode) merged.pattern_mode = 'ND';
     setInputs(merged);
     setFacilitySource(`Loaded ${row.call || row.facility_id || 'station'} via ${row.facility_lookup_source?.upstream || 'upstream'}`);
@@ -359,6 +387,7 @@ function MainApp({ onLogout }) {
   function loadSynthetic(){
     setInputs(PRESET_SYNTHETIC);
     setFacilitySource('');
+    // Synthetic carries no facility_id; fine to compute via state.
     setTimeout(() => compute(PRESET_SYNTHETIC), 0);
   }
   function reset(){
@@ -376,12 +405,19 @@ function MainApp({ onLogout }) {
     const cleanedExhibit = stripDomAndReact(exhibit);
     const body = JSON.stringify(cleanedExhibit);
 
+    // Try the persisted-save endpoint first.  When persistence is
+    // unavailable (no DATABASE_URL on the deploy, App Platform error
+    // page, proxy 502 → HTML body), fall back to /api/exhibits/save
+    // (ephemeral; never crashes on missing DB), then to a local file
+    // download — never let the UI surface a JSON-parse crash.
     const tryPost = async (url) => {
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body
       });
+      // readJsonOrThrow surfaces HTML / non-JSON / non-2xx as a
+      // structured Error instead of crashing inside response.json().
       return readJsonOrThrow(r);
     };
 
@@ -401,6 +437,7 @@ function MainApp({ onLogout }) {
         return;
       } catch (e){ console.warn('[save] ephemeral save failed:', e.message); }
 
+      // Final fallback: synthesize a downloadable JSON file in-browser.
       const blob = new Blob([JSON.stringify(cleanedExhibit, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -421,6 +458,9 @@ function MainApp({ onLogout }) {
       return;
     }
     if (!exhibit.id){
+      // stateless mode: synthesize JSON / GeoJSON in-browser; PDF needs
+      // server-side rendering, so POST the exhibit to the stateless
+      // /api/exhibits/export/pdf route which returns the PDF body.
       const map = {
         json:    () => [JSON.stringify(exhibit, null, 2),         'application/json',     'exhibit.json'],
         geojson: () => [JSON.stringify(exhibit.geojson, null, 2), 'application/geo+json', 'contours.geojson']
@@ -526,6 +566,7 @@ function MainApp({ onLogout }) {
     }
     const map = mapRef.current.map;
 
+    // clear previous polygons + tx marker
     for (const l of mapRef.current.layers) map.removeLayer(l);
     mapRef.current.layers = [];
     if (mapRef.current.txMarker) map.removeLayer(mapRef.current.txMarker);
@@ -622,6 +663,12 @@ function MainApp({ onLogout }) {
         <FacilityRack
           inputs={inputs}
           onChange={onChange}
+          // Wrap every callback so React's SyntheticEvent never lands
+          // as the first argument of compute/save/etc — it would be
+          // mistaken for an `overrideInputs` object and crash
+          // JSON.stringify on circular DOM refs (target/currentTarget/
+          // nativeEvent/_react*).  The sanitizer in compute() is a
+          // belt-and-suspenders defense; this is the seatbelt.
           onCompute={() => compute()}
           onReset={() => reset()}
           onSave={() => save()}
@@ -714,21 +761,45 @@ function MainApp({ onLogout }) {
 /* ---------------- Tab body content ---------------- */
 
 function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, onApplyCombo, onApplyAmDaPattern }){
-  if (id === 'fcc')        return <PaneFcc exhibit={exhibit} />;
-  if (id === 'radials')    return <PaneRadials exhibit={exhibit} />;
-  if (id === 'evidence')   return <PaneEvidence exhibit={exhibit} />;
-  if (id === 'validation') return <PaneValidation exhibit={exhibit} />;
-  if (id === 'sweep')      return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
-  if (id === 'am_da')      return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
-  if (id === 'narrative')  return <PaneNarrative exhibit={exhibit} />;
-  if (id === 'provenance') return <PaneProvenance exhibit={exhibit} />;
-  if (id === 'exports')    return <PaneExports exhibit={exhibit} />;
-  if (id === 'history')    return <PaneHistory rows={history} onPick={onPickHistory} />;
+  if (id === 'fcc'){
+    return <PaneFcc exhibit={exhibit} />;
+  }
+  if (id === 'radials'){
+    return <PaneRadials exhibit={exhibit} />;
+  }
+  if (id === 'evidence'){
+    return <PaneEvidence exhibit={exhibit} />;
+  }
+  if (id === 'validation'){
+    return <PaneValidation exhibit={exhibit} />;
+  }
+  if (id === 'sweep'){
+    return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
+  }
+  if (id === 'am_da'){
+    return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
+  }
+  if (id === 'filing'){
+    return <FilingPackagePanel exhibit={exhibit} />;
+  }
+  if (id === 'narrative'){
+    return <PaneNarrative exhibit={exhibit} />;
+  }
+  if (id === 'provenance'){
+    return <PaneProvenance exhibit={exhibit} />;
+  }
+  if (id === 'exports'){
+    return <PaneExports exhibit={exhibit} />;
+  }
+  if (id === 'history'){
+    return <PaneHistory rows={history} onPick={onPickHistory} />;
+  }
   return null;
 }
 
 function PaneFcc({ exhibit }){
   if (!exhibit) return <Empty/>;
+  const s   = exhibit.station_inputs || {};
   const m   = exhibit.calculation_method || {};
   const ip  = exhibit.interpolation || {};
   const tr  = exhibit.calculation_trace || {};
@@ -737,7 +808,7 @@ function PaneFcc({ exhibit }){
     ['Method',          m.name],
     ['Regulations',     (m.regulations || []).join(', ')],
     ['Engine module',   m.engine_module],
-    ['Engine version',  m.engine_version],
+    ['Engine version', m.engine_version],
     ['Interp · field',  ip.along_field],
     ['Interp · HAAT',   ip.along_haat],
     ['Curve dataset',   trS.dataset],
@@ -914,26 +985,6 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.terrain.fetched_at || '—']
           ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
-
-      <SubHead title="Terrain-aware ITM coverage (47 CFR §73.314)" />
-      <SubKv kv={(() => {
-        const itm = ev.itm_coverage;
-        const poly = (exhibit.itm_polygons || [])[0];
-        if (!itm?.available && !poly) return [['Status', 'ITM coverage not run. Reachable when the SPLAT sidecar or the JS Bullington/P.526 fallback returns.']];
-        return [
-          ['Engine',       (itm?.engine || poly?.engine || '—') + (itm?.tier ? ' (' + itm.tier + ')' : '')],
-          ['Method',       itm?.method || poly?.method || '—'],
-          ['DEM source',   itm?.dem_source || poly?.dem_source || '—'],
-          ['Service threshold', itm?.arc?.target_field_dbu != null ? `${itm.arc.target_field_dbu} dBu` : '—'],
-          ['Mean radial — terrain', poly?.mean_radial_km != null ? `${poly.mean_radial_km} km` : '—'],
-          ['Mean radial — §73.333', poly?.fcc_mean_km != null ? `${poly.fcc_mean_km} km` : '—'],
-          ['Δ (terrain − §73.333)', poly?.delta_mean_km != null ? `${poly.delta_mean_km >= 0 ? '+' : ''}${poly.delta_mean_km} km` : '—'],
-          ['Service area (terrain)', poly?.area_km2 != null ? `${Math.round(poly.area_km2).toLocaleString()} km²` : '—'],
-          ['Closed radials', poly?.n_radials ?? '—'],
-          ['Blocked radials', poly?.n_blocked_radials ?? '—']
-        ];
-      })()} />
-
       <SubHead title="Population (INFORMATIONAL ONLY — not used for §73.x compliance)" />
       <SubKv kv={pop.source && pop.vintage
         ? [
@@ -954,7 +1005,6 @@ function PaneEvidence({ exhibit }){
               ['Endpoint', pop.attempt_endpoint || '—']
             ]
           : [['Status', 'Placeholder — real Census data will populate once an exhibit is computed with lat/lon coordinates.']]} />
-
       <SubHead title="Measurements (SDR captures via ZTR)" />
       <SubKv kv={ev.measurements?.available
         ? [
@@ -967,7 +1017,6 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.measurements.fetched_at || '—']
           ]
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
-
       <SubHead title="FCC Parity Report (live geo.fcc.gov bit-exact comparison)" />
       <SubKv kv={ev.fcc_parity_report?.available
         ? [
@@ -1036,7 +1085,6 @@ function PaneEvidence({ exhibit }){
               ['Errors',        (ev.fcc_lms_attempt.errors || []).slice(0, 3).join('; ') || '—']
             ]
           : [['Status', 'FCC LMS lookup not run (no call/facility_id supplied or FCC_LMS_DISABLE=1).']]} />
-
       <SubHead title="NEC Model (NEC2++ via GPL-isolated sidecar)" />
       <SubKv kv={ev.nec_model?.ok
         ? [
@@ -1065,7 +1113,6 @@ function PaneEvidence({ exhibit }){
               ['Detail',  (ev.nec_model_attempt.detail || '—').slice(0, 120)]
             ]
           : [['Status', 'NEC sidecar not configured (set NEC_SIDECAR_URL) or no antenna geometry supplied.']]} />
-
       <SubHead title="Identity (RDS / RadioDNS / EAS / audio)" />
       <SubKv kv={ev.identity?.available
         ? [
@@ -1167,7 +1214,7 @@ function PaneProvenance({ exhibit }){
         ['Calibrated', ev.measurements.calibrated ? 'yes' : 'no'],
         ['Fetched at', ev.measurements.fetched_at || '—']
       ] : [['Status', 'no SDR evidence attached']]} />
-      <SubHead title="SPLAT sidecar (terrain-aware coverage)" />
+      <SubHead title="SPLAT sidecar (terrain-aware contour, future)" />
       <SubKv kv={(() => {
         const sp = exhibit.evidence?.splat;
         if (!sp) return [['Status', 'not configured (SPLAT_SIDECAR_URL unset)']];
@@ -1331,6 +1378,11 @@ function SubKv({ kv }){
     </div>
   );
 }
+// Sanitize the FacilityRack inputs into the shape /api/exhibits/sweep
+// (and the engine) expects: number-cast numeric fields, drop UI-only
+// flags, pass DA pattern only when toggled on.  Mirrors the cleaning
+// done inline in compute(); shared so the sweep route sees identical
+// base inputs.
 function sanitizeBaseInputs(i){
   if (!i) return {};
   return {
