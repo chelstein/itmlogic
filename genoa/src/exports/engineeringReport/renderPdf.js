@@ -66,23 +66,19 @@ export async function renderEngineeringReportPdf(doc){
     pdf.on('error', reject);
   });
 
-  // ── Pass 1: lay out content, track per-section page #s for TOC ────
-  const tocEntries = [];   // [{ heading, page0Based }]
+  const tocEntries = [];
   const sections = doc.sections;
 
-  // Cover page always starts on page 0.
   if (sections[0]?.type === 'cover'){
     renderCover(pdf, sections[0], meta);
   }
   pdf.addPage();
-  // Reserve TOC page now (we'll come back to fill it after layout).
   const tocPageIdx = pdf.bufferedPageRange().count - 1;
   pdf.addPage();
 
-  // Render the rest of the sections in flow.
   for (let i = 0; i < sections.length; i++){
     const s = sections[i];
-    if (s.type === 'cover') continue;  // already drawn
+    if (s.type === 'cover') continue;
     if (i > 1) maybeBreak(pdf);
     if (s.heading){
       tocEntries.push({
@@ -94,11 +90,9 @@ export async function renderEngineeringReportPdf(doc){
     renderSectionInFlow(pdf, s, meta);
   }
 
-  // ── Pass 2: switch to the TOC page and draw entries with real page #s
   pdf.switchToPage(tocPageIdx);
   renderToc(pdf, tocEntries);
 
-  // ── Pass 3: header + footer on every page after cover ─────────
   const range = pdf.bufferedPageRange();
   for (let p = range.start; p < range.start + range.count; p++){
     pdf.switchToPage(p);
@@ -112,18 +106,14 @@ export async function renderEngineeringReportPdf(doc){
   return done;
 }
 
-// ───────────────────────────── COVER ──────────────────────────────────
-
 function renderCover(pdf, s, meta){
   const w = pdf.page.width;
   const h = pdf.page.height;
   const cx = w / 2;
 
-  // Genoa-sail mark (hand-drawn pdfkit primitives — no SVG dep).
   const markY = MARGIN + 60;
   drawSailMark(pdf, cx, markY, 56);
 
-  // Title
   pdf.font(BOLD_FONT).fontSize(TITLE_SIZE).fillColor('black')
      .text((s.heading || 'ENGINEERING STATEMENT').toUpperCase(), MARGIN, markY + 90, {
         width: w - 2 * MARGIN, align: 'center'
@@ -132,13 +122,11 @@ function renderCover(pdf, s, meta){
   pdf.font(ITALIC_FONT).fontSize(SUBTITLE_SIZE).fillColor(TEXT_DIM)
      .text(meta?.subtitle || 'FCC Propagation Study', { align: 'center' });
 
-  // Amber double-rule under the title
   let y = pdf.y + 20;
   pdf.strokeColor(AMBER).lineWidth(1.5).moveTo(MARGIN + 100, y).lineTo(w - MARGIN - 100, y).stroke();
   y += 3;
   pdf.strokeColor(AMBER_HI).lineWidth(0.5).moveTo(MARGIN + 140, y).lineTo(w - MARGIN - 140, y).stroke();
 
-  // Station info card — vertically centered
   pdf.fillColor('black');
   const cardTop = h * 0.42;
   pdf.font(BOLD_FONT).fontSize(20).fillColor(TEAL_DARK)
@@ -153,7 +141,6 @@ function renderCover(pdf, s, meta){
   pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor('black');
   renderKv(pdf, s.rows, { center: true, labelMin: 180, narrow: true });
 
-  // Footer block on cover
   pdf.font(ITALIC_FONT).fontSize(10).fillColor(TEXT_DIM)
      .text(meta?.generated_by || FOOTER_TEXT, MARGIN, h - MARGIN - 40,
            { width: w - 2 * MARGIN, align: 'center' });
@@ -162,19 +149,14 @@ function renderCover(pdf, s, meta){
            { align: 'center' });
 }
 
-// Genoa sail mark — a pdfkit translation of components/ui/LogoMark.jsx.
 function drawSailMark(pdf, cx, cy, size){
   const r = size / 2;
-  // Dark badge
   pdf.save();
   pdf.circle(cx, cy, r).fillAndStroke(TEAL_DARK, AMBER);
-  // Mast
   pdf.lineWidth(1.6).strokeColor('#f4eee0')
      .moveTo(cx - r * 0.32, cy - r * 0.83).lineTo(cx - r * 0.32, cy + r * 0.83).stroke();
-  // Cyan tick
   pdf.lineWidth(1.2).strokeColor('#6fd3ff')
      .moveTo(cx - r * 0.32, cy - r * 0.83).lineTo(cx - r * 0.32, cy - r * 0.55).stroke();
-  // Sail (warm amber gradient approximation — solid amber)
   pdf.lineWidth(1.1).strokeColor(TEAL_DARK)
      .moveTo(cx - r * 0.32, cy - r * 0.78)
      .bezierCurveTo(cx + r * 0.40, cy - r * 0.45,
@@ -187,14 +169,11 @@ function drawSailMark(pdf, cx, cy, size){
   pdf.fillColor('black').strokeColor('black').lineWidth(1);
 }
 
-// ───────────────────────────── TOC ───────────────────────────────────────
-
 function renderToc(pdf, entries){
   const w = pdf.page.width;
   pdf.fillColor('black');
   pdf.font(BOLD_FONT).fontSize(16)
      .text('CONTENTS', MARGIN, MARGIN + HEADER_AREA, { width: w - 2 * MARGIN });
-  // Amber rule under heading
   let y = pdf.y + 4;
   pdf.strokeColor(AMBER).lineWidth(0.8).moveTo(MARGIN, y).lineTo(w - MARGIN, y).stroke();
   pdf.y = y + 10;
@@ -209,15 +188,12 @@ function renderToc(pdf, entries){
        .text(label, MARGIN + 4, startY, {
          width: w - 2 * MARGIN - 60, continued: false, lineBreak: false
        });
-    // Page number, right-aligned
     pdf.font(BOLD_FONT).text(String(e.pageIdx + 1), MARGIN, startY, {
       width: w - 2 * MARGIN - 4, align: 'right', lineBreak: false
     });
     pdf.y = startY + 16;
   }
 }
-
-// ───────────────────────────── SECTION FLOW ──────────────────────────────
 
 function maybeBreak(pdf){
   pdf.y = Math.max(pdf.y, MARGIN);
@@ -232,7 +208,6 @@ function maybeBreak(pdf){
 function renderSectionInFlow(pdf, s, meta){
   const w = pdf.page.width;
   if (s.heading){
-    // amber rule above heading
     const ruleY = pdf.y;
     pdf.strokeColor(AMBER).lineWidth(0.6)
        .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
@@ -286,6 +261,9 @@ function renderSectionInFlow(pdf, s, meta){
     case 'certification':
       renderCertification(pdf, s);
       break;
+    case 'image':
+      renderImage(pdf, s);
+      break;
     default:
       if (Array.isArray(s.rows)) renderKv(pdf, s.rows);
       else if (Array.isArray(s.paragraphs)) renderParagraphs(pdf, s.paragraphs);
@@ -294,13 +272,9 @@ function renderSectionInFlow(pdf, s, meta){
   }
 }
 
-// ───────────────────────────── PAGE CHROME ───────────────────────────────
-
 function drawPageHeader(pdf, meta){
   const w = pdf.page.width;
   const y = MARGIN - 20;
-  // Save margins, drop them to zero so writing in the top-margin area
-  // doesn't trigger pdfkit's auto-paginate-on-overflow.
   const m = pdf.page.margins;
   const saved = { top: m.top, bottom: m.bottom };
   m.top = 0; m.bottom = 0;
@@ -334,8 +308,6 @@ function drawPageFooter(pdf, meta, pageNum, totalPages){
   pdf.restore();
   m.top = saved.top; m.bottom = saved.bottom;
 }
-
-// ───────────────────────────── PRIMITIVES ───────────────────────────────
 
 function renderKv(pdf, rows, opts = {}){
   if (!Array.isArray(rows)) return;
@@ -480,6 +452,43 @@ function renderCertification(pdf, s){
 
 function pageBottomReached(pdf){
   return pdf.y > pdf.page.height - MARGIN - FOOTER_AREA - 12;
+}
+
+// Render an image section.  `image_buffer` is a Node Buffer; pdfkit
+// accepts it directly via pdf.image().  We force the image onto its
+// own page so the contour map gets a clean print frame, and reserve
+// ~80pt at the bottom for the caption + footer.
+function renderImage(pdf, s){
+  const buf = s.image_buffer;
+  if (!buf || !Buffer.isBuffer(buf)){
+    pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor(TEXT_DIM)
+       .text('(image buffer missing)', { align: 'left' });
+    return;
+  }
+  pdf.addPage();
+  if (s.heading){
+    const w = pdf.page.width;
+    const ruleY = pdf.y;
+    pdf.strokeColor(AMBER).lineWidth(0.6)
+       .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
+    pdf.y = ruleY + RULE_GAP;
+    const headingText = s.exhibit_number
+      ? `EXHIBIT ${s.exhibit_number} — ${s.heading.toUpperCase()}`
+      : s.heading.toUpperCase();
+    pdf.font(BOLD_FONT).fontSize(HEADING_SIZE).fillColor(TEAL_DARK)
+       .text(headingText, MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
+    pdf.fillColor('black').moveDown(0.4);
+  }
+  const w = pdf.page.width  - 2 * MARGIN;
+  const captionH = s.caption ? 56 : 12;
+  const availH = pdf.page.height - pdf.y - MARGIN - FOOTER_AREA - captionH;
+  pdf.image(buf, MARGIN, pdf.y, { fit: [w, Math.max(220, availH)], align: 'center' });
+  pdf.y = pdf.y + Math.max(220, availH) + 6;
+  if (s.caption){
+    pdf.font(ITALIC_FONT).fontSize(BODY_SIZE - 1).fillColor(TEXT_DIM)
+       .text(s.caption, MARGIN, pdf.y, { width: w, align: 'left' });
+    pdf.fillColor('black');
+  }
 }
 
 function formatCell(v){
