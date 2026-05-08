@@ -8,6 +8,7 @@ import ChartScope    from '@components/ui/ChartScope.jsx';
 import TelemetryRack from '@components/ui/TelemetryRack.jsx';
 import TabStrip      from '@components/ui/TabStrip.jsx';
 import HardwareButton from '@components/ui/HardwareButton.jsx';
+import SweepPanel    from '@components/ui/SweepPanel.jsx';
 
 /* =========================================================================
    App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
@@ -45,6 +46,7 @@ const TABS = [
   { id: 'radials',    label: 'Radials' },
   { id: 'evidence',   label: 'Evidence' },
   { id: 'validation', label: 'Validation' },
+  { id: 'sweep',      label: 'Find best config' },
   { id: 'provenance', label: 'Provenance' },
   { id: 'narrative',  label: 'AI narrative' },
   { id: 'exports',    label: 'Exports' },
@@ -621,7 +623,19 @@ export default function App() {
           <RackPanel eyebrow="Workbench" title="Exhibit detail" italicAccent="The numbers come from the engine.">
             <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
             <div className="pt-4">
-              <TabBody id={activeTab} exhibit={exhibit} history={history} onPickHistory={pickHistory} />
+              <TabBody
+                id={activeTab}
+                exhibit={exhibit}
+                history={history}
+                onPickHistory={pickHistory}
+                getBaseInputs={() => sanitizeBaseInputs(inputs)}
+                onApplyCombo={(combo) => setInputs(s => ({
+                  ...s,
+                  erp_kw: combo.erp_kw,
+                  haat_m: combo.haat_m,
+                  ...(combo.pattern_table ? { pattern_mode: 'DA', pattern_table: combo.pattern_table } : {})
+                }))}
+              />
             </div>
           </RackPanel>
         </>
@@ -644,7 +658,7 @@ export default function App() {
 
 /* ---------------- Tab body content ---------------- */
 
-function TabBody({ id, exhibit, history, onPickHistory }){
+function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, onApplyCombo }){
   if (id === 'fcc'){
     return <PaneFcc exhibit={exhibit} />;
   }
@@ -656,6 +670,9 @@ function TabBody({ id, exhibit, history, onPickHistory }){
   }
   if (id === 'validation'){
     return <PaneValidation exhibit={exhibit} />;
+  }
+  if (id === 'sweep'){
+    return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
   }
   if (id === 'narrative'){
     return <PaneNarrative exhibit={exhibit} />;
@@ -1252,6 +1269,27 @@ function SubKv({ kv }){
       ))}
     </div>
   );
+}
+// Sanitize the FacilityRack inputs into the shape /api/exhibits/sweep
+// (and the engine) expects: number-cast numeric fields, drop UI-only
+// flags, pass DA pattern only when toggled on.  Mirrors the cleaning
+// done inline in compute(); shared so the sweep route sees identical
+// base inputs.
+function sanitizeBaseInputs(i){
+  if (!i) return {};
+  return {
+    ...i,
+    _synthetic:       undefined,
+    _resolveFacility: undefined,
+    frequency:         num(i.frequency),
+    erp_kw:            num(i.erp_kw),
+    haat_m:            num(i.haat_m),
+    lat:               num(i.lat),
+    lon:               num(i.lon),
+    ground_sigma_mS_m: num(i.ground_sigma_mS_m),
+    radial_step_deg:   num(i.radial_step_deg) || 10,
+    pattern_table:     i.pattern_mode === 'DA' ? i.pattern_table : null
+  };
 }
 function num(s){
   if (s === null || s === undefined || s === '') return null;
