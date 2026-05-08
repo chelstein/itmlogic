@@ -50,8 +50,29 @@ export function buildRfExposureSection(exhibit){
     ['Bulletin',                  'OET-65 Bulletin (Edition 97-01) Supplement A · 47 CFR §1.1310 Table 1']
   ];
 
+  // Auto-generated filing-ready narrative — standard consulting voice
+  // pulled live from the exhibit's oet65 block so numbers track the
+  // table.  Conservative phrasing; mirrors the opening of an H&D /
+  // Cavell-Mertz Section 7 RF exposure exhibit.
+  const fmtMHz = oet.frequency_mhz != null ? `${oet.frequency_mhz} MHz` : 'the filed operating frequency';
+  const fmtErp = oet.erp_kw != null ? `${oet.erp_kw} kW` : 'the filed ERP';
+  const ctlD = ctl.distance_m != null ? `${ctl.distance_m.toFixed?.(2) ?? ctl.distance_m} m` : 'the calculated controlled-environment distance';
+  const uncD = unc.distance_m != null ? `${unc.distance_m.toFixed?.(2) ?? unc.distance_m} m` : 'the calculated uncontrolled-environment distance';
   const preface =
-    'The following is a categorical OET-65 / §1.1310 evaluation of routine RF exposure at the licensed-facility boundary, computed by the Genoa regulatory engine from the filed ERP, frequency, and antenna geometry.  Controlled and uncontrolled-environment compliance distances are reported per OET Bulletin 65 (Edition 97-01) Supplement A.';
+    'A radiofrequency exposure analysis was performed pursuant to OET Bulletin 65 ' +
+    `(Edition 97-01) Supplement A using the simplified far-field methodology applicable to FM broadcast facilities.  At ${fmtMHz} and ${fmtErp}, the controlled-environment maximum permissible exposure (MPE) compliance distance is ${ctlD}, and the corresponding uncontrolled-environment compliance distance is ${uncD}.  ` +
+    (bc.boundary_distance_m != null
+      ? `The closest property-line / publicly accessible boundary is ${bc.boundary_distance_m} m from the antenna.  Boundary power density is ${bc.power_density_mw_cm2 != null ? `${bc.power_density_mw_cm2.toFixed?.(4) ?? bc.power_density_mw_cm2} mW/cm²` : 'as tabulated below'}, ` +
+        (bc.pass === true
+          ? 'which clears the §1.1310 uncontrolled-environment limit; the facility therefore qualifies for routine categorical evaluation under §1.1307(b).  '
+          : bc.pass === false
+            ? 'which does NOT clear the §1.1310 uncontrolled-environment limit.  Operational mitigation (signage, fencing, controlled-access designation, or feed-power adjustment) is required prior to construction in order to qualify under §1.1307(b).  '
+            : '')
+      : '') +
+    (nf.required_for_filing
+      ? 'Because the antenna radiation center AGL is below the validity range of the OET-65 simplified far-field equation, full near-field reactive-region modeling (NEC) is REQUIRED before filing.  '
+      : '') +
+    'Compliance limits are taken from 47 CFR §1.1310 Table 1; controlled-environment limits apply to occupational personnel with awareness training, and uncontrolled-environment limits apply to the general public.';
 
   const summary = nf.required_for_filing
     ? 'NEAR-FIELD MODELING REQUIRED.  The antenna RC AGL falls below the validity range of the OET-65 simplified far-field equation; the engineer of record must perform an NEC reactive-region near-field study and attach it as a separate exhibit before filing.'

@@ -19,10 +19,23 @@ import React, { useEffect, useMemo, useState } from 'react';
 //     for spreadsheet paste.
 
 const STATUS_BADGE = {
-  filled:  { color: '#43a85a', label: 'FILLED' },
-  gap:     { color: '#c4745a', label: 'NEEDS INPUT' },
-  unknown: { color: '#d6a36a', label: 'EVIDENCE MISSING' }
+  filled:    { color: '#43a85a', label: 'FILLED' },
+  suggested: { color: '#5a9ec4', label: 'SUGGESTED' },
+  gap:       { color: '#c4745a', label: 'NEEDS INPUT' },
+  unknown:   { color: '#d6a36a', label: 'EVIDENCE MISSING' }
 };
+
+function fmtProvenance(p){
+  if (!p || typeof p !== 'object') return '';
+  const bits = [];
+  if (p.source) bits.push(p.source);
+  if (p.dataset) bits.push(p.dataset);
+  if (p.vintage) bits.push(`vintage ${p.vintage}`);
+  if (p.method) bits.push(p.method);
+  if (p.fetched_at) bits.push(`fetched ${p.fetched_at}`);
+  if (p.note) bits.push(p.note);
+  return bits.join(' · ');
+}
 
 // Manual-engineer fields the operator can fill via the panel form.
 // These IDs match form301fm.js.
@@ -134,7 +147,7 @@ export default function FilingPackagePanel({ exhibit }){
     );
   }
 
-  const summary = pkg?.summary || { total: 0, filled: 0, gaps: 0, unknown: 0, required_gaps: 0 };
+  const summary = pkg?.summary || { total: 0, filled: 0, suggested: 0, gaps: 0, unknown: 0, required_gaps: 0 };
   const ready   = pkg?.filing_ready === true;
   const fieldsBySection = (pkg?.fields || []).reduce((acc, f) => {
     const k = f.subsection || f.section || '—';
@@ -158,11 +171,12 @@ export default function FilingPackagePanel({ exhibit }){
             ({pkg?.compliance_pass || 'compliance: unknown'} · {pkg?.blockers_count ?? '?'} blocker(s))
           </span>
         </div>
-        <div className="grid grid-cols-4 gap-2 text-[11px]">
+        <div className="grid grid-cols-5 gap-2 text-[11px]">
           <Stat label="Filled"    value={summary.filled} of={summary.total} accent="text-green" />
-          <Stat label="Manual"    value={summary.gaps}      accent="text-amber" />
-          <Stat label="Evidence"  value={summary.unknown}   accent="text-cyan" />
-          <Stat label="Req gaps"  value={summary.required_gaps} accent={summary.required_gaps ? 'text-red' : 'text-green'} />
+          <Stat label="Suggested" value={summary.suggested ?? 0}            accent="text-cyan" />
+          <Stat label="Manual"    value={summary.gaps}                      accent="text-amber" />
+          <Stat label="Evidence"  value={summary.unknown}                   accent="text-amber" />
+          <Stat label="Req gaps"  value={summary.required_gaps}             accent={summary.required_gaps ? 'text-red' : 'text-green'} />
         </div>
       </div>
 
@@ -267,6 +281,7 @@ function FieldRow({ field }){
     valueText = String(field.value);
   }
   const isMissingValue = field.value == null;
+  const provText = fmtProvenance(field.provenance);
   return (
     <tr className="border-b border-rule/30 hover:bg-cream/5">
       <td className="px-3 py-1.5 align-top">
@@ -276,10 +291,18 @@ function FieldRow({ field }){
       <td className="px-3 py-1.5 align-top">
         {isMissingValue
           ? <span className="text-textDim italic">{valueText}</span>
-          : <code className="text-cream text-[11px]">{valueText}</code>}
+          : <>
+              <code className="text-cream text-[11px]">{valueText}</code>
+              {field.status === 'suggested' && (
+                <span className="ml-1 text-cyan text-[9px] italic">— confirm before filing</span>
+              )}
+            </>}
+        {provText && (
+          <div className="text-textDim text-[9px] font-mono mt-0.5 break-words">src: {provText}</div>
+        )}
       </td>
       <td className="px-3 py-1.5 align-top">
-        <span style={{ background: badge.color }} className="text-[9px] tracking-wider uppercase text-white rounded px-1.5 py-0.5 font-bold">
+        <span style={{ background: badge.color }} className="text-[9px] tracking-wider uppercase text-white rounded px-1.5 py-0.5 font-bold whitespace-nowrap">
           {badge.label}
         </span>
       </td>
