@@ -24,6 +24,7 @@ import { buildSpacingAnalysisSection }    from './sections/spacingAnalysis.js';
 import { buildContourProtectionSection }  from './sections/contourProtection.js';
 import { buildRfExposureSection }         from './sections/rfExposure.js';
 import { buildPopulationMethodologySection } from './sections/populationMethodology.js';
+import { buildTerrainProvenanceSection }  from './sections/terrainProvenance.js';
 import { buildValidationVerdictSection }  from './sections/validationVerdict.js';
 import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
@@ -62,7 +63,7 @@ export function buildEngineeringReport(exhibit, options){
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
-  push(buildAssumptionsSection(exhibit, opt));               // NEW — H&D-style assumptions block
+  push(buildAssumptionsSection(exhibit, opt));
   push(buildRegulatoryContextSection(exhibit, opt));
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
@@ -70,13 +71,14 @@ export function buildEngineeringReport(exhibit, options){
   push(buildItmCoverageSection(exhibit, opt));
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));
-  push(buildRfExposureSection(exhibit, opt));                // NEW — OET-65 §1.1310 dedicated section
-  push(buildPopulationMethodologySection(exhibit, opt));     // NEW — Census provenance + informational-only disclaimer
+  push(buildRfExposureSection(exhibit, opt));
+  push(buildPopulationMethodologySection(exhibit, opt));
+  push(buildTerrainProvenanceSection(exhibit, opt));         // NEW — DEM source, sampling method, radial count, fetch timestamp
   push(buildValidationVerdictSection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
   push(buildBuildAttestationSection(exhibit, opt));
   push(buildCertificationSection(exhibit, opt));
-  push(buildReferencesSection(exhibit, opt));                // NEW — bibliography of cited rules + datasets + tooling
+  push(buildReferencesSection(exhibit, opt));
   for (const ap of buildAppendixSections(exhibit, opt)) push(ap);
 
   // Assign exhibit numbers (Roman) to the major content sections.
