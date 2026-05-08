@@ -10,8 +10,21 @@
 // error, this resolves to `null` instead of throwing.  The PDF render
 // pipeline then skips the contour-map section gracefully — never
 // crashes the export over a sidecar outage.
+//
+// Defensive: every byte returned to the caller is verified to start
+// with a PNG magic header (89 50 4E 47 0D 0A 1A 0A).  If the sidecar
+// somehow returns HTML, JSON, or a JSON-stringified Uint8Array (which
+// happens when a Node service forgets to wrap a typed-array in
+// Buffer.from), we log + return null instead of letting pdfkit blow
+// up downstream with "Unknown image format".
 
 const DEFAULT_TIMEOUT_MS = 25000;
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+
+function isPng(buf){
+  if (!Buffer.isBuffer(buf) || buf.length < 8) return false;
+  return buf.subarray(0, 8).equals(PNG_MAGIC);
+}
 
 export async function fetchMapRender(exhibit, options = {}){
   const url = process.env.MAP_SIDECAR_URL;
@@ -35,8 +48,19 @@ export async function fetchMapRender(exhibit, options = {}){
       console.warn(`[mapClient] sidecar render failed: HTTP ${r.status}${detail ? ' — ' + detail.slice(0, 200) : ''}`);
       return null;
     }
+    const ct = String(r.headers.get('content-type') || '').toLowerCase();
+    if (!ct.startsWith('image/')){
+      const detail = await r.text().catch(() => '');
+      console.warn(`[mapClient] sidecar returned non-image content-type "${ct}"; refusing to embed.${detail ? ' body: ' + detail.slice(0, 200) : ''}`);
+      return null;
+    }
     const ab = await r.arrayBuffer();
-    return Buffer.from(ab);
+    const buf = Buffer.from(ab);
+    if (!isPng(buf)){
+      console.warn(`[mapClient] sidecar response did not start with a PNG magic header (len=${buf.length}); refusing to embed.  First 16 bytes: ${buf.subarray(0, 16).toString('hex')}`);
+      return null;
+    }
+    return buf;
   } catch (err){
     console.warn('[mapClient] sidecar unreachable:', err?.message || err);
     return null;
@@ -47,15 +71,17 @@ export async function fetchMapRender(exhibit, options = {}){
 
 // Synchronous helper used by section builders that already have the
 // rendered image stuffed into options.contour_map_png (Buffer or
-// base64 string).  Returns either a Buffer or null.
+// base64 string).  Returns either a verified-PNG Buffer or null.
 export function coerceMapBuffer(input){
   if (!input) return null;
-  if (Buffer.isBuffer(input)) return input;
+  if (Buffer.isBuffer(input)) return isPng(input) ? input : null;
   if (typeof input === 'string'){
     // Strip data: URI prefix if present.
     const stripped = input.startsWith('data:') ? input.split(',')[1] : input;
-    try { return Buffer.from(stripped, 'base64'); }
-    catch { return null; }
+    try {
+      const buf = Buffer.from(stripped, 'base64');
+      return isPng(buf) ? buf : null;
+    } catch { return null; }
   }
   return null;
 }
