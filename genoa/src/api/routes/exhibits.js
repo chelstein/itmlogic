@@ -11,6 +11,7 @@ import { exportPdf,  PDF_CONTENT_TYPE  }       from '../../exports/pdf/exporter.
 import { buildEngineeringReport }           from '../../exports/engineeringReport/index.js';
 import { renderEngineeringReportText }      from '../../exports/engineeringReport/renderText.js';
 import { renderEngineeringReportPdf }       from '../../exports/engineeringReport/renderPdf.js';
+import { fetchMapRender }                   from '../../sidecars/mapClient.js';
 
 import { readiness } from '../../types/readiness.js';
 
@@ -201,7 +202,12 @@ r.post('/exhibits/export/engineering-report.pdf', asyncHandler(async (req, res) 
       message: 'POST body must be an exhibit object (or { exhibit: <object> })'
     });
   }
-  const options = req.body?.options || {};
+  const options = { ...(req.body?.options || {}) };
+  // Fetch the contour-map render from the map sidecar before building
+  // the report.  Fail-soft: when the sidecar is unset / unreachable /
+  // times out, the map section emits a placeholder note.
+  const png = await fetchMapRender(exhibit).catch(() => null);
+  if (png) options.contour_map_png = png;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = await renderEngineeringReportPdf(doc);
   res.type(PDF_CONTENT_TYPE);

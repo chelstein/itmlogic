@@ -18,6 +18,7 @@ import { applyComputeOptionDefaults }      from './computeOptionDefaults.js';
 import { buildEngineeringReport }          from '../../exports/engineeringReport/index.js';
 import { renderEngineeringReportText }     from '../../exports/engineeringReport/renderText.js';
 import { renderEngineeringReportPdf }      from '../../exports/engineeringReport/renderPdf.js';
+import { fetchMapRender }                  from '../../sidecars/mapClient.js';
 
 const PROGRESS = Object.freeze({
   COMPUTING:        'Computing exhibit…',
@@ -98,9 +99,17 @@ async function runReportJob(r, ext){
   setProgress(r.id, PROGRESS.VALIDATING);
   // (No additional work here; computeExhibit attaches validation.)
 
-  // 3. Build report model.
+  // 3. Build report model.  PDF builds fetch the contour-map render
+  //    from the map sidecar first; TXT builds skip the fetch (no image
+  //    to embed in plain text).  Sidecar absence/timeouts are
+  //    fail-soft — the section emits a placeholder note instead.
   setProgress(r.id, PROGRESS.BUILDING_REPORT);
-  const doc = buildEngineeringReport(exhibit, r.options || {});
+  const reportOpts = { ...(r.options || {}) };
+  if (ext === 'pdf'){
+    const png = await fetchMapRender(exhibit).catch(() => null);
+    if (png) reportOpts.contour_map_png = png;
+  }
+  const doc = buildEngineeringReport(exhibit, reportOpts);
 
   // 4. Render TXT or PDF.
   if (ext === 'txt'){
