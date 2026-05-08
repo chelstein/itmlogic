@@ -9,6 +9,7 @@ import TelemetryRack from '@components/ui/TelemetryRack.jsx';
 import TabStrip      from '@components/ui/TabStrip.jsx';
 import HardwareButton from '@components/ui/HardwareButton.jsx';
 import SweepPanel    from '@components/ui/SweepPanel.jsx';
+import Login         from '@components/ui/Login.jsx';
 
 /* =========================================================================
    App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
@@ -55,7 +56,38 @@ const TABS = [
 
 const CONTOUR_COLORS = ['#ffb347', '#d6a36a', '#6fd3ff'];
 
-export default function App() {
+// Top-level App is just the auth gate.  All the actual workbench logic
+// lives in <MainApp/> below so its useState/useEffect hooks aren't
+// conditionally mounted (which would violate rules-of-hooks).
+export default function App(){
+  // null = probing session, true = authed, false = show <Login/>.
+  // The session cookie is HttpOnly, so the only way to know auth state
+  // is asking the server.  /api/auth/me is the canonical probe.
+  const [authed, setAuthed] = useState(null);
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(r => setAuthed(r.ok))
+      .catch(() => setAuthed(false));
+  }, []);
+  async function logout(){
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); }
+    catch {}
+    setAuthed(false);
+  }
+  if (authed === null){
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black font-mono text-textDim text-[12px] tracking-rack uppercase">
+        Checking session…
+      </div>
+    );
+  }
+  if (authed === false){
+    return <Login onSuccess={() => setAuthed(true)} />;
+  }
+  return <MainApp onLogout={logout} />;
+}
+
+function MainApp({ onLogout }) {
   const [inputs, setInputs] = useState(PRESET_SYNTHETIC);
   const [exhibit, setExhibit] = useState(null);
   const [computing, setComputing] = useState(false);
@@ -573,6 +605,14 @@ export default function App() {
   })();
 
   return (
+    <>
+    <button
+      onClick={onLogout}
+      title="Sign out"
+      className="fixed top-3 right-4 z-40 font-mono text-[10px] tracking-rack uppercase text-textDim hover:text-cream border border-rule hover:border-gold/50 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
+    >
+      Sign&nbsp;out
+    </button>
     <AppShell
       systemStatus={sysStatus}
       mode={exhibit?.calculation_method?.name || '47 CFR §73.333 F(50,50)'}
@@ -642,6 +682,7 @@ export default function App() {
       )}
       right={<TelemetryRack exhibit={exhibit} />}
     />
+    </>
   );
 
   async function pickHistory(id){
