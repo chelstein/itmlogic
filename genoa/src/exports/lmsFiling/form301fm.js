@@ -24,6 +24,12 @@
 //     cite        the 47 CFR rule the field documents
 //     mapping     dot-path into exhibit (engineering values), or null
 //                 when source is manual
+//     derive      OPTIONAL fn(exhibit) → value with multi-source
+//                 fallback.  When present, derive() runs first and
+//                 mapping is only used as a hint for resolveProvenance.
+//                 Useful for fields that may live under different keys
+//                 depending on which upstream populated the exhibit
+//                 (FCC FMQ vs ZTR vs operator typed).
 //     suggest     OPTIONAL fn(exhibit) → candidate value when source is
 //                 'manual-engineer'.  When operator hasn't supplied a
 //                 value AND suggest() returns one, mapping.js sets the
@@ -37,6 +43,20 @@
 //   LMS user guide (engineering): https://www.fcc.gov/media/radio/lms
 //   47 CFR §73.3539, §73.3540 — application requirements
 //   47 CFR §73.207, §73.215, §73.313, §73.333 — engineering rules
+
+// First-non-empty over a list of dot-paths into the exhibit.  Used by
+// fields whose value can land under different keys depending on which
+// upstream (FCC FMQ, ZTR, evidence.fcc_lms, operator input) populated
+// the row.  Returns null if every candidate is missing/empty.
+function firstNonEmptyPath(exhibit, paths){
+  for (const p of paths){
+    const v = p.split('.').reduce((o, k) => (o == null ? o : o[k]), exhibit);
+    if (v !== undefined && v !== null && !(typeof v === 'string' && !v.trim())){
+      return v;
+    }
+  }
+  return null;
+}
 
 export const FORM_301_FM_FIELDS = Object.freeze([
   // ── 3A — General application data ───────────────────────────────
@@ -80,7 +100,25 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §73.3539',
-    mapping: 'station_inputs.community'
+    mapping: 'station_inputs.community',
+    // Multi-source fallback: ZTR rich-station rows surface community
+    // under a few different keys depending on the upstream the
+    // facility lookup hit (FCC FMQ vs ZTR broadcast_stations vs FCC
+    // LMS license).  Try station_inputs first (operator-typed wins),
+    // then licensing_community / city aliases, then evidence blocks
+    // attached by the orchestrator.
+    derive: (exhibit) => firstNonEmptyPath(exhibit, [
+      'station_inputs.community',
+      'station_inputs.community_of_license',
+      'station_inputs.licensing_community',
+      'station_inputs.city',
+      'evidence.fcc_lms.license.community',
+      'evidence.fcc_lms.license.community_of_license',
+      'evidence.fcc_lms.license.city',
+      'facility_metadata.community',
+      'facility_metadata.community_of_license',
+      'facility_metadata.city'
+    ])
   },
   {
     id: 'service',
@@ -102,7 +140,22 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §73.211',
-    mapping: 'station_inputs.fcc_class'
+    mapping: 'station_inputs.fcc_class',
+    // Multi-source fallback: ZTR's broadcast_stations row uses `class`,
+    // FCC FMQ uses `fcc_class`, FCC LMS license rows use
+    // `station_class`.  Operator input under station_inputs.fcc_class
+    // wins, then the alias keys, then evidence blocks.
+    derive: (exhibit) => firstNonEmptyPath(exhibit, [
+      'station_inputs.fcc_class',
+      'station_inputs.class',
+      'station_inputs.station_class',
+      'evidence.fcc_lms.license.fcc_class',
+      'evidence.fcc_lms.license.station_class',
+      'evidence.fcc_lms.license.class',
+      'facility_metadata.fcc_class',
+      'facility_metadata.class',
+      'facility_metadata.station_class'
+    ])
   },
 
   // ── 3B — Frequency / channel / power / height ────────────────────────
@@ -150,11 +203,6 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     cite: '47 CFR §73.211',
     mapping: null,
     notes: 'Most FM stations file ERP-H = ERP-V; field becomes mandatory only when patterns differ.',
-    // Pre-stage a candidate when the antenna is non-directional and no
-    // separate ERP-V is on file.  ND FM/TV antennas conventionally
-    // radiate ERP-H = ERP-V, so the licensee almost always copies the
-    // horizontal value into the vertical box.  We suggest, never
-    // certify; the engineer of record must confirm before filing.
     suggest: (exhibit) => {
       const s = exhibit?.station_inputs || {};
       const isDirectional = Array.isArray(s.pattern) && s.pattern.length > 0;
