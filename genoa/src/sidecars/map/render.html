@@ -5,26 +5,130 @@
 <title>Genoa contour map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
-  /* H&D-style consulting print palette: cream paper, amber accents,
-     teal-dark text.  Avoid web-y colors that read "dashboard". */
-  html, body { margin: 0; padding: 0; height: 100%; background: #f6f1e1; color: #1c2e3a; font-family: 'Times New Roman', serif; }
+  /* H&D-style consulting print palette: warm white paper, narrow color
+     palette, professional cartographic ruling.  Avoid web-y borders +
+     drop-shadows that read "dashboard" rather than "engineering exhibit". */
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: #fcfaf2; color: #1c2e3a;
+    font-family: 'Times New Roman', serif;
+  }
   #wrap { position: relative; width: 100vw; height: 100vh; }
-  #map  { position: absolute; inset: 56px 24px 92px 24px; border: 2px solid #1c2e3a; box-shadow: 0 0 0 6px #f6f1e1, 0 0 0 7px #c4745a; }
-  #title-band { position: absolute; top: 0; left: 0; right: 0; height: 48px; padding: 8px 24px; background: #1c2e3a; color: #f3c86d; display: flex; align-items: center; justify-content: space-between; }
-  #title-band .lhs { font-size: 16px; font-family: 'Courier New', monospace; letter-spacing: 1.5px; text-transform: uppercase; }
-  #title-band .rhs { font-size: 11px; font-family: 'Courier New', monospace; opacity: 0.9; }
-  #legend { position: absolute; bottom: 16px; left: 36px; right: 36px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
-  #legend .swatches { display: flex; gap: 20px; align-items: center; }
+
+  /* Title band — survey-sheet header */
+  #title-band {
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 44px; padding: 8px 22px;
+    background: #1c2e3a; color: #f3c86d;
+    display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 2px solid #c4745a;
+  }
+  #title-band .lhs {
+    font-size: 14px; font-family: 'Courier New', monospace;
+    letter-spacing: 1.6px; text-transform: uppercase; font-weight: bold;
+  }
+  #title-band .rhs {
+    font-size: 10px; font-family: 'Courier New', monospace;
+    opacity: 0.85; letter-spacing: 0.5px;
+  }
+
+  /* Figure callout — upper-left of map area, like a survey diagram */
+  #figure-callout {
+    position: absolute; top: 60px; left: 36px;
+    background: rgba(252, 250, 242, 0.94);
+    padding: 4px 10px; border: 1.5px solid #1c2e3a;
+    font-family: 'Courier New', monospace; font-size: 9.5px;
+    text-transform: uppercase; letter-spacing: 1px; color: #1c2e3a;
+    z-index: 500; line-height: 1.3;
+  }
+  #figure-callout b { color: #c4745a; letter-spacing: 1.4px; }
+
+  /* Vector-only fallback banner — only visible when tiles fail */
+  #fallback-banner {
+    position: absolute; top: 60px; right: 38px;
+    background: #c4745a; color: #fcfaf2;
+    padding: 4px 10px;
+    font-family: 'Courier New', monospace; font-size: 9px;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    z-index: 700; display: none;
+  }
+  #fallback-banner.active { display: block; }
+
+  /* Map area — thin black survey-style frame, no shadow, no doubled rule */
+  #map {
+    position: absolute;
+    inset: 56px 30px 96px 30px;
+    border: 1.5px solid #1c2e3a;
+    background: #fcfaf2;
+  }
+
+  /* Coordinate ticks at the corners of the map frame */
+  .coord-tick {
+    position: absolute;
+    font-family: 'Courier New', monospace; font-size: 9px;
+    color: #1c2e3a; line-height: 1;
+    background: #fcfaf2; padding: 1px 4px;
+    z-index: 600;
+  }
+
+  /* Legend strip below the map */
+  #legend {
+    position: absolute; bottom: 26px; left: 36px; right: 36px;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 10.5px;
+  }
+  #legend .swatches {
+    display: flex; gap: 18px; align-items: center; flex-wrap: wrap;
+  }
   #legend .swatch { display: inline-flex; align-items: center; gap: 6px; }
-  #legend .sq { display: inline-block; width: 14px; height: 14px; border: 2px solid; }
-  #legend .scale { display: inline-flex; align-items: center; gap: 6px; font-family: 'Courier New', monospace; }
-  #legend .scale-bar { display: inline-block; height: 6px; border-left: 2px solid #1c2e3a; border-right: 2px solid #1c2e3a; border-top: 2px solid #1c2e3a; position: relative; }
-  #north { position: absolute; top: 80px; right: 56px; width: 56px; height: 56px; }
+  #legend .sq { display: inline-block; width: 14px; height: 12px; border: 1.5px solid; }
+  #legend .scale {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'Courier New', monospace; font-size: 9.5px;
+  }
+  #legend .scale-bar-wrap { display: inline-flex; flex-direction: column; align-items: stretch; }
+  #legend .scale-bar { display: block; height: 5px; background: #1c2e3a; }
+  #legend .scale-ticks {
+    display: flex; justify-content: space-between;
+    font-size: 8px; margin-top: 2px;
+  }
+
+  /* North arrow — survey-style outlined diamond with N */
+  #north {
+    position: absolute; top: 76px; right: 50px;
+    width: 42px; height: 56px;
+    z-index: 500;
+  }
   #north svg { width: 100%; height: 100%; }
-  #provenance { position: absolute; bottom: 0; left: 0; right: 0; height: 14px; padding: 0 24px; background: #c4745a; color: #f6f1e1; font-family: 'Courier New', monospace; font-size: 9px; display: flex; align-items: center; justify-content: space-between; }
-  /* Make Leaflet tiles render as cream-tinted (not full color) so the
-     contour overlays read clearly when printed in B&W or color. */
-  .leaflet-tile-pane { filter: grayscale(0.6) brightness(1.05) sepia(0.18); }
+
+  /* Provenance bar at very bottom — replay token, datum, generator */
+  #provenance {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 14px; padding: 0 22px;
+    background: #1c2e3a; color: #fcfaf2;
+    font-family: 'Courier New', monospace; font-size: 8.5px;
+    display: flex; align-items: center; justify-content: space-between;
+    border-top: 1.5px solid #c4745a;
+  }
+
+  /* Subtle warm tint on tiles — keeps overlays legible.  No grayscale —
+     pure grayscale on empty/blocked tiles reads as "broken viewer";
+     warm sepia is enough to push the basemap into the background. */
+  .leaflet-tile-pane { filter: sepia(0.10) brightness(1.02); }
+
+  /* Tx-site label */
+  .tx-label {
+    background: rgba(252, 250, 242, 0.92) !important;
+    border: 1px solid #1c2e3a !important;
+    border-radius: 0 !important;
+    padding: 1px 6px !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 10px !important;
+    color: #1c2e3a !important;
+    font-weight: bold;
+    box-shadow: none !important;
+  }
+  .tx-label::before { display: none !important; }
 </style>
 </head>
 <body>
@@ -33,17 +137,29 @@
     <span class="lhs" id="title-station">Station</span>
     <span class="rhs" id="title-meta">FCC §73.333 contour study</span>
   </div>
+  <div id="figure-callout">
+    <b id="figure-num">FIGURE 1</b><br>
+    <span id="figure-label">CONTOUR MAP — 47 CFR §73.333</span>
+  </div>
+  <div id="fallback-banner">BASEMAP UNAVAILABLE · vector contours only</div>
   <div id="map"></div>
   <div id="north" aria-label="north arrow">
-    <svg viewBox="0 0 100 100">
-      <polygon points="50,8 62,60 50,52 38,60" fill="#1c2e3a" />
-      <polygon points="50,92 38,40 50,48 62,40" fill="#c4745a" />
-      <text x="50" y="20" text-anchor="middle" font-family="Courier New, monospace" font-size="11" font-weight="bold" fill="#f6f1e1">N</text>
+    <svg viewBox="0 0 100 130">
+      <!-- Outlined diamond shape, survey-style -->
+      <polygon points="50,4 92,65 50,126 8,65" fill="none" stroke="#1c2e3a" stroke-width="1.5"/>
+      <!-- Filled north pointer -->
+      <polygon points="50,8 64,68 50,58 36,68" fill="#1c2e3a"/>
+      <!-- Hollow south pointer -->
+      <polygon points="50,122 36,62 50,72 64,62" fill="none" stroke="#1c2e3a" stroke-width="1"/>
+      <!-- N letter -->
+      <text x="50" y="42" text-anchor="middle"
+            font-family="Courier New, monospace" font-size="13" font-weight="bold"
+            fill="#fcfaf2">N</text>
     </svg>
   </div>
   <div id="legend">
     <div class="swatches" id="contour-swatches"></div>
-    <div class="scale" id="scale-readout">scale: <span id="scale-text">—</span></div>
+    <div class="scale" id="scale-readout"></div>
   </div>
   <div id="provenance">
     <span id="prov-lhs">NAD83 datum · 47 CFR §73.333 F(50,50)</span>
@@ -62,66 +178,119 @@
   const lat = Number(s.lat);
   const lon = Number(s.lon);
   const callTag = s.call || s.facility_id || 'Subject Facility';
-  const meta    = `${(s.service || '—').toUpperCase()} · ${s.frequency ?? '—'} ${s.frequency_unit || 'MHz'} · ERP ${s.erp_kw ?? '—'} kW · HAAT ${s.haat_m_input ?? '—'} m`;
-  document.getElementById('title-station').textContent = callTag;
+  const community = s.community || s.city || '';
+  const meta = `${(s.service || '—').toUpperCase()} · ${s.frequency ?? '—'} ${s.frequency_unit || 'MHz'} · ERP ${s.erp_kw ?? '—'} kW · HAAT ${s.haat_m_input ?? '—'} m`;
+
+  document.getElementById('title-station').textContent =
+    community ? `${callTag} — ${community.toUpperCase()}` : callTag;
   document.getElementById('title-meta').textContent = meta;
   document.getElementById('prov-lhs').textContent =
     `NAD83  ${Number.isFinite(lat) ? lat.toFixed(6) : '—'}, ${Number.isFinite(lon) ? lon.toFixed(6) : '—'}  ·  47 CFR §73.333 F(50,50)`;
+  if (opts.figure_num)   document.getElementById('figure-num').textContent   = String(opts.figure_num);
+  if (opts.figure_label) document.getElementById('figure-label').textContent = String(opts.figure_label);
 
   if (!Number.isFinite(lat) || !Number.isFinite(lon)){
-    // No coordinates — render a blank map and signal ready so the
-    // sidecar still returns something printable rather than timing out.
-    document.getElementById('map').innerHTML =
-      '<div style="display:flex;height:100%;align-items:center;justify-content:center;font-style:italic;color:#666">Coordinates missing — map cannot be rendered.</div>';
+    renderCoordsMissingFallback();
     window.__GENOA_MAP_READY__ = true;
     window.dispatchEvent(new Event('genoa-map-ready'));
     return;
   }
 
-  const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true });
-  const baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+  const map = L.map('map', {
+    zoomControl: false, attributionControl: false,
+    preferCanvas: true, fadeAnimation: false, zoomAnimation: false
+  });
+  // Use CARTO light_all (with city/town labels) so the map has cartographic
+  // context — without labels the contour ring floats over featureless tiles
+  // and the engineer can't orient the facility against nearby communities.
+  const baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
+    subdomains: 'abcd',
     attribution: '© OpenStreetMap · © CARTO'
   });
   baseLayer.addTo(map);
 
-  // Tx marker
-  L.circleMarker([lat, lon], {
-    radius: 6, color: '#1c2e3a', weight: 2.5, fillColor: '#c4745a', fillOpacity: 1
-  }).addTo(map);
+  // Tile health tracking — if a majority of tiles fail, show the
+  // BASEMAP UNAVAILABLE banner so the operator knows the contours are
+  // vector-only and can re-run when network is healthier.
+  let tileLoadAttempts = 0;
+  let tileLoadErrors   = 0;
+  baseLayer.on('tileloadstart', () => { tileLoadAttempts += 1; });
+  baseLayer.on('tileerror',     () => {
+    tileLoadErrors += 1;
+    if (tileLoadAttempts >= 4 && tileLoadErrors / tileLoadAttempts > 0.5){
+      document.getElementById('fallback-banner').classList.add('active');
+    }
+  });
+
+  // Tx marker — survey crosshair (precise) + amber filled center (visible)
+  const txIcon = L.divIcon({
+    className: 'tx-marker',
+    html:
+      `<svg viewBox="-12 -12 24 24" width="22" height="22" style="overflow:visible">
+         <line x1="-11" y1="0" x2="-3.5" y2="0" stroke="#1c2e3a" stroke-width="1.4"/>
+         <line x1="3.5"  y1="0" x2="11"   y2="0" stroke="#1c2e3a" stroke-width="1.4"/>
+         <line x1="0" y1="-11" x2="0" y2="-3.5" stroke="#1c2e3a" stroke-width="1.4"/>
+         <line x1="0" y1="3.5" x2="0" y2="11"   stroke="#1c2e3a" stroke-width="1.4"/>
+         <circle cx="0" cy="0" r="3.2" fill="#c4745a" stroke="#1c2e3a" stroke-width="1.2"/>
+       </svg>`,
+    iconSize:   [22, 22],
+    iconAnchor: [11, 11]
+  });
+  L.marker([lat, lon], { icon: txIcon, interactive: false }).addTo(map);
+
+  // Tx label tag — call sign next to the crosshair
+  if (callTag){
+    L.tooltip({
+      permanent: true, direction: 'right', offset: [12, 0],
+      className: 'tx-label', interactive: false
+    })
+      .setContent(escapeHtml(callTag))
+      .setLatLng([lat, lon])
+      .addTo(map);
+  }
 
   const COLORS = ['#c4745a', '#a85a3f', '#6f4e2a'];
   const swatchHost = document.getElementById('contour-swatches');
 
-  // Compliance polygons.
+  // Compliance polygons — solid for primary (60 dBu), dashed for secondary
   polys.forEach((p, i) => {
     const color = COLORS[i] || '#3b3b3b';
     L.polygon(p.ring_latlng, {
-      color, weight: i === 0 ? 2.5 : 1.5, opacity: 1.0,
+      color, weight: i === 0 ? 2.2 : 1.4, opacity: 1.0,
       fillColor: color, fillOpacity: i === 0 ? 0.10 : 0.04,
-      dashArray: i > 0 ? '5,5' : null
+      dashArray: i > 0 ? '5,4' : null,
+      interactive: false
     }).addTo(map);
 
     const sw = document.createElement('span');
     sw.className = 'swatch';
-    sw.innerHTML = `<span class="sq" style="border-color:${color}; ${i === 0 ? 'background:' + color + '22' : ''}"></span>${escapeHtml(p.label || p.contour_id || 'contour')} (${p.field_strength?.value ?? '—'} ${p.field_strength?.unit || ''})`;
+    const fillStyle = i === 0 ? `background:${color}22; ` : '';
+    const dashStyle = i > 0   ? 'border-style:dashed; '   : '';
+    const fsTxt = p.field_strength
+      ? `(${p.field_strength.value} ${p.field_strength.unit || ''})`
+      : '';
+    sw.innerHTML =
+      `<span class="sq" style="${fillStyle}${dashStyle}border-color:${color}"></span>` +
+      `${escapeHtml(p.label || p.contour_id || 'contour')} ${fsTxt}`;
     swatchHost.appendChild(sw);
   });
 
-  // ITM coverage layer (cyan dashed) when present.
+  // ITM coverage layer (cyan dashed) when present
   itm.forEach((p) => {
     L.polygon(p.ring_latlng, {
-      color: '#3a7a9a', weight: 1.5, opacity: 0.9,
+      color: '#3a7a9a', weight: 1.4, opacity: 0.9,
       fillColor: '#3a7a9a', fillOpacity: 0.04,
-      dashArray: '6,4'
+      dashArray: '6,4', interactive: false
     }).addTo(map);
     const sw = document.createElement('span');
     sw.className = 'swatch';
-    sw.innerHTML = `<span class="sq" style="border-color:#3a7a9a; border-style:dashed"></span>ITM coverage`;
+    sw.innerHTML =
+      `<span class="sq" style="border-color:#3a7a9a; border-style:dashed"></span>ITM coverage`;
     swatchHost.appendChild(sw);
   });
 
-  // Fit bounds, then render scale-bar in km from final zoom level.
+  // Fit bounds with padding so the legend / north arrow don't overlap
   const allPts = [...polys, ...itm].flatMap(p => p.ring_latlng || []);
   if (allPts.length){
     map.fitBounds(L.latLngBounds(allPts).pad(0.18));
@@ -129,9 +298,7 @@
     map.setView([lat, lon], 9);
   }
 
-  // Compose a numeric scale bar (5 km, 10 km, or 25 km step depending
-  // on map width-in-meters).  Drawn in pure DOM so it screenshots
-  // crisply at any zoom.
+  // Scale bar — single black bar with 0 / N km tick labels
   function drawScaleBar(){
     const widthMeters = map.distance(map.containerPointToLatLng([0, 0]),
                                      map.containerPointToLatLng([map.getSize().x, 0]));
@@ -139,25 +306,82 @@
     const n = Math.max(2, Math.min(5, Math.round(widthMeters / 4 / step) || 2));
     const totalKm = (step * n) / 1000;
     const px = (step * n) / widthMeters * map.getSize().x;
-    const bar = document.createElement('span');
-    bar.className = 'scale-bar';
-    bar.style.width = `${Math.round(px)}px`;
-    document.getElementById('scale-text').textContent = `${totalKm} km`;
-    document.getElementById('scale-readout').appendChild(bar);
+    const readout = document.getElementById('scale-readout');
+    readout.innerHTML =
+      `<span style="font-size:9px;letter-spacing:1px">SCALE</span>` +
+      `<div class="scale-bar-wrap" style="width:${Math.round(px)}px">` +
+        `<span class="scale-bar"></span>` +
+        `<div class="scale-ticks"><span>0</span><span>${totalKm} km</span></div>` +
+      `</div>`;
   }
 
-  // Wait for tiles to settle, then signal ready.
+  // Coordinate ticks — degree markers at the four map corners.
+  // Helps the reviewer place the contour study geographically without
+  // needing a separate locator map (we're not yet rendering an inset).
+  function drawCoordinateTicks(){
+    const wrapEl = document.getElementById('wrap');
+    wrapEl.querySelectorAll('.coord-tick').forEach(el => el.remove());
+    const mapEl = document.getElementById('map');
+    const r  = mapEl.getBoundingClientRect();
+    const wr = wrapEl.getBoundingClientRect();
+    const b = map.getBounds();
+    const minLat = b.getSouth(), maxLat = b.getNorth();
+    const minLon = b.getWest(),  maxLon = b.getEast();
+
+    const left   = r.left   - wr.left;
+    const right  = r.right  - wr.left;
+    const top    = r.top    - wr.top;
+    const bottom = r.bottom - wr.top;
+
+    function add(text, leftPx, topPx, transform){
+      const t = document.createElement('div');
+      t.className = 'coord-tick';
+      t.textContent = text;
+      t.style.left = leftPx + 'px';
+      t.style.top  = topPx  + 'px';
+      if (transform) t.style.transform = transform;
+      wrapEl.appendChild(t);
+    }
+
+    // Outside the map frame: top-left, top-right, bottom-left, bottom-right
+    add(maxLat.toFixed(3) + '°N', left  - 4, top - 14, 'translateX(-100%)');
+    add(maxLon.toFixed(3) + '°W', right + 4, top - 14, '');
+    add(minLat.toFixed(3) + '°N', left  - 4, bottom + 4, 'translateX(-100%)');
+    add(minLon.toFixed(3) + '°W', right + 4, bottom + 4, '');
+  }
+
+  // Wait for tiles to settle (300 ms idle), then signal ready.  Hard
+  // 6 s fallback so a network-blocked deploy still ships a vector-only
+  // map with the BASEMAP UNAVAILABLE banner.
   let tileLoadIdle = null;
   const markReady = () => {
     drawScaleBar();
+    drawCoordinateTicks();
     window.__GENOA_MAP_READY__ = true;
     window.dispatchEvent(new Event('genoa-map-ready'));
   };
-  baseLayer.on('load',          () => { clearTimeout(tileLoadIdle); tileLoadIdle = setTimeout(markReady, 250); });
+  baseLayer.on('load',          () => { clearTimeout(tileLoadIdle); tileLoadIdle = setTimeout(markReady, 300); });
   baseLayer.on('tileloadstart', () => { clearTimeout(tileLoadIdle); });
-  // Hard fallback: if no tiles ever load (network-blocked), fire ready
-  // after 6 s so the screenshot still happens.
   setTimeout(markReady, 6000);
+
+  function renderCoordsMissingFallback(){
+    document.getElementById('map').innerHTML =
+      `<div style="display:flex;flex-direction:column;height:100%;` +
+              `align-items:center;justify-content:center;` +
+              `font-family:'Times New Roman',serif;color:#666;padding:24px;text-align:center">
+         <div style="font-size:14px;color:#1c2e3a;margin-bottom:8px;letter-spacing:1px">COORDINATES NOT PROVIDED</div>
+         <div style="font-size:11px;font-style:italic;max-width:480px;line-height:1.5">
+           A printable contour map cannot be rendered without antenna lat/lon.
+           The compliance distances (mean radial km) and radial table are
+           still reported in the Engineering Statement; this figure will
+           re-render automatically once filed coordinates are entered and
+           the exhibit is recomputed.
+         </div>
+       </div>`;
+    // Hide elements that don't make sense without a map
+    document.getElementById('north').style.display = 'none';
+    document.getElementById('figure-callout').style.display = 'none';
+  }
 
   function escapeHtml(s){
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
