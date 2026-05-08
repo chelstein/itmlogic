@@ -10,6 +10,9 @@ import TabStrip      from '@components/ui/TabStrip.jsx';
 import HardwareButton from '@components/ui/HardwareButton.jsx';
 import SweepPanel    from '@components/ui/SweepPanel.jsx';
 import Login         from '@components/ui/Login.jsx';
+import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
+import PeSealCard     from '@components/ui/PeSealCard.jsx';
+import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
 
 /* =========================================================================
    App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
@@ -17,11 +20,6 @@ import Login         from '@components/ui/Login.jsx';
    component never does FCC math.
    ========================================================================= */
 
-// Synthetic preset.  No facility_id — this is intentionally a fake
-// engineering test fixture, NOT a real station that could be resolved
-// against ZTR.  The orchestrator therefore won't attempt a lookup,
-// won't stamp facility_lookup_source='zerotrustradio', and the
-// "Resolved via …" UI banner stays empty.
 const PRESET_SYNTHETIC = {
   call:'WBOB-FM (synthetic)', facility_id:'', service:'FM', fcc_class:'A',
   frequency:98.7, erp_kw:6.0, haat_m:100,
@@ -48,6 +46,7 @@ const TABS = [
   { id: 'evidence',   label: 'Evidence' },
   { id: 'validation', label: 'Validation' },
   { id: 'sweep',      label: 'Find best config' },
+  { id: 'am_da',      label: 'AM DA designer' },
   { id: 'provenance', label: 'Provenance' },
   { id: 'narrative',  label: 'AI narrative' },
   { id: 'exports',    label: 'Exports' },
@@ -60,9 +59,6 @@ const CONTOUR_COLORS = ['#ffb347', '#d6a36a', '#6fd3ff'];
 // lives in <MainApp/> below so its useState/useEffect hooks aren't
 // conditionally mounted (which would violate rules-of-hooks).
 export default function App(){
-  // null = probing session, true = authed, false = show <Login/>.
-  // The session cookie is HttpOnly, so the only way to know auth state
-  // is asking the server.  /api/auth/me is the canonical probe.
   const [authed, setAuthed] = useState(null);
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'same-origin' })
@@ -96,26 +92,17 @@ function MainApp({ onLogout }) {
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
-  // Station search (call-sign / partial / facility ID).  Driven by the
-  // /api/facilities/search endpoint — same upstream as the Lookup
-  // button, just a multi-result interactive picker instead of a single
-  // facility_id resolve.
   const [stationQuery,    setStationQuery]    = useState('');
   const [stationResults,  setStationResults]  = useState([]);
   const [stationSearching, setStationSearching] = useState(false);
   const [stationError,    setStationError]    = useState('');
-  // True when a search has completed at least once for the current
-  // query — drives the "no matches" hint in the dropdown.
   const [stationSearched, setStationSearched] = useState(false);
   const stationDebounceRef = useRef(null);
+  // PE certification dialog state.  Stamps land on `exhibit.pe_certification`.
+  const [peDialogOpen, setPeDialogOpen] = useState(false);
 
   const onChange = (k, v) => setInputs(s => ({ ...s, [k]: v }));
 
-  /* ---------------- FACILITY LOOKUP ---------------- */
-
-  // Merge an upstream facility row into a base inputs object, only
-  // filling fields the caller hasn't already set.  Pure: returns the
-  // merged inputs without touching React state.
   function mergeFacility(base, f){
     if (!f) return base;
     const fill = (k, v) => (base[k] === undefined || base[k] === '' || base[k] === null) ? v : base[k];
@@ -130,20 +117,10 @@ function MainApp({ onLogout }) {
       haat_m:       fill('haat_m',       f.haat_m),
       lat:          fill('lat',          f.lat),
       lon:          fill('lon',          f.lon),
-      // Pattern is only filled when the upstream row carries it.
-      // FCC FMQ (and Radio-Locator-style scrapes) report 'DA' / 'ND' in
-      // col 5 of the pipe-delim row; ZTR's broadcast_stations doesn't
-      // carry pattern today, so this stays at the user's prior choice
-      // when picking a ZTR result.
       pattern_mode: f.pattern_mode ? fill('pattern_mode', f.pattern_mode) : base.pattern_mode
     };
   }
 
-  // Returns { facility, source, cached } on success, null on any
-  // failure.  ALSO updates React state + facility-source banner so the
-  // form visibly fills.  Callers that need to chain a compute() right
-  // after should use the merged inputs returned by mergeFacility (to
-  // dodge the React stale-closure on `inputs`).
   async function lookupFacility(id, baseInputs = null){
     if (!id){ setFacilitySource('Enter a Facility ID first.'); return null; }
     setFacilitySource('Looking up…');
@@ -165,8 +142,6 @@ function MainApp({ onLogout }) {
       }
       const j = await r.json();
       const f = j.facility || {};
-      // Apply only to missing fields — never overwrite caller input.
-      // Use the functional form so React batched updates compose.
       setInputs(prev => mergeFacility(baseInputs || prev, f));
       const cacheTag = j.cached ? ' (cached)' : '';
       setFacilitySource(`Resolved via ${j.source}${cacheTag}`);
@@ -177,14 +152,6 @@ function MainApp({ onLogout }) {
     }
   }
 
-  /* ---------------- COMPUTE ---------------- */
-
-  // `overrideInputs` lets preset loaders pass freshly-merged inputs
-  // directly without depending on React state having flushed.
-  // Run an async export job: POST → poll every 2 s → return the
-  // completed job view.  Throws with the actual job error on failure
-  // (no more naked HTTP 504 from the proxy).  onProgress(message) lets
-  // the caller stream progress strings into the status line.
   async function runJobAndWait(kind, { input, options } = {}, onProgress){
     const post = await fetch('/api/exhibit/jobs', {
       method:  'POST',
@@ -217,10 +184,6 @@ function MainApp({ onLogout }) {
   }
 
   async function compute(overrideInputs = null){
-    // Defense: a careless `onClick={compute}` would pass a React
-    // SyntheticEvent here.  The wrapper bindings below already shield
-    // against that, but if any future callsite regresses we drop the
-    // event here so it cannot land in the payload.
     if (overrideInputs && typeof overrideInputs === 'object'
         && (overrideInputs.nativeEvent || overrideInputs.currentTarget || overrideInputs.target || overrideInputs._reactName)){
       overrideInputs = null;
@@ -232,10 +195,8 @@ function MainApp({ onLogout }) {
       const payload = {
         inputs: {
           ...i,
-          // Drop UI-only flags before sending to the API.
           _synthetic:       undefined,
           _resolveFacility: undefined,
-          // Re-cast string inputs to numbers where the engine expects them.
           frequency:         num(i.frequency),
           erp_kw:            num(i.erp_kw),
           haat_m:            num(i.haat_m),
@@ -243,19 +204,14 @@ function MainApp({ onLogout }) {
           lon:               num(i.lon),
           ground_sigma_mS_m: num(i.ground_sigma_mS_m),
           radial_step_deg:   num(i.radial_step_deg) || 10,
-          // Pass DA pattern only when the user toggled it on.
           pattern_table: i.pattern_mode === 'DA' ? i.pattern_table : null
         },
         options: {
           use_terrain: !!i.use_terrain
         }
       };
-      // Belt-and-suspenders: strip any DOM/React refs that could have
-      // snuck into the payload (would crash JSON.stringify with
-      // "Converting circular structure to JSON ... HTMLButtonElement").
       const cleanPayload = stripDomAndReact(payload);
 
-      // Async job — the proxy used to 504 here when DEM fetch ran cold.
       const view = await runJobAndWait(
         'exhibit',
         { input: cleanPayload.inputs, options: cleanPayload.options },
@@ -273,12 +229,6 @@ function MainApp({ onLogout }) {
     } finally { setComputing(false); }
   }
 
-  /* ---------------- PRESETS ---------------- */
-
-  // Load KSLX-FM, resolve via ZTR, compute against the resolved row.
-  // We thread the merged inputs through compute() to dodge React's
-  // stale-closure on `inputs` — setInputs queues a render but compute
-  // would otherwise still see the previous state.
   async function loadKslx(){
     setInputs(PRESET_KSLX);
     setFacilitySource('Looking up KSLX-FM (facility 11282)…');
@@ -290,16 +240,9 @@ function MainApp({ onLogout }) {
         setInputs(merged);
       }
     }
-    // Thread the merged inputs into compute() directly so the request
-    // body matches what the user just loaded — no React render delay.
     await compute(merged);
   }
 
-  /* ---------------- STATION SEARCH ---------------- */
-
-  // Debounced search against /api/facilities/search.  Returns up to 10
-  // matches.  No business logic in the UI — just hit the endpoint and
-  // render the rows.
   async function searchStations(q){
     const qs = String(q || '').trim();
     if (qs.length < 2){
@@ -340,35 +283,20 @@ function MainApp({ onLogout }) {
     stationDebounceRef.current = setTimeout(() => searchStations(q), 250);
   }
 
-  // Click handler for a station search result.  Fills inputs from the
-  // row, clears the search, then computes — same threading trick as
-  // loadKslx so the compute body matches what just got loaded.
   async function loadStationRow(row){
     if (!row) return;
-    // Build a clean base where every FCC-sourced field is empty so
-    // mergeFacility's "fill if empty" actually fills from the row.
-    // Operator-only UI choices (radial step, terrain toggle) carry
-    // forward; engineering inputs (call/service/freq/erp/haat/lat/lon/
-    // class/pattern) are reset.  Without this reset, picking a new
-    // station leaves the previous lat/lon, ERP, HAAT, etc. visible
-    // because mergeFacility is conservative ("fill if empty").
     const base = {
       ...PRESET_SYNTHETIC,
       _synthetic: false,
       radial_step_deg: inputs.radial_step_deg || 10,
       use_terrain:     !!inputs.use_terrain,
-      // Engineering fields — reset so the row's values show through.
       lat: '', lon: '',
       facility_id: '', call: '',
       service:    '', fcc_class: '',
       frequency:  '', erp_kw: '', haat_m: '',
-      pattern_mode: ''                      // mergeFacility falls back to
-                                            // base when row.pattern_mode is null
+      pattern_mode: ''
     };
     const merged = mergeFacility(base, row);
-    // mergeFacility leaves pattern_mode='' (from base) when the row
-    // doesn't carry pattern (e.g. ZTR rows) — coerce that to 'ND' so
-    // the dropdown shows a sensible default.
     if (!merged.pattern_mode) merged.pattern_mode = 'ND';
     setInputs(merged);
     setFacilitySource(`Loaded ${row.call || row.facility_id || 'station'} via ${row.facility_lookup_source?.upstream || 'upstream'}`);
@@ -379,7 +307,6 @@ function MainApp({ onLogout }) {
   function loadSynthetic(){
     setInputs(PRESET_SYNTHETIC);
     setFacilitySource('');
-    // Synthetic carries no facility_id; fine to compute via state.
     setTimeout(() => compute(PRESET_SYNTHETIC), 0);
   }
   function reset(){
@@ -389,27 +316,18 @@ function MainApp({ onLogout }) {
     setStatusMsg('Reset.');
   }
 
-  /* ---------------- SAVE / EXPORT ---------------- */
-
   async function save(){
     if (!exhibit){ setStatusMsg('Run a compute first.'); return; }
     setBusy(true);
     const cleanedExhibit = stripDomAndReact(exhibit);
     const body = JSON.stringify(cleanedExhibit);
 
-    // Try the persisted-save endpoint first.  When persistence is
-    // unavailable (no DATABASE_URL on the deploy, App Platform error
-    // page, proxy 502 → HTML body), fall back to /api/exhibits/save
-    // (ephemeral; never crashes on missing DB), then to a local file
-    // download — never let the UI surface a JSON-parse crash.
     const tryPost = async (url) => {
       const r = await fetch(url, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body
       });
-      // readJsonOrThrow surfaces HTML / non-JSON / non-2xx as a
-      // structured Error instead of crashing inside response.json().
       return readJsonOrThrow(r);
     };
 
@@ -429,7 +347,6 @@ function MainApp({ onLogout }) {
         return;
       } catch (e){ console.warn('[save] ephemeral save failed:', e.message); }
 
-      // Final fallback: synthesize a downloadable JSON file in-browser.
       const blob = new Blob([JSON.stringify(cleanedExhibit, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -450,9 +367,6 @@ function MainApp({ onLogout }) {
       return;
     }
     if (!exhibit.id){
-      // stateless mode: synthesize JSON / GeoJSON in-browser; PDF needs
-      // server-side rendering, so POST the exhibit to the stateless
-      // /api/exhibits/export/pdf route which returns the PDF body.
       const map = {
         json:    () => [JSON.stringify(exhibit, null, 2),         'application/json',     'exhibit.json'],
         geojson: () => [JSON.stringify(exhibit.geojson, null, 2), 'application/geo+json', 'contours.geojson']
@@ -521,8 +435,6 @@ function MainApp({ onLogout }) {
     setStatusMsg('PDF downloaded.');
   }
 
-  /* ---------------- HISTORY ---------------- */
-
   async function loadHistory(){
     try {
       const r = await fetch('/api/exhibits');
@@ -535,7 +447,6 @@ function MainApp({ onLogout }) {
     if (activeTab === 'history') loadHistory();
   }, [activeTab]);
 
-  /* ---------------- LEAFLET MAP ---------------- */
   const mapEl   = useRef(null);
   const mapRef  = useRef({ map: null, layers: [], txMarker: null });
   useEffect(() => { return () => { try { mapRef.current.map?.remove(); } catch {} }; }, []);
@@ -558,7 +469,6 @@ function MainApp({ onLogout }) {
     }
     const map = mapRef.current.map;
 
-    // clear previous polygons + tx marker
     for (const l of mapRef.current.layers) map.removeLayer(l);
     mapRef.current.layers = [];
     if (mapRef.current.txMarker) map.removeLayer(mapRef.current.txMarker);
@@ -582,8 +492,6 @@ function MainApp({ onLogout }) {
     if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.15));
     map.invalidateSize();
   }, [exhibit]);
-
-  /* ---------------- RENDER ---------------- */
 
   const fr        = exhibit?.filing_readiness;
   const sysStatus = !exhibit ? 'offline'
@@ -624,12 +532,6 @@ function MainApp({ onLogout }) {
         <FacilityRack
           inputs={inputs}
           onChange={onChange}
-          // Wrap every callback so React's SyntheticEvent never lands
-          // as the first argument of compute/save/etc — it would be
-          // mistaken for an `overrideInputs` object and crash
-          // JSON.stringify on circular DOM refs (target/currentTarget/
-          // nativeEvent/_react*).  The sanitizer in compute() is a
-          // belt-and-suspenders defense; this is the seatbelt.
           onCompute={() => compute()}
           onReset={() => reset()}
           onSave={() => save()}
@@ -669,19 +571,41 @@ function MainApp({ onLogout }) {
                 history={history}
                 onPickHistory={pickHistory}
                 getBaseInputs={() => sanitizeBaseInputs(inputs)}
+                inputs={inputs}
                 onApplyCombo={(combo) => setInputs(s => ({
                   ...s,
                   erp_kw: combo.erp_kw,
                   haat_m: combo.haat_m,
                   ...(combo.pattern_table ? { pattern_mode: 'DA', pattern_table: combo.pattern_table } : {})
                 }))}
+                onApplyAmDaPattern={(pattern_table) => setInputs(s => ({
+                  ...s,
+                  pattern_mode:  'DA',
+                  pattern_table
+                }))}
               />
             </div>
           </RackPanel>
         </>
       )}
-      right={<TelemetryRack exhibit={exhibit} />}
+      right={(
+        <>
+          <PeSealCard
+            exhibit={exhibit}
+            onCertify={() => setPeDialogOpen(true)}
+            onClear={() => setExhibit(prev => prev ? { ...prev, pe_certification: undefined } : prev)}
+          />
+          <TelemetryRack exhibit={exhibit} />
+        </>
+      )}
     />
+    {peDialogOpen ? (
+      <PeCertifyDialog
+        exhibit={exhibit}
+        onClose={() => setPeDialogOpen(false)}
+        onSealed={(sealed) => setExhibit(sealed)}
+      />
+    ) : null}
     </>
   );
 
@@ -699,7 +623,7 @@ function MainApp({ onLogout }) {
 
 /* ---------------- Tab body content ---------------- */
 
-function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, onApplyCombo }){
+function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, onApplyCombo, onApplyAmDaPattern }){
   if (id === 'fcc'){
     return <PaneFcc exhibit={exhibit} />;
   }
@@ -714,6 +638,9 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, onApplyCo
   }
   if (id === 'sweep'){
     return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
+  }
+  if (id === 'am_da'){
+    return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
   }
   if (id === 'narrative'){
     return <PaneNarrative exhibit={exhibit} />;
@@ -1311,11 +1238,6 @@ function SubKv({ kv }){
     </div>
   );
 }
-// Sanitize the FacilityRack inputs into the shape /api/exhibits/sweep
-// (and the engine) expects: number-cast numeric fields, drop UI-only
-// flags, pass DA pattern only when toggled on.  Mirrors the cleaning
-// done inline in compute(); shared so the sweep route sees identical
-// base inputs.
 function sanitizeBaseInputs(i){
   if (!i) return {};
   return {
