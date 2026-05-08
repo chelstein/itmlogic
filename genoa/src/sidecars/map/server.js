@@ -7,20 +7,29 @@
 //   GET /health
 //     resp: { ok, browser_pid, render_count, uptime_s }
 //
-// The Chromium browser is kept warm across requests (start cost ~1 s,
-// per-render cost ~400 ms with tiles cached).  A fresh page is opened
-// per request and closed when the screenshot lands; concurrent requests
-// share the browser but each gets its own tab.
+//   GET /render-template
+//     resp: text/html (the Leaflet page).  Used internally by the
+//           render handler via page.goto so the page can fetch
+//           /static/* via relative URLs.
 //
-// The HTML template (render.html) is a self-contained Leaflet page
-// that reads the exhibit from window.__EXHIBIT__ injected via
-// page.evaluateOnNewDocument().  Tile load is awaited via the
-// `genoa-map-ready` window event the template fires after Leaflet's
-// `tileLoadStart`/`tileload` settles.
+//   GET /static/states-10m.json     (us-atlas WGS84 TopoJSON)
+//   GET /static/counties-10m.json   (us-atlas WGS84 TopoJSON)
+//   GET /static/topojson-client.min.js
+//     Cartographic data + library bundled at npm-install time.
+//
+// The Chromium browser is kept warm across requests (start cost ~1 s,
+// per-render cost ~400 ms with everything cached).  A fresh page is
+// opened per request and closed when the screenshot lands.
+//
+// Architecture note: switched from page.setContent to page.goto in
+// v0.2.  setContent() leaves the page URL at about:blank, which means
+// relative-URL fetches from inside render.html fail.  Serving the
+// template + cartographic data over Express and using goto means the
+// Leaflet page can fetch /static/states-10m.json directly — no inline
+// 115 KB JSON literals, no setting baseURL, just normal HTTP.
 
 import express from 'express';
 import puppeteer from 'puppeteer-core';
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -52,17 +61,35 @@ async function getBrowser(){
   return browser;
 }
 
-const TEMPLATE_PATH = path.join(__dirname, 'render.html');
-let templateCache = null;
-async function loadTemplate(){
-  if (!templateCache) templateCache = await fs.readFile(TEMPLATE_PATH, 'utf8');
-  return templateCache;
-}
-
 const app = express();
 app.use(express.json({ limit: '32mb' }));
 
-app.get('/health', async (_req, res) => {
+// ─── Static resources used by render.html ──────────────────────────
+//
+// us-atlas + topojson-client come from npm; we serve them straight out
+// of node_modules so there's no copy-on-build step to keep in sync.
+// Cache-Control: 1 hour (these are immutable during a deploy).
+const ONE_HOUR = 'public, max-age=3600';
+app.get('/static/states-10m.json', (_req, res) => {
+  res.set('Cache-Control', ONE_HOUR);
+  res.sendFile(path.join(__dirname, 'node_modules', 'us-atlas', 'states-10m.json'));
+});
+app.get('/static/counties-10m.json', (_req, res) => {
+  res.set('Cache-Control', ONE_HOUR);
+  res.sendFile(path.join(__dirname, 'node_modules', 'us-atlas', 'counties-10m.json'));
+});
+app.get('/static/topojson-client.min.js', (_req, res) => {
+  res.set('Cache-Control', ONE_HOUR);
+  res.set('Content-Type', 'application/javascript; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'node_modules', 'topojson-client', 'dist', 'topojson-client.min.js'));
+});
+
+app.get('/render-template', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.sendFile(path.join(__dirname, 'render.html'));
+});
+
+app.get('/health', (_req, res) => {
   res.json({
     ok:           browser?.connected !== false,
     browser_pid:  browser?.process?.()?.pid ?? null,
@@ -84,16 +111,24 @@ app.post('/render', async (req, res) => {
     page = await b.newPage();
     await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
 
-    // Inject exhibit BEFORE any script on the page runs.
+    // Inject exhibit + options BEFORE the page navigates so render.html
+    // can read them at module-init time.  evaluateOnNewDocument applies
+    // to every navigation in this page (we only do one).
     await page.evaluateOnNewDocument((data, opts) => {
       window.__EXHIBIT__ = data;
       window.__RENDER_OPTIONS__ = opts;
     }, exhibit, options);
 
-    const html = await loadTemplate();
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: TIMEOUT_MS });
+    // Navigate to the template via the same Express server we're
+    // running.  Using goto (not setContent) means relative URLs inside
+    // render.html resolve to http://localhost:PORT/static/* — that's
+    // how render.html fetches the bundled cartographic data.
+    await page.goto(`http://localhost:${PORT}/render-template`, {
+      waitUntil: 'domcontentloaded',
+      timeout:   TIMEOUT_MS
+    });
 
-    // Wait for the template to signal tile load + layer ready.
+    // Wait for the template to signal it's done laying out.
     await page.evaluate((to) => new Promise((resolve, reject) => {
       if (window.__GENOA_MAP_READY__) return resolve();
       const t = setTimeout(() => reject(new Error('map-ready timeout')), to);
@@ -102,11 +137,9 @@ app.post('/render', async (req, res) => {
 
     // Puppeteer-core 22+ returns a Uint8Array, not a Buffer.  Express 4's
     // res.send() distinguishes Buffer (binary) from a generic typed-array
-    // by `Buffer.isBuffer(body)`; an unwrapped Uint8Array falls through
-    // to the object-serializer path and gets JSON.stringified, producing
-    // `{"0":137,"1":80,…}` — pdfkit then fails with "Unknown image
-    // format" when the consumer tries to embed it.  Wrap in Buffer.from
-    // so Express writes the raw bytes with image/png Content-Type.
+    // by Buffer.isBuffer(body); an unwrapped Uint8Array falls through to
+    // the object-serializer path and gets JSON.stringified.  Wrap in
+    // Buffer.from so Express writes the raw bytes.
     const png = await page.screenshot({ type: 'png', fullPage: false });
     const pngBuf = Buffer.isBuffer(png) ? png : Buffer.from(png);
     renderCount += 1;
