@@ -15,10 +15,24 @@ import { mapForm301Fm } from './mapping.js';
 import { FORM_301_FM_META } from './form301fm.js';
 
 const STATUS_BADGE = {
-  filled:  { color: '#43a85a', label: 'FILLED' },
-  gap:     { color: '#c4745a', label: 'NEEDS INPUT' },
-  unknown: { color: '#d6a36a', label: 'EVIDENCE MISSING' }
+  filled:    { color: '#43a85a', label: 'FILLED' },
+  suggested: { color: '#5a9ec4', label: 'SUGGESTED — confirm' },
+  gap:       { color: '#c4745a', label: 'NEEDS INPUT' },
+  unknown:   { color: '#d6a36a', label: 'EVIDENCE MISSING' }
 };
+
+// One-line "FCC FMQ · cached 2026-05-08T18:14Z" string for the cheatsheet.
+function fmtProvenance(p){
+  if (!p || typeof p !== 'object') return '';
+  const bits = [];
+  if (p.source) bits.push(p.source);
+  if (p.dataset) bits.push(p.dataset);
+  if (p.vintage) bits.push(`vintage ${p.vintage}`);
+  if (p.method) bits.push(p.method);
+  if (p.fetched_at) bits.push(`fetched ${p.fetched_at}`);
+  if (p.note) bits.push(p.note);
+  return bits.join(' · ');
+}
 
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => (
@@ -82,19 +96,21 @@ function jsonOutput(mapped){
       source:    f.source,
       status:    f.status,
       value:     f.value,
+      provenance: f.provenance || null,
       notes:     f.notes ?? null
     }))
   }, null, 2);
 }
 
 function csvOutput(mapped){
-  const rows = [['subsection','field_id','lms_label','required','source','status','cite','value']];
+  const rows = [['subsection','field_id','lms_label','required','source','status','cite','value','provenance']];
   for (const f of mapped.fields){
     const v = f.value;
     let cell = '';
     if (v === null || v === undefined) cell = '';
     else if (typeof v === 'object') cell = JSON.stringify(v);
     else cell = String(v).replace(/"/g, '""');
+    const prov = fmtProvenance(f.provenance).replace(/"/g, '""');
     rows.push([
       f.subsection || '',
       f.id,
@@ -103,7 +119,8 @@ function csvOutput(mapped){
       f.source,
       f.status,
       f.cite || '',
-      cell
+      cell,
+      prov
     ].map(c => `"${c}"`).join(','));
   }
   return rows.join('\n');
@@ -117,10 +134,12 @@ function plainTextOutput(mapped){
   out.push(`  Build SHA: ${mapped.exhibit_metadata.build_sha || 'unknown'}`);
   out.push(`  Generated: ${new Date().toISOString()}`);
   out.push(`  Filing-ready: ${mapped.filing_ready ? 'YES' : 'NO'}`);
-  out.push(`  Filled: ${mapped.summary.filled} / ${mapped.summary.total}  ·  Required gaps: ${mapped.summary.required_gaps}`);
+  out.push(`  Filled: ${mapped.summary.filled} / ${mapped.summary.total}  ·  Suggested: ${mapped.summary.suggested ?? 0}  ·  Required gaps: ${mapped.summary.required_gaps}`);
   out.push('='.repeat(80));
   out.push('');
   out.push('Per H&D-style filing convention, paste these values into LMS Section III.');
+  out.push('SUGGESTED entries are pre-staged by Genoa from the exhibit and require');
+  out.push('engineer confirmation before filing — they are not auto-certified.');
   out.push('Sections I (applicant), II (legal), and IV (ownership) are the licensee\'s');
   out.push('and FCC counsel\'s responsibility — Genoa does NOT fill those.');
   out.push('');
@@ -132,12 +151,14 @@ function plainTextOutput(mapped){
       out.push(`-- ${f.subsection || f.section} ${'-'.repeat(76 - (f.subsection || '').length)}`);
       lastSub = f.subsection;
     }
-    const tag = (STATUS_BADGE[f.status] || STATUS_BADGE.gap).label.padEnd(16);
+    const tag = (STATUS_BADGE[f.status] || STATUS_BADGE.gap).label.padEnd(20);
     const req = f.required ? '[REQ]' : '     ';
     out.push(`${tag} ${req} ${f.lms_label}`);
-    out.push(`                       ${fmtValue(f.value, f.type)}`);
-    if (f.cite)  out.push(`                       cite: ${f.cite}`);
-    if (f.notes) out.push(`                       note: ${f.notes}`);
+    out.push(`                           ${fmtValue(f.value, f.type)}`);
+    if (f.cite)  out.push(`                           cite: ${f.cite}`);
+    const prov = fmtProvenance(f.provenance);
+    if (prov)    out.push(`                           src:  ${prov}`);
+    if (f.notes) out.push(`                           note: ${f.notes}`);
   }
   out.push('');
   out.push('-'.repeat(80));
@@ -153,9 +174,16 @@ function htmlOutput(mapped){
   const ready = mapped.filing_ready;
   const fieldsHtml = mapped.fields.map(f => {
     const badge = STATUS_BADGE[f.status] || STATUS_BADGE.gap;
-    const valueCell = f.status === 'filled'
-      ? `<code>${escapeHtml(fmtValue(f.value, f.type))}</code>`
-      : `<i style="color:#999">${f.status === 'gap' ? 'manual entry required' : 'evidence missing'}</i>`;
+    const provText = fmtProvenance(f.provenance);
+    let valueCell;
+    if (f.status === 'filled' || f.status === 'suggested'){
+      valueCell = `<code>${escapeHtml(fmtValue(f.value, f.type))}</code>`;
+      if (f.status === 'suggested'){
+        valueCell += ' <small style="color:#5a9ec4;font-style:italic">(suggested — confirm before filing)</small>';
+      }
+    } else {
+      valueCell = `<i style="color:#999">${f.status === 'gap' ? 'manual entry required' : 'evidence missing'}</i>`;
+    }
     return `
       <tr>
         <td style="padding:6px 10px;border-bottom:1px solid #e7e2d4">${escapeHtml(f.subsection || '')}</td>
@@ -164,7 +192,10 @@ function htmlOutput(mapped){
           ${f.cite ? `<br><small style="color:#999">${escapeHtml(f.cite)}</small>` : ''}
           ${f.notes ? `<br><small style="color:#999;font-style:italic">${escapeHtml(f.notes)}</small>` : ''}
         </td>
-        <td style="padding:6px 10px;border-bottom:1px solid #e7e2d4">${valueCell}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #e7e2d4">
+          ${valueCell}
+          ${provText ? `<br><small style="color:#888;font-family:'Courier New',monospace;font-size:9px">src: ${escapeHtml(provText)}</small>` : ''}
+        </td>
         <td style="padding:6px 10px;border-bottom:1px solid #e7e2d4">
           <span style="background:${badge.color};color:#fff;padding:2px 6px;border-radius:3px;font-size:10px;font-family:monospace">${badge.label}</span>
         </td>
@@ -212,12 +243,15 @@ function htmlOutput(mapped){
   <p style="font-size:12px">
     Per H&D-style filing convention, paste the <i>filled</i> values below into the
     matching fields in FCC LMS Section III for the application.  Fields marked
-    <code>NEEDS INPUT</code> are out of scope for an engineering tool and must
-    be supplied by the engineer of record (tower / FAA / antenna make-model)
-    or by the licensee and counsel (applicant identification, legal
-    certifications, ownership reports — Sections I, II, IV).  Fields marked
-    <code>EVIDENCE MISSING</code> indicate a Genoa evidence gap (e.g. terrain
-    sidecar unreachable) that should be resolved before filing.
+    <code>SUGGESTED</code> have been pre-staged by Genoa from the exhibit and
+    must be confirmed by the engineer of record before filing — they are not
+    auto-certified.  Fields marked <code>NEEDS INPUT</code> are out of scope
+    for an engineering tool and must be supplied by the engineer of record
+    (tower / FAA / antenna make-model) or by the licensee and counsel
+    (applicant identification, legal certifications, ownership reports —
+    Sections I, II, IV).  Fields marked <code>EVIDENCE MISSING</code>
+    indicate a Genoa evidence gap (e.g. terrain sidecar unreachable) that
+    should be resolved before filing.
   </p>
 
   <h2>Section III — engineering data</h2>

@@ -24,6 +24,13 @@
 //     cite        the 47 CFR rule the field documents
 //     mapping     dot-path into exhibit (engineering values), or null
 //                 when source is manual
+//     suggest     OPTIONAL fn(exhibit) → candidate value when source is
+//                 'manual-engineer'.  When operator hasn't supplied a
+//                 value AND suggest() returns one, mapping.js sets the
+//                 field's status to 'suggested' — engineer must confirm
+//                 before filing; never auto-certified.
+//     suggest_note OPTIONAL human-readable rationale shown next to the
+//                 suggested value.
 //
 // REFERENCES
 //   FCC Form 301 (FM): https://transition.fcc.gov/Forms/Form301/301f.pdf
@@ -142,7 +149,22 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     required: false,
     cite: '47 CFR §73.211',
     mapping: null,
-    notes: 'Most FM stations file ERP-H = ERP-V; field becomes mandatory only when patterns differ.'
+    notes: 'Most FM stations file ERP-H = ERP-V; field becomes mandatory only when patterns differ.',
+    // Pre-stage a candidate when the antenna is non-directional and no
+    // separate ERP-V is on file.  ND FM/TV antennas conventionally
+    // radiate ERP-H = ERP-V, so the licensee almost always copies the
+    // horizontal value into the vertical box.  We suggest, never
+    // certify; the engineer of record must confirm before filing.
+    suggest: (exhibit) => {
+      const s = exhibit?.station_inputs || {};
+      const isDirectional = Array.isArray(s.pattern) && s.pattern.length > 0;
+      if (isDirectional) return null;
+      if (s.erp_v_kw != null && Number.isFinite(Number(s.erp_v_kw))) return null;
+      const erpH = Number(s.erp_kw);
+      if (!Number.isFinite(erpH) || erpH <= 0) return null;
+      return erpH;
+    },
+    suggest_note: 'ND antenna with no separate ERP-V on file — suggest ERP-V = ERP-H per §73.211 convention; engineer of record must confirm before filing.'
   },
   {
     id: 'haat-m',
@@ -341,7 +363,7 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     }
   },
 
-  // ── 3D — Population & RF safety ──────────────────────────────────
+  // ── 3D — Population & RF safety ─────────────────────────────────
   {
     id: 'population-served',
     lms_label: 'Population served (within 60 dBu, INFORMATIONAL)',
