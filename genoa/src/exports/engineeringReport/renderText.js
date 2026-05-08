@@ -20,8 +20,6 @@ export function renderEngineeringReportText(doc){
   return out.join('\n') + '\n';
 }
 
-// ───────────────────────────── header / footer ─────────────────────────────
-
 function headerBlock(meta){
   const m = meta || {};
   const lines = [];
@@ -41,8 +39,6 @@ function footerBlock(meta){
   lines.push(m.footer || 'Genoa FCC Propagation Studio');
   return lines.join('\n');
 }
-
-// ───────────────────────────── per-section ─────────────────────────────────
 
 function renderSection(s){
   const buf = [];
@@ -98,11 +94,16 @@ function renderSection(s){
       }
       break;
     case 'certification':
-      if (s.boilerplate){ buf.push(wrap(s.boilerplate, PAGE_WIDTH)); buf.push(''); }
-      buf.push(renderKv(s.fields));
+      if (s.sealed === true){
+        if (s.statement){ buf.push(wrap(s.statement, PAGE_WIDTH)); buf.push(''); }
+        buf.push(renderKv(s.fields));
+        if (s.footer){ buf.push(''); buf.push(wrap(s.footer, PAGE_WIDTH)); }
+      } else {
+        if (s.boilerplate){ buf.push(wrap(s.boilerplate, PAGE_WIDTH)); buf.push(''); }
+        buf.push(renderKv(s.fields));
+      }
       break;
     default:
-      // Unknown section types render their rows / paragraphs / table best-effort.
       if (Array.isArray(s.rows)) buf.push(renderKv(s.rows));
       else if (Array.isArray(s.paragraphs)) buf.push(renderParagraphs(s.paragraphs));
       else if (s.table) buf.push(renderTable(s.table));
@@ -163,13 +164,10 @@ function renderVerdict(v){
   return buf.join('\n');
 }
 
-// ───────────────────────────── helpers ─────────────────────────────────────
-
 function computeColumnWidths(cols, rows, total){
   const inter = (cols.length - 1) * 2;
   const usable = Math.max(20, total - inter);
   const fromHints = cols.map(c => Math.max(3, Math.floor(usable * (Number(c.width) || (1 / cols.length)))));
-  // Expand if any header/cell needs more.
   for (let i = 0; i < cols.length; i++){
     const headerLen = (cols[i].label || cols[i].key || '').length;
     const maxCell   = rows.reduce((m, r) => Math.max(m, formatCell(r[cols[i].key]).length), 0);

@@ -1,13 +1,10 @@
 // PDF renderer for the engineering report — pdfkit-based, Letter size,
 // 0.75" margins, Times-Roman 11pt body, Times-Bold 14pt section headers.
-//
-// Returns a Buffer.  Synchronous-style API: collects chunks into an array
-// and resolves once `doc.end()` flushes the stream.
 
 import PDFDocument from 'pdfkit';
 
 const PT_PER_INCH   = 72;
-const MARGIN        = 0.75 * PT_PER_INCH;     // 54pt
+const MARGIN        = 0.75 * PT_PER_INCH;
 const BODY_FONT     = 'Times-Roman';
 const BOLD_FONT     = 'Times-Bold';
 const ITALIC_FONT   = 'Times-Italic';
@@ -45,7 +42,6 @@ export async function renderEngineeringReportPdf(doc){
     renderSection(pdf, s, doc.meta);
   }
 
-  // Draw footers AFTER all content is laid out — page count is final.
   const footer = (doc.meta && doc.meta.footer) || FOOTER_TEXT;
   const range  = pdf.bufferedPageRange();
   for (let i = range.start; i < range.start + range.count; i++){
@@ -56,8 +52,6 @@ export async function renderEngineeringReportPdf(doc){
   pdf.end();
   return done;
 }
-
-// ───────────────────────────── footer ──────────────────────────────────────
 
 function drawFooter(pdf, footer, pageNum, totalPages){
   const w = pdf.page.width;
@@ -71,8 +65,6 @@ function drawFooter(pdf, footer, pageNum, totalPages){
   pdf.fillColor('black');
   pdf.restore();
 }
-
-// ───────────────────────────── section dispatch ────────────────────────────
 
 function renderSection(pdf, s, meta){
   if (s.type === 'cover'){
@@ -146,8 +138,6 @@ function renderCover(pdf, s, meta){
   renderKv(pdf, s.rows);
 }
 
-// ───────────────────────────── primitives ──────────────────────────────────
-
 function renderKv(pdf, rows){
   if (!Array.isArray(rows)) return;
   const items = rows.filter(Boolean).map(r => Array.isArray(r) ? r : [r.label || r.key || '', r.value || '']);
@@ -178,7 +168,6 @@ function renderTable(pdf, table){
   const w = pdf.page.width - 2 * MARGIN;
   const cols = table.columns;
   const widths = cols.map(c => Math.max(40, Math.floor(w * (Number(c.width) || (1 / cols.length)))));
-  // Header
   pdf.font(BOLD_FONT).fontSize(BODY_SIZE - 1).fillColor('black');
   let x = MARGIN, y = pdf.y;
   for (let i = 0; i < cols.length; i++){
@@ -190,7 +179,6 @@ function renderTable(pdf, table){
   y = pdf.y + 2;
   pdf.moveTo(MARGIN, y).lineTo(MARGIN + w, y).strokeColor('#888').lineWidth(0.5).stroke();
   pdf.y = y + 3;
-  // Rows
   pdf.font(BODY_FONT).fontSize(BODY_SIZE - 1);
   for (const r of table.rows){
     if (pdf.y > pdf.page.height - MARGIN - 30){
@@ -251,11 +239,25 @@ function renderConclusion(pdf, s){
 }
 
 function renderCertification(pdf, s){
-  if (s.boilerplate){
-    pdf.font(BODY_FONT).fontSize(BODY_SIZE).text(s.boilerplate, { align: 'left' });
-    pdf.moveDown(1);
+  if (s.sealed === true){
+    if (s.statement){
+      pdf.font(BODY_FONT).fontSize(BODY_SIZE).text(s.statement, { align: 'left' });
+      pdf.moveDown(1);
+    }
+    renderKv(pdf, s.fields);
+    if (s.footer){
+      pdf.moveDown(1);
+      pdf.font(BODY_FONT).fontSize(BODY_SIZE - 1).fillColor('#444')
+         .text(s.footer, { align: 'left' });
+      pdf.fillColor('black');
+    }
+  } else {
+    if (s.boilerplate){
+      pdf.font(BODY_FONT).fontSize(BODY_SIZE).text(s.boilerplate, { align: 'left' });
+      pdf.moveDown(1);
+    }
+    renderKv(pdf, s.fields);
   }
-  renderKv(pdf, s.fields);
 }
 
 function formatCell(v){
