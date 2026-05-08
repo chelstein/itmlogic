@@ -14,6 +14,17 @@ import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
 import PeSealCard     from '@components/ui/PeSealCard.jsx';
 import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
 
+/* =========================================================================
+   App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
+   exports, history, and Leaflet rendering.  Engine is server-side; this
+   component never does FCC math.
+   ========================================================================= */
+
+// Synthetic preset.  No facility_id — this is intentionally a fake
+// engineering test fixture, NOT a real station that could be resolved
+// against ZTR.  The orchestrator therefore won't attempt a lookup,
+// won't stamp facility_lookup_source='zerotrustradio', and the
+// "Resolved via …" UI banner stays empty.
 const PRESET_SYNTHETIC = {
   call:'WBOB-FM (synthetic)', facility_id:'', service:'FM', fcc_class:'A',
   frequency:98.7, erp_kw:6.0, haat_m:100,
@@ -49,7 +60,13 @@ const TABS = [
 
 const CONTOUR_COLORS = ['#ffb347', '#d6a36a', '#6fd3ff'];
 
+// Top-level App is just the auth gate.  All the actual workbench logic
+// lives in <MainApp/> below so its useState/useEffect hooks aren't
+// conditionally mounted (which would violate rules-of-hooks).
 export default function App(){
+  // null = probing session, true = authed, false = show <Login/>.
+  // The session cookie is HttpOnly, so the only way to know auth state
+  // is asking the server.  /api/auth/me is the canonical probe.
   const [authed, setAuthed] = useState(null);
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'same-origin' })
@@ -83,16 +100,28 @@ function MainApp({ onLogout }) {
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
+  // Station search (call-sign / partial / facility ID).  Driven by the
+  // /api/facilities/search endpoint — same upstream as the Lookup
+  // button, just a multi-result interactive picker instead of a single
+  // facility_id resolve.
   const [stationQuery,    setStationQuery]    = useState('');
   const [stationResults,  setStationResults]  = useState([]);
   const [stationSearching, setStationSearching] = useState(false);
   const [stationError,    setStationError]    = useState('');
+  // True when a search has completed at least once for the current
+  // query — drives the "no matches" hint in the dropdown.
   const [stationSearched, setStationSearched] = useState(false);
   const stationDebounceRef = useRef(null);
+  // PE certification dialog state.  Stamps land on `exhibit.pe_certification`.
   const [peDialogOpen, setPeDialogOpen] = useState(false);
 
   const onChange = (k, v) => setInputs(s => ({ ...s, [k]: v }));
 
+  /* ---------------- FACILITY LOOKUP ---------------- */
+
+  // Merge an upstream facility row into a base inputs object, only
+  // filling fields the caller hasn't already set.  Pure: returns the
+  // merged inputs without touching React state.
   function mergeFacility(base, f){
     if (!f) return base;
     const fill = (k, v) => (base[k] === undefined || base[k] === '' || base[k] === null) ? v : base[k];
@@ -107,10 +136,20 @@ function MainApp({ onLogout }) {
       haat_m:       fill('haat_m',       f.haat_m),
       lat:          fill('lat',          f.lat),
       lon:          fill('lon',          f.lon),
+      // Pattern is only filled when the upstream row carries it.
+      // FCC FMQ (and Radio-Locator-style scrapes) report 'DA' / 'ND' in
+      // col 5 of the pipe-delim row; ZTR's broadcast_stations doesn't
+      // carry pattern today, so this stays at the user's prior choice
+      // when picking a ZTR result.
       pattern_mode: f.pattern_mode ? fill('pattern_mode', f.pattern_mode) : base.pattern_mode
     };
   }
 
+  // Returns { facility, source, cached } on success, null on any
+  // failure.  ALSO updates React state + facility-source banner so the
+  // form visibly fills.  Callers that need to chain a compute() right
+  // after should use the merged inputs returned by mergeFacility (to
+  // dodge the React stale-closure on `inputs`).
   async function lookupFacility(id, baseInputs = null){
     if (!id){ setFacilitySource('Enter a Facility ID first.'); return null; }
     setFacilitySource('Looking up…');
@@ -132,6 +171,8 @@ function MainApp({ onLogout }) {
       }
       const j = await r.json();
       const f = j.facility || {};
+      // Apply only to missing fields — never overwrite caller input.
+      // Use the functional form so React batched updates compose.
       setInputs(prev => mergeFacility(baseInputs || prev, f));
       const cacheTag = j.cached ? ' (cached)' : '';
       setFacilitySource(`Resolved via ${j.source}${cacheTag}`);
@@ -142,6 +183,12 @@ function MainApp({ onLogout }) {
     }
   }
 
+  /* ---------------- COMPUTE ---------------- */
+
+  // Run an async export job: POST → poll every 2 s → return the
+  // completed job view.  Throws with the actual job error on failure
+  // (no more naked HTTP 504 from the proxy).  onProgress(message) lets
+  // the caller stream progress strings into the status line.
   async function runJobAndWait(kind, { input, options } = {}, onProgress){
     const post = await fetch('/api/exhibit/jobs', {
       method:  'POST',
@@ -174,6 +221,10 @@ function MainApp({ onLogout }) {
   }
 
   async function compute(overrideInputs = null){
+    // Defense: a careless `onClick={compute}` would pass a React
+    // SyntheticEvent here.  The wrapper bindings below already shield
+    // against that, but if any future callsite regresses we drop the
+    // event here so it cannot land in the payload.
     if (overrideInputs && typeof overrideInputs === 'object'
         && (overrideInputs.nativeEvent || overrideInputs.currentTarget || overrideInputs.target || overrideInputs._reactName)){
       overrideInputs = null;
@@ -185,8 +236,10 @@ function MainApp({ onLogout }) {
       const payload = {
         inputs: {
           ...i,
+          // Drop UI-only flags before sending to the API.
           _synthetic:       undefined,
           _resolveFacility: undefined,
+          // Re-cast string inputs to numbers where the engine expects them.
           frequency:         num(i.frequency),
           erp_kw:            num(i.erp_kw),
           haat_m:            num(i.haat_m),
@@ -194,13 +247,19 @@ function MainApp({ onLogout }) {
           lon:               num(i.lon),
           ground_sigma_mS_m: num(i.ground_sigma_mS_m),
           radial_step_deg:   num(i.radial_step_deg) || 10,
+          // Pass DA pattern only when the user toggled it on.
           pattern_table: i.pattern_mode === 'DA' ? i.pattern_table : null
         },
         options: {
           use_terrain: !!i.use_terrain
         }
       };
+      // Belt-and-suspenders: strip any DOM/React refs that could have
+      // snuck into the payload (would crash JSON.stringify with
+      // "Converting circular structure to JSON ... HTMLButtonElement").
       const cleanPayload = stripDomAndReact(payload);
+
+      // Async job — the proxy used to 504 here when DEM fetch ran cold.
       const view = await runJobAndWait(
         'exhibit',
         { input: cleanPayload.inputs, options: cleanPayload.options },
@@ -218,6 +277,8 @@ function MainApp({ onLogout }) {
     } finally { setComputing(false); }
   }
 
+  /* ---------------- PRESETS ---------------- */
+
   async function loadKslx(){
     setInputs(PRESET_KSLX);
     setFacilitySource('Looking up KSLX-FM (facility 11282)…');
@@ -231,6 +292,8 @@ function MainApp({ onLogout }) {
     }
     await compute(merged);
   }
+
+  /* ---------------- STATION SEARCH ---------------- */
 
   async function searchStations(q){
     const qs = String(q || '').trim();
@@ -305,11 +368,14 @@ function MainApp({ onLogout }) {
     setStatusMsg('Reset.');
   }
 
+  /* ---------------- SAVE / EXPORT ---------------- */
+
   async function save(){
     if (!exhibit){ setStatusMsg('Run a compute first.'); return; }
     setBusy(true);
     const cleanedExhibit = stripDomAndReact(exhibit);
     const body = JSON.stringify(cleanedExhibit);
+
     const tryPost = async (url) => {
       const r = await fetch(url, {
         method: 'POST',
@@ -318,6 +384,7 @@ function MainApp({ onLogout }) {
       });
       return readJsonOrThrow(r);
     };
+
     try {
       try {
         const j = await tryPost('/api/exhibits');
@@ -325,6 +392,7 @@ function MainApp({ onLogout }) {
         setStatusMsg(`Saved exhibit #${j.id}`);
         return;
       } catch (e){ console.warn('[save] persistent save failed:', e.message); }
+
       try {
         const j = await tryPost('/api/exhibits/save');
         const tag = j.id ? `exhibit #${j.id}` : (j.mode === 'ephemeral' ? 'ephemeral session' : 'session');
@@ -332,6 +400,7 @@ function MainApp({ onLogout }) {
         if (j.id) setExhibit(prev => ({ ...prev, id: j.id }));
         return;
       } catch (e){ console.warn('[save] ephemeral save failed:', e.message); }
+
       const blob = new Blob([JSON.stringify(cleanedExhibit, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -420,6 +489,8 @@ function MainApp({ onLogout }) {
     setStatusMsg('PDF downloaded.');
   }
 
+  /* ---------------- HISTORY ---------------- */
+
   async function loadHistory(){
     try {
       const r = await fetch('/api/exhibits');
@@ -432,6 +503,7 @@ function MainApp({ onLogout }) {
     if (activeTab === 'history') loadHistory();
   }, [activeTab]);
 
+  /* ---------------- LEAFLET MAP ---------------- */
   const mapEl   = useRef(null);
   const mapRef  = useRef({ map: null, layers: [], txMarker: null });
   useEffect(() => { return () => { try { mapRef.current.map?.remove(); } catch {} }; }, []);
@@ -501,6 +573,8 @@ function MainApp({ onLogout }) {
     if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.15));
     map.invalidateSize();
   }, [exhibit]);
+
+  /* ---------------- RENDER ---------------- */
 
   const fr        = exhibit?.filing_readiness;
   const sysStatus = !exhibit ? 'offline'
@@ -637,43 +711,24 @@ function MainApp({ onLogout }) {
   }
 }
 
+/* ---------------- Tab body content ---------------- */
+
 function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, onApplyCombo, onApplyAmDaPattern }){
-  if (id === 'fcc'){
-    return <PaneFcc exhibit={exhibit} />;
-  }
-  if (id === 'radials'){
-    return <PaneRadials exhibit={exhibit} />;
-  }
-  if (id === 'evidence'){
-    return <PaneEvidence exhibit={exhibit} />;
-  }
-  if (id === 'validation'){
-    return <PaneValidation exhibit={exhibit} />;
-  }
-  if (id === 'sweep'){
-    return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
-  }
-  if (id === 'am_da'){
-    return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
-  }
-  if (id === 'narrative'){
-    return <PaneNarrative exhibit={exhibit} />;
-  }
-  if (id === 'provenance'){
-    return <PaneProvenance exhibit={exhibit} />;
-  }
-  if (id === 'exports'){
-    return <PaneExports exhibit={exhibit} />;
-  }
-  if (id === 'history'){
-    return <PaneHistory rows={history} onPick={onPickHistory} />;
-  }
+  if (id === 'fcc')        return <PaneFcc exhibit={exhibit} />;
+  if (id === 'radials')    return <PaneRadials exhibit={exhibit} />;
+  if (id === 'evidence')   return <PaneEvidence exhibit={exhibit} />;
+  if (id === 'validation') return <PaneValidation exhibit={exhibit} />;
+  if (id === 'sweep')      return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
+  if (id === 'am_da')      return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
+  if (id === 'narrative')  return <PaneNarrative exhibit={exhibit} />;
+  if (id === 'provenance') return <PaneProvenance exhibit={exhibit} />;
+  if (id === 'exports')    return <PaneExports exhibit={exhibit} />;
+  if (id === 'history')    return <PaneHistory rows={history} onPick={onPickHistory} />;
   return null;
 }
 
 function PaneFcc({ exhibit }){
   if (!exhibit) return <Empty/>;
-  const s   = exhibit.station_inputs || {};
   const m   = exhibit.calculation_method || {};
   const ip  = exhibit.interpolation || {};
   const tr  = exhibit.calculation_trace || {};
@@ -682,7 +737,7 @@ function PaneFcc({ exhibit }){
     ['Method',          m.name],
     ['Regulations',     (m.regulations || []).join(', ')],
     ['Engine module',   m.engine_module],
-    ['Engine version', m.engine_version],
+    ['Engine version',  m.engine_version],
     ['Interp · field',  ip.along_field],
     ['Interp · HAAT',   ip.along_haat],
     ['Curve dataset',   trS.dataset],
@@ -859,6 +914,26 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.terrain.fetched_at || '—']
           ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
+
+      <SubHead title="Terrain-aware ITM coverage (47 CFR §73.314)" />
+      <SubKv kv={(() => {
+        const itm = ev.itm_coverage;
+        const poly = (exhibit.itm_polygons || [])[0];
+        if (!itm?.available && !poly) return [['Status', 'ITM coverage not run. Reachable when the SPLAT sidecar or the JS Bullington/P.526 fallback returns.']];
+        return [
+          ['Engine',       (itm?.engine || poly?.engine || '—') + (itm?.tier ? ' (' + itm.tier + ')' : '')],
+          ['Method',       itm?.method || poly?.method || '—'],
+          ['DEM source',   itm?.dem_source || poly?.dem_source || '—'],
+          ['Service threshold', itm?.arc?.target_field_dbu != null ? `${itm.arc.target_field_dbu} dBu` : '—'],
+          ['Mean radial — terrain', poly?.mean_radial_km != null ? `${poly.mean_radial_km} km` : '—'],
+          ['Mean radial — §73.333', poly?.fcc_mean_km != null ? `${poly.fcc_mean_km} km` : '—'],
+          ['Δ (terrain − §73.333)', poly?.delta_mean_km != null ? `${poly.delta_mean_km >= 0 ? '+' : ''}${poly.delta_mean_km} km` : '—'],
+          ['Service area (terrain)', poly?.area_km2 != null ? `${Math.round(poly.area_km2).toLocaleString()} km²` : '—'],
+          ['Closed radials', poly?.n_radials ?? '—'],
+          ['Blocked radials', poly?.n_blocked_radials ?? '—']
+        ];
+      })()} />
+
       <SubHead title="Population (INFORMATIONAL ONLY — not used for §73.x compliance)" />
       <SubKv kv={pop.source && pop.vintage
         ? [
@@ -872,7 +947,142 @@ function PaneEvidence({ exhibit }){
             ['Endpoint',   pop.endpoint || '—'],
             ['Fetched at', pop.fetched_at || '—']
           ]
-        : [['Status', 'Placeholder — real Census data will populate once an exhibit is computed with lat/lon coordinates.']]} />
+        : pop.attempt_status === 'failed'
+          ? [
+              ['Status',   'Census API call failed — placeholder retained'],
+              ['Error',    pop.attempt_error || '—'],
+              ['Endpoint', pop.attempt_endpoint || '—']
+            ]
+          : [['Status', 'Placeholder — real Census data will populate once an exhibit is computed with lat/lon coordinates.']]} />
+
+      <SubHead title="Measurements (SDR captures via ZTR)" />
+      <SubKv kv={ev.measurements?.available
+        ? [
+            ['Source',     ev.measurements.source || '—'],
+            ['Endpoint',   ev.measurements.endpoint || '—'],
+            ['Records',    ev.measurements.n_records ?? (ev.measurements.records || []).length],
+            ['Calibrated', ev.measurements.calibrated
+              ? 'yes'
+              : 'no — raw indications only (SDR_MEASUREMENTS_NOT_CALIBRATED)'],
+            ['Fetched at', ev.measurements.fetched_at || '—']
+          ]
+        : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
+
+      <SubHead title="FCC Parity Report (live geo.fcc.gov bit-exact comparison)" />
+      <SubKv kv={ev.fcc_parity_report?.available
+        ? [
+            ['Available',     'yes'],
+            ['Source',        ev.fcc_parity_report.source || '—'],
+            ['Samples',       `${ev.fcc_parity_report.n_pass}/${ev.fcc_parity_report.n_samples} within ${ev.fcc_parity_report.tolerance_km} km`],
+            ['Max delta',     `${ev.fcc_parity_report.max_error_km ?? '—'} km`],
+            ['Mean delta',    `${ev.fcc_parity_report.mean_error_km ?? '—'} km`],
+            ['Overall pass',  ev.fcc_parity_report.overall_pass === true ? 'YES' : ev.fcc_parity_report.overall_pass === false ? 'NO' : '—'],
+            ['FCC commit',    (ev.fcc_parity_report.provenance?.upstream_commit || '').slice(0, 16)],
+            ['Genoa engine',  ev.fcc_parity_report.provenance?.genoa_engine || '—']
+          ]
+        : ev.fcc_parity_report?.reason
+          ? [['Status', ev.fcc_parity_report.reason]]
+          : [['Status', 'Parity report not run.  Set options.fcc_parity_report=true to enable a live bit-exact comparison vs FCC distance.json.']]} />
+
+      <SubHead title="SDR Residuals (predicted vs measured, 47 CFR §73.314 / §73.186)" />
+      <SubKv kv={ev.measurements?.residuals
+        ? [
+            ['Captures',       ev.measurements.residuals.n_total],
+            ['Evaluated',      ev.measurements.residuals.n_evaluated],
+            ['Calibrated',     `${ev.measurements.residuals.n_calibrated}/${ev.measurements.residuals.n_total}`],
+            ['RMS residual',   `${ev.measurements.residuals.rms_residual_dB ?? '—'} dB`],
+            ['Mean residual',  `${ev.measurements.residuals.mean_residual_dB ?? '—'} dB`],
+            ['Above predicted',ev.measurements.residuals.n_above_predicted],
+            ['Below predicted',ev.measurements.residuals.n_below_predicted],
+            ['Calibration',    ev.measurements.calibration?.calibrated ? 'YES' : 'NO'],
+            ['Cal date',       ev.measurements.calibration?.last_calibration_date || '—'],
+            ['Cal method',     ev.measurements.calibration?.calibration_method    || '—'],
+            ['Antenna gain',   `${ev.measurements.calibration?.antenna_gain_dbi ?? '—'} dBi`],
+            ['Cable loss',     `${ev.measurements.calibration?.cable_loss_db    ?? '—'} dB`],
+            ['LNA gain',       `${ev.measurements.calibration?.lna_gain_db      ?? '—'} dB`]
+          ]
+        : ev.measurements?.available
+          ? [['Status', 'SDR captures present but no residual table computed (no tx geometry?).']]
+          : [['Status', 'No SDR captures attached.  See evidence.measurements_probe for diagnostics.']]} />
+
+      <SubHead title="FCC LMS / Public-File (47 CFR §73.3526 / §73.1620)" />
+      <SubKv kv={ev.fcc_lms?.available
+        ? [
+            ['Available',     'yes'],
+            ['Source',        ev.fcc_lms.source || '—'],
+            ['Sources tried', (ev.fcc_lms.sources_tried || []).join(', ') || '—'],
+            ['Call',          ev.fcc_lms.license?.call         || '—'],
+            ['Service',       ev.fcc_lms.license?.service      || '—'],
+            ['Class',         ev.fcc_lms.license?.fcc_class    || '—'],
+            ['Status',        ev.fcc_lms.license?.status       || '—'],
+            ['Last action',   ev.fcc_lms.license?.last_action  || '—'],
+            ['Licensee',      ev.fcc_lms.license?.licensee     || '—'],
+            ['Expiration',    ev.fcc_lms.license?.license_expiration_date
+                                ? `${ev.fcc_lms.license.license_expiration_date}  (${ev.fcc_lms.license.expired ? 'EXPIRED' : ev.fcc_lms.license.expiring_soon ? 'EXPIRING SOON' : 'current'}; ${ev.fcc_lms.license.days_to_expiration} days)`
+                                : '—'],
+            ['Cross-check',   ev.fcc_lms.cross_check?.match
+                                ? 'matches FCC FMQ/AMQ record'
+                                : `${ev.fcc_lms.cross_check?.n_mismatches ?? 0} mismatch(es) — see evidence.fcc_lms.cross_check`],
+            ['Public file',   ev.fcc_lms.public_file?.available
+                                ? `${ev.fcc_lms.public_file.required_folders?.present_count ?? 0} of ${ev.fcc_lms.public_file.required_folders?.required_total ?? 0} required folders present  ·  ${ev.fcc_lms.public_file.file_count ?? '—'} files`
+                                : 'not reachable'],
+            ['Public-file URL', ev.fcc_lms.public_file?.folder_url || '—'],
+            ['LMS deeper review', ev.fcc_lms.authorization_history?.deeper_review_url || '—']
+          ]
+        : ev.fcc_lms_attempt
+          ? [
+              ['Status', 'FCC LMS / public-file lookup ran but returned no usable record.'],
+              ['Sources tried', (ev.fcc_lms_attempt.sources_tried || []).join(', ') || '—'],
+              ['Errors',        (ev.fcc_lms_attempt.errors || []).slice(0, 3).join('; ') || '—']
+            ]
+          : [['Status', 'FCC LMS lookup not run (no call/facility_id supplied or FCC_LMS_DISABLE=1).']]} />
+
+      <SubHead title="NEC Model (NEC2++ via GPL-isolated sidecar)" />
+      <SubKv kv={ev.nec_model?.ok
+        ? [
+            ['Available',     'yes'],
+            ['Engine',        ev.nec_model.provenance?.engine || 'necpp/PyNEC'],
+            ['License boundary', ev.nec_model.provenance?.license_boundary || 'external sidecar'],
+            ['Frequency',     (ev.nec_model.frequency_mhz ?? '—') + ' MHz'],
+            ['Ground',        ev.nec_model.ground?.type || '—'],
+            ['Wires',         ev.nec_model.geometry?.n_wires ?? '—'],
+            ['Total length',  (ev.nec_model.geometry?.total_length_m ?? '—') + ' m'],
+            ['Feedpoint Z',   ev.nec_model.feedpoint
+                                ? `${ev.nec_model.feedpoint.r_ohm} + j${ev.nec_model.feedpoint.x_ohm} Ω  (VSWR50 ${ev.nec_model.feedpoint.vswr_50 ?? '—'})`
+                                : '—'],
+            ['Pattern samples', ev.nec_model.pattern
+                                ? `${(ev.nec_model.pattern.theta_deg || []).length} θ × ${(ev.nec_model.pattern.phi_deg || []).length} φ`
+                                : '—'],
+            ['Near-field samples', (ev.nec_model.near_field || []).length],
+            ['Warnings',      (ev.nec_model.warnings || []).length],
+            ['Model hash',    ev.nec_model.provenance?.model_hash?.slice(0, 16) || '—'],
+            ['Generated',     ev.nec_model.provenance?.generated_at || '—']
+          ]
+        : ev.nec_model_attempt
+          ? [
+              ['Status',  'NEC sidecar reachable but request failed.'],
+              ['Error',   ev.nec_model_attempt.error || '—'],
+              ['Detail',  (ev.nec_model_attempt.detail || '—').slice(0, 120)]
+            ]
+          : [['Status', 'NEC sidecar not configured (set NEC_SIDECAR_URL) or no antenna geometry supplied.']]} />
+
+      <SubHead title="Identity (RDS / RadioDNS / EAS / audio)" />
+      <SubKv kv={ev.identity?.available
+        ? [
+            ['Available',     'yes'],
+            ['Tiers used',    (ev.identity.tiers_used || []).join(', ') || '—'],
+            ['Confirmations', (ev.identity.confirmations || []).length],
+            ['Sources',       (ev.identity.sources || []).map(s => s.kind + ':' + s.status).join(', ')]
+          ]
+        : ev.identity_probe
+          ? [
+              ['Status', 'No identity confirmations attached. ZTR rich-station response was probed but carried no RadioDNS resolver fields and no station_record fields.'],
+              ['Sidecar configured',     ev.identity_probe.sidecar?.configured ? 'yes' : 'no'],
+              ['ZTR endpoint probed',    ev.identity_probe.ztr_radiodns?.endpoint || '—'],
+              ['ZTR station_keys (first 10)', (ev.identity_probe.ztr_radiodns?.station_keys || []).slice(0, 10).join(', ') || '—'],
+              ['Diagnostic',             'evidence.identity_probe carries the full list of checked field names and the actual ZTR station keys, so a missing variant can be added in one line.']
+            ]
+          : [['Status', 'Identity sidecar not attached and ZTR rich-station unavailable.']]} />
     </div>
   );
 }
@@ -891,13 +1101,119 @@ function PaneProvenance({ exhibit }){
         ['Build',   sig.hash || '—'],
         ['Node',    sig.node || '—']
       ]} />
+      <SubHead title="Facility source" />
+      <SubKv kv={[
+        ['Upstream',   fm.facility_lookup_source || '—'],
+        ['Endpoint',   fm.facility_endpoint || '—'],
+        ['Updated at', fm.facility_updated_at || '—']
+      ]} />
       <SubHead title="Terrain source" />
       <SubKv kv={ev.terrain?.available ? [
         ['Upstream', ev.terrain.source || '—'],
         ['Endpoint', ev.terrain.endpoint || '—'],
         ['Method',   ev.terrain.method   || '—'],
+        ['DEM',      `${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`.trim()],
         ['Fetched at', ev.terrain.fetched_at || '—']
       ] : [['Status', 'no terrain source attached']]} />
+      <SubHead title="Curve reference validation (internal golden fixtures)" />
+      <SubKv kv={(() => {
+        const cr = exhibit.validation?.curve_reference_validation;
+        if (!cr) return [['Status', 'no curve-reference run attached']];
+        const passLabel =
+          cr.result === 'pass'  ? 'PASS — clears CURVE_VALIDATION_MISSING'
+        : cr.result === 'fail'  ? 'FAIL — engine + dataset drift detected'
+        : 'NO CASES RUN';
+        return [
+          ['Fixture',      cr.name || '—'],
+          ['Method',       cr.method || '—'],
+          ['Path',         cr.fixture_path || '—'],
+          ['Curve dataset', cr.curve_dataset?.version || '—'],
+          ['Tolerance',    cr.tolerance_km != null ? cr.tolerance_km + ' km' : '—'],
+          ['Cases',        cr.n_run != null ? `${cr.n_pass ?? 0}/${cr.n_run} pass` : '—'],
+          ['Max error',    cr.max_error_km != null ? cr.max_error_km.toFixed(3) + ' km' : '—'],
+          ['Ran at',       cr.ran_at || '—'],
+          ['Result',       passLabel]
+        ];
+      })()} />
+      <SubHead title="FCC geo contour cross-check (external evidence)" />
+      <SubKv kv={(() => {
+        const cc = exhibit.validation?.fcc_cross_check;
+        if (!cc) return [['Status', 'SKIPPED — ZTR not configured or no facility_id resolved (cross-check requires ZTR rich-station endpoint)']];
+        const src = cc;
+        const passLabel =
+          src.result === 'pass'    ? 'PASS — engine matches FCC geo contour'
+        : src.result === 'fail'    ? 'FAIL — engine differs from FCC geo contour (warning, not blocker)'
+        : src.result === 'skipped' ? 'SKIPPED — no usable _fcc_contour returned by ZTR for this station'
+        : (src.authoritative_pass  ? 'PASS' : 'SKIPPED — 0 cross-check cases ran');
+        return [
+          ['Method',       src.method   || 'FCC contour cross-check'],
+          ['Source',       src.source   || 'zerotrustradio'],
+          ['Field',        '_fcc_contour'],
+          ['Endpoint',     src.endpoint || '—'],
+          ['Upstream API', src.upstream_api || 'https://geo.fcc.gov/api/contours/entity.json'],
+          ['Tolerance',    src.tolerance_km != null ? src.tolerance_km + ' km' : '—'],
+          ['Cases',        src.n_run != null ? `${src.n_pass ?? 0}/${src.n_run} pass` : '—'],
+          ['Max error',    src.max_error_km != null ? src.max_error_km.toFixed(2) + ' km' : '—'],
+          ['Ran at',       src.ran_at || '—'],
+          ['Result',       passLabel],
+          ['Note',         'External evidence only.  FCC uses terrain-aware ITM; engine is free-space §73.333.  This does NOT drive CURVE_VALIDATION_MISSING.']
+        ];
+      })()} />
+      <SubHead title="Measurement source" />
+      <SubKv kv={ev.measurements?.available ? [
+        ['Upstream', ev.measurements.source || '—'],
+        ['Endpoint', ev.measurements.endpoint || '—'],
+        ['Records',  ev.measurements.n_records ?? (ev.measurements.records || []).length],
+        ['Calibrated', ev.measurements.calibrated ? 'yes' : 'no'],
+        ['Fetched at', ev.measurements.fetched_at || '—']
+      ] : [['Status', 'no SDR evidence attached']]} />
+      <SubHead title="SPLAT sidecar (terrain-aware coverage)" />
+      <SubKv kv={(() => {
+        const sp = exhibit.evidence?.splat;
+        if (!sp) return [['Status', 'not configured (SPLAT_SIDECAR_URL unset)']];
+        if (!sp.available) return [
+          ['Status',  'sidecar unreachable'],
+          ['Source',  sp.source || '—'],
+          ['Error',   sp.error  || '—']
+        ];
+        return [
+          ['Status',          'reachable'],
+          ['Source',          sp.source],
+          ['Endpoint',        sp.endpoint || '—'],
+          ['Sidecar',         sp.sidecar_name || '—'],
+          ['SPLAT bin',       sp.splat_bin || '—'],
+          ['Workdir',         sp.workdir || '—'],
+          ['DEM provisioned', sp.dem_provisioned === true ? 'yes' : (sp.dem_provisioned === false ? 'no' : 'unknown')],
+          ['Note',            sp.note || '—']
+        ];
+      })()} />
+      <SubHead title="Population source" />
+      <SubKv kv={(() => {
+        const pop = exhibit.population_estimate || {};
+        if (pop.source && pop.vintage && pop.method && pop.fetched_at){
+          return [
+            ['Source',     pop.source],
+            ['Dataset',    pop.dataset || '—'],
+            ['Vintage',    String(pop.vintage)],
+            ['Method',     pop.method],
+            ['Endpoint',   pop.endpoint || '—'],
+            ['SHA256',     (pop.sha256 || '').slice(0, 12) + (pop.sha256 ? '…' : '—'),],
+            ['Fetched at', pop.fetched_at],
+            ['Persons',    Number(pop.primary).toLocaleString()],
+            ['Contour',    pop.contour_label || '—']
+          ];
+        }
+        if (pop.attempt_status === 'failed'){
+          return [
+            ['Status',          'population API call failed — POPULATION_PLACEHOLDER stays'],
+            ['Attempted source', pop.attempted_source || '—'],
+            ['Endpoint',         pop.attempt_endpoint || '—'],
+            ['Error',            pop.attempt_error    || '—'],
+            ['Missing fields',   (pop.attempt_missing || []).join(', ') || '—']
+          ];
+        }
+        return [['Status', 'placeholder — exhibit needs lat/lon coordinates for FCC Census Block API lookup']];
+      })()} />
     </div>
   );
 }
@@ -909,9 +1225,34 @@ function PaneValidation({ exhibit }){
   const kv = [
     ['Curve dataset',          last.curve_version],
     ['Authoritative cases',    `${last.n_run} run / ${last.n_pass} pass`],
+    ['Authoritative pass',     last.authoritative_pass ? 'yes' : 'no — CURVE_VALIDATION_MISSING blocker stays'],
+    ['Regression cases',       `${last.n_regression_run} run / ${last.n_regression_pass} pass`],
+    ['Mean error (km)',        last.mean_error_km ?? '—'],
+    ['Max error (km)',         last.max_error_km  ?? '—'],
     ['Reference cases present', last.reference_cases_present ? 'yes' : 'no']
   ];
-  return <SubKv kv={kv} />;
+  return (
+    <>
+      <SubKv kv={kv} />
+      <SubHead title="Cases" />
+      <div className="overflow-auto max-h-[340px] rounded-md border border-rule">
+        <table className="telemetry">
+          <thead><tr><th>Case</th><th>Role</th><th>Auth?</th><th>Status</th></tr></thead>
+          <tbody>
+            {(last.results || []).map((r, i) => (
+              <tr key={i}>
+                <td className="text-cream">{r.case || '—'}</td>
+                <td>{r.role || '—'}</td>
+                <td>{r.authoritative === true ? 'yes' : (r.authoritative === false ? 'no' : '—')}</td>
+                <td className={r.status === 'pass' ? 'text-green' : (r.status === 'fail' ? 'text-red' : 'text-amber')}>{r.status || '—'}</td>
+              </tr>
+            ))}
+            {!(last.results || []).length && <tr><td colSpan={4} className="text-textDim italic">no cases run.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
 }
 
 function PaneNarrative({ exhibit }){
@@ -969,6 +1310,8 @@ function PaneHistory({ rows, onPick }){
     </div>
   );
 }
+
+/* ---------------- helpers ---------------- */
 
 function Empty(){
   return <div className="font-mono text-[12px] text-textDim italic">— compute an exhibit —</div>;
