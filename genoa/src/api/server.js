@@ -12,6 +12,8 @@ import exhibitRoutes    from './routes/exhibits.js';
 import exhibitJobRoutes from './routes/exhibitJobs.js';
 import facilityRoutes   from './routes/facilities.js';
 import sweepRoutes      from './routes/sweep.js';
+import peCertificationRoutes from './routes/peCertification.js';
+import amDaDesignRoutes from './routes/amDaDesign.js';
 import authRoutes       from './routes/auth.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
@@ -46,24 +48,21 @@ app.use(express.static(uiRoot, {
   maxAge: NODE_ENV === 'production' ? '1h' : 0
 }));
 
-// Auth (publicly accessible: login / logout / me).  Mounted BEFORE the
-// requireAuth gate so the login endpoint itself isn't gated.  Any
-// /api path that isn't /api/auth/* falls through to requireAuth.
+// Auth (publicly accessible: login / logout / me).
 app.use('/api', authRoutes);
 
-// Auth gate for every other /api/* route.  Health (mounted at root,
-// not under /api) and the static UI bundle remain public; the React
-// app fetches /api/auth/me on mount and renders <Login/> on 401.
+// Auth gate for every other /api/* route.
 app.use('/api', requireAuth);
 
 // API routes (gated)
 app.use('/api', curveRoutes);
 app.use('/api', facilityRoutes);
-app.use('/api', exhibitJobRoutes);   // async job endpoints (mount before exhibitRoutes is harmless; paths don't collide)
-app.use('/api', sweepRoutes);        // parameter-sweep endpoint (POST /api/exhibits/sweep)
+app.use('/api', exhibitJobRoutes);
+app.use('/api', sweepRoutes);
+app.use('/api', peCertificationRoutes); // PE certify / verify-cert (POST /api/exhibits/{certify,verify-cert})
+app.use('/api', amDaDesignRoutes);   // AM DA pattern design (POST /api/am-da/{design,null})
 app.use('/api', exhibitRoutes);
 
-// Last-resort error handler
 app.use(errorHandler);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
