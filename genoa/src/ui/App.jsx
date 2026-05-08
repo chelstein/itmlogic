@@ -1270,6 +1270,27 @@ function SubKv({ kv }){
     </div>
   );
 }
+// Sanitize the FacilityRack inputs into the shape /api/exhibits/sweep
+// (and the engine) expects: number-cast numeric fields, drop UI-only
+// flags, pass DA pattern only when toggled on.  Mirrors the cleaning
+// done inline in compute(); shared so the sweep route sees identical
+// base inputs.
+function sanitizeBaseInputs(i){
+  if (!i) return {};
+  return {
+    ...i,
+    _synthetic:       undefined,
+    _resolveFacility: undefined,
+    frequency:         num(i.frequency),
+    erp_kw:            num(i.erp_kw),
+    haat_m:            num(i.haat_m),
+    lat:               num(i.lat),
+    lon:               num(i.lon),
+    ground_sigma_mS_m: num(i.ground_sigma_mS_m),
+    radial_step_deg:   num(i.radial_step_deg) || 10,
+    pattern_table:     i.pattern_mode === 'DA' ? i.pattern_table : null
+  };
+}
 function num(s){
   if (s === null || s === undefined || s === '') return null;
   const n = Number(s);

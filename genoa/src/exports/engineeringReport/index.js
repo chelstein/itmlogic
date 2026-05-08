@@ -9,6 +9,7 @@ import { buildCoverSection }              from './sections/cover.js';
 import { buildPurposeSection }            from './sections/purpose.js';
 import { buildFacilityParametersSection } from './sections/facilityParameters.js';
 import { buildMethodologySection }        from './sections/methodology.js';
+import { buildRegulatoryContextSection }  from './sections/regulatoryContext.js';
 import { buildContourResultsSection }     from './sections/contourResults.js';
 import { buildSpacingAnalysisSection }    from './sections/spacingAnalysis.js';
 import { buildContourProtectionSection }  from './sections/contourProtection.js';
@@ -32,6 +33,7 @@ export function buildEngineeringReport(exhibit, options){
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
+  push(buildRegulatoryContextSection(exhibit, opt));   // NEW — between Methodology and Considerations
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
