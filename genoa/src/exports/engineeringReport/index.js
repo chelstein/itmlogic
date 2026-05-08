@@ -32,13 +32,14 @@ import { buildReferencesSection }         from './sections/references.js';
 import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
+import { buildMapPackageSection }         from './sections/mapPackage.js';
 
 const ROMAN = ['', 'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX','XXI','XXII','XXIII','XXIV','XXV'];
 
 // Section ids whose heading should be treated as a numbered exhibit.
 // Cover / certification / appendices are intentionally excluded.
 const NUMBERED_TYPES = new Set([
-  'kv','paragraphs','paragraphs-with-kv','table','table-with-summary','verdict','considerations'
+  'kv','paragraphs','paragraphs-with-kv','table','table-with-summary','verdict','considerations','image'
 ]);
 const EXCLUDE_FROM_NUMBERING = new Set([
   'cover',
@@ -68,12 +69,13 @@ export function buildEngineeringReport(exhibit, options){
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
+  push(buildMapPackageSection(exhibit, opt));                // NEW — printable contour map (Chromium-rendered PNG)
   push(buildItmCoverageSection(exhibit, opt));
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));
   push(buildRfExposureSection(exhibit, opt));
   push(buildPopulationMethodologySection(exhibit, opt));
-  push(buildTerrainProvenanceSection(exhibit, opt));         // NEW — DEM source, sampling method, radial count, fetch timestamp
+  push(buildTerrainProvenanceSection(exhibit, opt));
   push(buildValidationVerdictSection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
   push(buildBuildAttestationSection(exhibit, opt));
