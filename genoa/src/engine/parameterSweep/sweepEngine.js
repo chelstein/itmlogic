@@ -8,10 +8,15 @@
 //
 // The sweep CALLS THE ENGINE — it does not reimplement the math.  Each
 // combination overrides the corresponding fields on baseInputs and
-// runs compute() with the SAME pre-resolved evidence (terrain HAAT,
-// nearby_primaries, etc.) so per-combo runtime is dominated by the
-// curve table interpolation rather than network fetches.  The caller
-// is responsible for resolving evidence ONCE before sweeping.
+// runs compute() with the SAME pre-resolved evidence (nearby_primaries,
+// fcc_lms, etc.) so per-combo runtime is dominated by the curve table
+// interpolation rather than network fetches.  The caller is responsible
+// for resolving evidence ONCE before sweeping.
+//
+// Evidence note: the route layer (api/routes/sweep.js) strips
+// evidence.terrain_haat_per_radial before handing it to this engine,
+// because compute() prefers per-radial terrain data over inputs.haat_m
+// — which would silently no-op the HAAT dimension of the sweep.
 
 import { scoreSweepResult, rankSweepResults } from './scorer.js';
 
@@ -113,9 +118,12 @@ function summarizeExhibit(exhibit){
  *                                      base station (nearby_primaries
  *                                      especially, which the engine
  *                                      needs for §73.207 / §73.215).
+ *                                      MUST NOT contain
+ *                                      terrain_haat_per_radial — see
+ *                                      file header.
  * @param {object}  args.validation   — same shape compute() expects.
  * @param {object}  args.options      — optional knobs:
- *                                        max_combinations  (≤ 5000),
+ *                                        max_combinations  (≥1, ≤5000),
  *                                        top_n             (default 10),
  *                                        concurrency       (default 8),
  *                                        only_compliant    (default true,
@@ -146,10 +154,23 @@ export async function sweepParameters({
   // pass their own computeFn without paying the import cost.
   const compute = computeFn || (await import('../index.js')).compute;
 
-  const max_combinations = Math.min(
-    Number(options.max_combinations) || DEFAULT_MAX_COMBOS,
-    HARD_MAX_COMBOS
-  );
+  // max_combinations: numeric values must be ≥1 (negative / zero would
+  // silently produce an empty downsample below).  Non-numeric /
+  // undefined falls back to the default; numeric > HARD_MAX_COMBOS is
+  // clamped down.
+  const rawMax = options.max_combinations;
+  let max_combinations;
+  if (rawMax == null){
+    max_combinations = DEFAULT_MAX_COMBOS;
+  } else {
+    const n = Number(rawMax);
+    if (!Number.isFinite(n) || n < 1){
+      const e = new Error(`sweepParameters: options.max_combinations must be a positive integer (got ${rawMax})`);
+      e.code = 'INVALID_OPTIONS';
+      throw e;
+    }
+    max_combinations = Math.min(Math.floor(n), HARD_MAX_COMBOS);
+  }
   const top_n          = Math.max(1, Number(options.top_n) || DEFAULT_TOP_N);
   const concurrency    = Math.max(1, Number(options.concurrency) || DEFAULT_CONCURRENCY);
   const only_compliant = options.only_compliant !== false;  // default true
