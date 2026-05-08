@@ -29,6 +29,7 @@ import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
 import { ENGINE_SIGNATURE, ENGINE_VERSION as SIG_VERSION } from './signature.js';
+import { buildAttestation, buildReplayToken } from './buildAttestation.js';
 
 export const ENGINE_VERSION = SIG_VERSION;
 
@@ -360,19 +361,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   const geojson = featureCollection(features);
 
   // ---- ITM terrain-aware coverage polygon ---------------------------
-  // The orchestrator (exhibitService.js) populates evidence.itm_coverage
-  // when terrain ITM is reachable.  Each radial carries terrain_distance_km
-  // (the distance to the service-threshold field-strength crossing on a
-  // real-DEM path).  We project those distances into a polygon ring using
-  // the same projection as the §73.333 contour so the UI / engineering
-  // report can render BOTH on the same map — that's what FCC filings
-  // actually show: §73.333 compliance contour + ITM-with-terrain coverage
-  // study as supplementary evidence (47 CFR §73.314).
-  //
-  // The ITM polygon does NOT replace the §73.333 contour for protection
-  // studies (§73.207 / §73.215 still operate on `polygons`).  It's surfaced
-  // alongside as evidence of how the actual coverage shape diverges from
-  // the deterministic free-space prediction.
   const itm_polygons = [];
   const itm = evidence.itm_coverage;
   if (hasCoords && itm?.available && Array.isArray(itm.radials) && itm.radials.length){
@@ -591,5 +579,23 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     generated_at: null
   };
   exhibit.narrative    = null;
+
+  // Build attestation + replay token.  Every exhibit ships with an
+  // HMAC-signed proof of WHICH build of the engine produced it
+  // (immutable git SHA, release tag, build time, node version,
+  // canonical fingerprint hash) AND a base64url replay token over
+  // the exhibit's content hash + canonical inputs/evidence hashes.
+  // Verify via POST /api/exhibits/verify-build.
+  exhibit.build_attestation = buildAttestation();
+  const _replay = buildReplayToken(exhibit, {
+    inputs:   exhibit.station_inputs,
+    evidence: evidenceBlock
+  });
+  exhibit.replay_token  = _replay.token;
+  exhibit.replay_digest = {
+    exhibit_sha256:  _replay.exhibit_sha256,
+    inputs_sha256:   _replay.inputs_sha256,
+    evidence_sha256: _replay.evidence_sha256
+  };
   return exhibit;
 }
