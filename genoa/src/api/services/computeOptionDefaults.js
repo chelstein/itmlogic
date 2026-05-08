@@ -9,8 +9,9 @@
 //   use_terrain
 //     Default: ON for non-AM services with lat/lon (real per-radial
 //     §73.313 HAAT — Hatfield-Dawson grade).  Skipped automatically
-//     for AM (groundwave doesn't use HAAT).  Adds ~10-30 s on cold
-//     cache; the existing compute budget caps the wait.
+//     for AM (groundwave doesn't use HAAT) by gates inside the
+//     orchestrator itself.  Adds ~10-30 s on cold cache; the existing
+//     compute budget caps the wait.
 //     Opt out per request:    options.use_terrain = false
 //     Opt out per deployment: TERRAIN_DEFAULT_ON=false (env var)
 //
