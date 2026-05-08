@@ -11,6 +11,7 @@ import { buildFacilityParametersSection } from './sections/facilityParameters.js
 import { buildMethodologySection }        from './sections/methodology.js';
 import { buildRegulatoryContextSection }  from './sections/regulatoryContext.js';
 import { buildContourResultsSection }     from './sections/contourResults.js';
+import { buildItmCoverageSection }        from './sections/itmCoverage.js';
 import { buildSpacingAnalysisSection }    from './sections/spacingAnalysis.js';
 import { buildContourProtectionSection }  from './sections/contourProtection.js';
 import { buildValidationVerdictSection }  from './sections/validationVerdict.js';
@@ -33,10 +34,11 @@ export function buildEngineeringReport(exhibit, options){
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
-  push(buildRegulatoryContextSection(exhibit, opt));   // NEW — between Methodology and Considerations
+  push(buildRegulatoryContextSection(exhibit, opt));
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
+  push(buildItmCoverageSection(exhibit, opt));        // §73.314 — supplementary terrain study (only when ITM data present)
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));
   push(buildValidationVerdictSection(exhibit, opt));
