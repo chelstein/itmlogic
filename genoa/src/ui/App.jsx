@@ -9,6 +9,11 @@ import TelemetryRack from '@components/ui/TelemetryRack.jsx';
 import TabStrip      from '@components/ui/TabStrip.jsx';
 import HardwareButton from '@components/ui/HardwareButton.jsx';
 import SweepPanel    from '@components/ui/SweepPanel.jsx';
+import Login         from '@components/ui/Login.jsx';
+import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
+import PeSealCard     from '@components/ui/PeSealCard.jsx';
+import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
+import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
 
 /* =========================================================================
    App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
@@ -47,6 +52,8 @@ const TABS = [
   { id: 'evidence',   label: 'Evidence' },
   { id: 'validation', label: 'Validation' },
   { id: 'sweep',      label: 'Find best config' },
+  { id: 'am_da',      label: 'AM DA designer' },
+  { id: 'filing',     label: 'Filing package' },
   { id: 'provenance', label: 'Provenance' },
   { id: 'narrative',  label: 'AI narrative' },
   { id: 'exports',    label: 'Exports' },
@@ -55,7 +62,38 @@ const TABS = [
 
 const CONTOUR_COLORS = ['#ffb347', '#d6a36a', '#6fd3ff'];
 
-export default function App() {
+// Top-level App is just the auth gate.  All the actual workbench logic
+// lives in <MainApp/> below so its useState/useEffect hooks aren't
+// conditionally mounted (which would violate rules-of-hooks).
+export default function App(){
+  // null = probing session, true = authed, false = show <Login/>.
+  // The session cookie is HttpOnly, so the only way to know auth state
+  // is asking the server.  /api/auth/me is the canonical probe.
+  const [authed, setAuthed] = useState(null);
+  useEffect(() => {
+    fetch('/api/auth/me', { credentials: 'same-origin' })
+      .then(r => setAuthed(r.ok))
+      .catch(() => setAuthed(false));
+  }, []);
+  async function logout(){
+    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); }
+    catch {}
+    setAuthed(false);
+  }
+  if (authed === null){
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black font-mono text-textDim text-[12px] tracking-rack uppercase">
+        Checking session…
+      </div>
+    );
+  }
+  if (authed === false){
+    return <Login onSuccess={() => setAuthed(true)} />;
+  }
+  return <MainApp onLogout={logout} />;
+}
+
+function MainApp({ onLogout }) {
   const [inputs, setInputs] = useState(PRESET_SYNTHETIC);
   const [exhibit, setExhibit] = useState(null);
   const [computing, setComputing] = useState(false);
@@ -76,6 +114,8 @@ export default function App() {
   // query — drives the "no matches" hint in the dropdown.
   const [stationSearched, setStationSearched] = useState(false);
   const stationDebounceRef = useRef(null);
+  // PE certification dialog state.  Stamps land on `exhibit.pe_certification`.
+  const [peDialogOpen, setPeDialogOpen] = useState(false);
 
   const onChange = (k, v) => setInputs(s => ({ ...s, [k]: v }));
 
@@ -546,7 +586,31 @@ export default function App() {
       layer.addTo(map);
       mapRef.current.layers.push(layer);
     });
-    const allPts = polys.flatMap(p => p.ring_latlng || []);
+    // ITM terrain-aware coverage as a supplementary contour (cyan dashed
+    // ring).  §73.333 polygons stay the compliance reference; this layer
+    // visualises §73.314 evidence for how actual coverage shapes around
+    // terrain.  Hidden when no ITM evidence is attached.
+    const itmPolys = (exhibit.itm_polygons || []).filter(p => p.closed && p.ring_latlng?.length);
+    itmPolys.forEach((p) => {
+      const layer = L.polygon(p.ring_latlng, {
+        color:       '#6fd3ff',
+        weight:      2.0,
+        opacity:     0.85,
+        fillColor:   '#6fd3ff',
+        fillOpacity: 0.05,
+        dashArray:   '6,4'
+      }).bindPopup(
+        `<b>${escapeHtml(p.label || 'ITM coverage')}</b><br/>` +
+        `terrain mean radial ${p.mean_radial_km != null ? p.mean_radial_km.toFixed(1) : '—'} km<br/>` +
+        `§73.333 mean ${p.fcc_mean_km != null ? p.fcc_mean_km.toFixed(1) : '—'} km<br/>` +
+        `Δ ${p.delta_mean_km != null ? (p.delta_mean_km >= 0 ? '+' : '') + p.delta_mean_km.toFixed(1) : '—'} km` +
+        (p.n_blocked_radials ? `<br/>${p.n_blocked_radials} blocked radial(s)` : '') +
+        (p.engine ? `<br/><i>${escapeHtml(p.engine)}${p.tier ? ' · ' + escapeHtml(p.tier) : ''}</i>` : '')
+      );
+      layer.addTo(map);
+      mapRef.current.layers.push(layer);
+    });
+    const allPts = [...polys, ...itmPolys].flatMap(p => p.ring_latlng || []);
     if (allPts.length) map.fitBounds(L.latLngBounds(allPts).pad(0.15));
     map.invalidateSize();
   }, [exhibit]);
@@ -558,10 +622,17 @@ export default function App() {
                   : (exhibit.blockers?.length ? 'blocked'
                   : (exhibit.degraded_mode    ? 'degraded' : 'nominal'));
 
-  const legend = (exhibit?.polygons || []).map((p, i) => ({
-    color: CONTOUR_COLORS[i] || '#9fdcb1',
-    label: p.label
-  }));
+  const legend = [
+    ...(exhibit?.polygons || []).map((p, i) => ({
+      color: CONTOUR_COLORS[i] || '#9fdcb1',
+      label: p.label
+    })),
+    ...((exhibit?.itm_polygons || []).filter(p => p.closed).map(p => ({
+      color: '#6fd3ff',
+      label: `${p.label}${p.delta_mean_km != null ? `  (Δ ${p.delta_mean_km >= 0 ? '+' : ''}${p.delta_mean_km.toFixed(1)} km)` : ''}`,
+      dashed: true
+    })))
+  ];
 
   const mapCaption = (() => {
     const s = exhibit?.station_inputs;
@@ -573,6 +644,14 @@ export default function App() {
   })();
 
   return (
+    <>
+    <button
+      onClick={onLogout}
+      title="Sign out"
+      className="fixed top-3 right-4 z-40 font-mono text-[10px] tracking-rack uppercase text-textDim hover:text-cream border border-rule hover:border-gold/50 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
+    >
+      Sign&nbsp;out
+    </button>
     <AppShell
       systemStatus={sysStatus}
       mode={exhibit?.calculation_method?.name || '47 CFR §73.333 F(50,50)'}
@@ -629,19 +708,42 @@ export default function App() {
                 history={history}
                 onPickHistory={pickHistory}
                 getBaseInputs={() => sanitizeBaseInputs(inputs)}
+                inputs={inputs}
                 onApplyCombo={(combo) => setInputs(s => ({
                   ...s,
                   erp_kw: combo.erp_kw,
                   haat_m: combo.haat_m,
                   ...(combo.pattern_table ? { pattern_mode: 'DA', pattern_table: combo.pattern_table } : {})
                 }))}
+                onApplyAmDaPattern={(pattern_table) => setInputs(s => ({
+                  ...s,
+                  pattern_mode:  'DA',
+                  pattern_table
+                }))}
               />
             </div>
           </RackPanel>
         </>
       )}
-      right={<TelemetryRack exhibit={exhibit} />}
+      right={(
+        <>
+          <PeSealCard
+            exhibit={exhibit}
+            onCertify={() => setPeDialogOpen(true)}
+            onClear={() => setExhibit(prev => prev ? { ...prev, pe_certification: undefined } : prev)}
+          />
+          <TelemetryRack exhibit={exhibit} />
+        </>
+      )}
     />
+    {peDialogOpen ? (
+      <PeCertifyDialog
+        exhibit={exhibit}
+        onClose={() => setPeDialogOpen(false)}
+        onSealed={(sealed) => setExhibit(sealed)}
+      />
+    ) : null}
+    </>
   );
 
   async function pickHistory(id){
@@ -658,7 +760,7 @@ export default function App() {
 
 /* ---------------- Tab body content ---------------- */
 
-function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, onApplyCombo }){
+function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, onApplyCombo, onApplyAmDaPattern }){
   if (id === 'fcc'){
     return <PaneFcc exhibit={exhibit} />;
   }
@@ -673,6 +775,12 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, onApplyCo
   }
   if (id === 'sweep'){
     return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
+  }
+  if (id === 'am_da'){
+    return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
+  }
+  if (id === 'filing'){
+    return <FilingPackagePanel exhibit={exhibit} />;
   }
   if (id === 'narrative'){
     return <PaneNarrative exhibit={exhibit} />;
@@ -700,7 +808,7 @@ function PaneFcc({ exhibit }){
     ['Method',          m.name],
     ['Regulations',     (m.regulations || []).join(', ')],
     ['Engine module',   m.engine_module],
-    ['Engine version',  m.engine_version],
+    ['Engine version', m.engine_version],
     ['Interp · field',  ip.along_field],
     ['Interp · HAAT',   ip.along_haat],
     ['Curve dataset',   trS.dataset],

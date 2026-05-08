@@ -1,17 +1,6 @@
 // Genoa engine — public entry.
 //
 // One function: compute({ inputs, evidence, options }) -> exhibit.v2
-//
-// Determinism contract:
-//   - Same inputs + same curve dataset version + same engine version
-//     ALWAYS produce the same exhibit (down to radial-table values and
-//     polygon vertex coordinates).
-//   - The engine never reaches out to a network at compute time.  All
-//     evidence (terrain HAAT per radial, measurements, identity) must
-//     be PRE-RESOLVED by the caller and handed in via `evidence`.
-//   - The engine never calls AI.  It does not import the narrative
-//     module.  Narrative is rendered on top of the exhibit as a
-//     separate post-processing step.
 
 import { loadDataset, loadManifest, curveProvenance } from './curves/loader.js';
 import { destPoint } from './geometry/geodesic.js';
@@ -40,6 +29,7 @@ import { W } from '../types/warnings.js';
 import { emptyExhibit } from '../types/schema.js';
 import { readiness } from '../types/readiness.js';
 import { ENGINE_SIGNATURE, ENGINE_VERSION as SIG_VERSION } from './signature.js';
+import { buildAttestation, buildReplayToken } from './buildAttestation.js';
 
 export const ENGINE_VERSION = SIG_VERSION;
 
@@ -66,9 +56,6 @@ function radialList(step_deg){
 }
 
 export async function compute({ inputs, evidence = {}, options = {} } = {}){
-  // ---- Strict contract guards ----
-  // These intentionally throw rather than emit warnings — they signal
-  // a programming error in the caller, not a property of the exhibit.
   if (!inputs || typeof inputs !== 'object'){
     const e = new Error('INVALID_INPUTS: compute(inputs, ...) requires an object');
     e.code = 'INVALID_INPUTS';
@@ -82,7 +69,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
 
   const warnings = [];
 
-  // ---- Inputs --------------------------------------------------------
   const service = String(inputs.service || 'FM').toUpperCase();
   const erp_kW  = Number(inputs.erp_kw);
   const haat_m  = Number(inputs.haat_m);
@@ -104,10 +90,8 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     warnings.push(W.make('FACILITY_COORDINATES_MISSING'));
   }
 
-  // ---- Method binding -----------------------------------------------
   const { method, regs } = methodFor(service);
 
-  // ---- HAAT per radial ----------------------------------------------
   const radials_deg = radialList(step);
   let haatPerRadial;
   if (service === 'AM'){
@@ -129,7 +113,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
-  // ---- Engine guards by service -------------------------------------
   if (service === 'FM') {
     warnings.push(...fmInputGuards({ erp_kW, haat_m, frequency_mhz: freq }));
   } else if (service === 'LPFM') {
@@ -139,7 +122,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     warnings.push(...fxInputGuards({ erp_kW }));
     warnings.push(...fmInputGuards({ erp_kW, haat_m, frequency_mhz: freq }));
   } else if (service === 'AM') {
-    // AM frequency is in kHz at the engine boundary.
     warnings.push(...amWarnings({
       frequency_khz:    Number(freq),
       conductivity_msm: Number(sigma),
@@ -150,14 +132,8 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
-  // ---- Radial table + contours --------------------------------------
   const factorFn = az => patternFactor(pattern, az);
   let contours, radial_table;
-  // Engine selection.  Default to the vendored FCC-canonical path
-  // (matches geo.fcc.gov/api/contours) so Genoa output is FCC-equivalent.
-  // Caller can opt back to the legacy v0.2 lookup via
-  //   options.engine = 'v0.2-legacy'
-  // for regression / debugging.
   const fmEngine = options.engine || FM_ENGINE_DEFAULT;
 
   switch (service){
@@ -178,10 +154,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       });
       break;
     case 'FX':
-      // Per-contour `mode` selects F(50,50) for the service contour and
-      // F(50,10) for the §74.1204(a)+(c) interfering contours.  The
-      // top-level mode here is the legacy default for any callers that
-      // pass a contour entry without its own mode field.
       contours     = FX_DEFAULT_CONTOURS;
       radial_table = await fxRadialTable({
         datasetByName: loadDataset, mode: '50,50', contours,
@@ -193,7 +165,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       contours     = AM_DEFAULT_CONTOURS;
       radial_table = amRadialTable({
         erp_kW,
-        frequency_khz:    Number(freq),       // AM frequency is kHz at the input boundary
+        frequency_khz:    Number(freq),
         conductivity_msm: Number(sigma),
         patternFactorFn:  factorFn,
         radials_deg,
@@ -202,12 +174,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       break;
   }
 
-  // ---- Regulatory compliance (§73.811 / §74.1204) -------------------
-  // LPFM exhibits get §73.811 service-contour + ERP-ceiling check.
-  // FM-translator exhibits get §74.1204 D/U short-spacing study against
-  // any primary stations supplied via evidence.nearby_primaries.  All
-  // results are stamped on exhibit.regulatory_compliance for downstream
-  // consumers; rule failures bubble up as typed warnings.
   let regulatory_compliance = null;
   if (service === 'LPFM'){
     regulatory_compliance = await checkLpfmCompliance({
@@ -229,11 +195,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       },
       primaries
     });
-    // Stamp the §74.1204(c) D/U gate table + interfering-contour
-    // derivations onto the compliance block so the JSON exhibit / TXT
-    // export / UI can render the regulatory thresholds alongside the
-    // study results.  This is sourced data (47 CFR §74.1204), not a
-    // computed assumption.
     regulatory_compliance.regulatory_metadata = FX_REGULATORY_METADATA;
     if (regulatory_compliance.missing_nearby_stations){
       warnings.push(W.make('MISSING_NEARBY_STATIONS'));
@@ -242,14 +203,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
         regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
     }
   } else if (service === 'FM'){
-    // 47 CFR §73.215 — full-service FM contour-protection short-spacing.
-    // Only runs when nearby full-service FM stations are supplied via
-    // evidence.nearby_primaries.  When the list is missing, the engine
-    // emits MISSING_NEARBY_STATIONS — same convention as §74.1204 above.
     const allNearby = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
-    // §73.215 governs full-service FM ↔ full-service FM only.  Strip
-    // translators (FX) and LPFM out of the list so a mis-classified
-    // entry can't generate a spurious §73.215 violation.
     const nearbyStations = allNearby.filter(p => {
       const svc = String(p?.service || '').toUpperCase();
       return svc === 'FM' || svc === '';
@@ -268,13 +222,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       warnings.push(W.make('FM_CONTOUR_PROTECTION_VIOLATION',
         regulatory_compliance.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
     }
-    // 47 CFR §73.207 — minimum-distance separation table A.  Runs as
-    // a CROSS-REFERENCE alongside the §73.215 contour study.  A
-    // §73.207 failure with §73.215 pass is informational (the station
-    // qualifies via §73.215 contour protection); §73.207 failure
-    // with §73.215 also failing escalates the FM_CONTOUR_PROTECTION_VIOLATION
-    // by stamping FM_MINIMUM_SEPARATION_VIOLATION (warning, not blocker —
-    // the §73.215 blocker is the operative one when both fail).
     const sep73_207 = checkSection73207({
       subject: { lat, lon, fcc_class: inputs.fcc_class || null, frequency_mhz: freq,
                  call: inputs.call || null, facility_id },
@@ -288,9 +235,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
           ? `Station fails §73.207(b) minimum-distance separation but qualifies via §73.215 contour protection.  Filing must cite §73.215.  Failed pairs: ${sep73_207.violations.length}.`
           : `Station fails BOTH §73.207(b) minimum-distance separation (${sep73_207.violations.length} pair(s)) AND §73.215 contour protection.  Filing requires either rule to clear.`));
     }
-    // 47 CFR §73.525 — TV channel 6 protection (reserved-band FM 88.1-91.9 MHz).
-    // Skipped when frequency is outside reserved band; pass-by-default
-    // when no nearby ch.6 emitters are supplied.
     const ch6Stations = Array.isArray(evidence.tv_ch6_stations) ? evidence.tv_ch6_stations : [];
     const sec73_525 = checkSection73525({
       subject: { erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
@@ -304,12 +248,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
         sec73_525.violations.map(v => `${v.cite}: ${v.message}`).join(' | ')));
     }
   } else if (service === 'AM'){
-    // 47 CFR §73.187 — AM nighttime skywave protection.
-    // Runs only when nearby AM stations are supplied via
-    // evidence.nearby_primaries.  Without the list the engine emits
-    // MISSING_NEARBY_STATIONS — same convention as §74.1204 / §73.215.
     const allNearby = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
-    // §73.187 governs AM ↔ AM only.
     const nearbyAm = allNearby.filter(p => {
       const svc = String(p?.service || '').toUpperCase();
       return svc === 'AM' || svc === '';
@@ -317,7 +256,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     regulatory_compliance = checkSection73187({
       subject: {
         erp_kw:           erp_kW,
-        frequency_khz:    Number(freq),       // AM uses kHz at engine boundary
+        frequency_khz:    Number(freq),
         lat, lon,
         fcc_class:        inputs.fcc_class || null,
         ground_sigma_msm: Number(inputs.ground_sigma_mS_m) || Number(sigma) || null,
@@ -335,12 +274,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
-  // ---- OET-65 / §1.1310 RF exposure compliance --------------------
-  // Universal — runs for every service (FM/LPFM/FX/AM) whenever ERP
-  // and frequency are present.  The §1.1310 MPE limits cover the
-  // 0.3 MHz – 100 GHz band so the analysis applies to all broadcast.
-  // Frequency input convention: AM in kHz at the engine boundary; we
-  // convert to MHz for the OET-65 lookup which is published in MHz.
   let oet65 = null;
   const freq_mhz_for_oet65 = service === 'AM' ? Number(freq) / 1000 : Number(freq);
   if (Number.isFinite(erp_kW) && erp_kW > 0
@@ -349,9 +282,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       erp_kw:           erp_kW,
       frequency_mhz:    freq_mhz_for_oet65,
       service,
-      // Pattern factor and ground-reflection are caller-overridable
-      // via inputs.oet65_*; defaults are the conservative OET-65
-      // worst-case (main lobe, free space).
       pattern_factor:   Number.isFinite(Number(inputs.oet65_pattern_factor))
                           ? Number(inputs.oet65_pattern_factor) : 1.0,
       ground_reflection: !!inputs.oet65_ground_reflection,
@@ -378,18 +308,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   }
 
   // ---- Polygons + GeoJSON ------------------------------------------
-  // If lat/lon are missing, polygons and GeoJSON cannot be built.
-  // The radial table (azimuth + contour distances) is still produced;
-  // exhibits without coordinates remain useful as an engineering view
-  // of the contour distance solver but cannot be plotted on a map.
-  //
-  // Projection.  Default 'wgs84-karney' (Karney 2013 geodesic on the
-  // WGS-84 ellipsoid; sub-nanometre round-trip residual at FCC scales).
-  // Set options.projection = 'fcc-spherical' for byte-equivalent vertex
-  // coordinates with FCC contours.js (great-circle on a sphere of
-  // radius 6371 km).
-  // Accepts the legacy alias 'wgs84-vincenty' for backwards-compatibility;
-  // both map to the Karney path.
   const projection =
     options.projection === 'fcc-spherical'  ? 'fcc-spherical' :
     options.projection === 'wgs84-vincenty' ? 'wgs84-karney'  :
@@ -442,18 +360,51 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   }
   const geojson = featureCollection(features);
 
-  // ---- Population (null until orchestrator attaches sourced evidence) -
-  // The engine does NOT fabricate a population number.  The orchestrator
-  // (exhibitService.js step 8a) replaces this with a sourced estimate
-  // from the FCC Census Block API (geo.fcc.gov/api/census/area) or an
-  // operator-configured POPULATION_EVIDENCE_URL sidecar.  If neither is
-  // reachable, primary/protected stay null and POPULATION_PLACEHOLDER
-  // persists so reviewers see exactly what's missing.
-  // Population is INFORMATIONAL ONLY — FCC §73.x compliance never
-  // depends on a population number computed by Genoa or anyone else.
-  // The contour rules (§73.207, §73.215, §74.1204, §73.187) are
-  // distance/field-strength tests; the population estimate exists for
-  // operator/reviewer context (audience reach), not as a filing gate.
+  // ---- ITM terrain-aware coverage polygon ---------------------------
+  const itm_polygons = [];
+  const itm = evidence.itm_coverage;
+  if (hasCoords && itm?.available && Array.isArray(itm.radials) && itm.radials.length){
+    const ring = [];
+    let n_blocked = 0;
+    for (const r of itm.radials){
+      const d = r.terrain_distance_km;
+      if (!Number.isFinite(d) || d <= 0){
+        n_blocked++;
+        continue;
+      }
+      ring.push(projectVertex(lat, lon, r.az, d));
+    }
+    const closed = closeRing(ring);
+    const area_km2 = closed.length >= 4 ? ringArea_km2(closed) : null;
+    if (closed.length >= 4){
+      const dists = itm.radials.map(r => r.terrain_distance_km).filter(Number.isFinite);
+      const mean_radial_km = dists.length ? dists.reduce((a, b) => a + b, 0) / dists.length : null;
+      const fcc_dists  = itm.radials.map(r => r.fcc_distance_km).filter(Number.isFinite);
+      const fcc_mean   = fcc_dists.length ? fcc_dists.reduce((a, b) => a + b, 0) / fcc_dists.length : null;
+      itm_polygons.push({
+        contour_id:        'itm_service',
+        label:             'Terrain-aware service coverage (ITM)',
+        field_strength:    { value: itm.arc?.target_field_dbu ?? null, unit: 'dBu' },
+        ring_latlng:       closed,
+        mean_radial_km:    mean_radial_km != null ? +mean_radial_km.toFixed(2) : null,
+        fcc_mean_km:       fcc_mean != null ? +fcc_mean.toFixed(2) : null,
+        delta_mean_km:     (mean_radial_km != null && fcc_mean != null)
+                              ? +(mean_radial_km - fcc_mean).toFixed(2)
+                              : null,
+        area_km2,
+        method:            itm.method || '47 CFR §73.314 supplementary terrain study (Bullington / ITU-R P.526)',
+        cite:              itm.cite || '47 CFR §73.314',
+        engine:            itm.engine || null,
+        tier:              itm.tier   || null,
+        dem_source:        itm.dem_source || null,
+        n_radials:         closed.length - 1,
+        n_blocked_radials: n_blocked,
+        vertex_count:      closed.length,
+        closed:            true
+      });
+    }
+  }
+
   const population_estimate = {
     primary:           null,
     protected:         null,
@@ -465,30 +416,18 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   };
   warnings.push(W.make('POPULATION_PLACEHOLDER'));
 
-  // ---- Validation block ---------------------------------------------
-  // The engine does NOT execute the validation suite at compute time
-  // (the suite is run separately via /api/exhibits/:id/readiness or
-  // the worker).  At compute time it only records whether validation
-  // has been previously attached.
   const validation = options.validation || { runs: [], reference_cases_present: false };
-  // CURVE_VALIDATION_MISSING is cleared by EITHER:
-  //   (a) any validation.runs[] entry with `pass: true` — covers the
-  //       curve_reference_validation golden fixture suite (the
-  //       authoritative-for-Genoa system per PR #30 directive), OR
-  //   (b) a legacy run with `authoritative_pass: true`.
-  // The orchestrator's warnings reconciliation may also clear or
-  // restate this independently.
   const passing = (validation.runs || []).some(r =>
     r && (r.pass === true || r.authoritative_pass === true));
   if (!passing){
     warnings.push(W.make('CURVE_VALIDATION_MISSING'));
   }
 
-  // ---- Evidence block ----------------------------------------------
   const evidenceBlock = {
     terrain:      evidence.terrain      || { available: false, source: null, profiles: [] },
     measurements: evidence.measurements || { available: false, source: null, calibrated: false, records: [] },
     identity:     evidence.identity     || { available: false, sources: [], confirmations: [] },
+    itm_coverage: evidence.itm_coverage || null,
     uncertainty:  evidence.uncertainty  || null
   };
   if (!evidenceBlock.measurements.available){
@@ -497,18 +436,13 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     warnings.push(W.make('SDR_MEASUREMENTS_NOT_CALIBRATED'));
   }
 
-  // ---- Provenance --------------------------------------------------
   await loadManifest();
   const curve_prov = await curveProvenance();
 
-  // ---- Assemble exhibit --------------------------------------------
   const exhibit = emptyExhibit();
   exhibit.generated_at      = new Date().toISOString();
   exhibit.engine_signature  = ENGINE_SIGNATURE;
   exhibit.software_versions = SOFTWARE_VERSIONS;
-  // Pick the interp-provenance block matching the engine that ran.
-  // FCC-canonical → vendored bivariate cubic surface fit.  Legacy →
-  // Genoa's earlier linear-log10.  AM doesn't use either.
   const interpBlock = (service === 'AM')
     ? { along_field: 'n/a', along_haat: 'n/a', source: '47 CFR §73.184 groundwave (engine NOT IMPLEMENTED)' }
     : (fmEngine === 'fcc-canonical' ? FM_INTERP_FCC : FM_INTERP);
@@ -559,9 +493,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     engine_version: ENGINE_VERSION
   };
   exhibit.interpolation = interpBlock;
-  // calculation_trace shows HOW each contour distance was derived.
-  // Engineers reading the saved exhibit can reproduce the lookup
-  // step-by-step from these inputs + the pinned curve dataset.
   exhibit.calculation_trace = {
     [service.toLowerCase()]: {
       mode:           service === 'AM' ? 'groundwave' : 'F(50,50)',
@@ -609,26 +540,19 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   }));
   exhibit.radial_table = radial_table;
   exhibit.polygons     = polygons;
+  exhibit.itm_polygons = itm_polygons;
   exhibit.geojson      = geojson;
   exhibit.evidence     = evidenceBlock;
   exhibit.validation   = validation;
   exhibit.uncertainty  = evidenceBlock.uncertainty;
   exhibit.population_estimate = population_estimate;
   exhibit.warnings     = W.dedupe(warnings);
-  // Top-level blockers are a derived view of warnings (severity ===
-  // 'blocker') so downstream systems can switch on a single field
-  // without re-implementing the warning type taxonomy.
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
   exhibit.degraded_mode    = exhibit.warnings.length > 0;
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
 
-  // Formal interference study — H&D-grade per-station table consolidating
-  // §73.207 / §73.215 / §74.1204 / §73.187 results into one filing-grade
-  // table with rule, distance, required vs actual, D/U, pass/fail per
-  // station.  This is the deliverable structure broadcast engineers
-  // expect; warnings are not a "study".
   exhibit.interference_study = buildInterferenceStudy({
     subject: {
       call:           inputs.call,
@@ -644,26 +568,34 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     service
   });
 
-  // OET-65 / §1.1310 RF exposure compliance — universal across services.
   exhibit.oet65 = oet65;
-
-  // Terrain-aware engineering confidence — pure analysis layer.
-  // Reads radial table + any attached SDR / ITM cross-check residuals;
-  // produces a HIGH/MODERATE/LOW disposition with reason codes.
-  // Does NOT modify FCC curve outputs or compliance results.
   exhibit.engineering_confidence = analyzeTerrainConfidence(exhibit);
-
-  // SDR residual interpretation — engineering-narrative summary of the
-  // measured-vs-predicted residual table.  Advisory only; does not modify
-  // FCC curve outputs or compliance results.
   exhibit.residual_interpretation = interpretResiduals(exhibit);
   exhibit.exports      = {
     json:        'pending',
     txt:         'pending',
     geojson:     'pending',
     pdf:         'pending',
-    generated_at: null   // populated by exporters when they actually render
+    generated_at: null
   };
-  exhibit.narrative    = null; // rendered separately
+  exhibit.narrative    = null;
+
+  // Build attestation + replay token.  Every exhibit ships with an
+  // HMAC-signed proof of WHICH build of the engine produced it
+  // (immutable git SHA, release tag, build time, node version,
+  // canonical fingerprint hash) AND a base64url replay token over
+  // the exhibit's content hash + canonical inputs/evidence hashes.
+  // Verify via POST /api/exhibits/verify-build.
+  exhibit.build_attestation = buildAttestation();
+  const _replay = buildReplayToken(exhibit, {
+    inputs:   exhibit.station_inputs,
+    evidence: evidenceBlock
+  });
+  exhibit.replay_token  = _replay.token;
+  exhibit.replay_digest = {
+    exhibit_sha256:  _replay.exhibit_sha256,
+    inputs_sha256:   _replay.inputs_sha256,
+    evidence_sha256: _replay.evidence_sha256
+  };
   return exhibit;
 }

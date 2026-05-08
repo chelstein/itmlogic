@@ -11,6 +11,8 @@ import { buildFacilityParametersSection } from './sections/facilityParameters.js
 import { buildMethodologySection }        from './sections/methodology.js';
 import { buildRegulatoryContextSection }  from './sections/regulatoryContext.js';
 import { buildContourResultsSection }     from './sections/contourResults.js';
+import { buildItmCoverageSection }        from './sections/itmCoverage.js';
+import { buildBuildAttestationSection }   from './sections/buildAttestation.js';
 import { buildSpacingAnalysisSection }    from './sections/spacingAnalysis.js';
 import { buildContourProtectionSection }  from './sections/contourProtection.js';
 import { buildValidationVerdictSection }  from './sections/validationVerdict.js';
@@ -33,14 +35,16 @@ export function buildEngineeringReport(exhibit, options){
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
-  push(buildRegulatoryContextSection(exhibit, opt));   // NEW — between Methodology and Considerations
+  push(buildRegulatoryContextSection(exhibit, opt));
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
+  push(buildItmCoverageSection(exhibit, opt));
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));
   push(buildValidationVerdictSection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
+  push(buildBuildAttestationSection(exhibit, opt));   // before the PE seal so the seal hash chains over it
   push(buildCertificationSection(exhibit, opt));
   for (const ap of buildAppendixSections(exhibit, opt)) push(ap);
 

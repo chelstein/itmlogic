@@ -1,36 +1,61 @@
 # Top-level Dockerfile for DigitalOcean App Platform.
-# Two-stage build:
-#   1) UI build  — install ALL deps (incl. Vite/React/Tailwind), run vite build
-#                  to emit src/ui/dist/.
-#   2) Runtime   — production-only deps + the engine + the built UI.
+# Three-stage build:
+#   1) sha-stage — COPY in .git, run `git rev-parse HEAD` and
+#      `git describe --tags --always --dirty`, write three small
+#      files (.build_sha / .build_tag / .build_time) that the
+#      runtime image baked-in.  This is what makes every exhibit
+#      carry an immutable build SHA + release tag instead of the
+#      'uncommitted' fallback.
+#   2) ui-build  — install ALL deps (incl. Vite/React/Tailwind), run
+#      vite build to emit src/ui/dist/.
+#   3) runtime   — production-only deps + the engine + the built UI
+#      + the three .build_* files baked at /app.
+#
+# Build context: REPO ROOT (DO app spec source_dir = ".") so that
+# .git/ is available to sha-stage.  Per-stage COPY paths are
+# prefixed with `genoa/` accordingly.
+#
 # Sidecar / worker Dockerfiles live under infra/docker/.
+
+FROM node:20-alpine AS sha-stage
+RUN apk add --no-cache git
+WORKDIR /repo
+# We only need .git to extract the SHA + tag.  Copying the rest of
+# the tree would just slow this stage down.
+COPY .git ./.git
+RUN sh -c '\
+  git --git-dir=/repo/.git rev-parse HEAD                          > /repo/.build_sha  2>/dev/null || echo "uncommitted" > /repo/.build_sha; \
+  git --git-dir=/repo/.git describe --tags --always --dirty        > /repo/.build_tag  2>/dev/null || echo "untagged"    > /repo/.build_tag; \
+  date -u +%Y-%m-%dT%H:%M:%SZ                                      > /repo/.build_time'
 
 FROM node:20-alpine AS ui-build
 WORKDIR /app
-ARG GIT_COMMIT_SHA=uncommitted
-ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 
-COPY package*.json ./
+COPY genoa/package*.json ./
 RUN npm install --no-audit --no-fund
 
-COPY vite.config.js tailwind.config.js postcss.config.js ./
-COPY src ./src
-COPY data ./data
+COPY genoa/vite.config.js genoa/tailwind.config.js genoa/postcss.config.js ./
+COPY genoa/src ./src
+COPY genoa/data ./data
 
 RUN npm run build:ui
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
-ARG GIT_COMMIT_SHA=uncommitted
-ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
 
-COPY package*.json ./
+COPY genoa/package*.json ./
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
-COPY src ./src
-COPY data ./data
+COPY genoa/src ./src
+COPY genoa/data ./data
 # Carry the built UI into the runtime image.
 COPY --from=ui-build /app/src/ui/dist ./src/ui/dist
+# Bake the immutable build identity into the runtime image so
+# engine/signature.js can read it without a network round-trip and
+# without needing GIT_COMMIT_SHA injected via DO env var.
+COPY --from=sha-stage /repo/.build_sha  ./.build_sha
+COPY --from=sha-stage /repo/.build_tag  ./.build_tag
+COPY --from=sha-stage /repo/.build_time ./.build_time
 
 ENV NODE_ENV=production
 ENV PORT=8080
