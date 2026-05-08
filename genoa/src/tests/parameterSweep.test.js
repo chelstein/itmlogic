@@ -204,6 +204,65 @@ test('sweepParameters: respects max_combinations downsample', async () => {
   assert.ok(result.runtime_ms >= 0);
 });
 
+test('sweepParameters: rejects max_combinations < 1 (Codex P2 — silent empty-result guard)', async () => {
+  // Negative / zero max_combinations would previously flow through
+  // Math.min(...) and produce an empty downsample, returning a
+  // "successful" sweep with total_evaluated=0.  Now it throws.
+  await assert.rejects(
+    sweepParameters({
+      baseInputs:  { service: 'FM' },
+      sweepRanges: { erp_kw: { min: 1, max: 10, step: 1 },
+                     haat_m: { min: 100, max: 200, step: 10 } },
+      validation:  { runs: [{ pass: true }], reference_cases_present: true },
+      computeFn:   syntheticCompute,
+      options:     { max_combinations: -5 }
+    }),
+    /max_combinations.*positive integer/
+  );
+  await assert.rejects(
+    sweepParameters({
+      baseInputs:  { service: 'FM' },
+      sweepRanges: { erp_kw: { min: 1, max: 10, step: 1 },
+                     haat_m: { min: 100, max: 200, step: 10 } },
+      validation:  { runs: [{ pass: true }], reference_cases_present: true },
+      computeFn:   syntheticCompute,
+      options:     { max_combinations: 0 }
+    }),
+    /max_combinations.*positive integer/
+  );
+});
+
+test('sweepParameters: per-combo haat_m reaches compute() inputs (Codex P1 — no-op HAAT guard)', async () => {
+  // Pin the contract that each combo's haat_m flows into the compute
+  // function's inputs.  If a future change re-introduced terrain
+  // evidence that shadowed inputs.haat_m, the engine would silently
+  // ignore the HAAT dimension; this test catches that at the boundary
+  // the sweep controls (the inputs handed to compute()).
+  const seenHaats = new Set();
+  const seenErps  = new Set();
+  const recordingCompute = async ({ inputs }) => {
+    seenHaats.add(Number(inputs.haat_m));
+    seenErps.add(Number(inputs.erp_kw));
+    return syntheticExhibit({
+      erp_kw: Number(inputs.erp_kw),
+      haat_m: Number(inputs.haat_m)
+    });
+  };
+  await sweepParameters({
+    baseInputs:  { service: 'FM', haat_m: 999 },   // base haat that combos must override
+    sweepRanges: { erp_kw: { min: 10, max: 30, step: 10 },
+                   haat_m: { min: 100, max: 300, step: 100 } },
+    validation:  { runs: [{ pass: true }], reference_cases_present: true },
+    computeFn:   recordingCompute,
+    options:     { only_compliant: false, concurrency: 1 }
+  });
+  // Each of the 3 sweep haat values must have been seen by compute.
+  assert.deepEqual([...seenHaats].sort((a,b) => a-b), [100, 200, 300]);
+  assert.deepEqual([...seenErps].sort((a,b) => a-b),  [10, 20, 30]);
+  // The base haat_m of 999 must NOT appear — every combo overrides it.
+  assert.ok(!seenHaats.has(999), 'combo.haat_m must override baseInputs.haat_m');
+});
+
 test('sweepParameters: returns only_compliant=false includes failures', async () => {
   const result = await sweepParameters({
     baseInputs:  { service: 'FM' },
