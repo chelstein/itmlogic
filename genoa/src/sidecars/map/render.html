@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Genoa contour map</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* H&D-style consulting print palette: cream paper, amber accents,
+     teal-dark text.  Avoid web-y colors that read "dashboard". */
+  html, body { margin: 0; padding: 0; height: 100%; background: #f6f1e1; color: #1c2e3a; font-family: 'Times New Roman', serif; }
+  #wrap { position: relative; width: 100vw; height: 100vh; }
+  #map  { position: absolute; inset: 56px 24px 92px 24px; border: 2px solid #1c2e3a; box-shadow: 0 0 0 6px #f6f1e1, 0 0 0 7px #c4745a; }
+  #title-band { position: absolute; top: 0; left: 0; right: 0; height: 48px; padding: 8px 24px; background: #1c2e3a; color: #f3c86d; display: flex; align-items: center; justify-content: space-between; }
+  #title-band .lhs { font-size: 16px; font-family: 'Courier New', monospace; letter-spacing: 1.5px; text-transform: uppercase; }
+  #title-band .rhs { font-size: 11px; font-family: 'Courier New', monospace; opacity: 0.9; }
+  #legend { position: absolute; bottom: 16px; left: 36px; right: 36px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; }
+  #legend .swatches { display: flex; gap: 20px; align-items: center; }
+  #legend .swatch { display: inline-flex; align-items: center; gap: 6px; }
+  #legend .sq { display: inline-block; width: 14px; height: 14px; border: 2px solid; }
+  #legend .scale { display: inline-flex; align-items: center; gap: 6px; font-family: 'Courier New', monospace; }
+  #legend .scale-bar { display: inline-block; height: 6px; border-left: 2px solid #1c2e3a; border-right: 2px solid #1c2e3a; border-top: 2px solid #1c2e3a; position: relative; }
+  #north { position: absolute; top: 80px; right: 56px; width: 56px; height: 56px; }
+  #north svg { width: 100%; height: 100%; }
+  #provenance { position: absolute; bottom: 0; left: 0; right: 0; height: 14px; padding: 0 24px; background: #c4745a; color: #f6f1e1; font-family: 'Courier New', monospace; font-size: 9px; display: flex; align-items: center; justify-content: space-between; }
+  /* Make Leaflet tiles render as cream-tinted (not full color) so the
+     contour overlays read clearly when printed in B&W or color. */
+  .leaflet-tile-pane { filter: grayscale(0.6) brightness(1.05) sepia(0.18); }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="title-band">
+    <span class="lhs" id="title-station">Station</span>
+    <span class="rhs" id="title-meta">FCC §73.333 contour study</span>
+  </div>
+  <div id="map"></div>
+  <div id="north" aria-label="north arrow">
+    <svg viewBox="0 0 100 100">
+      <polygon points="50,8 62,60 50,52 38,60" fill="#1c2e3a" />
+      <polygon points="50,92 38,40 50,48 62,40" fill="#c4745a" />
+      <text x="50" y="20" text-anchor="middle" font-family="Courier New, monospace" font-size="11" font-weight="bold" fill="#f6f1e1">N</text>
+    </svg>
+  </div>
+  <div id="legend">
+    <div class="swatches" id="contour-swatches"></div>
+    <div class="scale" id="scale-readout">scale: <span id="scale-text">—</span></div>
+  </div>
+  <div id="provenance">
+    <span id="prov-lhs">NAD83 datum · 47 CFR §73.333 F(50,50)</span>
+    <span id="prov-rhs">Genoa FCC Propagation Studio</span>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function(){
+  const ex = window.__EXHIBIT__ || {};
+  const opts = window.__RENDER_OPTIONS__ || {};
+  const s = ex.station_inputs || {};
+  const polys = (ex.polygons || []).filter(p => p.closed && p.ring_latlng?.length);
+  const itm   = (ex.itm_polygons || []).filter(p => p.closed && p.ring_latlng?.length);
+
+  const lat = Number(s.lat);
+  const lon = Number(s.lon);
+  const callTag = s.call || s.facility_id || 'Subject Facility';
+  const meta    = `${(s.service || '—').toUpperCase()} · ${s.frequency ?? '—'} ${s.frequency_unit || 'MHz'} · ERP ${s.erp_kw ?? '—'} kW · HAAT ${s.haat_m_input ?? '—'} m`;
+  document.getElementById('title-station').textContent = callTag;
+  document.getElementById('title-meta').textContent = meta;
+  document.getElementById('prov-lhs').textContent =
+    `NAD83  ${Number.isFinite(lat) ? lat.toFixed(6) : '—'}, ${Number.isFinite(lon) ? lon.toFixed(6) : '—'}  ·  47 CFR §73.333 F(50,50)`;
+
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+    // No coordinates — render a blank map and signal ready so the
+    // sidecar still returns something printable rather than timing out.
+    document.getElementById('map').innerHTML =
+      '<div style="display:flex;height:100%;align-items:center;justify-content:center;font-style:italic;color:#666">Coordinates missing — map cannot be rendered.</div>';
+    window.__GENOA_MAP_READY__ = true;
+    window.dispatchEvent(new Event('genoa-map-ready'));
+    return;
+  }
+
+  const map = L.map('map', { zoomControl: false, attributionControl: false, preferCanvas: true });
+  const baseLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap · © CARTO'
+  });
+  baseLayer.addTo(map);
+
+  // Tx marker
+  L.circleMarker([lat, lon], {
+    radius: 6, color: '#1c2e3a', weight: 2.5, fillColor: '#c4745a', fillOpacity: 1
+  }).addTo(map);
+
+  const COLORS = ['#c4745a', '#a85a3f', '#6f4e2a'];
+  const swatchHost = document.getElementById('contour-swatches');
+
+  // Compliance polygons.
+  polys.forEach((p, i) => {
+    const color = COLORS[i] || '#3b3b3b';
+    L.polygon(p.ring_latlng, {
+      color, weight: i === 0 ? 2.5 : 1.5, opacity: 1.0,
+      fillColor: color, fillOpacity: i === 0 ? 0.10 : 0.04,
+      dashArray: i > 0 ? '5,5' : null
+    }).addTo(map);
+
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.innerHTML = `<span class="sq" style="border-color:${color}; ${i === 0 ? 'background:' + color + '22' : ''}"></span>${escapeHtml(p.label || p.contour_id || 'contour')} (${p.field_strength?.value ?? '—'} ${p.field_strength?.unit || ''})`;
+    swatchHost.appendChild(sw);
+  });
+
+  // ITM coverage layer (cyan dashed) when present.
+  itm.forEach((p) => {
+    L.polygon(p.ring_latlng, {
+      color: '#3a7a9a', weight: 1.5, opacity: 0.9,
+      fillColor: '#3a7a9a', fillOpacity: 0.04,
+      dashArray: '6,4'
+    }).addTo(map);
+    const sw = document.createElement('span');
+    sw.className = 'swatch';
+    sw.innerHTML = `<span class="sq" style="border-color:#3a7a9a; border-style:dashed"></span>ITM coverage`;
+    swatchHost.appendChild(sw);
+  });
+
+  // Fit bounds, then render scale-bar in km from final zoom level.
+  const allPts = [...polys, ...itm].flatMap(p => p.ring_latlng || []);
+  if (allPts.length){
+    map.fitBounds(L.latLngBounds(allPts).pad(0.18));
+  } else {
+    map.setView([lat, lon], 9);
+  }
+
+  // Compose a numeric scale bar (5 km, 10 km, or 25 km step depending
+  // on map width-in-meters).  Drawn in pure DOM so it screenshots
+  // crisply at any zoom.
+  function drawScaleBar(){
+    const widthMeters = map.distance(map.containerPointToLatLng([0, 0]),
+                                     map.containerPointToLatLng([map.getSize().x, 0]));
+    const step = widthMeters > 100000 ? 25000 : widthMeters > 40000 ? 10000 : 5000;
+    const n = Math.max(2, Math.min(5, Math.round(widthMeters / 4 / step) || 2));
+    const totalKm = (step * n) / 1000;
+    const px = (step * n) / widthMeters * map.getSize().x;
+    const bar = document.createElement('span');
+    bar.className = 'scale-bar';
+    bar.style.width = `${Math.round(px)}px`;
+    document.getElementById('scale-text').textContent = `${totalKm} km`;
+    document.getElementById('scale-readout').appendChild(bar);
+  }
+
+  // Wait for tiles to settle, then signal ready.
+  let tileLoadIdle = null;
+  const markReady = () => {
+    drawScaleBar();
+    window.__GENOA_MAP_READY__ = true;
+    window.dispatchEvent(new Event('genoa-map-ready'));
+  };
+  baseLayer.on('load',          () => { clearTimeout(tileLoadIdle); tileLoadIdle = setTimeout(markReady, 250); });
+  baseLayer.on('tileloadstart', () => { clearTimeout(tileLoadIdle); });
+  // Hard fallback: if no tiles ever load (network-blocked), fire ready
+  // after 6 s so the screenshot still happens.
+  setTimeout(markReady, 6000);
+
+  function escapeHtml(s){
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
