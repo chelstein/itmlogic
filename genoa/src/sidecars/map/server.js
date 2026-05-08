@@ -22,7 +22,7 @@ import express from 'express';
 import puppeteer from 'puppeteer-core';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -100,14 +100,25 @@ app.post('/render', async (req, res) => {
       window.addEventListener('genoa-map-ready', () => { clearTimeout(t); resolve(); }, { once: true });
     }), TIMEOUT_MS);
 
+    // Puppeteer-core 22+ returns a Uint8Array, not a Buffer.  Express 4's
+    // res.send() distinguishes Buffer (binary) from a generic typed-array
+    // by `Buffer.isBuffer(body)`; an unwrapped Uint8Array falls through
+    // to the object-serializer path and gets JSON.stringified, producing
+    // `{"0":137,"1":80,…}` — pdfkit then fails with "Unknown image
+    // format" when the consumer tries to embed it.  Wrap in Buffer.from
+    // so Express writes the raw bytes with image/png Content-Type.
     const png = await page.screenshot({ type: 'png', fullPage: false });
+    const pngBuf = Buffer.isBuffer(png) ? png : Buffer.from(png);
     renderCount += 1;
     res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Content-Length', String(pngBuf.length));
     res.setHeader('X-Render-Ms', String(Date.now() - t0));
-    res.send(png);
+    res.end(pngBuf);
   } catch (err){
     console.error('[map-sidecar] render failed:', err && err.stack || err);
-    res.status(500).json({ error: 'RENDER_FAILED', detail: err?.message || String(err) });
+    if (!res.headersSent){
+      res.status(500).json({ error: 'RENDER_FAILED', detail: err?.message || String(err) });
+    }
   } finally {
     if (page){ try { await page.close(); } catch {} }
   }
