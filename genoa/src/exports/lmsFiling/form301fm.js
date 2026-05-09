@@ -475,10 +475,24 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §17.4',
-    derive: (exhibit) => firstNonEmptyPath(exhibit, [
-      'station_inputs.asr_number',
-      'evidence.asr.asr_number'
-    ])
+    derive: (exhibit) => {
+      const asrFromInput = firstNonEmptyPath(exhibit, [
+        'station_inputs.asr_number',
+        'evidence.asr.asr_number'
+      ]);
+      if (asrFromInput) return asrFromInput;
+      // No registered ASR found AND operator didn't supply one.  When
+      // rules-derived compliance says the tower is below §17.7
+      // notification thresholds, registration isn't required — render a
+      // sourced "NOT_REQUIRED" instead of EVIDENCE MISSING.  The
+      // engineer of record still signs off, but the form has a citation
+      // backing the empty cell.
+      const cmpl = exhibit?.tower_compliance;
+      if (cmpl?.applicable && cmpl.notification_required === false){
+        return 'NOT-REQUIRED — §17.7(a) below 60.96 m AGL (engineer to verify §17.7(c) airport proximity)';
+      }
+      return null;
+    }
   },
   {
     id: 'tower-overall-height-agl-m',
@@ -535,9 +549,13 @@ export const FORM_301_FM_FIELDS = Object.freeze([
       ]);
       if (fromAsr) return fromAsr;
       const cmpl = exhibit?.tower_compliance;
-      if (cmpl?.applicable && cmpl.marking?.required) return cmpl.marking.style;
-      if (cmpl?.applicable && !cmpl.marking?.required) return 'lighting-in-lieu-of-paint';
-      return null;
+      if (!cmpl?.applicable) return null;
+      // Below §17.7 thresholds — no FAA marking required at all.
+      if (cmpl.notification_required === false){
+        return 'NOT-REQUIRED — §17.7(a) below 60.96 m AGL (engineer to verify §17.7(c) airport proximity)';
+      }
+      if (cmpl.marking?.required) return cmpl.marking.style;
+      return 'lighting-in-lieu-of-paint';
     }
   },
   {
@@ -554,7 +572,11 @@ export const FORM_301_FM_FIELDS = Object.freeze([
       ]);
       if (fromAsr) return fromAsr;
       const cmpl = exhibit?.tower_compliance;
-      if (cmpl?.applicable && cmpl.lighting?.required) return cmpl.lighting.style;
+      if (!cmpl?.applicable) return null;
+      if (cmpl.notification_required === false){
+        return 'NOT-REQUIRED — §17.7(a) below 60.96 m AGL (engineer to verify §17.7(c) airport proximity)';
+      }
+      if (cmpl.lighting?.required) return cmpl.lighting.style;
       return null;
     }
   },

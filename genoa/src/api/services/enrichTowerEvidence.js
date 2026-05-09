@@ -93,24 +93,36 @@ export async function enrichTowerEvidence(exhibit, log = console){
   }
 
   // Rules-derived tower compliance (lighting + painting per §17.21 /
-  // §17.23 / AC 70/7460-1L).  Only adds when ASR resolved a height
-  // above threshold AND tower_compliance not already present.
-  if (!exhibit.tower_compliance?.applicable
-      && exhibit.evidence.asr?.available){
-    try {
-      const { requiredTowerCompliance, compareToAsr } =
-        await import('../../engine/tower/index.js');
-      const compliance = requiredTowerCompliance({
-        height_agl_m:   exhibit.evidence.asr.overall_height_m
-                          ?? exhibit.station_inputs?.overall_height_m
-                          ?? null,
-        height_amsl_m:  exhibit.evidence.asr.overall_height_amsl_m ?? null,
-        structure_type: exhibit.station_inputs?.structure_type || 'TOWER',
-        near_airport:   !!exhibit.station_inputs?.near_airport
-      });
-      if (compliance.applicable){
-        exhibit.tower_compliance = compareToAsr({ compliance, asr: exhibit.evidence.asr });
-      }
-    } catch { /* fail-soft */ }
+  // §17.23 / AC 70/7460-1L).  Runs whenever we have a positive
+  // overall_height_m — operator-supplied height alone is enough to
+  // determine §17.7 notification status, marking style, and lighting
+  // style.  When an ASR record is available we layer compareToAsr() on
+  // top so the row also captures any height/coords mismatch with the
+  // registered tower; otherwise we attach the raw rules verdict so the
+  // downstream LMS / engineering-report 3E rows fill from §17 rules
+  // instead of rendering EVIDENCE MISSING.
+  if (!exhibit.tower_compliance?.applicable){
+    const height_agl_m = exhibit.evidence.asr?.overall_height_m
+                      ?? exhibit.station_inputs?.overall_height_m
+                      ?? null;
+    if (Number.isFinite(Number(height_agl_m)) && Number(height_agl_m) > 0){
+      try {
+        const { requiredTowerCompliance, compareToAsr } =
+          await import('../../engine/tower/index.js');
+        const compliance = requiredTowerCompliance({
+          height_agl_m:   Number(height_agl_m),
+          height_amsl_m:  exhibit.evidence.asr?.overall_height_amsl_m
+                            ?? exhibit.station_inputs?.overall_height_amsl_m
+                            ?? null,
+          structure_type: exhibit.station_inputs?.structure_type || 'TOWER',
+          near_airport:   !!exhibit.station_inputs?.near_airport
+        });
+        if (compliance.applicable){
+          exhibit.tower_compliance = exhibit.evidence.asr?.available
+            ? compareToAsr({ compliance, asr: exhibit.evidence.asr })
+            : compliance;
+        }
+      } catch { /* fail-soft */ }
+    }
   }
 }
