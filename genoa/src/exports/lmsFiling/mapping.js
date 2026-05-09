@@ -98,16 +98,34 @@ export function mapForm301Fm(exhibit, applicant = {}){
     let provenance = null;
 
     if (def.source === 'genoa-auto'){
-      if (typeof def.derive === 'function'){
-        value = def.derive(exhibit);
-      } else if (def.mapping){
-        value = dotPath(exhibit, def.mapping);
-      }
-      if (value !== undefined && value !== null && !(typeof value === 'string' && !value.trim())){
+      // Operator-typed engineer field wins over Genoa derivation
+      // ALWAYS — including for genoa-auto fields with derive() / mapping.
+      // The PR #79 schema change (3E fields manual-engineer → genoa-auto
+      // with derive() pulling from evidence.asr / faa_oe / tower_compliance)
+      // had the side effect of locking out the FilingPackagePanel's
+      // localStorage form: when an engineer typed ASR / tower height /
+      // FAA determination / painting / lighting in the panel, the values
+      // landed in applicant.engineer[def.id] but the genoa-auto branch
+      // ignored them and still showed EVIDENCE MISSING.  Now operator
+      // input has the same priority on genoa-auto fields as it has on
+      // manual-engineer fields: operator-wins, evidence-second.
+      const operatorVal = applicant?.engineer?.[def.id];
+      if (operatorVal !== undefined && operatorVal !== null && operatorVal !== ''){
+        value = operatorVal;
         status = 'filled';
-        provenance = resolveProvenance(exhibit, def);
+        provenance = { source: 'engineer of record', note: 'operator input via workbench (override of auto-derive)' };
       } else {
-        status = 'unknown';
+        if (typeof def.derive === 'function'){
+          value = def.derive(exhibit);
+        } else if (def.mapping){
+          value = dotPath(exhibit, def.mapping);
+        }
+        if (value !== undefined && value !== null && !(typeof value === 'string' && !value.trim())){
+          status = 'filled';
+          provenance = resolveProvenance(exhibit, def);
+        } else {
+          status = 'unknown';
+        }
       }
     } else if (def.source === 'manual-engineer'){
       // Operator-provided value wins over a Genoa suggestion.
