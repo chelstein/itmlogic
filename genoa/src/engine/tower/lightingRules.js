@@ -46,6 +46,8 @@
 //   const cmp = compareToAsr({ compliance, asr });
 //   // → { ...compliance, comparison: { matches, gaps: [...] } }
 
+import { check17_7c } from './airportProximity.js';
+
 const FT_PER_M = 1 / 0.3048;
 
 // 47 CFR §17.7(a)(1) — notification gate.
@@ -100,14 +102,21 @@ const FAA_CODE_TO_STYLE = Object.freeze({
  * @param {number} args.height_agl_m         Overall height above ground level (m).  REQUIRED.
  * @param {number} [args.height_amsl_m]      Overall height above mean sea level (m).  Informational.
  * @param {string} [args.structure_type='TOWER']  'TOWER' | 'GUYED_TOWER' | 'BUILDING' | 'CATENARY' | 'WIND_TURBINE' | 'MET' | …
- * @param {boolean}[args.near_airport=false] Operator's airport-proximity flag (slope analysis happens elsewhere).
+ * @param {boolean}[args.near_airport=false] Legacy operator boolean — superseded by airports_nearby when supplied.
+ * @param {object[]}[args.airports_nearby]   List of public-use airports inside the §17.7(c) search radius
+ *                                           (from the genoa-faa-airports sidecar).  When supplied, the
+ *                                           §17.7(c) test runs against this list and the legacy
+ *                                           near_airport boolean is ignored.  Each row carries
+ *                                           { airport_id, ident, name, type, distance_m,
+ *                                             longest_runway_ft, … }.
  * @returns {object} compliance recommendation
  */
 export function requiredTowerCompliance({
   height_agl_m,
   height_amsl_m = null,
   structure_type = 'TOWER',
-  near_airport = false
+  near_airport = false,
+  airports_nearby = null
 } = {}){
   const cites = [];
 
@@ -121,14 +130,42 @@ export function requiredTowerCompliance({
 
   const height_agl_ft = Number(height_agl_m) * FT_PER_M;
 
-  // §17.7(a)(1): notification required for structures > 200 ft AGL,
-  // OR within 6 nm of a public-use airport meeting slope criteria.
-  const notification_required = height_agl_ft > NOTIFICATION_THRESHOLD_FT || !!near_airport;
+  // §17.7(a)(1): notification required for structures > 200 ft AGL.
+  // §17.7(c):    notification required within FAA-published airport
+  //              proximity radii (4 nm short / 6 nm long / 5,000 ft
+  //              heliport).  When `airports_nearby` is supplied (from
+  //              the genoa-faa-airports sidecar), we run the real
+  //              distance check; otherwise we honor the legacy
+  //              near_airport boolean for backwards compatibility.
+  let airport_check = null;
+  if (Array.isArray(airports_nearby)){
+    airport_check = check17_7c({ airports: airports_nearby });
+  }
+  const height_triggers   = height_agl_ft > NOTIFICATION_THRESHOLD_FT;
+  const proximity_triggers = airport_check
+    ? airport_check.triggered
+    : !!near_airport;
+  const notification_required = height_triggers || proximity_triggers;
+
   cites.push({
     rule: '47 CFR §17.7(a)',
-    text: 'FAA notification required: structures > 200 ft AGL, or within 6 nm of a public-use airport meeting slope criteria.',
-    triggered_by: height_agl_ft > NOTIFICATION_THRESHOLD_FT ? 'height_agl_ft > 200' : (near_airport ? 'near_airport flag' : null)
+    text: 'FAA notification required: structures > 200 ft AGL.',
+    triggered: height_triggers
   });
+  if (airport_check){
+    cites.push({
+      rule: '47 CFR §17.7(c)',
+      text: airport_check.reason,
+      triggered: airport_check.triggered,
+      triggering_airports: airport_check.triggering_airports
+    });
+  } else if (near_airport){
+    cites.push({
+      rule: '47 CFR §17.7(c)',
+      text: 'FAA notification required: within airport notification proximity (operator-attested; auto-check not available).',
+      triggered: true
+    });
+  }
 
   // Below threshold and not near an airport — no FAA marking / lighting.
   if (!notification_required){
