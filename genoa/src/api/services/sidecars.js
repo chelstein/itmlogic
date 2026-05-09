@@ -13,6 +13,8 @@
 //   Rich station / SDR   ZTR /api/radiodns       —                       — (vendor-locked)
 //   Identity / RadioDNS  identity sidecar        ZTR rich-station        — (massdns/EAS-Tools optional; ZTR is robust 2nd-tier)
 //   FCC LMS / pub. file  FCC FMQ/AMQ direct      publicfiles.fcc.gov     — (license expiration + public-file folder index)
+//   ASR / §17.4 tower    ZTR _tower              opendata.fcc.gov Socrata ASR_SIDECAR_URL operator proxy
+//   LOS / Fresnel        ZTR /api/los/profile    —                       —
 //
 // Every tier is independent — primary failure does NOT cascade.  The
 // orchestrator (exhibitService.js) walks each chain top-down and stops
@@ -30,6 +32,8 @@ import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
 import { makeNecClient }         from '../../evidence/nec/client.js';
 import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
+import { makeAsrClient }         from '../../evidence/asrClient.js';
+import { makeLosClient }         from '../../evidence/losClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -60,9 +64,11 @@ function buildPopulationClient(){
 
 export const sidecars = Object.freeze({
   terrain:     makeTerrainClient ({ baseUrl: process.env.TERRAIN_SIDECAR_URL  }),
-  // SPLAT sidecar (chelstein/splat — Genoa Flask sidecar).  When set,
-  // Genoa probes its capability and surfaces SPLAT availability /
-  // DEM-provisioning state as evidence provenance.
+  // SPLAT sidecar (chelstein/splat — Genoa Flask sidecar).  Runs
+  // SPLAT! which uses Longley-Rice ITM (Irregular Terrain Model) for
+  // terrain-aware propagation prediction.  When set, Genoa probes its
+  // capability and surfaces SPLAT availability / DEM-provisioning
+  // state as evidence provenance.
   splat:       makeSplatClient   ({ baseUrl: process.env.SPLAT_SIDECAR_URL    }),
   identity:    makeIdentityClient({ baseUrl: process.env.IDENTITY_SIDECAR_URL }),
   measurement: process.env.MEASUREMENT_SIDECAR_URL ? { baseUrl: process.env.MEASUREMENT_SIDECAR_URL } : null,
@@ -89,7 +95,17 @@ export const sidecars = Object.freeze({
   nec:         makeNecClient({ baseUrl: process.env.NEC_SIDECAR_URL || null }),
   // FCC LMS / public-files / FMQ-AMQ consolidated client.  Public
   // upstreams (no auth required); always on unless explicitly disabled.
-  fccLms:      process.env.FCC_LMS_DISABLE === '1' ? null : makeFccLmsClient()
+  fccLms:      process.env.FCC_LMS_DISABLE === '1' ? null : makeFccLmsClient(),
+  // FCC ASR / opendata.fcc.gov Socrata client (47 CFR §17.4 antenna
+  // structure registration cross-check).  Default upstream is the
+  // public Socrata dataset; no auth required.  Disable with
+  // ASR_SOCRATA_DISABLE=1.
+  asr:         makeAsrClient(),
+  // ZTR LOS profile client — point-to-point line-of-sight + Fresnel
+  // clearance via ZTR's /api/los/profile.  Same upstream as Facility,
+  // separate row so the panel surfaces ZTR's LOS capability
+  // distinctly from the broadcast-stations endpoint.
+  los:         makeLosClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
