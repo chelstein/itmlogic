@@ -29,9 +29,19 @@ export function buildRfExposureSection(exhibit){
   const nf  = oet.near_field  || {};
   const bc  = c.boundary_check || {};
 
+  // Status label: when a boundary check ran, report PASS/FAIL.  When
+  // the antenna geometry forces near-field modeling, say so.  When
+  // controlled / uncontrolled MPE distances ARE computed but the
+  // boundary check was skipped (typical: operator didn't supply
+  // lot/property-line dimensions), say "DISTANCES COMPUTED · BOUNDARY
+  // DEFERRED" rather than "NOT EVALUATED" — the prior label was
+  // misleading because the distances on this page are real outputs
+  // of the §1.1310 categorical evaluation, not placeholders.
+  const haveDistances = Number.isFinite(Number(ctl.distance_m)) || Number.isFinite(Number(unc.distance_m));
   const passLabel = bc.pass === true  ? 'PASS — boundary clears uncontrolled MPE'
                   : bc.pass === false ? 'FAIL — uncontrolled MPE exceeded at boundary'
                   : nf.required_for_filing ? 'NEAR-FIELD MODELING REQUIRED — antenna mounting height below the OET-65 simplified-equation validity range'
+                  : haveDistances ? 'DISTANCES COMPUTED · BOUNDARY CHECK DEFERRED — supply lot/property-line dimensions to complete §1.1307(b) categorical evaluation'
                   : 'NOT EVALUATED';
 
   const rows = [

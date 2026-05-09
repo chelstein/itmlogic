@@ -22,12 +22,99 @@ import { asyncHandler } from '../middleware/errors.js';
 
 const r = express.Router();
 
+// Late-binding ASR + FAA OE enrichment.  When the compute exhibit
+// shipped without evidence.asr (operator typed facility_id + coords
+// only; ZTR rich-station response carried no tower data; no ASR # in
+// inputs), the LMS Filing Package's Section III 3E rows would render
+// EVIDENCE MISSING — even though the FCC ASR Socrata DB knows the
+// tower from its lat/lon.  Same story for FAA OE/AAA: when the ASR
+// record on file references a faa_study_number, the form's FAA
+// determination / painting / lighting rows can fill from that record.
+//
+// This enricher mutates the supplied exhibit (only for this request's
+// in-memory copy — exhibits are not persisted by these routes) so the
+// downstream form301fm.js derive() functions see populated evidence
+// and produce filled rows.  Fail-soft: a Socrata outage just leaves
+// the rows as-is.
+async function enrichExhibitForLmsFiling(exhibit){
+  if (!exhibit || typeof exhibit !== 'object') return;
+  exhibit.evidence = exhibit.evidence || {};
+
+  // ASR by lat/lon proximity.
+  if (!exhibit.evidence.asr?.available){
+    const lat = Number(exhibit.station_inputs?.lat);
+    const lon = Number(exhibit.station_inputs?.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)){
+      try {
+        const { makeAsrClient, checkAsrAgainstApplication } = await import('../../evidence/asrClient.js');
+        const asrClient = makeAsrClient();
+        if (asrClient){
+          const byLoc = await asrClient.getByLocation({
+            lat, lon,
+            radius_m: Number(process.env.ASR_LOCATION_RADIUS_M) || 1000
+          });
+          if (byLoc.available){
+            const asrResult = checkAsrAgainstApplication({
+              asr: byLoc,
+              application: {
+                asr_number:            exhibit.station_inputs?.asr_number || null,
+                lat, lon,
+                overall_height_m:      exhibit.station_inputs?.overall_height_m || null,
+                overall_height_amsl_m: exhibit.station_inputs?.overall_height_amsl_m || null
+              }
+            });
+            exhibit.evidence.asr = asrResult;
+          }
+        }
+      } catch { /* fail-soft */ }
+    }
+  }
+
+  // FAA OE/AAA by Aeronautical Study Number on the ASR record.
+  if (!exhibit.evidence.faa_oe?.available
+      && exhibit.evidence.asr?.faa_study_number){
+    try {
+      const { makeFaaOeClient, checkFaaAgainstAsr } = await import('../../evidence/faaOeClient.js');
+      const faaClient = makeFaaOeClient();
+      if (faaClient){
+        const faa = await faaClient.getByStudyNumber(exhibit.evidence.asr.faa_study_number);
+        if (faa.available || faa.error){
+          exhibit.evidence.faa_oe = checkFaaAgainstAsr({ faa, asr: exhibit.evidence.asr });
+        }
+      }
+    } catch { /* fail-soft */ }
+  }
+
+  // Rules-derived tower compliance (lighting / painting recommendation
+  // per §17.21 / §17.23 / AC 70/7460-1L).  Only adds when ASR resolved
+  // a height above threshold AND tower_compliance not already present.
+  if (!exhibit.tower_compliance?.applicable
+      && exhibit.evidence.asr?.available){
+    try {
+      const { requiredTowerCompliance, compareToAsr } =
+        await import('../../engine/tower/index.js');
+      const compliance = requiredTowerCompliance({
+        height_agl_m:   exhibit.evidence.asr.overall_height_m
+                          ?? exhibit.station_inputs?.overall_height_m
+                          ?? null,
+        height_amsl_m:  exhibit.evidence.asr.overall_height_amsl_m ?? null,
+        structure_type: exhibit.station_inputs?.structure_type || 'TOWER',
+        near_airport:   !!exhibit.station_inputs?.near_airport
+      });
+      if (compliance.applicable){
+        exhibit.tower_compliance = compareToAsr({ compliance, asr: exhibit.evidence.asr });
+      }
+    } catch { /* fail-soft */ }
+  }
+}
+
 r.post('/exhibits/filing-package', asyncHandler(async (req, res) => {
   const exhibit  = req.body?.exhibit;
   const applicant = req.body?.applicant || {};
   if (!exhibit || typeof exhibit !== 'object'){
     return res.status(400).json({ error: 'BAD_REQUEST', detail: 'exhibit is required' });
   }
+  await enrichExhibitForLmsFiling(exhibit);
   const pkg = buildFilingPackage(exhibit, applicant);
   res.json(pkg);
 }));
@@ -41,6 +128,7 @@ r.post('/exhibits/filing-package/download', asyncHandler(async (req, res) => {
   if (!exhibit || typeof exhibit !== 'object'){
     return res.status(400).json({ error: 'BAD_REQUEST', detail: 'exhibit is required' });
   }
+  await enrichExhibitForLmsFiling(exhibit);
   const pkg = buildFilingPackage(exhibit, applicant);
   const stem = pkg.filename_stem;
   const variants = {
@@ -64,6 +152,7 @@ r.post('/exhibits/filing-package/summary', asyncHandler(async (req, res) => {
   if (!exhibit || typeof exhibit !== 'object'){
     return res.status(400).json({ error: 'BAD_REQUEST', detail: 'exhibit is required' });
   }
+  await enrichExhibitForLmsFiling(exhibit);
   const m = mapForm301Fm(exhibit, applicant);
   res.json({
     form:           m.form,
