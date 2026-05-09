@@ -48,11 +48,13 @@ async function enrichExhibitForLmsFiling(exhibit){
       try {
         const { makeAsrClient, checkAsrAgainstApplication } = await import('../../evidence/asrClient.js');
         const asrClient = makeAsrClient();
-        if (asrClient){
-          const byLoc = await asrClient.getByLocation({
-            lat, lon,
-            radius_m: Number(process.env.ASR_LOCATION_RADIUS_M) || 1000
-          });
+        if (!asrClient){
+          console.warn('[lmsFiling] enrichASR: asrClient is null (no ASR_SIDECAR_URL / ZTR / Socrata configured)');
+        } else {
+          const radius_m = Number(process.env.ASR_LOCATION_RADIUS_M) || 1000;
+          console.log(`[lmsFiling] enrichASR: getByLocation lat=${lat} lon=${lon} radius_m=${radius_m}`);
+          const byLoc = await asrClient.getByLocation({ lat, lon, radius_m });
+          console.log(`[lmsFiling] enrichASR: result available=${byLoc.available} source=${byLoc.source || '-'} asr=${byLoc.asr_number || '-'} err=${byLoc.error || '-'}`);
           if (byLoc.available){
             const asrResult = checkAsrAgainstApplication({
               asr: byLoc,
@@ -66,7 +68,11 @@ async function enrichExhibitForLmsFiling(exhibit){
             exhibit.evidence.asr = asrResult;
           }
         }
-      } catch { /* fail-soft */ }
+      } catch (err){
+        console.warn('[lmsFiling] enrichASR: threw:', err?.message || err);
+      }
+    } else {
+      console.log(`[lmsFiling] enrichASR: skipped — station_inputs lat/lon not finite (lat=${exhibit.station_inputs?.lat}, lon=${exhibit.station_inputs?.lon})`);
     }
   }
 

@@ -191,6 +191,16 @@ function rowToRecord(row, tier){
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 
+// Log every inbound /asr/* request so we can confirm the wire from
+// itmlogic-genoa's asrClient is actually reaching this sidecar.
+// /healthz is silent (it's polled every 30 s by the DO healthcheck).
+app.use((req, _res, next) => {
+  if (req.path.startsWith('/asr/')){
+    console.log(`[asr-sidecar] ${req.method} ${req.originalUrl}`);
+  }
+  next();
+});
+
 app.get('/healthz', async (_req, res) => {
   try {
     const r = await pool.query(`SELECT records_total, records_with_coords, records_with_owner,
