@@ -207,6 +207,15 @@ function MainApp({ onLogout }) {
     const { job_id } = await post.json();
     if (!job_id) throw new Error('Job submission returned no job_id');
 
+    // Continuous progress feedback per operator requirement: "as long
+    // as we get periodic updates it's still working".  Even when the
+    // server hasn't pushed a new progress_message in a while (slow
+    // FCC LMS pull, cold map sidecar, etc.), the elapsed-time ticker
+    // shows the user that things are alive and not frozen.  Engine
+    // pipelines can run as long as needed — there is no client-side
+    // poll-loop deadline.
+    const startedAt = Date.now();
+    let lastServerMessage = null;
     while (true){
       await new Promise(r => setTimeout(r, 2000));
       const r = await fetch(`/api/exhibit/jobs/${job_id}`);
@@ -214,8 +223,14 @@ function MainApp({ onLogout }) {
         throw new Error(`Job poll failed: HTTP ${r.status}`);
       }
       const view = await r.json();
-      if (typeof onProgress === 'function' && view.progress_message){
-        onProgress(view.progress_message);
+      if (view.progress_message) lastServerMessage = view.progress_message;
+      if (typeof onProgress === 'function'){
+        const elapsedS = Math.round((Date.now() - startedAt) / 1000);
+        const baseMsg = lastServerMessage || `Working on ${kind.replace(/_/g, ' ')}…`;
+        const elapsedTag = elapsedS < 60
+          ? `${elapsedS} s elapsed`
+          : `${Math.floor(elapsedS / 60)} m ${elapsedS % 60} s elapsed`;
+        onProgress(`${baseMsg}  ·  ${elapsedTag}`);
       }
       if (view.status === 'complete') return view;
       if (view.status === 'failed'){
@@ -495,16 +510,19 @@ function MainApp({ onLogout }) {
     );
     if (!view.artifact_url) throw new Error('Job completed without artifact');
     setStatusMsg(`Downloading ${ext.toUpperCase()} artifact…`);
-    // Race: jobStore.completeJob() flips status='complete' before the
-    // artifact body is fully available on the artifact endpoint, so the
-    // first GET can come back HTTP 409 { error:'JOB_NOT_READY',
-    // status:'running', message:'artifact is not yet available; poll
-    // /api/exhibit/jobs/:id' }.  Retry on 409 with a generous schedule
-    // (up to ~3 minutes) — PDF render is the heavy step and can take
-    // a while, especially when the map sidecar is rendering the contour
-    // map page.  Per the operator's guidance: "no rush on the speed of
-    // creation" — wait it out, do not surface the 409 as a failure.
-    const ARTIFACT_RETRY_BACKOFF_MS = [1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000, 30000, 30000, 30000, 30000];
+    // Per the operator's standing rule: each downstream step's clock
+    // starts only after upstream actually finishes; correctness over
+    // latency.  The artifact-retry clock starts AFTER the job poll
+    // saw status='complete'.  We retry on 409 / 404 with backoff up to
+    // ~7 minutes total — the artifact upload can sit behind a slow
+    // disk write on a cold container, behind a finalising Chromium
+    // render in the map sidecar, etc.  Showing per-attempt elapsed
+    // time keeps the operator oriented while they wait.
+    const ARTIFACT_RETRY_BACKOFF_MS = [
+      1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000,
+      30000, 30000, 30000, 30000, 60000, 60000, 60000, 60000
+    ];
+    const retryStartedAt = Date.now();
     let ar = null;
     for (let attempt = 0; attempt <= ARTIFACT_RETRY_BACKOFF_MS.length; attempt++){
       ar = await fetch(view.artifact_url);
@@ -517,10 +535,14 @@ function MainApp({ onLogout }) {
         // Out of retries.  Surface the latest body so the engineer can
         // see what state the job is stuck in.
         const txt = await ar.text().catch(() => '');
-        throw new Error(`Artifact still not ready after ~3 min of retries.  Last response: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+        throw new Error(`Artifact still not ready after ~7 min of retries.  Last response: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
       }
       const delay = ARTIFACT_RETRY_BACKOFF_MS[attempt];
-      setStatusMsg(`Artifact not ready yet (HTTP ${ar.status}); retrying in ${Math.round(delay / 1000)} s…`);
+      const waitedS = Math.round((Date.now() - retryStartedAt) / 1000);
+      const waitedTag = waitedS < 60
+        ? `${waitedS} s waited`
+        : `${Math.floor(waitedS / 60)} m ${waitedS % 60} s waited`;
+      setStatusMsg(`Artifact not ready yet (HTTP ${ar.status}) · ${waitedTag} · retrying in ${Math.round(delay / 1000)} s…`);
       await new Promise(r => setTimeout(r, delay));
     }
     const blob = await ar.blob();

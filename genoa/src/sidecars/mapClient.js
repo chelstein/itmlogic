@@ -18,18 +18,20 @@
 // Buffer.from), we log + return null instead of letting pdfkit blow
 // up downstream with "Unknown image format".
 
-// Map sidecar fetch timeout.  The sidecar's own Chromium pipeline
-// budgets ~20 s internally (server.js TIMEOUT_MS) plus a 9 s hard
-// fallback inside render.html, so the API needs to wait at least that
-// much PLUS cold-start variance (Chromium warm-up on a fresh container,
-// us-atlas TopoJSON parse, Leaflet vector layout, screenshot encode).
+// Map sidecar fetch timeout.  Per the operator's standing rule —
+// "no rush on the speed of creation; everything can run as long as
+// needed for the job to finish; downstream waits for upstream before
+// its clock starts" — the API gives the map sidecar a generous ceiling
+// rather than racing it.  The sidecar's own internal hard fallback
+// (render.html HARD_FALLBACK_MS = 9 s) prevents a runaway Chromium
+// from holding a connection open the full window, so increasing the
+// client-side ceiling only HELPS slow-render cases finish; it can't
+// stretch a healthy render's actual latency.
 //
-// 90 s default is generous on purpose: per the operator's guidance,
-// "no rush on the speed of creation" — when the sidecar is healthy
-// the typical render is ~400-800 ms; the long tail is cold-start where
-// Chromium spawn alone can eat 3-8 s.  Operator can override via
-// MAP_SIDECAR_TIMEOUT_MS for short-budget pipelines.
-const DEFAULT_TIMEOUT_MS = Number(process.env.MAP_SIDECAR_TIMEOUT_MS) || 90_000;
+// 240 s (4 min) default matches the engineering-statement PDF
+// generation envelope the operator described.  Operator can override
+// via MAP_SIDECAR_TIMEOUT_MS for short-budget pipelines.
+const DEFAULT_TIMEOUT_MS = Number(process.env.MAP_SIDECAR_TIMEOUT_MS) || 240_000;
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
 function isPng(buf){
