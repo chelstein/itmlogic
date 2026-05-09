@@ -495,10 +495,33 @@ function MainApp({ onLogout }) {
     );
     if (!view.artifact_url) throw new Error('Job completed without artifact');
     setStatusMsg(`Downloading ${ext.toUpperCase()} artifact…`);
-    const ar = await fetch(view.artifact_url);
-    if (!ar.ok){
-      const txt = await ar.text().catch(() => '');
-      throw new Error(`Artifact fetch failed: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+    // Race: jobStore.completeJob() flips status='complete' before the
+    // artifact body is fully available on the artifact endpoint, so the
+    // first GET can come back HTTP 409 { error:'JOB_NOT_READY',
+    // status:'running', message:'artifact is not yet available; poll
+    // /api/exhibit/jobs/:id' }.  Retry on 409 with a generous schedule
+    // (up to ~3 minutes) — PDF render is the heavy step and can take
+    // a while, especially when the map sidecar is rendering the contour
+    // map page.  Per the operator's guidance: "no rush on the speed of
+    // creation" — wait it out, do not surface the 409 as a failure.
+    const ARTIFACT_RETRY_BACKOFF_MS = [1000, 2000, 3000, 5000, 7000, 10000, 15000, 20000, 30000, 30000, 30000, 30000];
+    let ar = null;
+    for (let attempt = 0; attempt <= ARTIFACT_RETRY_BACKOFF_MS.length; attempt++){
+      ar = await fetch(view.artifact_url);
+      if (ar.ok) break;
+      if (ar.status !== 409 && ar.status !== 404){
+        const txt = await ar.text().catch(() => '');
+        throw new Error(`Artifact fetch failed: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+      }
+      if (attempt === ARTIFACT_RETRY_BACKOFF_MS.length){
+        // Out of retries.  Surface the latest body so the engineer can
+        // see what state the job is stuck in.
+        const txt = await ar.text().catch(() => '');
+        throw new Error(`Artifact still not ready after ~3 min of retries.  Last response: HTTP ${ar.status}${txt ? ' — ' + txt.slice(0, 120) : ''}`);
+      }
+      const delay = ARTIFACT_RETRY_BACKOFF_MS[attempt];
+      setStatusMsg(`Artifact not ready yet (HTTP ${ar.status}); retrying in ${Math.round(delay / 1000)} s…`);
+      await new Promise(r => setTimeout(r, delay));
     }
     const blob = await ar.blob();
     const a = document.createElement('a');
