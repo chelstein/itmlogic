@@ -66,6 +66,11 @@ export const sidecars = Object.freeze({
   splat:       makeSplatClient   ({ baseUrl: process.env.SPLAT_SIDECAR_URL    }),
   identity:    makeIdentityClient({ baseUrl: process.env.IDENTITY_SIDECAR_URL }),
   measurement: process.env.MEASUREMENT_SIDECAR_URL ? { baseUrl: process.env.MEASUREMENT_SIDECAR_URL } : null,
+  // Map sidecar (chelstein/itmlogic — genoa/src/sidecars/map).  Headless
+  // Chromium that renders the §73.333 contour-map exhibit page.  Fail-soft:
+  // when unset, the engineering-statement PDF emits the deferred-to-engineer
+  // placeholder for the map page instead of failing.
+  map:         process.env.MAP_SIDECAR_URL         ? { baseUrl: process.env.MAP_SIDECAR_URL         } : null,
   // Facility lookup is not a sidecar in the propagation sense — it's a
   // read-only adapter into chelstein/zerotrustradio (and optionally the
   // n8n station/analyze webhook).  Lives here so the same /readyz block
@@ -87,20 +92,35 @@ export const sidecars = Object.freeze({
   fccLms:      process.env.FCC_LMS_DISABLE === '1' ? null : makeFccLmsClient()
 });
 
-export async function sidecarStatus(){
-  const out = {};
-  for (const [name, c] of Object.entries(sidecars)){
-    if (!c){ out[name] = { configured: false, healthy: false }; continue; }
-    let healthy = false;
+// Probe one sidecar.  Health() if the client provides it; otherwise GET
+// /health on the baseUrl with a 3-s timeout.  Each probe also returns
+// the elapsed time so the UI can surface "slow but reachable" states.
+async function probeOne(name, c){
+  if (!c) return [name, { configured: false, healthy: false }];
+  const t0 = Date.now();
+  let healthy = false;
+  try {
     if (typeof c.health === 'function'){
-      try { healthy = !!(await c.health()); } catch { healthy = false; }
-    } else {
-      try {
-        const r = await fetch(c.baseUrl.replace(/\/$/, '') + '/health', { signal: AbortSignal.timeout(3000) });
-        healthy = r.ok;
-      } catch { healthy = false; }
+      healthy = !!(await c.health());
+    } else if (c.baseUrl){
+      const r = await fetch(c.baseUrl.replace(/\/$/, '') + '/health', { signal: AbortSignal.timeout(3000) });
+      healthy = r.ok;
     }
-    out[name] = { configured: true, healthy, baseUrl: c.baseUrl || null };
-  }
-  return out;
+  } catch { healthy = false; }
+  return [name, {
+    configured: true,
+    healthy,
+    baseUrl:    c.baseUrl || null,
+    latency_ms: Date.now() - t0
+  }];
+}
+
+// Probe every configured sidecar in parallel so a single slow upstream
+// doesn't block the readiness response.  Worst case is the timeout of
+// the slowest probe (3 s), not Σ (timeouts).
+export async function sidecarStatus(){
+  const entries = await Promise.all(
+    Object.entries(sidecars).map(([name, c]) => probeOne(name, c))
+  );
+  return Object.fromEntries(entries);
 }
