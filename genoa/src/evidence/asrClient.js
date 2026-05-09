@@ -67,11 +67,14 @@
 //   }
 
 const DEFAULT_TIMEOUT_MS  = 8_000;
-// Socrata public dataset URL for the FCC Antenna Structure
-// Registration database.  Operator can override via ASR_SOCRATA_URL
-// if FCC reorganises the dataset.  Setting ASR_SOCRATA_DISABLE=1
-// turns this tier off.
-const DEFAULT_SOCRATA_URL = 'https://opendata.fcc.gov/resource/wzue-cz5e.json';
+// HISTORICAL — the FCC retired the Socrata ASR mirror at wzue-cz5e
+// (returns 404 as of 2026-05).  Default is now null; canonical
+// resolution path is genoa-asr-sidecar (ASR_SIDECAR_URL) which loads
+// FCC ULS r_tower.zip weekly into Postgres + adds REC Networks
+// API tier-3 fallback.  Operator can still pin a working Socrata
+// dataset by setting ASR_SOCRATA_URL explicitly if one becomes
+// available again.
+const DEFAULT_SOCRATA_URL = null;
 
 export function makeAsrClient({
   ztrUrl    = process.env.ZERO_TRUST_RADIO_READONLY_URL || null,
@@ -85,30 +88,29 @@ export function makeAsrClient({
   if (!ztrUrl && !asrSidecarUrl && !htmlFallback && !socrataUrl) return null;
   if (!fetchFn) return null;
 
-  // Surfaces a primary baseUrl so the /readyz UI tooltip has
-  // something to point at (Socrata first; falls back to ASR_SIDECAR_URL
-  // if Socrata is disabled).
-  const baseUrl = socrataUrl || asrSidecarUrl || null;
+  // Surfaces a primary baseUrl for /readyz UI tooltips.  Sidecar
+  // first now that Socrata is dead by default.
+  const baseUrl = asrSidecarUrl || socrataUrl || null;
 
-  // Liveness probe for /readyz.  Hits the Socrata dataset with
-  // $limit=1 and counts ANY HTTP response (2xx-4xx) as "host
-  // reachable" — only network / DNS / TLS / timeout failures register
-  // as unhealthy.  Falls back to the ASR_SIDECAR_URL /health path when
-  // Socrata is disabled.
+  // Liveness probe for /readyz.  Probes genoa-asr-sidecar /healthz
+  // first (canonical path), falls through to Socrata only if the
+  // sidecar is unconfigured.  Counts ANY HTTP response (2xx-4xx) as
+  // "host reachable" for Socrata — only network / DNS / TLS /
+  // timeout failures register as unhealthy.
   async function health(){
+    if (asrSidecarUrl){
+      try {
+        const r = await fetchFn(joinUrl(asrSidecarUrl, '/healthz'),
+                                { signal: AbortSignal.timeout(3000) });
+        if (r.ok) return true;
+      } catch { /* fall through */ }
+    }
     if (socrataUrl){
       try {
         const headers = socrataAppToken ? { 'X-App-Token': socrataAppToken } : {};
         const r = await fetchFn(`${socrataUrl}?$limit=1`,
                                 { signal: AbortSignal.timeout(3000), headers });
         return r.status >= 200 && r.status < 600;
-      } catch { return false; }
-    }
-    if (asrSidecarUrl){
-      try {
-        const r = await fetchFn(joinUrl(asrSidecarUrl, '/health'),
-                                { signal: AbortSignal.timeout(3000) });
-        return r.ok;
       } catch { return false; }
     }
     return false;
@@ -126,29 +128,35 @@ export function makeAsrClient({
 
     /**
      * Lookup ASR by explicit registration number.  Tier order:
-     *   1. opendata.fcc.gov Socrata — clean JSON, public, no auth
-     *   2. ASR_SIDECAR_URL — operator-managed proxy
-     *   3. FCC ULS HTML scrape (only when htmlFallback enabled)
+     *   1. ASR_SIDECAR_URL (genoa-asr-sidecar) — FCC ULS r_tower.zip
+     *      bulk DB (the FCC-published source of truth).  The sidecar's
+     *      own internal fallback chain (tier-2 reserved → tier-3 ZTR
+     *      passthrough → tier-4 REC Networks / radio-locator) means
+     *      a single call here covers the full resolution chain.
+     *   2. opendata.fcc.gov Socrata — historical (dataset retired 2026-05).
+     *   3. FCC ULS HTML scrape (only when htmlFallback enabled).
      */
     async getByAsrNumber(asr_number){
       if (!asr_number) return { available: false, source: null, error: 'asr_number required' };
-      // Tier 1: opendata.fcc.gov Socrata.
+      // Tier 1: genoa-asr-sidecar /asr/by-number/:asr — already
+      // includes its own internal tier-3 (REC API + REC web + radio-
+      // locator) fallback so a single call covers bulk-DB → REC chain.
+      if (asrSidecarUrl){
+        try {
+          const u = joinUrl(asrSidecarUrl, `/asr/by-number/${encodeURIComponent(asr_number)}`);
+          const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs) });
+          if (r.ok){
+            const j = await r.json();
+            if (j?.available) return j;
+          }
+        } catch { /* fall through */ }
+      }
+      // Tier 2: opendata.fcc.gov Socrata (only if explicitly configured).
       if (socrataUrl){
         const out = await querySocrataByNumber(asr_number, {
           socrataUrl, socrataAppToken, timeoutMs, fetchFn
         });
         if (out?.available) return out;
-      }
-      // Tier 2: operator-managed ASR sidecar.
-      if (asrSidecarUrl){
-        try {
-          const u = joinUrl(asrSidecarUrl, `/api/v1/asr/${encodeURIComponent(asr_number)}`);
-          const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs) });
-          if (r.ok){
-            const j = await r.json();
-            return normalizeAsrRecord(j, 'asr-sidecar', u);
-          }
-        } catch { /* fall through */ }
       }
       // Tier 3: FCC ULS HTML scrape (operator-opted-in).
       if (htmlFallback){
@@ -166,10 +174,22 @@ export function makeAsrClient({
      * Socrata-only (the legacy ULS HTML form-search lacks a clean
      * geospatial filter; an operator proxy can also expose this).
      */
-    async getByLocation({ lat, lon, radius_m = 1000, limit = 10 } = {}){
+    async getByLocation({ lat, lon, radius_m = 1000, limit = 1 } = {}){
       if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))){
         return { available: false, source: null, error: 'lat / lon required' };
       }
+      // Tier 1: genoa-asr-sidecar /asr/by-location.
+      if (asrSidecarUrl){
+        try {
+          const u = joinUrl(asrSidecarUrl, `/asr/by-location?lat=${lat}&lon=${lon}&radius_m=${radius_m}&limit=${limit}`);
+          const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs) });
+          if (r.ok){
+            const j = await r.json();
+            if (j?.available) return j;
+          }
+        } catch { /* fall through */ }
+      }
+      // Tier 2: opendata.fcc.gov Socrata (historical).
       if (socrataUrl){
         const out = await querySocrataByLocation({
           lat: Number(lat), lon: Number(lon), radius_m, limit,
@@ -177,7 +197,7 @@ export function makeAsrClient({
         });
         if (out) return out;
       }
-      return { available: false, source: null, error: 'No ASR location-lookup source configured (set ASR_SOCRATA_URL or ASR_SIDECAR_URL).' };
+      return { available: false, source: null, error: 'No ASR location-lookup source returned a record (set ASR_SIDECAR_URL to a running genoa-asr-sidecar).' };
     },
 
     /**
