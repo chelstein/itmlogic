@@ -4,6 +4,7 @@ import { readJsonOrThrow }  from './lib/readJson.js';
 import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
+import ServiceHealthPanel from '@components/ui/ServiceHealthPanel.jsx';
 import ChartScope    from '@components/ui/ChartScope.jsx';
 import TelemetryRack from '@components/ui/TelemetryRack.jsx';
 import TabStrip      from '@components/ui/TabStrip.jsx';
@@ -659,7 +660,7 @@ function MainApp({ onLogout }) {
       readinessScore={fr?.score ?? null}
       readinessStatus={fr?.status || null}
       commitSha={exhibit?.engine_signature?.hash || 'uncommitted'}
-      left={(
+      left={(<>
         <FacilityRack
           inputs={inputs}
           onChange={onChange}
@@ -687,7 +688,8 @@ function MainApp({ onLogout }) {
           computing={computing}
           busy={busy}
         />
-      )}
+        <ServiceHealthPanel />
+      </>)}
       center={(
         <>
           <ChartScope
