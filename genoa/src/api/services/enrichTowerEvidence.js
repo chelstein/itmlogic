@@ -92,6 +92,37 @@ export async function enrichTowerEvidence(exhibit, log = console){
     } catch { /* fail-soft */ }
   }
 
+  // §17.7(c) airport-proximity auto-check.  Pull the list of
+  // public-use airports/heliports within 6 nm of the tower from the
+  // genoa-faa-airports sidecar so requiredTowerCompliance can run the
+  // real distance check instead of trusting an operator-typed
+  // near_airport boolean.  Fail-soft: if AIRPORTS_SIDECAR_URL is
+  // unset / unreachable, airports_nearby stays null and the legacy
+  // boolean still applies.
+  let airports_nearby = null;
+  {
+    const lat = Number(exhibit.station_inputs?.lat);
+    const lon = Number(exhibit.station_inputs?.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)){
+      try {
+        const { makeAirportClient } = await import('../../evidence/airportClient.js');
+        const airportClient = makeAirportClient();
+        if (airportClient){
+          const r = await airportClient.getAirportsNear({ lat, lon, radius_nm: 6 });
+          if (r.available){
+            airports_nearby = r.airports;
+            log.info?.(`[enrichTowerEvidence] airports_near n=${r.n} radius_nm=6`);
+            exhibit.evidence.airports_nearby = airports_nearby;
+          } else {
+            log.warn?.(`[enrichTowerEvidence] airports_near unavailable: ${r.error}`);
+          }
+        }
+      } catch (err){
+        log.warn?.('[enrichTowerEvidence] airport lookup threw:', err?.message || err);
+      }
+    }
+  }
+
   // Rules-derived tower compliance (lighting + painting per §17.21 /
   // §17.23 / AC 70/7460-1L).  Runs whenever we have a positive
   // overall_height_m — operator-supplied height alone is enough to
@@ -115,7 +146,8 @@ export async function enrichTowerEvidence(exhibit, log = console){
                             ?? exhibit.station_inputs?.overall_height_amsl_m
                             ?? null,
           structure_type: exhibit.station_inputs?.structure_type || 'TOWER',
-          near_airport:   !!exhibit.station_inputs?.near_airport
+          near_airport:   !!exhibit.station_inputs?.near_airport,
+          airports_nearby
         });
         if (compliance.applicable){
           exhibit.tower_compliance = exhibit.evidence.asr?.available
