@@ -12,16 +12,23 @@ export function buildFacilityParametersSection(exhibit){
     : (Number.isFinite(Number(s.frequency)) ? Math.round((Number(s.frequency) - 87.9) / 0.2 + 200) : null);
 
   // HAAT fallback: when the operator didn't type a filed HAAT, fall
-  // back to the per-radial DEM compute we just performed.  Average of
-  // the per-radial HAAT array (already conformant to §73.313(d)) is
-  // the correct "average HAAT" for the facility-parameters table.
+  // back to the per-radial DEM compute we just performed.  The engine
+  // populates evidence.terrain_haat_per_radial with rows that carry
+  // `haat_computed_m` (NOT `haat_m`) — the latter only appears on the
+  // operator's typed value via station_inputs.haat_m.  Average of the
+  // per-radial array (already conformant to §73.313(d)) is the correct
+  // "average HAAT" for the parameters table.
   const perRadial = Array.isArray(ev.terrain_haat_per_radial) ? ev.terrain_haat_per_radial : null;
-  const haatAvgFromRadials = perRadial && perRadial.length
-    ? perRadial.reduce((a, r) => a + (Number(r.haat_m) || 0), 0) / perRadial.length
+  const radialHaats = perRadial
+    ? perRadial.map(r => Number(r?.haat_computed_m ?? r?.haat_m)).filter(Number.isFinite)
+    : [];
+  const haatAvgFromRadials = radialHaats.length
+    ? radialHaats.reduce((a, h) => a + h, 0) / radialHaats.length
     : null;
   const haatDisplay = (s.haat_m != null && s.haat_m !== '')
     ? s.haat_m
-    : (Number.isFinite(ev.terrain?.haat_m) ? ev.terrain.haat_m
+    : (Number.isFinite(s.haat_m_input) ? s.haat_m_input
+       : Number.isFinite(ev.terrain?.haat_m) ? ev.terrain.haat_m
        : Number.isFinite(haatAvgFromRadials) ? Number(haatAvgFromRadials.toFixed(1))
        : null);
 
