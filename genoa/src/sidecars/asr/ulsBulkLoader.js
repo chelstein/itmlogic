@@ -275,39 +275,50 @@ export async function runBulkLoad(pool, log = console){
 }
 
 // ─── per-record handlers ────────────────────────────────────────────
+//
+// FCC ULS r_tower.zip pubacc record layout (verified against actual
+// 2026 file content; pubacc_tower_definitions doc is misleading because
+// it lists the LOGICAL columns omitting the universal pubacc prefix):
+//
+//   f[0] = record_type                   ('RA' | 'CO' | 'EN')
+//   f[1] = record_status                 ('REG' typically)
+//   f[2] = uls_file_number               ('A0094609')
+//   f[3] = unique_system_identifier      (BIGINT; the join key)
+//   f[4] = registration / call_sign      (ASR # for RA records)
+//   ... per-record fields from f[5] onward
+//
+// ALL indexes below are zero-based on the raw pipe-split row.
 
-// RA record (Antenna Structure Registration).  Field ordering per
-// pubacc_tower_definitions: record_type | unique_system_identifier |
-// uls_file_number | registration_number | application_purpose | ...
-// Indices (0-based) below are the documented FCC schema.
+// RA record (Antenna Structure Registration).
 function handleRA(f, towers){
   if (f[0] !== 'RA') return;
-  const usi = parseInt(f[1], 10);
-  const asr = emptyToNull(f[3]);
+  const usi = parseInt(f[3], 10);
+  if (!Number.isFinite(usi)) return;          // skip records w/ no USI
+  const asr = emptyToNull(f[4]);              // registration_number
   if (!asr) return;
   towers.set(usi, {
     asr_number:               asr,
     unique_system_id:         usi,
-    status:                   emptyToNull(f[10]),       // status_code
-    registration_purpose:     emptyToNull(f[4]),
-    date_issued:              parseDate(f[14]),
-    date_constructed:         parseDate(f[15]),
-    date_action:              parseDate(f[17]),
-    height_of_structure_m:    ftToM(f[31]),             // height_of_structure
-    ground_elevation_m:       ftToM(f[32]),             // ground_elevation
-    overall_height_agl_m:     ftToM(f[33]),             // overall_height_above_ground
-    overall_height_amsl_m:    ftToM(f[34]),             // overall_height_above_msl
-    structure_type:           emptyToNull(f[35]),
-    date_faa_determination:   parseDate(f[36]),
-    faa_study_number:         emptyToNull(f[37]),
-    faa_circular_number:      emptyToNull(f[38]),
-    painting_lighting:        emptyToNull(f[40]),
-    mark_light_code:          emptyToNull(f[41]),
-    faa_emi_flag:             emptyToNull(f[44]),
-    nepa_flag:                emptyToNull(f[45]),
-    structure_address:        emptyToNull(f[26]),
-    structure_city:           emptyToNull(f[27]),
-    structure_state:          emptyToNull(f[28]),
+    registration_purpose:     emptyToNull(f[5]),       // application_purpose (NE/MD/AM/etc)
+    status:                   emptyToNull(f[8]),       // status_code (A/T/C/W)
+    date_issued:              parseDate(f[11]),
+    date_constructed:         parseDate(f[12]),
+    date_action:              parseDate(f[14]),
+    structure_address:        emptyToNull(f[23]),
+    structure_city:           emptyToNull(f[24]),
+    structure_state:          emptyToNull(f[25]),
+    height_of_structure_m:    ftToM(f[28]),
+    ground_elevation_m:       ftToM(f[29]),
+    overall_height_agl_m:     ftToM(f[30]),            // overall_height_above_ground
+    overall_height_amsl_m:    ftToM(f[31]),            // overall_height_amsl
+    structure_type:           emptyToNull(f[32]),
+    date_faa_determination:   parseDate(f[33]),
+    faa_study_number:         emptyToNull(f[34]),
+    faa_circular_number:      emptyToNull(f[35]),
+    painting_lighting:        emptyToNull(f[37]),      // painting_and_lighting
+    mark_light_code:          emptyToNull(f[38]),
+    faa_emi_flag:             emptyToNull(f[41]),
+    nepa_flag:                emptyToNull(f[42]),
     latitude_deg:             null,           // filled by handleCO merge
     longitude_deg:            null,
     owner_name:               null,           // filled by handleEN merge
@@ -315,31 +326,57 @@ function handleRA(f, towers){
   });
 }
 
-// CO record (Coordinates).  Fields: record_type | usi | usi |
-// coordinate_type | lat_deg | lat_min | lat_sec | lat_dir |
-// lon_deg | lon_min | lon_sec | lon_dir
+// CO record (Coordinates).  Layout:
+//   record_type | record_status | file_number | usi | reg_number |
+//   coordinate_type ('T' tower / 'P' point) |
+//   lat_deg | lat_min | lat_sec | lat_dir |
+//   lon_deg | lon_min | lon_sec | lon_dir
 function handleCO(f, coordsByUsi){
   if (f[0] !== 'CO') return;
-  // Tower coordinates: coordinate_type 'T' (some FCC dumps use field index 3, others 4)
-  const usi = parseInt(f[1], 10);
-  const lat = dms(f[4], f[5], f[6], f[7]);
-  const lon = dms(f[8], f[9], f[10], f[11]);
-  if (Number.isFinite(lat) && Number.isFinite(lon)){
+  const usi = parseInt(f[3], 10);
+  if (!Number.isFinite(usi)) return;
+  // Coord triples start at f[6] (lat) and f[10] (lon).  Many CO rows
+  // in r_tower omit the lat/min and only fill seconds=0.0 — we accept
+  // them and just produce 0/0 if neither component is parseable, which
+  // dms() returns as null and the caller skips.
+  const lat = dms(f[6], f[7], f[8], f[9]);
+  const lon = dms(f[10], f[11], f[12], f[13]);
+  if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)){
     coordsByUsi.set(usi, { lat, lon });
   }
 }
 
-// EN record (Entity).  Fields: record_type | usi | uls_file | ebf |
-// call_sign | entity_type | license_id | entity_name | first_name |
-// middle_initial | last_name | suffix | phone | fax | email | ...
-// We want entity_type 'RB' (Registered Business / Tower Owner) — first wins per USI.
+// EN record (Entity).  Layout:
+//   record_type | record_status | file_number | usi | call_sign |
+//   entity_type | license_id | entity_name | first_name | last_name |
+//   ... | frn | applicant_type_code | ...
+// Entity types per FCC pubacc:
+//   'O'  = Owner             (most common for towers; we want this)
+//   'RB' = Registered Business
+//   'CL' = Client
+//   'L'  = Licensee
+//   'AT' = Attorney
+//   'CO' = Contact
+//   'E'  = Engineer
+// Tower-owner records use 'O' overwhelmingly.  First-wins per USI.
 function handleEN(f, ownerByUsi){
   if (f[0] !== 'EN') return;
-  const usi = parseInt(f[1], 10);
+  const usi = parseInt(f[3], 10);
+  if (!Number.isFinite(usi)) return;
   const entityType = emptyToNull(f[5]);
-  if (entityType !== 'RB' && entityType !== 'CL') return;
+  if (!['O', 'RB', 'CL', 'L'].includes(entityType)) return;
   if (ownerByUsi.has(usi)) return;
-  const name = emptyToNull(f[7]);
-  const frn  = emptyToNull(f[36]);     // FRN field
-  if (name) ownerByUsi.set(usi, { name, frn });
+  // entity_name is at f[9] in r_tower's EN layout (verified against
+  // actual file content).  When entity_name is empty the row may be
+  // an individual owner — concatenate first + last name.
+  let name = emptyToNull(f[9]);
+  if (!name){
+    const first = emptyToNull(f[10]);
+    const last  = emptyToNull(f[12]);
+    if (last) name = first ? `${first} ${last}` : last;
+  }
+  if (!name) return;
+  // FRN typically appears in the trailing portion of the row; pubacc
+  // varies the position across vintages, so we don't pin it.
+  ownerByUsi.set(usi, { name, frn: null });
 }
