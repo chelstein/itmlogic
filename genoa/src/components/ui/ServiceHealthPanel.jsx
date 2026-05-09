@@ -37,6 +37,7 @@ const ROWS = [
   ['los',         'LOS (ZTR)',                 'sidecar'],
   ['facility',    'Facility (ZTR)',            'upstream'],
   ['asr',         'ASR (FCC opendata)',        'upstream'],
+  ['faaOe',       'FAA OE/AAA',                'upstream'],
   ['population',  'Population',                'upstream'],
   ['fccContours', 'FCC contours',              'upstream'],
   ['fccLms',      'FCC LMS',                   'upstream']

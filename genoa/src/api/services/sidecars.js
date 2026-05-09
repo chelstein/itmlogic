@@ -15,6 +15,7 @@
 //   FCC LMS / pub. file  FCC FMQ/AMQ direct      publicfiles.fcc.gov     — (license expiration + public-file folder index)
 //   ASR / §17.4 tower    ZTR _tower              opendata.fcc.gov Socrata ASR_SIDECAR_URL operator proxy
 //   LOS / Fresnel        ZTR /api/los/profile    —                       —
+//   FAA OE/AAA           FAA_OE_SIDECAR_URL      oeaaa.faa.gov HTML      — (no public JSON API)
 //
 // Every tier is independent — primary failure does NOT cascade.  The
 // orchestrator (exhibitService.js) walks each chain top-down and stops
@@ -34,6 +35,7 @@ import { makeNecClient }         from '../../evidence/nec/client.js';
 import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 import { makeAsrClient }         from '../../evidence/asrClient.js';
 import { makeLosClient }         from '../../evidence/losClient.js';
+import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -64,11 +66,9 @@ function buildPopulationClient(){
 
 export const sidecars = Object.freeze({
   terrain:     makeTerrainClient ({ baseUrl: process.env.TERRAIN_SIDECAR_URL  }),
-  // SPLAT sidecar (chelstein/splat — Genoa Flask sidecar).  Runs
-  // SPLAT! which uses Longley-Rice ITM (Irregular Terrain Model) for
-  // terrain-aware propagation prediction.  When set, Genoa probes its
-  // capability and surfaces SPLAT availability / DEM-provisioning
-  // state as evidence provenance.
+  // SPLAT sidecar (chelstein/splat — Genoa Flask sidecar).  When set,
+  // Genoa probes its capability and surfaces SPLAT availability /
+  // DEM-provisioning state as evidence provenance.
   splat:       makeSplatClient   ({ baseUrl: process.env.SPLAT_SIDECAR_URL    }),
   identity:    makeIdentityClient({ baseUrl: process.env.IDENTITY_SIDECAR_URL }),
   measurement: process.env.MEASUREMENT_SIDECAR_URL ? { baseUrl: process.env.MEASUREMENT_SIDECAR_URL } : null,
@@ -105,7 +105,16 @@ export const sidecars = Object.freeze({
   // clearance via ZTR's /api/los/profile.  Same upstream as Facility,
   // separate row so the panel surfaces ZTR's LOS capability
   // distinctly from the broadcast-stations endpoint.
-  los:         makeLosClient()
+  los:         makeLosClient(),
+  // FAA OE/AAA client — Form 7460-1 obstruction-evaluation
+  // determinations.  Cross-references the asr.faa_study_number to
+  // pull the FAA's verbatim determination + lighting/marking
+  // conditions for the Tower Study exhibit.  Default upstream is
+  // oeaaa.faa.gov (host-reachable check only); set FAA_OE_SIDECAR_URL
+  // for an operator proxy that returns clean JSON, or
+  // FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape (unimplemented
+  // in this build).
+  faaOe:       makeFaaOeClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
