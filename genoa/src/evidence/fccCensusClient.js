@@ -85,6 +85,18 @@ export function makeFccCensusClient({
     censusYear,
     cacheSize: () => blockCache.size,
 
+    // Liveness probe used by /readyz.  geo.fcc.gov has no /health
+    // route, so we hit the real /area endpoint with a known sample
+    // point and count any HTTP response (2xx-4xx) as "host reachable".
+    // Only network / DNS / TLS failures register as unhealthy.
+    async health(){
+      try {
+        const r = await fetchFn(`${baseUrl}?lat=37.0902&lon=-95.7129&censusYear=${censusYear}&format=json`,
+                                { signal: AbortSignal.timeout(3000) });
+        return r.status >= 200 && r.status < 600;
+      } catch { return false; }
+    },
+
     /**
      * Compute polygon population from sampled FCC Census blocks.
      *

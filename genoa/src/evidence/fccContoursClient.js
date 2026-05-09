@@ -48,6 +48,18 @@ export function makeFccContoursClient({
   return {
     baseUrl,
 
+    // Liveness probe used by /readyz.  geo.fcc.gov has no /health
+    // route, so we hit the real endpoint with a known facility and
+    // count any HTTP response (2xx, 3xx, 4xx) as "host reachable".
+    // Only network / DNS / TLS failures register as unhealthy.
+    async health(){
+      try {
+        const r = await fetchFn(`${baseUrl}?facilityId=11282&serviceType=FM&unit=km`,
+                                { signal: AbortSignal.timeout(3000) });
+        return r.status >= 200 && r.status < 600;
+      } catch { return false; }
+    },
+
     /**
      * Fetch the FCC published contour for a licensed station.
      *
