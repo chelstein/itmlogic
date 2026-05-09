@@ -29,6 +29,24 @@ export function buildRfExposureSection(exhibit){
   const nf  = oet.near_field  || {};
   const bc  = c.boundary_check || {};
 
+  // Fallbacks for fields that older engine versions don't echo on the
+  // top-level oet block.  The compute had these values (the distance
+  // calc requires them); we just need to surface them here even if
+  // the engine forgot to copy them up.  Pull from the exhibit's
+  // station_inputs as the authoritative operator-supplied source,
+  // and from the OET-65 sub-blocks where the engine sometimes stashes
+  // the working values.
+  const s = exhibit.station_inputs || {};
+  const freqMHz = oet.frequency_mhz ?? c.frequency_mhz ?? s.frequency ?? null;
+  const erpKw   = oet.erp_kw       ?? c.erp_kw        ?? s.erp_kw    ?? null;
+  // FCC §1.1310 Table 1 values — controlled = 1.0 mW/cm², uncontrolled
+  // = 0.2 mW/cm² for the FM band (30 MHz – 300 MHz, occupational vs
+  // general-public).  These are the regulatory limits the compliance
+  // distances were derived from; if the engine doesn't echo them we
+  // can render the table values from the rule itself.
+  const ctlMpe = ctl.mpe_limit_mw_cm2 ?? (Number.isFinite(Number(freqMHz)) && Number(freqMHz) >= 30 && Number(freqMHz) <= 300 ? 1.0 : null);
+  const uncMpe = unc.mpe_limit_mw_cm2 ?? (Number.isFinite(Number(freqMHz)) && Number(freqMHz) >= 30 && Number(freqMHz) <= 300 ? 0.2 : null);
+
   // Status label: when a boundary check ran, report PASS/FAIL.  When
   // the antenna geometry forces near-field modeling, say so.  When
   // controlled / uncontrolled MPE distances ARE computed but the
@@ -47,14 +65,14 @@ export function buildRfExposureSection(exhibit){
   const rows = [
     ['Status',                    passLabel],
     ['Method',                    oet.method || 'OET-65 simplified-equation (far-field, omni)'],
-    ['Frequency',                 oet.frequency_mhz != null ? `${oet.frequency_mhz} MHz` : '—'],
-    ['ERP (peak, controlling)',   oet.erp_kw != null ? `${oet.erp_kw} kW` : '—'],
-    ['Controlled MPE limit',      ctl.mpe_limit_mw_cm2 != null ? `${ctl.mpe_limit_mw_cm2} mW/cm²` : '—'],
+    ['Frequency',                 freqMHz != null ? `${freqMHz} MHz` : '—'],
+    ['ERP (peak, controlling)',   erpKw != null ? `${erpKw} kW` : '—'],
+    ['Controlled MPE limit',      ctlMpe != null ? `${ctlMpe} mW/cm² (47 CFR §1.1310 Table 1, occupational/controlled)` : '—'],
     ['Controlled compliance distance', ctl.distance_m != null ? `${ctl.distance_m.toFixed?.(2) ?? ctl.distance_m} m` : '—'],
-    ['Uncontrolled MPE limit',    unc.mpe_limit_mw_cm2 != null ? `${unc.mpe_limit_mw_cm2} mW/cm²` : '—'],
+    ['Uncontrolled MPE limit',    uncMpe != null ? `${uncMpe} mW/cm² (47 CFR §1.1310 Table 1, general public/uncontrolled)` : '—'],
     ['Uncontrolled compliance distance', unc.distance_m != null ? `${unc.distance_m.toFixed?.(2) ?? unc.distance_m} m` : '—'],
-    ['Boundary check distance',   bc.boundary_distance_m != null ? `${bc.boundary_distance_m} m (per filed lot/property line or fence)` : '—'],
-    ['Boundary power density',    bc.power_density_mw_cm2 != null ? `${bc.power_density_mw_cm2.toFixed?.(4) ?? bc.power_density_mw_cm2} mW/cm²` : '—'],
+    ['Boundary check distance',   bc.boundary_distance_m != null ? `${bc.boundary_distance_m} m (per filed lot/property line or fence)` : 'DEFERRED — operator must supply lot/property-line dimensions'],
+    ['Boundary power density',    bc.power_density_mw_cm2 != null ? `${bc.power_density_mw_cm2.toFixed?.(4) ?? bc.power_density_mw_cm2} mW/cm²` : 'DEFERRED — depends on boundary distance above'],
     ['Near-field required',       nf.required_for_filing ? `YES — antenna RC AGL ${nf.rcagl_m ?? '—'} m is below the OET-65 simplified-equation lower bound; full NEC near-field modeling required` : 'no'],
     ['Engine module',             oet.engine_module || 'genoa.regulatory.oet65'],
     ['Bulletin',                  'OET-65 Bulletin (Edition 97-01) Supplement A · 47 CFR §1.1310 Table 1']

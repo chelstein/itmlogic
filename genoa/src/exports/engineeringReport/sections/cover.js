@@ -14,14 +14,23 @@ export function buildCoverSection(exhibit){
   // Multi-source fallback for cover-page identity rows.  Operator
   // typically types facility_id + call + frequency + coords; the rest
   // is enriched downstream from FCC FMQ / FCC LMS / facility_metadata.
-  // Reach into those evidence blocks here so a complete record displays
-  // even when station_inputs is sparse.
+  // Reach into every shape these upstreams have used across vintages
+  // (snake_case, camelCase, raw row vs license sub-object) so a
+  // complete record displays even when station_inputs is sparse.
+  const fmRaw = exhibit.facility_metadata?.raw || {};
+  const lmsRaw = exhibit.evidence?.fcc_lms?.raw || {};
   const community = s.community || s.city || s.licensing_community
+                 || s.community_of_license
                  || lic.community || lic.community_of_license || lic.city
-                 || fm.community || fm.community_of_license || fm.city;
+                 || lic.licensing_community
+                 || fm.community || fm.community_of_license || fm.city
+                 || fmRaw.community || fmRaw.community_of_license || fmRaw.city || fmRaw.licensing_community
+                 || lmsRaw.community || lmsRaw.community_of_license || lmsRaw.city;
   const fccClass  = s.fcc_class || s.class || s.station_class
                  || lic.fcc_class || lic.station_class || lic.class
-                 || fm.fcc_class || fm.station_class || fm.class;
+                 || fm.fcc_class || fm.station_class || fm.class
+                 || fmRaw.fcc_class || fmRaw.station_class || fmRaw.class
+                 || lmsRaw.fcc_class || lmsRaw.station_class || lmsRaw.class;
   return {
     id:      'cover',
     type:    'cover',

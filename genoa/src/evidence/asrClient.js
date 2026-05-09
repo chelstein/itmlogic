@@ -174,30 +174,71 @@ export function makeAsrClient({
      * Socrata-only (the legacy ULS HTML form-search lacks a clean
      * geospatial filter; an operator proxy can also expose this).
      */
-    async getByLocation({ lat, lon, radius_m = 1000, limit = 1 } = {}){
+    async getByLocation({ lat, lon, radius_m = null, limit = 1 } = {}){
       if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))){
         return { available: false, source: null, error: 'lat / lon required' };
       }
+      // Radius ladder.  FCC licensed station coords (typed by operators)
+      // can be 100 m to several km away from the registered ASR
+      // structure — the FCC tabulates licensed coords to-the-second
+      // (~30 m) but the ASR record is the physical tower base, often
+      // offset (towers off-property, shared structures, fence-line
+      // setbacks, etc.).  Try a tight match first for accuracy, then
+      // widen.  Each successive ring records the radius in `tried[]`
+      // so the caller / report can show how far we had to search.
+      const ladder = radius_m ? [Number(radius_m)] : [1000, 5000, 25000];
+      const tried = [];
+
       // Tier 1: genoa-asr-sidecar /asr/by-location.
       if (asrSidecarUrl){
-        try {
-          const u = joinUrl(asrSidecarUrl, `/asr/by-location?lat=${lat}&lon=${lon}&radius_m=${radius_m}&limit=${limit}`);
-          const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs) });
-          if (r.ok){
-            const j = await r.json();
-            if (j?.available) return j;
+        let lastSidecarError = null;
+        for (const r_m of ladder){
+          try {
+            const u = joinUrl(asrSidecarUrl, `/asr/by-location?lat=${lat}&lon=${lon}&radius_m=${r_m}&limit=${limit}`);
+            const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs) });
+            if (r.ok){
+              const j = await r.json();
+              tried.push({ radius_m: r_m, available: !!j?.available, distance_m: j?.distance_m ?? null, error: j?.error || null });
+              if (j?.available){
+                // Annotate with the ladder so reviewers can see how
+                // far we had to search to find this match.
+                return { ...j, search_ladder: tried };
+              }
+              lastSidecarError = j?.error || null;
+            } else {
+              tried.push({ radius_m: r_m, http: r.status, error: 'sidecar non-2xx' });
+            }
+          } catch (e){
+            tried.push({ radius_m: r_m, error: String(e.message || e) });
           }
-        } catch { /* fall through */ }
+        }
+        // Sidecar reachable but every ring missed.  Surface the
+        // FINAL ring's specific error, not the generic Tier-2 fallback
+        // text.  Caller can then render NOT_REGISTERED with citation.
+        if (tried.length){
+          return {
+            available: false,
+            source: 'asr-sidecar',
+            error: `no ASR record within ${ladder[ladder.length - 1]} m of ${lat},${lon}` +
+                   (lastSidecarError ? ` — sidecar: ${lastSidecarError}` : ''),
+            search_ladder: tried
+          };
+        }
       }
       // Tier 2: opendata.fcc.gov Socrata (historical).
       if (socrataUrl){
         const out = await querySocrataByLocation({
-          lat: Number(lat), lon: Number(lon), radius_m, limit,
+          lat: Number(lat), lon: Number(lon), radius_m: ladder[ladder.length - 1], limit,
           socrataUrl, socrataAppToken, timeoutMs, fetchFn
         });
-        if (out) return out;
+        if (out) return { ...out, search_ladder: tried };
       }
-      return { available: false, source: null, error: 'No ASR location-lookup source returned a record (set ASR_SIDECAR_URL to a running genoa-asr-sidecar).' };
+      return {
+        available: false,
+        source: null,
+        error: 'No ASR location-lookup source returned a record (set ASR_SIDECAR_URL to a running genoa-asr-sidecar).',
+        search_ladder: tried
+      };
     },
 
     /**
