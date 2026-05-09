@@ -148,10 +148,16 @@ export function buildTowerStudySection(exhibit){
   if (cmpl?.applicable){
     summaryParts.push(`rules-derived ${styleLabel(cmpl.lighting.style)} (per ${(cmpl.lighting.cites?.[0]?.rule) || 'AC 70/7460-1L'})`);
   }
+  let comparisonSentence = '';
+  if (cmpl?.comparison?.applicable){
+    comparisonSentence = cmpl.comparison.matches
+      ? 'Comparison shows the rules-derived recommendation aligns with the ASR record.'
+      : `Tower compliance comparison flagged ${cmpl.comparison.n_gaps} gap(s) — see the comparison rows below.  An FAA-issued case-specific letter typically explains a benign mismatch; verify the letter is on file before filing.`;
+  } else if (cmpl?.applicable && !asr?.available){
+    comparisonSentence = 'No FCC-registered ASR within the search radius; the rules-derived recommendation stands on §17.21 / §17.23 / AC 70/7460-1L alone — the engineer of record must confirm the §17.7(c) airport-proximity check before filing.';
+  }
   const summary = summaryParts.length
-    ? `${summaryParts.join(' · ')}.  ${cmpl?.comparison?.matches === false
-        ? `Tower compliance comparison flagged ${cmpl.comparison.n_gaps} gap(s) — see the comparison rows below.  An FAA-issued case-specific letter typically explains a benign mismatch; verify the letter is on file before filing.`
-        : 'Comparison shows the rules-derived recommendation aligns with the ASR record.'}`
+    ? `${summaryParts.join(' · ')}.${comparisonSentence ? '  ' + comparisonSentence : ''}`
     : 'Partial Tower Study — see deferred-to-engineer note above.';
 
   return {
