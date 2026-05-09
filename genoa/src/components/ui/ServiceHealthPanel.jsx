@@ -31,7 +31,7 @@ const ROWS = [
   ['terrain',     'Terrain',           'sidecar'],
   ['splat',       'SPLAT',             'sidecar'],
   ['map',         'Map render',        'sidecar'],
-  ['identity',    'Identity',          'sidecar'],
+  ['identity',    'Identity (RadioDNS)', 'sidecar'],
   ['nec',         'NEC2++',            'sidecar'],
   ['measurement', 'Measurement',       'sidecar'],
   ['facility',    'Facility (ZTR)',    'upstream'],
