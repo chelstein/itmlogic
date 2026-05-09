@@ -12,21 +12,21 @@
 //           render handler via page.goto so the page can fetch
 //           /static/* via relative URLs.
 //
-//   GET /static/states-10m.json     (us-atlas WGS84 TopoJSON)
-//   GET /static/counties-10m.json   (us-atlas WGS84 TopoJSON)
-//   GET /static/topojson-client.min.js
-//     Cartographic data + library bundled at npm-install time.
+//   GET /static/leaflet.css            (bundled Leaflet stylesheet)
+//   GET /static/leaflet.js             (bundled Leaflet runtime)
+//   GET /static/states-10m.json        (us-atlas WGS84 TopoJSON)
+//   GET /static/counties-10m.json      (us-atlas WGS84 TopoJSON)
+//   GET /static/topojson-client.min.js (bundled topojson-client lib)
+//     All cartographic data + libraries bundled at npm-install time.
+//     The render.html page never goes off-host — every fetch is to
+//     localhost:PORT.  This is deliberate: third-party CDN
+//     reachability from DO sidecar networking is unreliable, and a
+//     stalled <script src> tag from unpkg blocks page load and times
+//     the whole render out at TIMEOUT_MS.
 //
 // The Chromium browser is kept warm across requests (start cost ~1 s,
 // per-render cost ~400 ms with everything cached).  A fresh page is
 // opened per request and closed when the screenshot lands.
-//
-// Architecture note: switched from page.setContent to page.goto in
-// v0.2.  setContent() leaves the page URL at about:blank, which means
-// relative-URL fetches from inside render.html fail.  Serving the
-// template + cartographic data over Express and using goto means the
-// Leaflet page can fetch /static/states-10m.json directly — no inline
-// 115 KB JSON literals, no setting baseURL, just normal HTTP.
 
 import express from 'express';
 import puppeteer from 'puppeteer-core';
@@ -66,10 +66,18 @@ app.use(express.json({ limit: '32mb' }));
 
 // ─── Static resources used by render.html ──────────────────────────
 //
-// us-atlas + topojson-client come from npm; we serve them straight out
-// of node_modules so there's no copy-on-build step to keep in sync.
-// Cache-Control: 1 hour (these are immutable during a deploy).
+// All bundled via npm at install time — no runtime CDN fetches.
 const ONE_HOUR = 'public, max-age=3600';
+
+app.get('/static/leaflet.css', (_req, res) => {
+  res.set('Cache-Control', ONE_HOUR);
+  res.sendFile(path.join(__dirname, 'node_modules', 'leaflet', 'dist', 'leaflet.css'));
+});
+app.get('/static/leaflet.js', (_req, res) => {
+  res.set('Cache-Control', ONE_HOUR);
+  res.set('Content-Type', 'application/javascript; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'node_modules', 'leaflet', 'dist', 'leaflet.js'));
+});
 app.get('/static/states-10m.json', (_req, res) => {
   res.set('Cache-Control', ONE_HOUR);
   res.sendFile(path.join(__dirname, 'node_modules', 'us-atlas', 'states-10m.json'));
@@ -112,17 +120,22 @@ app.post('/render', async (req, res) => {
     await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
 
     // Inject exhibit + options BEFORE the page navigates so render.html
-    // can read them at module-init time.  evaluateOnNewDocument applies
-    // to every navigation in this page (we only do one).
+    // can read them at module-init time.
     await page.evaluateOnNewDocument((data, opts) => {
       window.__EXHIBIT__ = data;
       window.__RENDER_OPTIONS__ = opts;
     }, exhibit, options);
 
-    // Navigate to the template via the same Express server we're
-    // running.  Using goto (not setContent) means relative URLs inside
-    // render.html resolve to http://localhost:PORT/static/* — that's
-    // how render.html fetches the bundled cartographic data.
+    // Pipe page console messages to the sidecar log so render bugs are
+    // visible.  Errors during the async IIFE in render.html silently
+    // prevent the genoa-map-ready event from firing; without this hook
+    // the only symptom would be a 20 s timeout with no diagnostic.
+    page.on('console',     msg => console.log(`[render-page] ${msg.type()}: ${msg.text()}`));
+    page.on('pageerror',   err => console.error(`[render-page] pageerror:`, err && err.message));
+    page.on('requestfailed', req => console.warn(`[render-page] requestfailed: ${req.url()} — ${req.failure()?.errorText || 'unknown'}`));
+
+    // Use goto (not setContent) so relative URLs inside render.html
+    // resolve to http://localhost:PORT/static/*.
     await page.goto(`http://localhost:${PORT}/render-template`, {
       waitUntil: 'domcontentloaded',
       timeout:   TIMEOUT_MS
@@ -135,11 +148,8 @@ app.post('/render', async (req, res) => {
       window.addEventListener('genoa-map-ready', () => { clearTimeout(t); resolve(); }, { once: true });
     }), TIMEOUT_MS);
 
-    // Puppeteer-core 22+ returns a Uint8Array, not a Buffer.  Express 4's
-    // res.send() distinguishes Buffer (binary) from a generic typed-array
-    // by Buffer.isBuffer(body); an unwrapped Uint8Array falls through to
-    // the object-serializer path and gets JSON.stringified.  Wrap in
-    // Buffer.from so Express writes the raw bytes.
+    // Puppeteer-core 22+ returns a Uint8Array, not a Buffer.  Wrap so
+    // Express writes raw bytes (otherwise res.send JSON.stringifies it).
     const png = await page.screenshot({ type: 'png', fullPage: false });
     const pngBuf = Buffer.isBuffer(png) ? png : Buffer.from(png);
     renderCount += 1;
