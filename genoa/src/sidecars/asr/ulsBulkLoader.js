@@ -165,7 +165,11 @@ export async function runBulkLoad(pool, log = console){
   try {
     await pool.query('TRUNCATE asr_towers');
     const all = [...towers.values()];
-    const BATCH = 5_000;
+    // Postgres protocol caps a single query at 65535 bound parameters
+    // (16-bit length field in the Bind message).  26 columns × 2500
+    // rows = 65000, just under; pick 2000 for safety + steady-state
+    // memory use during the big chunked INSERT.
+    const BATCH = 2_000;
     for (let i = 0; i < all.length; i += BATCH){
       const slice = all.slice(i, i + BATCH);
       const cols = [
