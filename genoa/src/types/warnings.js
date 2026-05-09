@@ -124,6 +124,14 @@ export const WARNING_CODES = Object.freeze({
     title: 'ASR / application data mismatch (47 CFR §17.4)',
     description: 'The Antenna Structure Registration (ASR) record disagrees with the application\'s antenna data on one or more fields (coordinates, overall height AGL/AMSL).  Filing requires consistency between Form 302 / 301 and the ASR record on file with the FCC.  A minor mismatch may be a quantization artefact; a major mismatch indicates either the application or the ASR record needs to be corrected before filing.' },
 
+  FAA_DETERMINATION_EXPIRED: { severity: 'warning', phase: 'evidence',
+    title: 'FAA OE/AAA determination expired (FAA Order JO 7400.2 §6-3-3)',
+    description: 'The FAA OE/AAA Form 7460-2 Determination of No Hazard (or conditional determination) for this antenna structure has passed its expiration date.  DNHs are valid for 18 months from the determination date; past that window, the proponent must re-file Form 7460-1 and obtain a fresh determination before filing the FCC application.  Either re-study or update the application to reflect the structure as it is currently authorized.' },
+
+  TOWER_COMPLIANCE_GAP: { severity: 'warning', phase: 'evidence',
+    title: 'Tower marking / lighting gap vs ASR record (47 CFR §17.21 / §17.23)',
+    description: 'Genoa\'s rules-derived marking + lighting recommendation (per §17.21, §17.23, FAA AC 70/7460-1L) does not match the ASR record\'s actual lighting_requirement / painting_requirement.  An FAA-issued case-specific lighting letter typically explains a benign mismatch; absence of a lighting requirement on a structure where the rules require one indicates either a stale ASR record or a non-compliant structure.  The engineer-of-record must confirm the FAA letter is on file before filing.' },
+
   COMPUTE_TIMEOUT_PARTIAL: { severity: 'warning', phase: 'evidence',
     title: 'Compute completed with partial evidence (budget exceeded)',
     description: 'One or more network-bound evidence fetches were skipped because the per-request compute budget (COMPUTE_BUDGET_MS, default 4.5 minutes) was exhausted.  The exhibit numbers are still correct — the engine math is local and runs unconditionally — but the named evidence steps did not complete and their warnings (e.g. CONSTANT_HAAT_ASSUMED, MISSING_NEARBY_STATIONS) may be elevated as a result.  Re-run the compute when upstreams are responsive, or raise COMPUTE_BUDGET_MS / DigitalOcean App Platform http_request_timeout if the underlying source is consistently slow.' },

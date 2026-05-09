@@ -463,25 +463,36 @@ export const FORM_301_FM_FIELDS = Object.freeze([
   },
 
   // ── 3E — Tower / structure (FAA / Part 17) ───────────────────────────
+  // Auto-filled from evidence.asr (ASR record), evidence.faa_oe (FAA
+  // OE/AAA Form 7460-2), and exhibit.tower_compliance (rules-derived
+  // §17.21/§17.23/AC 70/7460-1L).  Status is 'suggested' on derived
+  // values — the engineer of record must confirm before filing.
   {
     id: 'asr-number',
     lms_label: 'Antenna structure registration (ASR) number',
     section: 'III', subsection: '3E',
     type: 'string',
-    source: 'manual-engineer',
+    source: 'genoa-auto',
     required: true,
     cite: '47 CFR §17.4',
-    mapping: null
+    derive: (exhibit) => firstNonEmptyPath(exhibit, [
+      'station_inputs.asr_number',
+      'evidence.asr.asr_number'
+    ])
   },
   {
     id: 'tower-overall-height-agl-m',
     lms_label: 'Overall tower height AGL (m)',
     section: 'III', subsection: '3E',
     type: 'number', unit: 'm',
-    source: 'manual-engineer',
+    source: 'genoa-auto',
     required: true,
     cite: '47 CFR §17',
-    mapping: null
+    derive: (exhibit) => firstNonEmptyPath(exhibit, [
+      'station_inputs.overall_height_m',
+      'evidence.asr.overall_height_m',
+      'tower_compliance.height_agl_m'
+    ])
   },
   {
     id: 'faa-determination',
@@ -489,30 +500,63 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     section: 'III', subsection: '3E',
     type: 'enum',
     options: ['NO-HAZARD', 'CONDITIONED', 'NOT-REQUIRED'],
-    source: 'manual-engineer',
+    source: 'genoa-auto',
     required: true,
-    cite: '14 CFR Part 77',
-    mapping: null
+    cite: '14 CFR Part 77; 47 CFR §17.7',
+    derive: (exhibit) => {
+      const faa = exhibit?.evidence?.faa_oe;
+      if (faa?.available && faa.determination){
+        const d = String(faa.determination).toUpperCase();
+        if (/DNH|NO\s*HAZARD/.test(d))      return 'NO-HAZARD';
+        if (/CONDITION/.test(d))            return 'CONDITIONED';
+        if (/HAZARD/.test(d))               return 'HAZARD';
+        if (/WITHDRAWN|PENDING/.test(d))    return null;
+        return d;
+      }
+      // No FAA OE evidence — derive from §17.7 notification gate.
+      const cmpl = exhibit?.tower_compliance;
+      if (cmpl?.applicable && !cmpl.notification_required) return 'NOT-REQUIRED';
+      return null;
+    }
   },
   {
     id: 'tower-painting',
     lms_label: 'Tower painting / marking specification',
     section: 'III', subsection: '3E',
     type: 'string',
-    source: 'manual-engineer',
+    source: 'genoa-auto',
     required: false,
     cite: '47 CFR §17.21, AC 70/7460-1L',
-    mapping: null
+    derive: (exhibit) => {
+      // Prefer the ASR record's actual code (filing-grade); fall back
+      // to the rules-derived recommendation.
+      const fromAsr = firstNonEmptyPath(exhibit, [
+        'evidence.asr.painting_requirement'
+      ]);
+      if (fromAsr) return fromAsr;
+      const cmpl = exhibit?.tower_compliance;
+      if (cmpl?.applicable && cmpl.marking?.required) return cmpl.marking.style;
+      if (cmpl?.applicable && !cmpl.marking?.required) return 'lighting-in-lieu-of-paint';
+      return null;
+    }
   },
   {
     id: 'tower-lighting',
     lms_label: 'Tower obstruction lighting style',
     section: 'III', subsection: '3E',
     type: 'string',
-    source: 'manual-engineer',
+    source: 'genoa-auto',
     required: false,
     cite: '47 CFR §17.23, AC 70/7460-1L',
-    mapping: null
+    derive: (exhibit) => {
+      const fromAsr = firstNonEmptyPath(exhibit, [
+        'evidence.asr.lighting_requirement'
+      ]);
+      if (fromAsr) return fromAsr;
+      const cmpl = exhibit?.tower_compliance;
+      if (cmpl?.applicable && cmpl.lighting?.required) return cmpl.lighting.style;
+      return null;
+    }
   },
 
   // ── 3F — Reference exhibits attached to LMS ──────────────────────────

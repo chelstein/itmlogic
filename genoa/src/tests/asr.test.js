@@ -23,7 +23,9 @@ const ASR_RECORD = {
 /* ---------- client construction ---------- */
 
 test('makeAsrClient: returns null when no source configured', () => {
-  const fc = makeAsrClient({ ztrUrl: null, asrSidecarUrl: null, htmlFallback: false });
+  // Socrata is on by default since PR1 (opendata.fcc.gov ASR DB).
+  // The test of "no source configured" must also disable that tier.
+  const fc = makeAsrClient({ ztrUrl: null, asrSidecarUrl: null, htmlFallback: false, socrataUrl: null });
   assert.equal(fc, null);
 });
 
@@ -166,7 +168,11 @@ test('checkAsrAgainstApplication: missing application data → applicable=false'
 test('ASR_PROVENANCE names §17.4, FAA Form 7460, fallback chain, license', () => {
   assert.match(ASR_PROVENANCE.regulation, /17\.4/);
   assert.ok(ASR_PROVENANCE.related.some(r => /FAA Form 7460/.test(r)));
-  assert.match(ASR_PROVENANCE.upstream, /wireless2\.fcc\.gov\/UlsApp\/AsrSearch/);
-  assert.equal(ASR_PROVENANCE.fallback_chain.length, 3);
+  // PR1 promoted Socrata to the primary upstream; the legacy ULS HTML
+  // path is the last-resort fallback.
+  assert.match(ASR_PROVENANCE.upstream, /opendata\.fcc\.gov/);
+  // Fallback chain grew from 3 (ZTR / sidecar / ULS HTML) to 4
+  // (ZTR / Socrata / sidecar / ULS HTML) in PR1.
+  assert.equal(ASR_PROVENANCE.fallback_chain.length, 4);
   assert.match(ASR_PROVENANCE.license_basis, /17 U\.S\.C\. § 105/);
 });

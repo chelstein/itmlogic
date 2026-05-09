@@ -33,6 +33,7 @@ import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
 import { buildMapPackageSection }         from './sections/mapPackage.js';
+import { buildTowerStudySection }         from './sections/towerStudy.js';
 
 const ROMAN = ['', 'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII','XIII','XIV','XV','XVI','XVII','XVIII','XIX','XX','XXI','XXII','XXIII','XXIV','XXV'];
 
@@ -76,6 +77,7 @@ export function buildEngineeringReport(exhibit, options){
   push(buildRfExposureSection(exhibit, opt));
   push(buildPopulationMethodologySection(exhibit, opt));
   push(buildTerrainProvenanceSection(exhibit, opt));
+  push(buildTowerStudySection(exhibit, opt));               // NEW — §17.4 ASR + FAA OE/AAA + §17.21/.23 lighting/marking
   push(buildValidationVerdictSection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
   push(buildBuildAttestationSection(exhibit, opt));
