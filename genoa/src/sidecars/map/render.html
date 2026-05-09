@@ -224,8 +224,20 @@
       fadeAnimation: false, zoomAnimation: false,
       inertia: false, worldCopyJump: false
     });
+    // Set an initial view BEFORE adding any layers.  Leaflet's polygon
+    // clipping path (_clipPoints → _update → _reset) reads
+    // map._pxBoundsZoomed; that field is undefined until the first
+    // setView()/fitBounds() runs.  When we add the states GeoJSON
+    // below before the view is set, every layer add would throw
+    // "Cannot read properties of undefined (reading 'min')" inside
+    // leaflet.js and the rendered page would show only the chrome
+    // (header/legend/scale bar) over a blank gray map area.  A
+    // placeholder zoom-9 view at the station coords is enough to
+    // initialise the renderer's bounds; we refit to the contour
+    // extent later (line 322) once the polygons are loaded.
+    map.setView([lat, lon], 9);
 
-    // ── Load bundled US state TopoJSON (WGS84) ──────────────────────
+    // ── Load bundled US state TopoJSON (WGS84) ──────────────────
     let states, statesLoaded = false;
     try {
       const r = await fetch('/static/states-10m.json');
@@ -253,7 +265,7 @@
       }).addTo(map);
     }
 
-    // ── Contour polygons ─────────────────────────────────────────────
+    // ── Contour polygons ────────────────────────────────────
     const COLORS = ['#b85a3a', '#a85a3f', '#6f4e2a'];
     const swatchHost = document.getElementById('contour-swatches');
 
@@ -317,12 +329,13 @@
         .addTo(map);
     }
 
-    // ── Frame the contour extent ────────────────────────────────────
+    // ── Frame the contour extent ────────────────────────────────
+    // Map already has a placeholder setView([lat,lon], 9) from boot;
+    // refit to the contour extent if polygons exist, otherwise leave
+    // the placeholder view (zoom 9 over the tx site) in place.
     const allPts = [...polys, ...itm].flatMap(p => p.ring_latlng || []);
     if (allPts.length){
       map.fitBounds(L.latLngBounds(allPts).pad(0.22));
-    } else {
-      map.setView([lat, lon], 9);
     }
 
     // ── State name labels (only states whose centroid is in view) ───
@@ -342,7 +355,7 @@
       });
     }
 
-    // ── Scale bar + coord ticks ─────────────────────────────────────
+    // ── Scale bar + coord ticks ─────────────────────────────────
     drawScaleBar(map);
     drawCoordinateTicks(map);
 
