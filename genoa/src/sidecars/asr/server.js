@@ -63,8 +63,27 @@ if (!process.env.DATABASE_URL){
   process.exit(1);
 }
 
+// Force sslmode=no-verify on the connection string when PG_SSL_REJECT_UNAUTHORIZED
+// is false.  DO's managed Postgres ships a self-signed cert chain; the
+// pg library has tightened its sslmode handling to alias `require` to
+// `verify-full`, which rejects self-signed certs even when we pass
+// `ssl: { rejectUnauthorized: false }` in the pool config.  Rewriting
+// the connection-string sslmode to `no-verify` keeps the libpq-style
+// "encrypt but don't verify" semantics that operator env clearly wants.
+function buildPgConnectionString(){
+  const raw = process.env.DATABASE_URL;
+  if (process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false') return raw;
+  try {
+    const u = new URL(raw);
+    u.searchParams.set('sslmode', 'no-verify');
+    return u.toString();
+  } catch {
+    return raw;
+  }
+}
+
 const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: buildPgConnectionString(),
   ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
   max: Number(process.env.PG_POOL_MAX) || 5,
   application_name: 'genoa-asr-sidecar'
