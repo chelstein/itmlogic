@@ -84,6 +84,33 @@ export function makeFccLmsClient({
   fetchFn     = (typeof fetch === 'function' ? fetch : null)
 } = {}){
   return {
+    // Surfaces a baseUrl so the /readyz probe + UI tooltip have
+    // something to point at.  The "real" baseUrl is dual (FMQ/AMQ +
+    // publicfiles); we report publicfiles since that's the actual
+    // licensee-side API.
+    baseUrl: publicFilesBase,
+
+    // Liveness probe used by /readyz.  publicfiles.fcc.gov + FMQ have
+    // no /health route, so we hit a known-good endpoint with a real
+    // facility id and count any HTTP response (2xx-4xx) as "host
+    // reachable".  Only network / DNS / TLS failures register as
+    // unhealthy.  Probes BOTH publicfiles + FMQ in parallel and treats
+    // "either reachable" as healthy — Genoa can fall back from one to
+    // the other.
+    async health(){
+      const probe = async (url) => {
+        try {
+          const r = await (fetchFn || fetch)(url, { signal: AbortSignal.timeout(3000) });
+          return r.status >= 200 && r.status < 600;
+        } catch { return false; }
+      };
+      const [publicFiles, fmq] = await Promise.all([
+        publicFilesEnabled ? probe(`${publicFilesBase}/fm/11282/contents`) : Promise.resolve(false),
+        probe('https://transition.fcc.gov/fcc-bin/fmq?state=AZ&call=KSLX')
+      ]);
+      return publicFiles || fmq;
+    },
+
     /**
      * Consolidated lookup for a station by call sign.
      * Returns the unified "FCC authoritative-record" evidence shape.
