@@ -26,18 +26,20 @@ const READYZ_URL = '/readyz';
 // table still renders, just at the bottom in alphabetical order.
 const ROWS = [
   // [key, label, kind]
-  ['api',         'Genoa API',         'core'],
-  ['db',          'Postgres',          'core'],
-  ['terrain',     'Terrain',           'sidecar'],
-  ['splat',       'SPLAT',             'sidecar'],
-  ['map',         'Map render',        'sidecar'],
-  ['identity',    'Identity (RadioDNS)', 'sidecar'],
-  ['nec',         'NEC2++',            'sidecar'],
-  ['measurement', 'Measurement',       'sidecar'],
-  ['facility',    'Facility (ZTR)',    'upstream'],
-  ['population',  'Population',        'upstream'],
-  ['fccContours', 'FCC contours',      'upstream'],
-  ['fccLms',      'FCC LMS',           'upstream']
+  ['api',         'Genoa API',                 'core'],
+  ['db',          'Postgres',                  'core'],
+  ['terrain',     'Terrain',                   'sidecar'],
+  ['splat',       'SPLAT (ITM / Longley-Rice)','sidecar'],
+  ['map',         'Map render',                'sidecar'],
+  ['identity',    'Identity (RadioDNS)',       'sidecar'],
+  ['nec',         'NEC2++',                    'sidecar'],
+  ['measurement', 'Measurement',               'sidecar'],
+  ['los',         'LOS (ZTR)',                 'sidecar'],
+  ['facility',    'Facility (ZTR)',            'upstream'],
+  ['asr',         'ASR (FCC opendata)',        'upstream'],
+  ['population',  'Population',                'upstream'],
+  ['fccContours', 'FCC contours',              'upstream'],
+  ['fccLms',      'FCC LMS',                   'upstream']
 ];
 
 function ledFor(entry){
