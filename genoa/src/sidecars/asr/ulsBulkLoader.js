@@ -22,11 +22,12 @@
 // "last loaded N records at T".
 
 import { createReadStream } from 'node:fs';
-import { writeFile, mkdir, stat, unlink } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, stat, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { createHash } from 'node:crypto';
 import unzipper from 'unzipper';
 
 const BULK_URL = process.env.ASR_BULK_URL
@@ -101,9 +102,11 @@ export async function runBulkLoad(pool, log = console){
   if (!r.ok) throw new Error(`bulk download HTTP ${r.status}`);
   const etag = r.headers.get('etag') || null;
   const lastMod = r.headers.get('last-modified') || null;
-  await writeFile(zipPath, Buffer.from(await r.arrayBuffer()));
-  const sz = (await stat(zipPath)).size;
-  log.info(`[asr-loader] downloaded ${(sz/1e6).toFixed(1)} MB (etag=${etag})`);
+  const zipBuf = Buffer.from(await r.arrayBuffer());
+  await writeFile(zipPath, zipBuf);
+  const sz = zipBuf.length;
+  const sha256 = createHash('sha256').update(zipBuf).digest('hex');
+  log.info(`[asr-loader] downloaded ${(sz/1e6).toFixed(1)} MB (etag=${etag}, sha256=${sha256.slice(0,16)}…)`);
 
   // 2. Parse — first pass: index every entry name so we know what's in there
   //    Then per-entry stream-parse the records we need.
@@ -220,11 +223,46 @@ export async function runBulkLoad(pool, log = console){
     `, [BULK_URL, etag, lastMod ? new Date(lastMod) : null,
         towers.size, nWithCoords, nWithOwner, elapsed]);
 
+    // 4. Archive the raw zip + rotate off anything > 28 days.  The
+    //    archive lets operators diff this week's data against any of
+    //    the prior 3 weekly publications.  Rolling 4-week window with
+    //    oldest aging off; the asr_zip_archive table holds the raw
+    //    bytea so we don't depend on container-ephemeral disk.
+    await pool.query(`
+      INSERT INTO asr_zip_archive
+        (snapshot_date, source_url, source_etag, source_last_modified, size_bytes, sha256, zip_data)
+      VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6)
+      ON CONFLICT (snapshot_date) DO UPDATE SET
+        source_url           = EXCLUDED.source_url,
+        source_etag          = EXCLUDED.source_etag,
+        source_last_modified = EXCLUDED.source_last_modified,
+        size_bytes           = EXCLUDED.size_bytes,
+        sha256               = EXCLUDED.sha256,
+        zip_data             = EXCLUDED.zip_data,
+        archived_at          = now()
+    `, [BULK_URL, etag, lastMod ? new Date(lastMod) : null, sz, sha256, zipBuf]);
+
+    const purged = await pool.query(`
+      DELETE FROM asr_zip_archive
+       WHERE archived_at < (now() - INTERVAL '28 days')
+       RETURNING snapshot_date
+    `);
+    if (purged.rowCount > 0){
+      log.info(`[asr-loader] archive: rotated off ${purged.rowCount} snapshot(s) older than 28 days: ${purged.rows.map(r => r.snapshot_date).join(', ')}`);
+    }
+
     await pool.query('COMMIT');
-    log.info(`[asr-loader] DONE ${towers.size} rows in ${elapsed}s`);
+    log.info(`[asr-loader] DONE ${towers.size} rows + ${(sz/1e6).toFixed(1)} MB zip archived in ${elapsed}s`);
     await unlink(zipPath).catch(() => {});
-    return { records_total: towers.size, records_with_coords: nWithCoords,
-             records_with_owner: nWithOwner, load_duration_seconds: elapsed };
+    return {
+      records_total:        towers.size,
+      records_with_coords:  nWithCoords,
+      records_with_owner:   nWithOwner,
+      load_duration_seconds: elapsed,
+      archive_size_bytes:   sz,
+      archive_sha256:       sha256,
+      archive_purged:       purged.rowCount
+    };
   } catch (e){
     await pool.query('ROLLBACK');
     await pool.query(`
