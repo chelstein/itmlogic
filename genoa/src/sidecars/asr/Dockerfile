@@ -1,18 +1,20 @@
 # Genoa ASR sidecar — FCC Antenna Structure Registration lookups.
 #
-# THREE TIERS, ONE IMAGE:
-#   Tier 1: Postgres-backed bulk DB (FCC ULS r_tower.zip weekly)
-#   Tier 2: ZTR rich-station passthrough (handled in main API; documented here)
-#   Tier 3: Python cloudscraper bridge against wireless2.fcc.gov ASR HTML
+# Tier hierarchy (operator-locked policy — FCC ALWAYS tier 1):
+#   Tier 1: Postgres-backed bulk DB (FCC ULS r_tower.zip weekly) ← official FCC
+#   Tier 2: reserved for future independent ASR mirror (TBD)
+#   Tier 3: ZTR rich-station passthrough (handled in main API; documented here)
+#   Tier 4: Python cloudscraper bridge → REC Networks → radio-locator
 #
 # Architecturally mirrors the NEC sidecar (genoa/src/sidecars/nec/):
 # Node Express server + Python subprocess bridge.  Single Dockerfile,
 # single CMD, multi-language runtime.
 #
-# Why Python for tier 3?  Akamai-protected FCC pages return 503 to
-# naive Node fetch.  Python's `cloudscraper` mimics a real browser's
-# TLS fingerprint + JS challenge handling and gets through.  Same
-# rationale as nec_bridge.py — use the right tool per task.
+# Why Python for tier 4?  Cloudflare/Akamai-protected pages (recnet.com,
+# wireless2.fcc.gov) return 503 to naive Node fetch.  Python's
+# `cloudscraper` mimics a real browser's TLS fingerprint + JS challenge
+# handling and gets through.  Same rationale as nec_bridge.py — use the
+# right tool per task.
 #
 # Final image is ~250 MB (Node 20 + Python 3.11 + npm deps + pip deps).
 

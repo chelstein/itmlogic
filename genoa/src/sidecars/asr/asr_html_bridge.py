@@ -1,28 +1,34 @@
 #!/usr/bin/env python3
 """
-Genoa ASR sidecar — Tier-3 lookup bridge.
+Genoa ASR sidecar — Tier-4 lookup bridge.
+
+Tier hierarchy (per operator-locked policy):
+  Tier 1 — FCC ULS r_tower.zip bulk DB (always primary; FCC-official)
+  Tier 2 — reserved for future independent ASR mirror (TBD)
+  Tier 3 — ZTR rich-station _tower passthrough (handled in main API)
+  Tier 4 — this bridge: REC Networks → radio-locator chain
 
 Modeled on nec_bridge.py: invoked as a subprocess from server.js,
 takes an ASR registration number on argv, prints exactly one JSON
 line on stdout, exits 0.
 
-Tier-3 has THREE providers attempted in order, until one succeeds:
+Tier-4 has THREE providers attempted in order, until one succeeds:
 
-  3a — REC Networks API (api.recnet.net/towerinfo)
+  4a — REC Networks API (api.recnet.net/towerinfo)
        Requires REC_API_KEY (free, request from recnet.com/api).
        JSON response, fastest.  Preferred when configured.
 
-  3b — REC Networks /towerfind web page via cloudscraper
+  4b — REC Networks /towerfind web page via cloudscraper
        Free, slower, occasionally rate-limited.  Defeats Cloudflare /
        Akamai by mimicking a real browser TLS fingerprint.
 
-  3c — radio-locator.com tower lookup
-       Independent third-party broadcast database; another free
+  4c — radio-locator.com tower lookup
+       Independent third-party broadcast database; last-resort
        fallback if REC is unreachable.
 
 Output schema matches what genoa-asr-sidecar's by-number tier-1
 endpoint returns (rowToRecord), so the calling code is uniform.
-Sets `source_tier: 3`, `source_subtier: '3a'|'3b'|'3c'` for
+Sets `source_tier: 4`, `source_subtier: '4a'|'4b'|'4c'` for
 provenance.
 """
 import os
@@ -42,8 +48,8 @@ def emit(obj):
 def fail(reason, attempts=None):
     emit({
         "available": False,
-        "source": "asr-sidecar-tier3",
-        "source_tier": 3,
+        "source": "asr-sidecar-tier4",
+        "source_tier": 4,
         "error": reason,
         "attempts": attempts or [],
     })
@@ -81,22 +87,22 @@ def parse_dms(s):
     return to_float(s)
 
 
-# ─── Tier 3a: REC API (api.recnet.net/towerinfo) ─────────────────────
-def tier_3a_rec_api(asr, scraper, attempts):
+# ─── Tier 4a: REC API (api.recnet.net/towerinfo) ─────────────────────
+def tier_4a_rec_api(asr, scraper, attempts):
     if not REC_API_KEY:
-        attempts.append({"subtier": "3a", "skipped": "REC_API_KEY not configured"})
+        attempts.append({"subtier": "4a", "skipped": "REC_API_KEY not configured"})
         return None
     url = f"https://api.recnet.net/towerinfo/?asrn={asr}&key={REC_API_KEY}"
     started = time.time()
     try:
         r = scraper.get(url, timeout=10)
-        attempts.append({"subtier": "3a", "url": "api.recnet.net/towerinfo",
+        attempts.append({"subtier": "4a", "url": "api.recnet.net/towerinfo",
                          "http": r.status_code, "ms": int((time.time()-started)*1000)})
         if r.status_code != 200:
             return None
         d = r.json()
     except Exception as e:
-        attempts.append({"subtier": "3a", "error": str(e)[:200]})
+        attempts.append({"subtier": "4a", "error": str(e)[:200]})
         return None
     if d.get("status", {}).get("error") == "error":
         return None
@@ -106,8 +112,8 @@ def tier_3a_rec_api(asr, scraper, attempts):
     return {
         "available":            True,
         "source":               "rec-networks-api",
-        "source_tier":          3,
-        "source_subtier":       "3a",
+        "source_tier":          4,
+        "source_subtier":       "4a",
         "asr_number":           str(t.get("asrn") or asr),
         "status":               t.get("status"),
         "owner":                t.get("entity") or t.get("owner") or t.get("registrant"),
@@ -129,8 +135,8 @@ def tier_3a_rec_api(asr, scraper, attempts):
     }
 
 
-# ─── Tier 3b: REC web /towerfind scrape (no API key) ─────────────────
-def tier_3b_rec_web(asr, scraper, attempts):
+# ─── Tier 4b: REC web /towerfind scrape (no API key) ─────────────────
+def tier_4b_rec_web(asr, scraper, attempts):
     """Submit asrnum to recnet.com/towerfind, parse the rendered detail."""
     started = time.time()
     try:
@@ -140,13 +146,13 @@ def tier_3b_rec_web(asr, scraper, attempts):
             timeout=12,
             headers={"Referer": "https://recnet.com/towerfind"},
         )
-        attempts.append({"subtier": "3b", "url": "recnet.com/towerfind",
+        attempts.append({"subtier": "4b", "url": "recnet.com/towerfind",
                          "http": r.status_code, "ms": int((time.time()-started)*1000)})
         if r.status_code != 200:
             return None
         body = r.text
     except Exception as e:
-        attempts.append({"subtier": "3b", "error": str(e)[:200]})
+        attempts.append({"subtier": "4b", "error": str(e)[:200]})
         return None
     # If the form rendered tower data, the page contains the ASR number
     # near the matched record.  Without the rendered match, the form
@@ -176,8 +182,8 @@ def tier_3b_rec_web(asr, scraper, attempts):
     return {
         "available":            True,
         "source":               "rec-networks-web",
-        "source_tier":          3,
-        "source_subtier":       "3b",
+        "source_tier":          4,
+        "source_subtier":       "4b",
         "asr_number":           str(asr),
         "status":               grab("status", "registration status"),
         "owner":                grab("registrant", "owner", "entity"),
@@ -198,8 +204,8 @@ def tier_3b_rec_web(asr, scraper, attempts):
     }
 
 
-# ─── Tier 3c: radio-locator.com fallback ─────────────────────────────
-def tier_3c_radio_locator(asr, scraper, attempts):
+# ─── Tier 4c: radio-locator.com fallback ─────────────────────────────
+def tier_4c_radio_locator(asr, scraper, attempts):
     """Best-effort radio-locator scrape.  Their public tower lookup may
     not be exposed under a stable URL; we try the most common."""
     started = time.time()
@@ -216,21 +222,21 @@ def tier_3c_radio_locator(asr, scraper, attempts):
             if r.status_code == 200 and str(asr) in r.text and "404" not in r.text[:200]:
                 # Found a render — surface the URL even if we can't
                 # parse all fields; this is best-effort tier-3c.
-                attempts.append({"subtier": "3c", "url": url, "http": 200,
+                attempts.append({"subtier": "4c", "url": url, "http": 200,
                                  "ms": int((time.time()-started)*1000)})
                 return {
                     "available":      True,
                     "source":         "radio-locator-web",
-                    "source_tier":    3,
-                    "source_subtier": "3c",
+                    "source_tier":    4,
+                    "source_subtier": "4c",
                     "asr_number":     str(asr),
                     "fetched_at":     time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
                     "endpoint":       url,
-                    "note":           "tier-3c surfaces the lookup URL only; field extraction not implemented",
+                    "note":           "tier-4c surfaces the lookup URL only; field extraction not implemented",
                 }
         except Exception as e:
             last_status = f"err:{e}"
-    attempts.append({"subtier": "3c", "tried": candidates, "last_status": str(last_status)})
+    attempts.append({"subtier": "4c", "tried": candidates, "last_status": str(last_status)})
     return None
 
 
@@ -258,15 +264,15 @@ def main():
 
     attempts = []
 
-    # 3a → 3b → 3c chain
-    for fn in (tier_3a_rec_api, tier_3b_rec_web, tier_3c_radio_locator):
+    # 4a → 4b → 4c chain
+    for fn in (tier_4a_rec_api, tier_4b_rec_web, tier_4c_radio_locator):
         result = fn(asr, scraper, attempts)
         if result:
             result["attempts"] = attempts
             emit(result)
             return
 
-    fail(f"all tier-3 providers exhausted for ASR {asr}", attempts)
+    fail(f"all tier-4 providers exhausted for ASR {asr}", attempts)
 
 
 if __name__ == "__main__":

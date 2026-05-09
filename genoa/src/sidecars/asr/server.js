@@ -1,31 +1,40 @@
 // Genoa ASR sidecar — REST API for FCC Antenna Structure Registration lookups.
 //
-// Three resolution tiers, each independently fail-soft:
+// Tier hierarchy (operator-locked policy — FCC official ALWAYS first):
 //
-//   Tier 1 (PRIMARY):    local Postgres asr_towers table loaded weekly
-//                        from FCC ULS r_tower.zip.  Sub-100 ms lookups
-//                        by ASR# or by lat/lon proximity.  ~1.7M towers.
+//   Tier 1 (PRIMARY, always):   local Postgres asr_towers table loaded
+//                               weekly from FCC ULS r_tower.zip
+//                               (data.fcc.gov/download/pub/uls/complete/
+//                               r_tower.zip — the FCC-published source
+//                               of truth).  Sub-100 ms lookups by ASR#
+//                               or by lat/lon proximity.  ~1.7M towers.
 //
-//   Tier 2 (FALLBACK A): operator can override / supplement the bulk DB
-//                        via ZTR rich-station _tower data.  This sidecar
-//                        does NOT call ZTR — that wiring lives in the
-//                        main API's asrClient.extractFromRichStation.
-//                        Tier 2 is mentioned here for documentation
-//                        completeness; the sidecar surfaces it via the
-//                        provenance.tier_chain in /asr/by-* responses
-//                        when a ZTR-sourced record is passed-through.
+//   Tier 2 (RESERVED, future):  independent ASR mirror (e.g.
+//                               chelstein/asr-server when it lands as
+//                               its own DO app).  Slot reserved here
+//                               for documentation completeness; the
+//                               main API's asrClient.js will gain the
+//                               wire-up when the second mirror exists.
 //
-//   Tier 3 (FALLBACK B): Python subprocess (asr_html_bridge.py) that
-//                        scrapes wireless2.fcc.gov/UlsApp/AsrSearch with
-//                        cloudscraper to defeat Akamai's 503 wall.
-//                        Same Node-server + Python-bridge pattern as the
-//                        NEC sidecar.  Slow (~3-8 s per lookup); used
-//                        only when bulk DB has no record AND asr_number
-//                        is supplied.
+//   Tier 3 (FALLBACK):          ZTR rich-station _tower passthrough.
+//                               This sidecar does NOT call ZTR — that
+//                               wiring lives in the main API's
+//                               asrClient.extractFromRichStation, which
+//                               runs BEFORE the call to this sidecar.
+//                               Documented here for tier-chain clarity.
+//
+//   Tier 4 (LAST RESORT):       Python subprocess (asr_html_bridge.py)
+//                               that hits REC Networks (api.recnet.net /
+//                               recnet.com/towerfind via cloudscraper)
+//                               then radio-locator.com.  Same Node +
+//                               Python-bridge pattern as the NEC sidecar.
+//                               Slow (~3-8 s per lookup); used only when
+//                               the bulk DB has no record AND an asr_number
+//                               is supplied.
 //
 // Endpoints:
 //   GET  /healthz                    — liveness; reports last bulk-load state
-//   GET  /asr/by-number/:asr         — exact match in asr_towers; tier-3 fallback if not found
+//   GET  /asr/by-number/:asr         — exact match in asr_towers; tier-4 fallback if not found
 //   GET  /asr/by-location?lat&lon&radius_m=1000&limit=1
 //                                    — haversine within candidate set
 //
@@ -93,7 +102,7 @@ function scheduleWeeklyRefresh(){
   console.log(`[asr-sidecar] weekly refresh scheduled every ${LOAD_REFRESH_DAYS} days`);
 }
 
-// ─── Tier-3 Python bridge ────────────────────────────────────────────
+// ─── Tier-4 Python bridge ────────────────────────────────────────────
 // Spawns asr_html_bridge.py with the ASR# on argv.  The bridge prints
 // a single JSON line on stdout; we parse it.  Failures resolve to
 // { available: false, error: ... } — never throw.
@@ -195,15 +204,13 @@ app.get('/asr/by-number/:asr', async (req, res) => {
   } catch (e){
     console.warn('[asr-sidecar] tier-1 query failed:', e.message);
   }
-  // Tier 3: HTML scrape (skipped when ASR_DISABLE_HTML_FALLBACK=1).
+  // Tier 4: external bridge (skipped when ASR_DISABLE_HTML_FALLBACK=1).
   if (process.env.ASR_DISABLE_HTML_FALLBACK === '1'){
-    return res.json({ available: false, source: 'asr-sidecar', error: 'not in bulk DB; html fallback disabled' });
+    return res.json({ available: false, source: 'asr-sidecar', error: 'not in bulk DB; tier-4 disabled' });
   }
+  // Tier 4: Python bridge → REC Networks → radio-locator (the bridge
+  // already stamps source_tier=4 on its successful results).
   const fallback = await htmlScrapeFallback(asr);
-  if (fallback.available){
-    fallback.source_tier = 3;
-    return res.json(fallback);
-  }
   return res.json(fallback);
 });
 
