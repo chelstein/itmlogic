@@ -1098,6 +1098,59 @@ export async function computeExhibit(req){
         `ASR ${evidence.asr.asr_number}${hasMajor ? ' MAJOR' : ''} mismatch (${evidence.asr.cross_check.n_mismatches}): ${detail}`));
       exhibit.warnings = warnings;
     }
+
+    // ── Tower Study: FAA OE/AAA + lighting/marking rules ──────────────
+    // Now that the ASR record is on the exhibit, run the two coupled
+    // tower-side cross-checks: (a) pull the FAA OE/AAA case file by the
+    // ASR record's faa_study_number, and (b) compute the rules-derived
+    // marking + lighting per §17.21 / §17.23 / AC 70/7460-1L and
+    // compare it to the ASR record's actual lighting_requirement.
+    //
+    // Both are fail-soft — neither blocks the exhibit; they attach
+    // evidence + comparison blocks for the Tower Study report section.
+    try {
+      const { makeFaaOeClient, checkFaaAgainstAsr } =
+        await import('../../evidence/faaOeClient.js');
+      const faaClient = makeFaaOeClient();
+      if (faaClient && evidence.asr.faa_study_number){
+        const faa = await faaClient.getByStudyNumber(evidence.asr.faa_study_number);
+        if (faa.available || faa.error){
+          exhibit.evidence.faa_oe = checkFaaAgainstAsr({ faa, asr: evidence.asr });
+          if (exhibit.evidence.faa_oe.cross_check?.expired){
+            let warnings = exhibit.warnings || [];
+            warnings.push(W.make('FAA_DETERMINATION_EXPIRED',
+              `FAA OE/AAA determination ${exhibit.evidence.faa_oe.study_number} expired ${exhibit.evidence.faa_oe.expiration_date} — re-study required per FAA Order JO 7400.2 §6-3-3 before filing.`));
+            exhibit.warnings = warnings;
+          }
+        }
+      }
+    } catch { /* swallow — FAA OE is informational, not load-bearing */ }
+
+    try {
+      const { requiredTowerCompliance, compareToAsr } =
+        await import('../../engine/tower/index.js');
+      const compliance = requiredTowerCompliance({
+        height_agl_m:   evidence.asr.overall_height_m
+                          ?? inputs.overall_height_m
+                          ?? null,
+        height_amsl_m:  evidence.asr.overall_height_amsl_m ?? null,
+        structure_type: inputs.structure_type || 'TOWER',
+        near_airport:   !!inputs.near_airport
+      });
+      if (compliance.applicable){
+        exhibit.tower_compliance = compareToAsr({ compliance, asr: evidence.asr });
+        // Surface compliance gaps as warnings so the Validation /
+        // Filing Package panels see them.
+        const gaps = exhibit.tower_compliance.comparison?.gaps || [];
+        const major = gaps.filter(g => g.severity === 'major');
+        if (major.length){
+          let warnings = exhibit.warnings || [];
+          warnings.push(W.make('TOWER_COMPLIANCE_GAP',
+            `Tower compliance MAJOR gap(s) vs ASR record: ${major.map(g => `${g.field} (${g.note || g.cite || ''})`).join(' | ')}`));
+          exhibit.warnings = warnings;
+        }
+      }
+    } catch { /* swallow — tower compliance is informational */ }
   }
   if (evidence.nearby_primaries_provenance){
     exhibit.evidence.nearby_primaries           = evidence.nearby_primaries;
