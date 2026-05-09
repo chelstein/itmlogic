@@ -15,6 +15,7 @@ import {
 } from './jobStore.js';
 import { computeExhibit }                  from './exhibitService.js';
 import { applyComputeOptionDefaults }      from './computeOptionDefaults.js';
+import { enrichTowerEvidence }             from './enrichTowerEvidence.js';
 import { buildEngineeringReport }          from '../../exports/engineeringReport/index.js';
 import { renderEngineeringReportText }     from '../../exports/engineeringReport/renderText.js';
 import { renderEngineeringReportPdf }      from '../../exports/engineeringReport/renderPdf.js';
@@ -109,6 +110,12 @@ async function runReportJob(r, ext){
     const png = await fetchMapRender(exhibit).catch(() => null);
     if (png) reportOpts.contour_map_png = png;
   }
+  // Late-bind ASR + FAA OE + tower-compliance evidence so the Tower
+  // Study (Exhibit XV) and §17 sections can fill from the FCC ASR bulk
+  // DB even when computeExhibit didn't already attach evidence.asr.
+  // Same enrichment used by the LMS Filing Package routes — the two
+  // render paths share render-time evidence.
+  await enrichTowerEvidence(exhibit, console);
   const doc = buildEngineeringReport(exhibit, reportOpts);
 
   // 4. Render TXT or PDF.

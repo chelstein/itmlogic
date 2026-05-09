@@ -25,11 +25,47 @@ export function buildAppendixSections(exhibit){
     for (const id of cidList){
       columns.push({ key: `c_${id}`, label: `${id} (km)`, width: widthPerContour, align: 'right' });
     }
+
+    // Build a per-azimuth HAAT lookup from evidence.terrain_haat_per_radial.
+    // The engine emits the radial_table with azimuth_deg + contour_distances_km
+    // but doesn't always echo HAAT/ERP per-radial.  We can recover both:
+    //   - HAAT: from the terrain compute (per-radial DEM sampling, §73.313)
+    //   - ERP: station-wide ERP for ND antennas, or ERP × (rel_field)² for DA
+    //          (the antenna pattern table is keyed by azimuth degree).
+    const perRadialHaat = Array.isArray(exhibit.evidence?.terrain_haat_per_radial)
+      ? exhibit.evidence.terrain_haat_per_radial
+      : [];
+    const haatByAz = new Map();
+    for (const r of perRadialHaat){
+      const az = Number(r?.az ?? r?.azimuth_deg);
+      const h  = Number(r?.haat_computed_m ?? r?.haat_m);
+      if (Number.isFinite(az) && Number.isFinite(h)) haatByAz.set(Math.round(az), h);
+    }
+    const stationErp = Number(exhibit.station_inputs?.erp_kw);
+    const pattern = Array.isArray(exhibit.station_inputs?.pattern)
+      ? exhibit.station_inputs.pattern
+      : null;
+    const erpByAz = new Map();
+    if (pattern && Number.isFinite(stationErp)){
+      for (const [az, relField] of pattern){
+        const a = Math.round(Number(az));
+        const f = Number(relField);
+        if (Number.isFinite(a) && Number.isFinite(f)) erpByAz.set(a, stationErp * f * f);
+      }
+    }
+
     const rows = rt.map(r => {
+      const az = Number.isFinite(r.azimuth_deg) ? Number(r.azimuth_deg) : null;
+      const azKey = az != null ? Math.round(az) : null;
+      const haat  = Number.isFinite(r.haat_m) ? Number(r.haat_m)
+                  : (azKey != null && haatByAz.has(azKey) ? haatByAz.get(azKey) : null);
+      const erp   = Number.isFinite(r.erp_kw) ? Number(r.erp_kw)
+                  : (azKey != null && erpByAz.has(azKey) ? erpByAz.get(azKey)
+                  : (Number.isFinite(stationErp) && !pattern ? stationErp : null));
       const row = {
-        azimuth_deg: Number.isFinite(r.azimuth_deg) ? Number(r.azimuth_deg).toFixed(1) : '—',
-        haat_m:      Number.isFinite(r.haat_m)      ? Number(r.haat_m).toFixed(1)     : '—',
-        erp_kw:      Number.isFinite(r.erp_kw)      ? Number(r.erp_kw).toFixed(3)     : '—'
+        azimuth_deg: az != null  ? az.toFixed(1)   : '—',
+        haat_m:      haat != null ? haat.toFixed(1) : '—',
+        erp_kw:      erp != null  ? erp.toFixed(3)  : '—'
       };
       const cd = r.contour_distances_km || {};
       for (const id of cidList){
@@ -41,29 +77,62 @@ export function buildAppendixSections(exhibit){
       id:      'appendix-a',
       type:    'table',
       heading: 'APPENDIX A — RADIAL DATA',
-      preface: 'Per-radial HAAT, ERP, and contour distances.  Radial step shown in METHODOLOGY.',
+      preface: 'Per-radial HAAT, ERP, and contour distances.  Radial step shown in METHODOLOGY.  ' +
+               (pattern ? 'ERP per radial computed from filed pattern table (ERP × (relative field)² per §73.316).'
+                        : 'Non-directional antenna; ERP constant across all azimuths.'),
       table:   { columns, rows }
     });
   }
 
-  // ── Appendix B — Interference study ────────────────────────────────
+  // ── Appendix B — Interference study ─────────────────────────────────────
   const isr = exhibit.interference_study;
   if (isr && Array.isArray(isr.stations)){
-    const rows = isr.stations.map(s => ({
-      call:               s.call || s.facility_id || '—',
-      facility_id:        s.facility_id || '—',
-      fcc_class:          s.class || '—',
-      frequency_mhz:      Number.isFinite(s.frequency_mhz) ? Number(s.frequency_mhz).toFixed(1) : '—',
-      relationship:       s.relationship || '—',
-      distance_km:        Number.isFinite(s.distance_km) ? Number(s.distance_km).toFixed(2) : '—',
-      rule_207:           s.section_73_207?.pass === true ? 'PASS'
-                            : s.section_73_207?.pass === false ? 'FAIL'
-                            : (s.section_73_207?.skipped ? 'skip' : '—'),
-      rule_215:           s.section_73_215?.pair_pass === true ? 'PASS'
-                            : s.section_73_215?.pair_pass === false ? 'FAIL'
-                            : (s.section_73_215?.skipped ? 'skip' : '—'),
-      pair_pass:          s.pair_pass === true ? 'PASS' : s.pair_pass === false ? 'FAIL' : '—'
-    }));
+    // Lookup index for nearby_primaries (orchestrator side) so we can
+    // fill Class + Freq + station-meta even when the engine's
+    // interference_study.stations row only carries call/facility_id.
+    // Indexed by both call and facility_id; either key resolves.
+    const nearby = Array.isArray(exhibit.evidence?.nearby_primaries)
+      ? exhibit.evidence.nearby_primaries : [];
+    const byCall = new Map();
+    const byFid  = new Map();
+    for (const n of nearby){
+      if (n?.call)        byCall.set(String(n.call).toUpperCase(), n);
+      if (n?.facility_id) byFid.set(String(n.facility_id), n);
+    }
+    const lookupNearby = (s) => {
+      if (s?.call && byCall.has(String(s.call).toUpperCase())) return byCall.get(String(s.call).toUpperCase());
+      if (s?.facility_id && byFid.has(String(s.facility_id)))  return byFid.get(String(s.facility_id));
+      return null;
+    };
+    const rows = isr.stations.map(s => {
+      const n = lookupNearby(s) || {};
+      // Class — try every shape both upstreams have used.
+      const fccClass = s.class || s.fcc_class || s.station_class
+                    || n.class || n.fcc_class || n.station_class
+                    || n.facility_class || null;
+      // Frequency — prefer the engine's already-MHz value, fall back to
+      // nearby_primaries' frequency / frequency_mhz (FMQ stores as MHz).
+      const freq = Number.isFinite(s.frequency_mhz) ? Number(s.frequency_mhz)
+                : Number.isFinite(s.frequency)      ? Number(s.frequency)
+                : Number.isFinite(n.frequency_mhz)  ? Number(n.frequency_mhz)
+                : Number.isFinite(n.frequency)      ? Number(n.frequency)
+                : null;
+      return {
+        call:               s.call || n.call || s.facility_id || '—',
+        facility_id:        s.facility_id || n.facility_id || '—',
+        fcc_class:          fccClass || '—',
+        frequency_mhz:      freq != null ? freq.toFixed(1) : '—',
+        relationship:       s.relationship || '—',
+        distance_km:        Number.isFinite(s.distance_km) ? Number(s.distance_km).toFixed(2) : '—',
+        rule_207:           s.section_73_207?.pass === true ? 'PASS'
+                              : s.section_73_207?.pass === false ? 'FAIL'
+                              : (s.section_73_207?.skipped ? 'skip' : '—'),
+        rule_215:           s.section_73_215?.pair_pass === true ? 'PASS'
+                              : s.section_73_215?.pair_pass === false ? 'FAIL'
+                              : (s.section_73_215?.skipped ? 'skip' : '—'),
+        pair_pass:          s.pair_pass === true ? 'PASS' : s.pair_pass === false ? 'FAIL' : '—'
+      };
+    });
     sections.push({
       id:      'appendix-b',
       type:    'table-with-summary',
@@ -89,7 +158,7 @@ export function buildAppendixSections(exhibit){
     });
   }
 
-  // ── Appendix C — Validation evidence ───────────────────────────────
+  // ── Appendix C — Validation evidence ───────────────────────────────────
   const v   = exhibit.validation_context || {};
   const ev  = exhibit.evidence || {};
   const cRows = [
@@ -115,7 +184,7 @@ export function buildAppendixSections(exhibit){
     rows:    cRows
   });
 
-  // ── Appendix D — Provenance ────────────────────────────────────────
+  // ── Appendix D — Provenance ──────────────────────────────────────────────
   const prov = exhibit.provenance || {};
   const dRows = [
     ['Engine version',     prov.engine_version || prov.version || '—'],
@@ -134,7 +203,7 @@ export function buildAppendixSections(exhibit){
     rows:    dRows
   });
 
-  // ── Appendix E — Replay bundle ─────────────────────────────────────
+  // ── Appendix E — Replay bundle ───────────────────────────────────────
   const replay = exhibit.replay_bundle || prov.replay_bundle || null;
   const eRows = [
     ['Replay bundle available', replay ? 'YES' : 'NO'],
