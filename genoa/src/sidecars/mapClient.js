@@ -18,7 +18,18 @@
 // Buffer.from), we log + return null instead of letting pdfkit blow
 // up downstream with "Unknown image format".
 
-const DEFAULT_TIMEOUT_MS = 25000;
+// Map sidecar fetch timeout.  The sidecar's own Chromium pipeline
+// budgets ~20 s internally (server.js TIMEOUT_MS) plus a 9 s hard
+// fallback inside render.html, so the API needs to wait at least that
+// much PLUS cold-start variance (Chromium warm-up on a fresh container,
+// us-atlas TopoJSON parse, Leaflet vector layout, screenshot encode).
+//
+// 90 s default is generous on purpose: per the operator's guidance,
+// "no rush on the speed of creation" — when the sidecar is healthy
+// the typical render is ~400-800 ms; the long tail is cold-start where
+// Chromium spawn alone can eat 3-8 s.  Operator can override via
+// MAP_SIDECAR_TIMEOUT_MS for short-budget pipelines.
+const DEFAULT_TIMEOUT_MS = Number(process.env.MAP_SIDECAR_TIMEOUT_MS) || 90_000;
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
 function isPng(buf){
