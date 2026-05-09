@@ -177,16 +177,82 @@ app.get('/healthz', async (_req, res) => {
     const r = await pool.query(`SELECT records_total, records_with_coords, records_with_owner,
                                        last_loaded_at, last_source_url, load_duration_seconds, load_error
                                 FROM asr_load_state WHERE id = 1`);
+    // Live size of the asr_towers + asr_zip_archive tables so the
+    // operator can monitor disk pressure and tier-bump genoadb if it
+    // approaches its allocated storage.  pg_total_relation_size includes
+    // toast tables + indexes + every byte the table occupies on disk.
+    const sizes = await pool.query(`
+      SELECT
+        pg_total_relation_size('asr_towers')      AS towers_bytes,
+        pg_total_relation_size('asr_zip_archive') AS archive_bytes,
+        (SELECT COUNT(*) FROM asr_zip_archive)    AS archive_count,
+        (SELECT MIN(snapshot_date) FROM asr_zip_archive) AS archive_oldest,
+        (SELECT MAX(snapshot_date) FROM asr_zip_archive) AS archive_newest
+    `).catch(() => ({ rows: [{}] }));
     res.json({
       ok:           true,
       sidecar:      'genoa-asr-sidecar',
       version:      '0.1.0',
       bulk_load:    r.rows[0] || { records_total: 0 },
+      storage: {
+        towers_bytes:    Number(sizes.rows[0]?.towers_bytes  || 0),
+        archive_bytes:   Number(sizes.rows[0]?.archive_bytes || 0),
+        archive_count:   Number(sizes.rows[0]?.archive_count || 0),
+        archive_oldest:  sizes.rows[0]?.archive_oldest || null,
+        archive_newest:  sizes.rows[0]?.archive_newest || null
+      },
       loader_running: loaderState.running,
       loader_error:   loaderState.last_error
     });
   } catch (e){
     res.status(500).json({ ok: false, error: String(e.message) });
+  }
+});
+
+// List the rolling 4-week archive of weekly r_tower.zip snapshots.
+// Returns metadata only (snapshot_date, source_etag, size, sha256);
+// the raw zip bytes are pulled via /asr/archive/:date.
+app.get('/asr/archive', async (_req, res) => {
+  try {
+    const r = await pool.query(`
+      SELECT snapshot_date, source_url, source_etag, source_last_modified,
+             size_bytes, sha256, archived_at
+        FROM asr_zip_archive
+       ORDER BY snapshot_date DESC
+    `);
+    res.json({ count: r.rowCount, archives: r.rows });
+  } catch (e){
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+// Fetch the raw r_tower.zip for a specific snapshot date.  Used by
+// operators / diff tooling to compare what FCC published this week
+// vs prior weeks.  Responds with application/zip + Content-Disposition.
+app.get('/asr/archive/:date', async (req, res) => {
+  const date = String(req.params.date).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)){
+    return res.status(400).json({ error: 'date must be YYYY-MM-DD' });
+  }
+  try {
+    const r = await pool.query(
+      `SELECT zip_data, size_bytes, sha256, source_etag, archived_at
+         FROM asr_zip_archive WHERE snapshot_date = $1`,
+      [date]
+    );
+    if (r.rowCount === 0){
+      return res.status(404).json({ error: `no archive for snapshot_date ${date} (rolling 4-week window)` });
+    }
+    const row = r.rows[0];
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Length', row.size_bytes);
+    res.setHeader('Content-Disposition', `attachment; filename="r_tower-${date}.zip"`);
+    res.setHeader('X-Snapshot-Date', date);
+    res.setHeader('X-Source-Etag', row.source_etag || '');
+    res.setHeader('X-SHA256', row.sha256);
+    res.send(row.zip_data);
+  } catch (e){
+    res.status(500).json({ error: String(e.message) });
   }
 });
 

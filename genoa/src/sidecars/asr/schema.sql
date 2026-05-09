@@ -1,12 +1,22 @@
 -- Genoa ASR sidecar — Postgres schema.
 --
--- One table for tower records (denormalised — RA + CO + EN joined by
--- unique_system_identifier USI on load).  One table for loader state
--- (last weekly bulk load timestamp, source URL, record counts).
+-- Two tables:
+--
+--   asr_towers — current-week tower records (denormalised RA + CO + EN
+--   joined by USI on load).  Each weekly load TRUNCATEs and reloads.
+--   Holds the freshest snapshot at all times; size ~1 row per tower
+--   (~1.7M rows, ~850 MB on disk).
+--
+--   asr_zip_archive — last 4 weekly downloads of the raw FCC ULS
+--   r_tower.zip kept as bytea blobs.  ~37 MB per blob × 4 = ~150 MB.
+--   Used for diff queries / replay / audit when an operator wants to
+--   compare what FCC published this week vs prior weeks.  After each
+--   successful weekly load, the loader DELETEs entries with
+--   archived_at < (now() - 28 days) — rolling 4-week window with
+--   oldest aging off.
 --
 -- Idempotent: every CREATE uses IF NOT EXISTS so the sidecar can run
--- this on every boot without conflicting with prior loads.  Weekly
--- refresh truncates+reloads; never modifies columns.
+-- this on every boot without conflicting with prior loads.
 
 CREATE TABLE IF NOT EXISTS asr_towers (
   asr_number              TEXT PRIMARY KEY,
@@ -64,6 +74,21 @@ CREATE INDEX IF NOT EXISTS asr_towers_lat_lon_idx
 CREATE INDEX IF NOT EXISTS asr_towers_status_idx
   ON asr_towers (status);
 
+-- Rolling 4-week archive of the raw r_tower.zip downloads.  Each
+-- weekly load INSERTs the freshly-downloaded zip here and then
+-- DELETEs anything older than 28 days.  Operators can pull a past
+-- zip via /asr/archive/:snapshot_date for diff/audit.
+CREATE TABLE IF NOT EXISTS asr_zip_archive (
+  snapshot_date           DATE        PRIMARY KEY,
+  source_url              TEXT        NOT NULL,
+  source_etag             TEXT,
+  source_last_modified    TIMESTAMPTZ,
+  size_bytes              BIGINT      NOT NULL,
+  sha256                  TEXT        NOT NULL,
+  zip_data                BYTEA       NOT NULL,
+  archived_at             TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Loader state: one row, updated on each successful weekly bulk load.
 CREATE TABLE IF NOT EXISTS asr_load_state (
   id                      INTEGER PRIMARY KEY DEFAULT 1
@@ -78,3 +103,4 @@ CREATE TABLE IF NOT EXISTS asr_load_state (
   load_duration_seconds   INTEGER,
   load_error              TEXT
 );
+
