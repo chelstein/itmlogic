@@ -1064,6 +1064,9 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.measurements.fetched_at || '—']
           ]
         : [['Status', 'No SDR / measurement records attached. Either no captures exist for this station in ZTR, or the rich-station endpoint was unreachable.']]} />
+      {ev.measurements?.available && (ev.measurements.records || []).length > 0 && (
+        <CaptureTable records={ev.measurements.records} />
+      )}
       <SubHead title="FCC Parity Report (live geo.fcc.gov bit-exact comparison)" />
       <SubKv kv={ev.fcc_parity_report?.available
         ? [
@@ -1422,6 +1425,103 @@ function SubKv({ kv }){
           <div className="text-cream">{v ?? <span className="text-textDim">—</span>}</div>
         </React.Fragment>
       ))}
+    </div>
+  );
+}
+
+// Resolve the per-capture audio URL.  Prefers explicit fields supplied
+// by ZTR / the SigMF builder; falls back to the genoa proxy path when
+// we only know the capture id.  Returns null when no playable URL can
+// be derived.  The proxy route lives at src/api/routes/captures.js and
+// attaches the ZTR_API_TOKEN server-side so the browser never sees it.
+function captureAudioUrl(r){
+  if (!r) return null;
+  // Explicit override (operator-supplied SigMF or ZTR rich-station record).
+  if (typeof r.audio_url     === 'string' && r.audio_url)     return r.audio_url;
+  if (typeof r.audio_proxy   === 'string' && r.audio_proxy)   return r.audio_proxy;
+  // ZTR rich-station / SigMF builder both stamp the capture id under
+  // one of several names.  Route through the genoa proxy so the
+  // browser doesn't cross-origin to ZTR + the API token stays server-side.
+  const id = r.ztr_capture_id ?? r.capture_id ?? r.id ?? null;
+  if (id !== null && id !== undefined && /^[0-9]+$/.test(String(id))){
+    return `/api/captures/${id}/audio`;
+  }
+  return null;
+}
+
+function captureTimestamp(r){
+  return r?.timestamp ?? r?.['core:datetime'] ?? r?.captured_at ?? r?.created_at ?? null;
+}
+function captureLat(r){
+  if (Number.isFinite(Number(r?.lat)))      return Number(r.lat);
+  if (Number.isFinite(Number(r?.latitude))) return Number(r.latitude);
+  const c = r?.['core:geolocation']?.coordinates;
+  if (Array.isArray(c) && Number.isFinite(Number(c[1]))) return Number(c[1]);
+  return null;
+}
+function captureLon(r){
+  if (Number.isFinite(Number(r?.lon)))       return Number(r.lon);
+  if (Number.isFinite(Number(r?.longitude))) return Number(r.longitude);
+  const c = r?.['core:geolocation']?.coordinates;
+  if (Array.isArray(c) && Number.isFinite(Number(c[0]))) return Number(c[0]);
+  return null;
+}
+function captureFieldDisplay(r){
+  if (Number.isFinite(Number(r?.field_dBu ?? r?.dbu)))
+    return `${Number(r.field_dBu ?? r.dbu).toFixed(2)} dBu`;
+  if (Number.isFinite(Number(r?.field_mvm ?? r?.mvm)))
+    return `${Number(r.field_mvm ?? r.mvm).toFixed(3)} mV/m`;
+  if (Number.isFinite(Number(r?.rssi_dbm ?? r?.signal_dbm ?? r?.power_dbm)))
+    return `${Number(r.rssi_dbm ?? r.signal_dbm ?? r.power_dbm).toFixed(2)} dBm (raw)`;
+  return null;
+}
+
+function CaptureTable({ records }){
+  return (
+    <div className="mt-2 font-mono text-[11px]">
+      <div className="text-textDim text-[10px] tracking-rack uppercase mb-1">
+        Captures ({records.length})
+      </div>
+      <table className="telemetry w-full">
+        <thead>
+          <tr>
+            <th className="text-left pr-2">#</th>
+            <th className="text-left pr-2">ID</th>
+            <th className="text-left pr-2">Captured</th>
+            <th className="text-left pr-2">RX (lat, lon)</th>
+            <th className="text-left pr-2">Field</th>
+            <th className="text-left">Audio</th>
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((r, i) => {
+            const url   = captureAudioUrl(r);
+            const id    = r?.ztr_capture_id ?? r?.capture_id ?? r?.id ?? '—';
+            const ts    = captureTimestamp(r);
+            const lat   = captureLat(r);
+            const lon   = captureLon(r);
+            const field = captureFieldDisplay(r);
+            return (
+              <tr key={i} className="align-top">
+                <td className="pr-2 text-textDim">{i + 1}</td>
+                <td className="pr-2 text-cream">{String(id)}</td>
+                <td className="pr-2 text-cream">{ts || <span className="text-textDim">—</span>}</td>
+                <td className="pr-2 text-cream">
+                  {Number.isFinite(lat) && Number.isFinite(lon)
+                    ? `${lat.toFixed(5)}, ${lon.toFixed(5)}`
+                    : <span className="text-textDim">—</span>}
+                </td>
+                <td className="pr-2 text-cream">{field || <span className="text-textDim">—</span>}</td>
+                <td className="pr-2">
+                  {url
+                    ? <audio controls preload="none" src={url} style={{ height: 28, width: 260 }} />
+                    : <span className="text-textDim">no audio URL</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }
