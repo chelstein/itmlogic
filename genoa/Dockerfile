@@ -48,6 +48,13 @@ RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 
 COPY genoa/src ./src
 COPY genoa/data ./data
+# scripts/ contains the bake-off harnesses (itmBakeOff.js,
+# itmBakeOffItwom.js) which are Useful To Run From Inside the
+# Container — they hit the splat sidecar over the internal network
+# (SPLAT_SIDECAR_URL=http://splat:8080) using the SPLAT_API_TOKEN
+# already in env, so nobody has to know the token to validate the
+# JS port against the C++ reference.
+COPY genoa/scripts ./scripts
 # Carry the built UI into the runtime image.
 COPY --from=ui-build /app/src/ui/dist ./src/ui/dist
 # Bake the immutable build identity into the runtime image so
