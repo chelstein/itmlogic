@@ -1,52 +1,65 @@
-// JS port of NTIA's ITM v1.2.2 - Genoa-side high-level entry.
+// JS port of NTIA's ITM v1.2.2 / ITWOM 3.0 - high-level entry.
 //
-// SCOPE OF THIS COMMIT (Phase 2 partial)
-//   - Primitive scalar helpers (primitives.js)
-//   - prop_type / propa_type structs + qlrps frequency-and-ground
-//     parameter setup (propagation.js)
-//   - alos line-of-sight attenuation (alos.js)
-//   - adiff extended-range diffraction (diffraction.js)
+// This file replaces the staging stub from Phase 2 part 1.  With
+// terrain.js + troposcatter.js + variability.js + lrprop.js +
+// qlrpfl.js now landed, the full point-to-point pipeline is
+// available in pure JS:
 //
-// NOT YET PORTED (Phase 2 follow-up)
-//   - hzns / hzns2 (terrain-horizon geometry)
-//   - z1sq1 / z1sq2 (least-squares fit of terrain irregularity)
-//   - lrprop / lrprop2 (mode-selection orchestrator that picks alos
-//     vs adiff vs ascat per distance band and assembles propa)
-//   - ascat (troposcatter, eq. 6.x in NTIA TR 82-100)
-//   - avar (ITS time/location/situation variability statistics)
-//   - qlrpfl (terrain-profile-driven point-to-point entry)
+//   1. Build prop_type via qlrps (frequency, refractivity,
+//      polarization, ground impedance).
+//   2. Hand a pfl[] terrain profile to qlrpfl, which runs hzns,
+//      d1thx, z1sq1 to populate dh / he[] / dl[] / the[], then
+//      primes lrprop (line-of-sight + diffraction-extrapolation +
+//      troposcatter coefficients).
+//   3. Each subsequent lrprop(d) call yields prop.aref (the median
+//      reference attenuation at distance d).
+//   4. Hand prop.aref + climate + mode-of-variability to avar with
+//      the desired (zzt, zzl, zzc) quantiles for the
+//      time/location/situation-confidence-adjusted path loss.
 //
-// As a result, the high-level `predictItmV122` exported from this
-// file is a STAGING entry point: it sets prop via qlrps, runs alos
-// or adiff for a given distance, but DOES NOT run the full Longley-
-// Rice mode-blending or variability-stats pipeline yet.  Callers
-// that need filing-grade numbers today should keep using either:
-//   - the splat sidecar (full ITWOM 3.0 fidelity), or
-//   - genoa/src/engine/coverage/itm_radial.js (Bullington fallback).
+// pointToPoint() bundles steps 1-4 in one call for the common case
+// of "give me path loss at a single distance for a single quantile".
 //
-// Once lrprop + avar land, this module replaces itm_radial.js as the
-// JS-side coverage engine and Genoa stops needing the splat sidecar
-// for resilience/speed.
+// The C++ source is the canonical specification - every function
+// here matches itwom3.0.cpp line-for-line on field names.
+//
+// Reference: NTIA TR 82-100, ITWOM 3.0 (Sid Shumate's extensions),
+// itm.cpp v1.2.2 (NTIA-ITS).
 
-import { qlrps, makeProp, makePropa } from './propagation.js';
-import { makeAdiff }                  from './diffraction.js';
-import { makeAlos }                   from './alos.js';
+import { qlrps, makeProp, makePropa, makePropv } from './propagation.js';
+import { makeAdiff }                              from './diffraction.js';
+import { makeAlos }                               from './alos.js';
+import { makeAscat }                              from './troposcatter.js';
+import { makeAvar }                               from './variability.js';
+import { makeLrprop }                             from './lrprop.js';
+import { makeQlrpfl }                             from './qlrpfl.js';
+import { hzns, hzns2, z1sq1, z1sq2, qtile, d1thx } from './terrain.js';
+import { qerfi }                                   from './primitives.js';
 
-export { qlrps, makeProp, makePropa, makeAdiff, makeAlos };
+// Re-exports so tests/cross-validation can poke at primitives directly.
+export { qlrps, makeProp, makePropa, makePropv };
+export { makeAdiff, makeAlos, makeAscat, makeAvar, makeLrprop, makeQlrpfl };
+export { hzns, hzns2, z1sq1, z1sq2, qtile, d1thx };
 export * from './primitives.js';
 
-// Convenience: build a prop_type populated from the high-level
-// parameters Genoa typically has on hand.  This does NOT yet set
-// prop.dh / prop.dl / prop.he - those come from the terrain profile
-// (hzns + z1sq2), which lands in the follow-up.
+// Phase 2 part 2 flips this on: the JS port now spans the full ITM
+// v1.2.2 pipeline (qlrpfl -> lrprop -> alos/adiff/ascat -> avar).
+// Callers that gate on this can stop falling back to the splat
+// sidecar for resilience-only reasons.  ITWOM 3.0 extensions
+// (alos2 with canopy + lrprop2 + qlrpfl2) are still pending - the
+// production-ready predicate covers v1.2.2 baseline only.
+export const ITM_V122_PRODUCTION_READY = true;
+
+// Convenience: assemble a prop_type populated from the parameters
+// Genoa typically has on hand.  The terrain-derived fields (he, dl,
+// the, dh) are filled by qlrpfl when a pfl profile is supplied.
 //
-//   tx_height_m    transmitter antenna AGL (m)
-//   rx_height_m    receiver antenna AGL (m)
-//   frequency_mhz  carrier frequency (MHz)
-//   en0            surface refractivity (N-units), default 301
-//   ipol           polarization, 0=H 1=V; default 1 (V is FM convention)
-//   eps_dielect    relative permittivity, default 15 (avg ground)
-//   sgm_conduct    ground conductivity (S/m), default 0.005
+//   tx_height_m, rx_height_m   antenna AGL (m)
+//   frequency_mhz              MHz
+//   en0                        N-units, default 301
+//   ipol                       0=H, 1=V (default 1; FM convention)
+//   eps_dielect                relative permittivity (default 15)
+//   sgm_conduct                ground conductivity S/m (default 0.005)
 export function buildProp({
   tx_height_m,
   rx_height_m,
@@ -63,19 +76,108 @@ export function buildProp({
   return prop;
 }
 
-// Predicate: does this build of itm_v122 cover everything a
-// production caller needs?  False until lrprop + avar + ascat land.
-// Wire the JS path through the splat sidecar fallback in callers
-// that gate on this.
-export const ITM_V122_PRODUCTION_READY = false;
+// Single-call point-to-point ITM run.
+//
+//   profile:        flat Float64Array or number[] in SPLAT pfl format:
+//                     [np, xi, elev_0, elev_1, ..., elev_np]
+//                   where np is the number of intervals and xi the
+//                   sample spacing (m).  Length = np + 3.
+//   tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect,
+//   sgm_conduct: same as buildProp().
+//   conf:           confidence quantile in [0..1] (default 0.50).
+//   rel:            reliability quantile in [0..1] (default 0.50).
+//   klim:           radio climate 1..7 (default 5 = continental temperate).
+//   mdvar:          mode-of-variability key (default 12 = broadcast).
+//
+// Returns:
+//   { aref_db, dbloss_db, kwx, mode, dl, the, he, dh, dist }
+// where aref_db is the median path loss (excess + free-space), dbloss_db
+// is the confidence/reliability-adjusted path loss (this is the "ITM
+// path loss" the FCC engine consumes), and kwx is the C++ warning level
+// (0 = clean, 1 = note, 2 = caution, 3 = important, 4 = invalid).
+export function pointToPoint({
+  profile,
+  tx_height_m,
+  rx_height_m,
+  frequency_mhz,
+  en0          = 301.0,
+  ipol         = 1,
+  eps_dielect  = 15.0,
+  sgm_conduct  = 0.005,
+  conf         = 0.50,
+  rel          = 0.50,
+  klim         = 5,
+  mdvar        = 12,
+} = {}){
+  const prop  = buildProp({
+    tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect, sgm_conduct
+  });
+  const propa = makePropa();
+  const propv = makePropv();
+  propv.klim  = klim;
+  propv.mdvar = mdvar;
 
-// Deliberately DO NOT export a `predictItmCoverage`-shaped function
-// here yet - that contract should drop in only when lrprop +
-// variability stats are real.  Stub callers that try to import a
-// production entry point should fail loudly:
-export function predictItmCoverage(){
-  throw new Error(
-    'itm_v122.predictItmCoverage is not implemented yet (Phase 2 partial).  '
-  + 'Use splatClient.predictItmCoverage or itm_radial.computeItmCoverage.'
-  );
+  const qlrpfl = makeQlrpfl();
+  const lrprop = qlrpfl(profile, klim, mdvar, prop, propa, propv);
+  // qlrpfl already called lrprop(0, ...) which set prop.aref to the
+  // ref-attenuation at the path distance.  Compute confidence/
+  // reliability-adjusted loss via avar.
+  const avar = makeAvar();
+  const zt = qerfi(rel);
+  const zl = qerfi(rel);
+  const zc = qerfi(conf);
+  const dbloss = avar(zt, zl, zc, prop, propv);
+
+  // SPLAT's `dbloss` convention is total path loss = excess + free-space.
+  // `prop.aref` and the avar return are both "excess above free-space"
+  // (NTIA TR 82-100 sec. 4); we compute fsl here and add for the total
+  // so callers see the same number splat's site report prints.
+  const dist_km    = prop.dist / 1000.0;
+  const fsl_db     = 32.45 + 20.0 * Math.log10(frequency_mhz)
+                   + 20.0 * Math.log10(Math.max(0.001, dist_km));
+  const dbloss_db  = dbloss + fsl_db;     // matches splat point_to_point_ITM
+  const aref_total = prop.aref + fsl_db;  // median path loss for symmetry
+
+  return {
+    aref_db:    aref_total,
+    excess_db:  prop.aref,        // excess (avar input); useful for cross-check
+    avar_db:    dbloss,           // confidence/reliability-adjusted excess
+    dbloss_db,                    // full path loss = avar_db + fsl_db
+    fsl_db,
+    kwx:        prop.kwx,
+    mode:       describeMode(prop, propa),
+    dl:         [prop.dl[0], prop.dl[1]],
+    the:        [prop.the[0], prop.the[1]],
+    he:         [prop.he[0], prop.he[1]],
+    dh:         prop.dh,
+    dist_m:     prop.dist,
+    dist_km,
+    _lrprop:    lrprop,
+    _avar:      avar,
+    _prop:      prop,
+    _propa:     propa,
+    _propv:     propv
+  };
+}
+
+// Build a SPLAT-format profile from a uniform sequence of elevation
+// samples (metres) plus the spacing (metres).  Convenience for callers
+// that have a (distance, elev) array rather than the bare pfl flat
+// layout.  `elev` MUST be in transmitter-to-receiver order.
+export function profileFromElevations(elevations, spacing_m){
+  const np  = elevations.length - 1;
+  const out = new Array(elevations.length + 2);
+  out[0]    = np;
+  out[1]    = spacing_m;
+  for (let i = 0; i < elevations.length; i++) out[i + 2] = elevations[i];
+  return out;
+}
+
+// String-ification of the path mode based on dist vs propa thresholds.
+// Mirrors splat's strmode output for cross-validation reporting.
+function describeMode(prop, propa){
+  if (prop.dist <= 0)            return 'invalid';
+  if (prop.dist < propa.dlsa)    return 'line-of-sight';
+  if (prop.dist > (propa.dx ?? Infinity)) return 'troposcatter';
+  return 'diffraction';
 }
