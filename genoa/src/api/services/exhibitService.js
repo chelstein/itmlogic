@@ -203,7 +203,40 @@ export async function computeExhibit(req){
     }
   }
 
-  // ---- 2b. FCC Contours direct fallback ----
+  // ---- 2b. Operator-supplied SigMF override (per-job inline blob or URL) ----
+  // When inputs.sigmf_meta or inputs.sigmf_url is set, treat it as
+  // measurement evidence for THIS job and let it override (or fill in
+  // for) ZTR's _captures.  The producer is scripts/sigmfFromKiwiCapture.js.
+  // Bypasses the per-service SDR gate: if the operator did the work to
+  // attach calibrated field-strength evidence, honor it regardless of
+  // ZTR's coverage gating.
+  if (inputs.sigmf_meta || inputs.sigmf_url){
+    try {
+      const { loadOperatorSigmfOverride } =
+        await import('../../evidence/measurements/operatorOverride.js');
+      const override = await loadOperatorSigmfOverride({
+        inline: inputs.sigmf_meta || null,
+        url:    inputs.sigmf_url  || null
+      });
+      if (override?.available){
+        sdrResp = override.sdrResp;       // overrides any ZTR _captures
+      } else if (override){
+        // Surface the failure as a probe diagnostic so the operator can
+        // see why their override didn't land (parse error, fetch 404,
+        // empty captures[], etc.).
+        sdrResp = {
+          available: false,
+          source:    'inputs.sigmf_meta',
+          n_records: 0,
+          error:     override.error || 'sigmf override did not produce records'
+        };
+      }
+    } catch (e){
+      console.warn('[exhibitService] sigmf override failed:', e.message);
+    }
+  }
+
+  // ---- 2c. FCC Contours direct fallback ----
   // When ZTR didn't supply a contour (not configured, station not in ZTR,
   // or _fcc_contour missing), hit geo.fcc.gov/api/contours/entity.json
   // directly using the facility_id + service from inputs.  This is the
