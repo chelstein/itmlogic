@@ -11,7 +11,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSigmfFromKiwiCapture } from '../evidence/measurements/buildSigmfFromKiwiCapture.js';
+import { buildSigmfFromKiwiCapture, ztrCaptureUrl, ZTR_SDR_SPACES_BASE }
+  from '../evidence/measurements/buildSigmfFromKiwiCapture.js';
 import { parseSigmfMeta }             from '../evidence/measurements/sigmf.js';
 import { applyCalibration, extractCalibration } from '../evidence/sdrCalibration.js';
 
@@ -123,4 +124,35 @@ test('geolocation is GeoJSON [lon, lat] not [lat, lon]', () => {
   const coords = meta.captures[0]['core:geolocation'].coordinates;
   assert.equal(coords[0], KRDM.rx_lon);
   assert.equal(coords[1], KRDM.rx_lat);
+});
+
+// ---------- ZTR Spaces URL ----------
+
+test('ztrCaptureUrl returns the canonical sfo3 Spaces URL by default', () => {
+  assert.equal(ztrCaptureUrl(100074),
+    'https://ztr.sfo3.digitaloceanspaces.com/sdr/100074/capture.wav');
+  assert.equal(ZTR_SDR_SPACES_BASE,
+    'https://ztr.sfo3.digitaloceanspaces.com/sdr');
+});
+
+test('ztrCaptureUrl returns null when station_id is empty', () => {
+  assert.equal(ztrCaptureUrl(null), null);
+  assert.equal(ztrCaptureUrl(undefined), null);
+  assert.equal(ztrCaptureUrl(''), null);
+});
+
+test('ztr_station_id auto-derives the canonical capture audio_url', () => {
+  const meta = buildSigmfFromKiwiCapture({ ...KRDM, ztr_station_id: 100074 });
+  assert.equal(meta.global['genoa:audio_url'],
+    'https://ztr.sfo3.digitaloceanspaces.com/sdr/100074/capture.wav');
+  assert.equal(meta.global['genoa:ztr_station_id'], '100074');
+});
+
+test('explicit audio_url overrides the derived ZTR URL', () => {
+  const meta = buildSigmfFromKiwiCapture({
+    ...KRDM,
+    ztr_station_id: 100074,
+    audio_url:      'https://example.org/foo.wav'
+  });
+  assert.equal(meta.global['genoa:audio_url'], 'https://example.org/foo.wav');
 });
