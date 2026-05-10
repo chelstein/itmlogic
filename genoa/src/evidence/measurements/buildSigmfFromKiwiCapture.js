@@ -34,17 +34,28 @@
 const POWER_TO_FIELD_DB = 107;     // dBm→dBu, 50Ω matched-antenna default
 const KIWI_DEFAULT_RATE = 12000;   // Hz; KiwiSDR's stock AM-mode demod rate
 
-// Canonical ZTR storage layout for SDR captures.  ZTR's capture pipeline
-// drops the audio under
-//   https://ztr.sfo3.digitaloceanspaces.com/sdr/<ztr_station_id>/capture.wav
-// where ztr_station_id is the numeric ZTR station id (matches
-// facility_lookup_source.ztr_id on the genoa-side normalized facility row).
-// Override via --ztr-spaces-base or by passing a fully-qualified audio_url.
-export const ZTR_SDR_SPACES_BASE = 'https://ztr.sfo3.digitaloceanspaces.com/sdr';
+// Canonical ZTR capture-audio URL.  ZTR's app serves captured audio
+// through an API endpoint keyed by the per-capture id (NOT the station
+// id — a station can have many captures over time):
+//   <ZTR_APP_URL>/api/sdr/captures/<ztr_capture_id>/audio
+// e.g.
+//   https://zerotrustradio-app-vvhi8.ondigitalocean.app/api/sdr/captures/71268/audio
+//
+// The endpoint is auth-gated; downstream fetchers (the future
+// exhibitService side-channel) will need a ZTR API token.  This module
+// only records the URL — it does no fetching.
+//
+// ZTR_APP_URL_DEFAULT points at the production DO App Platform deploy.
+// Override via the ZTR_APP_URL env var on the genoa side, or
+// --ztr-app-url on the CLI, when running against staging / a custom
+// domain.
+export const ZTR_APP_URL_DEFAULT = 'https://zerotrustradio-app-vvhi8.ondigitalocean.app';
 
-export function ztrCaptureUrl(ztr_station_id, base = ZTR_SDR_SPACES_BASE){
-  if (ztr_station_id === null || ztr_station_id === undefined || ztr_station_id === '') return null;
-  return `${base}/${encodeURIComponent(String(ztr_station_id))}/capture.wav`;
+export function ztrCaptureAudioUrl(ztr_capture_id, base = ZTR_APP_URL_DEFAULT){
+  if (ztr_capture_id === null || ztr_capture_id === undefined || ztr_capture_id === '') return null;
+  // Trim trailing slash on the base so a user-supplied "https://host/" works.
+  const cleanBase = String(base).replace(/\/+$/, '');
+  return `${cleanBase}/api/sdr/captures/${encodeURIComponent(String(ztr_capture_id))}/audio`;
 }
 
 export function buildSigmfFromKiwiCapture({
@@ -79,9 +90,10 @@ export function buildSigmfFromKiwiCapture({
   kiwi_user             = null,
   capture_proxy_url     = null,
   audio_filename        = null,
-  audio_url             = null,               // fully-qualified URL to the .wav (e.g. ZTR Spaces)
-  ztr_station_id        = null,               // numeric ZTR station id; if set and audio_url is null, derives the canonical Spaces URL
-  ztr_spaces_base       = ZTR_SDR_SPACES_BASE,
+  audio_url             = null,               // fully-qualified URL to the audio (e.g. ZTR app API)
+  ztr_capture_id        = null,               // numeric ZTR capture id; if set and audio_url is null, derives the ZTR app API URL
+  ztr_station_id        = null,               // numeric ZTR station id (cross-ref to facility_lookup_source.ztr_id); metadata only
+  ztr_app_url           = ZTR_APP_URL_DEFAULT,
   // ---- meta ----
   author                = 'genoa sigmfFromKiwiCapture',
   description           = null
@@ -186,13 +198,19 @@ export function buildSigmfFromKiwiCapture({
                                 ? { url: capture_proxy_url }
                                 : null,
       'genoa:audio_filename': audio_filename || null,
-      // ZTR's capture pipeline stores audio under a deterministic key
-      // by station id: <ZTR_SDR_SPACES_BASE>/<id>/capture.wav.  When
-      // ztr_station_id is supplied we synthesise that URL so the
-      // SigMF doc is self-contained — downstream ingest (or a human
-      // checking provenance) can fetch the raw .wav with no other
-      // lookup.  audio_url overrides this if explicitly supplied.
-      'genoa:audio_url':      audio_url || ztrCaptureUrl(ztr_station_id, ztr_spaces_base),
+      // ZTR serves captured audio through an API endpoint keyed by the
+      // per-capture id (a station can have many captures over time):
+      //   <ZTR_APP_URL>/api/sdr/captures/<capture_id>/audio
+      // When ztr_capture_id is supplied we synthesise that URL so the
+      // SigMF doc is self-contained — a human (or the future
+      // exhibitService side-channel) can pull the audio with one
+      // request.  Note this endpoint is auth-gated; downstream
+      // fetchers need a ZTR API token.  audio_url overrides this if
+      // explicitly supplied.
+      'genoa:audio_url':      audio_url || ztrCaptureAudioUrl(ztr_capture_id, ztr_app_url),
+      'genoa:ztr_capture_id': ztr_capture_id !== null && ztr_capture_id !== undefined && ztr_capture_id !== ''
+                                ? String(ztr_capture_id)
+                                : null,
       'genoa:ztr_station_id': ztr_station_id !== null && ztr_station_id !== undefined && ztr_station_id !== ''
                                 ? String(ztr_station_id)
                                 : null,
