@@ -122,9 +122,16 @@ export function pointToPoint({
   // qlrpfl already called lrprop(0, ...) which set prop.aref to the
   // ref-attenuation at the path distance.  Compute confidence/
   // reliability-adjusted loss via avar.
+  //
+  // Match SPLAT's point_to_point_ITM (itwom3.0.cpp line 2419):
+  //   dbloss = avar(zr, 0.0, zc, prop, propv) + fs;
+  // i.e. zzt = qerfi(rel), zzl = 0.0, zzc = qerfi(conf).  With mdvar=12
+  // (broadcast / kdv=2) avar internally overrides zl=zt so the zl
+  // input is ignored for the default case, but other modes use it
+  // directly - matching the C++ exactly avoids subtle drift on those.
   const avar = makeAvar();
   const zt = qerfi(rel);
-  const zl = qerfi(rel);
+  const zl = 0.0;
   const zc = qerfi(conf);
   const dbloss = avar(zt, zl, zc, prop, propv);
 
