@@ -1,18 +1,18 @@
-// SRTM-3 tile catalog helpers — pure functions, no side effects.
+// SRTM-3 tile catalog helpers - pure functions, no side effects.
 //
 // Two operations the provisioner cares about:
-//   tilesForBounds({lat, lon, radius_km})  — given a tx + radius, return
-//   the list of 1°×1° SRTM-3 tiles that need to be staged on the sidecar
-//   so SPLAT has terrain coverage out to that radius.
+//   tilesForBounds({lat, lon, radius_km})  - given a tx + radius, return
+//   the list of 1deg x 1deg SRTM-3 tiles that need to be staged on the
+//   sidecar so SPLAT has terrain coverage out to that radius.
 //
-//   parseSdfName(sdfName)  — given a .sdf filename produced by srtm2sdf
+//   parseSdfName(sdfName)  - given a .sdf filename produced by srtm2sdf
 //   (e.g. "40:41:73:74.sdf"), return the lat/lon bounds it covers so the
 //   provisioner can match an existing sidecar tile against a requested
 //   .hgt name.  SPLAT writes longitudes in WEST-POSITIVE form in these
 //   filenames, opposite of mathematical convention.
 //
 // Tile naming conventions:
-//   .hgt source:  N40W074.hgt  → covers lat 40..41, lon -74..-73 (W)
+//   .hgt source:  N40W074.hgt  -> covers lat 40..41, lon -74..-73 (W)
 //   .sdf output:  40:41:73:74.sdf  (lat_lo:lat_hi:lon_lo:lon_hi, W-pos)
 //
 // The conversion is deterministic so a "do we already have this tile?"
@@ -25,8 +25,8 @@ const EARTH_R_KM = 6371.0088;
 // ------------------------------------------------------------------
 
 // Build the SRTM .hgt filename that covers integer lat/lon.  Tiles are
-// named after their SOUTHWEST corner — so a tile named N40W074 covers
-// 40°N..41°N and 74°W..73°W.
+// named after their SOUTHWEST corner - so a tile named N40W074 covers
+// 40N..41N and 74W..73W.
 export function hgtNameFor(lat_int, lon_int){
   const ns   = lat_int >= 0 ? 'N' : 'S';
   const ew   = lon_int >= 0 ? 'E' : 'W';
@@ -46,7 +46,7 @@ export function parseHgtName(name){
 }
 
 // Parse an SDF filename written by srtm2sdf.  These use W-positive
-// longitudes — `40:41:73:74.sdf` means lat 40..41, lon 74..73 W.  We
+// longitudes - `40:41:73:74.sdf` means lat 40..41, lon 74..73 W.  We
 // return mathematical (E-positive) coords so callers can compare
 // directly against parseHgtName().
 export function parseSdfName(name){
@@ -73,7 +73,7 @@ export function parseSdfName(name){
 // longitude is shorter than a degree of latitude, so we widen the
 // longitude bounds by the cos(lat) factor.
 export function bboxFor({ lat, lon, radius_km }){
-  const lat_deg = Math.abs(radius_km / 111.0);                    // 1° ≈ 111 km
+  const lat_deg = Math.abs(radius_km / 111.0);                    // 1deg ~= 111 km
   const lon_deg = Math.abs(radius_km / (111.0 * Math.max(0.05, Math.cos(lat * Math.PI / 180))));
   return {
     lat_min: Math.floor(lat - lat_deg),
@@ -96,7 +96,7 @@ export function tilesForBounds({ lat, lon, radius_km }){
   for (let y = bb.lat_min; y <= bb.lat_max; y++){
     for (let x = bb.lon_min; x <= bb.lon_max; x++){
       // Skip impossible coords.
-      if (y < -56 || y > 60) continue;     // SRTM coverage is roughly 56°S..60°N
+      if (y < -56 || y > 60) continue;     // SRTM coverage is roughly 56S..60N
       if (x < -180 || x > 179) continue;
       out.push({ name: hgtNameFor(y, x), lat: y, lon: x });
     }
@@ -124,16 +124,25 @@ export function missingFrom(requested, sdfInventory){
 // Mirror URL templates
 // ------------------------------------------------------------------
 
-// Public SRTM-3 mirrors.  The `urlFor` function picks one based on
-// SRTM_TILE_URL_TEMPLATE — operator can override, default points at
-// ESA STEP since it's been reliable for years and serves vanilla
-// SRTMGL3 v3 tiles.
-const DEFAULT_URL_TEMPLATE = 'https://step.esa.int/auxdata/dem/SRTMGL3/{name}.SRTMGL3.hgt.zip';
+// Public SRTM-3 mirror.  Default points at bailu.ch - Sonny's archive
+// has been hosting SRTM-3 v2.1 reliably for over a decade; ESA STEP
+// only carries the higher-resolution SRTMGL1 set, and USGS EarthData
+// requires NASA-approved auth.  Path layout is:
+//
+//   https://bailu.ch/dem3/<lat-prefix>/<full-name>.hgt.zip
+//
+// where <lat-prefix> is the first three characters of the tile name
+// (e.g. N36 or S22) and <full-name> is the whole tile name without
+// the .hgt suffix (e.g. N36W076).  Operator can override via
+// SRTM_TILE_URL_TEMPLATE; supported placeholders are {name} (full tile
+// name without .hgt) and {lat_prefix} (the leading [NS]NN).
+const DEFAULT_URL_TEMPLATE = 'https://bailu.ch/dem3/{lat_prefix}/{name}.hgt.zip';
 
 export function urlFor(hgtName, template = process.env.SRTM_TILE_URL_TEMPLATE || DEFAULT_URL_TEMPLATE){
   // SRTM tile names come in as `N40W074.hgt`.  Strip the .hgt suffix
   // before substitution because most mirror URL conventions append it
-  // themselves (e.g. ESA STEP → `<base>.SRTMGL3.hgt.zip`).
+  // themselves.
   const stem = hgtName.replace(/\.(hgt|bil)(\.zip)?$/i, '');
-  return template.replace('{name}', stem);
+  const lat_prefix = stem.slice(0, 3); // first three chars: NS + 2-digit lat
+  return template.replace('{name}', stem).replace('{lat_prefix}', lat_prefix);
 }
