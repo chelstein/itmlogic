@@ -83,13 +83,25 @@ export function getJob(id){
 // Cross-instance read.  Tries in-process first (zero-latency for the
 // instance that ran the job), then the DB.  Hydrates the in-process
 // map on a DB hit so subsequent polls on this instance are fast.
-export async function getJobAsync(id){
+//
+// `light` (default true) skips the heavy artifact_body BYTEA + result_json
+// JSONB columns.  Polls use light=true so the 2s-cadence UI polling
+// doesn't pull megabytes of PDF/JSON from PG on every cross-instance
+// hop — which used to wedge the PG connection pool and trip the
+// 30-60 s gateway timeout under load.  The /artifact endpoint passes
+// light=false to fetch the full body; the poll endpoint upgrades to
+// the full read only when status=COMPLETE and the caller actually wants
+// the result JSON (see exhibitJobs.js GET /jobs/:id).
+export async function getJobAsync(id, { light = true } = {}){
   const m = memory.get(id);
   if (m) return m;
   if (!dbAvailable) return null;
-  const row = await readDbRow(id);
+  const row = light ? await readDbRowLight(id) : await readDbRowFull(id);
   if (!row) return null;
-  memory.set(id, row);   // hydrate cache for this instance
+  // Only hydrate the in-process cache from a FULL read — caching a
+  // light row would mask the heavy data from a later /artifact call
+  // until process restart.
+  if (!light) memory.set(id, row);
   return row;
 }
 
@@ -235,7 +247,58 @@ async function persist(r){
   }
 }
 
-async function readDbRow(id){
+// Light read — skips artifact_body (BYTEA, multi-MB for PDFs) and
+// result_json (JSONB, can be MBs for a full exhibit).  This is the
+// hot path: the UI polls /jobs/:id every 2 s and we don't want to
+// scan / transfer megabytes per poll across the cross-instance fallback.
+async function readDbRowLight(id){
+  if (!dbAvailable) return null;
+  try {
+    const p = pool();
+    const r = await p.query(
+      `SELECT id, kind, status, progress_message,
+              input_json, options_json,
+              artifact_url, error_json,
+              artifact_content_type, artifact_filename,
+              (artifact_body IS NOT NULL) AS has_artifact_body,
+              created_at, updated_at
+         FROM engineering_export_jobs
+        WHERE id = $1`,
+      [id]
+    );
+    const row = r.rows[0];
+    if (!row) return null;
+    return {
+      id:               row.id,
+      kind:             row.kind,
+      status:           row.status,
+      progress_message: row.progress_message,
+      input:            row.input_json   || {},
+      options:          row.options_json || {},
+      // result + artifact.body are stripped in the light read.  Callers
+      // that need them must re-fetch via getJobAsync(id, { light: false }).
+      result:           null,
+      artifact:         row.has_artifact_body
+        ? {
+            body:         null,    // sentinel: present in DB, not loaded here
+            content_type: row.artifact_content_type || 'application/octet-stream',
+            filename:     row.artifact_filename     || null
+          }
+        : null,
+      artifact_url:     row.artifact_url || null,
+      error:            row.error_json   || null,
+      created_at:       (row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at),
+      updated_at:       (row.updated_at instanceof Date ? row.updated_at.toISOString() : row.updated_at)
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Full read — includes result_json + artifact_body.  Used by the
+// /artifact endpoint and by completion-time polls (status=COMPLETE)
+// where the UI wants the structured exhibit JSON inline.
+async function readDbRowFull(id){
   if (!dbAvailable) return null;
   try {
     const p = pool();

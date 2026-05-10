@@ -58,9 +58,23 @@ r.get('/exhibit/jobs', asyncHandler(async (_req, res) => {
 // load-balances across instances; the job may have been created on the
 // instance that handled the POST) finds the job in the DB mirror
 // instead of returning 404.
+//
+// Two-stage read: the cross-instance read defaults to LIGHT (no
+// artifact_body BYTEA, no result_json JSONB) so the 2 s-cadence polling
+// doesn't pull megabytes of PDF / exhibit JSON from PG on every hop —
+// that used to wedge the connection pool and surface as a gateway 504.
+// When the light read shows status=COMPLETE we re-fetch with light=false
+// so the response still inlines the result_json the UI wants.
 r.get('/exhibit/jobs/:id', asyncHandler(async (req, res) => {
-  const job = await getJobAsync(req.params.id);
+  let job = await getJobAsync(req.params.id);          // light by default
   if (!job) return res.status(404).json({ error: 'NOT_FOUND', message: 'job not found' });
+  if (job.status === JOB_STATUS.COMPLETE && !job.result){
+    // Light read stripped result_json — re-fetch full so the UI gets
+    // the exhibit inline on the completing poll.  Doesn't touch
+    // artifact_body (still served separately via /artifact).
+    const full = await getJobAsync(req.params.id, { light: false });
+    if (full) job = full;
+  }
   // Include progress_message + (when complete) the structured result so
   // the UI doesn't need a second round-trip for the exhibit JSON case.
   const view = toView(job);
@@ -72,9 +86,9 @@ r.get('/exhibit/jobs/:id', asyncHandler(async (req, res) => {
 
 // GET /api/exhibit/jobs/:id/artifact  — streams the rendered artifact
 // (PDF / TXT) or the exhibit JSON.  Same cross-instance fallback as the
-// poll endpoint.
+// poll endpoint.  Full read (artifact_body is the whole point).
 r.get('/exhibit/jobs/:id/artifact', asyncHandler(async (req, res) => {
-  const job = await getJobAsync(req.params.id);
+  const job = await getJobAsync(req.params.id, { light: false });
   if (!job) return res.status(404).json({ error: 'NOT_FOUND', message: 'job not found' });
   if (job.status === JOB_STATUS.FAILED){
     return res.status(500).json({ error: 'JOB_FAILED', detail: job.error || null });
