@@ -280,37 +280,53 @@ export function qtile(nn, a, ir){
 }
 
 // d1thx: terrain-irregularity (delta-h) extraction.  Sub-samples the
-// profile uniformly, runs qtile to grab the 10/90 percentiles, returns
-// the irregularity statistic.  Used by qlrpfl to populate prop.dh.
+// profile uniformly, detrends with z1sq1, then takes the 10/90
+// percentile spread via qtile.  Used by qlrpfl to populate prop.dh.
+// Mirrors the C++ d1thx (itwom3.0.cpp line 2027) line-for-line — the
+// C++ aliases xa/xb across the sampling and detrend phases, so we
+// keep the same flow but rename the post-detrend aliases (z0/zn/step)
+// for readability.
 export function d1thx(pfl, x1, x2){
-  const np  = Math.trunc(pfl[0]);
-  const xa  = x1 / pfl[1];
-  const xb  = x2 / pfl[1];
-  let d1thxv = 0.0;
-  if (xb - xa < 2.0) return d1thxv;
+  const np = Math.trunc(pfl[0]);
+  let xa   = x1 / pfl[1];
+  let xb   = x2 / pfl[1];
+  if (xb - xa < 2.0) return 0.0;
 
-  const ka  = mymax(4, Math.trunc(0.1 * (xb - xa + 8)));
-  const n   = 10 * ka - 5;
-  const kb  = n - ka + 1;
-  const sn  = n - 1;
+  let ka = Math.trunc(0.1 * (xb - xa + 8.0));
+  ka = mymin(mymax(4, ka), 25);
+  const n  = 10 * ka - 5;
+  const kb = n - ka + 1;
+  const sn = n - 1;
   const sBuf = new Array(n + 2);
   sBuf[0] = sn;
   sBuf[1] = 1.0;
-  const xb2 = (xb - xa) / sn;
-  let kk = Math.trunc(xa + 1.0);
-  let xa2 = -xb2;
+  xb = (xb - xa) / sn;
+  let k = Math.trunc(xa + 1.0);
+  xa  -= k;
 
   for (let j = 0; j < n; j++){
-    while (xa2 <= 0.0 && kk < np){
-      xa2 += 1.0;
-      kk++;
+    while (xa > 0.0 && k < np){
+      xa -= 1.0;
+      k++;
     }
-    sBuf[j + 2] = pfl[kk + 2]
-                + (pfl[kk + 2] - pfl[kk + 1]) * xa2;
-    xa2 = xa2 - 1.0 + xb2;
+    sBuf[j + 2] = pfl[k + 2] + (pfl[k + 2] - pfl[k + 1]) * xa;
+    xa += xb;
   }
-  const xa3 = qtile(n - 1, sBuf, ka - 1);
-  const xb3 = qtile(n - 1, sBuf, kb - 1);
-  d1thxv = (xa3 - xb3) / (1.0 - 0.8 * Math.exp(-(x2 - x1) / 50.0e3));
-  return d1thxv;
+
+  // Detrend the sampled buffer via least-squares (z1sq1 returns the
+  // fit at x=0 (z0) and x=sn (zn)).
+  const fit = z1sq1(sBuf, 0.0, sn);
+  let trend = fit.z0;
+  const step = (fit.zn - fit.z0) / sn;
+  for (let j = 0; j < n; j++){
+    sBuf[j + 2] -= trend;
+    trend += step;
+  }
+
+  // qtile expects samples at a[0..nn]; sBuf[0..1] are the np/xi header
+  // for z1sq1, so feed qtile a view that starts at sBuf[2].
+  const samples = sBuf.slice(2);
+  const xa3 = qtile(n - 1, samples, ka - 1);
+  const xb3 = qtile(n - 1, samples, kb - 1);
+  return (xa3 - xb3) / (1.0 - 0.8 * Math.exp(-(x2 - x1) / 50.0e3));
 }
