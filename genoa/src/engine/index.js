@@ -473,7 +473,18 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     lat, lon,
     ground_sigma_mS_m: service === 'AM' ? sigma : null,
     pattern:        pattern || 'ND',
-    radial_step_deg: step
+    radial_step_deg: step,
+    // Tower height fields — propagated through to enrichTowerEvidence
+    // so the §17.21/§17.23 rules engine can derive painting + lighting
+    // even when no ASR record is found.  Operator-typed value wins;
+    // ZTR rich-station fallback runs upstream in exhibitService.js.
+    overall_height_m:      Number.isFinite(Number(inputs.overall_height_m))
+                            ? Number(inputs.overall_height_m) : null,
+    overall_height_amsl_m: Number.isFinite(Number(inputs.overall_height_amsl_m))
+                            ? Number(inputs.overall_height_amsl_m) : null,
+    asr_number:            inputs.asr_number || null,
+    structure_type:        inputs.structure_type || null,
+    near_airport:          !!inputs.near_airport
   };
   exhibit.facility_metadata = {
     cached:         false,
