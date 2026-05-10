@@ -45,6 +45,8 @@
 //   2. Read asr_load_state.records_total.  If 0 OR > LOAD_REFRESH_DAYS old,
 //      kick the bulk loader in the background (server still answers other
 //      lookups in the meantime; /healthz reports loading=true).
+//      Setting ASR_FORCE_RELOAD=1 forces the reload regardless of staleness
+//      (used after a parser fix to wipe + re-populate the table).
 //   3. After the first successful load, schedule a weekly refresh.
 
 import express from 'express';
@@ -95,13 +97,15 @@ async function ensureSchema(){
 async function maybeRunBulkLoad(){
   const r = await pool.query(`SELECT records_total, last_loaded_at FROM asr_load_state WHERE id = 1`);
   const row = r.rows[0];
+  const forced = process.env.ASR_FORCE_RELOAD === '1';
   const stale = !row
     || !row.records_total
     || (row.last_loaded_at && (Date.now() - new Date(row.last_loaded_at).getTime()) > LOAD_REFRESH_DAYS * 24 * 3600 * 1000);
-  if (!stale){
+  if (!stale && !forced){
     console.log(`[asr-sidecar] DB has ${row.records_total} towers loaded ${row.last_loaded_at}; skipping refresh`);
     return;
   }
+  if (forced) console.log('[asr-sidecar] ASR_FORCE_RELOAD=1 — forcing bulk reload despite fresh data');
   console.log('[asr-sidecar] kicking bulk load in background');
   loaderState.running = true;
   runBulkLoad(pool, console)
