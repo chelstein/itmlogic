@@ -29,6 +29,8 @@
 import { qlrps, makeProp, makePropa, makePropv } from './propagation.js';
 import { makeAdiff }                              from './diffraction.js';
 import { makeAlos }                               from './alos.js';
+import { alos2 }                                  from './alos2.js';
+import { saalos }                                 from './canopy.js';
 import { makeAscat }                              from './troposcatter.js';
 import { makeAvar }                               from './variability.js';
 import { makeLrprop }                             from './lrprop.js';
@@ -38,7 +40,7 @@ import { qerfi }                                   from './primitives.js';
 
 // Re-exports so tests/cross-validation can poke at primitives directly.
 export { qlrps, makeProp, makePropa, makePropv };
-export { makeAdiff, makeAlos, makeAscat, makeAvar, makeLrprop, makeQlrpfl };
+export { makeAdiff, makeAlos, alos2, saalos, makeAscat, makeAvar, makeLrprop, makeQlrpfl };
 export { hzns, hzns2, z1sq1, z1sq2, qtile, d1thx };
 export * from './primitives.js';
 
