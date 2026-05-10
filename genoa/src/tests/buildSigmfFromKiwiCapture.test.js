@@ -11,7 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSigmfFromKiwiCapture, ztrCaptureUrl, ZTR_SDR_SPACES_BASE }
+import { buildSigmfFromKiwiCapture, ztrCaptureAudioUrl, ZTR_APP_URL_DEFAULT }
   from '../evidence/measurements/buildSigmfFromKiwiCapture.js';
 import { parseSigmfMeta }             from '../evidence/measurements/sigmf.js';
 import { applyCalibration, extractCalibration } from '../evidence/sdrCalibration.js';
@@ -126,32 +126,48 @@ test('geolocation is GeoJSON [lon, lat] not [lat, lon]', () => {
   assert.equal(coords[1], KRDM.rx_lat);
 });
 
-// ---------- ZTR Spaces URL ----------
+// ---------- ZTR app capture-audio URL ----------
 
-test('ztrCaptureUrl returns the canonical sfo3 Spaces URL by default', () => {
-  assert.equal(ztrCaptureUrl(100074),
-    'https://ztr.sfo3.digitaloceanspaces.com/sdr/100074/capture.wav');
-  assert.equal(ZTR_SDR_SPACES_BASE,
-    'https://ztr.sfo3.digitaloceanspaces.com/sdr');
+test('ztrCaptureAudioUrl returns the canonical /api/sdr/captures/<id>/audio URL', () => {
+  assert.equal(ztrCaptureAudioUrl(71268),
+    'https://zerotrustradio-app-vvhi8.ondigitalocean.app/api/sdr/captures/71268/audio');
+  assert.equal(ZTR_APP_URL_DEFAULT,
+    'https://zerotrustradio-app-vvhi8.ondigitalocean.app');
 });
 
-test('ztrCaptureUrl returns null when station_id is empty', () => {
-  assert.equal(ztrCaptureUrl(null), null);
-  assert.equal(ztrCaptureUrl(undefined), null);
-  assert.equal(ztrCaptureUrl(''), null);
+test('ztrCaptureAudioUrl trims trailing slash on the base', () => {
+  assert.equal(ztrCaptureAudioUrl(71268, 'https://example.org/'),
+    'https://example.org/api/sdr/captures/71268/audio');
 });
 
-test('ztr_station_id auto-derives the canonical capture audio_url', () => {
-  const meta = buildSigmfFromKiwiCapture({ ...KRDM, ztr_station_id: 100074 });
+test('ztrCaptureAudioUrl returns null when capture_id is empty', () => {
+  assert.equal(ztrCaptureAudioUrl(null), null);
+  assert.equal(ztrCaptureAudioUrl(undefined), null);
+  assert.equal(ztrCaptureAudioUrl(''), null);
+});
+
+test('ztr_capture_id auto-derives the ZTR app audio_url', () => {
+  const meta = buildSigmfFromKiwiCapture({ ...KRDM, ztr_capture_id: 71268, ztr_station_id: 100074 });
   assert.equal(meta.global['genoa:audio_url'],
-    'https://ztr.sfo3.digitaloceanspaces.com/sdr/100074/capture.wav');
+    'https://zerotrustradio-app-vvhi8.ondigitalocean.app/api/sdr/captures/71268/audio');
+  assert.equal(meta.global['genoa:ztr_capture_id'], '71268');
   assert.equal(meta.global['genoa:ztr_station_id'], '100074');
+});
+
+test('ztr_app_url overrides the default base for staging / custom domain', () => {
+  const meta = buildSigmfFromKiwiCapture({
+    ...KRDM,
+    ztr_capture_id: 71268,
+    ztr_app_url:    'https://staging.zerotrustradio.example'
+  });
+  assert.equal(meta.global['genoa:audio_url'],
+    'https://staging.zerotrustradio.example/api/sdr/captures/71268/audio');
 });
 
 test('explicit audio_url overrides the derived ZTR URL', () => {
   const meta = buildSigmfFromKiwiCapture({
     ...KRDM,
-    ztr_station_id: 100074,
+    ztr_capture_id: 71268,
     audio_url:      'https://example.org/foo.wav'
   });
   assert.equal(meta.global['genoa:audio_url'], 'https://example.org/foo.wav');
