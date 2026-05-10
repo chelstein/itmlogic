@@ -1,55 +1,52 @@
 // JS port of NTIA's ITM v1.2.2 / ITWOM 3.0 - high-level entry.
 //
-// This file replaces the staging stub from Phase 2 part 1.  With
-// terrain.js + troposcatter.js + variability.js + lrprop.js +
-// qlrpfl.js now landed, the full point-to-point pipeline is
-// available in pure JS:
+// The full pipeline is now available in pure JS through TWO entry
+// points:
 //
-//   1. Build prop_type via qlrps (frequency, refractivity,
-//      polarization, ground impedance).
-//   2. Hand a pfl[] terrain profile to qlrpfl, which runs hzns,
-//      d1thx, z1sq1 to populate dh / he[] / dl[] / the[], then
-//      primes lrprop (line-of-sight + diffraction-extrapolation +
-//      troposcatter coefficients).
-//   3. Each subsequent lrprop(d) call yields prop.aref (the median
-//      reference attenuation at distance d).
-//   4. Hand prop.aref + climate + mode-of-variability to avar with
-//      the desired (zzt, zzl, zzc) quantiles for the
-//      time/location/situation-confidence-adjusted path loss.
+//   pointToPoint        v1.2.2 baseline (qlrpfl -> lrprop ->
+//                       alos / adiff / ascat -> avar)
 //
-// pointToPoint() bundles steps 1-4 in one call for the common case
-// of "give me path loss at a single distance for a single quantile".
+//   pointToPointItwom   ITWOM 3.0 (qlrpfl2 -> lrprop2 ->
+//                       alos2 / adiff2 / saalos / ascat -> avar)
 //
-// The C++ source is the canonical specification - every function
-// here matches itwom3.0.cpp line-for-line on field names.
+// pointToPoint is the "match SPLAT's point_to_point_ITM exactly"
+// path - matches splat's site-report numbers when SPLAT is invoked
+// with the v1.2.2 entry.  pointToPointItwom routes through Sid
+// Shumate's ITWOM 3.0 modifications - canopy-aware LOS, foliage
+// scatter, and the diffraction-vs-troposcatter min blend at beyond-
+// horizon distances.
 //
 // Reference: NTIA TR 82-100, ITWOM 3.0 (Sid Shumate's extensions),
-// itm.cpp v1.2.2 (NTIA-ITS).
+// itm.cpp v1.2.2 (NTIA-ITS).  The C++ source is the canonical
+// specification - every function here matches itwom3.0.cpp line-for-
+// line on field names.
 
 import { qlrps, makeProp, makePropa, makePropv } from './propagation.js';
 import { makeAdiff }                              from './diffraction.js';
+import { makeAdiff2 }                             from './diffraction2.js';
 import { makeAlos }                               from './alos.js';
 import { alos2 }                                  from './alos2.js';
 import { saalos }                                 from './canopy.js';
 import { makeAscat }                              from './troposcatter.js';
 import { makeAvar }                               from './variability.js';
 import { makeLrprop }                             from './lrprop.js';
+import { makeLrprop2 }                            from './lrprop2.js';
 import { makeQlrpfl }                             from './qlrpfl.js';
+import { makeQlrpfl2 }                            from './qlrpfl2.js';
 import { hzns, hzns2, z1sq1, z1sq2, qtile, d1thx } from './terrain.js';
+import { d1thx2 }                                  from './terrain2.js';
 import { qerfi }                                   from './primitives.js';
 
 // Re-exports so tests/cross-validation can poke at primitives directly.
 export { qlrps, makeProp, makePropa, makePropv };
-export { makeAdiff, makeAlos, alos2, saalos, makeAscat, makeAvar, makeLrprop, makeQlrpfl };
-export { hzns, hzns2, z1sq1, z1sq2, qtile, d1thx };
+export { makeAdiff, makeAdiff2, makeAlos, alos2, saalos };
+export { makeAscat, makeAvar, makeLrprop, makeLrprop2, makeQlrpfl, makeQlrpfl2 };
+export { hzns, hzns2, z1sq1, z1sq2, qtile, d1thx, d1thx2 };
 export * from './primitives.js';
 
-// Phase 2 part 2 flips this on: the JS port now spans the full ITM
-// v1.2.2 pipeline (qlrpfl -> lrprop -> alos/adiff/ascat -> avar).
-// Callers that gate on this can stop falling back to the splat
-// sidecar for resilience-only reasons.  ITWOM 3.0 extensions
-// (alos2 with canopy + lrprop2 + qlrpfl2) are still pending - the
-// production-ready predicate covers v1.2.2 baseline only.
+// True now that the full v1.2.2 pipeline (and ITWOM 3.0 extensions)
+// land.  Callers gating on this can stop falling back to the splat
+// sidecar for resilience-only reasons.
 export const ITM_V122_PRODUCTION_READY = true;
 
 // Convenience: assemble a prop_type populated from the parameters
@@ -78,7 +75,7 @@ export function buildProp({
   return prop;
 }
 
-// Single-call point-to-point ITM run.
+// Single-call point-to-point ITM v1.2.2 run.
 //
 //   profile:        flat Float64Array or number[] in SPLAT pfl format:
 //                     [np, xi, elev_0, elev_1, ..., elev_np]
@@ -91,12 +88,8 @@ export function buildProp({
 //   klim:           radio climate 1..7 (default 5 = continental temperate).
 //   mdvar:          mode-of-variability key (default 12 = broadcast).
 //
-// Returns:
-//   { aref_db, dbloss_db, kwx, mode, dl, the, he, dh, dist }
-// where aref_db is the median path loss (excess + free-space), dbloss_db
-// is the confidence/reliability-adjusted path loss (this is the "ITM
-// path loss" the FCC engine consumes), and kwx is the C++ warning level
-// (0 = clean, 1 = note, 2 = caution, 3 = important, 4 = invalid).
+// Returns the same envelope as pointToPointItwom; see below for
+// field documentation.
 export function pointToPoint({
   profile,
   tx_height_m,
@@ -121,37 +114,25 @@ export function pointToPoint({
 
   const qlrpfl = makeQlrpfl();
   const lrprop = qlrpfl(profile, klim, mdvar, prop, propa, propv);
-  // qlrpfl already called lrprop(0, ...) which set prop.aref to the
-  // ref-attenuation at the path distance.  Compute confidence/
-  // reliability-adjusted loss via avar.
-  //
   // Match SPLAT's point_to_point_ITM (itwom3.0.cpp line 2419):
   //   dbloss = avar(zr, 0.0, zc, prop, propv) + fs;
-  // i.e. zzt = qerfi(rel), zzl = 0.0, zzc = qerfi(conf).  With mdvar=12
-  // (broadcast / kdv=2) avar internally overrides zl=zt so the zl
-  // input is ignored for the default case, but other modes use it
-  // directly - matching the C++ exactly avoids subtle drift on those.
   const avar = makeAvar();
   const zt = qerfi(rel);
   const zl = 0.0;
   const zc = qerfi(conf);
   const dbloss = avar(zt, zl, zc, prop, propv);
 
-  // SPLAT's `dbloss` convention is total path loss = excess + free-space.
-  // `prop.aref` and the avar return are both "excess above free-space"
-  // (NTIA TR 82-100 sec. 4); we compute fsl here and add for the total
-  // so callers see the same number splat's site report prints.
   const dist_km    = prop.dist / 1000.0;
   const fsl_db     = 32.45 + 20.0 * Math.log10(frequency_mhz)
                    + 20.0 * Math.log10(Math.max(0.001, dist_km));
-  const dbloss_db  = dbloss + fsl_db;     // matches splat point_to_point_ITM
-  const aref_total = prop.aref + fsl_db;  // median path loss for symmetry
+  const dbloss_db  = dbloss + fsl_db;
+  const aref_total = prop.aref + fsl_db;
 
   return {
     aref_db:    aref_total,
-    excess_db:  prop.aref,        // excess (avar input); useful for cross-check
-    avar_db:    dbloss,           // confidence/reliability-adjusted excess
-    dbloss_db,                    // full path loss = avar_db + fsl_db
+    excess_db:  prop.aref,
+    avar_db:    dbloss,
+    dbloss_db,
     fsl_db,
     kwx:        prop.kwx,
     mode:       describeMode(prop, propa),
@@ -166,6 +147,94 @@ export function pointToPoint({
     _prop:      prop,
     _propa:     propa,
     _propv:     propv
+  };
+}
+
+// ITWOM 3.0 single-call point-to-point (qlrpfl2 -> lrprop2 -> avar).
+//
+// Same signature shape as pointToPoint, but routes through the
+// ITWOM-3.0 modified pipeline (alos2 / adiff2 / saalos canopy) so
+// callers with a populated canopy field set get the canopy-aware
+// path loss.  When the canopy fields aren't populated (default
+// empty profile, no cch/encc/etc), behaves close to v1.2.2 but
+// with hzns2 + d1thx2 + the ITWOM "min(adiff2, ascat)" beyond-
+// horizon blend instead of v1.2.2's straight diffraction-extrap.
+//
+// Extra optional fields beyond pointToPoint:
+//   canopy_height_m       (default 0)    prop.cch
+//   canopy_refractivity_n (default 360)  prop.encc - typical
+//                                  vegetation-canopy N value;
+//                                  unused when canopy_height_m=0.
+//   ptx                   (default ipol) saalos polarization key:
+//                                  0 = horizontal, 1 = vertical,
+//                                  2 = circular.
+export function pointToPointItwom({
+  profile,
+  tx_height_m,
+  rx_height_m,
+  frequency_mhz,
+  en0          = 301.0,
+  ipol         = 1,
+  eps_dielect  = 15.0,
+  sgm_conduct  = 0.005,
+  conf         = 0.50,
+  rel          = 0.50,
+  klim         = 5,
+  mdvar        = 12,
+  canopy_height_m       = 0,
+  canopy_refractivity_n = 360,
+  ptx                   = null,
+} = {}){
+  const prop  = buildProp({
+    tx_height_m, rx_height_m, frequency_mhz, en0, ipol, eps_dielect, sgm_conduct
+  });
+  prop.cch  = canopy_height_m;
+  prop.encc = canopy_refractivity_n;
+  prop.ptx  = ptx === null ? ipol : ptx;
+
+  const propa = makePropa();
+  const propv = makePropv();
+  propv.klim  = klim;
+  propv.mdvar = mdvar;
+
+  const qlrpfl2 = makeQlrpfl2();
+  const lrprop2 = qlrpfl2(profile, klim, mdvar, prop, propa, propv);
+
+  const avar = makeAvar();
+  const zt   = qerfi(rel);
+  const zl   = 0.0;
+  const zc   = qerfi(conf);
+  const dbloss = avar(zt, zl, zc, prop, propv);
+
+  const dist_km    = prop.dist / 1000.0;
+  const fsl_db     = 32.45 + 20.0 * Math.log10(frequency_mhz)
+                   + 20.0 * Math.log10(Math.max(0.001, dist_km));
+  const dbloss_db  = dbloss + fsl_db;
+  const aref_total = prop.aref + fsl_db;
+
+  return {
+    aref_db:    aref_total,
+    excess_db:  prop.aref,
+    avar_db:    dbloss,
+    dbloss_db,
+    fsl_db,
+    kwx:        prop.kwx,
+    mode:       describeMode(prop, propa),
+    dl:         [prop.dl[0], prop.dl[1]],
+    the:        [prop.the[0], prop.the[1]],
+    he:         [prop.he[0], prop.he[1]],
+    dh:         prop.dh,
+    los:        prop.los,
+    dist_m:     prop.dist,
+    dist_km,
+    canopy_active: canopy_height_m > 0
+                   && rx_height_m < canopy_height_m
+                   && (prop.thera < 0.785) && (prop.thenr < 0.785),
+    _lrprop2:   lrprop2,
+    _avar:      avar,
+    _prop:      prop,
+    _propa:     propa,
+    _propv:     propv,
   };
 }
 
