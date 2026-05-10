@@ -15,10 +15,10 @@
 //     --duration-seconds 60 \
 //     --rssi-dbm -73.5 \
 //     --antenna-gain-dbi 0 --cable-loss-db 1 --lna-gain-db 20 \
-//     --kiwi-host kiwisdr.example.org:8073 \
+//     --kiwi-host kk6pr.ddns.net:8077 \
 //     --capture-proxy-url wss://proxy.example.org/relay \
-//     --ztr-station-id 100074 \
-//     --out /tmp/krdm-1240.sigmf-meta.json
+//     --ztr-capture-id 71268 --ztr-station-id 100074 \
+//     --out /tmp/krdm-71268.sigmf-meta.json
 //
 //   # Stdout if --out is omitted; pipe straight to the measurement
 //   # sidecar's POST /v1/sigmf/parse:
@@ -66,8 +66,9 @@ const FLAG_TO_FIELD = {
   '--capture-proxy-url':       'capture_proxy_url',
   '--audio-filename':          'audio_filename',
   '--audio-url':               'audio_url',
+  '--ztr-capture-id':          'ztr_capture_id',
   '--ztr-station-id':          'ztr_station_id',
-  '--ztr-spaces-base':         'ztr_spaces_base',
+  '--ztr-app-url':             'ztr_app_url',
   '--author':                  'author',
   '--description':             'description'
 };
@@ -132,9 +133,10 @@ function helpText(){
     '  --kiwi-host host:port   --kiwi-user name',
     '  --capture-proxy-url wss://...',
     '  --audio-filename FILE   --audio-url URL  --description "..."',
-    '  --ztr-station-id N      (auto-derives audio_url to ZTR Spaces:',
-    '                           https://ztr.sfo3.digitaloceanspaces.com/sdr/<id>/capture.wav)',
-    '  --ztr-spaces-base URL   (override ZTR Spaces base; defaults to sfo3)',
+    '  --ztr-capture-id N      (auto-derives audio_url to ZTR app API:',
+    '                           https://<ztr-app>/api/sdr/captures/<id>/audio)',
+    '  --ztr-station-id N      (cross-ref to facility_lookup_source.ztr_id; metadata only)',
+    '  --ztr-app-url URL       (override ZTR app base; defaults to prod DO deploy)',
     '  --traceable             (NIST-traceable calibration flag)',
     '  --uncertainty-db N      (1-sigma calibration uncertainty)',
     '',
