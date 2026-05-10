@@ -40,7 +40,7 @@ export async function enrichTowerEvidence(exhibit, log = console){
         if (!asrClient){
           log.warn?.('[enrichTowerEvidence] asrClient is null (no ASR_SIDECAR_URL / ZTR / Socrata configured)');
         } else {
-          // Default ladder is 1km → 5km → 25km inside getByLocation.
+          // Default ladder is 1km → 5km → 25km → 100km → 200km inside getByLocation.
           // Operator can pin a single radius via ASR_LOCATION_RADIUS_M.
           const radius_m = process.env.ASR_LOCATION_RADIUS_M
             ? Number(process.env.ASR_LOCATION_RADIUS_M)
@@ -90,6 +90,54 @@ export async function enrichTowerEvidence(exhibit, log = console){
         }
       }
     } catch { /* fail-soft */ }
+  }
+
+  // ZTR rich-station tower-height backfill.  When the operator didn't
+  // type a tower height AND the asr-sidecar / FAA OE didn't return one,
+  // pull structure_height_m / amsl_m / asrn from ZTR's
+  // /api/broadcast/stations?callsign=X record.  ZTR carries these fields
+  // for almost every FCC broadcast license, sourced from the FCC's own
+  // FMQ/AMQ feeds.  Without this, the §17.21/§17.23 rules engine has no
+  // height to evaluate and Section III·3E renders EVIDENCE MISSING.
+  // Fail-soft: ZTR unreachable / no record / no height → operator must
+  // supply tower height, no change to behavior.
+  if (!Number.isFinite(Number(exhibit.station_inputs?.overall_height_m))){
+    const ztrBase = process.env.ZERO_TRUST_RADIO_READONLY_URL;
+    const call    = exhibit.station_inputs?.call;
+    if (ztrBase && call){
+      try {
+        const u = `${ztrBase.replace(/\/$/, '')}/api/broadcast/stations?callsign=${encodeURIComponent(call)}`;
+        const r = await fetch(u, { signal: AbortSignal.timeout(8000) });
+        if (r.ok){
+          const j = await r.json();
+          const row = (j?.rows || []).find(s =>
+            String(s?.callsign || '').toUpperCase() === String(call).toUpperCase());
+          if (row){
+            const h    = Number(row.structure_height_m);
+            const amsl = Number(row.amsl_m);
+            const asrn = row.asrn || row.asr_number || null;
+            if (Number.isFinite(h) && h > 0){
+              exhibit.station_inputs.overall_height_m = h;
+              log.info?.(`[enrichTowerEvidence] ztr-backfill structure_height_m=${h} for ${call}`);
+            }
+            if (Number.isFinite(amsl) && amsl > 0
+                && !Number.isFinite(Number(exhibit.station_inputs.overall_height_amsl_m))){
+              exhibit.station_inputs.overall_height_amsl_m = amsl;
+            }
+            if (asrn && !exhibit.station_inputs.asr_number){
+              exhibit.station_inputs.asr_number = String(asrn);
+              log.info?.(`[enrichTowerEvidence] ztr-backfill asr_number=${asrn} for ${call}`);
+            }
+          } else {
+            log.warn?.(`[enrichTowerEvidence] ztr-backfill: no rows for ${call}`);
+          }
+        } else {
+          log.warn?.(`[enrichTowerEvidence] ztr-backfill HTTP ${r.status}`);
+        }
+      } catch (err){
+        log.warn?.('[enrichTowerEvidence] ztr-backfill threw:', err?.message || err);
+      }
+    }
   }
 
   // §17.7(c) airport-proximity auto-check.  Pull the list of
