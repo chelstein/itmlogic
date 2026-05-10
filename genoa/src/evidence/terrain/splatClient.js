@@ -18,6 +18,7 @@
 //   GET    /api/v1/sdf               → { sdf_dir, count, tiles: [...] }
 //   POST   /api/v1/sdf/<name>        → { name, size_bytes, ... } 201
 //   DELETE /api/v1/sdf/<name>        → { deleted: name }
+//   POST   /api/v1/sdf/convert/srtm/<n> → { name, size_bytes, runtime_seconds, ... } 201
 //
 // Auth: when SPLAT_API_TOKEN is set on the Genoa side AND the sidecar's
 // own GENOA_API_TOKEN is set, callers must send `Authorization: Bearer
@@ -227,6 +228,37 @@ export function makeSplatClient({
           method:  'DELETE',
           headers: _headers(),
           signal:  AbortSignal.timeout(timeoutMs)
+        });
+        if (!r.ok){
+          const j = await r.json().catch(() => ({}));
+          return { available: false, endpoint, status: r.status, error: j.error || `HTTP ${r.status}` };
+        }
+        const j = await r.json();
+        return { available: true, endpoint, ...j };
+      } catch (e){
+        return { available: false, endpoint, error: String(e.message) };
+      }
+    },
+
+    // POST raw SRTM .hgt or .hgt.zip bytes to the sidecar's converter
+    // endpoint.  The sidecar runs srtm2sdf and stages the produced .sdf
+    // tile in WORKDIR/sdf/.  `name` MUST follow the SRTM convention
+    // (NLLLELLL.hgt[.zip]) — the sidecar's coord parser reads coords
+    // straight out of the filename.  Returns the standard envelope plus
+    // the produced .sdf name + url so the caller can confirm coverage.
+    async convertSrtmHgt(name, bytes){
+      if (!name)           return { available: false, error: 'name required' };
+      if (bytes == null)   return { available: false, error: 'bytes required' };
+      if (!/^[NSns]\d{2}[EWew]\d{3}\.(hgt|bil)(\.zip)?$/.test(name)){
+        return { available: false, error: 'name must match NLLLELLL.(hgt|bil)[.zip]' };
+      }
+      const endpoint = joinUrl(baseUrl, `/api/v1/sdf/convert/srtm/${encodeURIComponent(name)}`);
+      try {
+        const r = await fetch(endpoint, {
+          method:  'POST',
+          headers: _headers({ 'content-type': 'application/octet-stream' }),
+          body:    bytes,
+          signal:  AbortSignal.timeout(UPLOAD_TIMEOUT_MS)
         });
         if (!r.ok){
           const j = await r.json().catch(() => ({}));
