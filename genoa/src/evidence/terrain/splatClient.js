@@ -1,24 +1,24 @@
-// Genoa SPLAT client — talks to chelstein/splat's Genoa sidecar
+// Genoa SPLAT client - talks to chelstein/splat's Genoa sidecar
 // (Flask + gunicorn, deployed at SPLAT_SIDECAR_URL).
 //
-// Sidecar API (chelstein/splat#7–#11 reflected here):
-//   GET    /healthz                  → "ok"
-//   GET    /version                  → { sidecar, splat_bin, splat_version,
+// Sidecar API (chelstein/splat#7-#11 reflected here):
+//   GET    /healthz                  -> "ok"
+//   GET    /version                  -> { sidecar, splat_bin, splat_version,
 //                                      git_commit_sha, build_time, workdir,
 //                                      sdf_dir, auth_required }
-//   GET    /api/v1/stats             → { total_runs, success_count, ... }
-//   POST   /api/v1/splat/run         → { command, command_string, returncode,
+//   GET    /api/v1/stats             -> { total_runs, success_count, ... }
+//   POST   /api/v1/splat/run         -> { command, command_string, returncode,
 //                                      stdout, stderr }
 //                                    body: { tx_qth, rx_qth?, output_base?,
 //                                             flags?, timeout_seconds? }
 //                                    IMPORTANT: tx_qth is a FILE PATH on
 //                                    the sidecar's disk.
-//   GET    /api/v1/artifacts         → { workdir, count, artifacts: [...] }
-//   GET    /api/v1/artifacts/<path>  → file bytes
-//   GET    /api/v1/sdf               → { sdf_dir, count, tiles: [...] }
-//   POST   /api/v1/sdf/<name>        → { name, size_bytes, ... } 201
-//   DELETE /api/v1/sdf/<name>        → { deleted: name }
-//   POST   /api/v1/sdf/convert/srtm/<n> → { name, size_bytes, runtime_seconds, ... } 201
+//   GET    /api/v1/artifacts         -> { workdir, count, artifacts: [...] }
+//   GET    /api/v1/artifacts/<path>  -> file bytes
+//   GET    /api/v1/sdf               -> { sdf_dir, count, tiles: [...] }
+//   POST   /api/v1/sdf/<name>        -> { name, size_bytes, ... } 201
+//   DELETE /api/v1/sdf/<name>        -> { deleted: name }
+//   POST   /api/v1/sdf/convert/srtm/<n> -> { name, size_bytes, runtime_seconds, ... } 201
 //
 // Auth: when SPLAT_API_TOKEN is set on the Genoa side AND the sidecar's
 // own GENOA_API_TOKEN is set, callers must send `Authorization: Bearer
@@ -29,12 +29,12 @@
 //
 // REALITY CHECK
 //   Per-radial HAAT and ITM coverage need DEM tiles co-located on the
-//   sidecar's disk under WORKDIR/sdf/.  uploadSdfTile() now exists, so
-//   provisioning is wholly an HTTP-driven workflow: probe capability(),
-//   if dem_provisioned is false, upload tiles, then run.  capability()
-//   surfaces the live tile_count from the sidecar's /api/v1/sdf so the
-//   orchestrator can decide whether terrain-aware coverage is realistic
-//   or it should fall back to the JS terrain engine.
+//   sidecar's disk under WORKDIR/sdf/.  predictItmCoverage() now drives
+//   provisionDemForCoverage() automatically before each SPLAT run, so a
+//   fresh tx area auto-stages its 1deg-x-1deg SRTM-3 tiles via bailu.ch
+//   before the inline run goes out.  Disable via auto_provision_dem=false
+//   on the call site if you want a pure-SPLAT timing or you've already
+//   pre-warmed the sidecar.
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 const UPLOAD_TIMEOUT_MS  = 60_000;
@@ -118,10 +118,36 @@ export function makeSplatClient({
 
     async predictItmCoverage({ tx, max_distance_km = 80, target_field_dbu = 60,
                                 radial_step_deg = 10, climate_code = 5,
-                                timeout_seconds = 180 } = {}){
+                                timeout_seconds = 180,
+                                auto_provision_dem = true,
+                                provision_concurrency = 3 } = {}){
       if (!tx || !Number.isFinite(Number(tx.lat)) || !Number.isFinite(Number(tx.lon))){
         return { available: false, source: null, error: 'tx.lat / tx.lon required' };
       }
+
+      // Idempotent DEM provisioning before the SPLAT run.  Without
+      // this, the sidecar runs flat-earth on any tx whose tile bbox
+      // hasn't been pre-staged.  provisionDemForCoverage diffs against
+      // the sidecar's current SDF inventory and only fetches missing
+      // tiles, so calling it on every request is cheap when the area
+      // is already cached.  Disable via auto_provision_dem=false (e.g.
+      // when the caller wants to time a pure-SPLAT run, or when a
+      // pre-warm has already populated the sidecar).
+      let dem_provision = null;
+      if (auto_provision_dem){
+        try {
+          const { provisionDemForCoverage } = await import('./provisionDem.js');
+          dem_provision = await provisionDemForCoverage({
+            tx:           { lat: Number(tx.lat), lon: Number(tx.lon) },
+            radius_km:    max_distance_km,
+            splatClient:  this,
+            concurrency:  provision_concurrency
+          });
+        } catch (err){
+          dem_provision = { available: false, error: String(err?.message || err) };
+        }
+      }
+
       const qthLines = [
         String(tx.call || 'TX'),
         String(tx.lat),
@@ -151,12 +177,13 @@ export function makeSplatClient({
             endpoint:  inlineEndpoint,
             sidecar_enhancement_required: 'inline-qth',
             suggested_fallback:            'src/engine/coverage/itm_radial.js (computeItmCoverage)',
-            note:      'SPLAT sidecar does not expose /api/v1/splat/run-inline yet.  Use the multi-source-DEM JS terrain engine until the sidecar enhancement lands.'
+            note:      'SPLAT sidecar does not expose /api/v1/splat/run-inline yet.  Use the multi-source-DEM JS terrain engine until the sidecar enhancement lands.',
+            dem_provision
           };
         }
         if (!r.ok){
           const j = await r.json().catch(() => ({}));
-          return { available: false, source: null, endpoint: inlineEndpoint, error: j.error || `HTTP ${r.status}` };
+          return { available: false, source: null, endpoint: inlineEndpoint, error: j.error || `HTTP ${r.status}`, dem_provision };
         }
         const j = await r.json();
         return {
@@ -169,10 +196,11 @@ export function makeSplatClient({
           runtime_seconds: j.runtime_seconds || null,
           radials:      j.radials || [],
           target_field_dbu, max_distance_km,
-          stdout_excerpt: (j.stdout || '').slice(0, 400)
+          stdout_excerpt: (j.stdout || '').slice(0, 400),
+          dem_provision
         };
       } catch (e){
-        return { available: false, source: null, endpoint: inlineEndpoint, error: String(e.message) };
+        return { available: false, source: null, endpoint: inlineEndpoint, error: String(e.message), dem_provision };
       }
     },
 
@@ -243,7 +271,7 @@ export function makeSplatClient({
     // POST raw SRTM .hgt or .hgt.zip bytes to the sidecar's converter
     // endpoint.  The sidecar runs srtm2sdf and stages the produced .sdf
     // tile in WORKDIR/sdf/.  `name` MUST follow the SRTM convention
-    // (NLLLELLL.hgt[.zip]) — the sidecar's coord parser reads coords
+    // (NLLLELLL.hgt[.zip]) - the sidecar's coord parser reads coords
     // straight out of the filename.  Returns the standard envelope plus
     // the produced .sdf name + url so the caller can confirm coverage.
     async convertSrtmHgt(name, bytes){
@@ -339,7 +367,7 @@ export function makeSplatClient({
       }
 
       // SDF probe.  When this fails (auth wall, 5xx, network), leave
-      // tile_count and dem_provisioned as null — we do not silently
+      // tile_count and dem_provisioned as null - we do not silently
       // claim DEM is provisioned.
       let tile_count      = null;
       let dem_provisioned = null;
