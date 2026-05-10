@@ -178,15 +178,13 @@ export function makeAsrClient({
       if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))){
         return { available: false, source: null, error: 'lat / lon required' };
       }
-      // Radius ladder.  FCC licensed station coords (typed by operators)
-      // can be 100 m to several km away from the registered ASR
-      // structure — the FCC tabulates licensed coords to-the-second
-      // (~30 m) but the ASR record is the physical tower base, often
-      // offset (towers off-property, shared structures, fence-line
-      // setbacks, etc.).  Try a tight match first for accuracy, then
-      // widen.  Each successive ring records the radius in `tried[]`
-      // so the caller / report can show how far we had to search.
-      const ladder = radius_m ? [Number(radius_m)] : [1000, 5000, 25000];
+      // 1km → 5km → 25km → 100km → 200km ladder.  The wide upper rungs
+      // catch broadcast towers where FCC LMS antenna coords drift from
+      // the registered ASR coords (common: LMS records antenna mounting
+      // point, ASR records tower base, can differ by 50-200 m or more
+      // for guyed/co-located setups).  Engineer of record verifies the
+      // match before filing — wider net beats EVIDENCE MISSING.
+      const ladder = radius_m ? [Number(radius_m)] : [1000, 5000, 25000, 100000, 200000];
       const tried = [];
 
       // Tier 1: genoa-asr-sidecar /asr/by-location.
