@@ -37,6 +37,8 @@
 //   GET  /asr/by-number/:asr         — exact match in asr_towers; tier-4 fallback if not found
 //   GET  /asr/by-location?lat&lon&radius_m=1000&limit=1
 //                                    — haversine within candidate set
+//   GET  /asr/diag/nearest?lat&lon&n=5     — debug: N closest regardless of radius
+//   GET  /asr/diag/by-state?state=VA       — debug: counts + sample by state
 //
 // Boots:
 //   1. Apply schema.sql (idempotent).
@@ -63,13 +65,6 @@ if (!process.env.DATABASE_URL){
   process.exit(1);
 }
 
-// Force sslmode=no-verify on the connection string when PG_SSL_REJECT_UNAUTHORIZED
-// is false.  DO's managed Postgres ships a self-signed cert chain; the
-// pg library has tightened its sslmode handling to alias `require` to
-// `verify-full`, which rejects self-signed certs even when we pass
-// `ssl: { rejectUnauthorized: false }` in the pool config.  Rewriting
-// the connection-string sslmode to `no-verify` keeps the libpq-style
-// "encrypt but don't verify" semantics that operator env clearly wants.
 function buildPgConnectionString(){
   const raw = process.env.DATABASE_URL;
   if (process.env.PG_SSL_REJECT_UNAUTHORIZED !== 'false') return raw;
@@ -109,7 +104,6 @@ async function maybeRunBulkLoad(){
   }
   console.log('[asr-sidecar] kicking bulk load in background');
   loaderState.running = true;
-  // Don't await — let HTTP server start while load runs.
   runBulkLoad(pool, console)
     .then(s => { loaderState.running = false; loaderState.last_summary = s; })
     .catch(e => { loaderState.running = false; loaderState.last_error = String(e.message); console.error('[asr-sidecar] bulk load failed:', e); });
@@ -121,10 +115,6 @@ function scheduleWeeklyRefresh(){
   console.log(`[asr-sidecar] weekly refresh scheduled every ${LOAD_REFRESH_DAYS} days`);
 }
 
-// ─── Tier-4 Python bridge ────────────────────────────────────────────
-// Spawns asr_html_bridge.py with the ASR# on argv.  The bridge prints
-// a single JSON line on stdout; we parse it.  Failures resolve to
-// { available: false, error: ... } — never throw.
 async function htmlScrapeFallback(asrNumber){
   return new Promise(resolve => {
     const proc = spawn(process.env.PYNEC_PYTHON_BIN || 'python3',
@@ -153,7 +143,6 @@ async function htmlScrapeFallback(asrNumber){
   });
 }
 
-// ─── Row → API record shape ──────────────────────────────────────────
 function rowToRecord(row, tier){
   return {
     available:                 true,
@@ -187,13 +176,9 @@ function rowToRecord(row, tier){
   };
 }
 
-// ─── HTTP server ─────────────────────────────────────────────────────
 const app = express();
 app.use(express.json({ limit: '256kb' }));
 
-// Log every inbound /asr/* request so we can confirm the wire from
-// itmlogic-genoa's asrClient is actually reaching this sidecar.
-// /healthz is silent (it's polled every 30 s by the DO healthcheck).
 app.use((req, _res, next) => {
   if (req.path.startsWith('/asr/')){
     console.log(`[asr-sidecar] ${req.method} ${req.originalUrl}`);
@@ -206,10 +191,6 @@ app.get('/healthz', async (_req, res) => {
     const r = await pool.query(`SELECT records_total, records_with_coords, records_with_owner,
                                        last_loaded_at, last_source_url, load_duration_seconds, load_error
                                 FROM asr_load_state WHERE id = 1`);
-    // Live size of the asr_towers + asr_zip_archive tables so the
-    // operator can monitor disk pressure and tier-bump genoadb if it
-    // approaches its allocated storage.  pg_total_relation_size includes
-    // toast tables + indexes + every byte the table occupies on disk.
     const sizes = await pool.query(`
       SELECT
         pg_total_relation_size('asr_towers')      AS towers_bytes,
@@ -238,9 +219,6 @@ app.get('/healthz', async (_req, res) => {
   }
 });
 
-// List the rolling 4-week archive of weekly r_tower.zip snapshots.
-// Returns metadata only (snapshot_date, source_etag, size, sha256);
-// the raw zip bytes are pulled via /asr/archive/:date.
 app.get('/asr/archive', async (_req, res) => {
   try {
     const r = await pool.query(`
@@ -255,9 +233,6 @@ app.get('/asr/archive', async (_req, res) => {
   }
 });
 
-// Fetch the raw r_tower.zip for a specific snapshot date.  Used by
-// operators / diff tooling to compare what FCC published this week
-// vs prior weeks.  Responds with application/zip + Content-Disposition.
 app.get('/asr/archive/:date', async (req, res) => {
   const date = String(req.params.date).trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)){
@@ -290,7 +265,6 @@ app.get('/asr/by-number/:asr', async (req, res) => {
   if (!/^\d+$/.test(asr)){
     return res.status(400).json({ available: false, error: 'asr_number must be numeric' });
   }
-  // Tier 1: bulk DB.
   try {
     const r = await pool.query(`SELECT * FROM asr_towers WHERE asr_number = $1 LIMIT 1`, [asr]);
     if (r.rows.length){
@@ -299,12 +273,9 @@ app.get('/asr/by-number/:asr', async (req, res) => {
   } catch (e){
     console.warn('[asr-sidecar] tier-1 query failed:', e.message);
   }
-  // Tier 4: external bridge (skipped when ASR_DISABLE_HTML_FALLBACK=1).
   if (process.env.ASR_DISABLE_HTML_FALLBACK === '1'){
     return res.json({ available: false, source: 'asr-sidecar', error: 'not in bulk DB; tier-4 disabled' });
   }
-  // Tier 4: Python bridge → REC Networks → radio-locator (the bridge
-  // already stamps source_tier=4 on its successful results).
   const fallback = await htmlScrapeFallback(asr);
   return res.json(fallback);
 });
@@ -312,16 +283,27 @@ app.get('/asr/by-number/:asr', async (req, res) => {
 app.get('/asr/by-location', async (req, res) => {
   const lat      = parseFloat(req.query.lat);
   const lon      = parseFloat(req.query.lon);
-  const radius_m = Math.min(parseFloat(req.query.radius_m) || 1000, 25_000);
+  // Cap raised from 25 km to 200 km so the asrClient ladder can fall
+  // through to a wide net when LMS antenna coords drift from the
+  // registered ASR tower coords.  Engineer of record verifies the
+  // match before filing anyway; a wider search beats EVIDENCE MISSING
+  // on a tower that actually exists.
+  const radius_m = Math.min(parseFloat(req.query.radius_m) || 1000, 200_000);
   const limit    = Math.min(parseInt(req.query.limit, 10) || 1, 25);
+  // FCC ULS r_tower.zip uses single-letter codes ('C' Constructed,
+  // 'G' Granted, 'N' Notified, 'T' Terminated, 'W' Withdrawn,
+  // 'X' Cancelled).  Operator can disable the filter via
+  // ?include_inactive=1 for diagnostics.
+  const includeInactive = req.query.include_inactive === '1';
   if (!Number.isFinite(lat) || !Number.isFinite(lon)){
     return res.status(400).json({ available: false, error: 'lat / lon required' });
   }
-  // Coarse box prefilter (1 deg lat ≈ 111 km; 1 deg lon ≈ 111 km × cos(lat)).
-  // The PRIMARY KEY index on (latitude_deg, longitude_deg) makes this fast.
   const dLat = radius_m / 111_320;
   const dLon = radius_m / (111_320 * Math.cos(lat * Math.PI / 180));
   try {
+    const statusClause = includeInactive
+      ? ''
+      : `AND (status IS NULL OR status NOT IN ('TERMINATED','CANCELLED','WITHDRAWN','T','X','W'))`;
     const r = await pool.query(`
       SELECT *,
              6371000 * 2 * ASIN(SQRT(
@@ -332,7 +314,7 @@ app.get('/asr/by-location', async (req, res) => {
       FROM asr_towers
       WHERE latitude_deg  BETWEEN $1 - $3 AND $1 + $3
         AND longitude_deg BETWEEN $2 - $4 AND $2 + $4
-        AND status NOT IN ('TERMINATED', 'CANCELLED', 'WITHDRAWN')
+        ${statusClause}
       ORDER BY distance_m ASC
       LIMIT $5
     `, [lat, lon, dLat, dLon, limit]);
@@ -340,7 +322,6 @@ app.get('/asr/by-location', async (req, res) => {
     if (r.rows.length === 0){
       return res.json({ available: false, source: 'asr-sidecar', error: `no ASR record within ${radius_m} m of ${lat},${lon}` });
     }
-    // Filter to inside the actual circle (the box prefilter is square)
     const inside = r.rows.filter(row => row.distance_m <= radius_m);
     if (inside.length === 0){
       return res.json({ available: false, source: 'asr-sidecar', error: `no ASR record within ${radius_m} m (closest was ${Math.round(r.rows[0].distance_m)} m)` });
@@ -367,7 +348,88 @@ app.get('/asr/by-location', async (req, res) => {
   }
 });
 
-// ─── Boot ────────────────────────────────────────────────────────────
+// ─── Diagnostic endpoints ─────────────────────────────────────────────
+//
+// /asr/diag/nearest?lat&lon&n=5
+//   Returns the N nearest towers to (lat,lon) — no radius cap, no
+//   status filter — so the operator can see how far the closest
+//   registered tower really is when by-location returns empty.  Used to
+//   debug "why doesn't this site find a tower?" cases.
+//
+// /asr/diag/by-state?state=VA
+//   Counts asr_towers grouped by status for a US state, plus a sample
+//   of the most-recent rows.  Used to verify the bulk DB has data for
+//   the state we expect.
+app.get('/asr/diag/nearest', async (req, res) => {
+  const lat = parseFloat(req.query.lat);
+  const lon = parseFloat(req.query.lon);
+  const n   = Math.min(parseInt(req.query.n, 10) || 5, 25);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+    return res.status(400).json({ error: 'lat / lon required' });
+  }
+  try {
+    const r = await pool.query(`
+      SELECT asr_number, status, structure_type, structure_state, structure_city, owner_name,
+             latitude_deg, longitude_deg, overall_height_agl_m,
+             6371000 * 2 * ASIN(SQRT(
+                 POWER(SIN(RADIANS(latitude_deg - $1)/2), 2)
+               + COS(RADIANS($1)) * COS(RADIANS(latitude_deg))
+               * POWER(SIN(RADIANS(longitude_deg - $2)/2), 2)
+             )) AS distance_m
+      FROM asr_towers
+      WHERE latitude_deg  BETWEEN $1 - 5 AND $1 + 5
+        AND longitude_deg BETWEEN $2 - 5 AND $2 + 5
+      ORDER BY distance_m ASC
+      LIMIT $3
+    `, [lat, lon, n]);
+    res.json({
+      query:  { lat, lon, n },
+      n:      r.rows.length,
+      towers: r.rows.map(row => ({
+        ...row,
+        distance_m:  Math.round(row.distance_m),
+        distance_km: Number((row.distance_m / 1000).toFixed(2))
+      }))
+    });
+  } catch (e){
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
+app.get('/asr/diag/by-state', async (req, res) => {
+  const state = String(req.query.state || '').trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(state)){
+    return res.status(400).json({ error: 'state required (2-letter code)' });
+  }
+  try {
+    const counts = await pool.query(
+      `SELECT status, COUNT(*) AS n FROM asr_towers WHERE structure_state = $1 GROUP BY status ORDER BY n DESC`,
+      [state]
+    );
+    const sample = await pool.query(
+      `SELECT asr_number, status, structure_type, structure_city, owner_name,
+              latitude_deg, longitude_deg, overall_height_agl_m
+         FROM asr_towers
+        WHERE structure_state = $1
+        ORDER BY date_action DESC NULLS LAST
+        LIMIT 10`,
+      [state]
+    );
+    const total = await pool.query(
+      `SELECT COUNT(*) AS n FROM asr_towers WHERE structure_state = $1`,
+      [state]
+    );
+    res.json({
+      state,
+      total:        Number(total.rows[0]?.n || 0),
+      by_status:    counts.rows.map(r => ({ status: r.status, n: Number(r.n) })),
+      sample:       sample.rows
+    });
+  } catch (e){
+    res.status(500).json({ error: String(e.message) });
+  }
+});
+
 (async () => {
   try {
     await ensureSchema();
