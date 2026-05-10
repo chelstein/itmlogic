@@ -330,22 +330,46 @@ function handleRA(f, towers){
   });
 }
 
-// CO record (Coordinates).  Layout:
-//   record_type | record_status | file_number | usi | reg_number |
-//   coordinate_type ('T' tower / 'P' point) |
-//   lat_deg | lat_min | lat_sec | lat_dir |
-//   lon_deg | lon_min | lon_sec | lon_dir
+// CO record (Coordinates).  Verified against actual r_tower.zip CO.dat
+// content on 2026-05-10.  The pubacc data dictionary doesn't list the
+// pre-computed total-arc-second derived fields; the actual file format
+// is:
+//
+//   f[0]  = 'CO'
+//   f[1]  = record_status         ('REG')
+//   f[2]  = uls_file_number
+//   f[3]  = unique_system_identifier (USI)
+//   f[4]  = registration_number   (ASR #)
+//   f[5]  = coordinate_type       ('T' tower / 'P' point)
+//   f[6]  = lat_deg
+//   f[7]  = lat_min
+//   f[8]  = lat_sec (decimal)
+//   f[9]  = lat_dir               ('N' / 'S')
+//   f[10] = lat_total_arcsec      (PRE-COMPUTED — not lon_deg)
+//   f[11] = lon_deg
+//   f[12] = lon_min
+//   f[13] = lon_sec (decimal)
+//   f[14] = lon_dir               ('E' / 'W')
+//   f[15] = lon_total_arcsec      (PRE-COMPUTED)
+//   f[16-17] = unused
 function handleCO(f, coordsByUsi){
   if (f[0] !== 'CO') return;
   const usi = parseInt(f[3], 10);
   if (!Number.isFinite(usi)) return;
-  // Coord triples start at f[6] (lat) and f[10] (lon).  Many CO rows
-  // in r_tower omit the lat/min and only fill seconds=0.0 — we accept
-  // them and just produce 0/0 if neither component is parseable, which
-  // dms() returns as null and the caller skips.
-  const lat = dms(f[6], f[7], f[8], f[9]);
-  const lon = dms(f[10], f[11], f[12], f[13]);
-  if (Number.isFinite(lat) && Number.isFinite(lon) && (lat !== 0 || lon !== 0)){
+  // Earlier loader read lon from f[10..13], which is the PRE-COMPUTED
+  // lat_total_arcsec field (e.g. 148198.0) followed by lon_deg/min/sec.
+  // dms() produced lon ≈ 148199°, completely garbage, and EVERY tower
+  // got loaded at lon=+148199, breaking lat/lon proximity search for
+  // every region in CONUS.  This was the root cause of the
+  // "no ASR record within 200000 m" misses (e.g. WNVZ in Hampton VA).
+  const lat = dms(f[6],  f[7],  f[8],  f[9]);
+  const lon = dms(f[11], f[12], f[13], f[14]);
+  // Tighten validity check.  Old check `(lat !== 0 || lon !== 0)`
+  // accepted absurd lons like 148199 because they're "non-zero finite".
+  // Now require physical-plausibility — lat ∈ [-90, 90], lon ∈ [-180, 180].
+  if (Number.isFinite(lat) && Number.isFinite(lon)
+      && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+      && (lat !== 0 || lon !== 0)){
     coordsByUsi.set(usi, { lat, lon });
   }
 }
