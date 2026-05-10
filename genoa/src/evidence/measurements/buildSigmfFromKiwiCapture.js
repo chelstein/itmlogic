@@ -34,6 +34,19 @@
 const POWER_TO_FIELD_DB = 107;     // dBm→dBu, 50Ω matched-antenna default
 const KIWI_DEFAULT_RATE = 12000;   // Hz; KiwiSDR's stock AM-mode demod rate
 
+// Canonical ZTR storage layout for SDR captures.  ZTR's capture pipeline
+// drops the audio under
+//   https://ztr.sfo3.digitaloceanspaces.com/sdr/<ztr_station_id>/capture.wav
+// where ztr_station_id is the numeric ZTR station id (matches
+// facility_lookup_source.ztr_id on the genoa-side normalized facility row).
+// Override via --ztr-spaces-base or by passing a fully-qualified audio_url.
+export const ZTR_SDR_SPACES_BASE = 'https://ztr.sfo3.digitaloceanspaces.com/sdr';
+
+export function ztrCaptureUrl(ztr_station_id, base = ZTR_SDR_SPACES_BASE){
+  if (ztr_station_id === null || ztr_station_id === undefined || ztr_station_id === '') return null;
+  return `${base}/${encodeURIComponent(String(ztr_station_id))}/capture.wav`;
+}
+
 export function buildSigmfFromKiwiCapture({
   // ---- transmitter under test ----
   callsign,
@@ -66,6 +79,9 @@ export function buildSigmfFromKiwiCapture({
   kiwi_user             = null,
   capture_proxy_url     = null,
   audio_filename        = null,
+  audio_url             = null,               // fully-qualified URL to the .wav (e.g. ZTR Spaces)
+  ztr_station_id        = null,               // numeric ZTR station id; if set and audio_url is null, derives the canonical Spaces URL
+  ztr_spaces_base       = ZTR_SDR_SPACES_BASE,
   // ---- meta ----
   author                = 'genoa sigmfFromKiwiCapture',
   description           = null
@@ -170,6 +186,16 @@ export function buildSigmfFromKiwiCapture({
                                 ? { url: capture_proxy_url }
                                 : null,
       'genoa:audio_filename': audio_filename || null,
+      // ZTR's capture pipeline stores audio under a deterministic key
+      // by station id: <ZTR_SDR_SPACES_BASE>/<id>/capture.wav.  When
+      // ztr_station_id is supplied we synthesise that URL so the
+      // SigMF doc is self-contained — downstream ingest (or a human
+      // checking provenance) can fetch the raw .wav with no other
+      // lookup.  audio_url overrides this if explicitly supplied.
+      'genoa:audio_url':      audio_url || ztrCaptureUrl(ztr_station_id, ztr_spaces_base),
+      'genoa:ztr_station_id': ztr_station_id !== null && ztr_station_id !== undefined && ztr_station_id !== ''
+                                ? String(ztr_station_id)
+                                : null,
       'genoa:provenance': {
         regulation:     svc === 'AM' ? '47 CFR §73.186' : '47 CFR §73.314',
         reference:      'OET Bulletin 69 (receiver-calibration framework)',
