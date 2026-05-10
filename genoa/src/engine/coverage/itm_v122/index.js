@@ -165,6 +165,8 @@ export function pointToPoint({
 //   canopy_refractivity_n (default 360)  prop.encc - typical
 //                                  vegetation-canopy N value;
 //                                  unused when canopy_height_m=0.
+//   canopy_density        (default 1.0)  prop.cd - matches C++
+//                                  point_to_point() preset.
 //   ptx                   (default ipol) saalos polarization key:
 //                                  0 = horizontal, 1 = vertical,
 //                                  2 = circular.
@@ -183,6 +185,7 @@ export function pointToPointItwom({
   mdvar        = 12,
   canopy_height_m       = 0,
   canopy_refractivity_n = 360,
+  canopy_density        = 1.0,    // prop.cd; matches C++ point_to_point() preset
   ptx                   = null,
 } = {}){
   const prop  = buildProp({
@@ -190,6 +193,7 @@ export function pointToPointItwom({
   });
   prop.cch  = canopy_height_m;
   prop.encc = canopy_refractivity_n;
+  prop.cd   = canopy_density;
   prop.ptx  = ptx === null ? ipol : ptx;
 
   const propa = makePropa();
