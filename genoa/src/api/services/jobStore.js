@@ -26,6 +26,20 @@
 // Falls back to in-process-only when DATABASE_URL is unset or migrations
 // 003/004 haven't run.  This keeps unit tests and stateless dev
 // deployments working unchanged.
+//
+// ORPHAN RECOVERY
+// ---------------
+// Compute jobs run in-process via setImmediate(runJob) inside the same
+// gunicorn-style API worker that handled the POST.  When that worker
+// dies mid-compute (deploy, OOM, App Platform scale-down, SIGKILL)
+// the job's status stays RUNNING in PG forever — every cross-instance
+// poll keeps reporting the stale progress message and the UI is stuck.
+//
+// startOrphanReaper() (called from server.js) runs a background
+// setInterval that flips any RUNNING row whose updated_at hasn't moved
+// in JOB_REAP_STALE_AFTER_MS (default 15 min) to FAILED with code
+// JOB_ORPHANED.  Uses updated_at as a heartbeat proxy because every
+// setProgress()/completeJob()/failJob() already bumps it via persist().
 
 import { randomUUID } from 'node:crypto';
 import { pool, poolReady } from '../../db/pool.js';
@@ -42,6 +56,8 @@ export const JOB_KIND = Object.freeze({
   ENGINEERING_REPORT_TXT:  'engineering_report_txt',
   ENGINEERING_REPORT_PDF:  'engineering_report_pdf'
 });
+
+export const ORPHAN_REASON = 'JOB_ORPHANED';
 
 const memory = new Map();    // job_id → record (full record incl. artifact)
 let dbAvailable = poolReady();
@@ -337,6 +353,91 @@ async function readDbRowFull(id){
   } catch {
     return null;
   }
+}
+
+// ─────────── Orphan reaper ───────────
+//
+// Compute jobs run in-process via setImmediate(runJob).  When the API
+// worker dies mid-compute (deploy, OOM, scale-down, SIGKILL), the job
+// stays in RUNNING status forever — the UI polls and polls and never
+// sees a terminal state.  reapOrphanedJobs() flips any RUNNING job
+// whose updated_at hasn't moved in stale_after_ms to FAILED with code
+// JOB_ORPHANED, so the UI can surface a real failure + retry path.
+//
+// updated_at is the heartbeat proxy: every setProgress() bumps it via
+// persist(), so a healthy long compute (e.g. SPLAT inline sweep over
+// 36 radials) stays fresh as it ticks through PROGRESS milestones.
+// The default 15-min stale window comfortably exceeds the longest
+// expected compute (gunicorn worker timeout 600 s + parity report +
+// PDF render).
+
+export async function reapOrphanedJobs({ stale_after_ms = 15 * 60 * 1000 } = {}){
+  if (!dbAvailable) return { reaped: 0, scanned: 0, reason: 'db unavailable' };
+  const cutoff = new Date(Date.now() - stale_after_ms).toISOString();
+  try {
+    const p = pool();
+    // Atomic find-and-flip in a single UPDATE so two concurrent reapers
+    // (one per replica) can't both "claim" the same row.  RETURNING
+    // gives us the ids we touched so we can mirror into in-process state.
+    const r = await p.query(
+      `UPDATE engineering_export_jobs
+          SET status           = 'failed',
+              progress_message = 'Failed (orphaned)',
+              error_json       = $2,
+              updated_at       = NOW()
+        WHERE status = 'running' AND updated_at < $1
+        RETURNING id`,
+      [cutoff, JSON.stringify({
+        code:    ORPHAN_REASON,
+        message: `job exceeded ${Math.round(stale_after_ms / 1000)}s without progress and was marked failed by the orphan reaper`
+      })]
+    );
+    const reaped = r.rowCount || 0;
+    // Mirror into the local in-process map so a stale local cache
+    // doesn't resurrect the RUNNING view on the next getJob() hit.
+    for (const row of (r.rows || [])){
+      const m = memory.get(row.id);
+      if (m){
+        m.status           = JOB_STATUS.FAILED;
+        m.progress_message = 'Failed (orphaned)';
+        m.error            = { code: ORPHAN_REASON, message: 'job orphaned by reaper' };
+        m.updated_at       = new Date().toISOString();
+      }
+    }
+    return { reaped, scanned: reaped, cutoff };
+  } catch (e){
+    return { reaped: 0, scanned: 0, error: String(e?.message || e) };
+  }
+}
+
+// Start a setInterval-driven reaper.  Returns a stop() function for
+// graceful shutdown.  Default 60 s cadence + 15-min stale window
+// means an orphaned job surfaces as FAILED within ~16 min worst case.
+//
+// ENV
+//   JOB_REAP_INTERVAL_MS    default 60_000   (1 min between scans)
+//   JOB_REAP_STALE_AFTER_MS default 900_000  (15 min without progress)
+export function startOrphanReaper({ logger = console } = {}){
+  const period_ms      = Math.max(5_000,  Number(process.env.JOB_REAP_INTERVAL_MS)    || 60_000);
+  const stale_after_ms = Math.max(60_000, Number(process.env.JOB_REAP_STALE_AFTER_MS) || 15 * 60 * 1000);
+  if (!dbAvailable){
+    logger?.warn?.(`[job-reaper] DB unavailable; orphan reaper disabled`);
+    return () => {};
+  }
+  logger?.log?.(`[job-reaper] started (period=${period_ms}ms stale_after=${stale_after_ms}ms)`);
+  const t = setInterval(() => {
+    reapOrphanedJobs({ stale_after_ms })
+      .then((r) => {
+        if (r.reaped > 0){
+          logger?.warn?.(`[job-reaper] flipped ${r.reaped} orphaned job(s) to FAILED (cutoff=${r.cutoff})`);
+        } else if (r.error){
+          logger?.error?.(`[job-reaper] scan failed: ${r.error}`);
+        }
+      })
+      .catch((e) => logger?.error?.(`[job-reaper] iteration failed: ${e?.message || e}`));
+  }, period_ms);
+  t.unref?.();
+  return () => clearInterval(t);
 }
 
 // ─────────── Test-only helpers ───────────

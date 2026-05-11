@@ -21,6 +21,7 @@ import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
 import { migrate }   from '../db/migrate.js';
 import { poolReady } from '../db/pool.js';
+import { startOrphanReaper } from './services/jobStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
@@ -80,6 +81,13 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 server.on('error', (err) => { console.error('[genoa-api] listen error:', err && err.stack || err); process.exit(1); });
 
+// Background orphan-job reaper.  Flips any RUNNING job whose updated_at
+// hasn't moved in JOB_REAP_STALE_AFTER_MS (default 15 min) to FAILED
+// with code JOB_ORPHANED, so a worker death mid-compute surfaces as a
+// real failure on the UI poll instead of "Computing exhibit…" forever.
+// No-ops cleanly when DB is unconfigured.
+const stopReaper = startOrphanReaper({ logger: console });
+
 (async () => {
   if (poolReady()){
     try { const r = await migrate(); console.log('[genoa-api] migrations applied:', r.applied); }
@@ -91,6 +99,7 @@ server.on('error', (err) => { console.error('[genoa-api] listen error:', err && 
 
 const stop = (sig) => () => {
   console.log(`[genoa-api] received ${sig}, draining`);
+  stopReaper();
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 10_000).unref();
 };
