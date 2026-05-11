@@ -13,6 +13,18 @@
 //                                             flags?, timeout_seconds? }
 //                                    IMPORTANT: tx_qth is a FILE PATH on
 //                                    the sidecar's disk.
+//   POST   /api/v1/splat/run-inline  -> { available, source, method, engine,
+//                                      tier, dem_source, terrain_used,
+//                                      runtime_seconds, radials, ... }
+//                                    body: { tx_qth_content, frequency_mhz,
+//                                             erp_kw, polarization,
+//                                             max_distance_km,
+//                                             radial_step_deg,
+//                                             target_field_dbu,
+//                                             timeout_seconds }
+//                                    Inline JSON-in coverage sweep — no
+//                                    on-disk QTH files; sidecar materialises
+//                                    an ephemeral run dir per request.
 //   GET    /api/v1/artifacts         -> { workdir, count, artifacts: [...] }
 //   GET    /api/v1/artifacts/<path>  -> file bytes
 //   GET    /api/v1/sdf               -> { sdf_dir, count, tiles: [...] }
@@ -35,10 +47,23 @@
 //   before the inline run goes out.  Disable via auto_provision_dem=false
 //   on the call site if you want a pure-SPLAT timing or you've already
 //   pre-warmed the sidecar.
+//
+// TIMEOUT ENVELOPE
+//   The sidecar's gunicorn worker --timeout is 600 s (chelstein/splat
+//   Dockerfile CMD).  This client passes timeout_seconds in the body
+//   for the sidecar's own per-radial budget, AND wraps the fetch in
+//   AbortSignal.timeout(timeout_seconds + 60 s) so the genoa side
+//   doesn't trip first under normal load.  60 s slack covers TLS +
+//   sidecar startup latency on a cold worker.
 
 const DEFAULT_TIMEOUT_MS = 8_000;
 const UPLOAD_TIMEOUT_MS  = 60_000;
 const DOWNLOAD_TIMEOUT_MS = 60_000;
+// Headroom added to timeout_seconds when computing the AbortSignal for
+// /api/v1/splat/run-inline.  Must exceed the sidecar's own timeout
+// budget by enough to absorb cold-worker startup + TLS handshake but
+// stay safely under any upstream gateway limit.  60 s is comfortable.
+const INLINE_ABORT_SLACK_S = 60;
 
 export function makeSplatClient({
   baseUrl   = process.env.SPLAT_SIDECAR_URL || null,
@@ -168,16 +193,24 @@ export function makeSplatClient({
             max_distance_km, target_field_dbu, radial_step_deg, climate_code,
             timeout_seconds
           }),
-          signal:  AbortSignal.timeout((timeout_seconds + 10) * 1000)
+          // Sidecar gunicorn worker --timeout is 600 s; the inline
+          // route clamps client timeout_seconds to ≤ 540 server-side,
+          // so timeout_seconds + 60 s slack stays under both ceilings.
+          signal:  AbortSignal.timeout((timeout_seconds + INLINE_ABORT_SLACK_S) * 1000)
         });
         if (r.status === 404){
+          // Defense in depth: if the sidecar has been rolled back to a
+          // build that predates inline_runner.py, fall back to the JS
+          // multi-source-DEM engine cleanly instead of surfacing a 404
+          // as a generic compute error.  Current sidecars (chelstein/splat
+          // ≥ 28618eb) do expose this route — expected only on rollback.
           return {
             available: false,
             source:    null,
             endpoint:  inlineEndpoint,
             sidecar_enhancement_required: 'inline-qth',
             suggested_fallback:            'src/engine/coverage/itm_radial.js (computeItmCoverage)',
-            note:      'SPLAT sidecar does not expose /api/v1/splat/run-inline yet.  Use the multi-source-DEM JS terrain engine until the sidecar enhancement lands.',
+            note:      'SPLAT sidecar at this URL did not expose /api/v1/splat/run-inline; falling back to the multi-source-DEM JS terrain engine.  Verify the sidecar is on chelstein/splat ≥ 28618eb.',
             dem_provision
           };
         }
@@ -193,7 +226,10 @@ export function makeSplatClient({
           fetched_at:   new Date().toISOString(),
           method:       'SPLAT (Longley-Rice ITM v1.2.2) per-radial coverage prediction',
           dem_source:   j.dem_source || 'sidecar-provisioned (SRTM-3 / NED)',
+          terrain_used: !!j.terrain_used,
           runtime_seconds: j.runtime_seconds || null,
+          timeout_clamped: !!j.timeout_clamped,
+          timeout_requested: j.timeout_requested ?? null,
           radials:      j.radials || [],
           target_field_dbu, max_distance_km,
           stdout_excerpt: (j.stdout || '').slice(0, 400),
