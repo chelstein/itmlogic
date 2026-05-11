@@ -741,6 +741,99 @@ export function makeFacilityClient({
         calibrated:       allCalibrated,
         records:          usable
       };
+    },
+
+    /**
+     * SDR captures by callsign — fallback when ZTR station-id linkage
+     * is absent.
+     *
+     * getSdrEvidence() above needs a `stationId` to call ZTR's rich-
+     * station endpoint.  That works when facility resolution came from
+     * ZTR (carrying facility_lookup_source.ztr_id) but silently skips
+     * when the resolver fell through to FCC FMQ / N8N — even though
+     * ZTR may still have captures tagged with the same callsign
+     * (operator-attached audio, EAS validation captures, etc).
+     *
+     * This method bridges that gap.  ZTR's /api/sdr/captures endpoint
+     * supports a `?call=` filter that returns every capture row whose
+     * station_callsign matches.  We pull, service-filter, drop pending /
+     * failed sessions, and wrap the result in the same envelope shape
+     * that getSdrEvidence emits so the downstream measurements pipeline
+     * (engine + PDF render + UI CaptureTable) sees identical records.
+     *
+     * @param {object} args
+     * @param {string} args.call     station callsign (required)
+     * @param {string} [args.service] 'AM' | 'FM' | ...  optional service filter
+     * @param {number} [args.limit=20] cap on rows pulled from ZTR
+     * @returns {Promise<{available, source, endpoint, captures_field, records, ...}>}
+     */
+    async getSdrEvidenceByCall({ call, service = null, limit = 20 } = {}){
+      if (!call) return { available: false, source: null, error: 'call required' };
+      if (!ztrUrl) return { available: false, source: null, error: 'ztr unavailable' };
+      const params = new URLSearchParams();
+      params.set('call', String(call));
+      const cap = Math.max(1, Math.min(100, Number(limit) || 20));
+      params.set('limit', String(cap));
+      const endpoint = joinUrl(ztrUrl, `/api/sdr/captures?${params.toString()}`);
+
+      let raw;
+      try {
+        const r = await fetch(endpoint, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok){
+          return { available: false, source: 'zerotrustradio', endpoint, n_records: 0, error: `HTTP ${r.status}` };
+        }
+        raw = await r.json();
+      } catch (e){
+        return { available: false, source: 'zerotrustradio', endpoint, n_records: 0, error: String(e?.message || e) };
+      }
+
+      // ZTR's response shape varies by route version: accept either a
+      // bare array or { captures: [...] } / { rows: [...] }.
+      const rows = Array.isArray(raw) ? raw
+                  : Array.isArray(raw?.captures) ? raw.captures
+                  : Array.isArray(raw?.rows)     ? raw.rows
+                  : [];
+
+      // Service filter.  Capture rows carry `service` ('am'/'fm').  When
+      // the caller specifies a service, rows tagged with a different
+      // service are dropped.  Untagged rows pass through.
+      const wantedService = service ? String(service).toUpperCase() : null;
+      const filtered = !wantedService ? rows : rows.filter(c => {
+        const tag = c?.service || c?.service_type || c?.svc;
+        if (!tag) return true;
+        return String(tag).toUpperCase() === wantedService;
+      });
+
+      // Drop pending / failed / cancelled sessions — only completed
+      // captures are evidence-worthy.  ZTR's status field is one of
+      // 'pending' | 'succeeded' | 'failed' | 'cancelled' (current
+      // schema); a missing status defaults to keeping the row (legacy
+      // rows + manual-check entries).
+      const usable = filtered.filter(c => {
+        if (c == null || typeof c !== 'object') return false;
+        const status = String(c.status || c.session_status || 'succeeded').toLowerCase();
+        return status !== 'pending' && status !== 'failed' && status !== 'cancelled';
+      });
+
+      const allCalibrated = usable.length > 0 && usable.every(c =>
+        c.calibrated === true || (c.calibration && Object.keys(c.calibration).length > 0));
+
+      return {
+        available:        usable.length > 0,
+        source:           'zerotrustradio',
+        endpoint,
+        fetched_at:       new Date().toISOString(),
+        captures_field:   'ztr-sdr-captures-by-call',
+        lookup_strategy:  'callsign-filter',
+        call:             String(call),
+        service:          wantedService,
+        n_records:        usable.length,
+        n_records_raw:    rows.length,
+        n_dropped_service_filter: rows.length - filtered.length,
+        n_dropped_status_filter:  filtered.length - usable.length,
+        calibrated:       allCalibrated,
+        records:          usable
+      };
     }
   };
 }
