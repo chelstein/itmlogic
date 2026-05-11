@@ -296,3 +296,176 @@ export const TERRAIN_PROPAGATION_PROVENANCE = Object.freeze({
   full_itm_path: 'src/evidence/terrain/splatClient.js predictItmCoverage() — routes to chelstein/splat sidecar with provisioned DEM tiles for full Longley-Rice fidelity',
   license_basis: 'ITU and IRE references in the public domain; implementation original'
 });
+
+// ---------------------------------------------------------------------
+// ITM v1.2.2 path-loss adapter — drop-in replacement for terrainPathLoss
+// that routes through the validated JS port (src/engine/coverage/itm_v122).
+//
+// Returns the same shape as terrainPathLoss so findFieldStrengthCrossingOnRadial
+// can consume it without changes:
+//
+//   { total_loss_db, free_space_db, smooth_earth_extra_db, knife_edge_db,
+//     worst_edge, distance_km, frequency_mhz, tx_height_m, rx_height_m }
+//
+// The ITM path doesn't produce a "worst edge" — diffraction is integrated
+// across the full profile inside qlrpfl/lrprop.  We pack the avar-output
+// excess-above-free-space into `smooth_earth_extra_db` (so the existing
+// `extra = smooth_earth_extra_db + knife_edge_db` arithmetic in the
+// crossing-finder still yields the right total) and leave knife_edge_db=0
+// + worst_edge=null.
+//
+// Validated 12/12 PASS at max |Δ| = 0.05 dB vs C++ test_p2p (NTIA v1.2.2)
+// across the splat-vs-JS bake-off (chelstein/itmlogic itmBakeOff.js).
+// ---------------------------------------------------------------------
+
+let _pointToPointLazy = null;
+async function _loadPointToPoint(){
+  if (!_pointToPointLazy){
+    const mod = await import('./itm_v122/index.js');
+    _pointToPointLazy = mod.pointToPoint;
+  }
+  return _pointToPointLazy;
+}
+// Synchronous wrapper for hot-path use.  Top-level await isn't available
+// in CommonJS callers and the original API is sync; load the module on
+// first use via a module-level promise that callers can await once at
+// startup before using the sync surface.
+let _pointToPointSync = null;
+export async function preloadItmV122(){
+  if (!_pointToPointSync) _pointToPointSync = await _loadPointToPoint();
+  return _pointToPointSync;
+}
+function _requirePreloaded(){
+  if (!_pointToPointSync){
+    throw new Error('itmV122PathLoss called before preloadItmV122(); call await preloadItmV122() once at engine startup');
+  }
+  return _pointToPointSync;
+}
+
+/**
+ * Resample a (distance_km, elevation_m) terrain profile to a uniform
+ * pfl array in SPLAT format: [np, xi, e0, e1, ..., enp].  np = number
+ * of intervals (so length = np + 3).  Linear-interpolates elevation
+ * between adjacent input samples.
+ *
+ * @param {Array<{distance_km, elevation_m}>} profile  sorted by distance_km
+ * @param {number} [xi_m=100]  target sample spacing (m); the actual xi
+ *                              is adjusted so np * xi = total_distance_m exactly.
+ * @returns {Array<number>}  pfl array
+ */
+export function pflFromProfile(profile, xi_m = 100){
+  if (!Array.isArray(profile) || profile.length < 2){
+    return [1, xi_m, 0, 0];
+  }
+  const pts = profile.slice().sort((a, b) => a.distance_km - b.distance_km);
+  const total_m = Math.max((pts[pts.length - 1].distance_km - pts[0].distance_km) * 1000, xi_m);
+  const np = Math.max(1, Math.round(total_m / xi_m));
+  const xi = total_m / np;
+  const start_m = pts[0].distance_km * 1000;
+  const pfl = [np, xi];
+  let j = 1;
+  for (let i = 0; i <= np; i++){
+    const d_m = i * xi;
+    while (j < pts.length && (pts[j].distance_km * 1000 - start_m) < d_m) j++;
+    if (j >= pts.length) j = pts.length - 1;
+    const a = pts[j - 1], b = pts[j];
+    const a_m = a.distance_km * 1000 - start_m;
+    const b_m = b.distance_km * 1000 - start_m;
+    const t = b_m === a_m ? 0 : (d_m - a_m) / (b_m - a_m);
+    pfl.push(a.elevation_m + t * (b.elevation_m - a.elevation_m));
+  }
+  return pfl;
+}
+
+/**
+ * ITM v1.2.2 terrain path-loss — same return shape as terrainPathLoss
+ * so the existing crossing-finder consumes it unchanged.
+ *
+ * Requires preloadItmV122() to have been called at engine startup.
+ *
+ * @param {object} args  same as terrainPathLoss
+ * @param {number} [args.klim=5]      ITM radio climate (5 = continental temperate)
+ * @param {number} [args.mdvar=12]    ITM mode-of-variability (12 = broadcast)
+ * @param {number} [args.conf=0.5]    confidence quantile
+ * @param {number} [args.rel=0.5]     reliability quantile
+ * @param {number} [args.ipol=1]      polarisation (0=H, 1=V)
+ * @param {number} [args.xi_m=100]    pfl sample spacing
+ */
+export function itmV122PathLoss({
+  tx_amsl_m, rx_amsl_m, terrain_profile, frequency_mhz,
+  klim = 5, mdvar = 12, conf = 0.5, rel = 0.5, ipol = 1,
+  xi_m = 100
+}){
+  const pointToPoint = _requirePreloaded();
+  const first = terrain_profile[0];
+  const last  = terrain_profile[terrain_profile.length - 1];
+  const distance_km = last.distance_km - first.distance_km;
+  const tx_height_m = Math.max(Number(tx_amsl_m) - first.elevation_m, 1);
+  const rx_height_m = Math.max(Number(rx_amsl_m) - last.elevation_m,  1);
+
+  const pfl = pflFromProfile(terrain_profile, xi_m);
+  const r   = pointToPoint({
+    profile:       pfl,
+    tx_height_m,
+    rx_height_m,
+    frequency_mhz: Number(frequency_mhz),
+    klim, mdvar, conf, rel, ipol
+  });
+
+  const total = r.dbloss_db;
+  const fs    = r.fsl_db;
+  return {
+    total_loss_db:        Number(total.toFixed(2)),
+    free_space_db:        Number(fs.toFixed(2)),
+    // ITM doesn't separate smooth-earth vs knife-edge — the avar-output
+    // excess above free-space rolls them together.  Pack it into
+    // smooth_earth_extra_db so the existing crossing-finder arithmetic
+    // (`extra = smooth_earth_extra_db + knife_edge_db`) yields the same
+    // number we'd get by reading total - fsl directly.
+    smooth_earth_extra_db:Number((r.avar_db).toFixed(2)),
+    knife_edge_db:        0,
+    worst_edge:           null,
+    distance_km,
+    frequency_mhz:        Number(frequency_mhz),
+    tx_height_m, rx_height_m,
+    // Per-call ITM diagnostics — exposed so the radial-coverage layer
+    // can surface mode/kwx/dl/dh on each result for the engineering
+    // report.  Not consumed by predictFieldStrengthDbu / the crossing
+    // finder; safe to ignore.
+    _itm: {
+      mode:  r.mode,
+      kwx:   r.kwx,
+      dl:    r.dl,
+      he:    r.he,
+      dh:    r.dh,
+      excess_db: r.excess_db,
+      avar_db:   r.avar_db
+    }
+  };
+}
+
+export const ITM_V122_PROPAGATION_PROVENANCE = Object.freeze({
+  model:    'NTIA Irregular Terrain Model v1.2.2 (Longley-Rice) — JS port',
+  port_from: 'chelstein/splat itwom3.0.cpp point_to_point_ITM (v1.2.2 baseline)',
+  port_module: 'src/engine/coverage/itm_v122 (qlrpfl → lrprop → alos/adiff/ascat → avar)',
+  validation: '12/12 fixtures pass at max |Δ| ≤ 0.05 dB vs C++ test_p2p reference (PR #106 bake-off)',
+  references: [
+    'NTIA Tech. Report 82-100 (Longley-Rice), §4 (the radio-propagation model)',
+    'Irregular Terrain Model (Hufford / Longley / Rice 1967, NBS Tech. Note 101)',
+    'ITS implementation itm.cpp v1.2.2 (public domain)'
+  ],
+  dem_source: 'multi-source elevationClient (USGS 3DEP + Open-Meteo + OpenTopoData) resampled to uniform xi=100m via pflFromProfile()',
+  modeled: [
+    'Two-clear-horizon LOS + diffraction blend (qlrpfl ELSE branch)',
+    'Rounded-horizon / two-obstruction LOS + diffraction (qlrpfl IF branch)',
+    'Free-space + smooth-earth + knife-edge integration via adiff/alos coefficients',
+    'Troposcatter beyond-horizon regime (ascat)',
+    'Variability statistics (avar) with climate, time, location, situation, mode-of-variability'
+  ],
+  not_modeled: [
+    'Canopy attenuation — use pointToPointItwom (ITWOM 3.0) for the saalos canopy path',
+    'Multi-source DEM uncertainty propagation (single elevation per sample)',
+    'Polarization beyond H/V (no circular here; ITWOM path takes ptx=2)'
+  ],
+  license_basis: 'NTIA TR 82-100 in the public domain; JS port original (matches C++ at machine precision)'
+});
