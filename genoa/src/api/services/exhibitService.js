@@ -203,6 +203,36 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 2a. SDR capture fallback by callsign (when ztr_id isn't linked) ----
+  //
+  // Step 2's rich-station path only fires when facility resolution
+  // returned a row from ZTR carrying facility_lookup_source.ztr_id.
+  // When Genoa resolved the facility via FCC FMQ / N8N instead, no
+  // ztr_id is attached even if ZTR has captures tagged with the same
+  // callsign (operator-attached AM samples, EAS validation captures,
+  // 30-second manual_check audio, etc).
+  //
+  // Fall back to ZTR's /api/sdr/captures?call=<call> filter and attach
+  // matching captures with the same envelope shape the engine + UI
+  // already consume.  Also fires when step 2 ran but the rich-station
+  // bundle carried no captures (n_records=0) — gives ZTR's per-capture
+  // index a second chance to surface evidence that wasn't bundled on
+  // the rich-station response.
+  if (sdrEnabledForService
+      && (!sdrResp || !sdrResp.available || (sdrResp.n_records ?? 0) === 0)
+      && inputs.call
+      && sidecars.facility?.getSdrEvidenceByCall){
+    const byCall = await sidecars.facility.getSdrEvidenceByCall({
+      call:    inputs.call,
+      service: inputs.service
+    });
+    if (byCall?.available){
+      sdrResp = byCall;
+    } else if (byCall && !sdrResp){
+      sdrResp = byCall;   // preserve diagnostics (status_keys, etc.)
+    }
+  }
+
   // ---- 2b. Operator-supplied SigMF override (per-job inline blob or URL) ----
   // When inputs.sigmf_meta or inputs.sigmf_url is set, treat it as
   // measurement evidence for THIS job and let it override (or fill in
