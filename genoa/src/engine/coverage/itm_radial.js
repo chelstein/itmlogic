@@ -48,7 +48,14 @@
 //   }
 
 import { buildSamplePoints, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
-import { terrainPathLoss, predictFieldStrengthDbu, TERRAIN_PROPAGATION_PROVENANCE } from './terrain_propagation.js';
+import {
+  terrainPathLoss,
+  itmV122PathLoss,
+  preloadItmV122,
+  predictFieldStrengthDbu,
+  TERRAIN_PROPAGATION_PROVENANCE,
+  ITM_V122_PROPAGATION_PROVENANCE
+} from './terrain_propagation.js';
 import { fccDistanceKm } from '../curves/fcc/index.mjs';
 
 const DEFAULT_RX_AMSL_GROUND_OFFSET_M = 9.1;     // §73.683 / OET-69 standard receiver height
@@ -63,6 +70,7 @@ const DEFAULT_RX_AMSL_GROUND_OFFSET_M = 9.1;     // §73.683 / OET-69 standard r
  * @param {number} args.frequency_mhz
  * @param {number} args.target_field_dbu      service threshold (e.g. 60)
  * @param {number} [args.rx_height_above_ground_m=9.1]  §73.683 standard receiver
+ * @param {string} [args.engine='itm-v122']   propagation engine; see below
  * @returns {{
  *   crossing_distance_km: number|null,
  *   field_at_crossing_dbu: number|null,
@@ -75,11 +83,17 @@ const DEFAULT_RX_AMSL_GROUND_OFFSET_M = 9.1;     // §73.683 / OET-69 standard r
 export function findFieldStrengthCrossingOnRadial({
   profile, tx_amsl_m, erp_kw, frequency_mhz,
   target_field_dbu,
-  rx_height_above_ground_m = DEFAULT_RX_AMSL_GROUND_OFFSET_M
+  rx_height_above_ground_m = DEFAULT_RX_AMSL_GROUND_OFFSET_M,
+  // 'itm-v122' = validated JS port of NTIA ITM v1.2.2 (default; 12/12
+  //              fixtures match C++ to ≤0.05 dB).
+  // 'bullington' = legacy Bullington smooth-earth + ITU-R P.526 single-
+  //              knife-edge.  Kept for fallback / A-B diagnostics.
+  engine = 'itm-v122'
 }){
   if (!Array.isArray(profile) || profile.length < 2){
     return { crossing_distance_km: null, field_at_crossing_dbu: null, path_loss_at_crossing_db: null, worst_edge: null, profile_searched: 0, beyond_max_range: false };
   }
+  const pathLoss = engine === 'itm-v122' ? itmV122PathLoss : terrainPathLoss;
   let last_above = null;
   let last_below = null;
   let lastResult = null;
@@ -90,7 +104,7 @@ export function findFieldStrengthCrossingOnRadial({
     const cumulative = profile.slice(0, i + 1);
     const last_pt = cumulative[cumulative.length - 1];
     const rx_amsl_m = last_pt.elevation_m + rx_height_above_ground_m;
-    const loss = terrainPathLoss({
+    const loss = pathLoss({
       tx_amsl_m, rx_amsl_m,
       terrain_profile: cumulative,
       frequency_mhz
@@ -165,6 +179,7 @@ export function findFieldStrengthCrossingOnRadial({
  * @param {number} [args.to_km=80]           last sample distance
  * @param {number} [args.samples=40]         samples per radial (≈ 2 km step at 80 km)
  * @param {string} [args.fcc_mode='50,50']   FCC curve family for baseline
+ * @param {string} [args.engine='itm-v122']  'itm-v122' | 'bullington'
  */
 export async function computeItmCoverage({
   tx_lat, tx_lon, tx_amsl_m,
@@ -174,8 +189,21 @@ export async function computeItmCoverage({
   from_km = 1,
   to_km   = 80,
   samples = 40,
-  fcc_mode = '50,50'
+  fcc_mode = '50,50',
+  // Propagation engine.  'itm-v122' is the validated JS port of NTIA
+  // ITM v1.2.2 (default, 12/12 fixtures match C++ to ≤0.05 dB).
+  // 'bullington' is the legacy Bullington smooth-earth + ITU-R P.526
+  // path; kept for fallback + side-by-side comparison.
+  engine = 'itm-v122'
 }){
+  // Pre-load the ITM v1.2.2 JS port once per process so the per-sample
+  // sync call doesn't dynamic-import inside the hot loop.  Cheap no-op
+  // on subsequent calls.
+  if (engine === 'itm-v122'){
+    try { await preloadItmV122(); }
+    catch (e){ return { available: false, error: `ITM v1.2.2 preload failed: ${e.message}` }; }
+  }
+
   // 1. Sample points along every radial.
   const pts = buildSamplePoints({ tx_lat, tx_lon, radials_deg, from_km, to_km, samples });
 
@@ -229,7 +257,8 @@ export async function computeItmCoverage({
 
     const cross = findFieldStrengthCrossingOnRadial({
       profile, tx_amsl_m, erp_kw, frequency_mhz,
-      target_field_dbu
+      target_field_dbu,
+      engine
     });
 
     let mode = 'los';
@@ -253,16 +282,24 @@ export async function computeItmCoverage({
     };
   });
 
+  const isItm = engine === 'itm-v122';
   return {
     available:        true,
-    cite:             '47 CFR §73.333 / §73.184 with terrain via Bullington / ITU-R P.526',
-    method:           'per-radial Bullington smooth-earth + ITU-R P.526 single-knife-edge diffraction; field-strength crossing via linear interpolation',
+    engine,
+    cite:             isItm
+                        ? '47 CFR §73.333 / §73.184 with terrain via NTIA ITM v1.2.2 (Longley-Rice)'
+                        : '47 CFR §73.333 / §73.184 with terrain via Bullington / ITU-R P.526',
+    method:           isItm
+                        ? 'per-radial NTIA ITM v1.2.2 (qlrpfl → lrprop → alos/adiff/ascat → avar); profile resampled to xi=100 m via pflFromProfile; field-strength crossing via linear interpolation'
+                        : 'per-radial Bullington smooth-earth + ITU-R P.526 single-knife-edge diffraction; field-strength crossing via linear interpolation',
     dem_source:       dem_source_id,
     arc:              { from_km, to_km, samples, target_field_dbu, fcc_mode },
     tx:               { lat: tx_lat, lon: tx_lon, amsl_m: tx_amsl_m },
     fcc_baseline_km,
     radials,
     fetched_at:       new Date().toISOString(),
-    provenance:       TERRAIN_PROPAGATION_PROVENANCE
+    provenance:       isItm
+                        ? ITM_V122_PROPAGATION_PROVENANCE
+                        : TERRAIN_PROPAGATION_PROVENANCE
   };
 }
