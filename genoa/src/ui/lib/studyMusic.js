@@ -1,28 +1,29 @@
 // Bobby Caldwell background music for long-running operations.
 //
-// Per the operator:
-//   • "Open Your Eyes"             — playing while a study compute runs
-//   • "My Flame"                   — playing while a save operation runs
-//   • "What You Won't Do for Love" — playing once an exhibit is loaded
-//                                    and the operator is working with it
-//   • "Down for the Third Time"    — playing while PDF / TXT job runs
+// Phase tracks (one-shot per-action; auto-stops on phase change):
+//   • "Open Your Eyes"             — welcome track on first app load;
+//                                    plays until the operator clicks
+//                                    Compute, then never replays
+//   • "My Flame"                   — playing during exhibit compute,
+//                                    stops when compute finishes
+//   • "Down for the Third Time"    — playing during PDF / TXT render,
+//                                    stops when render finishes
 //
-// When the app is idle with no exhibit loaded, no music plays.
+// Optional ambient track (operator toggles on/off):
+//   • "What You Won't Do for Love" — loops in the background when no
+//                                    phase track is active.  Phase
+//                                    tracks pause it when they kick
+//                                    in, ambient resumes when they
+//                                    finish.  Default OFF.
 //
 // Audio source files are committed to public-static/audio/ with their
-// original "Bobby Caldwell <title>.mp3" filenames:
-//
-//   public-static/audio/Bobby Caldwell Open Your Eyes.mp3
-//   public-static/audio/Bobby Caldwell My Flame.mp3
-//   public-static/audio/Bobby Caldwell What You Won't Do for Love.mp3
-//   public-static/audio/Bobby Caldwell Down for the Third Time.mp3
-//
-// Filenames are URL-encoded at fetch time via encodeURIComponent so
-// spaces and the apostrophe in "Won't" resolve cleanly.
+// original "Bobby Caldwell <title>.mp3" filenames.  Filenames are
+// URL-encoded at fetch time via encodeURIComponent so spaces and the
+// apostrophe in "Won't" resolve cleanly.
 //
 // Browser autoplay policy blocks audio until the user has interacted
 // with the page at least once, so the player arms itself on the first
-// click anywhere — after that, automatic crossfades between tracks
+// click anywhere — after that, automatic crossfades between phases
 // work without further prompts.
 
 import { useEffect, useRef, useState } from 'react';
@@ -32,25 +33,25 @@ import { useEffect, useRef, useState } from 'react';
 // fetched URL is /audio/Bobby%20Caldwell%20...%20.mp3.
 const AUDIO = (file) => `/audio/${encodeURIComponent(file)}`;
 export const TRACKS = {
-  compute: {
+  welcome: {
     title:  'Open Your Eyes',
     artist: 'Bobby Caldwell',
     src:    AUDIO('Bobby Caldwell Open Your Eyes.mp3')
   },
-  save: {
+  compute: {
     title:  'My Flame',
     artist: 'Bobby Caldwell',
     src:    AUDIO('Bobby Caldwell My Flame.mp3')
-  },
-  exhibit: {
-    title:  "What You Won't Do for Love",
-    artist: 'Bobby Caldwell',
-    src:    AUDIO("Bobby Caldwell What You Won't Do for Love.mp3")
   },
   pdf: {
     title:  'Down for the Third Time',
     artist: 'Bobby Caldwell',
     src:    AUDIO('Bobby Caldwell Down for the Third Time.mp3')
+  },
+  ambient: {
+    title:  "What You Won't Do for Love",
+    artist: 'Bobby Caldwell',
+    src:    AUDIO("Bobby Caldwell What You Won't Do for Love.mp3")
   }
 };
 
@@ -75,13 +76,13 @@ function fade(audio, fromVol, toVol, ms){
 /**
  * useStudyMusic({ phase, muted, volume })
  *
- *   phase  — 'idle' | 'compute' | 'save' | 'exhibit' | 'pdf'
- *            which track should play; 'idle' pauses all elements
+ *   phase  — 'welcome' | 'compute' | 'pdf' | 'ambient' | null
+ *            which track should play; null/'idle' pauses all elements
  *   muted  — boolean                                   pause + fade out
  *   volume — 0..1                                       max track volume
  *
  * Returns: { currentTrack, armed, arm }
- *   currentTrack — the TRACKS entry for the active phase, or null on 'idle'
+ *   currentTrack — the TRACKS entry for the active phase, or null when silent
  *   armed        — whether the user has interacted with the page yet
  *                  (audio can play); set true automatically on the
  *                  first user click
