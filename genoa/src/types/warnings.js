@@ -156,6 +156,10 @@ export const WARNING_CODES = Object.freeze({
     title: 'NEC evidence sourced from GPL-isolated external sidecar',
     description: 'NEC2++ is GPL v2.  This evidence was produced by an isolated sidecar process that Genoa talks to over HTTP only — Genoa\'s own codebase does not link or embed any GPL\'d code.  evidence.nec_model.provenance.license_boundary is stamped "external sidecar" so reviewers can verify the boundary is preserved.' },
 
+  AM_GROUND_SIGMA_DEFAULTED: { severity: 'warning', phase: 'sidecar',
+    title: 'AM ground conductivity defaulted (synthetic 8 mS/m)',
+    description: 'The operator did not supply ground_sigma_mS_m and the NEC AM antenna model was synthesized with the §73.182 typical default of 8 mS/m / εr=13.  The Sommerfeld real-ground solution depends materially on this value; reviewers must confirm 8 mS/m is appropriate for the tower site before filing, or rerun with the measured / FCC M3 σ for the licensee\'s ground area.  evidence.nec_model_inputs.ground_sigma_mS_m_synthetic=true records the disclosure.' },
+
   LMS_DATA_UNAVAILABLE: { severity: 'warning', phase: 'evidence',
     title: 'FCC LMS / public-file data unavailable',
     description: 'Genoa could not reach the FCC FMQ/AMQ database or publicfiles.fcc.gov for this station.  Filing-grade exhibits should cross-reference the FCC\'s authoritative record (license expiration, status, last action, public-file folder presence).  Re-run the compute when the upstream is responsive, or pull the data manually from https://transition.fcc.gov/fcc-bin/fmq and https://publicfiles.fcc.gov/.' },

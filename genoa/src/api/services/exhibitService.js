@@ -570,11 +570,34 @@ export async function computeExhibit(req){
                           && Number.isFinite(Number(inputs.frequency))
                           && Number.isFinite(Number(inputs.haat_m));
     if (explicit_geom || explicit_arr || can_synth){
+      const sigmaProvided = Number.isFinite(Number(inputs.ground_sigma_mS_m));
+      const synthesizing  = !explicit_geom && !explicit_arr;
       const necReq = explicit_geom
         ? { kind: 'run',      payload: explicit_geom }
         : explicit_arr
           ? { kind: 'array',  payload: explicit_arr }
           : { kind: 'array',  payload: synthDefaultAmArray(inputs) };
+      // Disclose the NEC payload inputs (notably σ) on the exhibit so a
+      // reviewer can see exactly what the antenna model ran against.
+      // When the operator didn't provide ground_sigma_mS_m, the synth
+      // path silently defaults to 8 mS/m per §73.182 typical — surface
+      // that synthetic value AND emit AM_GROUND_SIGMA_DEFAULTED so the
+      // assumption is visible on the PDF instead of hidden behind "—".
+      if (synthesizing){
+        const sigma_mS_m = sigmaProvided ? Number(inputs.ground_sigma_mS_m) : 8;
+        evidence.nec_model_inputs = {
+          source: 'synthesized-default-single-monopole',
+          ground_sigma_mS_m:           sigma_mS_m,
+          ground_sigma_mS_m_synthetic: !sigmaProvided,
+          dielectric_constant:         13,
+          dielectric_constant_synthetic: true,
+          ground_model:                'sommerfeld',
+          tower_height_m_from_haat:    Number(inputs.haat_m) || null
+        };
+        if (!sigmaProvided){
+          warnings.push(W.make('AM_GROUND_SIGMA_DEFAULTED'));
+        }
+      }
       const necResp = await budget.withDeadline('nec_sidecar',
         () => necReq.kind === 'array'
           ? sidecars.nec.runAmArray(necReq.payload, { timeoutMs: 90_000 })
