@@ -585,14 +585,23 @@ export async function computeExhibit(req){
       // assumption is visible on the PDF instead of hidden behind "—".
       if (synthesizing){
         const sigma_mS_m = sigmaProvided ? Number(inputs.ground_sigma_mS_m) : 8;
+        // ground_conductivity evidence (set in step 6c) tells us where
+        // sigma came from when sigmaProvided is true: operator,
+        // fcc-m3 live, or zerotrustradio-m3-proxy.  When it's still
+        // null here, both upstream tiers failed AND no operator value
+        // was set — we're using the §73.182 typical synthetic default.
+        const gc = evidence.ground_conductivity || null;
         evidence.nec_model_inputs = {
           source: 'synthesized-default-single-monopole',
-          ground_sigma_mS_m:           sigma_mS_m,
-          ground_sigma_mS_m_synthetic: !sigmaProvided,
-          dielectric_constant:         13,
+          ground_sigma_mS_m:               sigma_mS_m,
+          ground_sigma_mS_m_synthetic:     !sigmaProvided,
+          ground_sigma_mS_m_resolved_from: sigmaProvided
+                                             ? (gc?.source || 'operator-supplied')
+                                             : 'synthetic-§73.182-typical',
+          dielectric_constant:           13,
           dielectric_constant_synthetic: true,
-          ground_model:                'sommerfeld',
-          tower_height_m_from_haat:    Number(inputs.haat_m) || null
+          ground_model:                  'sommerfeld',
+          tower_height_m_from_haat:      Number(inputs.haat_m) || null
         };
         if (!sigmaProvided){
           warnings.push(W.make('AM_GROUND_SIGMA_DEFAULTED'));
@@ -1054,6 +1063,62 @@ export async function computeExhibit(req){
         };
       }
     } catch { /* swallow; engine emits MISSING_NEARBY_STATIONS honestly */ }
+  }
+
+  // ---- 6c. Live ground conductivity (AM only) ----
+  // §73.190 / Figure M3 σ is required for honest AM groundwave compute
+  // AND the NEC Sommerfeld real-ground antenna model.  Chain:
+  //   1. operator-supplied inputs.ground_sigma_mS_m  (highest priority)
+  //   2. live geo.fcc.gov/api/contours/conductivity.json
+  //   3. ZTR /api/m3/conductivity proxy (cached / vendored M3 polygons)
+  //   4. silence here → §73.182 typical synthetic 8 mS/m default with
+  //      the AM_GROUND_SIGMA_DEFAULTED warning emitted downstream.
+  // Stamps evidence.ground_conductivity so the exhibit + PDF can show
+  // WHICH source produced the value (operator / fcc-m3 / ztr / default).
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))){
+    const sigmaIn = Number(inputs.ground_sigma_mS_m);
+    if (Number.isFinite(sigmaIn) && sigmaIn > 0){
+      evidence.ground_conductivity = {
+        available:  true,
+        sigma_mS_m: sigmaIn,
+        source:     'operator-supplied',
+        fetched_at: new Date().toISOString()
+      };
+    } else {
+      let resolved = null;
+      // Tier 1 — live FCC.
+      if (sidecars.fccConductivity){
+        try {
+          const r = await budget.withDeadline('fcc_conductivity',
+            () => sidecars.fccConductivity.lookupSigma({ lat: inputs.lat, lon: inputs.lon }),
+            { minMs: 2_000 });
+          if (r?.available) resolved = r;
+          else evidence.ground_conductivity_fcc_attempt = r;
+        } catch (e){
+          evidence.ground_conductivity_fcc_attempt = { available: false, error: String(e?.message || e) };
+        }
+      }
+      // Tier 2 — ZTR proxy.
+      if (!resolved && sidecars.facility?.getGroundConductivity){
+        try {
+          const r = await budget.withDeadline('ztr_conductivity',
+            () => sidecars.facility.getGroundConductivity({ lat: inputs.lat, lon: inputs.lon }),
+            { minMs: 2_000 });
+          if (r?.available) resolved = r;
+          else evidence.ground_conductivity_ztr_attempt = r;
+        } catch (e){
+          evidence.ground_conductivity_ztr_attempt = { available: false, error: String(e?.message || e) };
+        }
+      }
+      if (resolved){
+        inputs.ground_sigma_mS_m = resolved.sigma_mS_m;
+        evidence.ground_conductivity = resolved;
+      }
+      // No resolved value → leave inputs.ground_sigma_mS_m null; the
+      // engine and the NEC-synth disclosure (#132) handle it from here.
+    }
   }
 
   // ---- 7. Compute ----
