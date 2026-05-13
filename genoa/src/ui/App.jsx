@@ -102,25 +102,59 @@ function MainApp({ onLogout }) {
   const [busy, setBusy]           = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
-  // Bobby Caldwell — action-driven background music.  Each track loops
-  // while its action is in flight and stops the moment the action
-  // returns.  Nothing plays in between.
-  //   welcome  → "Open Your Eyes"           (loops during station lookup
-  //                                          via /api/facilities/:id;
-  //                                          ~12-30 s wall-clock)
-  //   compute  → "My Flame"                 (loops during exhibit compute;
-  //                                          ~1:40 wall-clock)
-  //   pdf      → "Down for the Third Time"  (loops during PDF/TXT render;
-  //                                          ~2-4 min wall-clock)
-  // Order: pdf > compute > welcome > silence.  PDF outranks compute
-  // because the report path internally runs a fresh compute (PR #119);
-  // compute outranks welcome because by the time the operator hits
-  // Compute, the station lookup has already finished anyway.
-  const [muted, setMuted]                       = useState(false);
-  const [lookingUpStation, setLookingUpStation] = useState(false);
-  const musicPhase = renderingPdf     ? 'pdf'
-                   : computing        ? 'compute'
-                   : lookingUpStation ? 'welcome'
+  // Bobby Caldwell — phase-driven background music.
+  //
+  // Workflow:
+  //   1. Operator picks a station — via any path (dropdown search
+  //      result, preset button, manual Lookup, type-in).  Open Your
+  //      Eyes loops from that pick THROUGH the first auto-compute,
+  //      stopping when that compute returns data.  Never replays
+  //      this session.
+  //   2. Operator clicks Compute Exhibit a second time (with the
+  //      use_terrain checkbox or any options changed).  My Flame
+  //      loops until that compute returns data.
+  //   3. Operator clicks Download Engineering Statement PDF.  Down
+  //      for the Third Time loops until the artifact downloads.
+  //
+  // Phase precedence: pdf > welcome (when active) > compute > silence.
+  // welcome outranks compute so OYE keeps playing through the first
+  // compute too (per operator spec); it retires the instant
+  // `computing` flips true → false the first time.
+  const [muted, setMuted]                   = useState(false);
+  const [welcomeUsed, setWelcomeUsed]       = useState(false); // OYE retired
+  const [welcomePending, setWelcomePending] = useState(false); // queued by station pick
+  const computingPrevRef                    = useRef(false);
+  const renderingPdfPrevRef                 = useRef(false);
+  // Any non-synthetic station entering inputs arms the welcome track.
+  // This catches every selection path: preset buttons (loadKslx etc.
+  // flip _synthetic:false), dropdown picks (loadStationRow ditto),
+  // Lookup button (lookupFacility sets facility_id), and manual
+  // facility_id type-in.
+  useEffect(() => {
+    if (welcomeUsed || welcomePending) return;
+    const synthDefault = inputs._synthetic === true;
+    const haveStation  = !synthDefault && !!inputs.facility_id;
+    if (haveStation) setWelcomePending(true);
+  }, [inputs._synthetic, inputs.facility_id, welcomeUsed, welcomePending]);
+  // Retire OYE the moment the first compute returns (computing flips
+  // true → false while OYE is queued).  Edge-detect on PDF too: if
+  // the operator somehow runs PDF without ever computing, retire OYE
+  // when the PDF finishes (defensive — unlikely path).
+  useEffect(() => {
+    const prevC = computingPrevRef.current;
+    const prevP = renderingPdfPrevRef.current;
+    computingPrevRef.current     = computing;
+    renderingPdfPrevRef.current  = renderingPdf;
+    const computeJustEnded = prevC && !computing;
+    const pdfJustEnded     = prevP && !renderingPdf;
+    if ((computeJustEnded || pdfJustEnded) && welcomePending && !welcomeUsed){
+      setWelcomePending(false);
+      setWelcomeUsed(true);
+    }
+  }, [computing, renderingPdf, welcomePending, welcomeUsed]);
+  const musicPhase = renderingPdf   ? 'pdf'
+                   : welcomePending ? 'welcome'   // outranks compute
+                   : computing      ? 'compute'
                    : null;
   const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
@@ -179,7 +213,6 @@ function MainApp({ onLogout }) {
   async function lookupFacility(id, baseInputs = null){
     if (!id){ setFacilitySource('Enter a Facility ID first.'); return null; }
     setFacilitySource('Looking up…');
-    setLookingUpStation(true);     // arms "Open Your Eyes" for the duration
     try {
       const r = await fetch(`/api/facilities/${encodeURIComponent(id)}`);
       if (r.status === 503){
@@ -207,8 +240,6 @@ function MainApp({ onLogout }) {
     } catch (e){
       setFacilitySource(`Lookup failed: ${e.message}`);
       return null;
-    } finally {
-      setLookingUpStation(false);  // station data returned → OYE stops
     }
   }
 
