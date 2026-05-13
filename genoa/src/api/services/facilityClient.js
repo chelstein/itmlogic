@@ -437,21 +437,35 @@ export function makeFacilityClient({
       ];
       const queries = isAM
         ? AM_RELATIONSHIPS
-            .map(r => ({ rel: r.rel, f: +((f0_khz + r.delta_khz) / 1000).toFixed(3) /* MHz for FMQ uniform grid */ }))
-            .filter(q => q.f >= 0.530 && q.f <= 1.710)
+            // AMQ takes frequency in kHz, not MHz — keep raw kHz here
+            // so the AMQ call below can route as-is.  Prior shape
+            // converted to MHz and routed through searchByFrequencyRange
+            // which is hardcoded to FM 88..108 MHz, so every AM lookup
+            // silently returned 0 rows (KRDM: "§73.187 / §73.190 — 0
+            // stations evaluated").
+            .map(r => ({ rel: r.rel, f_khz: f0_khz + r.delta_khz }))
+            .filter(q => q.f_khz >= 530 && q.f_khz <= 1710)
         : FM_RELATIONSHIPS
             .map(r => ({ rel: r.rel, f: +(f0_mhz + r.delta_mhz).toFixed(1) }))
             .filter(q => q.f >= 88.0 && q.f <= 108.0);
 
       const settled = await Promise.all(queries.map(q =>
-        fmqClient.searchByFrequencyRange(q.f, q.f).then(r => ({ ...q, ...r }))
+        isAM
+          ? fmqClient.searchAmByFrequencyRangeKhz(q.f_khz, q.f_khz).then(r => ({ ...q, ...r }))
+          : fmqClient.searchByFrequencyRange(q.f, q.f).then(r => ({ ...q, ...r }))
       ));
 
       const { karneyInverse } = await import('../../engine/geometry/wgs84.js');
       const errs = [];
       const collected = new Map();      // facility_id -> closest row
       for (const r of settled){
-        if (r.error){ errs.push(`f=${r.f}: ${r.error}`); continue; }
+        if (r.error){
+          const fLabel = Number.isFinite(r.f_khz) ? `${r.f_khz} kHz`
+                       : Number.isFinite(r.f)     ? `${r.f} MHz`
+                       : '?';
+          errs.push(`f=${fLabel}: ${r.error}`);
+          continue;
+        }
         for (const row of (r.rows || [])){
           if (!row || !row.facility_id) continue;
           if (exclude_facility_id && String(row.facility_id) === String(exclude_facility_id)) continue;
