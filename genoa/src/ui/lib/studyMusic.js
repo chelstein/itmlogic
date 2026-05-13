@@ -9,13 +9,16 @@
 //
 // When the app is idle with no exhibit loaded, no music plays.
 //
-// Audio source files are NOT committed (copyrighted material).  Drop
-// MP3s into genoa/src/ui/public-static/audio/ with these filenames and
-// the player picks them up automatically:
+// Audio source files are committed to public-static/audio/ with their
+// original "Bobby Caldwell <title>.mp3" filenames:
 //
-//   public-static/audio/open-your-eyes.mp3
-//   public-static/audio/never-find-a-love.mp3
-//   public-static/audio/down-for-the-third-time.mp3
+//   public-static/audio/Bobby Caldwell Open Your Eyes.mp3
+//   public-static/audio/Bobby Caldwell My Flame.mp3
+//   public-static/audio/Bobby Caldwell What You Won't Do for Love.mp3
+//   public-static/audio/Bobby Caldwell Down for the Third Time.mp3
+//
+// Filenames are URL-encoded at fetch time via encodeURIComponent so
+// spaces and the apostrophe in "Won't" resolve cleanly.
 //
 // Browser autoplay policy blocks audio until the user has interacted
 // with the page at least once, so the player arms itself on the first
@@ -24,8 +27,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-// Filenames match the literal MP3s committed to public-static/audio/.
-// URL-encoded (spaces, apostrophe) so the browser fetches them cleanly.
+// Filenames match the literal MP3s in public-static/audio/.  Spaces
+// and the apostrophe in "Won't" go through encodeURIComponent so the
+// fetched URL is /audio/Bobby%20Caldwell%20...%20.mp3.
 const AUDIO = (file) => `/audio/${encodeURIComponent(file)}`;
 export const TRACKS = {
   compute: {
@@ -85,7 +89,7 @@ function fade(audio, fromVol, toVol, ms){
  *                  (e.g. from a "Play 🎵" button click handler).
  */
 export function useStudyMusic({ phase = 'idle', muted = false, volume = 0.35 } = {}){
-  const audioRefs = useRef({});                  // { idle, compute, pdf } -> <audio>
+  const audioRefs = useRef({});                  // { compute, save, exhibit, pdf } -> <audio>
   const [armed, setArmed] = useState(false);
   const arm = () => setArmed(true);
 
@@ -140,8 +144,8 @@ export function useStudyMusic({ phase = 'idle', muted = false, volume = 0.35 } =
       if (!a.paused) fade(a, a.volume, 0, FADE_MS).then(() => a.pause());
     }
     target.play().catch(() => {
-      // Source not yet provided (404 on /audio/*.mp3) — silently no-op
-      // so the UI still works when audio files haven't been dropped in.
+      // 404 / decode error — silently no-op so the UI still works
+      // when an audio file is missing or unsupported by the browser.
     });
     fade(target, target.volume, volume, FADE_MS);
   }, [phase, armed, muted, volume]);

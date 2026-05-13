@@ -1,4 +1,0 @@
-# Don't commit audio files (copyrighted) — only the README is tracked.
-*
-!.gitignore
-!README.txt
