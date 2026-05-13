@@ -1,9 +1,14 @@
 // Bobby Caldwell background music for long-running operations.
 //
 // Per the operator:
-//   • "Open Your Eyes"              — initial / idle landing track
-//   • "Never Find a Love Like Mine" — playing while exhibit compute runs
+//   • "Open Your Eyes"              — playing while a study compute runs
+//                                     ("start with open your eyes on initial"
+//                                     = the initial action is the study)
+//   • "Never Find a Love Like Mine" — playing once an exhibit is loaded
+//                                     and the operator is working with it
 //   • "Down for the Third Time"     — playing while PDF / TXT job runs
+//
+// When the app is idle with no exhibit loaded, no music plays.
 //
 // Audio source files are NOT committed (copyrighted material).  Drop
 // MP3s into genoa/src/ui/public-static/audio/ with these filenames and
@@ -21,12 +26,12 @@
 import { useEffect, useRef, useState } from 'react';
 
 export const TRACKS = {
-  idle: {
+  compute: {
     title:  'Open Your Eyes',
     artist: 'Bobby Caldwell',
     src:    '/audio/open-your-eyes.mp3'
   },
-  compute: {
+  exhibit: {
     title:  'Never Find a Love Like Mine',
     artist: 'Bobby Caldwell',
     src:    '/audio/never-find-a-love.mp3'
@@ -59,12 +64,13 @@ function fade(audio, fromVol, toVol, ms){
 /**
  * useStudyMusic({ phase, muted, volume })
  *
- *   phase  — 'idle' | 'compute' | 'pdf'        which track should play
- *   muted  — boolean                            pause + fade out
- *   volume — 0..1                               max track volume
+ *   phase  — 'idle' | 'compute' | 'exhibit' | 'pdf'   which track should play
+ *            'idle' = no music; all <audio> elements pause
+ *   muted  — boolean                                   pause + fade out
+ *   volume — 0..1                                       max track volume
  *
  * Returns: { currentTrack, armed, arm }
- *   currentTrack — the TRACKS entry for the active phase (always set)
+ *   currentTrack — the TRACKS entry for the active phase, or null on 'idle'
  *   armed        — whether the user has interacted with the page yet
  *                  (audio can play); set true automatically on the
  *                  first user click
@@ -134,7 +140,7 @@ export function useStudyMusic({ phase = 'idle', muted = false, volume = 0.35 } =
   }, [phase, armed, muted, volume]);
 
   return {
-    currentTrack: TRACKS[phase] || TRACKS.idle,
+    currentTrack: TRACKS[phase] || null,
     armed,
     arm
   };
