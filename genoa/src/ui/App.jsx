@@ -102,70 +102,24 @@ function MainApp({ onLogout }) {
   const [busy, setBusy]           = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
-  // Bobby Caldwell — phase-driven background music.
+  // Bobby Caldwell — each track plays ONLY while its action is
+  // processing.  Stops the moment that action returns.
   //
-  //   welcome  → "Open Your Eyes"           (fires when the operator
-  //                                          selects their first station;
-  //                                          loops continuously through
-  //                                          the FIRST compute too —
-  //                                          overrides My Flame during
-  //                                          that compute.  Retires
-  //                                          permanently the moment that
-  //                                          first compute returns data;
-  //                                          never replays.)
-  //   compute  → "My Flame"                 (loops during the SECOND and
-  //                                          subsequent compute cycles,
-  //                                          stops when compute ends.)
-  //   pdf      → "Down for the Third Time"  (loops during PDF/TXT render,
-  //                                          stops when render ends.)
+  //   • Open Your Eyes          — while /api/facilities/:id is
+  //                               loading station data (~12-30 s)
+  //   • My Flame                — while exhibit compute is running
+  //                               (~1:40)
+  //   • Down for the Third Time — while PDF / TXT render is running
+  //                               (~2-4 min)
   //
-  // Phase precedence:
-  //   pdf > welcome (if active) > compute > silence
-  // welcome outranks compute because OYE is supposed to span the first
-  // compute too; it only retires once that compute finishes.
+  // Phase precedence: pdf > compute > welcome > silence.
   const [muted, setMuted]                       = useState(false);
-  const [welcomeUsed, setWelcomeUsed]           = useState(false); // OYE retired
-  const [welcomePending, setWelcomePending]     = useState(false); // queued by station-select
-  const computingPrevRef                        = useRef(false);   // edge-detect compute end
-  // First real station selection arms the welcome track.  A "real" pick
-  // is anything that flips _synthetic off or sets a non-empty facility_id
-  // (preset buttons, search results, manual typing).
-  useEffect(() => {
-    if (welcomeUsed || welcomePending) return;
-    const synthDefault = inputs._synthetic === true;
-    const haveStation  = !synthDefault && !!inputs.facility_id;
-    if (haveStation) setWelcomePending(true);
-  }, [inputs._synthetic, inputs.facility_id, welcomeUsed, welcomePending]);
-  // Retire the welcome the instant `computing` transitions from
-  // true → false (the first compute just returned data).  PDF without
-  // a prior compute also retires it as an edge-case cleanup.
-  useEffect(() => {
-    const prev = computingPrevRef.current;
-    computingPrevRef.current = computing;
-    if (prev && !computing && welcomePending && !welcomeUsed){
-      setWelcomePending(false);
-      setWelcomeUsed(true);
-    }
-    if (renderingPdf && welcomePending && !welcomeUsed){
-      setWelcomePending(false);
-      setWelcomeUsed(true);
-    }
-  }, [computing, renderingPdf, welcomePending, welcomeUsed]);
-  const musicPhase = renderingPdf   ? 'pdf'
-                   : welcomePending ? 'welcome'   // outranks compute so OYE keeps playing
-                   : computing      ? 'compute'
+  const [lookingUpStation, setLookingUpStation] = useState(false);
+  const musicPhase = renderingPdf     ? 'pdf'
+                   : computing        ? 'compute'
+                   : lookingUpStation ? 'welcome'
                    : null;
-  const { currentTrack, armed, arm } = useStudyMusic({
-    phase: musicPhase,
-    muted,
-    onTrackEnd: (p) => {
-      if (p === 'welcome'){
-        // Song played through naturally — retire it.
-        setWelcomePending(false);
-        setWelcomeUsed(true);
-      }
-    }
-  });
+  const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
@@ -222,6 +176,7 @@ function MainApp({ onLogout }) {
   async function lookupFacility(id, baseInputs = null){
     if (!id){ setFacilitySource('Enter a Facility ID first.'); return null; }
     setFacilitySource('Looking up…');
+    setLookingUpStation(true);     // arms "Open Your Eyes" for the call
     try {
       const r = await fetch(`/api/facilities/${encodeURIComponent(id)}`);
       if (r.status === 503){
@@ -249,6 +204,8 @@ function MainApp({ onLogout }) {
     } catch (e){
       setFacilitySource(`Lookup failed: ${e.message}`);
       return null;
+    } finally {
+      setLookingUpStation(false);  // station data returned → OYE stops
     }
   }
 
@@ -464,7 +421,18 @@ function MainApp({ onLogout }) {
     setFacilitySource(`Loaded ${row.call || row.facility_id || 'station'} via ${row.facility_lookup_source?.upstream || 'upstream'}`);
     setStationQuery('');
     setStationResults([]);
-    await compute(merged);
+    // Refresh the canonical /api/facilities/:id row in the background
+    // so the "Open Your Eyes" station-loading phase has a real
+    // processing window (~12-30 s).  Without this the dropdown-pick
+    // path skips straight to compute and OYE never gets a chance to
+    // play.  The lookup also enriches fields the search-row may not
+    // carry (canonical call, fcc_class, licensee, etc.).
+    let refreshed = merged;
+    if (merged.facility_id){
+      const r = await lookupFacility(merged.facility_id, merged);
+      if (r?.facility) refreshed = mergeFacility(merged, r.facility);
+    }
+    await compute(refreshed);
   }
   function loadSynthetic(){
     setInputs(PRESET_SYNTHETIC);

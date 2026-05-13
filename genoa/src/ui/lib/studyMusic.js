@@ -1,17 +1,15 @@
-// Bobby Caldwell background music for long-running operations.
+// Bobby Caldwell background music — each track plays ONLY while its
+// own action is processing.  Stops the moment that action returns.
 //
-//   • "Open Your Eyes"           — fires when the operator selects
-//                                  their first station this session.
-//                                  Loops continuously through the
-//                                  first compute (overrides "My Flame"
-//                                  during that compute).  Retires
-//                                  permanently the moment that first
-//                                  compute returns data; never replays.
-//   • "My Flame"                 — plays during exhibit compute on the
-//                                  SECOND and subsequent compute clicks
-//                                  (loops until compute finishes).
-//   • "Down for the Third Time"  — plays during PDF / TXT render,
-//                                  loops until the render finishes.
+//   • "Open Your Eyes"           — while /api/facilities/:id is
+//                                  loading station data (~12-30 s)
+//   • "My Flame"                 — while exhibit compute is running
+//                                  (~1:40 wall-clock)
+//   • "Down for the Third Time"  — while PDF / TXT render is running
+//                                  (~2-4 min wall-clock)
+//
+// No overlap, no spanning across phases.  When the action ends the
+// song stops; nothing plays in between.
 //
 // Audio source files are committed to public-static/audio/ with their
 // original "Bobby Caldwell <title>.mp3" filenames.  Filenames are
@@ -34,10 +32,8 @@ export const TRACKS = {
     title:  'Open Your Eyes',
     artist: 'Bobby Caldwell',
     src:    AUDIO('Bobby Caldwell Open Your Eyes.mp3'),
-    // Loops from first station-select through the first compute's
-    // completion (including DURING that first compute).  Retires
-    // permanently once that compute returns data; the second and
-    // subsequent computes get My Flame instead.
+    // Loops while the station lookup is in flight; stops when the
+    // /api/facilities/:id call returns.  Same pattern as compute/pdf.
     loop:   true
   },
   compute: {
