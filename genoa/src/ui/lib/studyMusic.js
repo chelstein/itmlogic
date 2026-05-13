@@ -1,16 +1,17 @@
 // Bobby Caldwell background music for long-running operations.
 //
-// Three phases, one song each.  All phases auto-stop when the
-// triggering action ends; nothing plays in between.
-//
-//   • "Open Your Eyes"           — fires the very first time a station
-//                                  is selected this session.  Never
-//                                  replays after that, even if the
-//                                  operator picks a different station.
-//   • "My Flame"                 — plays during exhibit compute, stops
-//                                  when the compute cycle finishes.
+//   • "Open Your Eyes"           — fires when the operator selects
+//                                  their first station this session.
+//                                  Loops continuously through the
+//                                  first compute (overrides "My Flame"
+//                                  during that compute).  Retires
+//                                  permanently the moment that first
+//                                  compute returns data; never replays.
+//   • "My Flame"                 — plays during exhibit compute on the
+//                                  SECOND and subsequent compute clicks
+//                                  (loops until compute finishes).
 //   • "Down for the Third Time"  — plays during PDF / TXT render,
-//                                  stops when the render finishes.
+//                                  loops until the render finishes.
 //
 // Audio source files are committed to public-static/audio/ with their
 // original "Bobby Caldwell <title>.mp3" filenames.  Filenames are
@@ -33,10 +34,11 @@ export const TRACKS = {
     title:  'Open Your Eyes',
     artist: 'Bobby Caldwell',
     src:    AUDIO('Bobby Caldwell Open Your Eyes.mp3'),
-    // One-shot: plays through once on first station select, then
-    // silence.  Doesn't loop (compute / pdf still loop until their
-    // action ends).
-    loop:   false
+    // Loops from first station-select through the first compute's
+    // completion (including DURING that first compute).  Retires
+    // permanently once that compute returns data; the second and
+    // subsequent computes get My Flame instead.
+    loop:   true
   },
   compute: {
     title:  'My Flame',

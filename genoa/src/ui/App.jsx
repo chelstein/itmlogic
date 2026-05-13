@@ -103,18 +103,30 @@ function MainApp({ onLogout }) {
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
   // Bobby Caldwell — phase-driven background music.
-  //   welcome  → "Open Your Eyes"           (fires once when the first
-  //                                          real station is selected;
-  //                                          one-shot, not looped;
-  //                                          never replays this session)
-  //   compute  → "My Flame"                 (loops during exhibit compute,
-  //                                          stops when compute ends)
+  //
+  //   welcome  → "Open Your Eyes"           (fires when the operator
+  //                                          selects their first station;
+  //                                          loops continuously through
+  //                                          the FIRST compute too —
+  //                                          overrides My Flame during
+  //                                          that compute.  Retires
+  //                                          permanently the moment that
+  //                                          first compute returns data;
+  //                                          never replays.)
+  //   compute  → "My Flame"                 (loops during the SECOND and
+  //                                          subsequent compute cycles,
+  //                                          stops when compute ends.)
   //   pdf      → "Down for the Third Time"  (loops during PDF/TXT render,
-  //                                          stops when render ends)
-  // Order: pdf > compute > welcome (only when welcomePending) > silence.
+  //                                          stops when render ends.)
+  //
+  // Phase precedence:
+  //   pdf > welcome (if active) > compute > silence
+  // welcome outranks compute because OYE is supposed to span the first
+  // compute too; it only retires once that compute finishes.
   const [muted, setMuted]                       = useState(false);
-  const [welcomeUsed, setWelcomeUsed]           = useState(false); // OYE consumed
+  const [welcomeUsed, setWelcomeUsed]           = useState(false); // OYE retired
   const [welcomePending, setWelcomePending]     = useState(false); // queued by station-select
+  const computingPrevRef                        = useRef(false);   // edge-detect compute end
   // First real station selection arms the welcome track.  A "real" pick
   // is anything that flips _synthetic off or sets a non-empty facility_id
   // (preset buttons, search results, manual typing).
@@ -124,18 +136,24 @@ function MainApp({ onLogout }) {
     const haveStation  = !synthDefault && !!inputs.facility_id;
     if (haveStation) setWelcomePending(true);
   }, [inputs._synthetic, inputs.facility_id, welcomeUsed, welcomePending]);
-  // If the operator runs Compute or a PDF before Open Your Eyes has
-  // started playing (or while it's queued), retire the welcome slot —
-  // it's a one-shot and we don't want it firing later in the session.
+  // Retire the welcome the instant `computing` transitions from
+  // true → false (the first compute just returned data).  PDF without
+  // a prior compute also retires it as an edge-case cleanup.
   useEffect(() => {
-    if ((computing || renderingPdf) && (welcomePending || !welcomeUsed)){
+    const prev = computingPrevRef.current;
+    computingPrevRef.current = computing;
+    if (prev && !computing && welcomePending && !welcomeUsed){
       setWelcomePending(false);
       setWelcomeUsed(true);
     }
-  }, [computing, renderingPdf]);
+    if (renderingPdf && welcomePending && !welcomeUsed){
+      setWelcomePending(false);
+      setWelcomeUsed(true);
+    }
+  }, [computing, renderingPdf, welcomePending, welcomeUsed]);
   const musicPhase = renderingPdf   ? 'pdf'
+                   : welcomePending ? 'welcome'   // outranks compute so OYE keeps playing
                    : computing      ? 'compute'
-                   : welcomePending ? 'welcome'
                    : null;
   const { currentTrack, armed, arm } = useStudyMusic({
     phase: musicPhase,
