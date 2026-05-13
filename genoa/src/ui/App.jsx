@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { stripDomAndReact } from './lib/stripDomAndReact.js';
 import { readJsonOrThrow }  from './lib/readJson.js';
+import { useStudyMusic }    from './lib/studyMusic.js';
 import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
@@ -99,7 +100,16 @@ function MainApp({ onLogout }) {
   const [exhibit, setExhibit] = useState(null);
   const [computing, setComputing] = useState(false);
   const [busy, setBusy]           = useState(false);
+  const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
+  // Bobby Caldwell — three tracks, one per phase of work.
+  // Phase resolves to 'pdf' while an engineering-statement render is in
+  // flight, 'compute' while the engine is producing an exhibit, 'idle'
+  // otherwise.  Order matters: PDF wins over compute because the PDF
+  // render path internally runs a fresh compute too (per PR #119).
+  const [muted, setMuted] = useState(false);
+  const musicPhase = renderingPdf ? 'pdf' : computing ? 'compute' : 'idle';
+  const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
@@ -502,12 +512,14 @@ function MainApp({ onLogout }) {
   async function statelessEngineeringReportDownload(ex, ext){
     const kind = ext === 'pdf' ? 'engineering_report_pdf' : 'engineering_report_txt';
     setStatusMsg(`Submitting Engineering Statement ${ext.toUpperCase()} job…`);
+    setRenderingPdf(true);
     const cleaned = stripDomAndReact(ex);
-    const view = await runJobAndWait(
-      kind,
-      { input: { exhibit: cleaned } },
-      (msg) => setStatusMsg(msg)
-    );
+    try {
+      const view = await runJobAndWait(
+        kind,
+        { input: { exhibit: cleaned } },
+        (msg) => setStatusMsg(msg)
+      );
     if (!view.artifact_url) throw new Error('Job completed without artifact');
     setStatusMsg(`Downloading ${ext.toUpperCase()} artifact…`);
     // Per the operator's standing rule: each downstream step's clock
@@ -553,6 +565,9 @@ function MainApp({ onLogout }) {
     a.download = `genoa-engineering-statement-${call}-${ts}.${ext}`;
     a.click();
     setStatusMsg(`Engineering Statement ${ext.toUpperCase()} downloaded.`);
+    } finally {
+      setRenderingPdf(false);
+    }
   }
 
   async function statelessPdfDownload(ex){
@@ -698,6 +713,23 @@ function MainApp({ onLogout }) {
     >
       Sign&nbsp;out
     </button>
+    <div
+      className="fixed top-3 right-28 z-40 flex items-center gap-2 font-mono text-[10px] tracking-rack uppercase text-textDim border border-rule rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm"
+      title={`Now playing: "${currentTrack.title}" — ${currentTrack.artist}`}
+    >
+      <button
+        onClick={() => { arm(); setMuted(m => !m); }}
+        className="hover:text-cream"
+        title={muted ? 'Unmute' : 'Mute'}
+      >
+        {muted ? '🔇' : '♪'}
+      </button>
+      <span className="text-cream/80 normal-case tracking-normal">
+        {armed
+          ? <>“{currentTrack.title}” — {currentTrack.artist}</>
+          : <span className="text-textDim">click ♪ to play music</span>}
+      </span>
+    </div>
     <AppShell
       systemStatus={sysStatus}
       mode={exhibit?.calculation_method?.name || '47 CFR §73.333 F(50,50)'}

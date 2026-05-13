@@ -87,12 +87,36 @@ async function runExhibitJob(r){
 }
 
 async function runReportJob(r, ext){
-  // 1. Compute (the input may already be a full exhibit; prefer that
-  //    path when the caller has done it).
+  // 1. Compute — always run a FRESH per-station compute().
+  //
+  // Previously this path would re-use r.input.exhibit when present
+  // (the UI's "Download Engineering Statement PDF" button sends the
+  // currently-loaded exhibit JSON for convenience).  That shortcut
+  // froze whatever engine state produced the cached exhibit into the
+  // PDF, including pre-existing bugs:
+  //   - exhibits pre-PR #117 carried empty Appendix C/D rows
+  //   - exhibits pre-PR #118 carried "(engine NOT IMPLEMENTED)"
+  //     in the methodology source string
+  //   - any future engine fix would silently fail to reach the PDF
+  //
+  // Every engineering statement must reflect a real per-station
+  // computation under the CURRENT engine — no filling in gaps from
+  // cached JSON.  When the caller passes a cached exhibit, extract
+  // its station_inputs and rerun the full compute pipeline (which
+  // also re-fetches upstream evidence like ZTR rich-station, FCC
+  // parity, nearby_primaries — none of which should be inherited
+  // from a stale snapshot).
   setProgress(r.id, PROGRESS.COMPUTING);
-  const exhibit = (r.input && r.input.exhibit && typeof r.input.exhibit === 'object')
+  const cached = (r.input && r.input.exhibit && typeof r.input.exhibit === 'object')
     ? r.input.exhibit
-    : await computeExhibit(computeReq(r));
+    : null;
+  const req = cached
+    ? applyComputeOptionDefaults({
+        inputs:  cached.station_inputs || {},
+        options: r.options || {}
+      })
+    : computeReq(r);
+  const exhibit = await computeExhibit(req);
 
   // 2. Validation pass — exhibitService.computeExhibit already runs the
   //    standard validation.  Surfacing the milestone separately is
