@@ -103,21 +103,31 @@ function MainApp({ onLogout }) {
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
   // Bobby Caldwell — phase-driven background music.
-  //   compute  → "Open Your Eyes"
-  //   save     → "My Flame"                    (busy === true during /api/exhibits save)
-  //   exhibit  → "What You Won't Do for Love"  (exhibit loaded, otherwise idle)
-  //   pdf      → "Down for the Third Time"
-  //   idle     → silence (app just opened, no exhibit yet, nothing running)
-  // Order matters: pdf > save > compute > exhibit > idle.  The PDF render
-  // path internally runs a fresh compute (per PR #119) so it must outrank
-  // 'compute'; save runs against a loaded exhibit so it must outrank
-  // 'exhibit'.
-  const [muted, setMuted] = useState(false);
-  const musicPhase = renderingPdf ? 'pdf'
-                   : busy         ? 'save'
-                   : computing    ? 'compute'
-                   : exhibit      ? 'exhibit'
-                   : 'idle';
+  //   welcome  → "Open Your Eyes"           (first app load only,
+  //                                          replaced by silence the
+  //                                          moment the operator clicks
+  //                                          Compute; never replays)
+  //   compute  → "My Flame"                 (during exhibit compute,
+  //                                          stops when compute finishes)
+  //   pdf      → "Down for the Third Time"  (during PDF/TXT render)
+  //   ambient  → "What You Won't Do for Love" (optional background loop;
+  //                                          plays whenever no phase
+  //                                          track is active and the
+  //                                          operator has toggled it on)
+  // Order: pdf > compute > welcome (only if firstRunDone is false)
+  //         > ambient (only if ambientOn) > silence
+  const [muted, setMuted]           = useState(false);
+  const [ambientOn, setAmbientOn]   = useState(false);
+  const [firstRunDone, setFirstRunDone] = useState(false);
+  // Latch firstRunDone the moment a compute begins.  Once true, the
+  // welcome track ("Open Your Eyes") never replays for the rest of
+  // this session.
+  useEffect(() => { if (computing) setFirstRunDone(true); }, [computing]);
+  const musicPhase = renderingPdf  ? 'pdf'
+                   : computing     ? 'compute'
+                   : !firstRunDone ? 'welcome'
+                   : ambientOn     ? 'ambient'
+                   : null;
   const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
@@ -742,6 +752,15 @@ function MainApp({ onLogout }) {
             ? <>“{currentTrack.title}” — {currentTrack.artist}</>
             : <span className="text-textDim">idle</span>}
       </span>
+      <button
+        onClick={() => { arm(); setAmbientOn(a => !a); }}
+        className={`ml-1 px-1.5 py-px rounded border ${ambientOn ? 'border-gold/60 text-gold' : 'border-rule text-textDim hover:text-cream'}`}
+        title={ambientOn
+          ? "Turn off ambient (“What You Won't Do for Love”)"
+          : "Turn on ambient (“What You Won't Do for Love” loops in the background)"}
+      >
+        BG
+      </button>
     </div>
     <AppShell
       systemStatus={sysStatus}
