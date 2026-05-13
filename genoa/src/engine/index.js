@@ -443,8 +443,15 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.generated_at      = new Date().toISOString();
   exhibit.engine_signature  = ENGINE_SIGNATURE;
   exhibit.software_versions = SOFTWARE_VERSIONS;
+  // AM groundwave runs through src/engine/am/groundwave.js, which
+  // reads the vendored FCC gwave.js grid keyed on (σ × distance per
+  // §73.184 Figure M3).  The prior label "(engine NOT IMPLEMENTED)"
+  // was stale — left over from a pre-2.0 scaffolding branch — and is
+  // a P1 misleading-metadata bug in the engineering statement.
   const interpBlock = (service === 'AM')
-    ? { along_field: 'n/a', along_haat: 'n/a', source: '47 CFR §73.184 groundwave (engine NOT IMPLEMENTED)' }
+    ? { along_field: 'σ × distance grid',
+        along_haat:  'n/a',
+        source:      '47 CFR §73.184 groundwave (vendored gwave.js; bivariate over σ × distance per Figure M3)' }
     : (fmEngine === 'fcc-canonical' ? FM_INTERP_FCC : FM_INTERP);
 
   exhibit.method_versions   = {
