@@ -1,12 +1,11 @@
 // Bobby Caldwell background music for long-running operations.
 //
 // Per the operator:
-//   • "Open Your Eyes"              — playing while a study compute runs
-//                                     ("start with open your eyes on initial"
-//                                     = the initial action is the study)
-//   • "Never Find a Love Like Mine" — playing once an exhibit is loaded
-//                                     and the operator is working with it
-//   • "Down for the Third Time"     — playing while PDF / TXT job runs
+//   • "Open Your Eyes"             — playing while a study compute runs
+//   • "My Flame"                   — playing while a save operation runs
+//   • "What You Won't Do for Love" — playing once an exhibit is loaded
+//                                    and the operator is working with it
+//   • "Down for the Third Time"    — playing while PDF / TXT job runs
 //
 // When the app is idle with no exhibit loaded, no music plays.
 //
@@ -25,21 +24,29 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+// Filenames match the literal MP3s committed to public-static/audio/.
+// URL-encoded (spaces, apostrophe) so the browser fetches them cleanly.
+const AUDIO = (file) => `/audio/${encodeURIComponent(file)}`;
 export const TRACKS = {
   compute: {
     title:  'Open Your Eyes',
     artist: 'Bobby Caldwell',
-    src:    '/audio/open-your-eyes.mp3'
+    src:    AUDIO('Bobby Caldwell Open Your Eyes.mp3')
+  },
+  save: {
+    title:  'My Flame',
+    artist: 'Bobby Caldwell',
+    src:    AUDIO('Bobby Caldwell My Flame.mp3')
   },
   exhibit: {
-    title:  'Never Find a Love Like Mine',
+    title:  "What You Won't Do for Love",
     artist: 'Bobby Caldwell',
-    src:    '/audio/never-find-a-love.mp3'
+    src:    AUDIO("Bobby Caldwell What You Won't Do for Love.mp3")
   },
   pdf: {
     title:  'Down for the Third Time',
     artist: 'Bobby Caldwell',
-    src:    '/audio/down-for-the-third-time.mp3'
+    src:    AUDIO('Bobby Caldwell Down for the Third Time.mp3')
   }
 };
 
@@ -64,8 +71,8 @@ function fade(audio, fromVol, toVol, ms){
 /**
  * useStudyMusic({ phase, muted, volume })
  *
- *   phase  — 'idle' | 'compute' | 'exhibit' | 'pdf'   which track should play
- *            'idle' = no music; all <audio> elements pause
+ *   phase  — 'idle' | 'compute' | 'save' | 'exhibit' | 'pdf'
+ *            which track should play; 'idle' pauses all elements
  *   muted  — boolean                                   pause + fade out
  *   volume — 0..1                                       max track volume
  *
