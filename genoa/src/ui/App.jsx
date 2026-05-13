@@ -102,59 +102,44 @@ function MainApp({ onLogout }) {
   const [busy, setBusy]           = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
-  // Bobby Caldwell — phase-driven background music.
+  // Bobby Caldwell — strict 1-2-3 sequence.  Each song plays during
+  // its action; the next action interrupts whatever's playing.
   //
-  // Workflow:
-  //   1. Operator picks a station — via any path (dropdown search
-  //      result, preset button, manual Lookup, type-in).  Open Your
-  //      Eyes loops from that pick THROUGH the first auto-compute,
-  //      stopping when that compute returns data.  Never replays
-  //      this session.
-  //   2. Operator clicks Compute Exhibit a second time (with the
-  //      use_terrain checkbox or any options changed).  My Flame
-  //      loops until that compute returns data.
-  //   3. Operator clicks Download Engineering Statement PDF.  Down
-  //      for the Third Time loops until the artifact downloads.
+  //   1. Open Your Eyes          — station pick → loops until compute
+  //                                STARTS (or the lookup HTTP returns,
+  //                                whichever comes first).
+  //   2. My Flame                — compute exhibit → loops until
+  //                                compute RETURNS data.
+  //   3. Down for the Third Time — PDF / TXT render → loops until
+  //                                the render returns.
   //
-  // Phase precedence: pdf > welcome (when active) > compute > silence.
-  // welcome outranks compute so OYE keeps playing through the first
-  // compute too (per operator spec); it retires the instant
-  // `computing` flips true → false the first time.
+  // Phase precedence: pdf > compute > welcome > silence.  Each later
+  // action wins — no overlap, no spanning.  This is the strict 1-2-3
+  // playback order the operator asked for.
   const [muted, setMuted]                   = useState(false);
-  const [welcomeUsed, setWelcomeUsed]       = useState(false); // OYE retired
-  const [welcomePending, setWelcomePending] = useState(false); // queued by station pick
-  const computingPrevRef                    = useRef(false);
-  const renderingPdfPrevRef                 = useRef(false);
+  const [welcomePending, setWelcomePending] = useState(false); // armed by station pick
   // Any non-synthetic station entering inputs arms the welcome track.
-  // This catches every selection path: preset buttons (loadKslx etc.
-  // flip _synthetic:false), dropdown picks (loadStationRow ditto),
-  // Lookup button (lookupFacility sets facility_id), and manual
-  // facility_id type-in.
+  // Covers every selection path: preset buttons (loadKslx flips
+  // _synthetic:false), dropdown picks (loadStationRow ditto), Lookup
+  // button (lookupFacility sets facility_id), manual type-in.  Resets
+  // the welcome arm each time a new station is picked so OYE plays
+  // again for each pick.
   useEffect(() => {
-    if (welcomeUsed || welcomePending) return;
     const synthDefault = inputs._synthetic === true;
     const haveStation  = !synthDefault && !!inputs.facility_id;
-    if (haveStation) setWelcomePending(true);
-  }, [inputs._synthetic, inputs.facility_id, welcomeUsed, welcomePending]);
-  // Retire OYE the moment the first compute returns (computing flips
-  // true → false while OYE is queued).  Edge-detect on PDF too: if
-  // the operator somehow runs PDF without ever computing, retire OYE
-  // when the PDF finishes (defensive — unlikely path).
+    if (haveStation && !welcomePending) setWelcomePending(true);
+  }, [inputs._synthetic, inputs.facility_id, welcomePending]);
+  // The moment Compute or PDF starts, retire the welcome arm so OYE
+  // doesn't resume after.  My Flame / Down for the Third Time take
+  // over via the phase precedence chain.
   useEffect(() => {
-    const prevC = computingPrevRef.current;
-    const prevP = renderingPdfPrevRef.current;
-    computingPrevRef.current     = computing;
-    renderingPdfPrevRef.current  = renderingPdf;
-    const computeJustEnded = prevC && !computing;
-    const pdfJustEnded     = prevP && !renderingPdf;
-    if ((computeJustEnded || pdfJustEnded) && welcomePending && !welcomeUsed){
+    if ((computing || renderingPdf) && welcomePending){
       setWelcomePending(false);
-      setWelcomeUsed(true);
     }
-  }, [computing, renderingPdf, welcomePending, welcomeUsed]);
+  }, [computing, renderingPdf, welcomePending]);
   const musicPhase = renderingPdf   ? 'pdf'
-                   : welcomePending ? 'welcome'   // outranks compute
                    : computing      ? 'compute'
+                   : welcomePending ? 'welcome'
                    : null;
   const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
