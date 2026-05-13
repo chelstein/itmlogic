@@ -10,7 +10,15 @@ export function buildSpacingAnalysisSection(exhibit){
   const sec = exhibit.regulatory_compliance?.section_73_207;
   if (!sec) return null;
 
-  const studies = Array.isArray(sec.studies) ? sec.studies.filter(s => !s.skipped || s.pair_pass === false) : [];
+  const allStudies = Array.isArray(sec.studies) ? sec.studies : [];
+  const studies = allStudies.filter(s => !s.skipped || s.pair_pass === false);
+  // Did any nearby station produce a real (non-skipped) §73.207
+  // evaluation?  Skipped entries cover non-restricted relationships and
+  // class pairs not in Table A — none of which §73.207 governs.  When
+  // EVERY entry is skipped, the section must say so explicitly rather
+  // than rendering an empty table with a "meets requirements" summary
+  // that contradicts itself.
+  const anyRealEval = allStudies.some(s => !s.skipped);
   if (sec.missing_nearby_stations){
     return {
       id:      'spacing',
@@ -38,10 +46,30 @@ export function buildSpacingAnalysisSection(exhibit){
   }));
 
   const failures = rows.filter(r => r.pass === 'FAIL');
-  const summary = failures.length === 0
+  // Summary text — must MATCH what the table actually shows:
+  //   * no real evaluations at all     → "no restricted pairs" note
+  //   * real evaluations, all passing  → "meets requirements" (table shows them)
+  //   * one or more failures           → list the failures (table shows them)
+  const summary = !anyRealEval
+    ? 'No nearby stations were in a §73.207(b) Table A restricted channel relationship (co-channel, 1st / 2nd / 3rd-adjacent, or IF 10.6 / 10.8 MHz) with the subject facility.  The §73.207 minimum-distance test has no protected pairs to evaluate; protection is governed by §73.215 contour-protection where applicable.'
+    : failures.length === 0
     ? 'The subject facility meets the applicable minimum distance separation requirements of 47 CFR §73.207(b) for every restricted-channel-relationship pair evaluated above.'
     : 'The subject facility does not meet the minimum distance separation requirements with respect to the following facilities:\n  ' +
       failures.map(f => `  • ${f.call} (${f.fcc_class}) at ${f.distance_km} km — ${f.relationship} requires ${f.required_km} km (short by ${Math.abs(Number(f.margin_km) || 0).toFixed(2)} km).`).join('\n  ');
+
+  // When the table would be empty (no real evals), render a paragraphs-
+  // only section so the PDF doesn't draw an empty bordered table.
+  if (!anyRealEval){
+    return {
+      id:      'spacing',
+      type:    'paragraphs',
+      heading: 'SPACING ANALYSIS — 47 CFR §73.207',
+      paragraphs: [
+        'The subject facility was evaluated against the minimum distance separation requirements of 47 CFR §73.207.',
+        summary
+      ]
+    };
+  }
 
   return {
     id:      'spacing',
