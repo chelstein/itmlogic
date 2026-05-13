@@ -57,7 +57,15 @@ export function buildAppendixSections(exhibit){
     const rows = rt.map(r => {
       const az = Number.isFinite(r.azimuth_deg) ? Number(r.azimuth_deg) : null;
       const azKey = az != null ? Math.round(az) : null;
-      const haat  = Number.isFinite(r.haat_m) ? Number(r.haat_m)
+      // The FM/LPFM/FX radial builders emit per-radial rows with
+      // `haat_computed_m` + `haat_input_m` (see src/engine/fm/contour.js).
+      // Reading just `r.haat_m` (the operator's station-wide input)
+      // misses the DEM-derived per-azimuth value the engine actually
+      // used, so every row of Appendix A would print "—" even on an
+      // exhibit that ran the terrain sidecar.
+      const haat  = Number.isFinite(r.haat_computed_m) ? Number(r.haat_computed_m)
+                  : Number.isFinite(r.haat_input_m)    ? Number(r.haat_input_m)
+                  : Number.isFinite(r.haat_m)          ? Number(r.haat_m)
                   : (azKey != null && haatByAz.has(azKey) ? haatByAz.get(azKey) : null);
       const erp   = Number.isFinite(r.erp_kw) ? Number(r.erp_kw)
                   : (azKey != null && erpByAz.has(azKey) ? erpByAz.get(azKey)
@@ -252,6 +260,17 @@ export function buildAppendixSections(exhibit){
   // chain rendered "—" for every row.  Read engine_signature directly.
   const sig  = exhibit.engine_signature || {};
   const prov = exhibit.provenance || {};
+  // DEM provenance — the terrain sidecar attaches commit/build info to
+  // evidence.terrain (top-level) on USGS-EPQS / SRTM responses, but
+  // older responses nested it under .dem.  Read both shapes plus the
+  // explicit dem_commit / dem_version fields some sidecars emit.
+  const tDem    = ev.terrain || {};
+  const tNested = ev.terrain?.dem || {};
+  const demDataset = tNested.dataset || tNested.source || tDem.dataset || tDem.source || tDem.backend || '—';
+  const demCommit  = tNested.commit  || tNested.version || tNested.build || tNested.sha
+                  || tDem.commit     || tDem.version    || tDem.build    || tDem.sha
+                  || tDem.dem_commit || tDem.dem_version
+                  || '—';
   const dRows = [
     ['Engine version',     sig.version || prov.engine_version || prov.version || '—'],
     ['Engine commit',      sig.hash || prov.git_commit || prov.commit || '—'],
@@ -260,8 +279,8 @@ export function buildAppendixSections(exhibit){
     ['Compute timestamp',  exhibit.generated_at || exhibit.computed_at || prov.computed_at || '—'],
     ['Build fingerprint',  sig.fingerprint_sha256 || prov.exhibit_hash || '—'],
     ['Node runtime',       sig.node || '—'],
-    ['DEM dataset',        ev.terrain?.dem?.dataset || ev.terrain?.dem?.source || '—'],
-    ['DEM commit',         ev.terrain?.dem?.commit || ev.terrain?.dem?.version || '—']
+    ['DEM dataset',        demDataset],
+    ['DEM commit',         demCommit]
   ];
   sections.push({
     id:      'appendix-d',
