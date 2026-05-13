@@ -102,13 +102,19 @@ function MainApp({ onLogout }) {
   const [busy, setBusy]           = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
-  // Bobby Caldwell — three tracks, one per phase of work.
-  // Phase resolves to 'pdf' while an engineering-statement render is in
-  // flight, 'compute' while the engine is producing an exhibit, 'idle'
-  // otherwise.  Order matters: PDF wins over compute because the PDF
-  // render path internally runs a fresh compute too (per PR #119).
+  // Bobby Caldwell — phase-driven background music.
+  //   compute  → "Open Your Eyes"
+  //   exhibit  → "Never Find a Love Like Mine"  (exhibit loaded, no PDF in flight)
+  //   pdf      → "Down for the Third Time"
+  //   idle     → silence (app just opened, no exhibit yet, no compute running)
+  // Order matters: PDF > compute > exhibit > idle.  PDF wins over compute
+  // because the report path internally runs its own fresh compute too
+  // (per PR #119).
   const [muted, setMuted] = useState(false);
-  const musicPhase = renderingPdf ? 'pdf' : computing ? 'compute' : 'idle';
+  const musicPhase = renderingPdf ? 'pdf'
+                   : computing    ? 'compute'
+                   : exhibit      ? 'exhibit'
+                   : 'idle';
   const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
@@ -715,7 +721,9 @@ function MainApp({ onLogout }) {
     </button>
     <div
       className="fixed top-3 right-28 z-40 flex items-center gap-2 font-mono text-[10px] tracking-rack uppercase text-textDim border border-rule rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm"
-      title={`Now playing: "${currentTrack.title}" — ${currentTrack.artist}`}
+      title={currentTrack
+        ? `Now playing: "${currentTrack.title}" — ${currentTrack.artist}`
+        : 'Bobby Caldwell — music plays during compute / PDF render'}
     >
       <button
         onClick={() => { arm(); setMuted(m => !m); }}
@@ -725,9 +733,11 @@ function MainApp({ onLogout }) {
         {muted ? '🔇' : '♪'}
       </button>
       <span className="text-cream/80 normal-case tracking-normal">
-        {armed
-          ? <>“{currentTrack.title}” — {currentTrack.artist}</>
-          : <span className="text-textDim">click ♪ to play music</span>}
+        {!armed
+          ? <span className="text-textDim">click ♪ to arm music</span>
+          : currentTrack
+            ? <>“{currentTrack.title}” — {currentTrack.artist}</>
+            : <span className="text-textDim">idle</span>}
       </span>
     </div>
     <AppShell
