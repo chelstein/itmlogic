@@ -103,32 +103,51 @@ function MainApp({ onLogout }) {
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
   // Bobby Caldwell — phase-driven background music.
-  //   welcome  → "Open Your Eyes"           (first app load only,
-  //                                          replaced by silence the
-  //                                          moment the operator clicks
-  //                                          Compute; never replays)
-  //   compute  → "My Flame"                 (during exhibit compute,
-  //                                          stops when compute finishes)
-  //   pdf      → "Down for the Third Time"  (during PDF/TXT render)
-  //   ambient  → "What You Won't Do for Love" (optional background loop;
-  //                                          plays whenever no phase
-  //                                          track is active and the
-  //                                          operator has toggled it on)
-  // Order: pdf > compute > welcome (only if firstRunDone is false)
-  //         > ambient (only if ambientOn) > silence
-  const [muted, setMuted]           = useState(false);
-  const [ambientOn, setAmbientOn]   = useState(false);
-  const [firstRunDone, setFirstRunDone] = useState(false);
-  // Latch firstRunDone the moment a compute begins.  Once true, the
-  // welcome track ("Open Your Eyes") never replays for the rest of
-  // this session.
-  useEffect(() => { if (computing) setFirstRunDone(true); }, [computing]);
-  const musicPhase = renderingPdf  ? 'pdf'
-                   : computing     ? 'compute'
-                   : !firstRunDone ? 'welcome'
-                   : ambientOn     ? 'ambient'
+  //   welcome  → "Open Your Eyes"           (fires once when the first
+  //                                          real station is selected;
+  //                                          one-shot, not looped;
+  //                                          never replays this session)
+  //   compute  → "My Flame"                 (loops during exhibit compute,
+  //                                          stops when compute ends)
+  //   pdf      → "Down for the Third Time"  (loops during PDF/TXT render,
+  //                                          stops when render ends)
+  // Order: pdf > compute > welcome (only when welcomePending) > silence.
+  const [muted, setMuted]                       = useState(false);
+  const [welcomeUsed, setWelcomeUsed]           = useState(false); // OYE consumed
+  const [welcomePending, setWelcomePending]     = useState(false); // queued by station-select
+  // First real station selection arms the welcome track.  A "real" pick
+  // is anything that flips _synthetic off or sets a non-empty facility_id
+  // (preset buttons, search results, manual typing).
+  useEffect(() => {
+    if (welcomeUsed || welcomePending) return;
+    const synthDefault = inputs._synthetic === true;
+    const haveStation  = !synthDefault && !!inputs.facility_id;
+    if (haveStation) setWelcomePending(true);
+  }, [inputs._synthetic, inputs.facility_id, welcomeUsed, welcomePending]);
+  // If the operator runs Compute or a PDF before Open Your Eyes has
+  // started playing (or while it's queued), retire the welcome slot —
+  // it's a one-shot and we don't want it firing later in the session.
+  useEffect(() => {
+    if ((computing || renderingPdf) && (welcomePending || !welcomeUsed)){
+      setWelcomePending(false);
+      setWelcomeUsed(true);
+    }
+  }, [computing, renderingPdf]);
+  const musicPhase = renderingPdf   ? 'pdf'
+                   : computing      ? 'compute'
+                   : welcomePending ? 'welcome'
                    : null;
-  const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
+  const { currentTrack, armed, arm } = useStudyMusic({
+    phase: musicPhase,
+    muted,
+    onTrackEnd: (p) => {
+      if (p === 'welcome'){
+        // Song played through naturally — retire it.
+        setWelcomePending(false);
+        setWelcomeUsed(true);
+      }
+    }
+  });
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
@@ -752,15 +771,6 @@ function MainApp({ onLogout }) {
             ? <>“{currentTrack.title}” — {currentTrack.artist}</>
             : <span className="text-textDim">idle</span>}
       </span>
-      <button
-        onClick={() => { arm(); setAmbientOn(a => !a); }}
-        className={`ml-1 px-1.5 py-px rounded border ${ambientOn ? 'border-gold/60 text-gold' : 'border-rule text-textDim hover:text-cream'}`}
-        title={ambientOn
-          ? "Turn off ambient (“What You Won't Do for Love”)"
-          : "Turn on ambient (“What You Won't Do for Love” loops in the background)"}
-      >
-        BG
-      </button>
     </div>
     <AppShell
       systemStatus={sysStatus}

@@ -1,20 +1,16 @@
 // Bobby Caldwell background music for long-running operations.
 //
-// Phase tracks (one-shot per-action; auto-stops on phase change):
-//   • "Open Your Eyes"             — welcome track on first app load;
-//                                    plays until the operator clicks
-//                                    Compute, then never replays
-//   • "My Flame"                   — playing during exhibit compute,
-//                                    stops when compute finishes
-//   • "Down for the Third Time"    — playing during PDF / TXT render,
-//                                    stops when render finishes
+// Three phases, one song each.  All phases auto-stop when the
+// triggering action ends; nothing plays in between.
 //
-// Optional ambient track (operator toggles on/off):
-//   • "What You Won't Do for Love" — loops in the background when no
-//                                    phase track is active.  Phase
-//                                    tracks pause it when they kick
-//                                    in, ambient resumes when they
-//                                    finish.  Default OFF.
+//   • "Open Your Eyes"           — fires the very first time a station
+//                                  is selected this session.  Never
+//                                  replays after that, even if the
+//                                  operator picks a different station.
+//   • "My Flame"                 — plays during exhibit compute, stops
+//                                  when the compute cycle finishes.
+//   • "Down for the Third Time"  — plays during PDF / TXT render,
+//                                  stops when the render finishes.
 //
 // Audio source files are committed to public-static/audio/ with their
 // original "Bobby Caldwell <title>.mp3" filenames.  Filenames are
@@ -23,8 +19,8 @@
 //
 // Browser autoplay policy blocks audio until the user has interacted
 // with the page at least once, so the player arms itself on the first
-// click anywhere — after that, automatic crossfades between phases
-// work without further prompts.
+// click anywhere — after that, crossfades between phases work
+// without further prompts.
 
 import { useEffect, useRef, useState } from 'react';
 
@@ -36,22 +32,23 @@ export const TRACKS = {
   welcome: {
     title:  'Open Your Eyes',
     artist: 'Bobby Caldwell',
-    src:    AUDIO('Bobby Caldwell Open Your Eyes.mp3')
+    src:    AUDIO('Bobby Caldwell Open Your Eyes.mp3'),
+    // One-shot: plays through once on first station select, then
+    // silence.  Doesn't loop (compute / pdf still loop until their
+    // action ends).
+    loop:   false
   },
   compute: {
     title:  'My Flame',
     artist: 'Bobby Caldwell',
-    src:    AUDIO('Bobby Caldwell My Flame.mp3')
+    src:    AUDIO('Bobby Caldwell My Flame.mp3'),
+    loop:   true
   },
   pdf: {
     title:  'Down for the Third Time',
     artist: 'Bobby Caldwell',
-    src:    AUDIO('Bobby Caldwell Down for the Third Time.mp3')
-  },
-  ambient: {
-    title:  "What You Won't Do for Love",
-    artist: 'Bobby Caldwell',
-    src:    AUDIO("Bobby Caldwell What You Won't Do for Love.mp3")
+    src:    AUDIO('Bobby Caldwell Down for the Third Time.mp3'),
+    loop:   true
   }
 };
 
@@ -76,8 +73,8 @@ function fade(audio, fromVol, toVol, ms){
 /**
  * useStudyMusic({ phase, muted, volume })
  *
- *   phase  — 'welcome' | 'compute' | 'pdf' | 'ambient' | null
- *            which track should play; null/'idle' pauses all elements
+ *   phase  — 'welcome' | 'compute' | 'pdf' | null
+ *            which track should play; null pauses all elements
  *   muted  — boolean                                   pause + fade out
  *   volume — 0..1                                       max track volume
  *
@@ -89,8 +86,10 @@ function fade(audio, fromVol, toVol, ms){
  *   arm()        — call to mark the user-interaction gate satisfied
  *                  (e.g. from a "Play 🎵" button click handler).
  */
-export function useStudyMusic({ phase = 'idle', muted = false, volume = 0.35 } = {}){
-  const audioRefs = useRef({});                  // { compute, save, exhibit, pdf } -> <audio>
+export function useStudyMusic({ phase = null, muted = false, volume = 0.35, onTrackEnd = null } = {}){
+  const audioRefs   = useRef({});               // { welcome, compute, pdf } -> <audio>
+  const onEndedRef  = useRef(onTrackEnd);
+  onEndedRef.current = onTrackEnd;              // always reflect the latest cb
   const [armed, setArmed] = useState(false);
   const arm = () => setArmed(true);
 
@@ -110,16 +109,21 @@ export function useStudyMusic({ phase = 'idle', muted = false, volume = 0.35 } =
     };
   }, [armed]);
 
-  // Lazy-create <audio> elements once.
+  // Lazy-create <audio> elements once.  loop flag comes from TRACKS so
+  // one-shot tracks (welcome) end naturally and fire onTrackEnd.
   useEffect(() => {
     if (typeof Audio === 'undefined') return;
     for (const key of Object.keys(TRACKS)){
       if (audioRefs.current[key]) continue;
-      const a = new Audio(TRACKS[key].src);
-      a.loop     = true;
-      a.preload  = 'none';
-      a.volume   = 0;
+      const t = TRACKS[key];
+      const a = new Audio(t.src);
+      a.loop        = t.loop !== false;
+      a.preload     = 'none';
+      a.volume      = 0;
       a.crossOrigin = 'anonymous';
+      a.addEventListener('ended', () => {
+        if (onEndedRef.current) onEndedRef.current(key);
+      });
       audioRefs.current[key] = a;
     }
     return () => {
