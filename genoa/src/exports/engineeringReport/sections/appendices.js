@@ -104,52 +104,100 @@ export function buildAppendixSections(exhibit){
       if (s?.facility_id && byFid.has(String(s.facility_id)))  return byFid.get(String(s.facility_id));
       return null;
     };
+    const svc = String(exhibit.station_inputs?.service || '').toUpperCase();
+    const isAmExhibit = svc === 'AM';
+    const isFxExhibit = svc === 'FX';
+    const passLabel = (v) => v === true ? 'PASS' : v === false ? 'FAIL' : null;
+    const ruleCell = (rule, passKey = 'pass') => {
+      if (!rule) return '—';
+      const p = passLabel(rule[passKey]);
+      if (p) return p;
+      if (rule.skipped) return 'skip';
+      return '—';
+    };
     const rows = isr.stations.map(s => {
       const n = lookupNearby(s) || {};
-      // Class — try every shape both upstreams have used.
       const fccClass = s.class || s.fcc_class || s.station_class
                     || n.class || n.fcc_class || n.station_class
                     || n.facility_class || null;
-      // Frequency — prefer the engine's already-MHz value, fall back to
-      // nearby_primaries' frequency / frequency_mhz (FMQ stores as MHz).
-      const freq = Number.isFinite(s.frequency_mhz) ? Number(s.frequency_mhz)
-                : Number.isFinite(s.frequency)      ? Number(s.frequency)
-                : Number.isFinite(n.frequency_mhz)  ? Number(n.frequency_mhz)
-                : Number.isFinite(n.frequency)      ? Number(n.frequency)
-                : null;
-      return {
+      // Frequency — AM rows carry kHz, FM/FX carry MHz.  Mis-picking the
+      // unit would print "1240.0 MHz" for a 1240 kHz AM station.
+      const freqStr = isAmExhibit
+        ? (() => {
+            const k = Number.isFinite(s.frequency_khz) ? Number(s.frequency_khz)
+                   : Number.isFinite(n.frequency_khz)  ? Number(n.frequency_khz)
+                   : Number.isFinite(n.frequency)      ? Number(n.frequency)
+                   : null;
+            return k != null ? String(Math.round(k)) : '—';
+          })()
+        : (() => {
+            const m = Number.isFinite(s.frequency_mhz) ? Number(s.frequency_mhz)
+                   : Number.isFinite(s.frequency)      ? Number(s.frequency)
+                   : Number.isFinite(n.frequency_mhz)  ? Number(n.frequency_mhz)
+                   : Number.isFinite(n.frequency)      ? Number(n.frequency)
+                   : null;
+            return m != null ? m.toFixed(1) : '—';
+          })();
+      // Distance — engine consolidated row uses channel_relationship +
+      // distance_km; fall back to nearby_primaries' Karney-inverse
+      // distance when the per-rule study didn't emit a separation.
+      const distKm = Number.isFinite(s.distance_km) ? Number(s.distance_km)
+                   : Number.isFinite(n.distance_km) ? Number(n.distance_km)
+                   : null;
+      // Relationship — blankStation emits channel_relationship; legacy
+      // shapes emitted relationship.  Accept either.
+      const rel = s.channel_relationship || s.relationship
+                || n.channel_relationship || n.relationship || '—';
+      const r = s.rules || {};
+      const row = {
         call:               s.call || n.call || s.facility_id || '—',
         facility_id:        s.facility_id || n.facility_id || '—',
         fcc_class:          fccClass || '—',
-        frequency_mhz:      freq != null ? freq.toFixed(1) : '—',
-        relationship:       s.relationship || '—',
-        distance_km:        Number.isFinite(s.distance_km) ? Number(s.distance_km).toFixed(2) : '—',
-        rule_207:           s.section_73_207?.pass === true ? 'PASS'
-                              : s.section_73_207?.pass === false ? 'FAIL'
-                              : (s.section_73_207?.skipped ? 'skip' : '—'),
-        rule_215:           s.section_73_215?.pair_pass === true ? 'PASS'
-                              : s.section_73_215?.pair_pass === false ? 'FAIL'
-                              : (s.section_73_215?.skipped ? 'skip' : '—'),
-        pair_pass:          s.pair_pass === true ? 'PASS' : s.pair_pass === false ? 'FAIL' : '—'
+        frequency:          freqStr,
+        relationship:       rel,
+        distance_km:        distKm != null ? distKm.toFixed(2) : '—',
+        // Pair = overall pass across all applicable rules.  blankStation
+        // stores this as pass_overall after rule consolidation.
+        pair_pass:          passLabel(s.pass_overall) ?? passLabel(s.pair_pass) ?? '—'
       };
+      if (isAmExhibit){
+        row.rule_187 = ruleCell(r.section_73_187);
+      } else if (isFxExhibit){
+        row.rule_1204 = ruleCell(r.section_74_1204);
+      } else {
+        row.rule_207 = ruleCell(r.section_73_207);
+        row.rule_215 = ruleCell(r.section_73_215);
+      }
+      return row;
     });
+    const baseCols = [
+      { key: 'call',           label: 'Call',         width: 0.10 },
+      { key: 'facility_id',    label: 'Facility ID',  width: 0.10 },
+      { key: 'fcc_class',      label: 'Class',        width: 0.07 },
+      { key: 'frequency',      label: isAmExhibit ? 'Freq (kHz)' : 'Freq (MHz)', width: 0.10, align: 'right' },
+      { key: 'relationship',   label: 'Relationship', width: 0.15 },
+      { key: 'distance_km',    label: 'Dist (km)',    width: 0.10, align: 'right' }
+    ];
+    const ruleCols = isAmExhibit
+      ? [{ key: 'rule_187', label: '§73.187 / §73.190', width: 0.18 }]
+      : isFxExhibit
+      ? [{ key: 'rule_1204', label: '§74.1204', width: 0.18 }]
+      : [
+          { key: 'rule_207', label: '§73.207',      width: 0.09 },
+          { key: 'rule_215', label: '§73.215',      width: 0.09 }
+        ];
+    const preface = isAmExhibit
+      ? 'Per-pair nighttime skywave evaluation under 47 CFR §73.187 using the SS-1 (50%) field-strength formulation of §73.190 (Wang).'
+      : isFxExhibit
+      ? 'Per-pair translator interference evaluation under 47 CFR §74.1204(a)+(c).'
+      : 'Consolidated per-pair evaluation under 47 CFR §73.207 (Table A distance spacing) and §73.215 (contour-protection).';
     sections.push({
       id:      'appendix-b',
       type:    'table-with-summary',
       heading: 'APPENDIX B — INTERFERENCE STUDY',
-      preface: 'Consolidated per-pair evaluation under 47 CFR §73.207, §73.215, §74.1204, and §73.187 as applicable.',
+      preface,
       table: {
-        columns: [
-          { key: 'call',           label: 'Call',         width: 0.10 },
-          { key: 'facility_id',    label: 'Facility ID',  width: 0.10 },
-          { key: 'fcc_class',      label: 'Class',        width: 0.07 },
-          { key: 'frequency_mhz',  label: 'Freq (MHz)',   width: 0.10, align: 'right' },
-          { key: 'relationship',   label: 'Relationship', width: 0.13 },
-          { key: 'distance_km',    label: 'Dist (km)',    width: 0.10, align: 'right' },
-          { key: 'rule_207',       label: '§73.207',      width: 0.10 },
-          { key: 'rule_215',       label: '§73.215',      width: 0.10 },
-          { key: 'pair_pass',      label: 'Pair',         width: 0.10 }
-        ],
+        columns: [...baseCols, ...ruleCols, { key: 'pair_pass', label: 'Pair', width: 0.10 }],
         rows
       },
       summary: `Filing qualifies: ${isr.filing_qualifies === true ? 'YES'
@@ -159,13 +207,27 @@ export function buildAppendixSections(exhibit){
   }
 
   // ── Appendix C — Validation evidence ───────────────────────────────────
+  // The engine populates method_versions.curve_dataset with the shape
+  //   { curve_version, meta_sha256, dataset_sha256, source_dir }
+  // (see src/engine/curves/loader.js#curveProvenance).  Prior versions
+  // of this appendix were reading the older flat `dataset` /
+  // `dataset_meta_sha256` keys and rendering "—" for every row.
   const v   = exhibit.validation_context || {};
   const ev  = exhibit.evidence || {};
+  const mv  = exhibit.method_versions || {};
+  const cd  = mv.curve_dataset || {};
+  const svc_c = String(exhibit.station_inputs?.service || '').toUpperCase();
+  const datasetLabel = mv.dataset
+    || cd.label
+    || cd.name
+    || (svc_c === 'AM' ? `FCC §73.184 groundwave (vendored gwave.js v${cd.curve_version || '?'})`
+                       : `FCC tvfm_curves.js (vendored, fcc/contours-api-node v${cd.curve_version || '?'})`);
   const cRows = [
-    ['Curve dataset',           exhibit.method_versions?.dataset           || '—'],
-    ['Curve dataset SHA-256',   exhibit.method_versions?.dataset_meta_sha256 || '—'],
-    ['Curve engine',            exhibit.method_versions?.curve_engine      || '—'],
-    ['FCC orchestration commit', exhibit.method_versions?.fcc_orchestration?.commit || '—'],
+    ['Curve dataset',           datasetLabel],
+    ['Curve dataset SHA-256',   cd.meta_sha256 || mv.dataset_meta_sha256 || '—'],
+    ['Curve engine',            mv.curve_engine
+                                  || (svc_c === 'AM' ? 'gwave.js (vendored FCC §73.184 grid)' : '—')],
+    ['FCC orchestration commit', mv.fcc_orchestration?.commit || '—'],
     ['Curve validation',        v.curve_reference_validation
                                   ? `${v.curve_reference_validation.n_pass || 0}/${v.curve_reference_validation.n_run || 0} cases pass`
                                   : 'not run'],
@@ -185,14 +247,19 @@ export function buildAppendixSections(exhibit){
   });
 
   // ── Appendix D — Provenance ──────────────────────────────────────────────
+  // engine_signature is populated by every compute() call; nothing
+  // writes exhibit.provenance, so the prior "prov.engine_version || …"
+  // chain rendered "—" for every row.  Read engine_signature directly.
+  const sig  = exhibit.engine_signature || {};
   const prov = exhibit.provenance || {};
   const dRows = [
-    ['Engine version',     prov.engine_version || prov.version || '—'],
-    ['Engine commit',      prov.git_commit || prov.commit || '—'],
-    ['Build timestamp',    prov.build_time || prov.built_at || '—'],
-    ['Compute timestamp',  exhibit.computed_at || prov.computed_at || '—'],
-    ['Exhibit hash',       prov.exhibit_hash || exhibit.hash || '—'],
-    ['Replay bundle hash', prov.replay_bundle_hash || '—'],
+    ['Engine version',     sig.version || prov.engine_version || prov.version || '—'],
+    ['Engine commit',      sig.hash || prov.git_commit || prov.commit || '—'],
+    ['Release tag',        sig.release_tag || '—'],
+    ['Build timestamp',    sig.build_time || prov.build_time || prov.built_at || '—'],
+    ['Compute timestamp',  exhibit.generated_at || exhibit.computed_at || prov.computed_at || '—'],
+    ['Build fingerprint',  sig.fingerprint_sha256 || prov.exhibit_hash || '—'],
+    ['Node runtime',       sig.node || '—'],
     ['DEM dataset',        ev.terrain?.dem?.dataset || ev.terrain?.dem?.source || '—'],
     ['DEM commit',         ev.terrain?.dem?.commit || ev.terrain?.dem?.version || '—']
   ];
@@ -203,17 +270,29 @@ export function buildAppendixSections(exhibit){
     rows:    dRows
   });
 
-  // ── Appendix E — Replay bundle ───────────────────────────────────────
+  // ── Appendix E — Replay determinism ───────────────────────────────────
+  // No literal replay_bundle file is generated yet, but the determinism
+  // contract rests on (engine fingerprint + curve dataset hash + inputs).
+  // Surface those directly so the appendix is honest about what makes
+  // the exhibit reproducible — same engine + same inputs → same numbers.
   const replay = exhibit.replay_bundle || prov.replay_bundle || null;
+  const inputsHash = sig.fingerprint_sha256
+    ? `${String(sig.fingerprint_sha256).slice(0, 12)}…`
+    : null;
   const eRows = [
-    ['Replay bundle available', replay ? 'YES' : 'NO'],
-    ['Bundle hash',             prov.replay_bundle_hash || (replay && replay.hash) || '—'],
-    ['Reproduction command',    'genoa replay <bundle.json>  (deterministic; same inputs → same outputs)']
+    ['Determinism contract',      'same engine fingerprint + same curve dataset hash + same station_inputs → same numbers'],
+    ['Engine fingerprint',        sig.fingerprint_sha256 || '—'],
+    ['Curve dataset hash',        cd.meta_sha256 || '—'],
+    ['Replay bundle (offline)',   replay ? 'attached' : 'not attached'],
+    ['Bundle hash',               prov.replay_bundle_hash || (replay && replay.hash) || '—'],
+    ['Reproduction',              inputsHash
+                                    ? `genoa replay --engine ${inputsHash} --inputs station_inputs.json`
+                                    : 'genoa replay <bundle.json>  (deterministic; same inputs → same outputs)']
   ];
   sections.push({
     id:      'appendix-e',
     type:    'kv',
-    heading: 'APPENDIX E — REPLAY BUNDLE',
+    heading: 'APPENDIX E — REPLAY DETERMINISM',
     rows:    eRows
   });
 

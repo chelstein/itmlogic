@@ -38,19 +38,39 @@ export function buildFacilityParametersSection(exhibit){
     ? `${Number(s.lat).toFixed(6)}, ${Number(s.lon).toFixed(6)}  (${lat_dms}, ${lon_dms})`
     : '—';
 
+  // AM stations use ground conductivity (σ, mS/m), not HAAT — the
+  // groundwave engine reads §73.184 Figure M3 curves keyed on σ.  FM/FX
+  // stations use HAAT per §73.313.  Building one section that prints
+  // both fields for both services would just be lying.
+  const isAm = String(s.service || '').toUpperCase() === 'AM';
+  const sigma = isAm
+    ? (Number.isFinite(Number(s.ground_sigma_mS_m)) ? Number(s.ground_sigma_mS_m)
+       : Number.isFinite(Number(s.ground_sigma_ms_m)) ? Number(s.ground_sigma_ms_m)
+       : null)
+    : null;
+  const heightOrConductivity = isAm
+    ? ['Ground conductivity (σ)',
+       sigma != null ? `${sigma} mS/m (per 47 CFR §73.183 Figure M3)` : '—']
+    : ['HAAT', fmt(haatDisplay, 'm')];
+  const terrainRow = isAm
+    ? ['Allocation basis',
+       'Groundwave field strength per §73.184 / §73.183; no terrain elevation model required']
+    : ['Terrain source',
+       ev.terrain?.source || (ev.terrain_haat_per_radial?.length ? 'per-radial DEM' : 'flat HAAT (CONSTANT_HAAT_ASSUMED)')];
+
   return {
     id:      'parameters',
     type:    'kv',
     heading: 'FACILITY PARAMETERS',
     rows: [
-      ['Frequency',           fmt(s.frequency, s.frequency_unit || (s.service === 'AM' ? 'kHz' : 'MHz'))],
+      ['Frequency',           fmt(s.frequency, s.frequency_unit || (isAm ? 'kHz' : 'MHz'))],
       channel != null ? ['Channel', String(channel)] : null,
       ['ERP',                 fmt(s.erp_kw, 'kW')],
-      ['HAAT',                fmt(haatDisplay, 'm')],
+      heightOrConductivity,
       ['Coordinates (NAD83 / WGS-84)', coordRow],
       ['Antenna pattern',     s.pattern_mode === 'DA' ? 'Directional (per pattern_table)' : 'Non-directional'],
       ['Radial resolution',   fmt(s.radial_step_deg || 10, '° step')],
-      ['Terrain source',      ev.terrain?.source || (ev.terrain_haat_per_radial?.length ? 'per-radial DEM' : 'flat HAAT (CONSTANT_HAAT_ASSUMED)')],
+      terrainRow,
       ['Facility source',     exhibit.facility_metadata?.source
                               || (exhibit.station_inputs?.facility_id ? 'operator-supplied facility_id' : 'inputs only')]
     ].filter(Boolean)
