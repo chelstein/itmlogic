@@ -31,7 +31,9 @@ import { makePopulationClient }  from '../../evidence/populationClient.js';
 import { makeAcsCensusClient }   from '../../evidence/acsCensusClient.js';
 import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
-import { makeFccConductivityClient } from '../../evidence/fccConductivityClient.js';
+import { makeFccConductivityClient }  from '../../evidence/fccConductivityClient.js';
+import { makeNoaaConductivityClient } from '../../evidence/noaaConductivityClient.js';
+import { makeItuConductivityClient }  from '../../evidence/ituConductivityClient.js';
 import { makeNecClient }         from '../../evidence/nec/client.js';
 import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 import { makeAsrClient }         from '../../evidence/asrClient.js';
@@ -94,7 +96,14 @@ export const sidecars = Object.freeze({
   // upstream; always on unless explicitly disabled.  When unreachable,
   // exhibitService falls through to ZTR's /api/m3/conductivity proxy
   // and then to the disclosed 8 mS/m §73.182 typical default.
-  fccConductivity: process.env.FCC_CONDUCTIVITY_DISABLE === '1' ? null : makeFccConductivityClient(),
+  fccConductivity:  process.env.FCC_CONDUCTIVITY_DISABLE  === '1' ? null : makeFccConductivityClient(),
+  // Tier 3 — NOAA NCEI ground conductivity (US-government public domain).
+  noaaConductivity: process.env.NOAA_CONDUCTIVITY_DISABLE === '1' ? null : makeNoaaConductivityClient(),
+  // Tier 4 — ITU-R BR World Atlas of Ground Conductivities (international
+  // authority; used both as a global fallback and for US border-zone
+  // stations near Canada / Mexico where the FCC M3 polygons may not
+  // extend.  Last live tier before AM_GROUND_SIGMA_UNRESOLVED blocker.).
+  ituConductivity:  process.env.ITU_CONDUCTIVITY_DISABLE  === '1' ? null : makeItuConductivityClient(),
   // NEC2++ / PyNEC antenna-modeling sidecar.  GPL v2 isolated in a
   // separate process; Genoa only talks to it over HTTP.  Set
   // NEC_SIDECAR_URL on the deploy to enable; Genoa works without it.
