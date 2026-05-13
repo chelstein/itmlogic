@@ -1,15 +1,16 @@
 Bobby Caldwell audio files for the study music player.
 
-Drop your own audio (MP3, OGG, or any browser-supported format) at:
+The player expects these literal filenames in this directory:
 
-  open-your-eyes.mp3              — initial / idle landing track
-  never-find-a-love.mp3           — playing while exhibit compute runs
-  down-for-the-third-time.mp3     — playing while PDF / TXT report runs
+  Bobby Caldwell Open Your Eyes.mp3              → Compute phase
+  Bobby Caldwell My Flame.mp3                     → Save phase
+  Bobby Caldwell What You Won't Do for Love.mp3   → Exhibit-ready phase
+  Bobby Caldwell Down for the Third Time.mp3     → PDF / TXT render phase
 
-The player picks them up automatically — no build / restart required.
-If a file is missing, the player silently no-ops for that phase (the
-"Now playing" badge still shows the intended track title).
+Filenames are URL-encoded at fetch time, so spaces + apostrophes work
+fine — just keep the names exactly as above.
 
-These files are NOT committed (copyrighted material).  Source them
-yourself; the .gitignore in this directory excludes everything but
-this README.
+To swap titles or add tracks, edit the TRACKS map in
+src/ui/lib/studyMusic.js — that's the only place filename strings
+live.  The player silently no-ops on 404, so a missing file = silence
+with no visible error.

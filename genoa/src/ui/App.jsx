@@ -104,14 +104,17 @@ function MainApp({ onLogout }) {
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
   // Bobby Caldwell — phase-driven background music.
   //   compute  → "Open Your Eyes"
-  //   exhibit  → "Never Find a Love Like Mine"  (exhibit loaded, no PDF in flight)
+  //   save     → "My Flame"                    (busy === true during /api/exhibits save)
+  //   exhibit  → "What You Won't Do for Love"  (exhibit loaded, otherwise idle)
   //   pdf      → "Down for the Third Time"
-  //   idle     → silence (app just opened, no exhibit yet, no compute running)
-  // Order matters: PDF > compute > exhibit > idle.  PDF wins over compute
-  // because the report path internally runs its own fresh compute too
-  // (per PR #119).
+  //   idle     → silence (app just opened, no exhibit yet, nothing running)
+  // Order matters: pdf > save > compute > exhibit > idle.  The PDF render
+  // path internally runs a fresh compute (per PR #119) so it must outrank
+  // 'compute'; save runs against a loaded exhibit so it must outrank
+  // 'exhibit'.
   const [muted, setMuted] = useState(false);
   const musicPhase = renderingPdf ? 'pdf'
+                   : busy         ? 'save'
                    : computing    ? 'compute'
                    : exhibit      ? 'exhibit'
                    : 'idle';
