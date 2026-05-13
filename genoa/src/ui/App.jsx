@@ -102,59 +102,22 @@ function MainApp({ onLogout }) {
   const [busy, setBusy]           = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
-  // Bobby Caldwell — phase-driven background music.
+  // Bobby Caldwell — each track plays ONLY while its action is
+  // processing.  Stops the moment that action returns.
   //
-  // Workflow:
-  //   1. Operator picks a station — via any path (dropdown search
-  //      result, preset button, manual Lookup, type-in).  Open Your
-  //      Eyes loops from that pick THROUGH the first auto-compute,
-  //      stopping when that compute returns data.  Never replays
-  //      this session.
-  //   2. Operator clicks Compute Exhibit a second time (with the
-  //      use_terrain checkbox or any options changed).  My Flame
-  //      loops until that compute returns data.
-  //   3. Operator clicks Download Engineering Statement PDF.  Down
-  //      for the Third Time loops until the artifact downloads.
+  //   • Open Your Eyes          — while /api/facilities/:id is
+  //                               loading station data (~12-30 s)
+  //   • My Flame                — while exhibit compute is running
+  //                               (~1:40)
+  //   • Down for the Third Time — while PDF / TXT render is running
+  //                               (~2-4 min)
   //
-  // Phase precedence: pdf > welcome (when active) > compute > silence.
-  // welcome outranks compute so OYE keeps playing through the first
-  // compute too (per operator spec); it retires the instant
-  // `computing` flips true → false the first time.
-  const [muted, setMuted]                   = useState(false);
-  const [welcomeUsed, setWelcomeUsed]       = useState(false); // OYE retired
-  const [welcomePending, setWelcomePending] = useState(false); // queued by station pick
-  const computingPrevRef                    = useRef(false);
-  const renderingPdfPrevRef                 = useRef(false);
-  // Any non-synthetic station entering inputs arms the welcome track.
-  // This catches every selection path: preset buttons (loadKslx etc.
-  // flip _synthetic:false), dropdown picks (loadStationRow ditto),
-  // Lookup button (lookupFacility sets facility_id), and manual
-  // facility_id type-in.
-  useEffect(() => {
-    if (welcomeUsed || welcomePending) return;
-    const synthDefault = inputs._synthetic === true;
-    const haveStation  = !synthDefault && !!inputs.facility_id;
-    if (haveStation) setWelcomePending(true);
-  }, [inputs._synthetic, inputs.facility_id, welcomeUsed, welcomePending]);
-  // Retire OYE the moment the first compute returns (computing flips
-  // true → false while OYE is queued).  Edge-detect on PDF too: if
-  // the operator somehow runs PDF without ever computing, retire OYE
-  // when the PDF finishes (defensive — unlikely path).
-  useEffect(() => {
-    const prevC = computingPrevRef.current;
-    const prevP = renderingPdfPrevRef.current;
-    computingPrevRef.current     = computing;
-    renderingPdfPrevRef.current  = renderingPdf;
-    const computeJustEnded = prevC && !computing;
-    const pdfJustEnded     = prevP && !renderingPdf;
-    if ((computeJustEnded || pdfJustEnded) && welcomePending && !welcomeUsed){
-      setWelcomePending(false);
-      setWelcomeUsed(true);
-    }
-  }, [computing, renderingPdf, welcomePending, welcomeUsed]);
-  const musicPhase = renderingPdf   ? 'pdf'
-                   : welcomePending ? 'welcome'   // outranks compute
-                   : computing      ? 'compute'
+  // Phase precedence: pdf > compute > welcome > silence.
+  const [muted, setMuted]                       = useState(false);
+  const [lookingUpStation, setLookingUpStation] = useState(false);
+  const musicPhase = renderingPdf     ? 'pdf'
+                   : computing        ? 'compute'
+                   : lookingUpStation ? 'welcome'
                    : null;
   const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
@@ -213,6 +176,7 @@ function MainApp({ onLogout }) {
   async function lookupFacility(id, baseInputs = null){
     if (!id){ setFacilitySource('Enter a Facility ID first.'); return null; }
     setFacilitySource('Looking up…');
+    setLookingUpStation(true);     // arms "Open Your Eyes" for the call
     try {
       const r = await fetch(`/api/facilities/${encodeURIComponent(id)}`);
       if (r.status === 503){
@@ -240,6 +204,8 @@ function MainApp({ onLogout }) {
     } catch (e){
       setFacilitySource(`Lookup failed: ${e.message}`);
       return null;
+    } finally {
+      setLookingUpStation(false);  // station data returned → OYE stops
     }
   }
 
@@ -455,7 +421,18 @@ function MainApp({ onLogout }) {
     setFacilitySource(`Loaded ${row.call || row.facility_id || 'station'} via ${row.facility_lookup_source?.upstream || 'upstream'}`);
     setStationQuery('');
     setStationResults([]);
-    await compute(merged);
+    // Refresh the canonical /api/facilities/:id row in the background
+    // so the "Open Your Eyes" station-loading phase has a real
+    // processing window (~12-30 s).  Without this the dropdown-pick
+    // path skips straight to compute and OYE never gets a chance to
+    // play.  The lookup also enriches fields the search-row may not
+    // carry (canonical call, fcc_class, licensee, etc.).
+    let refreshed = merged;
+    if (merged.facility_id){
+      const r = await lookupFacility(merged.facility_id, merged);
+      if (r?.facility) refreshed = mergeFacility(merged, r.facility);
+    }
+    await compute(refreshed);
   }
   function loadSynthetic(){
     setInputs(PRESET_SYNTHETIC);

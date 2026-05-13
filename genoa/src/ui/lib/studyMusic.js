@@ -1,19 +1,15 @@
-// Bobby Caldwell background music for long-running operations.
+// Bobby Caldwell background music — each track plays ONLY while its
+// own action is processing.  Stops the moment that action returns.
 //
-//   • "Open Your Eyes"           — loops from the operator's first
-//                                  station pick THROUGH the first
-//                                  auto-compute, stopping when that
-//                                  compute returns data.  Plays on
-//                                  ANY station-pick path (dropdown
-//                                  search result, preset, Lookup
-//                                  button, manual type-in).  Never
-//                                  replays this session.
-//   • "My Flame"                 — loops during second-and-subsequent
-//                                  Compute Exhibit clicks (the first
-//                                  compute is covered by OYE).  Stops
-//                                  when the compute job returns.
-//   • "Down for the Third Time"  — loops during PDF / TXT render,
-//                                  stops when the render job returns.
+//   • "Open Your Eyes"           — while /api/facilities/:id is
+//                                  loading station data (~12-30 s)
+//   • "My Flame"                 — while exhibit compute is running
+//                                  (~1:40 wall-clock)
+//   • "Down for the Third Time"  — while PDF / TXT render is running
+//                                  (~2-4 min wall-clock)
+//
+// No overlap, no spanning across phases.  When the action ends the
+// song stops; nothing plays in between.
 //
 // Audio source files are committed to public-static/audio/ with their
 // original "Bobby Caldwell <title>.mp3" filenames.  Filenames are
