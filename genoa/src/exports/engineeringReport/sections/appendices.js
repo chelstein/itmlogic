@@ -104,24 +104,37 @@ export function buildAppendixSections(exhibit){
       if (s?.facility_id && byFid.has(String(s.facility_id)))  return byFid.get(String(s.facility_id));
       return null;
     };
+    const isAmExhibit = String(exhibit.station_inputs?.service || '').toUpperCase() === 'AM';
     const rows = isr.stations.map(s => {
       const n = lookupNearby(s) || {};
       // Class — try every shape both upstreams have used.
       const fccClass = s.class || s.fcc_class || s.station_class
                     || n.class || n.fcc_class || n.station_class
                     || n.facility_class || null;
-      // Frequency — prefer the engine's already-MHz value, fall back to
-      // nearby_primaries' frequency / frequency_mhz (FMQ stores as MHz).
-      const freq = Number.isFinite(s.frequency_mhz) ? Number(s.frequency_mhz)
-                : Number.isFinite(s.frequency)      ? Number(s.frequency)
-                : Number.isFinite(n.frequency_mhz)  ? Number(n.frequency_mhz)
-                : Number.isFinite(n.frequency)      ? Number(n.frequency)
-                : null;
+      // Frequency — AM stations carry kHz on both engine + nearby_primaries
+      // shapes; FM/FX carry MHz.  Picking the wrong field would print kHz
+      // values under a "Freq (MHz)" header (e.g. 1240 kHz → "1240.0 MHz").
+      const freqStr = isAmExhibit
+        ? (() => {
+            const k = Number.isFinite(s.frequency_khz) ? Number(s.frequency_khz)
+                   : Number.isFinite(n.frequency_khz)  ? Number(n.frequency_khz)
+                   : Number.isFinite(n.frequency)      ? Number(n.frequency)
+                   : null;
+            return k != null ? String(Math.round(k)) : '—';
+          })()
+        : (() => {
+            const m = Number.isFinite(s.frequency_mhz) ? Number(s.frequency_mhz)
+                   : Number.isFinite(s.frequency)      ? Number(s.frequency)
+                   : Number.isFinite(n.frequency_mhz)  ? Number(n.frequency_mhz)
+                   : Number.isFinite(n.frequency)      ? Number(n.frequency)
+                   : null;
+            return m != null ? m.toFixed(1) : '—';
+          })();
       return {
         call:               s.call || n.call || s.facility_id || '—',
         facility_id:        s.facility_id || n.facility_id || '—',
         fcc_class:          fccClass || '—',
-        frequency_mhz:      freq != null ? freq.toFixed(1) : '—',
+        frequency:          freqStr,
         relationship:       s.relationship || '—',
         distance_km:        Number.isFinite(s.distance_km) ? Number(s.distance_km).toFixed(2) : '—',
         rule_207:           s.section_73_207?.pass === true ? 'PASS'
@@ -143,7 +156,7 @@ export function buildAppendixSections(exhibit){
           { key: 'call',           label: 'Call',         width: 0.10 },
           { key: 'facility_id',    label: 'Facility ID',  width: 0.10 },
           { key: 'fcc_class',      label: 'Class',        width: 0.07 },
-          { key: 'frequency_mhz',  label: 'Freq (MHz)',   width: 0.10, align: 'right' },
+          { key: 'frequency',      label: isAmExhibit ? 'Freq (kHz)' : 'Freq (MHz)',   width: 0.10, align: 'right' },
           { key: 'relationship',   label: 'Relationship', width: 0.13 },
           { key: 'distance_km',    label: 'Dist (km)',    width: 0.10, align: 'right' },
           { key: 'rule_207',       label: '§73.207',      width: 0.10 },

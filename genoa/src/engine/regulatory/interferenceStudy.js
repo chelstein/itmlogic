@@ -222,6 +222,10 @@ function blankStation(s, kind){
     facility_id:           s.nearby_facility_id  || s.primary_facility_id  || s.facility_id  || null,
     fcc_class:             s.nearby_class        || s.primary_class        || s.fcc_class    || null,
     frequency_mhz:         s.nearby_frequency_mhz ?? s.primary_frequency_mhz ?? s.frequency_mhz ?? null,
+    // AM §73.187 / §73.190 studies emit kHz, not MHz.  Carry both so
+    // the PDF appendix can render the band-appropriate unit instead
+    // of printing kHz values under a "Freq (MHz)" header.
+    frequency_khz:         s.nearby_frequency_khz ?? s.primary_frequency_khz ?? s.frequency_khz ?? null,
     frequency_offset_khz:  s.delta_khz           ?? null,
     channel_relationship:  s.relationship        ?? null,
     distance_km:           s.actual_separation_km ?? s.separation_km       ?? null,
