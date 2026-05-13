@@ -151,6 +151,54 @@ export function makeFacilityClient({
       }
     },
 
+    /**
+     * Ground-conductivity fallback against ZTR.  Genoa's primary path
+     * is fccConductivityClient (live geo.fcc.gov/api/contours/
+     * conductivity.json); when that's unreachable, hit ZTR's
+     * /api/m3/conductivity proxy as the second try.  ZTR vendors / caches
+     * the FCC M3 polygons so this stays available even when the public
+     * FCC endpoint is degraded.
+     *
+     * Returns the same shape as fccConductivityClient.lookupSigma so
+     * the caller chain is uniform.
+     */
+    async getGroundConductivity({ lat, lon } = {}){
+      if (!ztrUrl) return { available: false, source: null, error: 'ztrUrl missing' };
+      if (!Number.isFinite(Number(lat)) || !Number.isFinite(Number(lon))){
+        return { available: false, source: null, error: 'lat/lon required (finite)' };
+      }
+      const u = joinUrl(ztrUrl, `/api/m3/conductivity?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`);
+      const fetched_at = new Date().toISOString();
+      try {
+        const r = await fetch(u, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok){
+          return { available: false, source: null, endpoint: u, fetched_at,
+                   error: `HTTP ${r.status} from ZTR conductivity proxy` };
+        }
+        const j = await r.json();
+        const row = (j?.results && j.results[0]) || j;
+        const sigma = Number(row?.conductivity_mS_per_m
+                          ?? row?.conductivity_msm
+                          ?? row?.conductivity
+                          ?? row?.sigma_mS_m);
+        if (!Number.isFinite(sigma) || sigma <= 0){
+          return { available: false, source: null, endpoint: u, fetched_at,
+                   error: 'no conductivity value in ZTR response' };
+        }
+        return {
+          available:   true,
+          sigma_mS_m:  sigma,
+          zone:        row?.zone_label || row?.zone || row?.m3_zone || null,
+          source:      'zerotrustradio-m3-proxy',
+          endpoint:    u,
+          fetched_at
+        };
+      } catch (e){
+        return { available: false, source: null, endpoint: u, fetched_at,
+                 error: String(e?.message || e) };
+      }
+    },
+
     async getTerrainHaatRadials({ facility_id, radial_step_deg = 10 }){
       if (!ztrUrl || !facility_id) return { available: false, source: null, error: 'ztrUrl or facility_id missing' };
       try {
