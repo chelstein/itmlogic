@@ -142,6 +142,51 @@ export function makeFccFmqClient({
       }
     },
 
+    /**
+     * Frequency-range search for AM-band stations.
+     *
+     * AM sibling of searchByFrequencyRange.  Hits AMQ (not FMQ) with
+     * `lower_freq=X&upper_freq=Y` in kHz (AMQ's units, not MHz).  Used
+     * by the §73.187 nearby-AM-primaries proximity search at the ±10/
+     * 20 kHz channel offsets that §73.187 / §73.190 govern.
+     *
+     * Existed as a hole until 2026-05-12: the original
+     * searchByFrequencyRange was hardcoded to the FM band (88..108
+     * MHz) so every AM call returned silently empty, and every AM
+     * exhibit's interference study evaluated 0 stations.  See the
+     * KRDM 2026-05-12 PDF for the symptom: "0 stations evaluated; 0
+     * pass / 0 fail under §73.187 / §73.190 (Wang skywave)".
+     *
+     * @param {number} lowerKhz   inclusive (AMQ units)
+     * @param {number} upperKhz   inclusive
+     * @returns { rows, count, source, endpoint, error? | note? }
+     */
+    async searchAmByFrequencyRangeKhz(lowerKhz, upperKhz){
+      const lo = Number(lowerKhz), hi = Number(upperKhz);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || lo > hi){
+        return { rows: [], source: null, error: 'invalid frequency range' };
+      }
+      // US AM broadcast band: 530..1710 kHz (47 CFR §73.21).  Out-of-
+      // band requests no-op so a caller asking for f0±20 kHz near the
+      // band edge can't trip the upstream into returning everything.
+      if (hi < 530 || lo > 1710){
+        return { rows: [], source: 'fcc-amq', endpoint: null,
+                 note: `frequency range [${lo}, ${hi}] kHz outside AM band` };
+      }
+      const url = `${amqUrl}?lower_freq=${lo}&upper_freq=${hi}&list=4`;
+      try {
+        const r = await fetchFn(url, { signal: AbortSignal.timeout(timeoutMs) });
+        if (!r.ok) return { rows: [], source: null, endpoint: url, error: `HTTP ${r.status} from AMQ` };
+        const text = await r.text();
+        const rows = text.split(/\r?\n/)
+          .map(line => parseRow(line, /* isAm = */ true, url))
+          .filter(row => row && row.service === 'AM');
+        return { rows, count: rows.length, source: 'fcc-amq', endpoint: url };
+      } catch (e){
+        return { rows: [], source: null, endpoint: url, error: `AMQ range search failed: ${e.message}` };
+      }
+    },
+
     async searchByCallsign(call){
       const cs = String(call || '').trim().toUpperCase();
       if (cs.length < 2){
