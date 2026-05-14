@@ -1091,19 +1091,17 @@ export async function computeExhibit(req){
 
   // ---- 6c. Live ground conductivity (AM only) ----
   // §73.190 / Figure M3 σ is required for honest AM groundwave compute
-  // AND the NEC Sommerfeld real-ground antenna model.  Four-tier
-  // resolution chain — every tier real authority data:
+  // AND the NEC Sommerfeld real-ground antenna model.  Real-data
+  // policy: NO synthetic fallback.  Resolution chain:
   //   1. operator-supplied inputs.ground_sigma_mS_m  (highest priority)
-  //   2. live geo.fcc.gov/api/contours/conductivity.json
-  //   3. ZTR /api/m3/conductivity proxy (vendored / cached M3 polygons)
-  //   4. NOAA NCEI ground-conductivity service
-  //   5. ITU-R BR World Atlas of Ground Conductivities
-  //   6. chain exhausted → AM_GROUND_SIGMA_UNRESOLVED blocker
-  //      (no synthetic fallback — refuse to compute).
-  // Stamps evidence.ground_conductivity with the source that won AND
-  // evidence.ground_conductivity.tier_attempts with every tier's
-  // outcome so the exhibit / PDF can show exactly which authority
-  // produced σ.
+  //   2. ZTR /api/m3/conductivity (chelstein/zerotrustradio vendors
+  //      the FCC m3.seq / m3hw.seq / r2.seq files and serves them as
+  //      a point-in-polygon lookup; this is the only verified live
+  //      authority endpoint Genoa has — no public JSON API exists at
+  //      geo.fcc.gov / NOAA NCEI / ITU-R BR for this data, only
+  //      downloadable static files).
+  //   3. chain exhausted → AM_GROUND_SIGMA_UNRESOLVED blocker
+  //      (refuse to compute; reviewer sees the blocker on the PDF).
   if (String(inputs.service || '').toUpperCase() === 'AM'
       && Number.isFinite(Number(inputs.lat))
       && Number.isFinite(Number(inputs.lon))){
@@ -1116,49 +1114,29 @@ export async function computeExhibit(req){
         fetched_at: new Date().toISOString()
       };
     } else {
-      const tierAttempts = {};
-      const tryTier = async (name, deadlineSlot, sidecarRef) => {
-        if (!sidecarRef) { tierAttempts[name] = { available: false, error: 'sidecar not configured' }; return null; }
+      let resolved   = null;
+      let ztrAttempt = { available: false, error: 'sidecar not configured' };
+      if (sidecars.facility?.getGroundConductivity){
         try {
-          const r = await budget.withDeadline(deadlineSlot,
-            () => sidecarRef.lookupSigma({ lat: inputs.lat, lon: inputs.lon }),
+          const r = await budget.withDeadline('ztr_conductivity',
+            () => sidecars.facility.getGroundConductivity({ lat: inputs.lat, lon: inputs.lon }),
             { minMs: 2_000 });
-          tierAttempts[name] = r || { available: false, error: 'no response' };
-          return r?.available ? r : null;
+          ztrAttempt = r || { available: false, error: 'no response' };
+          if (r?.available) resolved = r;
         } catch (e){
-          tierAttempts[name] = { available: false, error: String(e?.message || e) };
-          return null;
+          ztrAttempt = { available: false, error: String(e?.message || e) };
         }
-      };
-      let resolved = null;
-      // Tier 1 — live FCC.
-      resolved ||= await tryTier('fcc',  'fcc_conductivity',  sidecars.fccConductivity);
-      // Tier 2 — ZTR proxy.  Wrap the facility-client method into
-      // tryTier's lookupSigma shape so the helper stays uniform.
-      if (!resolved && sidecars.facility?.getGroundConductivity){
-        const wrapper = { lookupSigma: (a) => sidecars.facility.getGroundConductivity(a) };
-        resolved = await tryTier('ztr', 'ztr_conductivity', wrapper);
-      } else if (!resolved){
-        tierAttempts.ztr = { available: false, error: 'sidecar not configured' };
       }
-      // Tier 3 — NOAA NCEI.
-      resolved ||= await tryTier('noaa', 'noaa_conductivity', sidecars.noaaConductivity);
-      // Tier 4 — ITU-R BR atlas.
-      resolved ||= await tryTier('itu',  'itu_conductivity',  sidecars.ituConductivity);
-
       if (resolved){
         inputs.ground_sigma_mS_m = resolved.sigma_mS_m;
-        evidence.ground_conductivity = { ...resolved, tier_attempts: tierAttempts };
+        evidence.ground_conductivity = { ...resolved, tier_attempts: { ztr: ztrAttempt } };
       } else {
-        // Real-data policy: NO synthetic σ fallback.  Emit a blocker so
-        // the AM compute halts cleanly and the reviewer is told exactly
-        // which upstream(s) failed.  AM groundwave + NEC will not run.
         warnings.push(W.make('AM_GROUND_SIGMA_UNRESOLVED'));
         evidence.ground_conductivity = {
           available:     false,
           source:        null,
-          reason:        'all upstream authority sources failed; refusing to synthesize',
-          tier_attempts: tierAttempts
+          reason:        'ZTR /api/m3/conductivity returned no usable value; no other authority endpoints exist as live services',
+          tier_attempts: { ztr: ztrAttempt }
         };
       }
     }

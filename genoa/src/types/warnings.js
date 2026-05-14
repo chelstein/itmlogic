@@ -157,8 +157,8 @@ export const WARNING_CODES = Object.freeze({
     description: 'NEC2++ is GPL v2.  This evidence was produced by an isolated sidecar process that Genoa talks to over HTTP only — Genoa\'s own codebase does not link or embed any GPL\'d code.  evidence.nec_model.provenance.license_boundary is stamped "external sidecar" so reviewers can verify the boundary is preserved.' },
 
   AM_GROUND_SIGMA_UNRESOLVED: { severity: 'blocker', phase: 'sidecar',
-    title: 'AM ground conductivity could not be resolved from any source',
-    description: 'Genoa refuses to compute AM groundwave / NEC results with a synthetic σ default.  The resolution chain (operator-supplied → live geo.fcc.gov/api/contours/conductivity.json → ZTR /api/m3/conductivity proxy) returned no usable value at the subject lat/lon.  Supply inputs.ground_sigma_mS_m explicitly (FCC §73.190 M3 zone value for the tower site) and recompute.  evidence.ground_conductivity_*_attempt records each upstream failure for diagnosis.' },
+    title: 'AM ground conductivity could not be resolved',
+    description: 'Genoa refuses to compute AM groundwave / NEC results with a synthetic σ default.  The resolution chain (operator-supplied inputs.ground_sigma_mS_m → ZTR /api/m3/conductivity at the subject lat/lon) returned no usable value.  Supply inputs.ground_sigma_mS_m explicitly with the §73.190 M3 zone value for the tower site (or fix the ZTR M3 endpoint) and recompute.  evidence.ground_conductivity.tier_attempts records the upstream failure for diagnosis.' },
 
   LMS_DATA_UNAVAILABLE: { severity: 'warning', phase: 'evidence',
     title: 'FCC LMS / public-file data unavailable',
