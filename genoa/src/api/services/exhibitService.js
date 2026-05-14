@@ -35,8 +35,7 @@ const VALIDATION_TTL_MS = 5 * 60 * 1000;
 // REAL DATA POLICY: this function REFUSES to run without a resolved
 // inputs.ground_sigma_mS_m — the σ must have come from one of:
 //   - operator-supplied
-//   - live geo.fcc.gov/api/contours/conductivity.json
-//   - ZTR /api/m3/conductivity proxy
+//   - ZTR /api/m3/conductivity proxy (vendored FCC §73.190 M3 polygons)
 // Synthetic defaults (the prior `|| 8`) are forbidden site-wide.
 // Returns null when σ is unresolved; the caller emits the blocker.
 function synthDefaultAmArray(inputs){
@@ -1090,16 +1089,22 @@ export async function computeExhibit(req){
   }
 
   // ---- 6c. Live ground conductivity (AM only) ----
-  // §73.190 / Figure M3 σ is required for honest AM groundwave compute
-  // AND the NEC Sommerfeld real-ground antenna model.  Four-tier
-  // resolution chain — every tier real authority data:
+  // §73.190 / Figure R3 σ is required for honest AM groundwave compute
+  // AND the NEC Sommerfeld real-ground antenna model.  Resolution chain
+  // — every tier is real authority data, no guessing:
   //   1. operator-supplied inputs.ground_sigma_mS_m  (highest priority)
-  //   2. live geo.fcc.gov/api/contours/conductivity.json
-  //   3. ZTR /api/m3/conductivity proxy (vendored / cached M3 polygons)
-  //   4. NOAA NCEI ground-conductivity service
-  //   5. ITU-R BR World Atlas of Ground Conductivities
-  //   6. chain exhausted → AM_GROUND_SIGMA_UNRESOLVED blocker
+  //   2. ZTR /api/m3/conductivity proxy (vendored FCC §73.190 M3
+  //      polygons in chelstein/zerotrustradio data/m3/)
+  //   3. chain exhausted → AM_GROUND_SIGMA_UNRESOLVED blocker
   //      (no synthetic fallback — refuse to compute).
+  //
+  // FCC, NOAA, and ITU-R BR do NOT publish a live JSON σ-at-lat/lon
+  // API.  The §73.190 dataset only ships as the m3.seq / .kml static
+  // file; ZTR owns the parser + polygon lookup so Genoa does not
+  // duplicate that work.  Prior FCC/NOAA/ITU client stubs that
+  // guessed at endpoint URLs were removed — see PR removing
+  // fccConductivityClient / noaaConductivityClient / ituConductivityClient.
+  //
   // Stamps evidence.ground_conductivity with the source that won AND
   // evidence.ground_conductivity.tier_attempts with every tier's
   // outcome so the exhibit / PDF can show exactly which authority
@@ -1117,34 +1122,21 @@ export async function computeExhibit(req){
       };
     } else {
       const tierAttempts = {};
-      const tryTier = async (name, deadlineSlot, sidecarRef) => {
-        if (!sidecarRef) { tierAttempts[name] = { available: false, error: 'sidecar not configured' }; return null; }
-        try {
-          const r = await budget.withDeadline(deadlineSlot,
-            () => sidecarRef.lookupSigma({ lat: inputs.lat, lon: inputs.lon }),
-            { minMs: 2_000 });
-          tierAttempts[name] = r || { available: false, error: 'no response' };
-          return r?.available ? r : null;
-        } catch (e){
-          tierAttempts[name] = { available: false, error: String(e?.message || e) };
-          return null;
-        }
-      };
       let resolved = null;
-      // Tier 1 — live FCC.
-      resolved ||= await tryTier('fcc',  'fcc_conductivity',  sidecars.fccConductivity);
-      // Tier 2 — ZTR proxy.  Wrap the facility-client method into
-      // tryTier's lookupSigma shape so the helper stays uniform.
-      if (!resolved && sidecars.facility?.getGroundConductivity){
-        const wrapper = { lookupSigma: (a) => sidecars.facility.getGroundConductivity(a) };
-        resolved = await tryTier('ztr', 'ztr_conductivity', wrapper);
-      } else if (!resolved){
+      // Tier 1 — ZTR /api/m3/conductivity (vendored FCC dataset).
+      if (sidecars.facility?.getGroundConductivity){
+        try {
+          const r = await budget.withDeadline('ztr_conductivity',
+            () => sidecars.facility.getGroundConductivity({ lat: inputs.lat, lon: inputs.lon }),
+            { minMs: 2_000 });
+          tierAttempts.ztr = r || { available: false, error: 'no response' };
+          if (r?.available) resolved = r;
+        } catch (e){
+          tierAttempts.ztr = { available: false, error: String(e?.message || e) };
+        }
+      } else {
         tierAttempts.ztr = { available: false, error: 'sidecar not configured' };
       }
-      // Tier 3 — NOAA NCEI.
-      resolved ||= await tryTier('noaa', 'noaa_conductivity', sidecars.noaaConductivity);
-      // Tier 4 — ITU-R BR atlas.
-      resolved ||= await tryTier('itu',  'itu_conductivity',  sidecars.ituConductivity);
 
       if (resolved){
         inputs.ground_sigma_mS_m = resolved.sigma_mS_m;
@@ -1157,7 +1149,7 @@ export async function computeExhibit(req){
         evidence.ground_conductivity = {
           available:     false,
           source:        null,
-          reason:        'all upstream authority sources failed; refusing to synthesize',
+          reason:        'ZTR /api/m3/conductivity unavailable and operator did not supply ground_sigma_mS_m; refusing to synthesize',
           tier_attempts: tierAttempts
         };
       }
