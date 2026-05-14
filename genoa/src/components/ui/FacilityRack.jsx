@@ -155,10 +155,12 @@ export default function FacilityRack({
           <label className="rack-label">Longitude (°W neg.)</label>
           <input className="rack-input" value={inputs.lon ?? ''} onChange={e => set('lon', e.target.value)} placeholder="-112.0" />
         </div>
+        {String(inputs.service || '').toUpperCase() === 'AM' && (
         <div>
           <label className="rack-label">AM σ (mS/m)</label>
           <input className="rack-input" value={inputs.ground_sigma_mS_m ?? ''} onChange={e => set('ground_sigma_mS_m', e.target.value)} placeholder="e.g. 8" />
         </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-2 mt-3">
