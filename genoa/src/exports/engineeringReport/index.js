@@ -19,6 +19,7 @@ import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
 import { buildMeasurementsSection }                from './sections/measurements.js';
+import { buildRegulatoryContextSection }           from './sections/regulatoryContext.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -33,6 +34,12 @@ export function buildEngineeringReport(exhibit, options){
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
+  // Regulatory-context section is conditional — only present when the
+  // classifier ran (exhibit.regulatoryContext is populated).  Sits
+  // between methodology and the engineering-considerations block so a
+  // reader sees the licensing / current-rule disposition before the
+  // technical interpretation.
+  push(buildRegulatoryContextSection(exhibit, opt));
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildMeasurementsSection(exhibit, opt));
