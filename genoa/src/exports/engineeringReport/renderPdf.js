@@ -43,6 +43,33 @@ const TEXT_DIM  = '#666666';
 
 const FOOTER_TEXT = 'Genoa FCC Propagation Studio';
 
+// PDFKit's built-in Times-Roman / Helvetica / Courier fonts use WinAnsi
+// encoding, which does NOT include arrow / dash / quote glyphs above
+// U+007E.  When upstream section builders emit "→", "↔", smart quotes,
+// etc., pdfkit silently substitutes garbage glyphs (we have seen
+// "→" render as "!'" in filed exhibits — unacceptable for a
+// customer-facing FCC document).  This fold maps the small set of
+// Unicode chars that section builders actually emit down to ASCII
+// equivalents the PDF font can render.  The plain-text export keeps
+// the original Unicode (UTF-8 in .txt survives fine).
+const PDF_UNICODE_FOLD = {
+  '→': '->',    // → right arrow
+  '←': '<-',    // ← left arrow
+  '↔': '<->',   // ↔ left-right arrow
+  '–': '-',     // – en dash
+  '—': '--',    // — em dash
+  '‘': "'",     // ‘
+  '’': "'",     // ’
+  '“': '"',     // “
+  '”': '"',     // ”
+  '…': '...'    // …
+};
+function pdfSafeText(s){
+  if (typeof s !== 'string') return s;
+  return s.replace(/[→←↔–—‘’“”…]/g,
+                   ch => PDF_UNICODE_FOLD[ch] || ch);
+}
+
 export async function renderEngineeringReportPdf(doc){
   if (!doc || !Array.isArray(doc.sections)){
     throw new Error('renderEngineeringReportPdf: invalid document model');
@@ -55,10 +82,16 @@ export async function renderEngineeringReportPdf(doc){
     info: {
       Title:    meta.title || 'Engineering Statement',
       Author:   meta.generated_by || FOOTER_TEXT,
-      Subject:  meta.station ? `FCC propagation study — ${meta.station}` : 'FCC propagation study',
+      Subject:  meta.station ? pdfSafeText(`FCC propagation study — ${meta.station}`) : 'FCC propagation study',
       Keywords: 'FCC, propagation, broadcast engineering, Genoa'
     }
   });
+  // Route every text write through the Unicode-to-WinAnsi fold so the
+  // base-14 PDF fonts never receive glyphs they cannot render.
+  const _origText = pdf.text.bind(pdf);
+  pdf.text = function patchedText(text, ...rest){
+    return _origText(pdfSafeText(text), ...rest);
+  };
   const chunks = [];
   pdf.on('data', c => chunks.push(c));
   const done = new Promise((resolve, reject) => {
@@ -372,18 +405,28 @@ function renderTable(pdf, table){
 
 function drawTableHeader(pdf, cols, widths){
   pdf.font(BOLD_FONT).fontSize(BODY_SIZE - 1).fillColor(TEAL_DARK);
-  let x = MARGIN, y = pdf.y;
+  let x = MARGIN;
+  const y = pdf.y;
+  // Track the bottom of the tallest (multi-line-wrapped) header cell so
+  // the underline rule and first data row clear ALL header lines.  Each
+  // column write resets pdf.y back to the top of the header band, so a
+  // wrapped-to-2-lines label like "D/U Req (dB)" would otherwise be
+  // followed by data overlapping the second header line.  Mirrors the
+  // maxBottom pattern in the row loop below.
+  let maxBottom = y;
   for (let i = 0; i < cols.length; i++){
     pdf.text(cols[i].label || cols[i].key, x + 2, y, {
-      width: widths[i] - 4, align: cols[i].align || 'left', lineBreak: false
+      width: widths[i] - 4, align: cols[i].align || 'left'
     });
+    maxBottom = Math.max(maxBottom, pdf.y);
+    pdf.y = y;
     x += widths[i];
   }
-  y = pdf.y + 2;
-  pdf.moveTo(MARGIN, y).lineTo(MARGIN + widths.reduce((a, b) => a + b, 0), y)
+  const ruleY = maxBottom + 2;
+  pdf.moveTo(MARGIN, ruleY).lineTo(MARGIN + widths.reduce((a, b) => a + b, 0), ruleY)
      .strokeColor(AMBER).lineWidth(0.5).stroke();
   pdf.strokeColor('black').fillColor('black');
-  pdf.y = y + 3;
+  pdf.y = ruleY + 3;
 }
 
 function renderVerdict(pdf, v){
