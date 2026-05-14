@@ -25,9 +25,33 @@ export function buildConclusionSection(exhibit){
       'Facility redesign, waiver analysis, or further engineering review is required prior to filing.';
   } else if (isr && isr.filing_qualifies === false){
     status = 'NON-COMPLIANT';
+    // Derive which rules actually failed from per-station failed_rules so
+    // the narrative can't claim §73.207 failed when only §73.215 did
+    // (or vice versa).  A station may have failed under multiple rules
+    // (e.g. §73.207+§73.215) — union them across all failing stations.
+    const failedRules = new Set();
+    for (const s of (isr.stations || [])){
+      if (s.pass_overall === false){
+        for (const cite of (s.failed_rules || [])) failedRules.add(cite);
+      }
+    }
+    const ruleDescriptors = {
+      '§73.207(b)': '§73.207 minimum distance separation',
+      '§73.215':    '§73.215 contour protection',
+      '§74.1204':   '§74.1204 translator-interference protection',
+      '§73.187':    '§73.187 AM nighttime skywave protection'
+    };
+    const failedList = [...failedRules]
+      .map(c => ruleDescriptors[c] || c)
+      .filter(Boolean);
+    const failedPhrase = failedList.length === 0
+      ? 'the applicable interference rules'
+      : failedList.length === 1
+        ? failedList[0]
+        : failedList.slice(0, -1).join(', ') + ' and ' + failedList[failedList.length - 1];
     narrative =
       'The interference study indicates the subject facility does not qualify under the applicable rule sets.  ' +
-      'The facility does not meet §73.207 minimum distance separation and does not qualify under §73.215 contour protection ' +
+      `The facility does not qualify under ${failedPhrase} ` +
       'for all required protected facilities.  Facility redesign, waiver analysis, or further engineering review is required prior to filing.';
   } else if (sec207Fail && sec215Pass){
     status = 'COMPLIANT VIA ALTERNATE RULE';
