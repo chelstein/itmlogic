@@ -31,9 +31,6 @@ import { makePopulationClient }  from '../../evidence/populationClient.js';
 import { makeAcsCensusClient }   from '../../evidence/acsCensusClient.js';
 import { makeFccCensusClient }   from '../../evidence/fccCensusClient.js';
 import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
-import { makeFccConductivityClient }  from '../../evidence/fccConductivityClient.js';
-import { makeNoaaConductivityClient } from '../../evidence/noaaConductivityClient.js';
-import { makeItuConductivityClient }  from '../../evidence/ituConductivityClient.js';
 import { makeNecClient }         from '../../evidence/nec/client.js';
 import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 import { makeAsrClient }         from '../../evidence/asrClient.js';
@@ -92,18 +89,14 @@ export const sidecars = Object.freeze({
   // or ZTR is not configured.  Always on (geo.fcc.gov is public / no auth).
   // Disable with FCC_CONTOURS_DISABLE=1.
   fccContours: process.env.FCC_CONTOURS_DISABLE === '1' ? null : makeFccContoursClient(),
-  // FCC §73.190 / Figure M3 ground-conductivity lookup.  Public
-  // upstream; always on unless explicitly disabled.  When unreachable,
-  // exhibitService falls through to ZTR's /api/m3/conductivity proxy
-  // and then to the disclosed 8 mS/m §73.182 typical default.
-  fccConductivity:  process.env.FCC_CONDUCTIVITY_DISABLE  === '1' ? null : makeFccConductivityClient(),
-  // Tier 3 — NOAA NCEI ground conductivity (US-government public domain).
-  noaaConductivity: process.env.NOAA_CONDUCTIVITY_DISABLE === '1' ? null : makeNoaaConductivityClient(),
-  // Tier 4 — ITU-R BR World Atlas of Ground Conductivities (international
-  // authority; used both as a global fallback and for US border-zone
-  // stations near Canada / Mexico where the FCC M3 polygons may not
-  // extend.  Last live tier before AM_GROUND_SIGMA_UNRESOLVED blocker.).
-  ituConductivity:  process.env.ITU_CONDUCTIVITY_DISABLE  === '1' ? null : makeItuConductivityClient(),
+  // §73.190 / Figure R3 ground-conductivity lookup.  Sourced via ZTR's
+  // /api/m3/conductivity endpoint (chelstein/zerotrustradio); operator-
+  // supplied inputs.ground_sigma_mS_m always wins over the lookup.
+  // No separate sidecar is registered because no public JSON authority
+  // endpoint exists for σ at lat/lon — FCC, NOAA NCEI, and ITU-R BR
+  // all publish the data only as static files, not live APIs.  Prior
+  // FCC/NOAA/ITU client stubs that guessed at endpoint URLs were
+  // removed in this PR to comply with the no-guessing rule.
   // NEC2++ / PyNEC antenna-modeling sidecar.  GPL v2 isolated in a
   // separate process; Genoa only talks to it over HTTP.  Set
   // NEC_SIDECAR_URL on the deploy to enable; Genoa works without it.
