@@ -6,27 +6,38 @@
 // When the FCC's own endpoint AND ZTR's M3 proxy are both unreachable,
 // NOAA NCEI is the authoritative US-government fallback.
 //
-// ENDPOINT
-//   The default URL points at NOAA's geomag/conductivity lookup
-//   namespace.  Operators MUST verify NOAA_CONDUCTIVITY_URL against
-//   the current NCEI service catalog and override the env var for
-//   their deploy if NOAA has moved the endpoint.  No data is
-//   synthesized here — when the service returns nothing usable, the
-//   client surfaces { available:false } and the caller falls through
-//   to Tier 4.
+// CONFIGURATION
+//   This client is OPT-IN.  NOAA NCEI exposes several conductivity
+//   datasets but no single stable JSON endpoint with consistent
+//   schema — operators must point Genoa at a deployment-specific URL
+//   (the NCEI service catalog endpoint that fits their use case, or
+//   an in-house proxy that normalises the response).  Set
+//   NOAA_CONDUCTIVITY_URL on the deploy to enable; unset →
+//   makeNoaaConductivityClient() returns null and the sidecar shows
+//   "not configured" instead of BLOCKED.
 
-const DEFAULT_BASE_URL   = process.env.NOAA_CONDUCTIVITY_URL
-                        || 'https://www.ngdc.noaa.gov/geomag-web/calculators/groundconductivity';
 const DEFAULT_TIMEOUT_MS = 8_000;
 
 export function makeNoaaConductivityClient({
-  baseUrl   = DEFAULT_BASE_URL,
+  baseUrl   = process.env.NOAA_CONDUCTIVITY_URL || null,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   fetchFn   = (typeof fetch === 'function' ? fetch : null)
 } = {}){
-  if (!fetchFn) return null;
+  if (!fetchFn || !baseUrl) return null;
   return {
     baseUrl,
+
+    // Liveness probe — any HTTP response = host reachable.  Avoids
+    // BLOCKED-mark for endpoints that exist but have no record for
+    // the probe coordinate.
+    async health(){
+      try {
+        const r = await fetchFn(
+          `${baseUrl}?lat=37.0902&lon=-95.7129&format=json`,
+          { signal: AbortSignal.timeout(3000) });
+        return r.status >= 200 && r.status < 600;
+      } catch { return false; }
+    },
 
     /**
      * Resolve σ (mS/m) at the given lat/lon from NOAA NCEI's ground-

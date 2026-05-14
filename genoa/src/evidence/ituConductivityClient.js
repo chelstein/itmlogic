@@ -9,26 +9,35 @@
 // FCC's national map may not extend, AND as the final-tier authority
 // when FCC, ZTR, and NOAA are all unreachable.
 //
-// ENDPOINT
-//   The default URL points at the ITU-R BR conductivity namespace.
-//   Operators MUST verify ITU_CONDUCTIVITY_URL against the current
-//   ITU service catalog and override the env var for their deploy
-//   if ITU has moved the endpoint.  No data is synthesized here —
-//   when the service returns nothing usable, { available:false } is
-//   returned and the caller emits AM_GROUND_SIGMA_UNRESOLVED.
+// CONFIGURATION
+//   This client is OPT-IN.  ITU publishes the World Atlas as software
+//   tools and downloadable datasets rather than a stable public JSON
+//   API — operators must point Genoa at their own service (a vendored
+//   atlas raster fronted by an HTTP wrapper, or a commercial proxy).
+//   Set ITU_CONDUCTIVITY_URL on the deploy to enable; unset →
+//   makeItuConductivityClient() returns null and the sidecar shows
+//   "not configured" instead of BLOCKED.
 
-const DEFAULT_BASE_URL   = process.env.ITU_CONDUCTIVITY_URL
-                        || 'https://www.itu.int/ITU-R/conductivity/api/lookup';
-const DEFAULT_TIMEOUT_MS = 10_000;     // ITU-R BR is sometimes slow
+const DEFAULT_TIMEOUT_MS = 10_000;     // atlas backends are sometimes slow
 
 export function makeItuConductivityClient({
-  baseUrl   = DEFAULT_BASE_URL,
+  baseUrl   = process.env.ITU_CONDUCTIVITY_URL || null,
   timeoutMs = DEFAULT_TIMEOUT_MS,
   fetchFn   = (typeof fetch === 'function' ? fetch : null)
 } = {}){
-  if (!fetchFn) return null;
+  if (!fetchFn || !baseUrl) return null;
   return {
     baseUrl,
+
+    // Liveness probe — any HTTP response = host reachable.
+    async health(){
+      try {
+        const r = await fetchFn(
+          `${baseUrl}?lat=37.0902&lon=-95.7129&format=json`,
+          { signal: AbortSignal.timeout(3000) });
+        return r.status >= 200 && r.status < 600;
+      } catch { return false; }
+    },
 
     /**
      * Resolve σ (mS/m) at the given lat/lon from ITU-R BR's World

@@ -20,7 +20,7 @@ test('lookupSigma: returns sigma + zone from a 200 OK response', async () => {
       }
     };
   };
-  const c = makeFccConductivityClient({ fetchFn });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn });
   const r = await c.lookupSigma({ lat: 37.0902, lon: -95.7129 });
   assert.equal(r.available, true);
   assert.equal(r.sigma_mS_m, 4);
@@ -35,7 +35,7 @@ test('lookupSigma: falls back through conductivity_msm and conductivity field na
     ok: true,
     async json(){ return { results: [{ conductivity: 8 }] }; }
   });
-  const c = makeFccConductivityClient({ fetchFn });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, true);
   assert.equal(r.sigma_mS_m, 8);
@@ -44,7 +44,7 @@ test('lookupSigma: falls back through conductivity_msm and conductivity field na
 test('lookupSigma: invalid lat/lon returns structured error without fetching', async () => {
   let called = false;
   const fetchFn = async () => { called = true; return { ok: true, async json(){ return {}; } }; };
-  const c = makeFccConductivityClient({ fetchFn });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn });
   const r = await c.lookupSigma({ lat: 'bad', lon: NaN });
   assert.equal(called, false);
   assert.equal(r.available, false);
@@ -53,7 +53,7 @@ test('lookupSigma: invalid lat/lon returns structured error without fetching', a
 
 test('lookupSigma: HTTP non-2xx surfaces a structured error', async () => {
   const fetchFn = async () => ({ ok: false, status: 503, async json(){ return {}; } });
-  const c = makeFccConductivityClient({ fetchFn });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, false);
   assert.match(r.error, /HTTP 503/);
@@ -64,7 +64,7 @@ test('lookupSigma: response missing conductivity value flags no-data error', asy
     ok: true,
     async json(){ return { results: [{ zone_label: 'unknown' }] }; }
   });
-  const c = makeFccConductivityClient({ fetchFn });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, false);
   assert.match(r.error, /no conductivity value/);
@@ -72,7 +72,7 @@ test('lookupSigma: response missing conductivity value flags no-data error', asy
 
 test('lookupSigma: network exception is caught and reported', async () => {
   const fetchFn = async () => { throw new Error('ENETUNREACH'); };
-  const c = makeFccConductivityClient({ fetchFn });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, false);
   assert.match(r.error, /ENETUNREACH/);

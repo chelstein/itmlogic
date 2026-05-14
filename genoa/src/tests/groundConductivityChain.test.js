@@ -18,7 +18,7 @@ const okFetch = (sigma, source_label) => async () => ({
 const downFetch = () => async () => { throw new Error('ENETUNREACH'); };
 
 test('FCC tier returns sigma + fcc-m3 source on success', async () => {
-  const c = makeFccConductivityClient({ fetchFn: okFetch(4, 'M3-12') });
+  const c = makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn: okFetch(4, 'M3-12') });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, true);
   assert.equal(r.sigma_mS_m, 4);
@@ -27,7 +27,7 @@ test('FCC tier returns sigma + fcc-m3 source on success', async () => {
 });
 
 test('NOAA tier returns sigma + noaa-ncei source on success', async () => {
-  const c = makeNoaaConductivityClient({ fetchFn: okFetch(6, 'plains') });
+  const c = makeNoaaConductivityClient({ baseUrl: "https://example.test/noaa", fetchFn: okFetch(6, 'plains') });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, true);
   assert.equal(r.sigma_mS_m, 6);
@@ -39,14 +39,14 @@ test('NOAA tier handles S/m → mS/m conversion when only conductivity_S_per_m i
     ok: true,
     async json(){ return { results: [{ conductivity_S_per_m: 0.008 }] }; }
   });
-  const c = makeNoaaConductivityClient({ fetchFn });
+  const c = makeNoaaConductivityClient({ baseUrl: "https://example.test/noaa", fetchFn });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, true);
   assert.equal(r.sigma_mS_m, 8);   // 0.008 S/m = 8 mS/m
 });
 
 test('ITU tier returns sigma + itu-r-br-atlas source on success', async () => {
-  const c = makeItuConductivityClient({ fetchFn: okFetch(2, 'Atlas-22') });
+  const c = makeItuConductivityClient({ baseUrl: "https://example.test/itu", fetchFn: okFetch(2, 'Atlas-22') });
   const r = await c.lookupSigma({ lat: 40, lon: -100 });
   assert.equal(r.available, true);
   assert.equal(r.sigma_mS_m, 2);
@@ -55,9 +55,9 @@ test('ITU tier returns sigma + itu-r-br-atlas source on success', async () => {
 
 test('All tiers handle network failure with structured error (no throw)', async () => {
   const clients = [
-    makeFccConductivityClient({ fetchFn: downFetch() }),
-    makeNoaaConductivityClient({ fetchFn: downFetch() }),
-    makeItuConductivityClient({ fetchFn: downFetch() })
+    makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn: downFetch() }),
+    makeNoaaConductivityClient({ baseUrl: "https://example.test/noaa", fetchFn: downFetch() }),
+    makeItuConductivityClient({ baseUrl: "https://example.test/itu", fetchFn: downFetch() })
   ];
   for (const c of clients){
     const r = await c.lookupSigma({ lat: 40, lon: -100 });
@@ -69,9 +69,9 @@ test('All tiers handle network failure with structured error (no throw)', async 
 test('All tiers handle non-2xx with structured error', async () => {
   const errFetch = async () => ({ ok: false, status: 503, async json(){ return {}; } });
   const clients = [
-    makeFccConductivityClient({ fetchFn: errFetch }),
-    makeNoaaConductivityClient({ fetchFn: errFetch }),
-    makeItuConductivityClient({ fetchFn: errFetch })
+    makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn: errFetch }),
+    makeNoaaConductivityClient({ baseUrl: "https://example.test/noaa", fetchFn: errFetch }),
+    makeItuConductivityClient({ baseUrl: "https://example.test/itu", fetchFn: errFetch })
   ];
   for (const c of clients){
     const r = await c.lookupSigma({ lat: 40, lon: -100 });
@@ -84,9 +84,9 @@ test('All tiers reject invalid lat/lon without fetching', async () => {
   let called = 0;
   const counter = async () => { called++; return { ok: true, async json(){ return {}; } }; };
   const clients = [
-    makeFccConductivityClient({ fetchFn: counter }),
-    makeNoaaConductivityClient({ fetchFn: counter }),
-    makeItuConductivityClient({ fetchFn: counter })
+    makeFccConductivityClient({ baseUrl: "https://example.test/fcc", fetchFn: counter }),
+    makeNoaaConductivityClient({ baseUrl: "https://example.test/noaa", fetchFn: counter }),
+    makeItuConductivityClient({ baseUrl: "https://example.test/itu", fetchFn: counter })
   ];
   for (const c of clients){
     const r = await c.lookupSigma({ lat: 'bad', lon: NaN });
