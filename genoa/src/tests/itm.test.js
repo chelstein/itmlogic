@@ -20,10 +20,19 @@ import {
   bullingtonWorstEdge,
   terrainPathLoss,
   predictFieldStrengthDbu,
+  preloadItmV122,
   TERRAIN_PROPAGATION_PROVENANCE
 } from '../engine/coverage/terrain_propagation.js';
 
 import { findFieldStrengthCrossingOnRadial } from '../engine/coverage/itm_radial.js';
+
+// findFieldStrengthCrossingOnRadial drives the ITM v1.2.2 path-loss
+// kernel, which fail-closes if its DLL/JS WASM bindings haven't been
+// preloaded.  In production the engine preloads once at startup; under
+// test we mirror that here so the crossing-finder tests can run.
+test.before(async () => {
+  await preloadItmV122();
+});
 
 /* -------------------- free-space -------------------- */
 

@@ -7,6 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn } from 'node:child_process';
@@ -44,10 +45,19 @@ test('createJob + scheduleJob returns within 1 second (no synchronous compute)',
 
 test('failed compute stores the engine error on the job', async () => {
   _resetForTests();
-  // Missing service / frequency / coords → the engine validates + throws.
+  // Engine is intentionally permissive for partially-populated FM
+  // inputs (degraded-mode exhibit + blocker warnings), so { call: 'BAD' }
+  // alone now produces 'complete'.  Force a hard throw by passing an
+  // unknown service, which methodFor() rejects with "unknown service".
+  //
+  // Important: createJob stores body.input directly, and jobRunner's
+  // computeReq() then wraps it as { inputs: r.input, options: r.options }.
+  // So r.input here IS the form fields — passing { inputs: {...} } would
+  // double-nest and the engine would never see `service`.  Match the
+  // shape the real /api/exhibit/jobs route uses.
   const id = createJob({
     kind:  JOB_KIND.EXHIBIT,
-    input: { inputs: { call: 'BAD' }, options: {} }
+    input: { call: 'BAD', service: 'BOGUS_SERVICE' }
   });
   await runJob(id);   // synchronous-await for deterministic test timing
   const job = getJob(id);
@@ -130,18 +140,35 @@ test('UI compute() and engineering exports use the async job endpoints', () => {
 test('HTTP /api/exhibit/jobs end-to-end (POST 202 + polling + artifact)', async (t) => {
   const port    = 18299 + Math.floor(Math.random() * 100);
   const baseUrl = `http://127.0.0.1:${port}`;
+  // requireAuth fail-closes when AUTH_* env is missing.  Supply a
+  // syntactic password hash + a known session secret, then mint a
+  // cookie directly (same HMAC+base64url that middleware/auth.js
+  // signSession() emits) so every /api/* fetch carries an auth.
+  const AUTH_SESSION_SECRET = 'genoa-test-session-secret-do-not-use-in-prod-32b';
+  const AUTH_PASSWORD_HASH  = 'scrypt$00$00';
+  const now = Math.floor(Date.now() / 1000);
+  const payload = Buffer.from(JSON.stringify({ iat: now, exp: now + 3600 }))
+    .toString('base64url');
+  const sig = crypto.createHmac('sha256', Buffer.from(AUTH_SESSION_SECRET, 'utf8'))
+    .update(payload).digest('base64url');
+  const sessionCookie = `genoa_session=${payload}.${sig}`;
   const proc = spawn(process.execPath, ['src/api/server.js'], {
     cwd: ROOT,
     env: { ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: '',
+           AUTH_PASSWORD_HASH, AUTH_SESSION_SECRET,
            FACILITY_DISABLE_FCC_FMQ: '1' },
     stdio: ['ignore', 'pipe', 'pipe']
   });
   t.after(() => { try { proc.kill('SIGTERM'); } catch {} });
   await waitForHealth(baseUrl + '/healthz', 8000);
+  const authFetch = (url, init = {}) => fetch(url, {
+    ...init,
+    headers: { ...(init.headers || {}), cookie: sessionCookie }
+  });
 
   // Submit a TXT engineering-report job.
   const t0 = Date.now();
-  const post = await fetch(baseUrl + '/api/exhibit/jobs', {
+  const post = await authFetch(baseUrl + '/api/exhibit/jobs', {
     method:  'POST',
     headers: { 'content-type': 'application/json' },
     body:    JSON.stringify({
@@ -160,7 +187,7 @@ test('HTTP /api/exhibit/jobs end-to-end (POST 202 + polling + artifact)', async 
   let view = null;
   const deadline = Date.now() + 30_000;
   while (Date.now() < deadline){
-    const r = await fetch(baseUrl + `/api/exhibit/jobs/${submitted.job_id}`);
+    const r = await authFetch(baseUrl + `/api/exhibit/jobs/${submitted.job_id}`);
     assert.equal(r.status, 200);
     view = await r.json();
     if (view.status === 'complete' || view.status === 'failed') break;
@@ -170,18 +197,18 @@ test('HTTP /api/exhibit/jobs end-to-end (POST 202 + polling + artifact)', async 
   assert.ok(view.artifact_url && view.artifact_url.includes('/artifact'));
 
   // Stream the artifact.
-  const ar = await fetch(baseUrl + view.artifact_url);
+  const ar = await authFetch(baseUrl + view.artifact_url);
   assert.equal(ar.status, 200);
   assert.ok(/text\/plain/.test(ar.headers.get('content-type')));
   const body = await ar.text();
   assert.ok(body.includes('ENGINEERING STATEMENT'));
 
   // Polling for an unknown id returns 404.
-  const r404 = await fetch(baseUrl + '/api/exhibit/jobs/00000000-0000-0000-0000-000000000000');
+  const r404 = await authFetch(baseUrl + '/api/exhibit/jobs/00000000-0000-0000-0000-000000000000');
   assert.equal(r404.status, 404);
 
   // Bad kind returns 400.
-  const r400 = await fetch(baseUrl + '/api/exhibit/jobs', {
+  const r400 = await authFetch(baseUrl + '/api/exhibit/jobs', {
     method:  'POST',
     headers: { 'content-type': 'application/json' },
     body:    JSON.stringify({ kind: 'nope', input: {} })
