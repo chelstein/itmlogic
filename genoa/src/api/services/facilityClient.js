@@ -152,15 +152,13 @@ export function makeFacilityClient({
     },
 
     /**
-     * Ground-conductivity fallback against ZTR.  Genoa's primary path
-     * is fccConductivityClient (live geo.fcc.gov/api/contours/
-     * conductivity.json); when that's unreachable, hit ZTR's
-     * /api/m3/conductivity proxy as the second try.  ZTR vendors / caches
-     * the FCC M3 polygons so this stays available even when the public
-     * FCC endpoint is degraded.
-     *
-     * Returns the same shape as fccConductivityClient.lookupSigma so
-     * the caller chain is uniform.
+     * Ground-conductivity lookup against ZTR's /api/m3/conductivity
+     * proxy.  ZTR owns the vendored FCC §73.190 M3 polygon dataset
+     * (data/m3/) and the point-in-polygon resolver — Genoa just calls
+     * the endpoint.  This is the ONLY authoritative σ source Genoa
+     * queries; FCC, NOAA NCEI, and ITU-R BR do not publish a live
+     * σ-at-lat/lon JSON API, so prior client stubs for those upstreams
+     * were removed to comply with the no-guessing rule.
      */
     async getGroundConductivity({ lat, lon } = {}){
       if (!ztrUrl) return { available: false, source: null, error: 'ztrUrl missing' };
