@@ -211,6 +211,18 @@ export default function FacilityRack({
         Calls ZTR's terrain-haat endpoint (OpenTopoData SRTM30m). Slow (~30s) on cold cache. Clears the CONSTANT_HAAT_ASSUMED warning when valid radials are returned.
       </p>
 
+      <label className="flex items-center gap-2 font-mono text-[11px] text-text mt-3">
+        <input
+          type="checkbox"
+          checked={!!inputs.use_itm}
+          onChange={e => set('use_itm', e.target.checked)}
+        />
+        <span>Compute terrain-aware ITM coverage (SPLAT / Bullington-P.526)</span>
+      </label>
+      <p className="font-mono text-[10px] text-textDim mt-1 leading-snug">
+        Runs Longley-Rice ITM v1.2.2 against the SPLAT sidecar (high-fidelity) or the in-process JS Bullington + ITU-R P.526 fallback. Slow (~30-90s for 36 radials × 40 samples). Populates evidence.itm_coverage + the ITM Coverage section in the engineering statement.
+      </p>
+
       <div className="rack-eyebrow mt-4 mb-1">Operate</div>
       <div className="flex flex-wrap gap-2">
         <HardwareButton variant="primary" onClick={onCompute} disabled={busy || computing}>
