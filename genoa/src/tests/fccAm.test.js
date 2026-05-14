@@ -80,14 +80,31 @@ test('FCC AM: out-of-range frequency throws FCC_AM_FREQ_OUT_OF_RANGE', () => {
   );
 });
 
-test('FCC AM: σ outside FCC M3 (1..8) throws FCC_AM_SIGMA_OUT_OF_RANGE', () => {
+test('FCC AM: σ outside FCC M3 (1..8) clamps to grid boundary + reports clamp direction', () => {
+  // Engine policy changed: σ values outside the FCC M3 grid (1..8 mS/m
+  // integer steps) now CLAMP to the nearest boundary instead of throwing.
+  // This is intentional — wet/marine soils routinely exceed 8 mS/m and
+  // the §73.184 boundary curve is the closest defined approximation;
+  // hard-failing every AM compute over saltwater would be incorrect.
+  // The clamp direction is reported on inputs.conductivity_clamp so the
+  // validator can surface a recommendation.
+  const lo = fccAmDistanceKm({ frequency_khz: 1240, target_mvm: 1, conductivity_msm: 0, erp_kw: 1 });
+  assert.equal(lo.inputs.conductivity_clamp,   'low');
+  assert.equal(lo.inputs.conductivity_msm,     1, 'low-side clamp lands on grid min (1 mS/m)');
+  assert.equal(lo.inputs.conductivity_msm_raw, 0);
+  assert.ok(Number.isFinite(lo.distance_km) && lo.distance_km > 0);
+
+  const hi = fccAmDistanceKm({ frequency_khz: 1240, target_mvm: 1, conductivity_msm: 100, erp_kw: 1 });
+  assert.equal(hi.inputs.conductivity_clamp,   'high');
+  assert.equal(hi.inputs.conductivity_msm,     8, 'high-side clamp lands on grid max (8 mS/m)');
+  assert.equal(hi.inputs.conductivity_msm_raw, 100);
+  assert.ok(Number.isFinite(hi.distance_km) && hi.distance_km > 0);
+
+  // Non-finite σ still throws — it's a structurally invalid input, not
+  // an out-of-grid value the boundary curve can substitute for.
   assert.throws(
-    () => fccAmDistanceKm({ frequency_khz: 1240, target_mvm: 1, conductivity_msm: 0, erp_kw: 1 }),
-    err => err.code === 'FCC_AM_SIGMA_OUT_OF_RANGE'
-  );
-  assert.throws(
-    () => fccAmDistanceKm({ frequency_khz: 1240, target_mvm: 1, conductivity_msm: 100, erp_kw: 1 }),
-    err => err.code === 'FCC_AM_SIGMA_OUT_OF_RANGE'
+    () => fccAmDistanceKm({ frequency_khz: 1240, target_mvm: 1, conductivity_msm: NaN, erp_kw: 1 }),
+    err => err.code === 'FCC_AM_SIGMA_INVALID'
   );
 });
 
