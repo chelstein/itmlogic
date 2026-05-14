@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,13 +9,42 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..', '..');
 
 let proc, baseUrl;
+// Session cookie signed with the same secret the server is launched
+// with — the auth middleware now refuses to run when AUTH_* env is
+// missing, so every /api/* request must present a valid session.
+let sessionCookie;
+
+// Build a server.js-compatible session cookie without going through
+// /api/auth/login (avoids paying scrypt cost in every test run).
+// Mirrors signSession() in src/api/middleware/auth.js.
+function signTestSession(secret, ttlSeconds = 3600){
+  const now = Math.floor(Date.now() / 1000);
+  const payload = Buffer.from(JSON.stringify({ iat: now, exp: now + ttlSeconds }))
+    .toString('base64url');
+  const sig = crypto.createHmac('sha256', Buffer.from(secret, 'utf8'))
+    .update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+// Wrapper that auto-attaches the session cookie + JSON content-type.
+async function api(pathname, init = {}){
+  const headers = { ...(init.headers || {}), cookie: `genoa_session=${sessionCookie}` };
+  return fetch(baseUrl + pathname, { ...init, headers });
+}
 
 test.before(async () => {
   const port = 18099 + Math.floor(Math.random() * 100);
   baseUrl = `http://127.0.0.1:${port}`;
+  // Synthetic auth config — the password hash is a syntactically valid
+  // scrypt$salt$hash placeholder; we sign cookies directly with the
+  // secret so the password value itself is never exercised.
+  const AUTH_SESSION_SECRET = 'genoa-test-session-secret-do-not-use-in-prod-32b';
+  const AUTH_PASSWORD_HASH  = 'scrypt$00$00';
+  sessionCookie = signTestSession(AUTH_SESSION_SECRET);
   proc = spawn(process.execPath, ['src/api/server.js'], {
     cwd: ROOT,
     env: { ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: '',
+           AUTH_PASSWORD_HASH, AUTH_SESSION_SECRET,
            // Disable the FCC FMQ default fallback so the
            // "no upstream configured" assertions still hold under test.
            // The FMQ path is exercised separately in fccFmq.test.js.
@@ -35,7 +65,7 @@ test('GET /healthz returns ok', async () => {
 });
 
 test('GET /api/curves returns the manifest with sha256s', async () => {
-  const r = await fetch(baseUrl + '/api/curves');
+  const r = await api('/api/curves');
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.ok(j.version);
@@ -44,7 +74,7 @@ test('GET /api/curves returns the manifest with sha256s', async () => {
 });
 
 test('POST /api/exhibits/compute returns a schema-valid v2 exhibit', async () => {
-  const r = await fetch(baseUrl + '/api/exhibits/compute', {
+  const r = await api('/api/exhibits/compute', {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
       inputs: { call:'WAPI-FM', facility_id:'1', service:'FM', fcc_class:'A',
@@ -62,7 +92,7 @@ test('POST /api/exhibits/compute returns a schema-valid v2 exhibit', async () =>
 });
 
 test('GET /api/validation returns regression + authoritative counters', async () => {
-  const r = await fetch(baseUrl + '/api/validation');
+  const r = await api('/api/validation');
   assert.equal(r.status, 200);
   const j = await r.json();
   assert.ok('n_run' in j);
@@ -72,12 +102,12 @@ test('GET /api/validation returns regression + authoritative counters', async ()
 });
 
 test('Persistence routes return 503 when no DATABASE_URL is configured', async () => {
-  const r = await fetch(baseUrl + '/api/exhibits');
+  const r = await api('/api/exhibits');
   assert.equal(r.status, 503);
 });
 
 test('PDF export route returns a PDF or 404/503 when the row is unavailable', async () => {
-  const r = await fetch(baseUrl + '/api/exhibits/123/export/pdf');
+  const r = await api('/api/exhibits/123/export/pdf');
   // 503 (no DB) or 404 (row not found) when persistence is unavailable;
   // 200 + application/pdf when the row exists.  The PDF renderer is now
   // wired via @pdfme/generator (no more 501).
@@ -88,7 +118,7 @@ test('PDF export route returns a PDF or 404/503 when the row is unavailable', as
 });
 
 test('GET /api/facilities/search with no upstream configured -> 503 + FACILITY_LOOKUP_UNAVAILABLE', async () => {
-  const r = await fetch(baseUrl + '/api/facilities/search?q=KSLX');
+  const r = await api('/api/facilities/search?q=KSLX');
   assert.equal(r.status, 503);
   const j = await r.json();
   assert.equal(j.error, 'FACILITY_LOOKUP_UNAVAILABLE');
@@ -96,12 +126,12 @@ test('GET /api/facilities/search with no upstream configured -> 503 + FACILITY_L
 });
 
 test('GET /api/facilities/:id with no upstream configured -> 503', async () => {
-  const r = await fetch(baseUrl + '/api/facilities/11282');
+  const r = await api('/api/facilities/11282');
   assert.equal(r.status, 503);
 });
 
 test('GET /api/facilities/search with q too short -> 400', async () => {
-  const r = await fetch(baseUrl + '/api/facilities/search?q=K');
+  const r = await api('/api/facilities/search?q=K');
   assert.equal(r.status, 400);
 });
 
@@ -111,7 +141,7 @@ test('POST /api/exhibits/save without DATABASE_URL returns JSON ephemeral ack (n
   // The CRITICAL invariant is: response is always application/json
   // with a parseable body, so the frontend's readJsonOrThrow doesn't
   // crash on "<!DOCTYPE …".
-  const r = await fetch(baseUrl + '/api/exhibits/save', {
+  const r = await api('/api/exhibits/save', {
     method:  'POST',
     headers: { 'content-type': 'application/json' },
     body:    JSON.stringify({
@@ -136,7 +166,7 @@ test('POST /api/exhibits/save with empty body returns JSON (never HTML)', async 
   // The CRITICAL invariant: even malformed/empty bodies get a JSON
   // response.  The frontend's readJsonOrThrow will then receive a
   // structured error instead of crashing on "<!DOCTYPE …".
-  const r = await fetch(baseUrl + '/api/exhibits/save', {
+  const r = await api('/api/exhibits/save', {
     method:  'POST',
     headers: { 'content-type': 'application/json' },
     body:    '{}'
