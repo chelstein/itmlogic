@@ -1422,6 +1422,16 @@ export async function computeExhibit(req){
             || (Number.isFinite(version.generated_at)
                   ? new Date(version.generated_at * 1000).toISOString()
                   : null);
+          // Composite hash over the three FORTRAN source files,
+          // computed locally when the sidecar's /version doesn't
+          // ship a precomputed source_sha256.  See
+          // src/evidence/fortranSourceRollup.js for the formula.
+          const { computeFortranSourceRollup } = await import('../../evidence/fortranSourceRollup.js');
+          const _computedSourceSha = computeFortranSourceRollup({
+            'driver.for':  fileSha('driver.for'),
+            'itplbv.for':  fileSha('itplbv.for'),
+            'tvfmfs.for':  fileSha('tvfmfs.for')
+          });
           exhibit.method_versions = {
             ...(exhibit.method_versions || {}),
             fcc_fortran_engine: {
@@ -1433,10 +1443,7 @@ export async function computeExhibit(req){
               // when present (Docker image digest, not source).
               git_commit_sha:        version.git_commit_sha || version.commit || null,
               image_sha256:          version.image_sha256 || null,
-              // Composite hash over the three FORTRAN source files —
-              // single-string "did the math change" boolean for
-              // reviewers who don't want to diff three SHAs.
-              source_sha256:         version.source_sha256 || null,
+              source_sha256:         version.source_sha256 || _computedSourceSha,
               build_time:            buildTime,
               tvfmfs_for_sha256:     fileSha('tvfmfs.for'),
               tvfmfs_for_size:       fileSize('tvfmfs.for'),

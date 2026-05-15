@@ -188,6 +188,76 @@ test('parity report: empty radial_table returns "no samples"', async () => {
     });
 });
 
+/* ---------- engine-array shape (regression for the WJPZ-FM exhibit) ---------- */
+
+test('parity report: contour_definitions array shape (engine output) yields samples', async () => {
+  // This is the shape src/engine/index.js actually emits.  The old
+  // object-keyed shape was a test fixture, not the production shape;
+  // the parity client must accept the array.
+  const EXHIBIT_ARRAY_SHAPE = {
+    station_inputs: { service: 'FM', frequency: 89.1, haat_m: 37, erp_kw: 1 },
+    contour_definitions: [
+      { id: 'service_60dbu',   label: '60 dBu (1 mV/m service)', field_strength: { value: 60, unit: 'dBu' } },
+      { id: 'city_54dbu',      label: '54 dBu (city grade)',      field_strength: { value: 54, unit: 'dBu' } },
+      { id: 'protected_40dbu', label: '40 dBu (protected)',       field_strength: { value: 40, unit: 'dBu' } }
+    ],
+    radial_table: [
+      { az: 0,   contour_distances_km: { service_60dbu: 19.23, city_54dbu: 26.56, protected_40dbu: 52.03 } },
+      { az: 90,  contour_distances_km: { service_60dbu: 12.98, city_54dbu: 18.60, protected_40dbu: 39.04 } },
+      { az: 180, contour_distances_km: { service_60dbu: 10.16, city_54dbu: 14.16, protected_40dbu: 30.97 } }
+    ]
+  };
+  const calls = [];
+  const fakeFetch = async (url) => {
+    calls.push(url);
+    // Mirror Genoa's distance back so deltas are 0.
+    const m = url.match(/field=(\d+)/);
+    const dBu = m ? Number(m[1]) : 60;
+    const km = dBu === 60 ? 14.0 : dBu === 54 ? 19.8 : 41.0;
+    return { ok: true, json: async () => ({ distance_km: km }) };
+  };
+  await withFetch(fakeFetch, async () => {
+    const c = makeFccParityClient({ toleranceKm: 100 });
+    const r = await c.report(EXHIBIT_ARRAY_SHAPE);
+    assert.equal(r.available, true);
+    assert.ok(r.n_samples > 0, `expected samples > 0, got ${r.n_samples}`);
+    // Every contour family represented at least once.
+    const families = new Set(r.samples.map(s => s.contour));
+    assert.ok(families.has('service_60dbu'));
+    assert.ok(families.has('city_54dbu'));
+    assert.ok(families.has('protected_40dbu'));
+    // 54 dBu sample uses field=54 on the URL.
+    assert.ok(calls.some(u => /field=54\b/.test(u)));
+  });
+});
+
+test('parity report: mV/m unit converts to dBµV/m (1 mV/m → 60 dBu)', async () => {
+  const EXHIBIT_MVM = {
+    station_inputs: { service: 'FM', frequency: 89.1, haat_m: 37, erp_kw: 1 },
+    contour_definitions: [
+      // 1 mV/m == 60 dBµV/m exactly; 0.5 mV/m ≈ 53.98 dBu; 0.1 mV/m == 40 dBu.
+      { id: 'svc',  field_strength: { value: 1.0, unit: 'mV/m' } },
+      { id: 'city', field_strength: { value: 0.5, unit: 'mV/m' } },
+      { id: 'prot', field_strength: { value: 0.1, unit: 'mV/m' } }
+    ],
+    radial_table: [
+      { az: 0, contour_distances_km: { svc: 19.2, city: 26.6, prot: 52.0 } }
+    ]
+  };
+  const seen = [];
+  await withFetch(async (url) => {
+    seen.push(url);
+    return { ok: true, json: async () => ({ distance_km: 1 }) };
+  }, async () => {
+    const c = makeFccParityClient({ toleranceKm: 100 });
+    await c.report(EXHIBIT_MVM);
+  });
+  // Rounded to nearest int per URL encoding; svc=60, prot=40, city≈54.
+  // We tolerate 53 or 54 for the city contour (cubic-precision rounding).
+  assert.ok(seen.some(u => /field=60\b/.test(u)));
+  assert.ok(seen.some(u => /field=40\b/.test(u)) || seen.some(u => /field=39\b/.test(u)));
+});
+
 /* ---------- provenance ---------- */
 
 test('FCC_PARITY_PROVENANCE names regulation + license + upstream commit', () => {

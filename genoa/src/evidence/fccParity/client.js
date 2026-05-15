@@ -214,31 +214,69 @@ export function frequencyToFmChannel(frequency_mhz){
 /**
  * Pull every {radial, contour} pair from the exhibit's radial_table
  * with its Genoa-computed distance.
+ *
+ * exhibit.contour_definitions is the engine-emitted shape:
+ *     [ { id, label, field_strength: { value, unit }, mode?: '50,50'|'50,10' } ]
+ * (see src/engine/index.js where this is written).  Older code paths
+ * keyed defs by id directly; both shapes are accepted here so the
+ * parity client keeps working if the engine shape ever flexes.
  */
 function collectSamples(exhibit){
   const samples = [];
+  const defs = indexContourDefinitions(exhibit.contour_definitions);
   const rt = Array.isArray(exhibit.radial_table) ? exhibit.radial_table : [];
   for (const r of rt){
     const cd = r.contour_distances_km || {};
-    const cdef = r.contour_definitions || exhibit.contour_definitions || {};
+    // Per-radial overrides (rare; respect them if present).
+    const localDefs = r.contour_definitions ? indexContourDefinitions(r.contour_definitions) : null;
     for (const [contour_id, distance_km] of Object.entries(cd)){
       const d = Number(distance_km);
       if (!Number.isFinite(d) || d <= 0) continue;
-      // Prefer per-radial defs if present, fall back to exhibit-level.
-      const def = cdef[contour_id] || (exhibit.contour_definitions || {})[contour_id] || {};
-      const dBu = Number(def.field_dBu);
-      const mode = def.mode || '50,50';
-      if (!Number.isFinite(dBu)) continue;
+      const def = (localDefs && localDefs[contour_id]) || defs[contour_id];
+      if (!def) continue;
+      if (!Number.isFinite(def.field_dBu)) continue;
       samples.push({
-        az: r.az ?? null,
-        contour: contour_id,
-        mode,
-        contour_dBu: dBu,
+        az:               r.az ?? null,
+        contour:          contour_id,
+        mode:             def.mode || '50,50',
+        contour_dBu:      def.field_dBu,
         genoa_distance_km: Number(d.toFixed(4))
       });
     }
   }
   return samples;
+}
+
+/**
+ * Normalize the array-of-objects engine shape OR an object keyed by
+ * id into a flat { [id]: { field_dBu, mode } } map.  Handles the
+ * field_strength.{value,unit} shape including mV/m → dBµV/m
+ * conversion (dBu = 20·log10(mV/m × 1000) = 20·log10(mV/m) + 60).
+ */
+function indexContourDefinitions(raw){
+  const out = {};
+  if (!raw) return out;
+  const entries = Array.isArray(raw)
+    ? raw.map(d => [d?.id, d])
+    : Object.entries(raw);
+  for (const [id, def] of entries){
+    if (!id || !def) continue;
+    let dBu = NaN;
+    if (Number.isFinite(Number(def.field_dBu))){
+      dBu = Number(def.field_dBu);
+    } else if (def.field_strength && Number.isFinite(Number(def.field_strength.value))){
+      const v = Number(def.field_strength.value);
+      const u = String(def.field_strength.unit || '').toLowerCase();
+      if (u === 'dbu' || u === 'dbuv/m' || u === 'dbµv/m'){
+        dBu = v;
+      } else if (u === 'mv/m' && v > 0){
+        dBu = 20 * Math.log10(v) + 60;
+      }
+    }
+    if (!Number.isFinite(dBu)) continue;
+    out[id] = { field_dBu: dBu, mode: def.mode || '50,50' };
+  }
+  return out;
 }
 
 /**

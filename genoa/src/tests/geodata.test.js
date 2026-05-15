@@ -241,6 +241,22 @@ test('manifest routes json_dir presence through the sidecar in sidecar mode', as
   assert.equal(fcc.via,    'sidecar');
 });
 
+test('manifest populates sha256 for json_dir when present in master sha map', async () => {
+  const fccDir = '/opt/genoa/live-data/fcc-contours/tests';
+  const svc = makeGeodataService({
+    raster: makeStubRaster([]),
+    statRasterRemote: async (p) =>
+      p === fccDir ? { exists: true, is_dir: true } : { exists: false },
+    shaMapPromise: Promise.resolve(new Map([[fccDir, 'ab'.repeat(32)]])),
+    listDir:       async () => [],
+    now:           NOW
+  });
+  const m = await svc.manifest();
+  const fcc = m.layers.find((l) => l.id === 'fcc_contour_evidence');
+  assert.equal(fcc.status, 'available');
+  assert.equal(fcc.sha256, 'ab'.repeat(32));
+});
+
 test('manifest uses statRasterRemote when running in sidecar mode', async () => {
   // sidecar mode: status comes from the sidecar's /raster/status, not
   // from local fs.stat (which would always say "missing" on App Platform).
