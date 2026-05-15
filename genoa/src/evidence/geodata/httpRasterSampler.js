@@ -68,5 +68,35 @@ export function makeHttpRasterSampler({
     }
   }
 
-  return { sampleRaster, statRaster };
+  // Fetches the corpus-level MASTER_SHA256SUMS.txt from the sidecar
+  // and parses it into a Map<absolutePath, sha256>.  Path resolution
+  // uses corpusRoot (passed in from config) so the parsed file paths
+  // line up with the layer paths configured on the Genoa side.
+  async function fetchMasterShas({ corpusRoot, fetchTimeoutMs = timeoutMs } = {}){
+    const url = `${base}/master-shas`;
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), fetchTimeoutMs);
+    let txt;
+    try {
+      const r = await fetchFn(url, { headers: auth, signal: ctrl.signal });
+      if (!r.ok) return new Map();
+      txt = await r.text();
+    } catch { return new Map(); }
+    finally { clearTimeout(to); }
+    const out = new Map();
+    for (const raw of (txt || '').split('\n')){
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const m = line.match(/^([a-f0-9]{64})\s+\*?(.+)$/i);
+      if (!m) continue;
+      const [, sha, rel] = m;
+      // Resolve relative to the corpus root the sidecar lives in —
+      // NOT the local fs root, which doesn't exist on App Platform.
+      const abs = rel.startsWith('/') ? rel : `${corpusRoot.replace(/\/$/, '')}/${rel}`;
+      out.set(abs, sha.toLowerCase());
+    }
+    return out;
+  }
+
+  return { sampleRaster, statRaster, fetchMasterShas };
 }

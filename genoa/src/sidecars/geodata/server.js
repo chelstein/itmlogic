@@ -164,6 +164,23 @@ export function makeApp({ runCommand = pExec } = {}){
     } catch (e){ next(e); }
   });
 
+  // Serve the corpus-level MASTER_SHA256SUMS.txt so the Genoa API can
+  // populate per-layer sha attestation when running off-host (App
+  // Platform).  Dedicated endpoint, not a generic file proxy — the
+  // path is fixed to the canonical location at the corpus root.
+  app.get('/master-shas', requireToken, async (_req, res, next) => {
+    try {
+      const p = path.join(GEODATA_ROOT, 'MASTER_SHA256SUMS.txt');
+      try {
+        const txt = await fs.readFile(p, 'utf8');
+        const st  = await fs.stat(p);
+        res.type('text/plain').set('x-master-shas-mtime', st.mtime.toISOString()).send(txt);
+      } catch (e){
+        res.status(404).json({ error: 'NOT_FOUND', path: p });
+      }
+    } catch (e){ next(e); }
+  });
+
   app.use((err, _req, res, _next) => {
     res.status(500).json({ error: 'INTERNAL', detail: String(err?.message || err) });
   });
