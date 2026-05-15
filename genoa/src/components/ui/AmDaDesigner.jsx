@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PolarPattern from './PolarPattern.jsx';
+import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
 // AM DA pattern designer.  Operator builds an array geometry (towers
 // with distance / bearing / drive amplitude / drive phase / electrical
@@ -28,6 +29,16 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
   const [error, setError]     = useState('');
   const [nullTarget, setNullTarget] = useState(270);
   const [appliedAt, setAppliedAt]   = useState(null);
+
+  // Carrier-band validation.  AM is 535-1705 kHz on a 10-kHz grid;
+  // FCCAM and the §73.182 orchestrator both reject anything outside,
+  // so we surface the same diagnostic at the designer input rather
+  // than letting users build a pattern at 89 kHz that no downstream
+  // engine will evaluate.
+  const carrierCheck = useMemo(
+    () => describeAmKhz(spec.frequency_khz),
+    [spec.frequency_khz]
+  );
 
   useEffect(() => {
     const id = setTimeout(() => synthesize(spec), 250);
@@ -132,12 +143,31 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
             type="number"
             value={spec.frequency_khz}
             onChange={(e) => setSpec({ ...spec, frequency_khz: Number(e.target.value) || 0 })}
+            onBlur={(e) => {
+              // Snap to nearest 10-kHz grid value on blur if the
+              // typed value is close enough to a real channel; clear
+              // otherwise so the bad value can't survive in state.
+              const snapped = normalizeAmKhz(e.target.value);
+              if (snapped !== null && snapped !== spec.frequency_khz){
+                setSpec({ ...spec, frequency_khz: snapped });
+              }
+            }}
             min="540" max="1700" step="10"
-            className="w-24 bg-black/70 border border-rule rounded px-2 py-1 text-cream text-[12px]"
+            className={`w-24 bg-black/70 border rounded px-2 py-1 text-cream text-[12px] ${
+              carrierCheck.valid ? 'border-rule' : 'border-red-500'
+            }`}
+            aria-invalid={!carrierCheck.valid}
           />
           <span className="text-textDim text-[10px]">
             λ ≈ {pattern?.wavelength_m?.toFixed?.(1) || '—'} m
           </span>
+          {carrierCheck.message && (
+            <span className={`text-[10px] ${
+              carrierCheck.valid ? 'text-textDim' : 'text-red-400'
+            }`}>
+              {carrierCheck.message}
+            </span>
+          )}
           <button
             onClick={addTower}
             disabled={spec.towers.length >= 12}
