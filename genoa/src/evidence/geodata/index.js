@@ -8,6 +8,7 @@
 import fs from 'node:fs/promises';
 import { GEODATA_CONFIG, loadMasterSha256Map } from './config.js';
 import { makeRasterSampler } from './rasterSampler.js';
+import { makeHttpRasterSampler } from './httpRasterSampler.js';
 import {
   sampleNlcdImpervious,
   sampleNalcmsMexico,
@@ -22,13 +23,30 @@ export const GEODATA_INVALID_COORDS  = 'GEODATA_INVALID_COORDS';
 
 export function makeGeodataService({
   config = GEODATA_CONFIG,
-  raster,         // (rasterSampler-shaped fn) — defaults to gdallocationinfo
+  raster,         // (rasterSampler-shaped fn) — defaults to sidecar HTTP if
+                  // GEODATA_SIDECAR_URL is set, otherwise local gdallocationinfo
+  statRasterRemote,  // optional: ({path}) => Promise<{exists,size?}>; used
+                     // by the manifest endpoint to detect file presence
+                     // when the corpus lives on a sidecar (App Platform)
   query,          // (sql, params) => Promise<{rows}> — defaults to pgPool.query
   listDir = fs.readdir,
   shaMapPromise,  // overridable for tests
   now             // overridable for tests
 } = {}){
-  const _raster = raster || makeRasterSampler({ bin: config.gdal_locationinfo_bin });
+  let _statRemote = statRasterRemote || null;
+  let _raster = raster;
+  if (!_raster){
+    if (config.sidecar_url){
+      const http = makeHttpRasterSampler({
+        baseUrl:  config.sidecar_url,
+        apiToken: config.sidecar_token
+      });
+      _raster = http.sampleRaster;
+      if (!_statRemote) _statRemote = (p) => http.statRaster(p);
+    } else {
+      _raster = makeRasterSampler({ bin: config.gdal_locationinfo_bin });
+    }
+  }
   const _shaMap = shaMapPromise || loadMasterSha256Map();
   const shaFor = async (p) => (await _shaMap).get(p) || null;
 
@@ -111,7 +129,16 @@ export function makeGeodataService({
       if (cfg.kind === 'raster'){
         row.path   = cfg.path;
         row.sha256 = shaMap.get(cfg.path) || null;
-        row.status = await fileExists(cfg.path) ? 'available' : 'missing';
+        // If a remote stat is configured (sidecar mode), use it —
+        // otherwise the local fs check is meaningless on App Platform.
+        if (_statRemote){
+          const st = await _statRemote(cfg.path);
+          row.status = st?.exists ? 'available' : 'missing';
+          if (Number.isFinite(st?.size)) row.size = st.size;
+          row.via    = 'sidecar';
+        } else {
+          row.status = await fileExists(cfg.path) ? 'available' : 'missing';
+        }
       } else if (cfg.kind === 'postgis'){
         row.table = cfg.table;
         row.source_geojson = cfg.geojson_source;

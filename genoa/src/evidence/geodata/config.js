@@ -23,6 +23,12 @@ export const GEODATA_CONFIG = {
     || path.join(ROOT, 'manifests'),
   gdal_locationinfo_bin:
     process.env.GDAL_LOCATIONINFO_BIN || 'gdallocationinfo',
+  // When set, raster sampling + presence checks go over HTTP to the
+  // geodata sidecar (genoa/src/sidecars/geodata/) instead of touching
+  // the local filesystem.  Required on DO App Platform where the
+  // corpus lives on a separate droplet.
+  sidecar_url:    process.env.GEODATA_SIDECAR_URL || null,
+  sidecar_token:  (process.env.GEODATA_SIDECAR_TOKEN || '').trim() || null,
 
   layers: {
     nlcd_impervious_2024: {

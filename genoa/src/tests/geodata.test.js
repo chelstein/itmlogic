@@ -219,3 +219,26 @@ test('unknown layer returns GEODATA_LAYER_NOT_FOUND', async () => {
   const r = await svc.sample({ layer: 'made_up', ...KAZM });
   assert.equal(r.error, 'GEODATA_LAYER_NOT_FOUND');
 });
+
+test('manifest uses statRasterRemote when running in sidecar mode', async () => {
+  // sidecar mode: status comes from the sidecar's /raster/status, not
+  // from local fs.stat (which would always say "missing" on App Platform).
+  const svc = makeGeodataService({
+    raster: makeStubRaster([]),
+    statRasterRemote: async (p) => ({
+      exists: p.endsWith('Annual_NLCD_FctImp_2024_CU_C1V1.tif'),
+      size:   p.endsWith('Annual_NLCD_FctImp_2024_CU_C1V1.tif') ? 1234567890 : null
+    }),
+    shaMapPromise: Promise.resolve(new Map()),
+    listDir:       async () => [],
+    now:           NOW
+  });
+  const m = await svc.manifest();
+  const nlcd  = m.layers.find((l) => l.id === 'nlcd_impervious_2024');
+  const nalcm = m.layers.find((l) => l.id === 'nalcms_mexico_2020v2');
+  assert.equal(nlcd.status,  'available');
+  assert.equal(nlcd.size,    1234567890);
+  assert.equal(nlcd.via,     'sidecar');
+  assert.equal(nalcm.status, 'missing');
+  assert.equal(nalcm.via,    'sidecar');
+});
