@@ -162,6 +162,10 @@ export function makeGeodataService({
         } else {
           row.status = await dirExists(cfg.dir) ? 'available' : 'missing';
         }
+        // Directory rollup sha (sha-of-shas of contents).  Operators
+        // append a single line for the dir path to MASTER_SHA256SUMS.txt;
+        // see scripts/regen-master-shas.sh for the canonical recipe.
+        row.sha256 = await shaFor(cfg.dir);
       }
       out.push(row);
     }

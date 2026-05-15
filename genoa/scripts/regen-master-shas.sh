@@ -28,6 +28,15 @@ RASTERS=(
   "sources/vegetation/2024_perennial_herbaceous_departure/2024_perennial_herbaceous_departure_20250608.tif"
 )
 
+# Directory layers (kind: json_dir).  We compute a deterministic
+# "sha-of-shas" rollup by hashing every regular file under the dir,
+# sorting the per-file sha lines, then hashing that.  The resulting
+# single sha is filed under the dir's corpus-relative path so the
+# Genoa side can look it up with the same shaFor() lookup as rasters.
+DIRS=(
+  "live-data/fcc-contours/tests"
+)
+
 cd "$ROOT"
 MASTER="MASTER_SHA256SUMS.txt"
 touch "$MASTER"
@@ -47,13 +56,29 @@ if [[ ${#present[@]} -gt 0 ]]; then
   sha256sum "${present[@]}" > "$tmp_new"
 fi
 
-# Strip any existing lines for the rasters we just hashed, then
+# Directory rollups.
+dirs_present=()
+for rel in "${DIRS[@]}"; do
+  if [[ -d "$rel" ]]; then
+    dirs_present+=("$rel")
+    # find -> stable order via LC_ALL=C sort of file paths
+    rollup="$( \
+      (cd "$rel" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) \
+        | sha256sum | awk '{print $1}' \
+    )"
+    printf '%s  %s\n' "$rollup" "$rel" >> "$tmp_new"
+  else
+    echo "warn: missing $ROOT/$rel — skipping dir rollup" >&2
+  fi
+done
+
+# Strip any existing lines for the items we just hashed, then
 # append the fresh entries.  Match on suffix " <relpath>" so the
 # inevitable double-space sha256sum format collides cleanly.
 tmp_merged="$(mktemp)"
 trap 'rm -f "$tmp_new" "$tmp_merged"' EXIT
 cp "$MASTER" "$tmp_merged"
-for rel in "${present[@]}"; do
+for rel in "${present[@]}" "${dirs_present[@]}"; do
   # shellcheck disable=SC2001
   esc="$(echo "$rel" | sed 's/[][\.*^$/]/\\&/g')"
   sed -i "/  ${esc}\$/d" "$tmp_merged"
@@ -62,8 +87,8 @@ cat "$tmp_new" >> "$tmp_merged"
 
 mv "$tmp_merged" "$MASTER"
 
-echo "regenerated entries for ${#present[@]} raster(s):"
-for rel in "${present[@]}"; do
+echo "regenerated entries for ${#present[@]} raster(s) + ${#dirs_present[@]} dir rollup(s):"
+for rel in "${present[@]}" "${dirs_present[@]}"; do
   grep -F "  $rel" "$MASTER" | sed 's/^/  /'
 done
 echo
