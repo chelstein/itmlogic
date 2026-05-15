@@ -120,7 +120,30 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
-  // Radial parity (sub-set of FCC cross-check by radial)
+  // ----- FORTRAN reference-engine parity (per-radial × per-contour) -----
+  // chelstein/fcc-fortran-engine wraps the deterministic FCC/REC
+  // TVFMFS_METRIC routine.  Genoa cross-checks every (radial × contour)
+  // pair against this reference and stamps evidence.fcc_curve_parity
+  // with abs/delta_km + pass/fail at 1.0 km tolerance.  Informational —
+  // never gates compliance.
+  const fortran = exhibit.evidence?.fcc_curve_parity || null;
+  if (fortran){
+    if (fortran.available){
+      components.push({
+        name:   'FCC reference-engine parity (FORTRAN TVFMFS_METRIC, per-radial × per-contour)',
+        status: fortran.pass ? 'PASS' : 'FAIL',
+        detail: `${fortran.n_ok}/${fortran.n_requests} pairs ok; max |Δ| ${Number.isFinite(fortran.max_abs_delta_km) ? fortran.max_abs_delta_km.toFixed(3) + ' km' : '—'}, mean |Δ| ${Number.isFinite(fortran.mean_abs_delta_km) ? fortran.mean_abs_delta_km.toFixed(3) + ' km' : '—'}, RMS ${Number.isFinite(fortran.rms_delta_km) ? fortran.rms_delta_km.toFixed(3) + ' km' : '—'} (tolerance ${fortran.tolerance_km} km)`
+      });
+    } else {
+      components.push({
+        name:   'FCC reference-engine parity (FORTRAN TVFMFS_METRIC)',
+        status: 'SKIP',
+        detail: fortran.error || 'fortran parity batch failed'
+      });
+    }
+  }
+
+
   components.push({
     name:   'Radial parity (per-radial spherical-vs-Karney delta)',
     status: 'PASS',
