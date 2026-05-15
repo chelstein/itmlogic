@@ -42,6 +42,27 @@ test('patternFactorAt: accepts array entries [factor, field_at_1km]', () => {
   assert.equal(patternFactorAt(t, 180), 0.2);
 });
 
+test('patternFactorAt: accepts array-of-pairs shape from §73.150 synthesizer', () => {
+  // This is the shape /api/am-da/design returns: [[az, f], ...]
+  const t = [[0, 1.0], [90, 0.5], [180, 0.1], [270, 0.5]];
+  assert.equal(patternFactorAt(t, 0),   1.0);
+  assert.equal(patternFactorAt(t, 90),  0.5);
+  assert.equal(patternFactorAt(t, 180), 0.1);
+  // Interpolation should still work between pairs.
+  const v45 = patternFactorAt(t, 45);
+  assert.ok(v45 > 0.5 && v45 < 1.0, `expected 0.5<v<1.0, got ${v45}`);
+});
+
+test('patternFactorAt: array-of-pairs and object shapes produce identical results', () => {
+  const arr = [[0, 1.0], [90, 0.5], [180, 0.1], [270, 0.5]];
+  const obj = { 0: 1.0, 90: 0.5, 180: 0.1, 270: 0.5 };
+  for (const az of [0, 30, 45, 90, 135, 180, 225, 270, 315, 359]){
+    const a = patternFactorAt(arr, az);
+    const o = patternFactorAt(obj, az);
+    assert.ok(Math.abs(a - o) < 1e-9, `shape mismatch at az=${az}: arr=${a} obj=${o}`);
+  }
+});
+
 /* ---------- great-circle geometry ---------- */
 
 test('greatCircleKm: 1° latitude ≈ 111 km', () => {

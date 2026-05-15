@@ -46,7 +46,32 @@ const EARTH_RADIUS_KM = 6371.0;
  * @returns {number}
  */
 export function patternFactorAt(patternTable, azDeg){
-  if (!patternTable || typeof patternTable !== 'object') return 1;
+  if (!patternTable) return 1;
+  // Accept two shapes:
+  //   - Array of [az, factor] pairs (the §73.150 synthesizer output)
+  //   - Object keyed by integer azimuth (filed pattern_table)
+  // Normalize into one Map<azDeg, factor> so the lookup logic is
+  // shape-agnostic from here on.
+  const map = {};
+  if (Array.isArray(patternTable)){
+    for (const entry of patternTable){
+      if (!Array.isArray(entry) || entry.length < 2) continue;
+      const az = Number(entry[0]);
+      const f  = Number(entry[1]);
+      if (Number.isFinite(az) && Number.isFinite(f)){
+        map[((az % 360) + 360) % 360] = f;
+      }
+    }
+  } else if (typeof patternTable === 'object'){
+    for (const [k, v] of Object.entries(patternTable)){
+      const az = Number(k);
+      if (!Number.isFinite(az)) continue;
+      map[((az % 360) + 360) % 360] = readFactor(v);
+    }
+  } else {
+    return 1;
+  }
+  patternTable = map;
   const samples = Object.keys(patternTable)
     .map((k) => Number(k))
     .filter((n) => Number.isFinite(n))
