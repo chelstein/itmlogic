@@ -1403,15 +1403,36 @@ export async function computeExhibit(req){
         // Stamp the fortran service version on method_versions so the
         // exhibit's signature embeds it for replay auditing.
         if (version){
+          // The FORTRAN service returns the source-file hashes nested
+          // under a `files` object (e.g. files['tvfmfs.for'].sha256),
+          // not as flat top-level keys.  Accept both shapes so this
+          // code keeps working if the operator ever flattens the
+          // response.
+          const fileSha = (name) =>
+            version.files?.[name]?.sha256
+            || version[name.replace('.', '_') + '_sha256']    // e.g. tvfmfs_for_sha256
+            || null;
+          // /version returns `generated_at` as a unix timestamp; older
+          // doc-spec showed `build_time` as an ISO string.  Accept either.
+          const buildTime = version.build_time
+            || (Number.isFinite(version.generated_at)
+                  ? new Date(version.generated_at * 1000).toISOString()
+                  : null);
           exhibit.method_versions = {
             ...(exhibit.method_versions || {}),
             fcc_fortran_engine: {
               engine:                version.engine || 'fcc-tvfmfs-fortran',
-              build_time:            version.build_time           || null,
-              git_commit_sha:        version.git_commit_sha       || null,
-              tvfmfs_for_sha256:     version.tvfmfs_for_sha256    || null,
-              itplbv_for_sha256:     version.itplbv_for_sha256    || null,
-              driver_for_sha256:     version.driver_for_sha256    || null,
+              version:               version.version || null,
+              // The service returns the deployment SHA as either
+              // `git_commit_sha` (doc-spec) or `commit` (the live
+              // 20260515-v1 image).  Image SHA is a separate field
+              // when present (Docker image digest, not source).
+              git_commit_sha:        version.git_commit_sha || version.commit || null,
+              image_sha256:          version.image_sha256 || null,
+              build_time:            buildTime,
+              tvfmfs_for_sha256:     fileSha('tvfmfs.for'),
+              itplbv_for_sha256:     fileSha('itplbv.for'),
+              driver_for_sha256:     fileSha('driver.for'),
               endpoint:              version.endpoint,
               fetched_at:            version.fetched_at
             }
