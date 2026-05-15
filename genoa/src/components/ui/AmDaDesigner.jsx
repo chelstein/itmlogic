@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PolarPattern from './PolarPattern.jsx';
+import AmNightNifPreview from './AmNightNifPreview.jsx';
 import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
 // AM DA pattern designer.  Operator builds an array geometry (towers
@@ -292,6 +293,17 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
           </div>
         </div>
       </div>
+
+      {/* Live §73.182 NIF preview — recomputes on every pattern nudge.  */}
+      <AmNightNifPreview
+        lat={baseInputs?.lat}
+        lon={baseInputs?.lon}
+        freq_khz={spec.frequency_khz}
+        erp_kw={baseInputs?.erp_kw}
+        fcc_class={baseInputs?.fcc_class}
+        pattern_mode={pattern?.pattern_table ? 'DA' : 'omni'}
+        pattern_table={pattern?.pattern_table || null}
+      />
     </div>
   );
 }
