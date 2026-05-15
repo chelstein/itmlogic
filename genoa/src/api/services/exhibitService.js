@@ -1237,6 +1237,170 @@ export async function computeExhibit(req){
     };
   }
 
+  // ---- 8c. FCC FORTRAN reference engine PARITY ----
+  // Cross-check Genoa's vendored tvfm_curves.js per-radial distances
+  // against the chelstein/fcc-fortran-engine microservice (the
+  // deterministic FCC TVFMFS_METRIC FORTRAN routine, exposed via
+  // POST /run-batch).  Stamps evidence.fcc_curve_parity with per-radial-
+  // per-contour deltas + summary stats so the engineering report can
+  // surface "Genoa's curve math agrees with FCC reference to within
+  // X km".
+  //
+  // SCOPE:  Service ∈ { FM, LPFM, FX } only — TVFMFS_METRIC is the
+  //         §73.333 FM curve routine; AM groundwave uses a separate
+  //         FCC routine (gwave) and the parity check is meaningless.
+  //
+  // FAIL-SOFT:  When sidecar unset, unreachable, or the radial-table
+  //             is empty, the block is skipped and no warning fires.
+  //             Parity is informational; it never gates compliance.
+  if (sidecars.fortranFcc
+      && ['FM','LPFM','FX'].includes(String(inputs.service || '').toUpperCase())
+      && Array.isArray(exhibit?.radial_table)
+      && exhibit.radial_table.length > 0
+      && Array.isArray(exhibit?.contours)
+      && exhibit.contours.length > 0){
+    const t0 = Date.now();
+    const erpBase = Number(inputs.erp_kw);
+    // FM full-service uses F(50,50) for service + city grade contours
+    // and is documented as F(50,10) for protected/interferer pairs in
+    // §73.215 studies.  For the simple per-radial distance parity, we
+    // ask FORTRAN for the SAME curve the engine reported using.  The
+    // engine's contour list carries field_dBu but not curve choice —
+    // map by id so the comparison is apples-to-apples.
+    const curveForContour = (cid) =>
+      (cid === 'protected_40dbu' || cid === 'protected_48dbu') ? 'F50_10' : 'F50_50';
+
+    // Build the batch — one request per (radial, contour) pair.  Skip
+    // entries with missing inputs so a partial run still produces
+    // useful evidence.
+    const requests = [];
+    const reqIndex = [];   // parallel: [{ az, contour_id, engine_km }]
+    for (const radial of exhibit.radial_table){
+      const erpAz = Number.isFinite(radial.relative_field)
+        ? erpBase * radial.relative_field * radial.relative_field
+        : erpBase;
+      const haatAz = Number(radial.haat_computed_m ?? radial.haat_input_m);
+      if (!Number.isFinite(erpAz) || erpAz <= 0 || !Number.isFinite(haatAz) || haatAz <= 0) continue;
+      for (const contour of exhibit.contours){
+        const fieldDbu = Number(contour.field_dBu);
+        const engineKm = Number(radial.contour_distances_km?.[contour.id]);
+        if (!Number.isFinite(fieldDbu) || !Number.isFinite(engineKm)) continue;
+        requests.push({
+          erp_kw:     erpAz,
+          haat_m:     haatAz,
+          field_dbuv: fieldDbu,
+          curve:      curveForContour(contour.id)
+        });
+        reqIndex.push({ az: radial.azimuth_deg, contour_id: contour.id, engine_km: engineKm });
+      }
+    }
+
+    if (requests.length > 0){
+      let batch = null;
+      try {
+        batch = await budget.withDeadline('fortran_fcc_parity',
+          () => sidecars.fortranFcc.runBatch(requests),
+          { minMs: 5_000 });
+      } catch (e){
+        batch = { available: false, error: String(e?.message || e) };
+      }
+
+      if (batch?.available && Array.isArray(batch.results)){
+        // Stitch FORTRAN results back to (az, contour_id) pairs.  Compute
+        // delta_km = engine_km - fortran_km per pair, then summarize.
+        const pairs = [];
+        for (let i = 0; i < batch.results.length; i++){
+          const idx = reqIndex[i];
+          const r   = batch.results[i];
+          if (!idx || !r) continue;
+          const fortranKm = Number(r.distance_km);
+          if (!r.ok || !Number.isFinite(fortranKm)){
+            pairs.push({ az: idx.az, contour_id: idx.contour_id,
+                         engine_km: idx.engine_km, fortran_km: null,
+                         delta_km: null, flag: r.flag || null,
+                         error: r.error || (r.ok === false ? 'fortran returned ok=false' : 'no distance') });
+            continue;
+          }
+          pairs.push({
+            az:           idx.az,
+            contour_id:   idx.contour_id,
+            engine_km:    idx.engine_km,
+            fortran_km:   fortranKm,
+            delta_km:     idx.engine_km - fortranKm,
+            abs_delta_km: Math.abs(idx.engine_km - fortranKm),
+            flag:         r.flag || null,
+            input_sha256: r.input_sha256 || null
+          });
+        }
+        const deltas = pairs.map(p => p.abs_delta_km).filter(Number.isFinite);
+        const max_abs = deltas.length ? Math.max(...deltas) : null;
+        const mean_abs = deltas.length ? deltas.reduce((a,b)=>a+b,0) / deltas.length : null;
+        const rms = deltas.length
+          ? Math.sqrt(deltas.reduce((a,b)=>a + b*b, 0) / deltas.length)
+          : null;
+        // Tolerance: FCC curves are tabulated at coarse grid points so
+        // floating-point parity should agree well within 0.5 km on FM.
+        // Use 1.0 km as the "engineering equivalence" threshold; below
+        // that, Genoa's vendored math is byte-equivalent to TVFMFS_METRIC
+        // for filing-purposes accuracy.
+        const TOLERANCE_KM = 1.0;
+        const pass = max_abs != null && max_abs <= TOLERANCE_KM;
+
+        let version = null;
+        try {
+          const v = await budget.withDeadline('fortran_fcc_version',
+            () => sidecars.fortranFcc.version(),
+            { minMs: 1_500 });
+          if (v?.available) version = v;
+        } catch { /* version is provenance, not gating */ }
+
+        evidence.fcc_curve_parity = {
+          available:     true,
+          source:        'fcc-tvfmfs-fortran',
+          method:        'per-(radial × contour) parity against FCC TVFMFS_METRIC via /run-batch',
+          endpoint:      batch.endpoint,
+          fetched_at:    batch.fetched_at,
+          n_requests:    batch.n_requests,
+          n_ok:          batch.n_ok,
+          n_failed:      batch.n_failed,
+          max_abs_delta_km:  max_abs,
+          mean_abs_delta_km: mean_abs,
+          rms_delta_km:      rms,
+          tolerance_km:      TOLERANCE_KM,
+          pass,
+          pairs,
+          version,
+          elapsed_ms:    Date.now() - t0
+        };
+        // Stamp the fortran service version on method_versions so the
+        // exhibit's signature embeds it for replay auditing.
+        if (version){
+          exhibit.method_versions = {
+            ...(exhibit.method_versions || {}),
+            fcc_fortran_engine: {
+              engine:                version.engine || 'fcc-tvfmfs-fortran',
+              build_time:            version.build_time           || null,
+              git_commit_sha:        version.git_commit_sha       || null,
+              tvfmfs_for_sha256:     version.tvfmfs_for_sha256    || null,
+              itplbv_for_sha256:     version.itplbv_for_sha256    || null,
+              driver_for_sha256:     version.driver_for_sha256    || null,
+              endpoint:              version.endpoint,
+              fetched_at:            version.fetched_at
+            }
+          };
+        }
+      } else {
+        evidence.fcc_curve_parity = {
+          available: false,
+          source:    null,
+          error:     batch?.error || 'fortran parity batch failed',
+          n_requests: requests.length,
+          elapsed_ms: Date.now() - t0
+        };
+      }
+    }
+  }
+
   // ---- 9. Provenance: facility / terrain / curve / sdr ----
   if (facilityResolution){
     const f = facilityResolution.facility;
@@ -1266,6 +1430,9 @@ export async function computeExhibit(req){
   }
   if (evidence.splat){
     exhibit.evidence.splat = evidence.splat;
+  }
+  if (evidence.fcc_curve_parity){
+    exhibit.evidence.fcc_curve_parity = evidence.fcc_curve_parity;
   }
   if (evidence.nec_model){
     exhibit.evidence.nec_model = evidence.nec_model;
