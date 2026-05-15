@@ -45,6 +45,9 @@ test.before(async () => {
     cwd: ROOT,
     env: { ...process.env, PORT: String(port), NODE_ENV: 'test', DATABASE_URL: '',
            AUTH_PASSWORD_HASH, AUTH_SESSION_SECRET,
+           // Service-token bypass for operator CLI verification of the
+           // geodata routes — exercised below in the geodata auth tests.
+           GENOA_SERVICE_TOKEN: 'svc_token_test_value_must_be_long_enough_aa',
            // Disable the FCC FMQ default fallback so the
            // "no upstream configured" assertions still hold under test.
            // The FMQ path is exercised separately in fccFmq.test.js.
@@ -184,6 +187,57 @@ test('POST /api/exhibits/save with empty body returns JSON (never HTML)', async 
     assert.equal(j.saved, false);
     assert.equal(j.mode,  'ephemeral');
   }
+});
+
+// ── Geodata service-token auth ───────────────────────────────────
+//
+// The geodata evidence endpoints are reachable both via cookie
+// session AND via GENOA_SERVICE_TOKEN headers (for operator CLI
+// verification).  These tests exercise the live HTTP path.
+
+test('GET /api/geodata/manifest with valid x-service-token → 200, no cookie needed', async () => {
+  const r = await fetch(baseUrl + '/api/geodata/manifest', {
+    headers: { 'x-service-token': 'svc_token_test_value_must_be_long_enough_aa' }
+  });
+  assert.equal(r.status, 200);
+  const j = await r.json();
+  assert.ok(Array.isArray(j.layers));
+  assert.ok(j.layers.find((l) => l.id === 'nlcd_impervious_2024'));
+});
+
+test('GET /api/geodata/manifest with Authorization: Bearer → 200', async () => {
+  const r = await fetch(baseUrl + '/api/geodata/manifest', {
+    headers: { authorization: 'Bearer svc_token_test_value_must_be_long_enough_aa' }
+  });
+  assert.equal(r.status, 200);
+});
+
+test('GET /api/geodata/manifest with wrong service token → 401 INVALID_SERVICE_TOKEN', async () => {
+  const r = await fetch(baseUrl + '/api/geodata/manifest', {
+    headers: { 'x-service-token': 'definitely-wrong' }
+  });
+  assert.equal(r.status, 401);
+  const j = await r.json();
+  assert.equal(j.error, 'INVALID_SERVICE_TOKEN');
+});
+
+test('GET /api/geodata/manifest with no auth at all → 401 UNAUTHENTICATED', async () => {
+  const r = await fetch(baseUrl + '/api/geodata/manifest');
+  assert.equal(r.status, 401);
+});
+
+test('Service token does NOT unlock write endpoints (e.g. /api/exhibits/compute)', async () => {
+  const r = await fetch(baseUrl + '/api/exhibits/compute', {
+    method: 'POST',
+    headers: {
+      'content-type':    'application/json',
+      'x-service-token': 'svc_token_test_value_must_be_long_enough_aa'
+    },
+    body: JSON.stringify({})
+  });
+  // Not a 200 — service token isn't honored on non-whitelisted routes,
+  // so cookie auth would be required.  No valid cookie → 401.
+  assert.equal(r.status, 401);
 });
 
 async function waitForHealth(url, timeoutMs){
