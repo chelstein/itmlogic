@@ -1468,6 +1468,50 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 8d. AM nighttime allocation (§73.182 NIF contour) ----
+  //
+  // For AM exhibits, run the §73.182 nighttime allocation study via
+  // the FCCAM sidecar + the nearby-primaries we already pulled in
+  // step 6b.  Attaches evidence.am_night_nif with the per-azimuth
+  // contour, interferer table, and §73.182(k)/(s) summary stats.
+  //
+  // Fail-soft: if FCCAM isn't configured (FCCAM_SIDECAR_URL unset)
+  // or the proposed station's class isn't supplied, attaches an
+  // explanatory available:false record rather than skipping
+  // silently — the appendix surfaces the diagnostic verbatim.
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && sidecars.fccam
+      && options.am_night_nif !== false){
+    const t0 = Date.now();
+    try {
+      const { nighttimeNifStudy } = await import('../../engine/am/nightOrchestrator.js');
+      const proposed = {
+        lat:           Number(inputs.lat),
+        lon:           Number(inputs.lon),
+        freq_khz:      Number(inputs.frequency),
+        erp_kw:        Number(inputs.erp_kw),
+        fcc_class:     inputs.fcc_class || null,
+        facility_id:   inputs.facility_id || null,
+        pattern_mode:  inputs.pattern_mode || (inputs.pattern_table ? 'DA' : 'omni'),
+        pattern_table: inputs.pattern_table || null
+      };
+      const study = await budget.withDeadline('am_night_nif',
+        () => nighttimeNifStudy({ proposed, options: options.am_night_nif_options || {} },
+                                { fccamClient: sidecars.fccam, facilityClient: sidecars.facility }),
+        { minMs: 30_000 });
+      evidence.am_night_nif = {
+        ...(study || { available: false, error: 'compute budget exhausted' }),
+        elapsed_ms: Date.now() - t0
+      };
+    } catch (e){
+      evidence.am_night_nif = {
+        available: false,
+        error:     `am_night_nif compute failed: ${e?.message || e}`,
+        elapsed_ms: Date.now() - t0
+      };
+    }
+  }
+
   // ---- 9. Provenance: facility / terrain / curve / sdr ----
   if (facilityResolution){
     const f = facilityResolution.facility;
@@ -1500,6 +1544,9 @@ export async function computeExhibit(req){
   }
   if (evidence.fcc_curve_parity){
     exhibit.evidence.fcc_curve_parity = evidence.fcc_curve_parity;
+  }
+  if (evidence.am_night_nif){
+    exhibit.evidence.am_night_nif = evidence.am_night_nif;
   }
   if (evidence.nec_model){
     exhibit.evidence.nec_model = evidence.nec_model;
