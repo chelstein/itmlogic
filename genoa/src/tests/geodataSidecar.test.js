@@ -193,3 +193,71 @@ test('sidecar /raster/status returns exists=false for missing paths', async () =
     assert.equal(j.exists, false);
   } finally { await closeServer(srv); }
 });
+
+test('sidecar /master-shas serves MASTER_SHA256SUMS.txt when present', async () => {
+  // Write a temp MASTER_SHA256SUMS.txt under a synthetic corpus root,
+  // point GEODATA_ROOT at it, then boot the sidecar.
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const os = await import('node:os');
+  const tmpRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'geodata-shas-'));
+  await fs.writeFile(path.join(tmpRoot, 'MASTER_SHA256SUMS.txt'),
+    'aa'.repeat(32) + '  sources/nlcd/Annual_NLCD_FctImp_2024_CU_C1V1/Annual_NLCD_FctImp_2024_CU_C1V1.tif\n' +
+    'bb'.repeat(32) + '  sources/vegetation/2024_perennial_herbaceous_departure/2024_perennial_herbaceous_departure_20250608.tif\n'
+  );
+  process.env.GEODATA_ROOT = tmpRoot;
+  process.env.GEODATA_ALLOW_PREFIXES = tmpRoot;
+  delete process.env.GEODATA_SIDECAR_TOKEN;
+  const mod = await import('../sidecars/geodata/server.js?shas=' + Math.random());
+  const app = mod.makeApp({});
+  const http = await import('node:http');
+  const srv = await new Promise((resolve) => {
+    const s = http.createServer(app);
+    s.listen(0, '127.0.0.1', () => resolve(s));
+  });
+  try {
+    const url = `http://127.0.0.1:${srv.address().port}`;
+    const r = await fetch(url + '/master-shas');
+    assert.equal(r.status, 200);
+    const txt = await r.text();
+    assert.match(txt, /Annual_NLCD_FctImp_2024_CU_C1V1\.tif/);
+    assert.match(txt, /perennial_herbaceous_departure/);
+  } finally {
+    await closeServer(srv);
+    await fs.rm(tmpRoot, { recursive: true, force: true });
+  }
+});
+
+test('httpRasterSampler.fetchMasterShas parses sidecar output into absolute-path Map', async () => {
+  const { makeHttpRasterSampler } = await import('../evidence/geodata/httpRasterSampler.js');
+  const sampler = makeHttpRasterSampler({
+    baseUrl: 'http://sc',
+    fetchFn: async (_url, _opts) => ({
+      ok: true, status: 200,
+      text: async () =>
+        'aa'.repeat(32) + '  sources/nlcd/Annual_NLCD_FctImp_2024_CU_C1V1/Annual_NLCD_FctImp_2024_CU_C1V1.tif\n' +
+        '# comment line ignored\n' +
+        'bb'.repeat(32) + '  sources/vegetation/2024_perennial_herbaceous_departure/2024_perennial_herbaceous_departure_20250608.tif\n'
+    })
+  });
+  const m = await sampler.fetchMasterShas({ corpusRoot: '/opt/genoa' });
+  assert.equal(m.size, 2);
+  assert.equal(
+    m.get('/opt/genoa/sources/nlcd/Annual_NLCD_FctImp_2024_CU_C1V1/Annual_NLCD_FctImp_2024_CU_C1V1.tif'),
+    'aa'.repeat(32)
+  );
+  assert.equal(
+    m.get('/opt/genoa/sources/vegetation/2024_perennial_herbaceous_departure/2024_perennial_herbaceous_departure_20250608.tif'),
+    'bb'.repeat(32)
+  );
+});
+
+test('httpRasterSampler.fetchMasterShas returns empty Map on 404', async () => {
+  const { makeHttpRasterSampler } = await import('../evidence/geodata/httpRasterSampler.js');
+  const sampler = makeHttpRasterSampler({
+    baseUrl: 'http://sc',
+    fetchFn: async () => ({ ok: false, status: 404, text: async () => '' })
+  });
+  const m = await sampler.fetchMasterShas({ corpusRoot: '/opt/genoa' });
+  assert.equal(m.size, 0);
+});
