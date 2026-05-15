@@ -1273,9 +1273,26 @@ export async function computeExhibit(req){
     // Build the batch — one request per (radial, contour) pair.  Skip
     // entries with missing inputs so a partial run still produces
     // useful evidence.
+    //
+    // SAMPLING: the full 36-radial × 3-contour grid is 108 FORTRAN
+    // calls per compute, which pushes wall-clock past the App
+    // Platform 60 s HTTP timeout when /run-batch is serializing
+    // stdout/stderr for every pair.  Sample evenly along the radial
+    // table so we get ≤ N_SAMPLE_RADIALS radials × all contours
+    // (default 6 × 3 = 18 pairs) — enough to assert "engine and
+    // FCC FORTRAN math agree at sampled bearings" without paying
+    // the full grid.  Operators can request the full grid with
+    // options.fcc_parity_full = true.
+    const N_SAMPLE_RADIALS = 6;
+    const fullGrid = options.fcc_parity_full === true;
+    const allRadials = exhibit.radial_table;
+    const sampledRadials = fullGrid || allRadials.length <= N_SAMPLE_RADIALS
+      ? allRadials
+      : Array.from({ length: N_SAMPLE_RADIALS },
+                   (_, i) => allRadials[Math.floor(i * allRadials.length / N_SAMPLE_RADIALS)]);
     const requests = [];
     const reqIndex = [];   // parallel: [{ az, contour_id, engine_km }]
-    for (const radial of exhibit.radial_table){
+    for (const radial of sampledRadials){
       const erpAz = Number.isFinite(radial.relative_field)
         ? erpBase * radial.relative_field * radial.relative_field
         : erpBase;
@@ -1303,9 +1320,15 @@ export async function computeExhibit(req){
     if (requests.length > 0){
       let batch = null;
       try {
+        // Cap the FORTRAN parity batch at 20 s wall-clock — this is
+        // informational evidence, not gating, so we'd rather skip it
+        // than block the compute / PDF export beyond the App Platform
+        // HTTP timeout.  A 6-radial × 3-contour batch (18 pairs)
+        // typically completes in 3-7 s; the 20 s cap absorbs upstream
+        // jitter without ever stalling the orchestrator.
         batch = await budget.withDeadline('fortran_fcc_parity',
-          () => sidecars.fortranFcc.runBatch(requests),
-          { minMs: 5_000 });
+          () => sidecars.fortranFcc.runBatch(requests, { timeoutMs: 20_000 }),
+          { minMs: 20_000 });
       } catch (e){
         batch = { available: false, error: String(e?.message || e) };
       }
