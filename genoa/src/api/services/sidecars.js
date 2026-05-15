@@ -37,6 +37,7 @@ import { makeAsrClient }         from '../../evidence/asrClient.js';
 import { makeLosClient }         from '../../evidence/losClient.js';
 import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
 import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
+import { makeFccamClient }       from '../../evidence/fccamClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -131,7 +132,16 @@ export const sidecars = Object.freeze({
   // FORTRAN_FCC_SIDECAR_URL on the deploy; Genoa runs untouched on
   // the vendored curves dataset when unset.  See
   // src/evidence/fortranFccClient.js for the contract.
-  fortranFcc:  makeFortranFccClient()
+  fortranFcc:  makeFortranFccClient(),
+  // FCCAM (AM skywave) reference engine — FastAPI wrapper around the
+  // FCC's public-domain Fccam.for (Wang 1985 skywave model permitted
+  // under 47 CFR §73.190(c)).  Authoritative 50% skywave field-strength
+  // source for §73.182 AM nighttime allocation analysis.  Opt-in via
+  // FCCAM_SIDECAR_URL on the deploy; when unset, AM-night analysis
+  // degrades explicitly rather than substituting a different engine.
+  // See genoa/src/sidecars/fccam/ for the sidecar code + deploy doc
+  // and src/evidence/fccamClient.js for the contract.
+  fccam:       makeFccamClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
