@@ -21,11 +21,16 @@ FROM node:20-alpine AS sha-stage
 RUN apk add --no-cache git
 WORKDIR /repo
 # We only need .git to extract the SHA + tag.  Copying the rest of
-# the tree would just slow this stage down.
+# the tree would just slow this stage down — but it also means there
+# is no working tree to compare against, so `git describe --dirty`
+# would always report "-dirty" (every tracked file appears deleted
+# from the empty /repo working tree).  Omit --dirty for that reason;
+# DO App Platform builds from a clean checkout, the "dirty" signal
+# would be meaningless here even if the work tree were copied.
 COPY .git ./.git
 RUN sh -c '\
   git --git-dir=/repo/.git rev-parse HEAD                          > /repo/.build_sha  2>/dev/null || echo "uncommitted" > /repo/.build_sha; \
-  git --git-dir=/repo/.git describe --tags --always --dirty        > /repo/.build_tag  2>/dev/null || echo "untagged"    > /repo/.build_tag; \
+  git --git-dir=/repo/.git describe --tags --always                > /repo/.build_tag  2>/dev/null || echo "untagged"    > /repo/.build_tag; \
   date -u +%Y-%m-%dT%H:%M:%SZ                                      > /repo/.build_time'
 
 FROM node:20-alpine AS ui-build
