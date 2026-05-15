@@ -66,11 +66,12 @@ export async function probeAllSources(){
   const splatUrl     = process.env.SPLAT_SIDECAR_URL             || null;
   const identityUrl  = process.env.IDENTITY_SIDECAR_URL          || null;
   const necUrl       = process.env.NEC_SIDECAR_URL               || null;
+  const fortranUrl   = process.env.FORTRAN_FCC_SIDECAR_URL       || null;
 
   // Probe each independently and in parallel.
   const [
     ztrHealth, n8nHealth, popSidecar, terrainSidecar, splatSidecar, identitySidecar,
-    necSidecar,
+    necSidecar, fortranFccSidecar,
     fccFmq, fccAmq, fccContours, fccCensus,
     publicFiles,
     usgsEpqs, openMeteo, openTopoData,
@@ -85,6 +86,9 @@ export async function probeAllSources(){
     // NEC sidecar /health must be GET (not HEAD) because the body
     // carries the actionable pynec_available + pynec_version fields.
     probe(necUrl       ? necUrl       + '/health'  : null, { method: 'GET' }),
+    // FORTRAN FCC reference engine — fcc-fortran-engine microservice
+    // wrapping TVFMFS_METRIC.  Health endpoint is /healthz (text "ok").
+    probe(fortranUrl   ? fortranUrl   + '/healthz' : null),
     // Always-on public upstreams (no env gate).  HEAD on the index host.
     probe('https://transition.fcc.gov/fcc-bin/fmq?list=4&service=FM&call=KSLX'),
     probe('https://transition.fcc.gov/fcc-bin/amq?list=4&call=KSLX'),
@@ -110,6 +114,16 @@ export async function probeAllSources(){
       { tier: 'secondary', id: 'geo-fcc-contours',   health: fccContours },
       { tier: 'tertiary',  id: 'engine-self-compute', health: { configured: true, reachable: true, endpoint: 'engine/curves/fcc/tvfm_curves.js (vendored)' } }
     ]),
+    // §73.333 F(50,50) / F(50,10) distance math — where does the actual
+    // FCC curve solver run.  Primary = the FORTRAN reference engine
+    // (chelstein/fcc-fortran-engine wrapping TVFMFS_METRIC) when
+    // configured; secondary = Genoa's in-process vendored tvfm_curves.js
+    // dataset.  Not marked critical because the secondary is always
+    // available (it ships in-tree).
+    fcc_curve_engine: pickFirst([
+      { tier: 'primary',   id: 'fcc-tvfmfs-fortran',  health: fortranFccSidecar },
+      { tier: 'secondary', id: 'engine-self-compute', health: { configured: true, reachable: true, endpoint: 'engine/curves/fcc/tvfm_curves.js (vendored)' } }
+    ], fortranUrl ? null : 'FORTRAN_FCC_SIDECAR_URL not set; engine runs on vendored tvfm_curves.js only'),
     terrain_haat: pickFirst([
       { tier: 'primary',   id: 'fcc-contour-haat',     health: fccContours },
       { tier: 'secondary', id: 'ztr-terrain-haat',     health: ztrHealth   },
@@ -161,6 +175,7 @@ export async function probeAllSources(){
       ztr: ztrHealth, n8n: n8nHealth, population_sidecar: popSidecar,
       terrain_sidecar: terrainSidecar, splat_sidecar: splatSidecar, identity_sidecar: identitySidecar,
       nec_sidecar: necSidecar,
+      fortran_fcc_sidecar: fortranFccSidecar,
       fcc_fmq: fccFmq, fcc_amq: fccAmq, fcc_contours: fccContours, fcc_census: fccCensus,
       publicfiles_fcc_gov: publicFiles,
       usgs_epqs: usgsEpqs, open_meteo: openMeteo, opentopodata: openTopoData,
