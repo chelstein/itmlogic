@@ -220,6 +220,27 @@ test('unknown layer returns GEODATA_LAYER_NOT_FOUND', async () => {
   assert.equal(r.error, 'GEODATA_LAYER_NOT_FOUND');
 });
 
+test('manifest routes json_dir presence through the sidecar in sidecar mode', async () => {
+  const svc = makeGeodataService({
+    raster: makeStubRaster([]),
+    statRasterRemote: async (p) => {
+      // fcc_contour_evidence dir exists as a directory; everything
+      // else (the raster files) doesn't matter for this assertion.
+      if (p.endsWith('/live-data/fcc-contours/tests')){
+        return { exists: true, is_dir: true, size: null };
+      }
+      return { exists: false };
+    },
+    shaMapPromise: Promise.resolve(new Map()),
+    listDir:       async () => [],
+    now:           NOW
+  });
+  const m = await svc.manifest();
+  const fcc = m.layers.find((l) => l.id === 'fcc_contour_evidence');
+  assert.equal(fcc.status, 'available');
+  assert.equal(fcc.via,    'sidecar');
+});
+
 test('manifest uses statRasterRemote when running in sidecar mode', async () => {
   // sidecar mode: status comes from the sidecar's /raster/status, not
   // from local fs.stat (which would always say "missing" on App Platform).

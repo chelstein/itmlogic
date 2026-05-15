@@ -35,6 +35,7 @@ export function makeGeodataService({
 } = {}){
   let _statRemote = statRasterRemote || null;
   let _raster = raster;
+  let _shaMapOverride = null;
   if (!_raster){
     if (config.sidecar_url){
       const http = makeHttpRasterSampler({
@@ -43,11 +44,14 @@ export function makeGeodataService({
       });
       _raster = http.sampleRaster;
       if (!_statRemote) _statRemote = (p) => http.statRaster(p);
+      // Master sha map also comes from the sidecar in App Platform
+      // mode — the local MASTER_SHA256SUMS.txt isn't on the container.
+      _shaMapOverride = http.fetchMasterShas({ corpusRoot: config.root });
     } else {
       _raster = makeRasterSampler({ bin: config.gdal_locationinfo_bin });
     }
   }
-  const _shaMap = shaMapPromise || loadMasterSha256Map();
+  const _shaMap = shaMapPromise || _shaMapOverride || loadMasterSha256Map();
   const shaFor = async (p) => (await _shaMap).get(p) || null;
 
   async function sample({ layer, lat, lon }){
@@ -151,7 +155,13 @@ export function makeGeodataService({
         row.warnings.push('tile bounds not yet attested — terrain sampling intentionally disabled');
       } else if (cfg.kind === 'json_dir'){
         row.dir    = cfg.dir;
-        row.status = await dirExists(cfg.dir) ? 'available' : 'missing';
+        if (_statRemote){
+          const st = await _statRemote(cfg.dir);
+          row.status = (st?.exists && st?.is_dir) ? 'available' : 'missing';
+          row.via    = 'sidecar';
+        } else {
+          row.status = await dirExists(cfg.dir) ? 'available' : 'missing';
+        }
       }
       out.push(row);
     }
