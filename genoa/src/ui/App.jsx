@@ -294,7 +294,8 @@ function MainApp({ onLogout }) {
           pattern_table: i.pattern_mode === 'DA' ? i.pattern_table : null
         },
         options: {
-          use_terrain: !!i.use_terrain
+          use_terrain: !!i.use_terrain,
+          use_itm:     !!i.use_itm
         }
       };
       // Belt-and-suspenders: strip any DOM/React refs that could have
@@ -404,6 +405,7 @@ function MainApp({ onLogout }) {
       _synthetic: false,
       radial_step_deg: inputs.radial_step_deg || 10,
       use_terrain:     !!inputs.use_terrain,
+      use_itm:         !!inputs.use_itm,
       // Engineering fields — reset so the row's values show through.
       lat: '', lon: '',
       facility_id: '', call: '',
