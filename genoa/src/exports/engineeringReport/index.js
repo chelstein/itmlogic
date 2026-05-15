@@ -20,6 +20,7 @@ import { buildEngineeringConsiderationsSection } from './sections/engineeringCon
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
 import { buildMeasurementsSection }                from './sections/measurements.js';
 import { buildRegulatoryContextSection }           from './sections/regulatoryContext.js';
+import { buildItmCoverageSection }                 from './sections/itmCoverage.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -44,6 +45,13 @@ export function buildEngineeringReport(exhibit, options){
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildMeasurementsSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
+  // Terrain-aware ITM coverage (47 CFR §73.314) — conditional, only
+  // present when exhibit.itm_polygons[0] is a closed ring (the engine
+  // ran ITM under options.use_itm=true).  Sits AFTER the §73.333
+  // contour results and BEFORE the §73.207 / §73.215 protection
+  // studies so the reader sees the free-space contour first, then the
+  // evidentiary terrain analysis, then the regulatory compliance work.
+  push(buildItmCoverageSection(exhibit, opt));
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));
   push(buildValidationVerdictSection(exhibit, opt));
