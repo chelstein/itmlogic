@@ -346,5 +346,132 @@ export function buildAppendixSections(exhibit){
     rows:    eRows
   });
 
+  // ── Appendix F — AM nighttime allocation (§73.182) ────────────────────
+  // Populated by exhibitService step 8d when service=AM and the
+  // FCCAM sidecar is reachable.  Three blocks: summary KV,
+  // per-azimuth NIF table, and the interferer table that fed the
+  // RSS sum.  Falls back to a single "unavailable / reason" line
+  // when the study didn't complete.
+  const nif = exhibit.evidence?.am_night_nif;
+  const svc_f = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (svc_f === 'AM' && nif){
+    if (!nif.available){
+      sections.push({
+        id:      'appendix-f',
+        type:    'kv',
+        heading: 'APPENDIX F — AM NIGHTTIME ALLOCATION (§73.182)',
+        preface: 'Nighttime NIF contour analysis per 47 CFR §73.182 + §73.190(c).',
+        rows: [
+          ['Status',     'NOT RUN'],
+          ['Reason',     nif.error || 'unavailable'],
+          ['Regulation', '47 CFR §73.182 / §73.183 / §73.190(c)']
+        ]
+      });
+    } else {
+      const s = nif.summary || {};
+      const fmtKm   = (v) => Number.isFinite(v) ? `${v.toFixed(1)} km` : '—';
+      const fmtDb   = (v) => Number.isFinite(v) ? `${v >= 0 ? '+' : ''}${v.toFixed(2)} dB` : '—';
+      const fmtN    = (v) => Number.isFinite(v) ? String(v) : '—';
+      const fSummary = [
+        ['Source',                  nif.source || 'fccam'],
+        ['Fetched at',              nif.fetched_at || '—'],
+        ['Azimuths evaluated',      fmtN(s.n_azimuths)],
+        ['Failing azimuths',        fmtN(s.n_failing_azimuths)],
+        ['No-service azimuths',     fmtN(s.n_no_service_azimuths)],
+        ['Unbounded azimuths',      fmtN(s.n_unbounded_azimuths)],
+        ['Mean NIF radius',         fmtKm(s.mean_radius_km)],
+        ['Min NIF radius',          fmtKm(s.min_radius_km)],
+        ['Max NIF radius',          fmtKm(s.max_radius_km)],
+        ['Worst binding margin',    fmtDb(s.worst_margin_db)],
+        ['Interferers used',        fmtN(s.n_interferers_used)],
+        ['Interferers seen',        fmtN(s.n_interferers_seen)],
+        ['Interferer cap applied',  nif.interferer_cap_applied ? 'yes' : 'no'],
+        ['D/U applied (co-channel)',     fmtN(nif.du_db_by_relation?.co_channel)],
+        ['D/U applied (1st-adjacent)',   fmtN(nif.du_db_by_relation?.first_adjacent)],
+        ['D/U applied (2nd-adjacent)',   fmtN(nif.du_db_by_relation?.second_adjacent)],
+        ['Regulation',              nif.regulation || '47 CFR §73.182 / §73.183 / §73.190(c)'],
+        ['Upstream engine',         nif.provenance?.upstream_skywave || 'FCCAM (Fccam.for)']
+      ];
+      sections.push({
+        id:      'appendix-f',
+        type:    'kv',
+        heading: 'APPENDIX F — AM NIGHTTIME ALLOCATION (§73.182)',
+        preface: 'Nighttime Interference-Free (NIF) contour analysis per 47 CFR §73.182.  ' +
+                 'Per-azimuth bisection of the boundary where the proposed station\'s 50% ' +
+                 'skywave equals the §73.182(k) RSS-aggregated interference (25% exclusion ' +
+                 'applied per FCC rule) at the §73.183 protection ratio for the proposed class.  ' +
+                 'Skywave fields computed via Wang 1985 model (FCCAM); ' +
+                 'NIF math vendored in Genoa.',
+        rows: fSummary
+      });
+      // Per-azimuth NIF table.
+      const azRows = (nif.contour || []).map((p) => ({
+        az:            Number.isFinite(p.azimuth_deg) ? p.azimuth_deg.toFixed(1) : '—',
+        distance_km:   Number.isFinite(p.distance_km) ? p.distance_km.toFixed(2) : '—',
+        lat:           Number.isFinite(p.lat) ? p.lat.toFixed(4) : '—',
+        lon:           Number.isFinite(p.lon) ? p.lon.toFixed(4) : '—',
+        binding:       p.binding?.relation
+                          ? `${p.binding.relation} ${Number.isFinite(p.binding.margin_db) ? p.binding.margin_db.toFixed(1) : '—'} dB`
+                          : (p.saturated || '—'),
+        iter:          Number.isFinite(p.iterations) ? p.iterations : '—'
+      }));
+      if (azRows.length){
+        sections.push({
+          id:      'appendix-f-azimuths',
+          type:    'table',
+          heading: 'Appendix F-1 — Per-azimuth NIF radius',
+          preface: 'NIF radius per azimuth and the §73.183 protection relation that binds it ' +
+                   '(margin = 20·log10(desired/required), positive = margin above protection).',
+          table: {
+            columns: [
+              { key: 'az',          label: 'Az (°)',         width: 0.10, align: 'right' },
+              { key: 'distance_km', label: 'NIF (km)',       width: 0.16, align: 'right' },
+              { key: 'lat',         label: 'Lat',            width: 0.16, align: 'right' },
+              { key: 'lon',         label: 'Lon',            width: 0.16, align: 'right' },
+              { key: 'binding',     label: 'Binding · margin', width: 0.30 },
+              { key: 'iter',        label: 'Iter',           width: 0.10, align: 'right' }
+            ],
+            rows: azRows
+          }
+        });
+      }
+      // Interferer table (sorted by RSS contribution where known,
+      // otherwise by distance).  Limited to 25 rows by orchestrator cap.
+      const ints = (nif.interferers || []).slice();
+      if (ints.length){
+        const intRows = ints.map((s_) => ({
+          call:          s_.call         || '—',
+          facility_id:   s_.station_id   || '—',
+          class:         s_.fcc_class    || '—',
+          freq_khz:      Number.isFinite(s_.freq_khz) ? s_.freq_khz : '—',
+          erp_kw:        Number.isFinite(s_.erp_kw) ? s_.erp_kw.toFixed(2) : '—',
+          distance_km:   Number.isFinite(s_.distance_km) ? s_.distance_km.toFixed(1) : '—',
+          relation:      s_.relation || '—'
+        }));
+        sections.push({
+          id:      'appendix-f-interferers',
+          type:    'table',
+          heading: 'Appendix F-2 — Interferer pool (§73.182(k) RSS input)',
+          preface: 'Nearby co- and adjacent-channel AMs pulled from FCC AM Query within ' +
+                   '~1500 km.  All passed §73.182(k)\'s field-presence test before RSS; ' +
+                   'the 25% exclusion is applied per-receiver, not per-station, so a row ' +
+                   'may contribute at some azimuths and not others.',
+          table: {
+            columns: [
+              { key: 'call',        label: 'Call',     width: 0.12 },
+              { key: 'facility_id', label: 'Facility', width: 0.10, align: 'right' },
+              { key: 'class',       label: 'Class',    width: 0.08 },
+              { key: 'freq_khz',    label: 'kHz',      width: 0.10, align: 'right' },
+              { key: 'erp_kw',      label: 'ERP (kW)', width: 0.12, align: 'right' },
+              { key: 'distance_km', label: 'Dist (km)', width: 0.14, align: 'right' },
+              { key: 'relation',    label: 'Relation', width: 0.22 }
+            ],
+            rows: intRows
+          }
+        });
+      }
+    }
+  }
+
   return sections;
 }

@@ -194,6 +194,38 @@ export function buildValidationVerdictSection(exhibit){
               : 'no interference study (no nearby_primaries attached)'
   });
 
+  // AM §73.182 nighttime NIF (AM exhibits only; FM ignores).
+  const svc_v = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (svc_v === 'AM'){
+    const nif = exhibit.evidence?.am_night_nif;
+    if (nif?.available){
+      const s = nif.summary || {};
+      const passing = (s.n_failing_azimuths || 0) === 0 && (s.n_no_service_azimuths || 0) === 0;
+      const detail = `${s.n_azimuths || 0} azimuths · ` +
+        `mean NIF ${Number.isFinite(s.mean_radius_km) ? s.mean_radius_km.toFixed(0) + ' km' : '—'} · ` +
+        `worst margin ${Number.isFinite(s.worst_margin_db) ? s.worst_margin_db.toFixed(1) + ' dB' : '—'} · ` +
+        `${s.n_failing_azimuths || 0} failing / ${s.n_no_service_azimuths || 0} no-service azimuths · ` +
+        `${s.n_interferers_used || 0} interferers used`;
+      components.push({
+        name:   'AM nighttime allocation (§73.182 NIF)',
+        status: passing ? 'PASS' : 'FAIL',
+        detail
+      });
+    } else if (nif && !nif.available){
+      components.push({
+        name:   'AM nighttime allocation (§73.182 NIF)',
+        status: 'NOT_RUN',
+        detail: nif.error || 'unavailable'
+      });
+    } else {
+      components.push({
+        name:   'AM nighttime allocation (§73.182 NIF)',
+        status: 'NOT_RUN',
+        detail: 'FCCAM sidecar not configured (FCCAM_SIDECAR_URL unset) — nighttime allocation requires FCC Wang skywave model per §73.190(c)'
+      });
+    }
+  }
+
   // Determine overall status + confidence per spec.
   // FALLBACK (tier 2 or tier 3) counts as a deterministic pass for the
   // purposes of the validation verdict — the user-facing contract is
