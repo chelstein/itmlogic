@@ -7,13 +7,14 @@
 // reference against its own vendored tvfm_curves.js engine so the two
 // can be cross-validated on every FM exhibit.
 //
-// CURRENT SERVICE CONTRACT (as of 2026-05-14)
+// CURRENT SERVICE CONTRACT (as of 2026-05-15, tasks 5 + 6 shipped)
 //
 //   GET  /healthz
 //     → 200 "ok" (text)
 //
-//   GET  /version                      (planned, task 5)
-//     → { tvfmfs_for_sha256, itplbv_for_sha256, driver_for_sha256, ... }
+//   GET  /version
+//     → { engine, splat_bin? (n/a here), tvfmfs_for_sha256, itplbv_for_sha256,
+//         driver_for_sha256, build_time, git_commit_sha, ... }
 //
 //   POST /run
 //     body: {
@@ -21,7 +22,7 @@
 //       haat_m:      number,
 //       field_dbuv:  number,      // target field strength for distance_to_field
 //       curve:       "F50_50" | "F50_10",   // mapped server-side to CURVE int
-//       channel:     number,      // FM channel; defaults to 221 server-side today
+//       channel:     number,      // FM channel; defaults to 221 server-side
 //       mode:        "distance_to_field" | "field_at_distance"   (default "distance_to_field")
 //     }
 //     → 200 {
@@ -29,15 +30,15 @@
 //          engine:         "fcc-tvfmfs-fortran",
 //          distance_km:    number,
 //          distance_miles: number,
-//          flag:           null | string,    // FCC TVFMFS_METRIC flags (e.g. "extrapolated")
-//          input_sha256:   string,           // hash of normalized inputs (reproducibility)
+//          flag:           null | string,    // FCC TVFMFS_METRIC flags
+//          input_sha256:   string,           // hash of normalized inputs
 //          stdout:         string,
 //          stderr:         string
 //        }
 //
-//   POST /batch                       (planned, task 6)
-//     body: { runs: [ /run input objects ] }
-//     → 200 { runs: [ /run output objects ] }
+//   POST /run-batch
+//     body: { requests: [ /run input objects ] }
+//     → 200 { results: [ /run output objects + { ok, returncode } per entry ] }
 //
 // USE
 //   Set FORTRAN_FCC_SIDECAR_URL on the API deploy (and optionally
@@ -87,11 +88,9 @@ export function makeFortranFccClient({
                                          5_000);
         if (!r.ok) return { available: false, error: `HTTP ${r.status}` };
         const j = await r.json();
-        return { available: true, ...j };
+        return { available: true, endpoint: joinUrl(baseUrl, '/version'),
+                 fetched_at: new Date().toISOString(), ...j };
       } catch (e){
-        // /version isn't shipped yet on the FORTRAN side — treat absent
-        // version endpoint as "service up, version unknown" rather than
-        // failing the whole parity probe.
         return { available: false, error: String(e?.message || e) };
       }
     },
@@ -162,36 +161,56 @@ export function makeFortranFccClient({
       }
     },
 
-    // Batch helper — placeholder for the operator's task 6.  When
-    // /batch isn't deployed yet (the service returns 404) the
-    // caller should fall back to N sequential distanceToField calls
-    // or, for the parity-evidence use, just sample a single radial.
-    async runBatch(runs, opts = {}){
-      if (!Array.isArray(runs) || runs.length === 0){
-        return { available: false, error: 'runs[] must be a non-empty array' };
+    // Batch helper — POST /run-batch with up to N requests in one
+    // round-trip.  Used by exhibitService.js for per-radial parity
+    // (one entry per radial × contour), so a 36-radial × 3-contour
+    // exhibit fans out 108 TVFMFS_METRIC calls in a single HTTP round.
+    //
+    // Each input entry follows the /run shape; each output result
+    // includes ok + returncode in addition to the usual /run fields.
+    async runBatch(requests, opts = {}){
+      if (!Array.isArray(requests) || requests.length === 0){
+        return { available: false, error: 'requests[] must be a non-empty array' };
       }
+      // Normalize each entry so callers don't have to remember the
+      // exact field names — same shape distanceToField() accepts.
+      const normalized = requests.map(req => ({
+        erp_kw:     Number(req.erp_kw),
+        haat_m:     Number(req.haat_m),
+        field_dbuv: Number(req.field_dbuv),
+        curve:      req.curve   || 'F50_50',
+        channel:    Number(req.channel) || 221,
+        mode:       req.mode    || 'distance_to_field'
+      }));
       try {
-        const r = await fetchWithTimeout(joinUrl(baseUrl, '/batch'), {
+        const r = await fetchWithTimeout(joinUrl(baseUrl, '/run-batch'), {
           method:  'POST',
           headers: { 'content-type': 'application/json', ...authHeaders(apiToken) },
-          body:    JSON.stringify({ runs })
+          body:    JSON.stringify({ requests: normalized })
         }, opts.timeoutMs ?? (timeoutMs * 6));
         if (r.status === 404){
-          return { available: false, error: '/batch not deployed on the FORTRAN service yet (operator task 6)',
-                   endpoint: joinUrl(baseUrl, '/batch') };
+          return { available: false, error: '/run-batch not deployed on the FORTRAN service',
+                   endpoint: joinUrl(baseUrl, '/run-batch') };
         }
         if (!r.ok){
           return { available: false, error: `HTTP ${r.status}`,
-                   endpoint: joinUrl(baseUrl, '/batch') };
+                   endpoint: joinUrl(baseUrl, '/run-batch') };
         }
         const j = await r.json();
+        // Server returns `results: [...]` per the documented contract.
+        // Old shape (`runs: [...]`) is accepted as a safety net in case
+        // the server changes naming again — pick whichever is present.
+        const results = j.results || j.runs || [];
         return { available: true, source: 'fcc-tvfmfs-fortran',
-                 endpoint: joinUrl(baseUrl, '/batch'),
+                 endpoint:   joinUrl(baseUrl, '/run-batch'),
                  fetched_at: new Date().toISOString(),
-                 runs: j.runs || [] };
+                 n_requests: normalized.length,
+                 n_ok:       results.filter(x => x?.ok === true).length,
+                 n_failed:   results.filter(x => x?.ok === false).length,
+                 results };
       } catch (e){
         return { available: false, error: String(e?.message || e),
-                 endpoint: joinUrl(baseUrl, '/batch') };
+                 endpoint: joinUrl(baseUrl, '/run-batch') };
       }
     }
   };
