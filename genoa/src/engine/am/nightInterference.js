@@ -178,7 +178,7 @@ export function checkProtection(desired_uv_m, rss_uv_m, du_db){
  */
 export function standardDuDb(subjectClass, relation){
   const cls = String(subjectClass || '').toUpperCase();
-  const rel = String(relation || '').toLowerCase();
+  const rel = normalizeRelation(relation);
   const matrix = {
     A: { co_channel: 26, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
     B: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
@@ -189,6 +189,25 @@ export function standardDuDb(subjectClass, relation){
   if (!row) return null;
   const v = row[rel];
   return Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Normalize the channel-relation string Genoa sees from upstream
+ * sources (facilityClient emits `cochannel`; the engine + tests use
+ * `co_channel`).  Idempotent; accepts both forms + a couple of common
+ * aliases.
+ *
+ * @param {string} relation
+ * @returns {'co_channel'|'first_adjacent'|'second_adjacent'|'third_adjacent'|'if_offset'|string}
+ */
+export function normalizeRelation(relation){
+  const r = String(relation || '').toLowerCase().replace(/[\s-]/g, '_');
+  if (r === 'cochannel' || r === 'co_channel') return 'co_channel';
+  if (r === '1st_adjacent' || r === 'first_adjacent') return 'first_adjacent';
+  if (r === '2nd_adjacent' || r === 'second_adjacent') return 'second_adjacent';
+  if (r === '3rd_adjacent' || r === 'third_adjacent') return 'third_adjacent';
+  if (r === 'if_offset' || r === 'if') return 'if_offset';
+  return r;
 }
 
 export const NIGHT_INTERFERENCE_PROVENANCE = Object.freeze({
