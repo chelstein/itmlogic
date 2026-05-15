@@ -1257,16 +1257,16 @@ export async function computeExhibit(req){
       && ['FM','LPFM','FX'].includes(String(inputs.service || '').toUpperCase())
       && Array.isArray(exhibit?.radial_table)
       && exhibit.radial_table.length > 0
-      && Array.isArray(exhibit?.contours)
-      && exhibit.contours.length > 0){
+      && Array.isArray(exhibit?.contour_definitions)
+      && exhibit.contour_definitions.length > 0){
     const t0 = Date.now();
     const erpBase = Number(inputs.erp_kw);
     // FM full-service uses F(50,50) for service + city grade contours
     // and is documented as F(50,10) for protected/interferer pairs in
     // §73.215 studies.  For the simple per-radial distance parity, we
     // ask FORTRAN for the SAME curve the engine reported using.  The
-    // engine's contour list carries field_dBu but not curve choice —
-    // map by id so the comparison is apples-to-apples.
+    // engine's contour list carries field_strength.value (dBu) — map
+    // by id so the comparison is apples-to-apples.
     const curveForContour = (cid) =>
       (cid === 'protected_40dbu' || cid === 'protected_48dbu') ? 'F50_10' : 'F50_50';
 
@@ -1281,8 +1281,13 @@ export async function computeExhibit(req){
         : erpBase;
       const haatAz = Number(radial.haat_computed_m ?? radial.haat_input_m);
       if (!Number.isFinite(erpAz) || erpAz <= 0 || !Number.isFinite(haatAz) || haatAz <= 0) continue;
-      for (const contour of exhibit.contours){
-        const fieldDbu = Number(contour.field_dBu);
+      for (const contour of exhibit.contour_definitions){
+        const fieldDbu = Number(contour.field_strength?.value);
+        const fieldUnit = contour.field_strength?.unit || 'dBu';
+        // FORTRAN engine accepts target field in dBu; mV/m contours
+        // (AM) aren't in scope (AM is filtered out above) so we treat
+        // any non-dBu unit as a skip rather than guess a conversion.
+        if (fieldUnit !== 'dBu') continue;
         const engineKm = Number(radial.contour_distances_km?.[contour.id]);
         if (!Number.isFinite(fieldDbu) || !Number.isFinite(engineKm)) continue;
         requests.push({

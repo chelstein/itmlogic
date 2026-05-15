@@ -245,7 +245,15 @@ export function buildAppendixSections(exhibit){
                                   : 'not attached'],
     ['FCC parity (live)',       ev.fcc_parity_report?.available
                                   ? `${ev.fcc_parity_report.n_pass}/${ev.fcc_parity_report.n_samples} samples within tolerance`
-                                  : 'opt-in (not requested)']
+                                  : 'opt-in (not requested)'],
+    // FORTRAN reference-engine parity (per-radial × per-contour).
+    // Stamped on evidence.fcc_curve_parity when FORTRAN_FCC_SIDECAR_URL
+    // is configured AND service ∈ { FM, LPFM, FX }.
+    ['FCC FORTRAN parity',      ev.fcc_curve_parity?.available
+                                  ? `${ev.fcc_curve_parity.n_ok}/${ev.fcc_curve_parity.n_requests} pairs ok; max |Δ| ${Number.isFinite(ev.fcc_curve_parity.max_abs_delta_km) ? ev.fcc_curve_parity.max_abs_delta_km.toFixed(3) + ' km' : '—'} (tolerance ${ev.fcc_curve_parity.tolerance_km} km) — ${ev.fcc_curve_parity.pass ? 'PASS' : 'FAIL'}`
+                                  : ev.fcc_curve_parity?.error
+                                    ? `unavailable: ${ev.fcc_curve_parity.error}`
+                                    : 'not configured (FORTRAN_FCC_SIDECAR_URL unset)']
   ];
   sections.push({
     id:      'appendix-c',
@@ -271,6 +279,10 @@ export function buildAppendixSections(exhibit){
                   || tDem.commit     || tDem.version    || tDem.build    || tDem.sha
                   || tDem.dem_commit || tDem.dem_version
                   || '—';
+  // FORTRAN reference-engine source-file provenance (when configured).
+  // Stamped on method_versions.fcc_fortran_engine by exhibitService.js
+  // step 8c from GET /version on the fcc-fortran-engine microservice.
+  const ffe = mv.fcc_fortran_engine || null;
   const dRows = [
     ['Engine version',     sig.version || prov.engine_version || prov.version || '—'],
     ['Engine commit',      sig.hash || prov.git_commit || prov.commit || '—'],
@@ -282,6 +294,16 @@ export function buildAppendixSections(exhibit){
     ['DEM dataset',        demDataset],
     ['DEM commit',         demCommit]
   ];
+  if (ffe){
+    dRows.push(
+      ['FCC FORTRAN engine',        ffe.engine || 'fcc-tvfmfs-fortran'],
+      ['FCC FORTRAN commit',        ffe.git_commit_sha || '—'],
+      ['FCC FORTRAN build',         ffe.build_time     || '—'],
+      ['tvfmfs.for SHA-256',        ffe.tvfmfs_for_sha256 || '—'],
+      ['itplbv.for SHA-256',        ffe.itplbv_for_sha256 || '—'],
+      ['driver.for SHA-256',        ffe.driver_for_sha256 || '—']
+    );
+  }
   sections.push({
     id:      'appendix-d',
     type:    'kv',
