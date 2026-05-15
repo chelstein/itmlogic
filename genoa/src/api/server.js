@@ -16,6 +16,7 @@ import peCertificationRoutes from './routes/peCertification.js';
 import amDaDesignRoutes from './routes/amDaDesign.js';
 import lmsFilingRoutes from './routes/lmsFiling.js';
 import captureRoutes   from './routes/captures.js';
+import geodataRoutes   from './routes/geodata.js';
 import authRoutes       from './routes/auth.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
@@ -70,6 +71,7 @@ app.use('/api', peCertificationRoutes); // PE certify / verify-cert (POST /api/e
 app.use('/api', amDaDesignRoutes);   // AM DA pattern design (POST /api/am-da/{design,null})
 app.use('/api', lmsFilingRoutes);    // FCC Form 301-FM filing package (POST /api/exhibits/filing-package{,/download,/summary})
 app.use('/api', captureRoutes);      // SDR capture audio proxy (GET /api/captures/:id/audio)
+app.use('/api', geodataRoutes);      // geodata evidence layers (GET /api/geodata/{sample,clutter,vegetation,conductivity,terrain/status,manifest})
 app.use('/api', exhibitRoutes);
 
 // Last-resort error handler
