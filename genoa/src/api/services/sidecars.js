@@ -36,6 +36,7 @@ import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 import { makeAsrClient }         from '../../evidence/asrClient.js';
 import { makeLosClient }         from '../../evidence/losClient.js';
 import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
+import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -122,7 +123,15 @@ export const sidecars = Object.freeze({
   // for an operator proxy that returns clean JSON, or
   // FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape (unimplemented
   // in this build).
-  faaOe:       makeFaaOeClient()
+  faaOe:       makeFaaOeClient(),
+  // FCC FORTRAN reference engine (chelstein/fcc-fortran-engine — a
+  // microservice that links and calls the FCC/REC TVFMFS_METRIC routine
+  // directly).  Used as a deterministic PARITY reference against
+  // Genoa's own vendored tvfm_curves.js engine.  Opt-in via
+  // FORTRAN_FCC_SIDECAR_URL on the deploy; Genoa runs untouched on
+  // the vendored curves dataset when unset.  See
+  // src/evidence/fortranFccClient.js for the contract.
+  fortranFcc:  makeFortranFccClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
