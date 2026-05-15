@@ -62,11 +62,26 @@ const PDF_UNICODE_FOLD = {
   '’': "'",     // ’
   '“': '"',     // “
   '”': '"',     // ”
-  '…': '...'    // …
+  '…': '...',   // …
+  // Greek letters that the section builders sometimes emit.  PDFKit's
+  // base-14 Times-Roman uses WinAnsi encoding which has NO Greek
+  // glyphs above U+007E; without these mappings the rendered output
+  // is garbage AND the surrounding ASCII gets mangled because the
+  // missing-glyph substitution shifts the content-stream byte
+  // positions.  Add new letters here as section builders adopt them.
+  'Δ': 'delta', // Δ (U+0394) — "max |Δ|" in parity outputs
+  'δ': 'delta', // δ (U+03B4)
+  'σ': 'sigma', // σ (U+03C3) — ground conductivity (when it leaks past the AM-only inputs)
+  'π': 'pi',    // π (U+03C0)
+  'μ': 'u',     // μ (U+03BC) — micro, e.g. µV/m
+  'Ω': 'ohm',   // Ω (U+03A9)
+  'λ': 'lambda',// λ (U+03BB) — wavelength
+  'θ': 'theta', // θ (U+03B8) — angle
+  'φ': 'phi'    // φ (U+03C6) — phase
 };
 function pdfSafeText(s){
   if (typeof s !== 'string') return s;
-  return s.replace(/[→←↔–—‘’“”…]/g,
+  return s.replace(/[→←↔–—‘’“”…ΔδσπμΩλθφ]/g,
                    ch => PDF_UNICODE_FOLD[ch] || ch);
 }
 

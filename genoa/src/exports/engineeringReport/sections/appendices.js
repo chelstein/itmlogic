@@ -297,8 +297,10 @@ export function buildAppendixSections(exhibit){
   if (ffe){
     dRows.push(
       ['FCC FORTRAN engine',        ffe.engine || 'fcc-tvfmfs-fortran'],
+      ['FCC FORTRAN version',       ffe.version       || '—'],
       ['FCC FORTRAN commit',        ffe.git_commit_sha || '—'],
-      ['FCC FORTRAN build',         ffe.build_time     || '—'],
+      ['FCC FORTRAN image SHA-256', ffe.image_sha256  || '—'],
+      ['FCC FORTRAN build',         ffe.build_time    || '—'],
       ['tvfmfs.for SHA-256',        ffe.tvfmfs_for_sha256 || '—'],
       ['itplbv.for SHA-256',        ffe.itplbv_for_sha256 || '—'],
       ['driver.for SHA-256',        ffe.driver_for_sha256 || '—']
