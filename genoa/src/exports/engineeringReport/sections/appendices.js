@@ -295,15 +295,22 @@ export function buildAppendixSections(exhibit){
     ['DEM commit',         demCommit]
   ];
   if (ffe){
+    // "tvfmfs.for" + size in bytes if known: "tvfmfs.for SHA-256 (35,906 B)"
+    const srcLabel = (fname, size) =>
+      Number.isFinite(size)
+        ? `${fname} SHA-256 (${size.toLocaleString('en-US')} B)`
+        : `${fname} SHA-256`;
     dRows.push(
-      ['FCC FORTRAN engine',        ffe.engine || 'fcc-tvfmfs-fortran'],
-      ['FCC FORTRAN version',       ffe.version       || '—'],
-      ['FCC FORTRAN commit',        ffe.git_commit_sha || '—'],
-      ['FCC FORTRAN image SHA-256', ffe.image_sha256  || '—'],
-      ['FCC FORTRAN build',         ffe.build_time    || '—'],
-      ['tvfmfs.for SHA-256',        ffe.tvfmfs_for_sha256 || '—'],
-      ['itplbv.for SHA-256',        ffe.itplbv_for_sha256 || '—'],
-      ['driver.for SHA-256',        ffe.driver_for_sha256 || '—']
+      ['FCC FORTRAN engine',         ffe.engine || 'fcc-tvfmfs-fortran'],
+      ['FCC FORTRAN version',        ffe.version        || '—'],
+      ['FCC FORTRAN commit',         ffe.git_commit_sha || '—'],
+      ['FCC FORTRAN image SHA-256',  ffe.image_sha256   || '—'],
+      // Composite "did the math change" hash over the 3 source files.
+      ['FCC FORTRAN source SHA-256', ffe.source_sha256  || '—'],
+      ['FCC FORTRAN build',          ffe.build_time     || '—'],
+      [srcLabel('tvfmfs.for', ffe.tvfmfs_for_size), ffe.tvfmfs_for_sha256 || '—'],
+      [srcLabel('itplbv.for', ffe.itplbv_for_size), ffe.itplbv_for_sha256 || '—'],
+      [srcLabel('driver.for', ffe.driver_for_size), ffe.driver_for_sha256 || '—']
     );
   }
   sections.push({

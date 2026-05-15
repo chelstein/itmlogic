@@ -1412,6 +1412,10 @@ export async function computeExhibit(req){
             version.files?.[name]?.sha256
             || version[name.replace('.', '_') + '_sha256']    // e.g. tvfmfs_for_sha256
             || null;
+          const fileSize = (name) =>
+            Number.isFinite(version.files?.[name]?.size)
+              ? version.files[name].size
+              : null;
           // /version returns `generated_at` as a unix timestamp; older
           // doc-spec showed `build_time` as an ISO string.  Accept either.
           const buildTime = version.build_time
@@ -1429,10 +1433,17 @@ export async function computeExhibit(req){
               // when present (Docker image digest, not source).
               git_commit_sha:        version.git_commit_sha || version.commit || null,
               image_sha256:          version.image_sha256 || null,
+              // Composite hash over the three FORTRAN source files —
+              // single-string "did the math change" boolean for
+              // reviewers who don't want to diff three SHAs.
+              source_sha256:         version.source_sha256 || null,
               build_time:            buildTime,
               tvfmfs_for_sha256:     fileSha('tvfmfs.for'),
+              tvfmfs_for_size:       fileSize('tvfmfs.for'),
               itplbv_for_sha256:     fileSha('itplbv.for'),
+              itplbv_for_size:       fileSize('itplbv.for'),
               driver_for_sha256:     fileSha('driver.for'),
+              driver_for_size:       fileSize('driver.for'),
               endpoint:              version.endpoint,
               fetched_at:            version.fetched_at
             }
