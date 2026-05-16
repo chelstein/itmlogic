@@ -263,16 +263,28 @@
   .logo-sail svg { display: block; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
 
   /* ----- Tab strip -----
-     Grouped wrapping layout: each group header forces a full-width
-     line break (flex-basis: 100%) so all 15+ tabs are visible at
-     once without horizontal scroll. Items inside a group wrap as
-     needed under their section header. */
+     Two-level Bloomberg nav.  Row 1 is the 5 primary section tabs
+     (Exhibit / Studies / AM / Filing / System) — always visible,
+     fits in any column width.  Row 2 is the active group's
+     sub-tabs only, surfacing one cluster at a time instead of
+     hammering all 15 leaves in one strip. */
   .tab-strip {
-    display: flex; flex-wrap: wrap; gap: 0 2px; align-items: stretch;
+    display: flex; flex-direction: column; gap: 0;
     border-bottom: 1px solid theme('colors.rule');
     background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0));
-    padding: 4px 0 0;
   }
+  .tab-strip .tab-primary-row,
+  .tab-strip .tab-secondary-row {
+    display: flex; flex-wrap: wrap; gap: 0 2px; align-items: stretch;
+  }
+  .tab-strip .tab-secondary-row {
+    border-top: 1px solid rgba(214,163,106,0.12);
+    background: rgba(0,0,0,0.20);
+    padding-left: 4px;
+  }
+  /* Legacy: section-divider label, only used when callers still
+     pass `groups` to the OLD wrap layout.  Kept for compatibility
+     with any panel-internal TabStrip that hasn't migrated. */
   .tab-strip .tab-group-header {
     flex: 0 0 100%;
     display: block;
@@ -294,22 +306,36 @@
   }
   .tab-strip .tab {
     font-family: theme('fontFamily.mono');
-    font-size: 10.5px;
+    font-size: 11px;
     letter-spacing: theme('letterSpacing.rack');
     text-transform: uppercase;
     color: theme('colors.textDim');
-    padding: 8px 12px;
+    padding: 10px 16px;
     border: none; border-bottom: 2px solid transparent;
     background: transparent;
     cursor: pointer;
     white-space: nowrap;
     transition: color .2s, border-color .2s, background .2s;
   }
+  .tab-strip .tab.tab-primary {
+    font-weight: 600;
+  }
+  .tab-strip .tab.tab-secondary {
+    font-size: 10.5px;
+    padding: 7px 12px;
+    color: theme('colors.textDim');
+    opacity: 0.92;
+  }
   .tab-strip .tab:hover { color: theme('colors.cyan'); }
   .tab-strip .tab.active {
     color: theme('colors.amber');
     border-bottom-color: theme('colors.amber');
     background: linear-gradient(180deg, rgba(255,179,71,0.06), transparent 80%);
+  }
+  .tab-strip .tab.tab-secondary.active {
+    color: theme('colors.cyan');
+    border-bottom-color: theme('colors.cyan');
+    background: linear-gradient(180deg, rgba(111,211,255,0.08), transparent 80%);
   }
 
   /* ----- Telemetry table (Bloomberg-style) ----- */
