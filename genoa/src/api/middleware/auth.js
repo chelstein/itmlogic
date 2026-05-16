@@ -103,11 +103,18 @@ export function clearSessionCookie(){
 
 // Route patterns that may be authenticated via GENOA_SERVICE_TOKEN
 // (header-based) instead of a cookie session.  Kept narrow on purpose:
-// only the geodata evidence/manifest endpoints — all read-only.
-// requireAuth is mounted under `/api` so req.path here begins at
-// `/geodata/...` (no `/api` prefix).
+// only read-only verification routes that operators / CI need to be
+// able to probe without a browser session.  requireAuth is mounted
+// under `/api` so req.path here begins at the post-`/api` segment.
+//
+//   /geodata/*       — evidence manifest + sample probes
+//   /am/physics/*    — SOMNEC2D advisory evidence (independent
+//                      NEC-family ground-field solver, advisory only;
+//                      never modifies §73.184 contour math or any
+//                      filing-controlling rule output)
 export const SERVICE_TOKEN_ROUTE_PATTERNS = [
-  /^\/geodata(\/|$)/
+  /^\/geodata(\/|$)/,
+  /^\/am\/physics(\/|$)/
 ];
 
 export function isServiceTokenRoute(reqPath){
