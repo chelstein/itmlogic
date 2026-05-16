@@ -122,12 +122,69 @@ test('client.distanceToField: bisection finds distance where field = target', as
   assert.ok(Math.abs(r.distance_km - 500) < 1, `expected ~500 km, got ${r.distance_km}`);
 });
 
+/* ---------- distanceToField input validation (Codex P1 on #174) ---------- */
+
+test('distanceToField: rejects missing field_uv_m (instead of fabricating a distance)', async () => {
+  const c = makeBerrySkywaveClient();
+  const r = await c.distanceToField({
+    erp_kw: 50, freq_khz: 700, midpoint_lat: 39
+    // field_uv_m omitted entirely
+  });
+  assert.equal(r.available, false);
+  assert.match(r.error, /field_uv_m/);
+});
+
+test('distanceToField: rejects zero / negative / NaN field_uv_m', async () => {
+  const c = makeBerrySkywaveClient();
+  for (const target of [0, -10, NaN]){
+    const r = await c.distanceToField({
+      erp_kw: 50, freq_khz: 700, midpoint_lat: 39, field_uv_m: target
+    });
+    assert.equal(r.available, false, `field_uv_m=${target} should reject`);
+    assert.match(r.error, /field_uv_m/);
+  }
+});
+
 /* ---------- runBatch ---------- */
 
 test('runBatch: rejects empty array', async () => {
   const c = makeBerrySkywaveClient();
   const r = await c.runBatch([]);
   assert.equal(r.available, false);
+});
+
+test('runBatch: honors mode=distance_to_field per-row (Codex P2 on #174)', async () => {
+  const c = makeBerrySkywaveClient();
+  const args = { erp_kw: 50, freq_khz: 700, midpoint_lat: 39, percent_time: 50 };
+  const target = berryFieldUvm({ ...args, distance_km: 500 });
+  const r = await c.runBatch([
+    { ...args, distance_km: 200, mode: 'field_at_distance' },
+    { ...args, mode: 'distance_to_field', field_uv_m: target },
+    { ...args, distance_km: 800, mode: 'field_at_distance' }
+  ]);
+  assert.equal(r.available, true);
+  assert.equal(r.n_ok, 3);
+  // Forward rows return field_uv_m, no distance_km override.
+  assert.ok(Number.isFinite(r.results[0].field_uv_m));
+  assert.equal(r.results[0].distance_km, undefined);
+  // Inverse row returns distance_km close to 500, NO field_uv_m.
+  assert.ok(Math.abs(r.results[1].distance_km - 500) < 1);
+  assert.equal(r.results[1].field_uv_m, undefined);
+  // Forward row 2 unaffected.
+  assert.ok(Number.isFinite(r.results[2].field_uv_m));
+});
+
+test('runBatch: distance_to_field row with missing field_uv_m fails per-row (does not corrupt others)', async () => {
+  const c = makeBerrySkywaveClient();
+  const r = await c.runBatch([
+    { erp_kw: 50, freq_khz: 700, distance_km: 400, midpoint_lat: 39 },
+    { erp_kw: 50, freq_khz: 700, midpoint_lat: 39, mode: 'distance_to_field' }
+    // field_uv_m omitted on row 1
+  ]);
+  assert.equal(r.n_ok, 1);
+  assert.equal(r.n_failed, 1);
+  assert.equal(r.results[1].ok, false);
+  assert.match(r.results[1].error, /field_uv_m/);
 });
 
 test('runBatch: aggregates n_ok / n_failed; per-call inputs validated independently', async () => {
