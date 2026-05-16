@@ -153,14 +153,58 @@ export function makeGeoRfEvidenceClient({
     },
 
     /**
+     * Canopy rose — N azimuths (default 12) at a fixed distance from
+     * the tx.  All samples run in parallel via Promise.all so the
+     * worst-case wall-clock is ~one HTTP round-trip, not N.  Empty /
+     * out-of-coverage points return value_numeric:null per the
+     * single-point contract (no misleading 0 coercion).
+     *
+     * @returns {Promise<{ available, distance_km, n_azimuths, samples:
+     *           Array<{ az_deg, lat, lon, value_numeric, value_raw,
+     *                   available, interpretation }> }>}
+     */
+    async sampleCanopyRose({ lat, lon, distance_km, n_azimuths = 12 } = {}, opts = {}){
+      const fLat  = Number(lat), fLon = Number(lon), fDist = Number(distance_km);
+      const nAz   = Math.max(4, Math.min(36, Math.floor(Number(n_azimuths) || 12)));
+      if (!Number.isFinite(fLat) || !Number.isFinite(fLon) || !Number.isFinite(fDist) || fDist <= 0){
+        return { available: false, error: 'lat / lon / distance_km required (finite, positive)',
+                 distance_km: null, n_azimuths: nAz, samples: [] };
+      }
+      const azimuths = Array.from({ length: nAz }, (_, i) => (i * 360) / nAz);
+      const samples = await Promise.all(azimuths.map(async (az) => {
+        const [sLat, sLon] = projectLatLon(fLat, fLon, az, fDist);
+        const r = await this.sampleTreeCanopy({ lat: sLat, lon: sLon }, opts);
+        return {
+          az_deg:         az,
+          lat:            sLat,
+          lon:            sLon,
+          value_numeric:  r.value_numeric ?? null,
+          value_raw:      r.value_raw ?? null,
+          available:      r.available && r.value_numeric != null,
+          interpretation: r.interpretation || null
+        };
+      }));
+      return {
+        available:   samples.some(s => s.available),
+        distance_km: fDist,
+        n_azimuths:  nAz,
+        samples
+      };
+    },
+
+    /**
      * Composite "everything we know for a facility" sample.  Pulls the
      * tree-canopy point sample plus a fresh health probe so we surface
      * which auxiliary datasets are available even though we don't
      * sample tau/landcover for a single point in this pass.
      *
+     * Optional `canopy_rose_distance_km` triggers a second-tier rose
+     * sample (12 azimuths at that distance) attached as
+     * datasets.tree_canopy_conus.rose.
+     *
      * @returns the normalized evidence.geo_rf_evidence object shape
      */
-    async sampleGeoRfEvidenceForFacility({ lat, lon, service, call, facility_id } = {}, opts = {}){
+    async sampleGeoRfEvidenceForFacility({ lat, lon, service, call, facility_id, canopy_rose_distance_km } = {}, opts = {}){
       // Treat null/undefined/'' as missing — Number(null)===0 would
       // otherwise falsely pass isFinite and try to sample at 0,0.
       const fLat = (lat === null || lat === undefined || lat === '') ? NaN : Number(lat);
@@ -179,9 +223,14 @@ export function makeGeoRfEvidenceClient({
           error:  'coordinates_missing'
         });
       }
-      const [health, canopy] = await Promise.all([
+      const roseDist = Number(canopy_rose_distance_km);
+      const wantRose = Number.isFinite(roseDist) && roseDist > 0;
+      const [health, canopy, rose] = await Promise.all([
         this.healthDetail(),
-        this.sampleTreeCanopy({ lat: fLat, lon: fLon }, opts)
+        this.sampleTreeCanopy({ lat: fLat, lon: fLon }, opts),
+        wantRose
+          ? this.sampleCanopyRose({ lat: fLat, lon: fLon, distance_km: roseDist }, opts)
+          : Promise.resolve(null)
       ]);
       const sidecarDatasets = (health && health.ok && health.datasets) || {};
       return geoRfEnvelope({
@@ -194,11 +243,13 @@ export function makeGeoRfEvidenceClient({
                 dataset:        canopy.dataset,
                 value_raw:      canopy.value_raw,
                 value_numeric:  canopy.value_numeric,
-                interpretation: canopy.interpretation
+                interpretation: canopy.interpretation,
+                ...(rose ? { rose } : {})
               }
             : {
                 available: !!sidecarDatasets.tree_canopy_conus,
-                error:     canopy.error || null
+                error:     canopy.error || null,
+                ...(rose ? { rose } : {})
               },
           tau_rf_models: {
             available: !!sidecarDatasets.tau_rf_models,
@@ -266,6 +317,24 @@ async function fetchWithTimeout(fetchFn, url, init = {}, ms = DEFAULT_TIMEOUT_MS
   } finally {
     clearTimeout(t);
   }
+}
+
+// Great-circle projection — destination (lat, lon) given a start
+// (lat0, lon0), azimuth (deg, 0=N clockwise) and distance (km).
+// Same math as engine/index.js#projectVertex; kept local so the
+// client has no dependency on the engine module.
+function projectLatLon(lat0, lon0, az_deg, d_km){
+  const R = 6371.0088;
+  const az = (Number(az_deg) || 0) * Math.PI / 180;
+  const dr = (Number(d_km)   || 0) / R;
+  const lat1 = (Number(lat0) || 0) * Math.PI / 180;
+  const lon1 = (Number(lon0) || 0) * Math.PI / 180;
+  const sinLat2 = Math.sin(lat1) * Math.cos(dr) + Math.cos(lat1) * Math.sin(dr) * Math.cos(az);
+  const lat2 = Math.asin(sinLat2);
+  const y = Math.sin(az) * Math.sin(dr) * Math.cos(lat1);
+  const x = Math.cos(dr) - Math.sin(lat1) * sinLat2;
+  const lon2 = lon1 + Math.atan2(y, x);
+  return [lat2 * 180 / Math.PI, ((lon2 * 180 / Math.PI) + 540) % 360 - 180];
 }
 
 /** Build a not_configured envelope without constructing a client (used by

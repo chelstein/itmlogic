@@ -1768,9 +1768,21 @@ export async function computeExhibit(req){
           elapsed_ms: Date.now() - t0
         };
       } else {
+        // Canopy-rose distance: half the primary contour radius (so the
+        // rose sits well INSIDE the populated service area, not on the
+        // contour edge or beyond it).  Falls back to ~3 km when no
+        // primary contour is on the exhibit yet.
+        const primaryRing = (exhibit?.contour_definitions || [])
+          .find(c => String(c?.id || '').toLowerCase() === 'primary_2mvm');
+        const roseDistKm = primaryRing?.mean_km
+          ? Math.max(1, Math.min(40, Number(primaryRing.mean_km) * 0.5))
+          : 3;
         const out = await budget.withDeadline('geo_rf_evidence',
-          () => sidecars.geoRfEvidence.sampleGeoRfEvidenceForFacility(facilityInputs),
-          { minMs: 10_000 });
+          () => sidecars.geoRfEvidence.sampleGeoRfEvidenceForFacility({
+            ...facilityInputs,
+            canopy_rose_distance_km: roseDistKm
+          }),
+          { minMs: 12_000 });
         evidence.geo_rf_evidence = {
           ...(out || { status: 'failed', advisory: true, filing_effect: 'none', inputs: facilityInputs, error: 'compute budget exhausted' }),
           elapsed_ms: Date.now() - t0
