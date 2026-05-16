@@ -48,16 +48,18 @@ export function applyExecutiveSummaryVariant(doc){
   for (const s of doc.sections){
     if (!s || !s.id) continue;
     if (!KEEP_IDS.has(s.id)) continue;
+    let next = s;
     if (s.id === 'appendix-d' || s.id === 'appendix-e'){
-      sections.push(friendlyAppendixDe(s));
-      continue;
+      next = friendlyAppendixDe(s);
+    } else if (Array.isArray(s.rows)){
+      next = { ...s, rows: sanitizeDiagnosticsRows(s.rows) };
     }
-    // For surviving kv-style sections, scrub diagnostics rows.
-    if (Array.isArray(s.rows)){
-      sections.push({ ...s, rows: sanitizeDiagnosticsRows(s.rows) });
-      continue;
-    }
-    sections.push(s);
+    // Deep-soften any leaked internal wording.  Section builders we
+    // don't own (validationVerdict.js) emit "tier-3 fallback" status
+    // names and "orchestrator" detail strings that are not appropriate
+    // for a customer-facing executive summary.  This pass rewrites
+    // those strings recursively while preserving section structure.
+    sections.push(softenSectionWordingDeep(next));
   }
   const meta = {
     ...(doc.meta || {}),
@@ -101,20 +103,38 @@ function friendlyAppendixDe(section){
   if (!section || !Array.isArray(section.rows)) return section;
   const filtered = sanitizeDiagnosticsRows(section.rows).map(([label, value]) => {
     const v = String(value == null ? '' : value);
-    // Truncate commits / hex hashes to a 12-char prefix so they are
-    // referenceable but not visually dominant.
     const labelStr = String(label || '');
     if (/(commit|sha|fingerprint|hash)/i.test(labelStr) && /^[0-9a-f]{16,}$/i.test(v)){
       return [label, v.slice(0, 12)];
     }
-    // Soften any leaked internal wording.
-    const cleaned = v
-      .replace(/\btier[- ]?3\b/gi,    'deterministic reference')
-      .replace(/\bfallback\b/gi,      'reference computation')
-      .replace(/\bstale\b/gi,         'cached')
-      .replace(/\borchestrator\b/gi,  'engine')
-      .replace(/\bgenoa replay[^\n]*/g, 'available on request');
-    return [label, cleaned];
+    return [label, softenInternalWording(v)];
   });
   return { ...section, rows: filtered };
+}
+
+function softenInternalWording(s){
+  return String(s)
+    .replace(/\btier[- ]?3\b\s*(deterministic|fallback)?\s*(fallback)?/gi, 'deterministic reference')
+    .replace(/\btier[- ]?2\b\s*(cached|fallback)?/gi,                       'cached reference')
+    .replace(/\btier[- ]?1\b\s*(live)?/gi,                                  'live reference')
+    .replace(/\bfallback\b/gi,                                              'reference computation')
+    .replace(/\bstale\b/gi,                                                 'cached')
+    .replace(/\borchestrator\b/gi,                                          'engine')
+    .replace(/genoa replay[^\n.]*\.?/gi,                                    'available on request');
+}
+
+function softenSectionWordingDeep(section){
+  return softenValue(section);
+}
+
+function softenValue(v){
+  if (v == null) return v;
+  if (typeof v === 'string') return softenInternalWording(v);
+  if (Array.isArray(v))      return v.map(softenValue);
+  if (typeof v === 'object'){
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = softenValue(v[k]);
+    return out;
+  }
+  return v;
 }
