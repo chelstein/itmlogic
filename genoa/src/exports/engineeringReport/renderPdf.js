@@ -1209,10 +1209,16 @@ function renderVisualSummary(pdf, s){
   }
 
   // ── ENVIRONMENT (canopy) stat tile ──────────────────────────────────
+  // Shows the TX-point canopy value AND, when sampled, the rose summary
+  // (min / max / mean at the rose distance).  The spread between point
+  // and rose is the engineering signal — a TX on a clearing surrounded
+  // by forest reads very differently from a uniformly open site.
   if (s.canopy){
     const v = s.canopy.value_numeric;
+    const rose = s.canopy.rose;
+    const tileH = rose ? 78 : 60;
     pdf.save();
-    pdf.fillColor('#2c4a2d').rect(sbX0, sbY0, STATS_W, 60).fill();
+    pdf.fillColor('#2c4a2d').rect(sbX0, sbY0, STATS_W, tileH).fill();
     pdf.font(BODY_FONT).fontSize(statLblSize).fillColor('#cfe9b6')
        .text('TREE CANOPY AT TRANSMITTER', sbX0 + 8, sbY0 + 6,
              { width: STATS_W - 16, characterSpacing: 0.6, lineBreak: false, ellipsis: true });
@@ -1222,8 +1228,14 @@ function renderVisualSummary(pdf, s){
     pdf.font(ITALIC_FONT).fontSize(7).fillColor('#cfe9b6')
        .text(s.canopy.interpretation || '', sbX0 + 8, sbY0 + 44,
              { width: STATS_W - 16, lineBreak: true, height: 14, ellipsis: true });
+    if (rose){
+      pdf.font(MONO_FONT).fontSize(6.5).fillColor('#cfe9b6')
+         .text(`rose @ ${rose.distance_km} km  ·  min ${rose.min}  max ${rose.max}  mean ${rose.mean}`,
+               sbX0 + 8, sbY0 + tileH - 14,
+               { width: STATS_W - 16, lineBreak: false, ellipsis: true });
+    }
     pdf.restore();
-    sbY0 += 70;
+    sbY0 += tileH + 10;
   }
 
   // ── COVERAGE area stat tile ──────────────────────────────────────────

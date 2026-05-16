@@ -97,17 +97,46 @@ export function buildVisualSummarySection(exhibit){
       }
     : null;
 
-  // Environmental RF evidence — geo-RF tree canopy at tx site.
+  // Environmental RF evidence — geo-RF tree canopy at tx site.  Both
+  // the canonical `tree_canopy` slot and the legacy `tree_canopy_conus`
+  // slot are checked so older sidecar contracts still render.  The
+  // 12-azimuth canopy rose summary (when present) carries far more
+  // engineering signal than the single TX-point value alone: a TX on a
+  // cleared peak surrounded by heavy forest (e.g. WNBZ at 32 % TX-point
+  // but rose mean 80 %) is a different propagation environment than a
+  // TX on a uniform open plain.  Surface the rose stats here so the
+  // visual showpiece carries the actual environmental context.
   const ge = exhibit?.evidence?.geo_rf_evidence;
-  const tc = ge?.datasets?.tree_canopy_conus || {};
-  const canopy = (ge?.status === 'run' && tc.available)
-    ? {
-        value_numeric:  Number.isFinite(Number(tc.value_numeric)) ? Number(tc.value_numeric) : null,
-        value_raw:      tc.value_raw || null,
-        dataset:        tc.dataset || null,
-        interpretation: tc.interpretation || null
+  const tc = (ge?.datasets?.tree_canopy && ge.datasets.tree_canopy.available)
+               ? ge.datasets.tree_canopy
+               : (ge?.datasets?.tree_canopy_conus || {});
+  let canopy = null;
+  if (ge?.status === 'run' && tc.available){
+    canopy = {
+      value_numeric:  Number.isFinite(Number(tc.value_numeric)) ? Number(tc.value_numeric) : null,
+      value_raw:      tc.value_raw || null,
+      dataset:        tc.dataset || null,
+      interpretation: tc.interpretation || null,
+      rose:           null
+    };
+    const rose = tc.rose && Array.isArray(tc.rose.samples) ? tc.rose : null;
+    if (rose){
+      const vals = rose.samples
+        .map(s => Number(s.value_numeric))
+        .filter(Number.isFinite);
+      if (vals.length){
+        canopy.rose = {
+          n_azimuths:   rose.n_azimuths,
+          distance_km:  rose.distance_km,
+          min:          Math.min(...vals),
+          max:          Math.max(...vals),
+          mean:         Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)),
+          n_in_coverage: vals.length,
+          n_total:      rose.samples.length
+        };
       }
-    : null;
+    }
+  }
 
   const fmtKhz = (f) => {
     const n = Number(f);
