@@ -638,5 +638,83 @@ export function buildAppendixSections(exhibit){
     }
   }
 
+  // ── Appendix H — Independent AM Physics Evidence (advisory) ──────────
+  // Populated by exhibitService step 8e for AM exhibits when the
+  // operator-hosted SOMNEC2D sidecar is configured (AM_PHYSICS_SIDECAR_URL).
+  // ADVISORY ONLY: independent NEC-family FORTRAN ground-field solver
+  // (modified Sommerfeld integral evaluation producing the SOM2D.NEC
+  // interpolation grid).  Does NOT modify FCC §73.184 curve-derived
+  // contour distances, §73.183 allocation results, or any filing-
+  // controlling rule math — those remain authoritative as reported in
+  // the body of this engineering statement and in Appendices A–G.
+  const physics = exhibit.evidence?.am_physics;
+  const svc_h   = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (svc_h === 'AM' && physics){
+    const inp = physics.inputs  || {};
+    const out = physics.outputs || {};
+    const sum = physics.stdout_summary || {};
+    const advisoryPreface =
+      'INDEPENDENT PHYSICS EVIDENCE — ADVISORY ONLY.  This appendix surfaces ' +
+      'the output of the operator-hosted SOMNEC2D sidecar, an independent ' +
+      'NEC-family FORTRAN solver that numerically evaluates modified ' +
+      'Sommerfeld integrals to produce the SOM2D.NEC ground-field ' +
+      'interpolation grid consumed by NEC-2 / NEC2++.  Genoa does not ' +
+      'replace FCC allocation rules with NEC-family physics output.  ' +
+      'Genoa uses SOMNEC2D as an independent physics engine beside ' +
+      'deterministic FCC §73.183 / §73.184 / §73.190 / §73.182 rule ' +
+      'calculations.  Filing-controlling math is reported elsewhere in ' +
+      'this statement and is unaffected by anything in this appendix.';
+
+    if (physics.status !== 'run'){
+      const reason = physics.status === 'not_configured'
+        ? 'AM_PHYSICS_SIDECAR_URL unset — sidecar not invoked.'
+        : (physics.warning || physics.error || 'unavailable');
+      sections.push({
+        id:      'appendix-h',
+        type:    'kv',
+        heading: 'APPENDIX H — INDEPENDENT AM PHYSICS EVIDENCE (ADVISORY)',
+        preface: advisoryPreface,
+        rows: [
+          ['Status',        String(physics.status || 'unknown').toUpperCase()],
+          ['Engine',        physics.engine || 'somnec2d'],
+          ['Reason',        reason],
+          ['Filing effect', 'NONE (advisory only)'],
+          ['Posture',       'Does not modify §73.184 contour distances or any filing-controlling rule math.']
+        ]
+      });
+    } else {
+      const fmtNum = (v, dp = 6) =>
+        Number.isFinite(Number(v)) ? Number(v).toFixed(dp) : '—';
+      const sigmaSrc = inp.sigma_source === 'default' ? '  (default per §73.190 Fig. R3)' : '';
+      const eprSrc   = inp.epr_source   === 'default' ? '  (default — NEC average soil)' : '';
+      const timeSec  = Number.isFinite(Number(sum.time_seconds))
+        ? `${Number(sum.time_seconds).toFixed(4)} s` : '—';
+
+      sections.push({
+        id:      'appendix-h',
+        type:    'kv',
+        heading: 'APPENDIX H — INDEPENDENT AM PHYSICS EVIDENCE (ADVISORY)',
+        preface: advisoryPreface,
+        rows: [
+          ['Engine',                physics.engine || 'somnec2d'],
+          ['Method',                physics.method || 'Modified Sommerfeld integral evaluation (NEC-family ground-field solver)'],
+          ['EPR (εᵣ)',              `${fmtNum(inp.epr, 3)}${eprSrc}`],
+          ['Conductivity σ',        `${fmtNum(inp.sig_s_m, 6)} S/m  (${fmtNum(inp.sigma_ms_m, 2)} mS/m)${sigmaSrc}`],
+          ['Frequency',             `${fmtNum(inp.frequency_mhz, 6)} MHz`],
+          ['Grid file',             out.grid_file || '—'],
+          ['Grid SHA-256',          out.grid_sha256 || '—'],
+          ['Grid created',          out.grid_created === false ? 'NO' : 'yes'],
+          ['Solver runtime',        timeSec],
+          ['Diagnostic (EPSCF)',    sum.epscf || '—'],
+          ['Diagnostic (AR1[1,1,1])', sum.ar1_1_1 || '—'],
+          ['Sidecar fetched at',    physics.fetched_at || '—'],
+          ['Filing effect',         'NONE (advisory only)'],
+          ['Posture',               'Does not modify §73.184 contour distances or any filing-controlling rule math.'],
+          ['Regulation',            '47 CFR §73.190 (input conventions) — informational; this appendix establishes no rule compliance.']
+        ]
+      });
+    }
+  }
+
   return sections;
 }
