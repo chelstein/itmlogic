@@ -732,5 +732,58 @@ export function buildAppendixSections(exhibit){
     }
   }
 
+  // ── Appendix I — Environmental RF Evidence (advisory) ────────────────
+  // Populated by exhibitService step 8g for both AM and FM exhibits when
+  // the operator-hosted Geo-RF Evidence sidecar is configured
+  // (GEO_RF_EVIDENCE_SIDECAR_URL).  ADVISORY ONLY: environmental
+  // geospatial datasets (USFS tree canopy, landcover, RF/environment
+  // statistical model artifacts) sampled at the transmitter coordinates.
+  // Does NOT modify FCC §73.184 / §73.182 / §73.190 / §73.313 / §73.207
+  // / §73.215 contour or allocation math.
+  const geoRf = exhibit.evidence?.geo_rf_evidence;
+  if (geoRf){
+    const inp = geoRf.inputs || {};
+    const tc  = geoRf.datasets?.tree_canopy_conus || {};
+    const tau = geoRf.datasets?.tau_rf_models     || {};
+    const cl  = geoRf.datasets?.canada_landcover  || {};
+    const advisoryPreface =
+      'Environmental RF evidence was sampled from advisory geospatial ' +
+      'datasets including tree-canopy, landcover, and RF/environment ' +
+      'statistical artifacts.  These data may help explain observed-vs-' +
+      'predicted residuals or confidence scoring in future workflows.  ' +
+      'They do not modify FCC contour distances, AM nighttime allocation, ' +
+      'skywave results, spacing determinations, or filing-controlling ' +
+      'rule calculations.';
+
+    const fmtCoord = (v) => Number.isFinite(Number(v)) ? Number(v).toFixed(6) : '—';
+    const status   = String(geoRf.status || 'unknown').toUpperCase();
+
+    const rows = [
+      ['Status',                       status],
+      ['Latitude',                     fmtCoord(inp.lat)],
+      ['Longitude',                    fmtCoord(inp.lon)],
+      ['Tree canopy dataset',          tc.dataset || (tc.available ? '(unspecified)' : 'unavailable')],
+      ['Tree canopy value',            tc.value_numeric != null
+                                         ? `${tc.value_numeric}${tc.interpretation ? `  (${tc.interpretation})` : ''}`
+                                         : (tc.value_raw || 'unavailable')],
+      ['Tau RF model artifacts',       tau.available ? 'available' : 'unavailable'],
+      ['Canada landcover',             cl.available  ? 'available' : 'unavailable'],
+      ['Filing effect',                'NONE (advisory only)'],
+      ['Advisory',                     'Yes'],
+      ['Fetched at',                   geoRf.fetched_at || '—'],
+      ['Posture',                      'Does not modify FCC rule outputs; informational context only.']
+    ];
+    if (geoRf.error){
+      rows.splice(1, 0, ['Note', geoRf.error]);
+    }
+    sections.push({
+      id:      'appendix-i',
+      type:    'kv',
+      heading: 'APPENDIX I — ENVIRONMENTAL RF EVIDENCE (ADVISORY)',
+      preface: advisoryPreface,
+      rows
+    });
+  }
+
   return sections;
 }

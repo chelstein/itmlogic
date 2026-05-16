@@ -261,6 +261,50 @@ export async function exportPdf(exhibit){
     emitGap(builder, 4);
   }
 
+  // Section 7c — ENVIRONMENTAL RF EVIDENCE (advisory only)
+  //
+  // ADVISORY ONLY.  Independent environmental geospatial datasets
+  // (tree canopy, landcover, RF/environment statistical artifacts)
+  // sampled at the transmitter coordinates.  Does NOT modify FCC
+  // §73.184 / §73.182 / §73.190 / §73.313 / §73.207 / §73.215 rule
+  // outputs.
+  if (exhibit.evidence?.geo_rf_evidence){
+    const ge  = exhibit.evidence.geo_rf_evidence;
+    const inp = ge.inputs || {};
+    const tc  = ge.datasets?.tree_canopy_conus || {};
+    const tau = ge.datasets?.tau_rf_models     || {};
+    const cl  = ge.datasets?.canada_landcover  || {};
+    emitH1(builder, 'Environmental RF Evidence');
+    emitBody(builder,
+      'Environmental RF evidence was sampled from advisory geospatial');
+    emitBody(builder,
+      'datasets (tree canopy, landcover, RF/environment statistical');
+    emitBody(builder,
+      'artifacts).  This evidence is advisory only and does NOT modify');
+    emitBody(builder,
+      'FCC contour distances, AM nighttime allocation, skywave results,');
+    emitBody(builder,
+      'or any filing-controlling rule calculation.');
+    emitGap(builder, 1);
+    emitMonoBlock(builder, [
+      `Status            : ${val(String(ge.status || 'unknown').toUpperCase())}`,
+      `Latitude          : ${val(inp.lat)}`,
+      `Longitude         : ${val(inp.lon)}`,
+      `Tree canopy data  : ${val(tc.dataset || (tc.available ? '(unspecified)' : 'unavailable'))}`,
+      `Tree canopy value : ${val(tc.value_numeric ?? tc.value_raw)}${tc.interpretation ? `  (${tc.interpretation})` : ''}`,
+      `Tau RF models     : ${tau.available ? 'available' : 'unavailable'}`,
+      `Canada landcover  : ${cl.available  ? 'available' : 'unavailable'}`,
+      `Filing effect     : None`,
+      `Advisory          : Yes`,
+      `Fetched at        : ${val(ge.fetched_at)}`
+    ]);
+    if (ge.error){
+      emitGap(builder, 1);
+      emitBody(builder, `Note: ${ge.error}`);
+    }
+    emitGap(builder, 4);
+  }
+
   // Section 8 — Validation
   if (exhibit.validation_context){
     emitH1(builder, 'Validation');

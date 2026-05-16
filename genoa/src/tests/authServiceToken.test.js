@@ -45,27 +45,31 @@ test.beforeEach(() => {
   delete process.env.GENOA_SERVICE_TOKEN;
 });
 
-test('isServiceTokenRoute allowlist: read-only routes only (geodata + am/physics + facilities)', () => {
+test('isServiceTokenRoute allowlist: read-only routes only (geodata + am/physics + facilities + geo-rf-evidence)', () => {
   // Allowlisted read-only routes — service token (CI / operator) is accepted.
-  assert.equal(isServiceTokenRoute('/geodata/manifest'),       true);
-  assert.equal(isServiceTokenRoute('/geodata/clutter'),        true);
-  assert.equal(isServiceTokenRoute('/geodata/terrain/status'), true);
-  assert.equal(isServiceTokenRoute('/geodata'),                true);
-  assert.equal(isServiceTokenRoute('/am/physics/health'),      true);
-  assert.equal(isServiceTokenRoute('/am/physics/somnec'),      true);
-  assert.equal(isServiceTokenRoute('/am/physics'),             true);
-  assert.equal(isServiceTokenRoute('/facilities/search'),      true);
-  assert.equal(isServiceTokenRoute('/facilities/53588'),       true);
-  assert.equal(isServiceTokenRoute('/facilities'),             true);
+  assert.equal(isServiceTokenRoute('/geodata/manifest'),         true);
+  assert.equal(isServiceTokenRoute('/geodata/clutter'),          true);
+  assert.equal(isServiceTokenRoute('/geodata/terrain/status'),   true);
+  assert.equal(isServiceTokenRoute('/geodata'),                  true);
+  assert.equal(isServiceTokenRoute('/am/physics/health'),        true);
+  assert.equal(isServiceTokenRoute('/am/physics/somnec'),        true);
+  assert.equal(isServiceTokenRoute('/am/physics'),               true);
+  assert.equal(isServiceTokenRoute('/facilities/search'),        true);
+  assert.equal(isServiceTokenRoute('/facilities/53588'),         true);
+  assert.equal(isServiceTokenRoute('/facilities'),               true);
+  assert.equal(isServiceTokenRoute('/geo-rf-evidence/health'),   true);
+  assert.equal(isServiceTokenRoute('/geo-rf-evidence/sample'),   true);
+  assert.equal(isServiceTokenRoute('/geo-rf-evidence'),          true);
   // Write endpoints — must stay cookie-only.
-  assert.equal(isServiceTokenRoute('/exhibits/compute'),       false);
-  assert.equal(isServiceTokenRoute('/exhibits/save'),          false);
-  assert.equal(isServiceTokenRoute('/am-da/design'),           false);
-  assert.equal(isServiceTokenRoute('/am-night/nif'),           false);
-  assert.equal(isServiceTokenRoute('/auth/login'),             false);
+  assert.equal(isServiceTokenRoute('/exhibits/compute'),         false);
+  assert.equal(isServiceTokenRoute('/exhibits/save'),            false);
+  assert.equal(isServiceTokenRoute('/am-da/design'),             false);
+  assert.equal(isServiceTokenRoute('/am-night/nif'),             false);
+  assert.equal(isServiceTokenRoute('/auth/login'),               false);
   // Substring near-misses must NOT match (anchored regex).
-  assert.equal(isServiceTokenRoute('/x/geodata/manifest'),     false);
-  assert.equal(isServiceTokenRoute('/facilitiesx'),            false);
+  assert.equal(isServiceTokenRoute('/x/geodata/manifest'),       false);
+  assert.equal(isServiceTokenRoute('/facilitiesx'),              false);
+  assert.equal(isServiceTokenRoute('/geo-rf-evidencex'),         false);
 });
 
 test('verifyServiceToken is constant-time and supports rotation', () => {

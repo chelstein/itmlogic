@@ -41,6 +41,7 @@ import { makeFccamClient }       from '../../evidence/fccamClient.js';
 import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
 import { makeFccSunClient }      from '../../evidence/fccSunClient.js';
 import { makeAmPhysicsClient }   from '../../evidence/amPhysicsClient.js';
+import { makeGeoRfEvidenceClient } from '../../evidence/geoRfEvidenceClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -171,7 +172,20 @@ export const sidecars = Object.freeze({
   // rule math.  Opt-in via AM_PHYSICS_SIDECAR_URL on the deploy; when
   // unset the AM exhibit attaches evidence.am_physics =
   // { status:'not_configured' } and the study still ships.
-  amPhysics:   makeAmPhysicsClient()
+  amPhysics:   makeAmPhysicsClient(),
+
+  // Geo-RF Evidence sidecar — environmental geospatial datasets used for
+  // advisory confidence-scoring and observed-vs-predicted residual
+  // support.  Wraps a microservice that surfaces:
+  //   - USFS Tree Canopy Cover (CONUS) per-point sample
+  //   - tau_statistic_for_rf_models artifact availability
+  //   - NRCan Canada landcover availability (for cross-border studies)
+  // ADVISORY ONLY — never modifies §73.184 / §73.182 / §73.190 / §73.313
+  // / §73.207 / §73.215 contour or allocation math.  Opt-in via
+  // GEO_RF_EVIDENCE_SIDECAR_URL on the deploy; when unset the exhibit
+  // attaches evidence.geo_rf_evidence = { status:'not_configured' } and
+  // ships unchanged.
+  geoRfEvidence: makeGeoRfEvidenceClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET

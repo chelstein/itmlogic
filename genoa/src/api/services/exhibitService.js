@@ -1728,6 +1728,69 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 8g. Geo-RF Environmental Evidence (advisory; AM + FM) ----
+  //
+  // Independent environmental geospatial datasets (tree canopy, landcover,
+  // RF/environment statistical model artifacts).  ADVISORY ONLY — never
+  // modifies §73.184 / §73.182 / §73.190 / §73.313 / §73.207 / §73.215
+  // contour or allocation math.  When GEO_RF_EVIDENCE_SIDECAR_URL is
+  // unset, attaches a not_configured stub; on sidecar failure, attaches a
+  // failed/offline status.  Either way the exhibit ships.
+  if (options.geo_rf_evidence !== false){
+    const t0 = Date.now();
+    try {
+      const { geoRfNotConfigured } = await import('../../evidence/geoRfEvidenceClient.js');
+      const lat = Number(inputs.lat);
+      const lon = Number(inputs.lon);
+      const facilityInputs = {
+        lat, lon,
+        service:     inputs.service     || null,
+        call:        inputs.call        || null,
+        facility_id: inputs.facility_id || null
+      };
+      if (!sidecars.geoRfEvidence){
+        evidence.geo_rf_evidence = {
+          ...geoRfNotConfigured(facilityInputs),
+          elapsed_ms: Date.now() - t0
+        };
+      } else if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+        evidence.geo_rf_evidence = {
+          status:        'failed',
+          advisory:      true,
+          filing_effect: 'none',
+          inputs:        facilityInputs,
+          datasets:      {},
+          error:         'coordinates_missing',
+          notes: [
+            'Environmental RF evidence is advisory only.',
+            'Does not modify FCC filing-controlling contour or allocation calculations.'
+          ],
+          elapsed_ms: Date.now() - t0
+        };
+      } else {
+        const out = await budget.withDeadline('geo_rf_evidence',
+          () => sidecars.geoRfEvidence.sampleGeoRfEvidenceForFacility(facilityInputs),
+          { minMs: 10_000 });
+        evidence.geo_rf_evidence = {
+          ...(out || { status: 'failed', advisory: true, filing_effect: 'none', inputs: facilityInputs, error: 'compute budget exhausted' }),
+          elapsed_ms: Date.now() - t0
+        };
+      }
+    } catch (e){
+      evidence.geo_rf_evidence = {
+        status:        'failed',
+        advisory:      true,
+        filing_effect: 'none',
+        error:         `geo_rf_evidence compute failed: ${e?.message || e}`,
+        notes: [
+          'Environmental RF evidence is advisory only.',
+          'Does not modify FCC filing-controlling contour or allocation calculations.'
+        ],
+        elapsed_ms: Date.now() - t0
+      };
+    }
+  }
+
   // ---- 9. Provenance: facility / terrain / curve / sdr ----
   if (facilityResolution){
     const f = facilityResolution.facility;
@@ -1769,6 +1832,9 @@ export async function computeExhibit(req){
   }
   if (evidence.am_psra_pssa){
     exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;
+  }
+  if (evidence.geo_rf_evidence){
+    exhibit.evidence.geo_rf_evidence = evidence.geo_rf_evidence;
   }
   if (evidence.nec_model){
     exhibit.evidence.nec_model = evidence.nec_model;

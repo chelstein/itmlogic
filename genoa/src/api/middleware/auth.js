@@ -118,10 +118,16 @@ export function clearSessionCookie(){
 //                      that's publicly available at transition.fcc.gov.
 //                      Used by CI to smoke-test the AM class auto-
 //                      populate path (FCC AMQ enrichment).
+//   /geo-rf-evidence/* — advisory environmental geospatial datasets
+//                      (USFS Tree Canopy Cover, NRCan landcover, RF/
+//                      environment statistical model artifacts).  Read-
+//                      only point samples and health probe; never
+//                      modifies FCC rule outputs.
 export const SERVICE_TOKEN_ROUTE_PATTERNS = [
   /^\/geodata(\/|$)/,
   /^\/am\/physics(\/|$)/,
-  /^\/facilities(\/|$)/
+  /^\/facilities(\/|$)/,
+  /^\/geo-rf-evidence(\/|$)/
 ];
 
 export function isServiceTokenRoute(reqPath){
