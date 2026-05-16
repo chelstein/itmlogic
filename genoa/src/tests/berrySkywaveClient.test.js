@@ -51,12 +51,16 @@ test('berryFieldUvm: field scales with √ERP at constant distance', () => {
     `100x ERP should give 10x field, got ratio ${f100 / f1}`);
 });
 
-test('berryFieldUvm: SS-2 (10%) ≈ 1.4x SS-1 (50%)', () => {
+test('berryFieldUvm: SS-2 (10%) is +6 dB above SS-1 (50%) per §73.190(c)', () => {
+  // §73.190(c) charts: 10 % field is +6 dB above 50 % field at midband
+  // → ratio = 10^(6/20) = 1.9953.  Audit MAJOR 6 corrected the prior
+  // 1.4× (~+2.9 dB) under-stating heuristic.
   const args = { erp_kw: 50, freq_khz: 700, distance_km: 400, midpoint_lat: 39 };
   const ss1 = berryFieldUvm({ ...args, percent_time: 50 });
   const ss2 = berryFieldUvm({ ...args, percent_time: 10 });
-  assert.ok(Math.abs(ss2 / ss1 - 1.4) < 0.01,
-    `SS-2/SS-1 should be 1.4, got ${ss2 / ss1}`);
+  const expected = Math.pow(10, 6 / 20);    // 1.9953
+  assert.ok(Math.abs(ss2 / ss1 - expected) < 0.01,
+    `SS-2/SS-1 should be ${expected.toFixed(4)} (= +6 dB), got ${ss2 / ss1}`);
 });
 
 test('berryFieldUvm: deterministic — same inputs produce identical output', () => {
