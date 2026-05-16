@@ -11,6 +11,24 @@
 //   HIGH    — VERIFIED
 //   MEDIUM  — PARTIAL
 //   LOW     — UNVERIFIED
+//
+// Ontology alignment
+// ------------------
+// In addition to the legacy {status, confidence} tuple, the returned
+// verdict object now carries an `ontology` block sourced from
+// `verdictFor()` so a SCREENING or INCOMPLETE component is surfaced
+// honestly in the same shape used by the conclusion section.  The
+// legacy {status, confidence} values are preserved bit-for-bit so
+// existing TXT/PDF renderers and downstream tests are unchanged.
+
+import {
+  FindingStatus,
+  Confidence,
+  Scope,
+  verdictFor,
+  capConfidence
+} from '../../../engine/finding/ontology.js';
+import { rewordForReport } from '../../../engine/finding/serviceWording.js';
 
 export function buildValidationVerdictSection(exhibit){
   // Read both keys.  Newer exhibits stamp `validation_context` directly;
@@ -57,7 +75,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'Curve validation (golden suite)',
       status: 'FAIL',
-      detail: 'no curve_reference_validation record attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 or deterministic tier-3 fallback).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+      detail: 'No curve-validation record was attached to this exhibit.  Treat the validation as INCOMPLETE pending re-compute.'
     });
   }
 
@@ -84,7 +102,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'FCC contour cross-check (ZTR _fcc_contour vs engine)',
       status: 'FAIL',
-      detail: 'no fcc_cross_check record attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 from ZTR / direct geo.fcc.gov, or tier-3 deterministic engine-self).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+      detail: 'No FCC contour cross-check record was attached to this exhibit.  Treat the cross-check as INCOMPLETE pending re-compute.'
     });
   }
 
@@ -116,7 +134,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'FCC parity (live geo.fcc.gov/api/contours/distance.json)',
       status: 'FAIL',
-      detail: 'no fcc_parity_report attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 or tier-3 deterministic dataset-SHA match).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+      detail: 'No FCC parity record was attached to this exhibit.  Treat the parity check as INCOMPLETE pending re-compute.'
     });
   }
 
@@ -151,14 +169,35 @@ export function buildValidationVerdictSection(exhibit){
   });
 
   // Terrain source
+  //
+  // §73.184 AM groundwave is by definition a flat-earth FCC curve over
+  // assumed conductivity (47 CFR §73.183 / §73.190 Figure M3 / R3) —
+  // terrain elevation is NOT an input to the AM contour calculation.
+  // So for AM exhibits, "no terrain attached" is the expected outcome,
+  // not a warning condition.  Report it as SKIP with the regulatory
+  // explanation; reserve WARN for FM/LPFM/FX where terrain IS expected
+  // but the sidecar fell through.
   const ev = exhibit.evidence || {};
-  components.push({
-    name:   'Terrain source',
-    status: ev.terrain?.available ? 'PASS' : 'WARN',
-    detail: ev.terrain?.available
-              ? `${ev.terrain.source} · ${ev.terrain.dem?.dataset || ev.terrain.dem?.source || 'DEM'} · ${ev.terrain.n_radials || 0} radials`
-              : 'CONSTANT_HAAT_ASSUMED — flat HAAT used (terrain sidecar not available)'
-  });
+  const svc_terrain = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (ev.terrain?.available){
+    components.push({
+      name:   'Terrain source',
+      status: 'PASS',
+      detail: `${ev.terrain.source} · ${ev.terrain.dem?.dataset || ev.terrain.dem?.source || 'DEM'} · ${ev.terrain.n_radials || 0} radials`
+    });
+  } else if (svc_terrain === 'AM'){
+    components.push({
+      name:   'Terrain source',
+      status: 'SKIP',
+      detail: '§73.184 AM groundwave does not use terrain — FCC curve over assumed conductivity per §73.183 / §73.190.  No DEM lookup is required or performed for AM exhibits.'
+    });
+  } else {
+    components.push({
+      name:   'Terrain source',
+      status: 'WARN',
+      detail: 'CONSTANT_HAAT_ASSUMED — flat HAAT used (terrain sidecar not available)'
+    });
+  }
 
   // Engineering confidence (terrain-aware advisory layer).
   const ec = exhibit.engineering_confidence;
@@ -201,14 +240,22 @@ export function buildValidationVerdictSection(exhibit){
     if (nif?.available){
       const s = nif.summary || {};
       const passing = (s.n_failing_azimuths || 0) === 0 && (s.n_no_service_azimuths || 0) === 0;
+      const isScreening = /berry/i.test(
+        String(nif.provenance?.upstream_skywave || nif.source || '')
+      );
       const detail = `${s.n_azimuths || 0} azimuths · ` +
         `mean NIF ${Number.isFinite(s.mean_radius_km) ? s.mean_radius_km.toFixed(0) + ' km' : '—'} · ` +
         `worst margin ${Number.isFinite(s.worst_margin_db) ? s.worst_margin_db.toFixed(1) + ' dB' : '—'} · ` +
         `${s.n_failing_azimuths || 0} failing / ${s.n_no_service_azimuths || 0} no-service azimuths · ` +
-        `${s.n_interferers_used || 0} interferers used`;
+        `${s.n_interferers_used || 0} interferers used` +
+        (isScreening ? ' · SCREENING-grade (Berry 1968 analytical — re-run with FCCAM/Wang 1985 before filing)' : '');
+      // SCREENING-grade source never produces a clean PASS/FAIL — it's
+      // advisory.  A reviewer must NOT see "VERIFIED / HIGH" with a Berry-
+      // sourced NIF underneath; force a SCREENING status so the headline
+      // verdict can't promise more confidence than the engine warrants.
       components.push({
         name:   'AM nighttime allocation (§73.182 NIF)',
-        status: passing ? 'PASS' : 'FAIL',
+        status: isScreening ? 'SCREENING' : (passing ? 'PASS' : 'FAIL'),
         detail
       });
     } else if (nif && !nif.available){
@@ -235,10 +282,26 @@ export function buildValidationVerdictSection(exhibit){
   const parityRun    = components[2].status === 'PASS' || components[2].status === 'FAIL' || components[2].status === 'FALLBACK';
   const parityPass   = components[2].status === 'PASS' || components[2].status === 'FALLBACK';
 
+  // SCREENING-grade components (e.g. Berry-1968 AM NIF) MUST cap the
+  // headline confidence at MEDIUM and the status at PARTIAL — a
+  // reviewer cannot see VERIFIED / HIGH on an exhibit whose nighttime
+  // allocation is screening-only.
+  const hasScreening = components.some(c => c.status === 'SCREENING');
+  const hasComponentFail = components.some(c => c.status === 'FAIL');
+
   let status, confidence;
   if (!curvePass){
     status = 'UNVERIFIED';
     confidence = 'LOW';
+  } else if (hasComponentFail){
+    // Any FAIL component (e.g. AM §73.182 NIF FAIL on FCCAM) — verdict
+    // cannot be VERIFIED.  Sit at PARTIAL/LOW so the engineer reads the
+    // failure before the cover page calls the exhibit "VERIFIED HIGH".
+    status = 'PARTIAL';
+    confidence = 'LOW';
+  } else if (hasScreening){
+    status = 'PARTIAL';
+    confidence = 'MEDIUM';
   } else if (curvePass && xcPass && parityRun && parityPass){
     status = 'VERIFIED';
     confidence = 'HIGH';
@@ -268,10 +331,85 @@ export function buildValidationVerdictSection(exhibit){
     'Genoa does not certify FCC filings.  Final certification is the responsibility of the qualified broadcast engineer of record.'
   ];
 
+  // ---------- Ontology surface (additive, never overrides legacy fields) -
+  //
+  // Translate the section-local component statuses into the finding
+  // ontology so a SCREENING or INCOMPLETE (= "no record attached")
+  // component cannot silently be promoted past PARTIAL/MEDIUM.
+
+  const ontologyComponents = components.map(c => ({
+    name:   c.name,
+    status: mapLegacyStatusToOntology(c.status, c.detail),
+    detail: c.detail
+  }));
+  const ov = verdictFor({ components: ontologyComponents, blockers: [], warnings: [] });
+
+  // Ontology-driven invariants — apply ONLY downgrading caps so the
+  // legacy verdict cannot be silently relaxed.  We deliberately do not
+  // promote a PARTIAL up to VERIFIED based on the ontology; the legacy
+  // logic above already encodes the spec's promotion rules.
+  //
+  // Critical caps:
+  //   * INCOMPLETE component anywhere ⇒ scope=UNVERIFIED in the
+  //     ontology output ⇒ force legacy UNVERIFIED/LOW.
+  //   * SCREENING_* anywhere ⇒ scope=SCREENING in the ontology output
+  //     ⇒ cap legacy to PARTIAL/MEDIUM (the legacy code already does
+  //     this, but the cap makes it explicit and defends against future
+  //     regressions).
+  //   * NOT_RUN alone does NOT downgrade — the validation verdict
+  //     treats advisory NOT_RUN rows (e.g. AM §73.182 without FCCAM
+  //     configured) as orthogonal to the core curve/cross-check/parity
+  //     gates that drive VERIFIED.
+  if (ov.scope === Scope.UNVERIFIED){
+    status = 'UNVERIFIED';
+    confidence = 'LOW';
+  } else if (ov.scope === Scope.SCREENING){
+    if (status === 'VERIFIED') status = 'PARTIAL';
+    confidence = capConfidence(confidence, Confidence.MEDIUM);
+  }
+
   return {
     id:      'validation',
     type:    'verdict',
     heading: 'VALIDATION VERDICT',
-    verdict: { status, confidence, components, interpretation, limitations }
+    verdict: {
+      status,
+      confidence,
+      components,
+      interpretation: rewordForReport(interpretation),
+      limitations,
+      // Ontology surface — additive.
+      ontology: {
+        verdict:             ov.status,
+        confidence:          ov.confidence,
+        scope:               ov.scope,
+        narrative_fragments: ov.narrative_fragments
+      }
+    }
   };
+}
+
+/**
+ * Map the legacy per-component status string to a FindingStatus.
+ * Section-internal — only this file uses it.
+ */
+function mapLegacyStatusToOntology(status, detail){
+  switch (status){
+    case 'PASS':     return FindingStatus.PASS;
+    case 'FALLBACK': return FindingStatus.PASS;       // deterministic-tier success
+    case 'FAIL':
+      // "no <foo> record attached" detail strings represent INCOMPLETE,
+      // not a clean filing-grade FAIL.  Same rationale as the absent-cr
+      // branches above: data-loss / attachment failure.
+      if (typeof detail === 'string' && /no [a-z_]+ record attached/i.test(detail)){
+        return FindingStatus.INCOMPLETE;
+      }
+      return FindingStatus.FAIL;
+    case 'WARN':     return FindingStatus.ADVISORY;
+    case 'SKIP':     return FindingStatus.SKIP;
+    case 'PARTIAL':  return FindingStatus.ADVISORY;
+    case 'NOT_RUN':  return FindingStatus.NOT_RUN;
+    case 'SCREENING': return FindingStatus.SCREENING_PASS;
+    default:          return FindingStatus.INFO;
+  }
 }

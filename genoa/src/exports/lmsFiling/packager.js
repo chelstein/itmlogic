@@ -11,8 +11,19 @@
 // references the PDF by filename so the licensee uploads both side
 // by side to LMS.
 
-import { mapForm301Fm } from './mapping.js';
+import { mapForm301Fm, selectSchemaForService } from './mapping.js';
 import { FORM_301_FM_META } from './form301fm.js';
+
+// Per-service filename stem suffix.  AM/FM/FX/LPFM each get a
+// distinct token so engineers can tell at a glance which form a
+// cheatsheet was generated for.
+function filingStemForForm(formId){
+  const id = String(formId || '').toUpperCase();
+  if (id === '301-AM') return 'form301am-filing-package';
+  if (id === '349')    return 'form349-filing-package';
+  if (id === '318')    return 'form318-filing-package';
+  return 'form301fm-filing-package';
+}
 
 const STATUS_BADGE = {
   filled:    { color: '#43a85a', label: 'FILLED' },
@@ -59,31 +70,79 @@ export function buildFilingPackage(exhibit, applicant = {}){
   const callTag = (exhibit?.station_inputs?.call || 'unknown')
     .replace(/[^A-Z0-9]/gi, '_')
     .toUpperCase();
-  const filename_stem = `${callTag}-form301fm-filing-package`;
+  const filename_stem = `${callTag}-${filingStemForForm(mapped?.form?.form_id)}`;
+
+  // Advisory-only notes surfaced alongside the filing package.  These
+  // are NEVER LMS fields, NEVER required, and NEVER affect
+  // filing_ready / compliance_pass / blockers_count.  Reviewers see
+  // them as contextual evidence next to the form.
+  const advisory_notes = buildAdvisoryNotes(exhibit);
 
   return {
-    json:          jsonOutput(mapped),
+    json:          jsonOutput(mapped, advisory_notes),
     html:          htmlOutput(mapped),
-    plain_text:    plainTextOutput(mapped),
+    plain_text:    plainTextOutput(mapped, advisory_notes),
     fields_csv:    csvOutput(mapped),
     filename_stem,
     summary:       mapped.summary,
     filing_ready:  mapped.filing_ready,
     blockers_count: mapped.blockers_count,
-    compliance_pass: mapped.compliance_pass
+    compliance_pass: mapped.compliance_pass,
+    advisory_notes
   };
 }
 
-function jsonOutput(mapped){
+// Build the advisory-notes array (geo-RF environmental evidence, AM
+// physics evidence, anything else that's strictly informational and
+// must NOT gate filing).  Each entry is a small KV record reviewers
+// can read; nothing here maps to an LMS field.
+function buildAdvisoryNotes(exhibit){
+  const notes = [];
+  const ge = exhibit?.evidence?.geo_rf_evidence;
+  if (ge){
+    const tc = ge.datasets?.tree_canopy_conus || {};
+    notes.push({
+      id:            'environmental_rf_evidence',
+      label:         'Environmental RF Evidence',
+      status:        ge.status,
+      advisory:      true,
+      filing_effect: 'none',
+      summary:       'advisory only — does not change LMS required fields or filing_ready',
+      tree_canopy_value:   tc.value_numeric ?? tc.value_raw ?? null,
+      tree_canopy_dataset: tc.dataset || null,
+      fetched_at:    ge.fetched_at || null
+    });
+  }
+  const ap = exhibit?.evidence?.am_physics;
+  if (ap){
+    notes.push({
+      id:            'am_physics_evidence',
+      label:         'AM Physics (SOMNEC2D) Evidence',
+      status:        ap.status,
+      advisory:      true,
+      filing_effect: 'none',
+      summary:       'advisory only — independent NEC-family ground-field solver; does not modify §73.184 contour distances',
+      grid_sha256:   ap.outputs?.grid_sha256 || null,
+      fetched_at:    ap.fetched_at || null
+    });
+  }
+  return notes;
+}
+
+function jsonOutput(mapped, advisory_notes = []){
+  const formIdSlug = String(mapped?.form?.form_id || '301-FM')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '_');
   return JSON.stringify({
-    schema:        'genoa.filing_package.form_301_fm.v1',
+    schema:        `genoa.filing_package.form_${formIdSlug}.v1`,
     generated_at:  new Date().toISOString(),
     form:          mapped.form,
     summary:       mapped.summary,
     filing_ready:  mapped.filing_ready,
+    gating_reason: mapped.gating_reason ?? null,
     blockers_count: mapped.blockers_count,
     compliance_pass: mapped.compliance_pass,
     exhibit:       mapped.exhibit_metadata,
+    advisory_notes,                                    // never affects filing_ready
     fields:        mapped.fields.map(f => ({
       id:        f.id,
       lms_label: f.lms_label,
@@ -97,7 +156,8 @@ function jsonOutput(mapped){
       status:    f.status,
       value:     f.value,
       provenance: f.provenance || null,
-      notes:     f.notes ?? null
+      notes:     f.notes ?? null,
+      engineer_confirmation_required: f.engineer_confirmation_required || false
     }))
   }, null, 2);
 }
@@ -126,7 +186,7 @@ function csvOutput(mapped){
   return rows.join('\n');
 }
 
-function plainTextOutput(mapped){
+function plainTextOutput(mapped, advisory_notes = []){
   const out = [];
   out.push('='.repeat(80));
   out.push('  FCC FORM 301-FM — ENGINEERING (SECTION III) FILING CHEATSHEET');
@@ -159,6 +219,25 @@ function plainTextOutput(mapped){
     const prov = fmtProvenance(f.provenance);
     if (prov)    out.push(`                           src:  ${prov}`);
     if (f.notes) out.push(`                           note: ${f.notes}`);
+  }
+  if (advisory_notes && advisory_notes.length){
+    out.push('');
+    out.push('-'.repeat(80));
+    out.push('ADVISORY EVIDENCE (informational only — NOT filing fields)');
+    out.push('-'.repeat(80));
+    for (const n of advisory_notes){
+      out.push(`  ${n.label}`);
+      out.push(`      Status         : ${n.status || 'unknown'}`);
+      out.push(`      Filing effect  : NONE (advisory only)`);
+      if (n.tree_canopy_value != null)
+        out.push(`      Tree canopy    : ${n.tree_canopy_value}${n.tree_canopy_dataset ? `  (${n.tree_canopy_dataset})` : ''}`);
+      if (n.grid_sha256)
+        out.push(`      Grid SHA-256   : ${n.grid_sha256}`);
+      if (n.fetched_at)
+        out.push(`      Fetched at     : ${n.fetched_at}`);
+      out.push(`      Note           : ${n.summary}`);
+      out.push('');
+    }
   }
   out.push('');
   out.push('-'.repeat(80));

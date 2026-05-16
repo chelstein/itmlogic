@@ -115,7 +115,16 @@ export async function psraPssaExhibit(input, ctx = {}){
 
   // 1. Sun sidecar — windows + monthly schedule.
   if (sunClient){
-    const tzone = proposed.timezone_code || DEFAULT_TZ;
+    // Resolution chain: operator-supplied → lat/lon-derived default →
+    // DEFAULT_TZ.  The middle step was previously missing — a Pacific-
+    // coast site with no operator timezone silently fell through to
+    // EST sunrise/sunset (DEFAULT_TZ='B'), putting windows off by 3 h.
+    // defaultTzForLatLon is conservative (always picks Standard-time
+    // variants per §73.99); engineer can still override.
+    const { defaultTzForLatLon } = await import('../../evidence/fccSunClient.js');
+    const tzone = proposed.timezone_code
+      || defaultTzForLatLon(proposed.lat, proposed.lon)
+      || DEFAULT_TZ;
     const sun = await sunClient.fetchAmSun({
       lat: Number(proposed.lat),
       lon: Number(proposed.lon),

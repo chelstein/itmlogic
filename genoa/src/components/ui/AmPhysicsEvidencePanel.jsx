@@ -30,9 +30,30 @@ export default function AmPhysicsEvidencePanel({ baseInputs }){
   const sigma_ms_m = numOrNull(baseInputs?.ground_sigma_mS_m);
   const epr = numOrNull(baseInputs?.ground_epr);
 
-  const [busy,   setBusy]   = useState(false);
-  const [result, setResult] = useState(null);
-  const [error,  setError]  = useState('');
+  const [busy,    setBusy]    = useState(false);
+  const [result,  setResult]  = useState(null);
+  const [error,   setError]   = useState('');
+  const [copied,  setCopied]  = useState(false);
+
+  // Copy the full Grid SHA-256 (not the abbreviated display value) so
+  // reviewers can paste the bytes-of-record into their replay tooling.
+  async function copyGridSha(sha){
+    if (!sha) return;
+    try {
+      if (navigator?.clipboard?.writeText){
+        await navigator.clipboard.writeText(String(sha));
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = String(sha);
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch { /* fall through silently */ }
+  }
 
   useEffect(() => {
     if (!isAm || !freq_khz) return undefined;
@@ -82,11 +103,14 @@ export default function AmPhysicsEvidencePanel({ baseInputs }){
     );
   }
 
+  // Prominent advisory badge — bright amber, uppercase, lockup
+  // explicitly states filing_effect:none so reviewers cannot miss
+  // the boundary even at a glance.
   const advisoryBadge = (
     <span
-      title="Independent physics evidence — NEC-family FORTRAN SOMNEC2D modified Sommerfeld integral solver.  Does NOT modify FCC §73.184 curve-derived contour distances or any filing-controlling rule math."
-      className="ml-auto text-[10px] tracking-rack uppercase border border-cyan-400 text-cyan-400 rounded px-1.5 py-0.5">
-      Advisory · SOMNEC2D
+      title="Independent physics evidence — NEC-family FORTRAN SOMNEC2D modified Sommerfeld integral solver.  Does NOT modify FCC §73.184 curve-derived contour distances or any filing-controlling rule math. filing_effect = none."
+      className="ml-auto text-[10px] tracking-rack uppercase font-semibold border border-amber-400 bg-amber-400/15 text-amber-300 rounded px-2 py-0.5 shadow-[0_0_0_1px_rgba(251,191,36,0.25)]">
+      Advisory · SOMNEC2D · filing_effect=none
     </span>
   );
 
@@ -139,21 +163,47 @@ export default function AmPhysicsEvidencePanel({ baseInputs }){
               <Kv k="Engine"         v={result.engine || 'somnec2d'} />
               <Kv k="Method"         v="Modified Sommerfeld integrals" />
               <Kv k="Grid file"      v={outputs.grid_file || '—'} />
-              <Kv k="Grid SHA-256"   v={outputs.grid_sha256 ? short(outputs.grid_sha256) : '—'} title={outputs.grid_sha256 || ''} />
+              <div className="grid grid-cols-[110px_1fr] gap-x-2 text-[11px]"
+                   title={outputs.grid_sha256 || ''}>
+                <span className="text-textDim text-[10px] tracking-rack uppercase">Grid SHA-256</span>
+                <span className="text-cream text-right break-all flex items-center justify-end gap-1">
+                  <span>{outputs.grid_sha256 ? short(outputs.grid_sha256) : '—'}</span>
+                  {outputs.grid_sha256 && (
+                    <button
+                      type="button"
+                      onClick={() => copyGridSha(outputs.grid_sha256)}
+                      title="Copy full SHA-256 to clipboard"
+                      aria-label="Copy full Grid SHA-256"
+                      className="ml-1 px-1 py-0 text-[9px] tracking-rack uppercase border border-rule rounded hover:border-cyan-400 hover:text-cyan-400">
+                      {copied ? 'copied' : 'copy'}
+                    </button>
+                  )}
+                </span>
+              </div>
               <Kv k="Runtime"        v={summary.time_seconds != null ? `${Number(summary.time_seconds).toFixed(4)} s` : '—'} />
               <Kv k="Filing effect"  v="None (advisory)" />
             </div>
           </div>
         )}
 
-        {summary && status === 'run' && (summary.epscf || summary.ar1_1_1) && (
-          <details className="rounded-md border border-rule p-3 text-[11px]">
-            <summary className="cursor-pointer text-textDim text-[10px] tracking-rack uppercase">
-              Solver detail (first AR1 + EPSCF)
+        {status === 'run' && (
+          <details className="rounded-md border border-rule p-3 text-[11px] group">
+            <summary className="cursor-pointer text-textDim text-[10px] tracking-rack uppercase flex items-center gap-2 group-open:text-cream">
+              <span>Solver detail (EPSCF, AR1, grid provenance)</span>
+              <span className="ml-auto text-[9px] text-amber-300/80">advisory · filing_effect=none</span>
             </summary>
             <div className="mt-2 space-y-1 text-cream">
-              {summary.epscf  && <div>EPSCF      = <span className="text-textDim">{summary.epscf}</span></div>}
-              {summary.ar1_1_1 && <div>AR1[1,1]   = <span className="text-textDim">{summary.ar1_1_1}</span></div>}
+              {summary.epscf   && <div>EPSCF       = <span className="text-textDim">{summary.epscf}</span></div>}
+              {summary.ar1_1_1 && <div>AR1[1,1,1]  = <span className="text-textDim">{summary.ar1_1_1}</span></div>}
+              {outputs.grid_sha256 && (
+                <div className="pt-1 border-t border-rule/40">
+                  <div className="text-textDim text-[9px] tracking-rack uppercase">Grid SHA-256 (full)</div>
+                  <div className="break-all text-[10px]">{outputs.grid_sha256}</div>
+                </div>
+              )}
+              {!summary.epscf && !summary.ar1_1_1 && !outputs.grid_sha256 && (
+                <div className="text-textDim">(no diagnostic detail returned by sidecar)</div>
+              )}
             </div>
           </details>
         )}

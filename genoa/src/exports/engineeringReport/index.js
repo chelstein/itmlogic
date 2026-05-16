@@ -19,6 +19,7 @@ import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
 import { buildMeasurementsSection }                from './sections/measurements.js';
+import { buildSdrObservabilitySection }            from './sections/sdrObservability.js';
 import { buildRegulatoryContextSection }           from './sections/regulatoryContext.js';
 import { buildItmCoverageSection }                 from './sections/itmCoverage.js';
 import { buildMapPackageSection }                  from './sections/mapPackage.js';
@@ -28,6 +29,7 @@ import {
   buildDaPatternChartSection,
   buildItmCoverageOverlaySection
 }                                                  from './sections/vectorCharts.js';
+import { buildVisualSummarySection }               from './sections/visualSummary.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -51,6 +53,13 @@ export function buildEngineeringReport(exhibit, options){
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildMeasurementsSection(exhibit, opt));
+  // SDR observability — advisory per-capture surface that adds
+  // observed-vs-predicted columns when a calibrated residual table is
+  // attached, or an advisory notice when only audio captures exist.
+  // Strictly observational; never modifies radial_table /
+  // contour_definitions.  Sits right after Measurements so a reviewer
+  // sees the raw audio record then the engineering comparison.
+  push(buildSdrObservabilitySection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
   // Printable contour map — embedded PNG composed by the map sidecar
   // (genoa/src/sidecars/map/, headless Chromium + Leaflet).  The HTTP
@@ -64,6 +73,15 @@ export function buildEngineeringReport(exhibit, options){
   // This sits right after the §73.333 contour-results table so the
   // map appears next to the numerical contours it visualizes.
   push(buildMapPackageSection(exhibit, opt));
+  // Visual Summary — the showpiece page.  Composes contours +
+  // population dot-density + tree-canopy halo + advisory banner into
+  // one stylized vector composition that reads at a glance.  Sits
+  // right after the H&D contour-map deliverable so a reviewer sees
+  // the regulatory map first, then the synthesized visual that
+  // overlays population and environmental context.  Skipped when
+  // there are no contours or no tx coords.  Advisory only — no
+  // filing-controlling math.
+  push(buildVisualSummarySection(exhibit, opt));
   // Terrain-aware ITM coverage (47 CFR §73.314) — conditional, only
   // present when exhibit.itm_polygons[0] is a closed ring (the engine
   // ran ITM under options.use_itm=true).  Sits AFTER the §73.333

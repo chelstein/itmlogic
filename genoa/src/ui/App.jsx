@@ -6,6 +6,9 @@ import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
 import ServiceHealthPanel from '@components/ui/ServiceHealthPanel.jsx';
+import SidecarHealthRack from '@components/ui/SidecarHealthRack.jsx';
+import EvidenceRack      from '@components/ui/EvidenceRack.jsx';
+import MapPreview        from '@components/ui/MapPreview.jsx';
 import ChartScope    from '@components/ui/ChartScope.jsx';
 import TelemetryRack from '@components/ui/TelemetryRack.jsx';
 import TabStrip      from '@components/ui/TabStrip.jsx';
@@ -184,7 +187,16 @@ function MainApp({ onLogout }) {
   // PE certification dialog state.  Stamps land on `exhibit.pe_certification`.
   const [peDialogOpen, setPeDialogOpen] = useState(false);
 
-  const onChange = (k, v) => setInputs(s => ({ ...s, [k]: v }));
+  // 3rd arg (src) tags the provenance of the change — only fcc_class
+  // currently uses it so the source chip in FacilityRack flips from
+  // "AMQ" to "manual" when the engineer types over the auto-populated
+  // value.  When the user picks a station, mergeFacility writes both
+  // fcc_class and fcc_class_source ('fcc-amq' | 'fcc-amq-cache').
+  const onChange = (k, v, src) => setInputs(s => {
+    const next = { ...s, [k]: v };
+    if (k === 'fcc_class') next.fcc_class_source = src || 'manual';
+    return next;
+  });
 
   /* ---------------- FACILITY LOOKUP ---------------- */
 
@@ -200,6 +212,12 @@ function MainApp({ onLogout }) {
       facility_id:  fill('facility_id',  f.facility_id),
       service:      fill('service',      f.service),
       fcc_class:    fill('fcc_class',    f.fcc_class),
+      // Provenance for the FCC class field — surfaced in FacilityRack's
+      // source chip so the engineer can tell auto-populated values from
+      // manually-entered ones.  Picking a fresh facility row stamps the
+      // server-side enrichment provenance (fcc-amq | fcc-amq-cache);
+      // manual edits in the dropdown overwrite it via onChange(_,_,src).
+      fcc_class_source: f.fcc_class_source || base.fcc_class_source || (f.fcc_class ? 'lookup' : undefined),
       frequency:    fill('frequency',    f.frequency),
       erp_kw:       fill('erp_kw',       f.erp_kw),
       haat_m:       fill('haat_m',       f.haat_m),
@@ -842,9 +860,11 @@ function MainApp({ onLogout }) {
           busy={busy}
         />
         <ServiceHealthPanel />
+        <SidecarHealthRack />
       </>)}
       center={(
         <>
+          {exhibit && fr ? <FilingHeroBanner exhibit={exhibit} fr={fr} /> : null}
           <ChartScope
             mode={exhibit?.calculation_method?.name || '47 CFR §73.333 F(50,50)'}
             status={statusMsg}
@@ -888,6 +908,7 @@ function MainApp({ onLogout }) {
             onClear={() => setExhibit(prev => prev ? { ...prev, pe_certification: undefined } : prev)}
           />
           <TelemetryRack exhibit={exhibit} />
+          <MapPreview tx={{ label: exhibit?.station_inputs?.call_sign || 'TX' }} />
         </>
       )}
     />
@@ -971,6 +992,53 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
     return <PaneHistory rows={history} onPick={onPickHistory} />;
   }
   return null;
+}
+
+// Hero banner — outsized PASS / CONDITIONAL / BLOCKED status at the top
+// of the center column.  The TopStatusBar score chip is too easy to
+// miss; this banner gives the operator the disposition at a glance.
+// AM NIF failure surfaces immediately; Berry-screening NIF failure
+// shows as "REVIEW REQUIRED" instead of BLOCKED so the engineer is
+// nudged to re-run with FCCAM before treating the result as binding.
+function FilingHeroBanner({ exhibit, fr }){
+  const blockers = (exhibit?.blockers?.length || 0)
+                 + (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'blocker').length;
+  const warnings = (exhibit?.warnings?.length || 0)
+                 + (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'warning').length;
+  const nif = exhibit?.evidence?.am_night_nif || null;
+  const nifFailing = nif && nif.available && (
+    (Number(nif.summary?.n_failing_azimuths) || 0) > 0 ||
+    (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0)
+  );
+  const nifScreening = nif && /berry/i.test(String(nif.provenance?.upstream_skywave || nif.source || ''));
+
+  let tone, label, sub;
+  if (blockers > 0 || (nifFailing && !nifScreening)){
+    tone  = 'bg-red/20 border-red text-red';
+    label = 'BLOCKED';
+    sub   = nifFailing && !nifScreening
+      ? `§73.182 NIF fails at ${nif.summary?.n_failing_azimuths ?? '?'}/${nif.summary?.azimuths_evaluated ?? '?'} azimuths — facility redesign required`
+      : `${blockers} blocker${blockers === 1 ? '' : 's'} block filing`;
+  } else if (warnings > 0 || (nifFailing && nifScreening) || fr?.status === 'CONDITIONAL'){
+    tone  = 'bg-gold/20 border-gold text-gold';
+    label = 'REVIEW REQUIRED';
+    sub   = nifFailing && nifScreening
+      ? '§73.182 NIF screening-grade fail — re-run with FCCAM (Wang 1985) before filing'
+      : `${warnings} warning${warnings === 1 ? '' : 's'} — engineer review required`;
+  } else {
+    tone  = 'bg-emerald-700/30 border-emerald-500 text-emerald-300';
+    label = 'READY TO FILE';
+    sub   = `Filing readiness ${fr?.score ?? '—'}/100 · ${fr?.status || 'PASS'}`;
+  }
+  return (
+    <div className={`rounded-md border-2 ${tone} px-4 py-3 mb-2 flex items-center gap-4`}>
+      <div className="font-bold tracking-wider text-[15px]">{label}</div>
+      <div className="opacity-80 text-[11px] flex-1">{sub}</div>
+      <div className="font-mono text-[10px] opacity-70">
+        {exhibit?.station_inputs?.call || '—'} · {exhibit?.station_inputs?.facility_id || '—'}
+      </div>
+    </div>
+  );
 }
 
 function PaneFcc({ exhibit }){
@@ -1150,6 +1218,7 @@ function PaneEvidence({ exhibit }){
   const pop = exhibit.population_estimate || {};
   return (
     <div className="space-y-3">
+      <EvidenceRack exhibit={exhibit} />
       <SubHead title="Terrain" />
       <SubKv kv={ev.terrain?.available
         ? [

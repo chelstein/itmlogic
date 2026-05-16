@@ -1547,6 +1547,31 @@ export async function computeExhibit(req){
         ...(study || { available: false, error: 'compute budget exhausted' }),
         elapsed_ms: Date.now() - t0
       };
+
+      // Surface §73.182 NIF failure as a top-level annotation so the
+      // engineering-conclusion logic (which walks exhibit.annotations
+      // for blockers/warnings) sees it.  Berry-1968 screening failures
+      // surface as 'warning' so the conclusion can prompt "re-run with
+      // FCCAM" rather than declare NON-COMPLIANT.  FCCAM/Wang failures
+      // surface as 'blocker'.
+      const _nif = evidence.am_night_nif;
+      if (_nif?.available){
+        const _sum = _nif.summary || {};
+        const _isFailing = (Number(_sum.n_failing_azimuths) || 0) > 0
+          || (Number.isFinite(Number(_sum.worst_margin_db)) && Number(_sum.worst_margin_db) < 0);
+        if (_isFailing){
+          const _isScreening = /berry/i.test(String(_nif.provenance?.upstream_skywave || _nif.source || ''));
+          const _ann = exhibit.annotations = exhibit.annotations || [];
+          _ann.push({
+            severity: _isScreening ? 'warning' : 'blocker',
+            code:     _isScreening ? 'AM_NIGHT_NIF_FAIL_SCREENING' : 'AM_NIGHT_NIF_FAIL',
+            message:  `§73.182 nighttime allocation fails at ${_sum.n_failing_azimuths || 0}/${_sum.azimuths_evaluated || 0} azimuths (worst margin ${Number.isFinite(Number(_sum.worst_margin_db)) ? Number(_sum.worst_margin_db).toFixed(2) + ' dB' : 'n/a'})`,
+            detail:   _isScreening
+              ? 'Re-run with FCCAM (Wang 1985) before filing — Berry 1968 is screening-grade only per §73.190(c).'
+              : 'Facility redesign, reduced ERP, daytime-only mode, or §73.99 reduced-power authority required prior to filing.'
+          });
+        }
+      }
     } catch (e){
       evidence.am_night_nif = {
         available: false,
@@ -1728,6 +1753,81 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 8g. Geo-RF Environmental Evidence (advisory; AM + FM) ----
+  //
+  // Independent environmental geospatial datasets (tree canopy, landcover,
+  // RF/environment statistical model artifacts).  ADVISORY ONLY — never
+  // modifies §73.184 / §73.182 / §73.190 / §73.313 / §73.207 / §73.215
+  // contour or allocation math.  When GEO_RF_EVIDENCE_SIDECAR_URL is
+  // unset, attaches a not_configured stub; on sidecar failure, attaches a
+  // failed/offline status.  Either way the exhibit ships.
+  if (options.geo_rf_evidence !== false){
+    const t0 = Date.now();
+    try {
+      const { geoRfNotConfigured } = await import('../../evidence/geoRfEvidenceClient.js');
+      const lat = Number(inputs.lat);
+      const lon = Number(inputs.lon);
+      const facilityInputs = {
+        lat, lon,
+        service:     inputs.service     || null,
+        call:        inputs.call        || null,
+        facility_id: inputs.facility_id || null
+      };
+      if (!sidecars.geoRfEvidence){
+        evidence.geo_rf_evidence = {
+          ...geoRfNotConfigured(facilityInputs),
+          elapsed_ms: Date.now() - t0
+        };
+      } else if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+        evidence.geo_rf_evidence = {
+          status:        'failed',
+          advisory:      true,
+          filing_effect: 'none',
+          inputs:        facilityInputs,
+          datasets:      {},
+          error:         'coordinates_missing',
+          notes: [
+            'Environmental RF evidence is advisory only.',
+            'Does not modify FCC filing-controlling contour or allocation calculations.'
+          ],
+          elapsed_ms: Date.now() - t0
+        };
+      } else {
+        // Canopy-rose distance: half the primary contour radius (so the
+        // rose sits well INSIDE the populated service area, not on the
+        // contour edge or beyond it).  Falls back to ~3 km when no
+        // primary contour is on the exhibit yet.
+        const primaryRing = (exhibit?.contour_definitions || [])
+          .find(c => String(c?.id || '').toLowerCase() === 'primary_2mvm');
+        const roseDistKm = primaryRing?.mean_km
+          ? Math.max(1, Math.min(40, Number(primaryRing.mean_km) * 0.5))
+          : 3;
+        const out = await budget.withDeadline('geo_rf_evidence',
+          () => sidecars.geoRfEvidence.sampleGeoRfEvidenceForFacility({
+            ...facilityInputs,
+            canopy_rose_distance_km: roseDistKm
+          }),
+          { minMs: 12_000 });
+        evidence.geo_rf_evidence = {
+          ...(out || { status: 'failed', advisory: true, filing_effect: 'none', inputs: facilityInputs, error: 'compute budget exhausted' }),
+          elapsed_ms: Date.now() - t0
+        };
+      }
+    } catch (e){
+      evidence.geo_rf_evidence = {
+        status:        'failed',
+        advisory:      true,
+        filing_effect: 'none',
+        error:         `geo_rf_evidence compute failed: ${e?.message || e}`,
+        notes: [
+          'Environmental RF evidence is advisory only.',
+          'Does not modify FCC filing-controlling contour or allocation calculations.'
+        ],
+        elapsed_ms: Date.now() - t0
+      };
+    }
+  }
+
   // ---- 9. Provenance: facility / terrain / curve / sdr ----
   if (facilityResolution){
     const f = facilityResolution.facility;
@@ -1769,6 +1869,9 @@ export async function computeExhibit(req){
   }
   if (evidence.am_psra_pssa){
     exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;
+  }
+  if (evidence.geo_rf_evidence){
+    exhibit.evidence.geo_rf_evidence = evidence.geo_rf_evidence;
   }
   if (evidence.nec_model){
     exhibit.evidence.nec_model = evidence.nec_model;

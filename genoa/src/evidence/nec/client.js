@@ -16,7 +16,45 @@
 //   the orchestrator emits a NEC_MODEL_UNAVAILABLE warning and ships
 //   the exhibit without the NEC block — never blocks filing.
 
+import {
+  _groundConstantsResolver,
+  DEFAULT_EPR,
+  DEFAULT_GROUND_SIGMA_MS_M
+} from '../amPhysicsClient.js';
+
 const DEFAULT_TIMEOUT_MS = 90_000;
+
+// Re-export the unified ground constants so the NEC sidecar bridge,
+// orchestrator wiring, and tests can all read a single source of
+// truth.  Historically the NEC sidecar carried a hard-coded
+// dielectric_constant of 13; that mismatch is gone — both SOMNEC2D
+// and NEC2++ now resolve (εᵣ, σ) through _groundConstantsResolver
+// with εᵣ = DEFAULT_EPR (15) when no operator value is supplied.
+export {
+  _groundConstantsResolver,
+  DEFAULT_EPR,
+  DEFAULT_GROUND_SIGMA_MS_M
+};
+
+/**
+ * Build the NEC sidecar `ground` block from facility inputs using the
+ * unified resolver.  Returns the exact shape sidecars/nec/server.js
+ * expects on /model/run, /model/am-array and /model/near-field.
+ */
+export function resolveNecGround(inputs = {}){
+  const g = _groundConstantsResolver(inputs);
+  return {
+    type:               'sommerfeld',
+    conductivity_s_m:   g.sig_s_m,
+    dielectric_constant: g.epr,
+    _source: {
+      epr:        g.epr_source,
+      sigma:      g.sigma_source,
+      resolver:   'evidence/amPhysicsClient._groundConstantsResolver',
+      unified:    true
+    }
+  };
+}
 
 export function makeNecClient({
   baseUrl   = process.env.NEC_SIDECAR_URL || null,

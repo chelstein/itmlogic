@@ -59,6 +59,48 @@ export const DEFAULT_GROUND_SIGMA_MS_M = 8;
 // study) should pass it via inputs.epr.
 export const DEFAULT_EPR = 15;
 
+/**
+ * Unified ground-constants resolver shared by every AM physics
+ * sidecar client (SOMNEC2D, NEC2++ / PyNEC).  Single source of truth
+ * for the (εᵣ, σ, source-tag) tuple so the SOMNEC2D advisory and the
+ * NEC moment-method advisory cannot drift apart — historically the
+ * NEC sidecar carried a hard-coded dielectric_constant of 13 while
+ * SOMNEC2D used 15; this helper eliminates that disagreement at the
+ * client layer.
+ *
+ * @param {object} inp                       facility / station inputs
+ * @param {number} [inp.ground_epr]          measured / operator dielectric
+ * @param {number} [inp.ground_sigma_mS_m]   measured / operator conductivity
+ * @param {object} [defaults]                override defaults (rarely needed)
+ * @returns {{
+ *   epr:         number,
+ *   epr_source:  'input' | 'default',
+ *   sigma_ms_m:  number,
+ *   sig_s_m:     number,
+ *   sigma_source:'input' | 'default'
+ * }}
+ */
+export function _groundConstantsResolver(inp = {}, defaults = {}){
+  const D_EPR   = Number(defaults.epr ?? DEFAULT_EPR);
+  const D_SIGMA = Number(defaults.sigma_ms_m ?? DEFAULT_GROUND_SIGMA_MS_M);
+
+  let epr = Number(inp.ground_epr);
+  let epr_source = 'input';
+  if (!Number.isFinite(epr) || epr <= 0){
+    epr = D_EPR;
+    epr_source = 'default';
+  }
+
+  let sigma_ms_m = Number(inp.ground_sigma_mS_m);
+  let sigma_source = 'input';
+  if (!Number.isFinite(sigma_ms_m) || sigma_ms_m <= 0){
+    sigma_ms_m = D_SIGMA;
+    sigma_source = 'default';
+  }
+  const sig_s_m = sigmaMsmToSm(sigma_ms_m) ?? 0;
+  return { epr, epr_source, sigma_ms_m, sig_s_m, sigma_source };
+}
+
 /** Convert ground conductivity from mS/m (Genoa schema native) to S/m
  *  (NEC / SOMNEC2D native).  8 mS/m → 0.008 S/m.  Returns null for
  *  non-positive / non-finite inputs (incl. null, undefined). */

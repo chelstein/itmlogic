@@ -17,6 +17,7 @@ import amDaDesignRoutes from './routes/amDaDesign.js';
 import amNightRoutes    from './routes/amNight.js';
 import amSunRoutes      from './routes/amSun.js';
 import amPhysicsRoutes  from './routes/amPhysics.js';
+import geoRfEvidenceRoutes from './routes/geoRfEvidence.js';
 import amPsraPssaRoutes from './routes/amPsraPssa.js';
 import allotmentRoutes  from './routes/allotment.js';
 import comparablesRoutes from './routes/comparables.js';
@@ -80,6 +81,7 @@ app.use('/api', amDaDesignRoutes);   // AM DA pattern design (POST /api/am-da/{d
 app.use('/api', amNightRoutes);      // AM nighttime allocation (POST /api/am-night/nif — §73.182 NIF contour)
 app.use('/api', amSunRoutes);        // FCC sunrise/sunset authority (GET /api/am/sun — §73.99 PSRA/PSSA + §73.1209)
 app.use('/api', amPhysicsRoutes);    // AM Physics SOMNEC2D advisory evidence (POST /api/am/physics/somnec — independent NEC ground-field solver)
+app.use('/api', geoRfEvidenceRoutes); // Geo-RF Evidence — advisory environmental geospatial datasets (tree canopy, landcover, tau RF models); never modifies FCC rule outputs
 app.use('/api', amPsraPssaRoutes);   // §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit (POST /api/am/psra-pssa)
 app.use('/api', allotmentRoutes);    // FM allotment search (POST /api/allotment/search — §73.201/§73.207/§73.215)
 app.use('/api', comparablesRoutes);  // Comparable-facility benchmarking (POST /api/comparables/fm — §73.211)

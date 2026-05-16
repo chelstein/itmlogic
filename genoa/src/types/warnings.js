@@ -210,7 +210,11 @@ export const WARNING_CODES = Object.freeze({
 
   MISSING_NEARBY_STATIONS: { severity: 'warning', phase: 'evidence',
     title: 'Nearby-stations list missing',
-    description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' }
+    description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' },
+
+  SIGMA_CLAMP: { severity: 'warning', phase: 'engine',
+    title: 'AM σ rounded or clamped to FCC M3 grid (47 CFR §73.184)',
+    description: 'The §73.184 groundwave grid is keyed on integer σ ∈ {1..8} mS/m (Figure M3).  The typed conductivity was rounded to the nearest grid value, or clamped to the 1 / 8 mS/m boundary for out-of-range soils (wet/marine commonly ≥10 mS/m).  Distances reflect the boundary curve, not the typed σ.  See exhibit.evidence.ground_constants for the input vs. used values.' }
 });
 
 export class W {

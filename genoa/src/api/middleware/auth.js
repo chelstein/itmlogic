@@ -103,11 +103,31 @@ export function clearSessionCookie(){
 
 // Route patterns that may be authenticated via GENOA_SERVICE_TOKEN
 // (header-based) instead of a cookie session.  Kept narrow on purpose:
-// only the geodata evidence/manifest endpoints — all read-only.
-// requireAuth is mounted under `/api` so req.path here begins at
-// `/geodata/...` (no `/api` prefix).
+// only read-only verification routes that operators / CI need to be
+// able to probe without a browser session.  requireAuth is mounted
+// under `/api` so req.path here begins at the post-`/api` segment.
+//
+//   /geodata/*       — evidence manifest + sample probes
+//   /am/physics/*    — SOMNEC2D advisory evidence (independent
+//                      NEC-family ground-field solver, advisory only;
+//                      never modifies §73.184 contour math or any
+//                      filing-controlling rule output)
+//   /facilities/*    — read-only adapter into public FCC data (FMQ/AMQ
+//                      pipe-delim + ZTR broadcast_stations).  Returns
+//                      facility metadata only; never writes; same data
+//                      that's publicly available at transition.fcc.gov.
+//                      Used by CI to smoke-test the AM class auto-
+//                      populate path (FCC AMQ enrichment).
+//   /geo-rf-evidence/* — advisory environmental geospatial datasets
+//                      (USFS Tree Canopy Cover, NRCan landcover, RF/
+//                      environment statistical model artifacts).  Read-
+//                      only point samples and health probe; never
+//                      modifies FCC rule outputs.
 export const SERVICE_TOKEN_ROUTE_PATTERNS = [
-  /^\/geodata(\/|$)/
+  /^\/geodata(\/|$)/,
+  /^\/am\/physics(\/|$)/,
+  /^\/facilities(\/|$)/,
+  /^\/geo-rf-evidence(\/|$)/
 ];
 
 export function isServiceTokenRoute(reqPath){

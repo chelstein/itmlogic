@@ -234,3 +234,74 @@ async function fetchWithTimeout(url, init = {}, ms = DEFAULT_TIMEOUT_MS){
     clearTimeout(t);
   }
 }
+
+/**
+ * Summarize the FORTRAN-parity status for use in engineering-report
+ * narratives.  Honest wording — does NOT claim "verified against FCC
+ * TVFMFS_METRIC" unless the parity sweep actually ran AND passed.
+ *
+ * Inputs
+ *   evidence  — exhibit.evidence (reads evidence.fcc_curve_parity)
+ *   service   — 'FM'|'LPFM'|'FX'|'AM' (case-insensitive)
+ *
+ * Output
+ *   {
+ *     status: 'verified'|'failed'|'not_configured'|'not_applicable'|'unavailable',
+ *     wording: human-readable sentence to splice into a narrative,
+ *     n_ok:    number,
+ *     n_requests: number,
+ *     max_abs_delta_km: number|null,
+ *     tolerance_km: number|null
+ *   }
+ */
+export function summarizeFortranParity(evidence, service){
+  const svc = String(service || '').toUpperCase();
+  const ev  = evidence?.fcc_curve_parity || null;
+  // AM exhibits never run TVFMFS_METRIC (it's §73.333 FM/TV only).
+  if (svc === 'AM'){
+    return {
+      status:  'not_applicable',
+      wording: 'FORTRAN parity not applicable to AM (FCC TVFMFS_METRIC implements §73.333 FM/TV curves only; AM contours use the vendored §73.184 gwave engine).',
+      n_ok:               0,
+      n_requests:         0,
+      max_abs_delta_km:   null,
+      tolerance_km:       null
+    };
+  }
+  if (!ev){
+    return {
+      status:  'not_configured',
+      wording: 'FORTRAN parity not configured for this exhibit (FORTRAN_FCC_SIDECAR_URL unset; contour distances use the vendored tvfm_curves.js engine).',
+      n_ok:               0,
+      n_requests:         0,
+      max_abs_delta_km:   null,
+      tolerance_km:       null
+    };
+  }
+  if (ev.available === false){
+    return {
+      status:  'unavailable',
+      wording: `FORTRAN parity sweep unavailable: ${ev.error || 'reference engine did not respond'}.`,
+      n_ok:               Number(ev.n_ok) || 0,
+      n_requests:         Number(ev.n_requests) || 0,
+      max_abs_delta_km:   Number.isFinite(ev.max_abs_delta_km) ? ev.max_abs_delta_km : null,
+      tolerance_km:       Number.isFinite(ev.tolerance_km) ? ev.tolerance_km : null
+    };
+  }
+  const n_ok       = Number(ev.n_ok)       || 0;
+  const n_requests = Number(ev.n_requests) || 0;
+  const max_delta  = Number.isFinite(ev.max_abs_delta_km) ? ev.max_abs_delta_km : null;
+  const tol        = Number.isFinite(ev.tolerance_km)     ? ev.tolerance_km     : null;
+  if (ev.pass === true && n_ok === n_requests && n_requests > 0){
+    return {
+      status:  'verified',
+      wording: `Contour distances verified against FCC TVFMFS_METRIC (${n_ok}/${n_requests} radial×contour pairs within ${tol ?? '—'} km tolerance; max |Δ| ${max_delta != null ? max_delta.toFixed(3) + ' km' : '—'}).`,
+      n_ok, n_requests, max_abs_delta_km: max_delta, tolerance_km: tol
+    };
+  }
+  return {
+    status:  'failed',
+    wording: `FORTRAN parity sweep ran but did not pass: ${n_ok}/${n_requests} pairs within tolerance (max |Δ| ${max_delta != null ? max_delta.toFixed(3) + ' km' : '—'} vs tolerance ${tol ?? '—'} km). Genoa's vendored curves are NOT certified to TVFMFS_METRIC for this exhibit.`,
+    n_ok, n_requests, max_abs_delta_km: max_delta, tolerance_km: tol
+  };
+}

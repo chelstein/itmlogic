@@ -51,7 +51,13 @@ export function amRadialTable({
   contours = AM_DEFAULT_CONTOURS,
   dielectric = AM_DEFAULT_DIELECTRIC
 }){
-  return radials_deg.map(az => {
+  // Capture σ clamp/rounding metadata from the first successful FCC
+  // call; the σ used is identical for every radial (M3 grid is keyed
+  // on σ alone), so one sample suffices.  Exposed as the table's
+  // `_ground_constants` sidecar so the orchestrator can plumb it onto
+  // exhibit.evidence.ground_constants and emit SIGMA_CLAMP warnings.
+  let groundConstants = null;
+  const rows = radials_deg.map(az => {
     const f = patternFactorFn(az);
     const erp_az = erp_kW * f * f;
     const distances = {};
@@ -65,6 +71,27 @@ export function amRadialTable({
           erp_kw:            erp_az
         });
         distances[c.id] = r.distance_km;
+        if (!groundConstants && r.inputs){
+          const sigma_in  = Number(r.inputs.conductivity_msm_raw);
+          const sigma_use = Number(r.inputs.conductivity_msm);
+          const rounding  = Number.isFinite(sigma_in) && Number.isFinite(sigma_use)
+            ? +(sigma_use - sigma_in).toFixed(6)
+            : null;
+          let src = 'exact';
+          if (r.inputs.conductivity_clamp === 'low')  src = 'clamped-low (FCC M3 floor σ=1 mS/m)';
+          else if (r.inputs.conductivity_clamp === 'high') src = 'clamped-high (FCC M3 ceiling σ=8 mS/m)';
+          else if (rounding !== 0 && rounding !== null) src = 'rounded-to-integer-grid';
+          groundConstants = {
+            sigma_input:    Number.isFinite(sigma_in) ? sigma_in : null,
+            sigma_used:     Number.isFinite(sigma_use) ? sigma_use : null,
+            sigma_rounding: rounding,
+            sigma_clamp:    r.inputs.conductivity_clamp || null,
+            sigma_source:   src,
+            dielectric:     Number(r.inputs.dielectric),
+            frequency_khz_grid: Number(r.inputs.frequency_khz_grid),
+            regulation:     '47 CFR §73.184 / Figure M3 (σ ∈ {1..8} mS/m integer grid)'
+          };
+        }
       } catch (e){
         // Out-of-range / FCC routine error — record null, do NOT
         // fabricate.  The orchestrator surfaces a warning.
@@ -82,6 +109,45 @@ export function amRadialTable({
       contour_distances_km:       distances
     };
   });
+  // Attach the ground-constants sidecar on the array without changing
+  // its iteration shape — callers that don't read it see the original
+  // per-radial array.
+  Object.defineProperty(rows, '_ground_constants', {
+    value:        groundConstants,
+    enumerable:   false,
+    configurable: false
+  });
+  return rows;
+}
+
+/**
+ * Inspect σ resolution metadata.  Returns the same shape as the
+ * `_ground_constants` sidecar attached to amRadialTable's return value,
+ * computed standalone for callers that just want to know how the FCC
+ * grid clamped/rounded their σ before computing distances.
+ */
+export function amGroundConstants({ frequency_khz, conductivity_msm, dielectric = AM_DEFAULT_DIELECTRIC } = {}){
+  const sigma_in = Number(conductivity_msm);
+  if (!Number.isFinite(sigma_in)) return null;
+  let sigma_use = Math.round(sigma_in);
+  let clamp = null;
+  if (sigma_use < 1){ sigma_use = 1; clamp = 'low'; }
+  else if (sigma_use > 8){ sigma_use = 8; clamp = 'high'; }
+  const rounding = +(sigma_use - sigma_in).toFixed(6);
+  let src = 'exact';
+  if (clamp === 'low') src = 'clamped-low (FCC M3 floor σ=1 mS/m)';
+  else if (clamp === 'high') src = 'clamped-high (FCC M3 ceiling σ=8 mS/m)';
+  else if (rounding !== 0) src = 'rounded-to-integer-grid';
+  return {
+    sigma_input:    sigma_in,
+    sigma_used:     sigma_use,
+    sigma_rounding: rounding,
+    sigma_clamp:    clamp,
+    sigma_source:   src,
+    dielectric:     Number(dielectric),
+    frequency_khz_grid: Number.isFinite(Number(frequency_khz)) ? Math.round(Number(frequency_khz) / 10) * 10 : null,
+    regulation:     '47 CFR §73.184 / Figure M3 (σ ∈ {1..8} mS/m integer grid)'
+  };
 }
 
 // Returns warnings for the AM compute path.  No longer emits

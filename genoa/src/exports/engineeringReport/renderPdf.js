@@ -77,12 +77,33 @@ const PDF_UNICODE_FOLD = {
   'Ω': 'ohm',   // Ω (U+03A9)
   'λ': 'lambda',// λ (U+03BB) — wavelength
   'θ': 'theta', // θ (U+03B8) — angle
-  'φ': 'phi'    // φ (U+03C6) — phase
+  'φ': 'phi',   // φ (U+03C6) — phase
+  'ε': 'epsilon', // ε (U+03B5) — permittivity (NEC EPR)
+  'Σ': 'Sigma',   // Σ (U+03A3) — RSS sum
+  'α': 'alpha',   // α (U+03B1)
+  'β': 'beta',    // β (U+03B2)
+  'γ': 'gamma',   // γ (U+03B3)
+  'ω': 'omega',   // ω (U+03C9) — angular frequency
+  // Latin subscript letters (U+1D62…U+1D6A) — used for εᵣ, σᵧ, etc.
+  // PDFKit base-14 fonts have no glyph and silently shift bytes when
+  // encountered; adding them here keeps the content stream aligned.
+  'ᵢ': '_i', 'ᵣ': '_r', 'ᵤ': '_u', 'ᵥ': '_v',
+  'ₐ': '_a', 'ₑ': '_e', 'ₒ': '_o', 'ₓ': '_x',
+  // Common technical glyphs that have crept into section builders.
+  '²': '^2',  '³': '^3',  '⁻¹': '^-1', '½': '1/2',
+  '·': '.',   // U+00B7 middle dot (we render KV separators with dots elsewhere)
+  '≤': '<=', '≥': '>=', '≠': '!=', '≈': '~=', '±': '+/-',
+  '⋅': '.',
+  '°': ' deg',
+  'µ': 'u',   // U+00B5 micro sign (distinct from Greek μ U+03BC)
+  '∞': 'inf'
 };
 function pdfSafeText(s){
   if (typeof s !== 'string') return s;
-  return s.replace(/[→←↔–—‘’“”…ΔδσπμΩλθφ]/g,
-                   ch => PDF_UNICODE_FOLD[ch] || ch);
+  return s.replace(
+    /[→←↔–—‘’“”…ΔδσπμΩλθφεΣαβγωᵢᵣᵤᵥₐₑₒₓ²³½·≤≥≠≈±⋅°µ∞]/g,
+    (ch) => PDF_UNICODE_FOLD[ch] || ch
+  );
 }
 
 export async function renderEngineeringReportPdf(doc){
@@ -320,6 +341,9 @@ function renderSectionInFlow(pdf, s, meta){
       break;
     case 'polygon-overlay':
       renderPolygonOverlay(pdf, s);
+      break;
+    case 'visual-summary':
+      renderVisualSummary(pdf, s);
       break;
     default:
       if (Array.isArray(s.rows)) renderKv(pdf, s.rows);
@@ -974,4 +998,355 @@ function textWidth(pdf, str, font, size){
   const w = pdf.widthOfString(String(str));
   pdf.restore();
   return w;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Visual Summary — the showpiece page.
+//
+// Composes the engineer's computed result into a single stylized
+// vector composition: stacked service contours, population dot-
+// density inside the primary contour, environmental tree-canopy
+// halo at the transmitter site, oversized headline stats, advisory
+// banner verbatim.  All pdfkit primitives; no PNG round-trip, no
+// sidecar call at render time, fully deterministic across runs of
+// the same exhibit (seeded PRNG for the dot scatter).
+//
+// Section data shape produced by sections/visualSummary.js.
+// ────────────────────────────────────────────────────────────────────
+
+function renderVisualSummary(pdf, s){
+  if (!s || !Array.isArray(s.contours) || s.contours.length === 0) return;
+  if (!s.tx || !Number.isFinite(s.tx.lat) || !Number.isFinite(s.tx.lon)) return;
+
+  const w        = pdf.page.width - 2 * MARGIN;
+  const startY   = pdf.y;
+  // Reserve room for stats sidebar (right) + advisory banner (bottom).
+  const STATS_W  = 168;
+  const BANNER_H = 56;
+  const FOOTER_H = 60;   // caption / provenance under everything
+  const availH   = pdf.page.height - startY - MARGIN - FOOTER_AREA - BANNER_H - FOOTER_H;
+  const plotW    = Math.max(280, w - STATS_W - 14);
+  const plotH    = Math.min(availH, plotW);     // square
+  const x0       = MARGIN;
+  const y0       = startY + 4;
+
+  // Establish a km projection centered on the transmitter.  Outermost
+  // contour drives the bounds; pad 8% so labels don't kiss the frame.
+  const outermost = s.contours[0].radius_km;
+  const halfKm    = outermost * 1.08;
+  const xMin = -halfKm, xMax = halfKm;
+  const yMin = -halfKm, yMax = halfKm;
+  const xScale = plotW / (xMax - xMin);
+  const yScale = plotH / (yMax - yMin);
+  // x grows east, y grows north (PDF y grows south so flip).
+  const txCx   = x0 + plotW / 2;
+  const txCy   = y0 + plotH / 2;
+  const kmToPx = (km) => km * xScale;             // square; xScale==yScale
+
+  pdf.save();
+
+  // ── Background plate (warm cream rectangle so the rings pop) ────────
+  pdf.fillColor('#fbf6e8').rect(x0, y0, plotW, plotH).fill();
+  // Subtle compass grid (every 25% of the half-width).
+  pdf.strokeColor('#e9dcb8').lineWidth(0.3);
+  for (let i = 1; i <= 4; i++){
+    const r = (halfKm * i) / 4;
+    pdf.circle(txCx, txCy, kmToPx(r)).stroke();
+  }
+  // North-south + east-west cross.
+  pdf.strokeColor('#e0d2a5').lineWidth(0.3);
+  pdf.moveTo(txCx, y0).lineTo(txCx, y0 + plotH).stroke();
+  pdf.moveTo(x0, txCy).lineTo(x0 + plotW, txCy).stroke();
+
+  // ── Concentric service contours (back-to-front so city paints last) ─
+  for (const c of s.contours){
+    const px = kmToPx(c.radius_km);
+    if (!(px > 0)) continue;
+    pdf.save();
+    pdf.fillColor(c.color).opacity(c.fill_opacity);
+    pdf.circle(txCx, txCy, px).fill();
+    pdf.opacity(1);
+    pdf.strokeColor(c.color).lineWidth(c.is_dominant ? 1.4 : 0.9);
+    if (c.dashed) pdf.dash(3, { space: 2 });
+    pdf.circle(txCx, txCy, px).stroke();
+    pdf.undash();
+    pdf.restore();
+  }
+
+  // ── Population dot density inside the dominant (primary) contour ────
+  // Deterministic seed: facility_id + tx call, so the same exhibit
+  // re-rendered places dots identically (replay-stable visual).
+  const dominant = s.contours.find(c => c.is_dominant)
+                 || s.contours[s.contours.length - 1];
+  if (s.population?.persons && dominant){
+    const persons      = s.population.persons;
+    // Honor the section builder's cap (visualSummary.js publishes
+    // display_hints.max_dots).  This is a defense-in-depth re-check:
+    // never let a huge-metro exhibit render the dominant ring as a
+    // solid black disk regardless of upstream model state.
+    const MAX_DOTS     = Math.max(60, Math.min(1200,
+                          Number(s.display_hints?.max_dots) || 680));
+    const peoplePerDot = Math.max(1, Math.ceil(persons / MAX_DOTS));
+    const nDots        = Math.min(MAX_DOTS, Math.ceil(persons / peoplePerDot));
+    const rPx          = kmToPx(dominant.radius_km);
+    const seed         = `${s.tx.facility_id || s.tx.call || 'x'}|${persons}|${dominant.id}`;
+    const rng          = mulberry32(hashStr(seed));
+    pdf.save();
+    pdf.fillColor('#1c2e3a').opacity(0.78);
+    for (let i = 0; i < nDots; i++){
+      // Uniform disk: r = R·√u, theta = 2π·v
+      const r = rPx * Math.sqrt(rng());
+      const t = 2 * Math.PI * rng();
+      const dx = r * Math.cos(t);
+      const dy = r * Math.sin(t);
+      pdf.circle(txCx + dx, txCy + dy, 0.85).fill();
+    }
+    pdf.opacity(1);
+    pdf.restore();
+    // Stash for the legend (so the dot-ratio is documented).
+    s.__people_per_dot = peoplePerDot;
+    s.__n_dots         = nDots;
+  }
+
+  // ── Environmental tree canopy halo at the transmitter ───────────────
+  // Halo is a thick ring around the tx, color graded by canopy density
+  // (USFS TCC 0-100 %).  Green-scale from washed-out (low canopy) to
+  // forest-deep (very dense).  Renders even when canopy is null — then
+  // a neutral gray ring with "no coverage" label.
+  if (s.canopy){
+    const v = Number.isFinite(s.canopy.value_numeric) ? s.canopy.value_numeric : null;
+    const ringColor = canopyColor(v);
+    pdf.save();
+    pdf.strokeColor(ringColor).lineWidth(2.6).opacity(0.85);
+    pdf.circle(txCx, txCy, 9).stroke();
+    pdf.opacity(1);
+    pdf.restore();
+  }
+
+  // ── Transmitter marker (Genoa teal-dark with white center pip) ──────
+  pdf.save();
+  pdf.fillColor(TEAL_DARK).circle(txCx, txCy, 4.0).fill();
+  pdf.fillColor('white').circle(txCx, txCy, 1.6).fill();
+  pdf.restore();
+
+  // ── North arrow (top-left) ──────────────────────────────────────────
+  pdf.save();
+  const naX = x0 + 14, naY = y0 + 18;
+  pdf.strokeColor(TEAL_DARK).lineWidth(0.9).fillColor(TEAL_DARK);
+  pdf.moveTo(naX, naY + 12).lineTo(naX, naY - 8).stroke();
+  pdf.moveTo(naX - 4, naY - 3).lineTo(naX, naY - 8).lineTo(naX + 4, naY - 3).closePath().fill();
+  pdf.font(BOLD_FONT).fontSize(8).fillColor(TEAL_DARK)
+     .text('N', naX - 3, naY + 14, { lineBreak: false });
+  pdf.restore();
+
+  // ── Scale bar (bottom-left of plot) ─────────────────────────────────
+  pdf.save();
+  const targetKm = halfKm * 0.5;   // ~half the radius
+  const roundKm = roundScaleStep(targetKm);
+  const barLenPdf = kmToPx(roundKm);
+  const sbX = x0 + 14;
+  const sbY = y0 + plotH - 18;
+  pdf.strokeColor(TEAL_DARK).lineWidth(1.0);
+  pdf.moveTo(sbX, sbY).lineTo(sbX + barLenPdf, sbY).stroke();
+  pdf.moveTo(sbX, sbY - 3).lineTo(sbX, sbY + 3).stroke();
+  pdf.moveTo(sbX + barLenPdf, sbY - 3).lineTo(sbX + barLenPdf, sbY + 3).stroke();
+  pdf.font(MONO_FONT).fontSize(7).fillColor(TEAL_DARK)
+     .text(`${roundKm} km`, sbX, sbY + 4, { width: barLenPdf, align: 'center', lineBreak: false });
+  pdf.restore();
+
+  // ── Right sidebar: oversized headline stats + contour legend ────────
+  const sbX0 = x0 + plotW + 14;
+  let   sbY0 = y0;
+
+  // STATION HEADER
+  // Typography sizes come from section.display_hints (visualSummary.js)
+  // so the section can re-tune the headline without a renderer change.
+  const hints = s.display_hints || {};
+  const callSize    = Number.isFinite(hints.station_label_size) ? hints.station_label_size : 20;
+  const subSize     = Number.isFinite(hints.sub_label_size)     ? hints.sub_label_size     : 9;
+  const statLblSize = Number.isFinite(hints.stat_label_size)    ? hints.stat_label_size    : 8;
+  const statValSize = Number.isFinite(hints.stat_value_size)    ? hints.stat_value_size    : 22;
+  const legendSize  = Number.isFinite(hints.legend_size)        ? hints.legend_size        : 8;
+  pdf.save();
+  pdf.font(BOLD_FONT).fontSize(callSize).fillColor(TEAL_DARK)
+     .text(s.tx.call || '—', sbX0, sbY0, { width: STATS_W, lineBreak: false, ellipsis: true });
+  sbY0 += callSize + 4;
+  const subParts = [
+    s.tx.community,
+    s.tx.frequency,
+    s.tx.service,
+    s.tx.fcc_class ? `Class ${s.tx.fcc_class}` : null,
+    Number.isFinite(s.tx.erp_kw) ? `${s.tx.erp_kw} kW` : null
+  ].filter(Boolean);
+  // Allow the subline to wrap (long community-of-license names overflow
+  // the 168pt sidebar with lineBreak: false and were getting clipped).
+  pdf.font(BODY_FONT).fontSize(subSize).fillColor(TEXT_DIM)
+     .text(subParts.join(' · '), sbX0, sbY0, {
+        width: STATS_W,
+        lineBreak: hints.wrap_station_subline !== false,
+        ellipsis: hints.wrap_station_subline === false
+     });
+  sbY0 = pdf.y + 10;
+  pdf.restore();
+
+  // ── PEOPLE stat tile ─────────────────────────────────────────────────
+  if (s.population?.persons){
+    pdf.save();
+    pdf.fillColor('#1c2e3a').rect(sbX0, sbY0, STATS_W, 60).fill();
+    pdf.font(BODY_FONT).fontSize(statLblSize).fillColor('#f3c86d')
+       .text('PEOPLE INSIDE PRIMARY CONTOUR', sbX0 + 8, sbY0 + 6,
+             { width: STATS_W - 16, characterSpacing: 0.6, lineBreak: false, ellipsis: true });
+    pdf.font(BOLD_FONT).fontSize(statValSize).fillColor('white')
+       .text(`~ ${fmtPersons(s.population.persons)}`, sbX0 + 8, sbY0 + 18,
+             { width: STATS_W - 16, lineBreak: false, ellipsis: true });
+    const srcLabel = [s.population.source, s.population.vintage].filter(Boolean).join(' · ');
+    if (srcLabel){
+      pdf.font(BODY_FONT).fontSize(7).fillColor('#a8b4be')
+         .text(srcLabel, sbX0 + 8, sbY0 + 44, { width: STATS_W - 16, lineBreak: false, ellipsis: true });
+    }
+    pdf.restore();
+    sbY0 += 70;
+  }
+
+  // ── ENVIRONMENT (canopy) stat tile ──────────────────────────────────
+  if (s.canopy){
+    const v = s.canopy.value_numeric;
+    pdf.save();
+    pdf.fillColor('#2c4a2d').rect(sbX0, sbY0, STATS_W, 60).fill();
+    pdf.font(BODY_FONT).fontSize(statLblSize).fillColor('#cfe9b6')
+       .text('TREE CANOPY AT TRANSMITTER', sbX0 + 8, sbY0 + 6,
+             { width: STATS_W - 16, characterSpacing: 0.6, lineBreak: false, ellipsis: true });
+    pdf.font(BOLD_FONT).fontSize(statValSize).fillColor('white')
+       .text(v == null ? '—' : `${v}%`, sbX0 + 8, sbY0 + 18,
+             { width: STATS_W - 16, lineBreak: false, ellipsis: true });
+    pdf.font(ITALIC_FONT).fontSize(7).fillColor('#cfe9b6')
+       .text(s.canopy.interpretation || '', sbX0 + 8, sbY0 + 44,
+             { width: STATS_W - 16, lineBreak: true, height: 14, ellipsis: true });
+    pdf.restore();
+    sbY0 += 70;
+  }
+
+  // ── COVERAGE area stat tile ──────────────────────────────────────────
+  const dominantArea = (s.contours.find(c => c.is_dominant) || s.contours[s.contours.length - 1])?.area_km2;
+  if (Number.isFinite(dominantArea)){
+    pdf.save();
+    pdf.fillColor('#fbf6e8').rect(sbX0, sbY0, STATS_W, 50).fill();
+    pdf.strokeColor('#c8843c').lineWidth(0.6).rect(sbX0, sbY0, STATS_W, 50).stroke();
+    pdf.font(BODY_FONT).fontSize(8).fillColor('#8a4a1a')
+       .text('PRIMARY CONTOUR AREA', sbX0 + 8, sbY0 + 6, { width: STATS_W - 16, characterSpacing: 0.6 });
+    pdf.font(BOLD_FONT).fontSize(16).fillColor('#8a2a14')
+       .text(`${fmtArea(dominantArea)} km²`, sbX0 + 8, sbY0 + 18, { width: STATS_W - 16, lineBreak: false });
+    pdf.restore();
+    sbY0 += 58;
+  }
+
+  // ── Contour legend ───────────────────────────────────────────────────
+  pdf.save();
+  pdf.font(BODY_FONT).fontSize(legendSize).fillColor(TEXT_DIM)
+     .text('CONTOURS', sbX0, sbY0, { width: STATS_W, characterSpacing: 0.4 });
+  sbY0 = pdf.y + 4;
+  for (const c of s.contours.slice().reverse()){     // city first (warmest)
+    pdf.save();
+    pdf.strokeColor(c.color).lineWidth(c.is_dominant ? 1.4 : 0.9);
+    if (c.dashed) pdf.dash(2.5, { space: 1.5 });
+    pdf.moveTo(sbX0, sbY0 + 4).lineTo(sbX0 + 18, sbY0 + 4).stroke();
+    pdf.undash();
+    pdf.restore();
+    const txt = `${c.label}  ·  ${c.radius_km.toFixed(2)} km`;
+    pdf.font(MONO_FONT).fontSize(legendSize).fillColor('#2a3a48')
+       .text(txt, sbX0 + 24, sbY0, { width: STATS_W - 24, lineBreak: false, ellipsis: true });
+    sbY0 += 11;
+  }
+  pdf.restore();
+
+  // People-per-dot legend (if dots were rendered)
+  if (s.__n_dots){
+    pdf.save();
+    sbY0 += 4;
+    pdf.font(BODY_FONT).fontSize(7).fillColor(TEXT_DIM)
+       .text(`Each dot ≈ ${fmtPersons(s.__people_per_dot)} ${s.__people_per_dot === 1 ? 'person' : 'people'} · ${s.__n_dots} dots shown`,
+             sbX0, sbY0, { width: STATS_W });
+    pdf.restore();
+  }
+
+  pdf.restore();   // close the outer save() from the start of the function
+
+  // ── Advisory banner (bottom, full width, verbatim posture) ──────────
+  const bannerY = y0 + plotH + 10;
+  pdf.save();
+  pdf.fillColor('#1c2e3a').rect(x0, bannerY, w, BANNER_H).fill();
+  pdf.fillColor('#f3c86d').rect(x0, bannerY, 4, BANNER_H).fill();      // amber accent stripe
+  pdf.font(BOLD_FONT).fontSize(8).fillColor('#f3c86d')
+     .text('ADVISORY · FILING EFFECT: NONE', x0 + 14, bannerY + 6,
+           { width: w - 28, characterSpacing: 0.7 });
+  pdf.font(BODY_FONT).fontSize(9).fillColor('#e8eef2')
+     .text(s.advisory || 'Advisory only.  Does not modify FCC rule outputs.',
+           x0 + 14, bannerY + 18, { width: w - 28 });
+  pdf.restore();
+
+  // ── Provenance footer (small print under the banner) ───────────────
+  const footerY = bannerY + BANNER_H + 8;
+  const provBits = [
+    `tx ${Number(s.tx.lat).toFixed(4)}, ${Number(s.tx.lon).toFixed(4)}`,
+    s.canopy?.dataset ? `canopy ${s.canopy.dataset}` : null,
+    s.population?.source ? `population ${s.population.source}${s.population.vintage ? ' (' + s.population.vintage + ')' : ''}` : null,
+    `contours per 47 CFR §73.184 / §73.333 (vendored gwave.js / tvfm_curves.js)`
+  ].filter(Boolean);
+  pdf.save();
+  pdf.font(BODY_FONT).fontSize(7).fillColor(TEXT_DIM)
+     .text(provBits.join(' · '), x0, footerY, { width: w, align: 'left' });
+  pdf.restore();
+
+  pdf.y = footerY + 18;
+}
+
+// ───── helpers for the visual summary ─────────────────────────────────
+
+function fmtPersons(n){
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '—';
+  if (x >= 1_000_000) return `${(x / 1_000_000).toFixed(x >= 10_000_000 ? 0 : 1)} M`;
+  if (x >= 10_000)    return `${Math.round(x / 1000)} k`;
+  if (x >= 1000)      return `${(x / 1000).toFixed(1)} k`;
+  return x.toLocaleString('en-US');
+}
+
+function fmtArea(n){
+  const x = Number(n);
+  if (!Number.isFinite(x)) return '—';
+  if (x >= 100_000) return Math.round(x).toLocaleString('en-US');
+  if (x >= 1000)    return Math.round(x).toLocaleString('en-US');
+  return x.toFixed(1);
+}
+
+// USFS TCC canopy 0..100 → green-scale; null → neutral gray ring.
+function canopyColor(v){
+  if (v == null || !Number.isFinite(v)) return '#9aa4ac';
+  // Anchor stops: 0=#d8e8c8 (pale), 20=#a7d39b, 40=#76c893, 60=#3aa05a, 80+=#1a6b34
+  if (v <= 10) return '#d8e8c8';
+  if (v <= 30) return '#a7d39b';
+  if (v <= 50) return '#76c893';
+  if (v <= 70) return '#3aa05a';
+  return '#1a6b34';
+}
+
+// Deterministic 32-bit PRNG (mulberry32) seeded from a string hash so
+// the same exhibit always paints dots in the same places (replay-stable).
+function hashStr(s){
+  let h = 2166136261 >>> 0;
+  const str = String(s);
+  for (let i = 0; i < str.length; i++){
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h || 1;
+}
+function mulberry32(a){
+  return function(){
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1) >>> 0;
+    t ^= (t + Math.imul(t ^ (t >>> 7), t | 61)) >>> 0;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }

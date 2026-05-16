@@ -71,6 +71,13 @@ export function makeFacilityClient({
           if (r.ok){
             const j = await r.json();
             ztrRows = (j.rows || []).map(row => normalizeZtrRow(row, u));
+            // Server-side AM-class enrichment (FCC AMQ) — ZTR doesn't
+            // carry fcc_class; the orchestrator needs it for §73.182 NIF
+            // and §73.99 PSRA/PSSA.  Bounded + fail-soft, so a slow or
+            // unreachable AMQ never stalls the dropdown.
+            ztrRows = await Promise.all(
+              ztrRows.map((row) => enrichAmFromAmq(row, fmqClient))
+            );
             if (ztrRows.length > 0){
               return {
                 rows:   ztrRows,
@@ -117,7 +124,11 @@ export function makeFacilityClient({
           if (r.ok){
             const j = await r.json();
             const row = (j.rows || [])[0];
-            if (row) return { facility: normalizeZtrRow(row, u), source: 'zerotrustradio' };
+            if (row){
+              const normalized = normalizeZtrRow(row, u);
+              const enriched   = await enrichAmFromAmq(normalized, fmqClient);
+              return { facility: enriched, source: 'zerotrustradio' };
+            }
           }
         } catch (_){/* fall through */}
       }
@@ -896,6 +907,82 @@ export function makeFacilityClient({
       };
     }
   };
+}
+
+// ---------------- AM enrichment from FCC AMQ ----------------
+//
+// ZTR's broadcast_stations table does not carry the FCC AM service class
+// (A / B / C / D) — see normalizeZtrRow's `fcc_class: null` below.  Without
+// that field, the AM-night orchestrator (§73.182 NIF + §73.99 PSRA/PSSA)
+// refuses to run because §73.183 D/U protection ratios are class-dependent
+// and there is no defensible default.
+//
+// To make the form populate automatically (so the operator doesn't have to
+// click an "advanced" expander and pick the class manually for every
+// station), we enrich each AM row server-side by querying FCC AMQ for the
+// same callsign and patching `fcc_class` (and other AM-specific fields)
+// onto the ZTR row.  AMQ is the FCC's authoritative class-of-station
+// data — the official pipe-delimited Active AM record dump on
+// transition.fcc.gov.  Pattern-mode is NOT derived from AMQ for AM (AMQ
+// col 5 is a time period, not a pattern); it stays null until the
+// engineer attaches a pattern_table from §73.151 filings.
+//
+// Fail-soft: a 1-second cap on the AMQ call so a slow upstream cannot
+// stall the facility lookup.  On any AMQ failure the original ZTR row
+// is returned unchanged — the orchestrator will surface the missing-
+// class diagnostic in the AM-night appendix as before.
+//
+// Cache: a small in-process Map (LRU-ish — drops oldest entries past
+// AM_CLASS_CACHE_MAX) so a session's repeated lookups of the same
+// station don't keep round-tripping to AMQ.
+
+const AM_CLASS_CACHE_MAX = 256;
+const _amClassCache = new Map();   // key: facility_id || call → fcc_class
+
+// Test hook — drop the cache between unit tests.  Not used in production.
+export function _resetAmClassCache(){
+  _amClassCache.clear();
+}
+
+function _cachePut(key, value){
+  if (!key) return;
+  if (_amClassCache.has(key)) _amClassCache.delete(key);
+  _amClassCache.set(key, value);
+  while (_amClassCache.size > AM_CLASS_CACHE_MAX){
+    const oldest = _amClassCache.keys().next().value;
+    _amClassCache.delete(oldest);
+  }
+}
+
+export async function enrichAmFromAmq(row, fmqClient){
+  if (!row || row.service !== 'AM') return row;
+  if (row.fcc_class) return row;                                  // already populated
+  if (!fmqClient || !row.call) return row;                        // can't enrich
+  const cacheKey = row.facility_id || row.call;
+  if (_amClassCache.has(cacheKey)){
+    const cached = _amClassCache.get(cacheKey);
+    return cached ? { ...row, fcc_class: cached, fcc_class_source: 'fcc-amq-cache' } : row;
+  }
+  try {
+    // 1-second budget — facility search is interactive and the operator
+    // is waiting for the dropdown.  AMQ usually responds in 200-400 ms.
+    const r = await Promise.race([
+      fmqClient.searchByCallsign(row.call),
+      new Promise((resolve) => setTimeout(() => resolve({ rows: [] }), 1000))
+    ]);
+    const candidates = (r?.rows || []).filter((x) => x.service === 'AM');
+    let match = null;
+    if (row.facility_id){
+      match = candidates.find((x) => String(x.facility_id) === String(row.facility_id)) || null;
+    }
+    if (!match) match = candidates.find((x) => x.call === row.call) || null;
+    const cls = match?.fcc_class || null;
+    _cachePut(cacheKey, cls);
+    if (!cls) return row;
+    return { ...row, fcc_class: cls, fcc_class_source: 'fcc-amq' };
+  } catch {
+    return row;
+  }
 }
 
 // ---------------- normalization ----------------

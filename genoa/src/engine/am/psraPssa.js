@@ -103,21 +103,24 @@ export function buildPsraPssaWindows({ sunrise, sunset, timezone_label = null } 
   const morningBoundary = hhmmToMinutes(LOCAL_MORNING_BOUNDARY_HHMM);  // 360
   const eveningBoundary = hhmmToMinutes(LOCAL_EVENING_BOUNDARY_HHMM);  // 1080
 
-  // PSRA: 6 AM local → local sunrise.  Only applicable when sunrise
-  // is AFTER 6 AM (otherwise the window is empty — no PSRA needed
-  // because daytime already started before 6 AM).  In US AM the
-  // sunrise window straddles 6 AM seasonally; June sunrise can be
-  // ~5:30 AM in northern latitudes which means no PSRA is needed.
-  const psraStart = morningBoundary;
+  // PSRA: max( 6 AM local, sunrise − 2 h ) → local sunrise.
+  // 47 CFR §73.99(b)(1) caps the pre-sunrise window at 2 hours
+  // (120 minutes) before local sunrise — even when the regulatory
+  // 6 AM boundary would otherwise produce a longer window in high-
+  // latitude winter (e.g. Anchorage sunrise 09:30 local would yield
+  // a 3.5-hour 06:00→09:30 window, which is over-broad authority).
+  // The boundary is the LATER of 06:00 and (sunrise − 120 min).
+  const psraStart = Math.max(morningBoundary, srMin - 120);
   const psraEnd   = srMin;
   const psraDur   = Math.max(0, psraEnd - psraStart);
   const psraApplicable = psraDur > 0;
 
-  // PSSA: local sunset → 6 PM local.  Only applicable when sunset
-  // is BEFORE 6 PM (otherwise no PSSA needed — daytime extends past
-  // 6 PM).
+  // PSSA: local sunset → min( 6 PM local, sunset + 2 h ).
+  // Same 2-hour §73.99(b)(2) cap on the post-sunset window;
+  // high-latitude winter sunset of 15:30 should NOT yield a
+  // 15:30→18:00 (2.5-hour) PSSA window.
   const pssaStart = ssMin;
-  const pssaEnd   = eveningBoundary;
+  const pssaEnd   = Math.min(eveningBoundary, ssMin + 120);
   const pssaDur   = Math.max(0, pssaEnd - pssaStart);
   const pssaApplicable = pssaDur > 0;
 

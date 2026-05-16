@@ -15,6 +15,21 @@
 // emits its "no residuals attached" disclaimer — but the captures
 // themselves are real evidence and belong on the exhibit.  THIS
 // section gives them a home.
+//
+// SIBLING:  sdrObservability.js bridges THIS section and the residual
+// table — when calibrated residuals exist, it surfaces "observed vs
+// predicted (dB)" per capture; when only audio captures are attached
+// it emits an ADVISORY-badged row set with a single explanatory line.
+// The two are complementary: this section gives the raw audio record;
+// sdrObservability adds the engineering comparison column.
+//
+// FUTURE-SUPPORT (planned, no wiring here):
+//   * KiwiSDR network feeds (https://kiwisdr.com/public/)
+//   * OpenWebRX / OpenWebRX+ self-hosted SDR servers
+//   * Drive-test WAV + GPS uploads from field crews
+//   These would all land in exhibit.evidence.measurements.records[]
+//   with `source` set to the provider name; the schema normalizer in
+//   src/types/sdrEvidence.schema.js already accepts those variants.
 
 export function buildMeasurementsSection(exhibit){
   const m = exhibit?.evidence?.measurements;

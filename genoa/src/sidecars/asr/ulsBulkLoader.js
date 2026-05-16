@@ -161,9 +161,15 @@ export async function runBulkLoad(pool, log = console){
   log.info(`[asr-loader] merged: ${towers.size} towers; ${nWithCoords} w/coords; ${nWithOwner} w/owner`);
 
   // 3. Bulk upsert in batches of 5_000
-  await pool.query('BEGIN');
+  // Transaction MUST be on a single checked-out client — issuing
+  // BEGIN/COMMIT/ROLLBACK on the pool sends each statement to an
+  // arbitrary backend connection, so the giant TRUNCATE + multi-INSERT
+  // block was NOT actually a transaction.  A crash mid-load could
+  // leave asr_towers empty or partial with no rollback.
+  const client = await pool.connect();
+  await client.query('BEGIN');
   try {
-    await pool.query('TRUNCATE asr_towers');
+    await client.query('TRUNCATE asr_towers');
     const all = [...towers.values()];
     // Postgres protocol caps a single query at 65535 bound parameters
     // (16-bit length field in the Bind message).  26 columns × 2500
@@ -204,12 +210,12 @@ export async function runBulkLoad(pool, log = console){
       });
       const sql = `INSERT INTO asr_towers (${cols.join(',')}) VALUES ${placeholders.join(',')}
                    ON CONFLICT (asr_number) DO NOTHING`;
-      await pool.query(sql, values);
+      await client.query(sql, values);
       if ((i / BATCH) % 10 === 0) log.info(`[asr-loader]   inserted ${Math.min(i+BATCH, all.length)} / ${all.length}`);
     }
 
     const elapsed = Math.round((Date.now() - startedAt) / 1000);
-    await pool.query(`
+    await client.query(`
       INSERT INTO asr_load_state (id, last_loaded_at, last_source_url, last_source_etag,
                                   last_source_last_modified, records_total, records_with_coords,
                                   records_with_owner, load_duration_seconds, load_error)
@@ -232,7 +238,7 @@ export async function runBulkLoad(pool, log = console){
     //    the prior 3 weekly publications.  Rolling 4-week window with
     //    oldest aging off; the asr_zip_archive table holds the raw
     //    bytea so we don't depend on container-ephemeral disk.
-    await pool.query(`
+    await client.query(`
       INSERT INTO asr_zip_archive
         (snapshot_date, source_url, source_etag, source_last_modified, size_bytes, sha256, zip_data)
       VALUES (CURRENT_DATE, $1, $2, $3, $4, $5, $6)
@@ -246,7 +252,7 @@ export async function runBulkLoad(pool, log = console){
         archived_at          = now()
     `, [BULK_URL, etag, lastMod ? new Date(lastMod) : null, sz, sha256, zipBuf]);
 
-    const purged = await pool.query(`
+    const purged = await client.query(`
       DELETE FROM asr_zip_archive
        WHERE archived_at < (now() - INTERVAL '28 days')
        RETURNING snapshot_date
@@ -255,7 +261,7 @@ export async function runBulkLoad(pool, log = console){
       log.info(`[asr-loader] archive: rotated off ${purged.rowCount} snapshot(s) older than 28 days: ${purged.rows.map(r => r.snapshot_date).join(', ')}`);
     }
 
-    await pool.query('COMMIT');
+    await client.query('COMMIT');
     log.info(`[asr-loader] DONE ${towers.size} rows + ${(sz/1e6).toFixed(1)} MB zip archived in ${elapsed}s`);
     await unlink(zipPath).catch(() => {});
     return {
@@ -268,13 +274,22 @@ export async function runBulkLoad(pool, log = console){
       archive_purged:       purged.rowCount
     };
   } catch (e){
-    await pool.query('ROLLBACK');
+    try { await client.query('ROLLBACK'); } catch { /* best-effort; client may already be broken */ }
+    // Error-state insert on the pool (not the client — the client's
+    // transaction is dead).  A pooled connection gives the error log a
+    // chance even if the transactional client itself is no longer
+    // healthy.
     await pool.query(`
       INSERT INTO asr_load_state (id, last_loaded_at, load_error)
       VALUES (1, now(), $1)
       ON CONFLICT (id) DO UPDATE SET last_loaded_at = now(), load_error = EXCLUDED.load_error
     `, [String(e.message).slice(0, 500)]);
     throw e;
+  } finally {
+    // ALWAYS return the connection to the pool, even on success path
+    // (return + finally both run because finally executes before the
+    // return value is yielded to the caller).
+    client.release();
   }
 }
 

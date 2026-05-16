@@ -62,6 +62,15 @@ export function rssAggregate(interferers, opts = {}){
   const exclusionFraction = Number.isFinite(opts.exclusionFraction)
     ? Math.max(0, Math.min(1, opts.exclusionFraction))
     : RSS_EXCLUSION_FRACTION;
+  // Optional caller-supplied threshold (µV/m) — overrides
+  // strongest × exclusionFraction.  Used by nifContour.js to apply
+  // §73.182(k)'s 25 % threshold PER RECEIVER (across all relations)
+  // rather than per relation; the FCC rule sets the threshold from the
+  // loudest signal the receiver sees "in any one direction," regardless
+  // of channel relation.
+  const thresholdOverride = Number.isFinite(opts.thresholdUvm) && opts.thresholdUvm >= 0
+    ? Number(opts.thresholdUvm)
+    : null;
 
   // Drop entries with non-finite or non-positive fields up front;
   // a "zero or NaN" field is "no interferer", not a contributor.
@@ -74,18 +83,19 @@ export function rssAggregate(interferers, opts = {}){
       n_input:         interferers.length,
       n_contributing:  0,
       n_excluded:      interferers.length,
-      threshold_uv_m:  0,
+      threshold_uv_m:  thresholdOverride || 0,
       strongest_uv_m:  0,
       contributing:    [],
       excluded:        interferers.slice(),
       exclusion_fraction: exclusionFraction,
-      regulation:      '47 CFR §73.182(k)'
+      regulation:      '47 CFR §73.182(k)',
+      threshold_source: thresholdOverride != null ? 'caller (cross-relation)' : 'pool-local'
     };
   }
 
   const sorted   = cleaned.slice().sort((a, b) => b.field_uv_m - a.field_uv_m);
   const strongest = sorted[0].field_uv_m;
-  const threshold = strongest * exclusionFraction;
+  const threshold = thresholdOverride != null ? thresholdOverride : strongest * exclusionFraction;
 
   const contributing = [];
   const excluded     = [];
@@ -180,10 +190,10 @@ export function standardDuDb(subjectClass, relation){
   const cls = String(subjectClass || '').toUpperCase();
   const rel = normalizeRelation(relation);
   const matrix = {
-    A: { co_channel: 26, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
-    B: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
-    C: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
-    D: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: null }
+    A: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    B: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    C: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    D: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: null }
   };
   const row = matrix[cls];
   if (!row) return null;

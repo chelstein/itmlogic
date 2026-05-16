@@ -41,6 +41,7 @@ import { makeFccamClient }       from '../../evidence/fccamClient.js';
 import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
 import { makeFccSunClient }      from '../../evidence/fccSunClient.js';
 import { makeAmPhysicsClient }   from '../../evidence/amPhysicsClient.js';
+import { makeGeoRfEvidenceClient } from '../../evidence/geoRfEvidenceClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -171,14 +172,215 @@ export const sidecars = Object.freeze({
   // rule math.  Opt-in via AM_PHYSICS_SIDECAR_URL on the deploy; when
   // unset the AM exhibit attaches evidence.am_physics =
   // { status:'not_configured' } and the study still ships.
-  amPhysics:   makeAmPhysicsClient()
+  amPhysics:   makeAmPhysicsClient(),
+
+  // Geo-RF Evidence sidecar — environmental geospatial datasets used for
+  // advisory confidence-scoring and observed-vs-predicted residual
+  // support.  Wraps a microservice that surfaces:
+  //   - USFS Tree Canopy Cover (CONUS) per-point sample
+  //   - tau_statistic_for_rf_models artifact availability
+  //   - NRCan Canada landcover availability (for cross-border studies)
+  // ADVISORY ONLY — never modifies §73.184 / §73.182 / §73.190 / §73.313
+  // / §73.207 / §73.215 contour or allocation math.  Opt-in via
+  // GEO_RF_EVIDENCE_SIDECAR_URL on the deploy; when unset the exhibit
+  // attaches evidence.geo_rf_evidence = { status:'not_configured' } and
+  // ships unchanged.
+  geoRfEvidence: makeGeoRfEvidenceClient()
 });
+
+// SIDECAR_REGISTRY — additive metadata describing each sidecar's role,
+// filing effect, and which broadcast services rely on it.  Used by
+// /readyz to annotate the per-sidecar status block and by docs/exhibits
+// to surface "which engine produced this number".  This registry does
+// NOT change runtime selection — the `sidecars` map above is the source
+// of truth for client wiring; this registry is descriptive metadata only.
+//
+// filing_effect semantics:
+//   'authoritative' — output feeds §73.* rule math directly (contours,
+//                     allocation, allotment, NIF, sunrise/sunset).
+//   'none'          — advisory / observability only; cannot move a
+//                     contour or change an allocation outcome.
+//
+// role taxonomy:
+//   'fcc'                — FCC-authored or FCC-data reference engine.
+//   'advisory_physics'   — physics solver attached as evidence only.
+//   'environmental'      — environmental / geospatial evidence dataset.
+//   'identity'           — station-identity / RadioDNS / EAS lookups.
+//   'rendering'          — exhibit page rendering (headless browser).
+//   'reference_engine'   — non-FCC vendored engine kept for parity.
+//   'observability'      — measurement / telemetry collection.
+export const SIDECAR_REGISTRY = Object.freeze([
+  {
+    name: 'fortranFcc',
+    url_env_var: 'FORTRAN_FCC_SIDECAR_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['FM','LPFM','FX','TV'],
+    current_url: process.env.FORTRAN_FCC_SIDECAR_URL || null
+  },
+  {
+    name: 'fccam',
+    url_env_var: 'FCCAM_SIDECAR_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['AM'],
+    current_url: process.env.FCCAM_SIDECAR_URL || null
+  },
+  {
+    name: 'sun',
+    url_env_var: 'FCC_SUN_SIDECAR_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['AM'],
+    current_url: process.env.FCC_SUN_SIDECAR_URL || null
+  },
+  {
+    name: 'fccContours',
+    url_env_var: 'FCC_CONTOURS_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['FM','LPFM','FX','TV','AM'],
+    current_url: process.env.FCC_CONTOURS_URL || null
+  },
+  {
+    name: 'fccLms',
+    url_env_var: 'FCC_LMS_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.FCC_LMS_URL || null
+  },
+  {
+    name: 'asr',
+    url_env_var: 'ASR_SIDECAR_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.ASR_SIDECAR_URL || null
+  },
+  {
+    name: 'faaOe',
+    url_env_var: 'FAA_OE_SIDECAR_URL',
+    role: 'fcc',
+    filing_effect: 'authoritative',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.FAA_OE_SIDECAR_URL || null
+  },
+  {
+    name: 'amPhysics',
+    url_env_var: 'AM_PHYSICS_SIDECAR_URL',
+    role: 'advisory_physics',
+    filing_effect: 'none',
+    required_for: ['AM'],
+    current_url: process.env.AM_PHYSICS_SIDECAR_URL || null
+  },
+  {
+    name: 'nec',
+    url_env_var: 'NEC_SIDECAR_URL',
+    role: 'advisory_physics',
+    filing_effect: 'none',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.NEC_SIDECAR_URL || null
+  },
+  {
+    name: 'geoRfEvidence',
+    url_env_var: 'GEO_RF_EVIDENCE_SIDECAR_URL',
+    role: 'environmental',
+    filing_effect: 'none',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.GEO_RF_EVIDENCE_SIDECAR_URL || null
+  },
+  {
+    name: 'terrain',
+    url_env_var: 'TERRAIN_SIDECAR_URL',
+    role: 'reference_engine',
+    filing_effect: 'authoritative',
+    required_for: ['FM','LPFM','FX','TV'],
+    current_url: process.env.TERRAIN_SIDECAR_URL || null
+  },
+  {
+    name: 'splat',
+    url_env_var: 'SPLAT_SIDECAR_URL',
+    role: 'reference_engine',
+    filing_effect: 'none',
+    required_for: ['FM','LPFM','FX','TV'],
+    current_url: process.env.SPLAT_SIDECAR_URL || null
+  },
+  {
+    name: 'identity',
+    url_env_var: 'IDENTITY_SIDECAR_URL',
+    role: 'identity',
+    filing_effect: 'none',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.IDENTITY_SIDECAR_URL || null
+  },
+  {
+    name: 'map',
+    url_env_var: 'MAP_SIDECAR_URL',
+    role: 'rendering',
+    filing_effect: 'none',
+    required_for: ['FM','LPFM','FX','TV','AM'],
+    current_url: process.env.MAP_SIDECAR_URL || null
+  },
+  {
+    name: 'measurement',
+    url_env_var: 'MEASUREMENT_SIDECAR_URL',
+    role: 'observability',
+    filing_effect: 'none',
+    required_for: [],
+    current_url: process.env.MEASUREMENT_SIDECAR_URL || null
+  },
+  {
+    name: 'population',
+    url_env_var: 'POPULATION_EVIDENCE_URL',
+    role: 'reference_engine',
+    filing_effect: 'authoritative',
+    required_for: ['FM','LPFM','FX','TV','AM'],
+    current_url: process.env.POPULATION_EVIDENCE_URL || null
+  },
+  {
+    name: 'facility',
+    url_env_var: 'ZTR_BASE_URL',
+    role: 'reference_engine',
+    filing_effect: 'none',
+    required_for: ['AM','FM','LPFM','FX','TV'],
+    current_url: process.env.ZTR_BASE_URL || null
+  },
+  {
+    name: 'los',
+    url_env_var: 'ZTR_BASE_URL',
+    role: 'reference_engine',
+    filing_effect: 'none',
+    required_for: ['FM','LPFM','FX','TV'],
+    current_url: process.env.ZTR_BASE_URL || null
+  }
+]);
+
+// O(1) metadata lookup keyed by sidecar name.  Used by sidecarStatus()
+// to annotate /readyz entries and by getSidecarMeta() for external
+// callers (docs generator, exhibit provenance).
+const REGISTRY_BY_NAME = Object.freeze(
+  Object.fromEntries(SIDECAR_REGISTRY.map(r => [r.name, r]))
+);
+
+// Resolve role + filing_effect metadata for a given sidecar key.
+// Returns null for keys not present in SIDECAR_REGISTRY so callers
+// degrade gracefully without crashing.
+export function getSidecarMeta(name){
+  return REGISTRY_BY_NAME[name] || null;
+}
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
 // /health on the baseUrl with a 3-s timeout.  Each probe also returns
 // the elapsed time so the UI can surface "slow but reachable" states.
 async function probeOne(name, c){
-  if (!c) return [name, { configured: false, healthy: false }];
+  const meta = REGISTRY_BY_NAME[name];
+  if (!c) return [name, {
+    configured: false,
+    healthy:    false,
+    role:           meta ? meta.role          : null,
+    filing_effect:  meta ? meta.filing_effect : null
+  }];
   const t0 = Date.now();
   let healthy = false;
   try {
@@ -193,7 +395,9 @@ async function probeOne(name, c){
     configured: true,
     healthy,
     baseUrl:    c.baseUrl || null,
-    latency_ms: Date.now() - t0
+    latency_ms: Date.now() - t0,
+    role:           meta ? meta.role          : null,
+    filing_effect:  meta ? meta.filing_effect : null
   }];
 }
 

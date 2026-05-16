@@ -39,7 +39,11 @@ export default function FacilityRack({
   computing = false,
   busy = false
 }) {
-  const set = (k, v) => onChange && onChange(k, v);
+  // 3rd arg is an optional provenance tag — only the fcc_class field
+  // uses it today so the source chip can flip from "AMQ" to "manual"
+  // when the user overrides the auto-populated class.  Parent App.jsx
+  // also receives this and stashes it on inputs.fcc_class_source.
+  const set = (k, v, src) => onChange && onChange(k, v, src);
   return (
     <RackPanel
       eyebrow="Console / 01"
@@ -106,8 +110,11 @@ export default function FacilityRack({
           </select>
         </div>
         <div>
-          <label className="rack-label">FCC class</label>
-          <select className="rack-input" value={inputs.fcc_class || 'A'} onChange={e => set('fcc_class', e.target.value)}>
+          <label className="rack-label flex items-center gap-2">
+            <span>FCC class</span>
+            <FccClassSourceChip source={inputs.fcc_class_source} hasValue={!!inputs.fcc_class} />
+          </label>
+          <select className="rack-input" value={inputs.fcc_class || 'A'} onChange={(e) => set('fcc_class', e.target.value, 'manual')}>
             {FCC_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
@@ -237,5 +244,25 @@ export default function FacilityRack({
         <HardwareButton variant="ghost"     onClick={onReset}              disabled={busy}>Reset</HardwareButton>
       </div>
     </RackPanel>
+  );
+}
+
+// Small provenance chip next to the FCC class dropdown.  Surfaces
+// whether the class value came from FCC AMQ (live or cache) or from
+// manual entry / facility lookup — so the engineer never confuses an
+// auto-populated value with one they typed.
+function FccClassSourceChip({ source, hasValue }){
+  if (!hasValue) return null;
+  const tone = {
+    'fcc-amq':       { bg: 'bg-emerald-500/15', fg: 'text-emerald-300', label: 'AMQ live' },
+    'fcc-amq-cache': { bg: 'bg-emerald-500/15', fg: 'text-emerald-300', label: 'AMQ cache' },
+    'manual':        { bg: 'bg-gold/15',         fg: 'text-gold',         label: 'manual' },
+    'lookup':        { bg: 'bg-cyan-500/15',     fg: 'text-cyan-300',     label: 'lookup' }
+  }[source] || { bg: 'bg-rule/10', fg: 'text-textDim', label: 'unverified' };
+  return (
+    <span className={`inline-block ${tone.bg} ${tone.fg} text-[9px] tracking-rack uppercase rounded px-1.5 py-0.5`}
+          title={source ? `source: ${source}` : 'class not yet verified against FCC AMQ'}>
+      {tone.label}
+    </span>
   );
 }

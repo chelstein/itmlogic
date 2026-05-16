@@ -1,0 +1,19 @@
+{
+  "call": "KDUS-AM",
+  "facility_id": "57847",
+  "service": "AM",
+  "frequency": 1060,
+  "erp_kw": 50,
+  "ground_sigma_mS_m": 6,
+  "lat": 33.448,
+  "lon": -112.074,
+  "radial_step_deg": 45,
+  "invariants": {
+    "contour_count": 4,
+    "radial_count": 8,
+    "must_not_contain_substrings_in_narrative": ["HAAT (input):"],
+    "must_contain_appendices": ["appendix-c", "appendix-d", "appendix-e"],
+    "page_count_band": { "min": 4, "max": 30 }
+  },
+  "notes": "AM 50 kW in Phoenix, AZ. AM smoke test."
+}

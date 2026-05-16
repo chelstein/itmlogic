@@ -61,7 +61,10 @@ services:
       - { key: NODE_ENV,                    scope: RUN_TIME, value: production }
       - { key: PORT,                        scope: RUN_TIME, value: "8080" }
       - { key: PG_SSL,                      scope: RUN_TIME, value: "true" }
-      - { key: PG_SSL_REJECT,               scope: RUN_TIME, value: "false" }
+      # NOTE: env-var name MUST match what pool.js reads
+      # (PG_SSL_REJECT_UNAUTHORIZED).  A previous "PG_SSL_REJECT" key
+      # was silently ignored — the override never reached the code.
+      - { key: PG_SSL_REJECT_UNAUTHORIZED,  scope: RUN_TIME, value: "false" }
       # DATABASE_URL is provisioned automatically when component is bound to ${db.DATABASE_URL}.
       - { key: DATABASE_URL,                scope: RUN_TIME, value: "${db.DATABASE_URL}" }
       # Spaces — set as encrypted SECRET in the console, not in this file.
@@ -199,7 +202,7 @@ workers:
       - { key: NODE_ENV,    scope: RUN_TIME, value: production }
       - { key: DATABASE_URL, scope: RUN_TIME, value: "${db.DATABASE_URL}" }
       - { key: PG_SSL,       scope: RUN_TIME, value: "true" }
-      - { key: PG_SSL_REJECT, scope: RUN_TIME, value: "false" }
+      - { key: PG_SSL_REJECT_UNAUTHORIZED, scope: RUN_TIME, value: "false" }
       - { key: WORKER_POLL_MS, scope: RUN_TIME, value: "5000" }
 
 # Notes on what's NOT in this spec:
