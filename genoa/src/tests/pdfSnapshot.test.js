@@ -103,6 +103,8 @@ test('snapshot: full FM engineering report renders with all key headings', async
     assert.ok(docHasHeading(doc, heading),
       `full report model missing heading containing: ${heading}`);
   }
+  assert.ok(docHasId(doc, 'visual-summary'),
+    'full FM report missing visual-summary section (build returned null — radii contract drift?)');
 });
 
 test('snapshot: exec_summary variant strips drilldowns and keeps the showpiece', async () => {
@@ -115,10 +117,15 @@ test('snapshot: exec_summary variant strips drilldowns and keeps the showpiece',
   // pages.  Check via section ids on the model (cheap) AND via PDF
   // render (smoke).
   const ids = doc.sections.map(s => s.id);
-  assert.ok(ids.includes('cover'),         'exec_summary lost cover');
-  assert.ok(ids.includes('purpose'),       'exec_summary lost purpose');
-  assert.ok(ids.includes('conclusion'),    'exec_summary lost conclusion');
-  assert.ok(ids.includes('certification'), 'exec_summary lost certification');
+  assert.ok(ids.includes('cover'),          'exec_summary lost cover');
+  assert.ok(ids.includes('purpose'),        'exec_summary lost purpose');
+  assert.ok(ids.includes('conclusion'),     'exec_summary lost conclusion');
+  assert.ok(ids.includes('certification'),  'exec_summary lost certification');
+  // The visual-summary page is the V-Soft-killer showpiece — exec_summary
+  // exists for non-engineer readers and MUST surface it.  A silent build-
+  // time drop (e.g. radii read from the wrong field) would otherwise pass
+  // every other assertion.  Pin it here.
+  assert.ok(ids.includes('visual-summary'), 'exec_summary lost visual-summary (radii contract drift?)');
   assert.ok(!ids.includes('appendix-a'),   'exec_summary should not include Appendix A');
   assert.ok(!ids.includes('appendix-b'),   'exec_summary should not include Appendix B');
   assert.ok(!ids.includes('appendix-c'),   'exec_summary should not include Appendix C');

@@ -26,11 +26,15 @@ export function buildVisualSummarySection(exhibit){
   const txLon = Number(inp.lon);
   if (!Number.isFinite(txLat) || !Number.isFinite(txLon)) return null;
 
-  // Contour definitions from the engine.  Shape:
-  //   { id, label, mean_km, min_km, max_km, area_km2 }  (non-DA: all same)
-  // Plus optionally per-radial polygons on exhibit.radial_table.
+  // Contour radii live on exhibit.polygons (engine/index.js:337) as
+  //   { contour_id, label, mean_radial_km, area_km2, field_strength, ... }
+  // exhibit.contour_definitions carries only { id, label, field_strength }
+  // — it does NOT include radii, so we key off polygons here.  When
+  // polygons is empty (coordinates missing / non-coord exhibit) the
+  // section is skipped.
+  const polys = Array.isArray(exhibit?.polygons) ? exhibit.polygons : [];
+  if (polys.length === 0) return null;
   const defs = Array.isArray(exhibit?.contour_definitions) ? exhibit.contour_definitions : [];
-  if (defs.length === 0) return null;
 
   // Build a stable, ordered palette of rings — outermost first so the
   // renderer paints back-to-front (large washes underneath, tight rings
@@ -42,17 +46,18 @@ export function buildVisualSummarySection(exhibit){
     city_5mvm:       { color: '#a8412a', label: '5 mV/m city grade', fill_opacity: 0.28,  dashed: false }
   };
 
-  const contours = defs
-    .map((d) => {
-      const km = Number(d?.mean_km ?? d?.max_km);
+  const labelById = new Map(defs.map(d => [String(d?.id || '').toLowerCase(), d?.label]));
+  const contours = polys
+    .map((p) => {
+      const km = Number(p?.mean_radial_km);
       if (!Number.isFinite(km) || km <= 0) return null;
-      const id = String(d?.id || '').toLowerCase();
-      const style = PALETTE[id] || { color: '#666666', label: d?.label || id, fill_opacity: 0.08, dashed: false };
+      const id = String(p?.contour_id || '').toLowerCase();
+      const style = PALETTE[id] || { color: '#666666', label: p?.label || id, fill_opacity: 0.08, dashed: false };
       return {
         id,
-        label:        d?.label || style.label,
+        label:        p?.label || labelById.get(id) || style.label,
         radius_km:    km,
-        area_km2:     Number(d?.area_km2),
+        area_km2:     Number(p?.area_km2),
         color:        style.color,
         fill_opacity: style.fill_opacity,
         dashed:       style.dashed,
