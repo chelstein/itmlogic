@@ -169,9 +169,13 @@ export function berryFieldUvm({ erp_kw, freq_khz, distance_km, midpoint_lat, per
   const alpha = 1.0 + 0.001 * phi_abs;
   const K_phi = -0.05 * (Number(midpoint_lat) / 90);
   const K_f   = -0.10 * Math.log10(Number(freq_khz) / 1000);
-  // Percent-time scaling — SS-2 (10%) is roughly 1.4× SS-1 per
-  // §73.190 charts; conservative pull rather than the full +3 dB.
-  const pct_scale = percent_time === 10 ? 1.4 : 1.0;
+  // Percent-time scaling per §73.190(c) charts: 10 % field (SS-2) is
+  // ~+6 dB above 50 % field (SS-1) at midband — factor of 10^(6/20) =
+  // 1.995, NOT 1.4.  The previous 1.4 (≈+2.9 dB) under-stated the
+  // 10 % field, which is *non-conservative* for protection-of-others
+  // (under-counts neighbor interference at the proposed station).
+  // Audit finding §73.190(c) MAJOR 6 — Berry-screening lineage.
+  const pct_scale = percent_time === 10 ? Math.pow(10, 6 / 20) : 1.0;
   const E_uvm = 1000 * E0_mvm_at_1km
               * Math.pow(Math.max(1, distance_km), -alpha)
               * Math.pow(10, K_phi + K_f)
@@ -195,7 +199,10 @@ function bisectDistanceForField(body){
     if (f > body.field_uv_m) lo = mid; else hi = mid;
     if (hi - lo < 0.5) break;
   }
-  return Number(mid.toFixed(2));
+  // Return the bracket midpoint, not the last-evaluated mid.  At loop
+  // exit, `mid` was the side that *moved* (so mid === lo or mid === hi),
+  // which is off by up to 0.25 km vs the actual bracket center.
+  return Number(((lo + hi) / 2).toFixed(2));
 }
 
 function normalize(input){
