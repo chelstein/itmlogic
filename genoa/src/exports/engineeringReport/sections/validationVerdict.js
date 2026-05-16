@@ -243,14 +243,23 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
-  // Interference rules
+  // Interference rules — REGULATORY COMPLIANCE FINDING, not a math
+  // validation result.  When the §73.215 / §73.207 study reports
+  // failures, the facility doesn't comply with current rules — but the
+  // ENGINE MATH is still correct.  Tag this as category: 'compliance'
+  // so the verdict headline Status/Confidence (computed from
+  // category: 'validation' components only) doesn't conflate "facility
+  // out of compliance" with "engine math unverified".  The line still
+  // renders in the component list so the engineer sees it at a glance;
+  // the Engineering Conclusion section below repeats and explains it.
   const isr = exhibit.interference_study;
   components.push({
-    name:   'Interference rules',
-    status: isr ? (isr.filing_qualifies === true ? 'PASS' : isr.filing_qualifies === false ? 'FAIL' : 'WARN') : 'NOT_RUN',
-    detail: isr
-              ? `${isr.n_stations} stations evaluated; ${isr.n_pass} pass / ${isr.n_fail} fail under ${(isr.rules_evaluated || []).join(' / ')}`
-              : 'no interference study (no nearby_primaries attached)'
+    name:     'Interference rules',
+    category: 'compliance',
+    status:   isr ? (isr.filing_qualifies === true ? 'PASS' : isr.filing_qualifies === false ? 'FAIL' : 'WARN') : 'NOT_RUN',
+    detail:   isr
+                ? `${isr.n_stations} stations evaluated; ${isr.n_pass} pass / ${isr.n_fail} fail under ${(isr.rules_evaluated || []).join(' / ')}`
+                : 'no interference study (no nearby_primaries attached)'
   });
 
   // AM §73.182 nighttime NIF (AM exhibits only; FM ignores).
@@ -306,8 +315,16 @@ export function buildValidationVerdictSection(exhibit){
   // headline confidence at MEDIUM and the status at PARTIAL — a
   // reviewer cannot see VERIFIED / HIGH on an exhibit whose nighttime
   // allocation is screening-only.
-  const hasScreening = components.some(c => c.status === 'SCREENING');
-  const hasComponentFail = components.some(c => c.status === 'FAIL');
+  //
+  // Status/Confidence is computed from VALIDATION components only —
+  // category 'compliance' (e.g. Interference rules §73.215 failures)
+  // is a regulatory finding, not a math-validation failure, and gets
+  // surfaced separately in the Engineering Conclusion section below.
+  // Mixing them produced misleading "UNVERIFIED · LOW" headlines on
+  // exhibits whose engine math was at 0.000 km FORTRAN parity.
+  const validationComponents = components.filter(c => (c.category || 'validation') === 'validation');
+  const hasScreening     = validationComponents.some(c => c.status === 'SCREENING');
+  const hasComponentFail = validationComponents.some(c => c.status === 'FAIL');
 
   let status, confidence;
   if (!curvePass){
