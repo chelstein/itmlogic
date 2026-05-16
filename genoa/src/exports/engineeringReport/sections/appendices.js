@@ -4,6 +4,8 @@
 // Each appendix is emitted as its own section so the renderer can place
 // page breaks between them and renderText.js can put each on its own page.
 
+import { buildAmNightNarrative } from './amNightNarrative.js';
+
 export function buildAppendixSections(exhibit){
   const sections = [];
 
@@ -404,6 +406,22 @@ export function buildAppendixSections(exhibit){
                  'NIF math vendored in Genoa.',
         rows: fSummary
       });
+
+      // Auto-narrative — engineer-grade prose composed from the
+      // structured §73.182 study fields.  Rendered as a paragraphs
+      // section between the summary KV and the per-azimuth table so
+      // the reviewer reads "what this means" before "the per-azimuth
+      // numbers".  Falls back silently when the study didn't run.
+      const narrative = buildAmNightNarrative(exhibit);
+      if (narrative.ok && narrative.paragraphs.length){
+        sections.push({
+          id:         'appendix-f-narrative',
+          type:       'paragraphs',
+          heading:    'Appendix F — Engineering interpretation',
+          paragraphs: narrative.paragraphs
+        });
+      }
+
       // Per-azimuth NIF table.
       const azRows = (nif.contour || []).map((p) => ({
         az:            Number.isFinite(p.azimuth_deg) ? p.azimuth_deg.toFixed(1) : '—',
