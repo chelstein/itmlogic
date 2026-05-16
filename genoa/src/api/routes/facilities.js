@@ -53,9 +53,16 @@ r.get('/facilities/:id', asyncHandler(async (req, res) => {
   const id = String(req.params.id || '').trim();
   if (!id) return res.status(400).json({ error: 'BAD_REQUEST', message: 'facility_id required' });
 
-  // 1. Cache.
+  // 1. Cache.  Self-heal: an AM row with fcc_class:null was cached
+  // before the AMQ enrichment shipped.  Treat that specific shape as a
+  // miss so the upstream path re-fetches, the enrichment runs, and the
+  // new value overwrites the stale cache.  Non-AM rows + AM rows that
+  // already carry a class still serve from cache.
   const cached = await getCached(id);
-  if (cached?.facility){
+  const isStaleAmCache =
+    cached?.facility?.service === 'AM' &&
+    !cached?.facility?.fcc_class;
+  if (cached?.facility && !isStaleAmCache){
     res.set('X-Genoa-Facility-Cache', 'hit');
     return res.json({ facility: cached.facility, source: cached.source, cached: true, fetched_at: cached.fetched_at });
   }
