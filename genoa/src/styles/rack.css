@@ -264,8 +264,30 @@
 
   /* ----- Tab strip ----- */
   .tab-strip {
-    display: flex; gap: 0; border-bottom: 1px solid theme('colors.rule');
+    display: flex; gap: 0; align-items: stretch;
+    border-bottom: 1px solid theme('colors.rule');
     background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0));
+    overflow-x: auto;
+  }
+  /* Inline section divider — renders the group label as a small
+     uppercase pill between tab clusters so the horizontal strip
+     stays scannable even with 15+ items. */
+  .tab-strip .tab-group-header {
+    display: inline-flex; align-items: center;
+    padding: 0 10px;
+    font-family: theme('fontFamily.mono');
+    font-size: 9px;
+    letter-spacing: theme('letterSpacing.rack');
+    text-transform: uppercase;
+    color: theme('colors.gold');
+    opacity: 0.55;
+    border-left: 1px solid theme('colors.rule');
+    user-select: none;
+    pointer-events: none;
+  }
+  .tab-strip .tab-group-header:first-child {
+    border-left: none;
+    padding-left: 0;
   }
   .tab-strip .tab {
     font-family: theme('fontFamily.mono');

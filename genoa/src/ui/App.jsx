@@ -15,8 +15,8 @@ import Login         from '@components/ui/Login.jsx';
 import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
 import PeSealCard     from '@components/ui/PeSealCard.jsx';
 import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
-import AmNightNifPreview from '@components/ui/AmNightNifPreview.jsx';
-import AmSunAuthorityPanel from '@components/ui/AmSunAuthorityPanel.jsx';
+// AmNightNifPreview + AmSunAuthorityPanel are now mounted by
+// AmDaDesigner as stacked sections; no separate rack imports here.
 import AllotmentSearchPanel from '@components/ui/AllotmentSearchPanel.jsx';
 import ComparableFacilitiesPanel from '@components/ui/ComparableFacilitiesPanel.jsx';
 import ExhibitDiffPanel from '@components/ui/ExhibitDiffPanel.jsx';
@@ -54,25 +54,59 @@ const PRESET_KSLX = {
   _resolveFacility: true
 };
 
-const TABS = [
-  { id: 'fcc',        label: 'FCC method' },
-  { id: 'radials',    label: 'Radials' },
-  { id: 'evidence',   label: 'Evidence' },
-  { id: 'validation', label: 'Validation' },
-  { id: 'sweep',      label: 'Find best config' },
-  { id: 'allotment',  label: 'FM channel search' },
-  { id: 'comparables', label: 'Peer benchmarking' },
-  { id: 'am_da',      label: 'AM DA designer' },
-  { id: 'am_night',   label: 'AM nighttime (§73.182)' },
-  { id: 'am_sun',     label: 'AM sunrise/sunset (§73.99)' },
-  { id: 'short_spacing', label: 'Short-spacing showing' },
-  { id: 'diff',       label: 'Move-in / what-if diff' },
-  { id: 'filing',     label: 'Filing package' },
-  { id: 'provenance', label: 'Provenance' },
-  { id: 'narrative',  label: 'AI narrative' },
-  { id: 'exports',    label: 'Exports' },
-  { id: 'history',    label: 'History' }
+// Rack items grouped into 5 sections so the workbench rail stays
+// scannable at 100% zoom as we keep adding studies.  Each group has
+// a short uppercase label; rack rendering inserts a header row above
+// each group's first item.
+const TAB_GROUPS = [
+  {
+    label: 'Exhibit',
+    items: [
+      { id: 'fcc',        label: 'FCC method' },
+      { id: 'radials',    label: 'Radials' },
+      { id: 'evidence',   label: 'Evidence' },
+      { id: 'validation', label: 'Validation' }
+    ]
+  },
+  {
+    label: 'Studies',
+    items: [
+      { id: 'sweep',       label: 'Find best config' },
+      { id: 'allotment',   label: 'FM channel search' },
+      { id: 'comparables', label: 'Peer benchmarking' },
+      { id: 'diff',        label: 'Move-in / what-if diff' }
+    ]
+  },
+  {
+    label: 'AM',
+    items: [
+      // Single "AM designer" tab.  The panel itself stacks all AM
+      // features as sections (DA pattern designer · live §73.182
+      // NIF preview · §73.99 sunrise/sunset authority) so the
+      // workbench rail doesn't bloat one row per AM rule.
+      { id: 'am_da',    label: 'AM designer' }
+    ]
+  },
+  {
+    label: 'Filing',
+    items: [
+      { id: 'short_spacing', label: 'Short-spacing showing' },
+      { id: 'filing',        label: 'Filing package' },
+      { id: 'narrative',     label: 'AI narrative' }
+    ]
+  },
+  {
+    label: 'System',
+    items: [
+      { id: 'provenance', label: 'Provenance' },
+      { id: 'exports',    label: 'Exports' },
+      { id: 'history',    label: 'History' }
+    ]
+  }
 ];
+
+// Flat list kept for any legacy callers that still iterate TABS.
+const TABS = TAB_GROUPS.flatMap((g) => g.items);
 
 const CONTOUR_COLORS = ['#ffb347', '#d6a36a', '#6fd3ff'];
 
@@ -821,7 +855,7 @@ function MainApp({ onLogout }) {
           </ChartScope>
 
           <RackPanel eyebrow="Workbench" title="Exhibit detail" italicAccent="The numbers come from the engine.">
-            <TabStrip tabs={TABS} activeId={activeTab} onChange={setActiveTab} />
+            <TabStrip groups={TAB_GROUPS} activeId={activeTab} onChange={setActiveTab} />
             <div className="pt-4">
               <TabBody
                 id={activeTab}
@@ -898,37 +932,11 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
     return <SweepPanel getBaseInputs={getBaseInputs} onApplyCombo={onApplyCombo} />;
   }
   if (id === 'am_da'){
+    // Single AM tab — the AmDaDesigner panel now renders the DA
+    // designer + the §73.182 NIF live preview + the §73.99 sunrise/
+    // sunset authority as stacked sections, so engineers don't have
+    // to flip between three rack items for AM workflows.
     return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
-  }
-  if (id === 'am_night'){
-    // Standalone §73.182 NIF preview — same component the DA Designer
-    // embeds, but plumbed straight off the FacilityRack inputs so an
-    // engineer can stay on this tab while iterating without opening
-    // the DA designer.
-    return (
-      <div className="space-y-4">
-        <div className="text-textDim text-[10px] tracking-rack uppercase font-mono">
-          AM nighttime allocation — live §73.182 NIF preview against the current facility
-        </div>
-        <AmNightNifPreview
-          lat={inputs?.lat}
-          lon={inputs?.lon}
-          freq_khz={Number.isFinite(Number(inputs?.frequency))
-                      ? Math.round(Number(inputs.frequency)
-                          * (Number(inputs.frequency) < 30 ? 1000 : 1))
-                      : null}
-          erp_kw={inputs?.erp_kw}
-          fcc_class={inputs?.fcc_class}
-          pattern_mode={Array.isArray(inputs?.pattern) ? 'DA' : 'omni'}
-          pattern_table={Array.isArray(inputs?.pattern)
-                           ? Object.fromEntries(inputs.pattern)
-                           : null}
-        />
-      </div>
-    );
-  }
-  if (id === 'am_sun'){
-    return <AmSunAuthorityPanel baseInputs={inputs} />;
   }
   if (id === 'allotment'){
     return <AllotmentSearchPanel baseInputs={inputs} onPickChannel={(ch) => {

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PolarPattern from './PolarPattern.jsx';
-import AmNightNifPreview from './AmNightNifPreview.jsx';
+import AmNightNifPreview   from './AmNightNifPreview.jsx';
+import AmSunAuthorityPanel from './AmSunAuthorityPanel.jsx';
 import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
 // AM DA pattern designer.  Operator builds an array geometry (towers
@@ -294,16 +295,35 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
         </div>
       </div>
 
-      {/* Live §73.182 NIF preview — recomputes on every pattern nudge.  */}
+      {/* Live §73.182 NIF preview — driven by the FACILITY inputs
+          (frequency / pattern / class) so the numbers reflect the
+          currently-loaded facility, not the designer's draft.
+          Operator gets the right answer for "is my real station
+          protected at night?" without first re-typing it into the
+          designer.  When the operator clicks "Apply to facility"
+          above, the synthesized pattern flows into baseInputs and
+          the preview re-computes against the new pattern.
+          Regression caught by Codex on #180. */}
       <AmNightNifPreview
         lat={baseInputs?.lat}
         lon={baseInputs?.lon}
-        freq_khz={spec.frequency_khz}
+        freq_khz={Number.isFinite(Number(baseInputs?.frequency))
+                    ? Math.round(Number(baseInputs.frequency)
+                        * (Number(baseInputs.frequency) < 30 ? 1000 : 1))
+                    : null}
         erp_kw={baseInputs?.erp_kw}
         fcc_class={baseInputs?.fcc_class}
-        pattern_mode={pattern?.pattern_table ? 'DA' : 'omni'}
-        pattern_table={pattern?.pattern_table || null}
+        pattern_mode={Array.isArray(baseInputs?.pattern) ? 'DA' : 'omni'}
+        pattern_table={Array.isArray(baseInputs?.pattern)
+                         ? Object.fromEntries(baseInputs.pattern)
+                         : null}
       />
+
+      {/* §73.99 sunrise / sunset authority — monthly windows + the
+          regulator's PSRA/PSSA framework.  Only renders monthly
+          table for AM facilities; for FM/FX falls back to the
+          panel's own "not applicable" hint. */}
+      <AmSunAuthorityPanel baseInputs={baseInputs} />
     </div>
   );
 }
