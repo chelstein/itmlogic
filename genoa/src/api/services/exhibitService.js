@@ -1547,6 +1547,31 @@ export async function computeExhibit(req){
         ...(study || { available: false, error: 'compute budget exhausted' }),
         elapsed_ms: Date.now() - t0
       };
+
+      // Surface §73.182 NIF failure as a top-level annotation so the
+      // engineering-conclusion logic (which walks exhibit.annotations
+      // for blockers/warnings) sees it.  Berry-1968 screening failures
+      // surface as 'warning' so the conclusion can prompt "re-run with
+      // FCCAM" rather than declare NON-COMPLIANT.  FCCAM/Wang failures
+      // surface as 'blocker'.
+      const _nif = evidence.am_night_nif;
+      if (_nif?.available){
+        const _sum = _nif.summary || {};
+        const _isFailing = (Number(_sum.n_failing_azimuths) || 0) > 0
+          || (Number.isFinite(Number(_sum.worst_margin_db)) && Number(_sum.worst_margin_db) < 0);
+        if (_isFailing){
+          const _isScreening = /berry/i.test(String(_nif.provenance?.upstream_skywave || _nif.source || ''));
+          const _ann = exhibit.annotations = exhibit.annotations || [];
+          _ann.push({
+            severity: _isScreening ? 'warning' : 'blocker',
+            code:     _isScreening ? 'AM_NIGHT_NIF_FAIL_SCREENING' : 'AM_NIGHT_NIF_FAIL',
+            message:  `§73.182 nighttime allocation fails at ${_sum.n_failing_azimuths || 0}/${_sum.azimuths_evaluated || 0} azimuths (worst margin ${Number.isFinite(Number(_sum.worst_margin_db)) ? Number(_sum.worst_margin_db).toFixed(2) + ' dB' : 'n/a'})`,
+            detail:   _isScreening
+              ? 'Re-run with FCCAM (Wang 1985) before filing — Berry 1968 is screening-grade only per §73.190(c).'
+              : 'Facility redesign, reduced ERP, daytime-only mode, or §73.99 reduced-power authority required prior to filing.'
+          });
+        }
+      }
     } catch (e){
       evidence.am_night_nif = {
         available: false,

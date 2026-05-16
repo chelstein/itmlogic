@@ -20,8 +20,16 @@ export function buildMethodologySection(exhibit){
       'Field-strength values were determined by interpolation of FCC tabulated data.'
     );
   }
+  // Interpolation kernel: FM/TV uses the FCC tvfm_curves bivariate cubic
+  // surface over (HAAT × distance); AM uses log-linear interpolation
+  // along distance on the §73.184 pre-tabulated field grid (gwave.js)
+  // at fixed integer ground-conductivity values per §73.190 Figure M3
+  // (1, 2, 4, 6, 8, 15, 30 mS/m).  The two methods are different and
+  // citing only "bivariate cubic" misrepresents AM.
   paragraphs.push(
-    'Genoa uses a bivariate cubic surface interpolation consistent with the FCC contours implementation and records the curve dataset hash for reproducibility.'
+    svc === 'AM'
+      ? 'For §73.184 groundwave evaluation, Genoa performs log-linear interpolation along distance on the FCC §73.184 pre-tabulated field grid at the §73.190 Figure M3 reference conductivities and records the curve dataset SHA-256 for reproducibility.  Operator-supplied σ is rounded to the nearest M3 reference value; any rounding is recorded in the exhibit provenance.'
+      : 'For §73.333 FM/TV evaluation, Genoa uses a bivariate cubic surface interpolation across (HAAT × distance) consistent with the FCC contours-api-node reference implementation and records the curve dataset SHA-256 for reproducibility.'
   );
   if (exhibit.engineering_confidence){
     paragraphs.push(

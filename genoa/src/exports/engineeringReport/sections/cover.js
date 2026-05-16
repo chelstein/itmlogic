@@ -50,8 +50,11 @@ export function buildCoverSection(exhibit){
       // Engine SHA = the Genoa engine's own git commit, NOT the FCC
       // orchestration commit (which is the upstream contours-api-node
       // repo).  Mis-pointing this at fcc_orchestration.commit would
-      // make exhibit-to-engine attestation untraceable.
-      ['Engine SHA',           fmt((sig.hash || mv.engine_sha || mv.fcc_orchestration?.commit)?.slice?.(0, 12))],
+      // falsely identify the deployed Genoa engine by its FCC upstream
+      // and make exhibit-to-engine attestation untraceable.  Render
+      // em-dash when no genoa-engine sig.hash / mv.engine_sha is
+      // available — never silently substitute mv.fcc_orchestration.commit.
+      ['Engine SHA',           fmt((sig.hash || mv.engine_sha)?.slice?.(0, 12))],
       // Curve dataset: prefer the explicit `dataset` label set by the engine.
       // Fall back to the curve-dataset's own metadata (vendored tvfm_curves.js
       // for FM/TV, gwave.js for AM), or the dataset SHA-256 as a last resort

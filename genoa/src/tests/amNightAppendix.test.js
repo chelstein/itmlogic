@@ -73,7 +73,7 @@ test('Appendix F renders summary KV + per-azimuth table + interferer table', () 
           n_interferers_seen: 8,
           interferer_cap: 25
         },
-        du_db_by_relation: { co_channel: 20, first_adjacent: 6, second_adjacent: -26 },
+        du_db_by_relation: { co_channel: 20, first_adjacent: 0, second_adjacent: -26 },
         contour: [
           { azimuth_deg: 0,   distance_km: 400.9, lat: 43.61, lon: -75,    binding: { relation: 'co_channel', margin_db: 1.2 }, iterations: 8 },
           { azimuth_deg: 90,  distance_km: 200.0, lat: 40,    lon: -72.65, binding: { relation: 'co_channel', margin_db: 0.4 }, iterations: 10 },

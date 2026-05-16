@@ -222,14 +222,22 @@ export function buildValidationVerdictSection(exhibit){
     if (nif?.available){
       const s = nif.summary || {};
       const passing = (s.n_failing_azimuths || 0) === 0 && (s.n_no_service_azimuths || 0) === 0;
+      const isScreening = /berry/i.test(
+        String(nif.provenance?.upstream_skywave || nif.source || '')
+      );
       const detail = `${s.n_azimuths || 0} azimuths · ` +
         `mean NIF ${Number.isFinite(s.mean_radius_km) ? s.mean_radius_km.toFixed(0) + ' km' : '—'} · ` +
         `worst margin ${Number.isFinite(s.worst_margin_db) ? s.worst_margin_db.toFixed(1) + ' dB' : '—'} · ` +
         `${s.n_failing_azimuths || 0} failing / ${s.n_no_service_azimuths || 0} no-service azimuths · ` +
-        `${s.n_interferers_used || 0} interferers used`;
+        `${s.n_interferers_used || 0} interferers used` +
+        (isScreening ? ' · SCREENING-grade (Berry 1968 analytical — re-run with FCCAM/Wang 1985 before filing)' : '');
+      // SCREENING-grade source never produces a clean PASS/FAIL — it's
+      // advisory.  A reviewer must NOT see "VERIFIED / HIGH" with a Berry-
+      // sourced NIF underneath; force a SCREENING status so the headline
+      // verdict can't promise more confidence than the engine warrants.
       components.push({
         name:   'AM nighttime allocation (§73.182 NIF)',
-        status: passing ? 'PASS' : 'FAIL',
+        status: isScreening ? 'SCREENING' : (passing ? 'PASS' : 'FAIL'),
         detail
       });
     } else if (nif && !nif.available){
@@ -256,10 +264,26 @@ export function buildValidationVerdictSection(exhibit){
   const parityRun    = components[2].status === 'PASS' || components[2].status === 'FAIL' || components[2].status === 'FALLBACK';
   const parityPass   = components[2].status === 'PASS' || components[2].status === 'FALLBACK';
 
+  // SCREENING-grade components (e.g. Berry-1968 AM NIF) MUST cap the
+  // headline confidence at MEDIUM and the status at PARTIAL — a
+  // reviewer cannot see VERIFIED / HIGH on an exhibit whose nighttime
+  // allocation is screening-only.
+  const hasScreening = components.some(c => c.status === 'SCREENING');
+  const hasComponentFail = components.some(c => c.status === 'FAIL');
+
   let status, confidence;
   if (!curvePass){
     status = 'UNVERIFIED';
     confidence = 'LOW';
+  } else if (hasComponentFail){
+    // Any FAIL component (e.g. AM §73.182 NIF FAIL on FCCAM) — verdict
+    // cannot be VERIFIED.  Sit at PARTIAL/LOW so the engineer reads the
+    // failure before the cover page calls the exhibit "VERIFIED HIGH".
+    status = 'PARTIAL';
+    confidence = 'LOW';
+  } else if (hasScreening){
+    status = 'PARTIAL';
+    confidence = 'MEDIUM';
   } else if (curvePass && xcPass && parityRun && parityPass){
     status = 'VERIFIED';
     confidence = 'HIGH';

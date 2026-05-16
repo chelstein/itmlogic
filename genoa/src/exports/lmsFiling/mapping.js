@@ -172,8 +172,25 @@ export function mapForm301Fm(exhibit, applicant = {}){
 
   const compliance_pass = filled.find(f => f.id === 'compliance-pass')?.value;
   const blockers = exhibit.blockers?.length || 0;
+
+  // AM nighttime allocation (§73.182 NIF) is a filing-controlling rule.
+  // If NIF ran and any azimuth fails OR the worst margin is negative,
+  // the exhibit is NOT filing-ready — regardless of how the §73.207 /
+  // §73.215 checks landed.  Berry-screening source still counts as
+  // not-ready (engineer must re-run with FCCAM before filing) so that
+  // filing_ready never silently flips true on a screening-grade
+  // failure.  Skipping when service !== 'AM' so this never affects
+  // FM/LPFM/FX paths.
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const nif = exhibit?.evidence?.am_night_nif || null;
+  const am_night_blocking = svc === 'AM' && nif && nif.available && (
+    (Number(nif.summary?.n_failing_azimuths) || 0) > 0 ||
+    (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0)
+  );
+
   const filing_ready = summary.required_gaps === 0
     && blockers === 0
+    && !am_night_blocking
     && (compliance_pass === 'PASS' || compliance_pass === 'PASS-via-73.215');
 
   return {

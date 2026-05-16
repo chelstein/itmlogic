@@ -180,10 +180,10 @@ export function standardDuDb(subjectClass, relation){
   const cls = String(subjectClass || '').toUpperCase();
   const rel = normalizeRelation(relation);
   const matrix = {
-    A: { co_channel: 26, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
-    B: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
-    C: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: -50 },
-    D: { co_channel: 20, first_adjacent: 6,  second_adjacent: -26, third_adjacent: null }
+    A: { co_channel: 26, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    B: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    C: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: -50 },
+    D: { co_channel: 20, first_adjacent: 0,  second_adjacent: -26, third_adjacent: null }
   };
   const row = matrix[cls];
   if (!row) return null;

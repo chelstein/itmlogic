@@ -17,12 +17,49 @@ export function buildConclusionSection(exhibit){
   const sec215Pass = rc && rc.cite === '47 CFR §73.215' && rc.pass === true;
   const sec207Fail = sec207 && sec207.pass === false;
 
+  // AM nighttime allocation (§73.182 NIF) is a filing-controlling rule
+  // that the engineering conclusion MUST honor.  If NIF ran AND any
+  // azimuth fails the §73.183 D/U threshold OR the worst binding margin
+  // is negative, the facility cannot file at the proposed nighttime
+  // operating mode/power.  Berry-screening source flips to ENGINEERING
+  // REVIEW REQUIRED because the user is warned in-line to re-run with
+  // FCCAM/Wang before filing; FCCAM-sourced NIF failure is binding
+  // NON-COMPLIANT.
+  const nif = exhibit.evidence?.am_night_nif || null;
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const nifFailing = svc === 'AM' && nif && nif.available && (
+    (Number(nif.summary?.n_failing_azimuths) || 0) > 0 ||
+    (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0)
+  );
+  const nifSourceIsScreening = nif && /berry/i.test(
+    String(nif.provenance?.upstream_skywave || nif.source || '')
+  );
+
   let status, narrative;
   if (blockers.length > 0){
     status = 'NON-COMPLIANT';
     narrative =
       'The exhibit carries one or more blocker-level findings that prevent a clean compliance disposition.  ' +
       'Facility redesign, waiver analysis, or further engineering review is required prior to filing.';
+  } else if (nifFailing && !nifSourceIsScreening){
+    status = 'NON-COMPLIANT';
+    const s = nif.summary || {};
+    narrative =
+      'The 47 CFR §73.182 AM nighttime allocation study indicates the facility does not qualify at its ' +
+      'proposed nighttime operating mode/power.  ' +
+      `${s.n_failing_azimuths ?? '?'}/${s.azimuths_evaluated ?? '?'} evaluated azimuths fail the §73.183 D/U protection ratio; ` +
+      `worst binding margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}.  ` +
+      'Facility redesign (DA pattern, reduced ERP, daytime-only mode, or PSRA/PSSA reduced-power authority) ' +
+      'is required prior to filing.';
+  } else if (nifFailing && nifSourceIsScreening){
+    status = 'ENGINEERING REVIEW REQUIRED';
+    const s = nif.summary || {};
+    narrative =
+      'The 47 CFR §73.182 AM nighttime allocation study was run on the SCREENING-grade Berry 1968 analytical ' +
+      'engine and reports ' + (s.n_failing_azimuths ?? '?') + ' failing azimuth(s) ' +
+      `(worst margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}).  ` +
+      'Re-run with FCCAM (Wang 1985) before filing to obtain a defensible §73.190(c) result; ' +
+      'a Berry-only failure is advisory and may not bind under §73.187/§73.190(c).';
   } else if (isr && isr.filing_qualifies === false){
     status = 'NON-COMPLIANT';
     // Derive which rules actually failed from per-station failed_rules so
