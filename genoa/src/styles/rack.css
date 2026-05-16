@@ -262,32 +262,35 @@
      class adds a soft drop shadow to keep it warm. */
   .logo-sail svg { display: block; filter: drop-shadow(0 6px 14px rgba(0,0,0,0.5)); }
 
-  /* ----- Tab strip ----- */
+  /* ----- Tab strip -----
+     Grouped wrapping layout: each group header forces a full-width
+     line break (flex-basis: 100%) so all 15+ tabs are visible at
+     once without horizontal scroll. Items inside a group wrap as
+     needed under their section header. */
   .tab-strip {
-    display: flex; gap: 0; align-items: stretch;
+    display: flex; flex-wrap: wrap; gap: 0 2px; align-items: stretch;
     border-bottom: 1px solid theme('colors.rule');
     background: linear-gradient(180deg, rgba(0,0,0,0.18), rgba(0,0,0,0));
-    overflow-x: auto;
+    padding: 4px 0 0;
   }
-  /* Inline section divider — renders the group label as a small
-     uppercase pill between tab clusters so the horizontal strip
-     stays scannable even with 15+ items. */
   .tab-strip .tab-group-header {
-    display: inline-flex; align-items: center;
-    padding: 0 10px;
+    flex: 0 0 100%;
+    display: block;
+    margin-top: 8px;
+    padding: 4px 2px 2px;
     font-family: theme('fontFamily.mono');
     font-size: 9px;
     letter-spacing: theme('letterSpacing.rack');
     text-transform: uppercase;
     color: theme('colors.gold');
-    opacity: 0.55;
-    border-left: 1px solid theme('colors.rule');
+    opacity: 0.6;
+    border-top: 1px dashed rgba(214,163,106,0.18);
     user-select: none;
     pointer-events: none;
   }
   .tab-strip .tab-group-header:first-child {
-    border-left: none;
-    padding-left: 0;
+    margin-top: 0;
+    border-top: none;
   }
   .tab-strip .tab {
     font-family: theme('fontFamily.mono');
@@ -295,10 +298,11 @@
     letter-spacing: theme('letterSpacing.rack');
     text-transform: uppercase;
     color: theme('colors.textDim');
-    padding: 10px 14px;
+    padding: 8px 12px;
     border: none; border-bottom: 2px solid transparent;
     background: transparent;
     cursor: pointer;
+    white-space: nowrap;
     transition: color .2s, border-color .2s, background .2s;
   }
   .tab-strip .tab:hover { color: theme('colors.cyan'); }
