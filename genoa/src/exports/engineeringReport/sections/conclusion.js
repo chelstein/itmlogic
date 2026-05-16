@@ -174,10 +174,38 @@ export function buildConclusionSection(exhibit){
       : failedList.length === 1
         ? failedList[0]
         : failedList.slice(0, -1).join(', ') + ' and ' + failedList[failedList.length - 1];
-    narrative =
-      'The interference study indicates the subject facility does not qualify under the applicable rule sets.  ' +
-      `The facility does not qualify under ${failedPhrase} ` +
-      'for all required protected facilities.  Facility redesign, waiver analysis, or further engineering review is required prior to filing.';
+    // Soften the wording when this is a licensed/operating facility
+    // review.  Saying "facility redesign required prior to filing"
+    // for a station that's been on the air for decades is the wrong
+    // framing — the station is already authorized; current-rule
+    // conflicts may be grandfathered, waived, or historically
+    // authorized.  Only "redesign required prior to filing" when the
+    // study intent is a new/modification application that hasn't
+    // been authorized yet.
+    const rc          = exhibit?.regulatory_compliance || {};
+    const studyIntent = String(rc.study_intent || '').toLowerCase();
+    const interp      = String(rc.interpretation || '').toLowerCase();
+    const isLegacyReview = studyIntent === 'existing_facility_review'
+                        || interp.includes('legacy')
+                        || interp === 'licensed_with_legacy_conflicts';
+    if (isLegacyReview){
+      narrative =
+        'Under current §73.x rules the subject facility does not qualify under ' +
+        `${failedPhrase} for all required protected facilities.  This is an ` +
+        'existing licensed facility, so the modeled conflicts may reflect ' +
+        'grandfathered, waived, or otherwise historically authorized operating ' +
+        'conditions; Genoa does not determine FCC legal authorization status.  ' +
+        'Treat this as a LEGACY/GRANDFATHERING REVIEW condition: the current ' +
+        'authorization is not invalidated by this finding, but any modification ' +
+        'application that would change parameters affecting the listed conflicts ' +
+        'will need engineering review, waiver analysis, or redesign before ' +
+        'filing.';
+    } else {
+      narrative =
+        'The interference study indicates the subject facility does not qualify under the applicable rule sets.  ' +
+        `The facility does not qualify under ${failedPhrase} ` +
+        'for all required protected facilities.  Facility redesign, waiver analysis, or further engineering review is required prior to filing.';
+    }
   } else if (v.status === Verdict.COMPLIANT_VIA_ALT_RULE){
     narrative =
       `The subject facility does not meet the minimum distance separation requirements of 47 CFR ${vocab.allocation_rule_cite} with respect to ` +
