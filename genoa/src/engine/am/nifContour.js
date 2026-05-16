@@ -127,13 +127,28 @@ export async function evaluateReceiver({
     };
   });
 
+  // §73.182(k) — the 25% exclusion threshold is set from the LOUDEST
+  // contributor at this receiver, regardless of channel relation.
+  // A 1st-adjacent interferer ten times louder than every co-channel
+  // would otherwise shape its own pool's threshold without raising the
+  // co-channel pool's threshold — wrong per FCC practice ("the strongest
+  // signal in any one direction").  Compute the cross-relation strongest
+  // first, derive ONE threshold, and pass it into rssAggregate per pool
+  // so each pool aggregates against the same per-receiver gate.
+  const strongest_cross = enriched.reduce(
+    (m, x) => (Number.isFinite(x.field_uv_m) && x.field_uv_m > m) ? x.field_uv_m : m,
+    0
+  );
+  const receiverThresholdUvm = 0.25 * strongest_cross;
+
   // RSS-aggregate by relation: §73.182 protects co-channel and 1st-/
   // 2nd-/3rd-adjacent with different D/U ratios, so we aggregate
-  // each pool independently then check the strictest binding.
+  // each pool independently — but using the single per-receiver
+  // §73.182(k) threshold above.
   const byRelation = groupBy(enriched, (x) => x.relation || 'co_channel');
   const checks = [];
   for (const [relation, group] of Object.entries(byRelation)){
-    const agg = rssAggregate(group);
+    const agg = rssAggregate(group, { thresholdUvm: receiverThresholdUvm });
     const du  = duDbByRelation?.[relation];
     if (!Number.isFinite(du)) continue;        // not protected for this combo
     const verdict = checkProtection(desired.field_uv_m, agg.rss_uv_m, du);
