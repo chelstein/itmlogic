@@ -312,6 +312,12 @@ function renderSectionInFlow(pdf, s, meta){
     case 'image':
       renderImage(pdf, s);
       break;
+    case 'polar-chart':
+      renderPolarChart(pdf, s);
+      break;
+    case 'scatter-chart':
+      renderScatterChart(pdf, s);
+      break;
     default:
       if (Array.isArray(s.rows)) renderKv(pdf, s.rows);
       else if (Array.isArray(s.paragraphs)) renderParagraphs(pdf, s.paragraphs);
@@ -547,6 +553,237 @@ function renderImage(pdf, s){
        .text(s.caption, MARGIN, pdf.y, { width: w, align: 'left' });
     pdf.fillColor('black');
   }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Vector charts — pure pdfkit primitives, no PNG round-trip, no
+// external sidecar.  Data lives in exhibit.evidence and is shaped
+// by the section builders.
+// ────────────────────────────────────────────────────────────────────
+
+function renderChartHeader(pdf, s){
+  pdf.addPage();
+  if (s.heading){
+    const w = pdf.page.width;
+    const ruleY = pdf.y;
+    pdf.strokeColor(AMBER).lineWidth(0.6)
+       .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
+    pdf.y = ruleY + RULE_GAP;
+    pdf.font(BOLD_FONT).fontSize(HEADING_SIZE).fillColor(TEAL_DARK)
+       .text(s.heading.toUpperCase(), MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
+    pdf.fillColor('black').moveDown(0.4);
+  }
+}
+
+function renderChartCaption(pdf, s, captionY){
+  if (!s.caption) return;
+  const w = pdf.page.width - 2 * MARGIN;
+  pdf.font(ITALIC_FONT).fontSize(BODY_SIZE - 1).fillColor(TEXT_DIM)
+     .text(s.caption, MARGIN, captionY, { width: w, align: 'left' });
+  pdf.fillColor('black');
+}
+
+// Polar chart — concentric range rings + radial spokes + the data
+// polygon.  Used for AM-night NIF contour where data is an array of
+// { azimuth_deg, distance_km } points spanning 0-360°.  Closes the
+// polygon by repeating the first point at the end.
+function renderPolarChart(pdf, s){
+  renderChartHeader(pdf, s);
+  const pts = Array.isArray(s.data) ? s.data : [];
+  if (pts.length < 3){
+    pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor(TEXT_DIM)
+       .text('(insufficient data to render polar chart)', { align: 'left' });
+    return;
+  }
+  const w = pdf.page.width  - 2 * MARGIN;
+  const captionH = s.caption ? 48 : 8;
+  const availH = pdf.page.height - pdf.y - MARGIN - FOOTER_AREA - captionH;
+  const size   = Math.min(w, Math.max(260, availH));
+  const cx     = MARGIN + w / 2;
+  const cy     = pdf.y + size / 2;
+  const radius = (size / 2) - 28;
+
+  // Auto-scale to data max.
+  let rMax = 0;
+  for (const p of pts){
+    const v = Number(p.value);
+    if (Number.isFinite(v) && v > rMax) rMax = v;
+  }
+  if (s.r_max && s.r_max > rMax) rMax = s.r_max;
+  if (rMax <= 0) rMax = 1;
+
+  // Range rings — 4 concentric circles at 0.25 / 0.5 / 0.75 / 1.0 R.
+  pdf.save();
+  pdf.strokeColor('#888').lineWidth(0.3);
+  for (let i = 1; i <= 4; i++){
+    const r = radius * (i / 4);
+    pdf.circle(cx, cy, r).stroke();
+  }
+  // Range ring labels (along east axis).
+  pdf.font(MONO_FONT).fontSize(7).fillColor(TEXT_DIM);
+  for (let i = 1; i <= 4; i++){
+    const r  = radius * (i / 4);
+    const rv = rMax  * (i / 4);
+    pdf.text(`${rv.toFixed(rv >= 100 ? 0 : 1)} ${s.r_unit || 'km'}`,
+             cx + r + 2, cy - 4, { lineBreak: false });
+  }
+
+  // Compass spokes every 30°.
+  pdf.strokeColor('#888').lineWidth(0.25);
+  for (let az = 0; az < 360; az += 30){
+    const rad = (az - 90) * Math.PI / 180;  // 0° = north (up)
+    const x2 = cx + radius * Math.cos(rad);
+    const y2 = cy + radius * Math.sin(rad);
+    pdf.moveTo(cx, cy).lineTo(x2, y2).stroke();
+  }
+  // Cardinal labels.
+  pdf.font(BOLD_FONT).fontSize(8).fillColor(TEAL_DARK);
+  const labels = [['N',  0, -radius - 12], ['E',  radius + 6, -4],
+                  ['S',  0,  radius + 4],  ['W', -radius - 14, -4]];
+  for (const [lab, dx, dy] of labels){
+    pdf.text(lab, cx + dx - 3, cy + dy, { lineBreak: false });
+  }
+
+  // Data polygon — close it.
+  pdf.strokeColor(AMBER).lineWidth(1.2);
+  pdf.fillColor(AMBER_HI).opacity(0.18);
+  const fillPath = [];
+  for (let i = 0; i < pts.length; i++){
+    const az = Number(pts[i].azimuth_deg);
+    const v  = Number(pts[i].value);
+    if (!Number.isFinite(az) || !Number.isFinite(v) || v <= 0) continue;
+    const r  = radius * (Math.min(v, rMax) / rMax);
+    const rad = (az - 90) * Math.PI / 180;
+    const x = cx + r * Math.cos(rad);
+    const y = cy + r * Math.sin(rad);
+    fillPath.push([x, y]);
+  }
+  if (fillPath.length){
+    pdf.moveTo(fillPath[0][0], fillPath[0][1]);
+    for (let i = 1; i < fillPath.length; i++){
+      pdf.lineTo(fillPath[i][0], fillPath[i][1]);
+    }
+    pdf.closePath().fillAndStroke(AMBER_HI, AMBER);
+  }
+  pdf.opacity(1).fillColor('black').strokeColor('black');
+  pdf.restore();
+
+  pdf.y = cy + size / 2 + 6;
+  renderChartCaption(pdf, s, pdf.y);
+}
+
+// Scatter chart — axes + grid + plotted points + optional tolerance
+// band.  Used for FORTRAN parity (Δkm vs azimuth°).  data items:
+// { x: number, y: number, ok?: boolean }.
+function renderScatterChart(pdf, s){
+  renderChartHeader(pdf, s);
+  const pts = Array.isArray(s.data) ? s.data : [];
+  if (pts.length === 0){
+    pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor(TEXT_DIM)
+       .text('(no data points to render)', { align: 'left' });
+    return;
+  }
+  const w = pdf.page.width  - 2 * MARGIN;
+  const captionH = s.caption ? 48 : 8;
+  const availH = pdf.page.height - pdf.y - MARGIN - FOOTER_AREA - captionH;
+  const plotW = w - 60;
+  const plotH = Math.min(availH - 40, 360);
+  const x0 = MARGIN + 50;
+  const y0 = pdf.y + 8;
+
+  // Compute scales.
+  let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+  for (const p of pts){
+    const x = Number(p.x), y = Number(p.y);
+    if (Number.isFinite(x)){ if (x < xMin) xMin = x; if (x > xMax) xMax = x; }
+    if (Number.isFinite(y)){ if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
+  }
+  if (!Number.isFinite(xMin)){ xMin = 0; xMax = 1; }
+  if (!Number.isFinite(yMin)){ yMin = -1; yMax = 1; }
+  if (Number.isFinite(s.x_min)) xMin = s.x_min;
+  if (Number.isFinite(s.x_max)) xMax = s.x_max;
+  // Symmetric y-axis when caller passes y_symmetric (e.g. Δkm).
+  if (s.y_symmetric){
+    const m = Math.max(Math.abs(yMin), Math.abs(yMax), Number(s.tolerance) || 0);
+    yMin = -m * 1.1; yMax = m * 1.1;
+  }
+  if (yMin === yMax){ yMin -= 1; yMax += 1; }
+  const sx = (x) => x0 + plotW * (x - xMin) / Math.max(1e-9, xMax - xMin);
+  const sy = (y) => y0 + plotH * (1 - (y - yMin) / Math.max(1e-9, yMax - yMin));
+
+  pdf.save();
+  // Plot frame.
+  pdf.strokeColor('#888').lineWidth(0.4);
+  pdf.rect(x0, y0, plotW, plotH).stroke();
+
+  // Grid lines (5 horizontal, 6 vertical) + axis tick labels.
+  pdf.strokeColor('#bbb').lineWidth(0.2);
+  pdf.font(MONO_FONT).fontSize(7).fillColor(TEXT_DIM);
+  for (let i = 1; i < 5; i++){
+    const y = y0 + plotH * (i / 5);
+    pdf.moveTo(x0, y).lineTo(x0 + plotW, y).stroke();
+    const yv = yMin + (yMax - yMin) * (1 - i / 5);
+    pdf.text(yv.toFixed(2), x0 - 36, y - 3, { width: 32, align: 'right', lineBreak: false });
+  }
+  for (let i = 1; i < 6; i++){
+    const x = x0 + plotW * (i / 6);
+    pdf.moveTo(x, y0).lineTo(x, y0 + plotH).stroke();
+    const xv = xMin + (xMax - xMin) * (i / 6);
+    pdf.text(xv.toFixed(0), x - 12, y0 + plotH + 4, { width: 24, align: 'center', lineBreak: false });
+  }
+  // Min/max tick labels.
+  pdf.text(yMin.toFixed(2), x0 - 36, y0 + plotH - 3, { width: 32, align: 'right', lineBreak: false });
+  pdf.text(yMax.toFixed(2), x0 - 36, y0 - 3,         { width: 32, align: 'right', lineBreak: false });
+  pdf.text(xMin.toFixed(0), x0 - 12, y0 + plotH + 4, { width: 24, align: 'center', lineBreak: false });
+  pdf.text(xMax.toFixed(0), x0 + plotW - 12, y0 + plotH + 4, { width: 24, align: 'center', lineBreak: false });
+
+  // Tolerance band (when supplied).
+  if (Number.isFinite(s.tolerance) && s.tolerance > 0){
+    pdf.fillColor(AMBER_HI).opacity(0.12);
+    const yTop = sy(s.tolerance);
+    const yBot = sy(-s.tolerance);
+    pdf.rect(x0, yTop, plotW, yBot - yTop).fill();
+    pdf.opacity(1);
+    pdf.strokeColor(AMBER).lineWidth(0.3).dash(3, { space: 2 });
+    pdf.moveTo(x0, yTop).lineTo(x0 + plotW, yTop).stroke();
+    pdf.moveTo(x0, yBot).lineTo(x0 + plotW, yBot).stroke();
+    pdf.undash();
+  }
+
+  // Zero line.
+  if (yMin < 0 && yMax > 0){
+    pdf.strokeColor('#555').lineWidth(0.5);
+    const yz = sy(0);
+    pdf.moveTo(x0, yz).lineTo(x0 + plotW, yz).stroke();
+  }
+
+  // Axis labels.
+  pdf.font(BODY_FONT).fontSize(8).fillColor(TEAL_DARK);
+  if (s.x_label){
+    pdf.text(s.x_label, x0, y0 + plotH + 18, { width: plotW, align: 'center', lineBreak: false });
+  }
+  if (s.y_label){
+    pdf.save();
+    pdf.rotate(-90, { origin: [x0 - 40, y0 + plotH / 2] });
+    pdf.text(s.y_label, x0 - 40 - plotH / 2, y0 + plotH / 2 - 4,
+             { width: plotH, align: 'center', lineBreak: false });
+    pdf.restore();
+  }
+
+  // Plot points.
+  for (const p of pts){
+    const x = Number(p.x), y = Number(p.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+    const px = sx(x), py = sy(y);
+    const ok = p.ok !== false;
+    pdf.fillColor(ok ? AMBER : '#c0392b');
+    pdf.circle(px, py, 1.6).fill();
+  }
+  pdf.fillColor('black').strokeColor('black');
+  pdf.restore();
+
+  pdf.y = y0 + plotH + (s.x_label ? 32 : 14);
+  renderChartCaption(pdf, s, pdf.y);
 }
 
 function formatCell(v){
