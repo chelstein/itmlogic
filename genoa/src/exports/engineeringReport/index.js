@@ -28,6 +28,7 @@ import {
   buildDaPatternChartSection,
   buildItmCoverageOverlaySection
 }                                                  from './sections/vectorCharts.js';
+import { buildVisualSummarySection }               from './sections/visualSummary.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -64,6 +65,15 @@ export function buildEngineeringReport(exhibit, options){
   // This sits right after the §73.333 contour-results table so the
   // map appears next to the numerical contours it visualizes.
   push(buildMapPackageSection(exhibit, opt));
+  // Visual Summary — the showpiece page.  Composes contours +
+  // population dot-density + tree-canopy halo + advisory banner into
+  // one stylized vector composition that reads at a glance.  Sits
+  // right after the H&D contour-map deliverable so a reviewer sees
+  // the regulatory map first, then the synthesized visual that
+  // overlays population and environmental context.  Skipped when
+  // there are no contours or no tx coords.  Advisory only — no
+  // filing-controlling math.
+  push(buildVisualSummarySection(exhibit, opt));
   // Terrain-aware ITM coverage (47 CFR §73.314) — conditional, only
   // present when exhibit.itm_polygons[0] is a closed ring (the engine
   // ran ITM under options.use_itm=true).  Sits AFTER the §73.333
