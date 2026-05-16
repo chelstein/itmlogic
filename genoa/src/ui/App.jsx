@@ -17,6 +17,7 @@ import PeSealCard     from '@components/ui/PeSealCard.jsx';
 import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
 import AllotmentSearchPanel from '@components/ui/AllotmentSearchPanel.jsx';
 import ComparableFacilitiesPanel from '@components/ui/ComparableFacilitiesPanel.jsx';
+import ShortSpacingShowingPanel from '@components/ui/ShortSpacingShowingPanel.jsx';
 import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
 
 /* =========================================================================
@@ -59,6 +60,7 @@ const TABS = [
   { id: 'allotment',  label: 'FM channel search' },
   { id: 'comparables', label: 'Peer benchmarking' },
   { id: 'am_da',      label: 'AM DA designer' },
+  { id: 'short_spacing', label: 'Short-spacing showing' },
   { id: 'filing',     label: 'Filing package' },
   { id: 'provenance', label: 'Provenance' },
   { id: 'narrative',  label: 'AI narrative' },
@@ -902,6 +904,9 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
   }
   if (id === 'comparables'){
     return <ComparableFacilitiesPanel baseInputs={inputs} />;
+  }
+  if (id === 'short_spacing'){
+    return <ShortSpacingShowingPanel exhibit={exhibit} />;
   }
   if (id === 'filing'){
     return <FilingPackagePanel exhibit={exhibit} />;
