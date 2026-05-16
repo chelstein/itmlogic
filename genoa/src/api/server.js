@@ -18,6 +18,7 @@ import amNightRoutes    from './routes/amNight.js';
 import allotmentRoutes  from './routes/allotment.js';
 import comparablesRoutes from './routes/comparables.js';
 import exhibitDiffRoutes from './routes/exhibitDiff.js';
+import section73215ShowingRoutes from './routes/section73215Showing.js';
 import lmsFilingRoutes from './routes/lmsFiling.js';
 import captureRoutes   from './routes/captures.js';
 import geodataRoutes   from './routes/geodata.js';
@@ -77,6 +78,7 @@ app.use('/api', amNightRoutes);      // AM nighttime allocation (POST /api/am-ni
 app.use('/api', allotmentRoutes);    // FM allotment search (POST /api/allotment/search — §73.201/§73.207/§73.215)
 app.use('/api', comparablesRoutes);  // Comparable-facility benchmarking (POST /api/comparables/fm — §73.211)
 app.use('/api', exhibitDiffRoutes);  // Move-in / what-if exhibit diff (POST /api/exhibits/diff)
+app.use('/api', section73215ShowingRoutes);  // §73.215 short-spacing showing (POST /api/exhibits/short-spacing-showing)
 app.use('/api', lmsFilingRoutes);    // FCC Form 301-FM filing package (POST /api/exhibits/filing-package{,/download,/summary})
 app.use('/api', captureRoutes);      // SDR capture audio proxy (GET /api/captures/:id/audio)
 app.use('/api', geodataRoutes);      // geodata evidence layers (GET /api/geodata/{sample,clutter,vegetation,conductivity,terrain/status,manifest})
