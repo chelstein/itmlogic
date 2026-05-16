@@ -894,6 +894,25 @@ export async function computeExhibit(req){
         evidence.itm_coverage_attempted = { available: false, error: String(err.message) };
       }
     }
+
+    // If ITM was requested (options.use_itm) but neither SPLAT nor the
+    // JS fallback produced closed-ring coverage, attach an explicit
+    // "attempted, unavailable" diagnostic on the exhibit so the report
+    // and UI can surface WHY the §73.314 section is missing instead of
+    // silently dropping it.  Operators who checked the "compute terrain
+    // ITM" box deserve to see what happened.
+    if (!evidence.itm_coverage){
+      evidence.itm_coverage_unavailable = {
+        attempted:        true,
+        reason:           'neither SPLAT sidecar nor JS Bullington/P.526 fallback produced closed-ring coverage within compute budget',
+        splat_attempt:    splatAttempt
+          ? { available: !!splatAttempt.available, error: splatAttempt.error || null,
+              endpoint:  splatAttempt.endpoint || null,
+              sidecar_enhancement_required: splatAttempt.sidecar_enhancement_required || null }
+          : { available: false, error: 'SPLAT sidecar not configured' },
+        guidance:         'Re-run with a longer SPLAT_TIMEOUT_SECONDS / COMPUTE_BUDGET_MS, or check the SPLAT sidecar health (see Service Health rack).  ITM coverage is supplementary §73.314 evidence; filing-controlling §73.333 contours are NOT affected.'
+      };
+    }
   }
 
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
