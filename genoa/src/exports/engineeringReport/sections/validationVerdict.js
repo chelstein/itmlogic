@@ -75,7 +75,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'Curve validation (golden suite)',
       status: 'FAIL',
-      detail: 'no curve_reference_validation record attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 or deterministic tier-3 fallback).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+      detail: 'No curve-validation record was attached to this exhibit.  Treat the validation as INCOMPLETE pending re-compute.'
     });
   }
 
@@ -102,7 +102,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'FCC contour cross-check (ZTR _fcc_contour vs engine)',
       status: 'FAIL',
-      detail: 'no fcc_cross_check record attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 from ZTR / direct geo.fcc.gov, or tier-3 deterministic engine-self).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+      detail: 'No FCC contour cross-check record was attached to this exhibit.  Treat the cross-check as INCOMPLETE pending re-compute.'
     });
   }
 
@@ -134,7 +134,7 @@ export function buildValidationVerdictSection(exhibit){
     components.push({
       name:   'FCC parity (live geo.fcc.gov/api/contours/distance.json)',
       status: 'FAIL',
-      detail: 'no fcc_parity_report attached to this exhibit — exhibits produced by the current orchestrator always carry a record (live tier-1 or tier-3 deterministic dataset-SHA match).  Absence here indicates upstream data-loss / attachment failure / stale exhibit; treat as unverified.'
+      detail: 'No FCC parity record was attached to this exhibit.  Treat the parity check as INCOMPLETE pending re-compute.'
     });
   }
 
