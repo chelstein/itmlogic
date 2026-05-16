@@ -777,7 +777,30 @@ export async function computeExhibit(req){
       && Number.isFinite(Number(inputs.haat_m))
       && Number.isFinite(Number(inputs.frequency))
       && Number.isFinite(Number(inputs.erp_kw))){
-    const step = Number(inputs.radial_step_deg) || 10;
+    // SPLAT fidelity knobs.  All three default-tuned for the
+    // current droplet spec (4 GB / 2 shared vCPUs per container,
+    // 2-3 autoscaled containers).  Per-call work stays moderate so
+    // a single call still finishes in seconds; the per-call BUDGET
+    // bumps to 30s so longer rings don't bite, and the autoscaling
+    // headroom is used by callers that fan multiple SPLAT calls
+    // out in parallel (allotment search, comparable benchmarking).
+    //
+    // Operator dials each of these via SPLAT_RADIAL_STEP_DEG /
+    // SPLAT_MAX_DISTANCE_KM / SPLAT_BUDGET_MIN_MS env vars on the
+    // deploy:
+    //   - 5° step → 72 radials/call (about 2× compute) when CPU
+    //     headroom shows up
+    //   - 200 km ring for AM-grade rings
+    //   - 90 s budget on the larger ones
+    //
+    // inputs.radial_step_deg + options.itm_to_km remain per-request
+    // overrides that win over the env defaults — used by the
+    // workbench when an engineer asks for finer fidelity on one
+    // exhibit without changing global behavior.
+    const SPLAT_DEFAULT_STEP_DEG      = Number(process.env.SPLAT_RADIAL_STEP_DEG) || 10;
+    const SPLAT_DEFAULT_MAX_KM        = Number(process.env.SPLAT_MAX_DISTANCE_KM) || 100;
+    const SPLAT_DEFAULT_BUDGET_MIN_MS = Number(process.env.SPLAT_BUDGET_MIN_MS)   || 30_000;
+    const step = Number(inputs.radial_step_deg) || SPLAT_DEFAULT_STEP_DEG;
     const radials = [];
     for (let az = 0; az < 360; az += step) radials.push(az);
     const target = service73215Threshold(inputs.fcc_class) || 60;
@@ -798,15 +821,23 @@ export async function computeExhibit(req){
               erp_kw:            Number(inputs.erp_kw),
               polarization:      inputs.polarization || 'V'
             },
-            max_distance_km:  Number(options.itm_to_km)   || 80,
+            max_distance_km:  Number(options.itm_to_km)   || SPLAT_DEFAULT_MAX_KM,
             target_field_dbu: target,
             radial_step_deg:  step
-          }), { minMs: 15_000 });
+          }), { minMs: SPLAT_DEFAULT_BUDGET_MIN_MS });
         if (splatAttempt?.available){
           evidence.itm_coverage = {
             ...splatAttempt,
             engine: 'splat-itm-v1.2.2',
-            tier:   'high-fidelity'
+            tier:   'high-fidelity',
+            // Stamp the fidelity knobs that produced this run so the
+            // appendix + replay can show resolution, not just the
+            // n_radials count.  Operator-tuned via SPLAT_* env vars.
+            fidelity: {
+              radial_step_deg:  step,
+              max_distance_km:  Number(options.itm_to_km)   || SPLAT_DEFAULT_MAX_KM,
+              budget_min_ms:    SPLAT_DEFAULT_BUDGET_MIN_MS
+            }
           };
         }
       } catch (err){
