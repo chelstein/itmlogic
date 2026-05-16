@@ -1678,6 +1678,56 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 8f. AM §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit ----
+  //
+  // Runs the closed-form reduced-power formula for the proposed AM
+  // station against the same nearby-primaries pool used by step 8d.
+  // Attaches evidence.am_psra_pssa with PSSA + PSRA per-pool windows
+  // (reduced_w, binding pair, ceiling flag), §73.99 local-time
+  // windows (sun sidecar), and the §73.182(k) RSS share that was
+  // used to derive E_max_allowed for each protected pair.
+  //
+  // Fail-soft: same envelope as 8d.  When the sun sidecar is
+  // unconfigured the orchestrator still computes the power table
+  // (ceiling-only verdict) but omits the window schedule; when the
+  // FCCAM/Berry skywave engine is unconfigured the orchestrator
+  // returns protected_pairs=[] and the ceiling-only verdict applies.
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && options.am_psra_pssa !== false){
+    const t0 = Date.now();
+    try {
+      const { psraPssaExhibit } = await import('../../engine/am/psraPssaOrchestrator.js');
+      const proposed = {
+        lat:           Number(inputs.lat),
+        lon:           Number(inputs.lon),
+        freq_khz:      Number(inputs.frequency),
+        p_daytime_kw:  Number(inputs.erp_kw),
+        fcc_class:     inputs.fcc_class || null,
+        call:          inputs.call || null,
+        facility_id:   inputs.facility_id || null,
+        timezone_code: inputs.timezone_code || undefined,
+        pattern_table: inputs.pattern_table || null,
+        pattern_mode:  inputs.pattern_mode  || (inputs.pattern_table ? 'DA' : 'omni')
+      };
+      const study = await budget.withDeadline('am_psra_pssa',
+        () => psraPssaExhibit({ proposed, options: options.am_psra_pssa_options || {} },
+                              { fccamClient:    sidecars.fccam,
+                                facilityClient: sidecars.facility,
+                                sunClient:      sidecars.sun }),
+        { minMs: 20_000 });
+      evidence.am_psra_pssa = {
+        ...(study || { available: false, error: 'compute budget exhausted' }),
+        elapsed_ms: Date.now() - t0
+      };
+    } catch (e){
+      evidence.am_psra_pssa = {
+        available: false,
+        error:     `am_psra_pssa compute failed: ${e?.message || e}`,
+        elapsed_ms: Date.now() - t0
+      };
+    }
+  }
+
   // ---- 9. Provenance: facility / terrain / curve / sdr ----
   if (facilityResolution){
     const f = facilityResolution.facility;
@@ -1716,6 +1766,9 @@ export async function computeExhibit(req){
   }
   if (evidence.am_physics){
     exhibit.evidence.am_physics = evidence.am_physics;
+  }
+  if (evidence.am_psra_pssa){
+    exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;
   }
   if (evidence.nec_model){
     exhibit.evidence.nec_model = evidence.nec_model;
