@@ -15,6 +15,7 @@ import sweepRoutes      from './routes/sweep.js';
 import peCertificationRoutes from './routes/peCertification.js';
 import amDaDesignRoutes from './routes/amDaDesign.js';
 import amNightRoutes    from './routes/amNight.js';
+import amSunRoutes      from './routes/amSun.js';
 import allotmentRoutes  from './routes/allotment.js';
 import comparablesRoutes from './routes/comparables.js';
 import exhibitDiffRoutes from './routes/exhibitDiff.js';
@@ -75,6 +76,7 @@ app.use('/api', sweepRoutes);        // parameter-sweep endpoint (POST /api/exhi
 app.use('/api', peCertificationRoutes); // PE certify / verify-cert (POST /api/exhibits/{certify,verify-cert,verify-build,verify-replay-token})
 app.use('/api', amDaDesignRoutes);   // AM DA pattern design (POST /api/am-da/{design,null})
 app.use('/api', amNightRoutes);      // AM nighttime allocation (POST /api/am-night/nif — §73.182 NIF contour)
+app.use('/api', amSunRoutes);        // FCC sunrise/sunset authority (GET /api/am/sun — §73.99 PSRA/PSSA + §73.1209)
 app.use('/api', allotmentRoutes);    // FM allotment search (POST /api/allotment/search — §73.201/§73.207/§73.215)
 app.use('/api', comparablesRoutes);  // Comparable-facility benchmarking (POST /api/comparables/fm — §73.211)
 app.use('/api', exhibitDiffRoutes);  // Move-in / what-if exhibit diff (POST /api/exhibits/diff)
