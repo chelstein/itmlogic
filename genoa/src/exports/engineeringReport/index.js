@@ -25,7 +25,8 @@ import { buildMapPackageSection }                  from './sections/mapPackage.j
 import {
   buildNifPolarChartSection,
   buildFortranParityChartSection,
-  buildDaPatternChartSection
+  buildDaPatternChartSection,
+  buildItmCoverageOverlaySection
 }                                                  from './sections/vectorCharts.js';
 
 export function buildEngineeringReport(exhibit, options){
@@ -84,6 +85,7 @@ export function buildEngineeringReport(exhibit, options){
   // isn't present, so the chart pages only appear on exhibits that
   // actually ran the relevant computation.
   push(buildDaPatternChartSection(exhibit));       // AM/FM DA: filed pattern polygon
+  push(buildItmCoverageOverlaySection(exhibit));   // §73.314: ITM coverage overlay
   push(buildFortranParityChartSection(exhibit));   // FM/LPFM/FX: FORTRAN parity scatter
   push(buildNifPolarChartSection(exhibit));        // AM: nighttime NIF polar contour
 
