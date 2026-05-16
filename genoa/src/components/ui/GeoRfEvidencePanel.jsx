@@ -129,12 +129,15 @@ export default function GeoRfEvidencePanel({ baseInputs }){
             </div>
             <div className="rounded-md border border-rule p-3 space-y-1">
               <div className="text-textDim text-[10px] tracking-rack uppercase">Auxiliary datasets</div>
-              <Kv k="Landcover"          v={lc.available  ? 'available' : 'unavailable'} />
-              <Kv k="Tau RF models"      v={tau.available ? 'available' : 'unavailable'} />
-              <Kv k="FCC M3 cond."       v={m3.available  ? 'available' : 'unavailable'} />
-              <Kv k="Water proximity"    v={wp.available  ? 'available' : 'unavailable'} />
-              <Kv k="Climate projection" v={cp.available  ? 'available' : 'unavailable'} />
-              <Kv k="SDR residual"       v={rs.available  ? 'available' : 'unavailable'} />
+              {lc.available  && <Kv k="Landcover"          v="available" />}
+              {tau.available && <Kv k="Tau RF models"      v="available" />}
+              {m3.available  && <Kv k="FCC M3 cond."       v="available" />}
+              {wp.available  && <Kv k="Water proximity"    v="available" />}
+              {cp.available  && <Kv k="Climate projection" v="available" />}
+              {rs.available  && <Kv k="SDR residual"       v="available" />}
+              {!(lc.available || tau.available || m3.available || wp.available || cp.available || rs.available) && (
+                <div className="text-[11px] text-textDim italic">no auxiliary datasets sampled for this point</div>
+              )}
               <Kv k="Filing effect"      v="None (advisory)" />
               <Kv k="Fetched at"         v={result.fetched_at || '—'} />
             </div>
