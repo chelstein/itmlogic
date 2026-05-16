@@ -151,14 +151,35 @@ export function buildValidationVerdictSection(exhibit){
   });
 
   // Terrain source
+  //
+  // §73.184 AM groundwave is by definition a flat-earth FCC curve over
+  // assumed conductivity (47 CFR §73.183 / §73.190 Figure M3 / R3) —
+  // terrain elevation is NOT an input to the AM contour calculation.
+  // So for AM exhibits, "no terrain attached" is the expected outcome,
+  // not a warning condition.  Report it as SKIP with the regulatory
+  // explanation; reserve WARN for FM/LPFM/FX where terrain IS expected
+  // but the sidecar fell through.
   const ev = exhibit.evidence || {};
-  components.push({
-    name:   'Terrain source',
-    status: ev.terrain?.available ? 'PASS' : 'WARN',
-    detail: ev.terrain?.available
-              ? `${ev.terrain.source} · ${ev.terrain.dem?.dataset || ev.terrain.dem?.source || 'DEM'} · ${ev.terrain.n_radials || 0} radials`
-              : 'CONSTANT_HAAT_ASSUMED — flat HAAT used (terrain sidecar not available)'
-  });
+  const svc_terrain = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (ev.terrain?.available){
+    components.push({
+      name:   'Terrain source',
+      status: 'PASS',
+      detail: `${ev.terrain.source} · ${ev.terrain.dem?.dataset || ev.terrain.dem?.source || 'DEM'} · ${ev.terrain.n_radials || 0} radials`
+    });
+  } else if (svc_terrain === 'AM'){
+    components.push({
+      name:   'Terrain source',
+      status: 'SKIP',
+      detail: '§73.184 AM groundwave does not use terrain — FCC curve over assumed conductivity per §73.183 / §73.190.  No DEM lookup is required or performed for AM exhibits.'
+    });
+  } else {
+    components.push({
+      name:   'Terrain source',
+      status: 'WARN',
+      detail: 'CONSTANT_HAAT_ASSUMED — flat HAAT used (terrain sidecar not available)'
+    });
+  }
 
   // Engineering confidence (terrain-aware advisory layer).
   const ec = exhibit.engineering_confidence;

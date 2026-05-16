@@ -250,12 +250,18 @@ export function buildAppendixSections(exhibit){
                                   : 'opt-in (not requested)'],
     // FORTRAN reference-engine parity (per-radial × per-contour).
     // Stamped on evidence.fcc_curve_parity when FORTRAN_FCC_SIDECAR_URL
-    // is configured AND service ∈ { FM, LPFM, FX }.
+    // is configured AND service ∈ { FM, LPFM, FX }.  The FCC FORTRAN
+    // TVFMFS_METRIC routine implements §73.333 FM/TV curves only; it
+    // has no AM groundwave capability, so for AM exhibits the parity
+    // sweep is correctly skipped at the orchestrator (no missing
+    // sidecar — not applicable to the service).
     ['FCC FORTRAN parity',      ev.fcc_curve_parity?.available
                                   ? `${ev.fcc_curve_parity.n_ok}/${ev.fcc_curve_parity.n_requests} pairs ok; max |Δ| ${Number.isFinite(ev.fcc_curve_parity.max_abs_delta_km) ? ev.fcc_curve_parity.max_abs_delta_km.toFixed(3) + ' km' : '—'} (tolerance ${ev.fcc_curve_parity.tolerance_km} km) — ${ev.fcc_curve_parity.pass ? 'PASS' : 'FAIL'}`
                                   : ev.fcc_curve_parity?.error
                                     ? `unavailable: ${ev.fcc_curve_parity.error}`
-                                    : 'not configured (FORTRAN_FCC_SIDECAR_URL unset)']
+                                    : svc_c === 'AM'
+                                      ? 'not applicable to AM (FCC TVFMFS_METRIC is §73.333 FM/TV curves only; §73.184 AM groundwave uses the vendored gwave.js engine reported above)'
+                                      : 'not configured (FORTRAN_FCC_SIDECAR_URL unset)']
   ];
   sections.push({
     id:      'appendix-c',
@@ -276,11 +282,21 @@ export function buildAppendixSections(exhibit){
   // explicit dem_commit / dem_version fields some sidecars emit.
   const tDem    = ev.terrain || {};
   const tNested = ev.terrain?.dem || {};
-  const demDataset = tNested.dataset || tNested.source || tDem.dataset || tDem.source || tDem.backend || '—';
-  const demCommit  = tNested.commit  || tNested.version || tNested.build || tNested.sha
-                  || tDem.commit     || tDem.version    || tDem.build    || tDem.sha
-                  || tDem.dem_commit || tDem.dem_version
-                  || '—';
+  // For AM exhibits, §73.184 groundwave does not consume a DEM at all —
+  // contour distances are derived from the FCC curve over assumed
+  // ground conductivity (§73.183 / §73.190 Fig. M3/R3).  Print the
+  // regulatory rationale rather than a misleading em-dash that would
+  // suggest a missing data source.
+  const demNotApplicable = svc_c === 'AM' && !tDem.available;
+  const demDataset = demNotApplicable
+    ? 'n/a — §73.184 AM groundwave does not use DEM'
+    : (tNested.dataset || tNested.source || tDem.dataset || tDem.source || tDem.backend || '—');
+  const demCommit  = demNotApplicable
+    ? 'n/a — AM exhibits do not sample terrain'
+    : (tNested.commit  || tNested.version || tNested.build || tNested.sha
+        || tDem.commit     || tDem.version    || tDem.build    || tDem.sha
+        || tDem.dem_commit || tDem.dem_version
+        || '—');
   // FORTRAN reference-engine source-file provenance (when configured).
   // Stamped on method_versions.fcc_fortran_engine by exhibitService.js
   // step 8c from GET /version on the fcc-fortran-engine microservice.

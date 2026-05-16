@@ -12,7 +12,19 @@
 
 export function buildTerrainProvenanceSection(exhibit){
   const t = exhibit?.evidence?.terrain;
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
   if (!t || !t.available){
+    if (svc === 'AM'){
+      return {
+        id:      'terrain-provenance',
+        type:    'paragraphs',
+        heading: 'Terrain Provenance',
+        paragraphs: [
+          'No DEM provenance is attached because §73.184 AM groundwave contour distances do not consume terrain elevation data.  The FCC §73.184 curve evaluates field strength as a function of frequency, distance, and ground conductivity (§73.183 / §73.190 Figure M3 / R3) — terrain elevation is not an input.',
+          'For AM exhibits, the "Allocation basis" stated in FACILITY PARAMETERS is the controlling methodology; DEM source / dataset version / sampling method are not applicable.'
+        ]
+      };
+    }
     return {
       id:      'terrain-provenance',
       type:    'paragraphs',
