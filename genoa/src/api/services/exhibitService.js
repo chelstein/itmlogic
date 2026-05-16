@@ -300,15 +300,37 @@ export async function computeExhibit(req){
   // status, last action, public-file folder index) to surface
   // alongside the engine output.  Public upstreams (no auth);
   // wrapped in budget so a slow upstream doesn't stall the exhibit.
+  //
+  // PARALLELIZATION: this lookup is independent of HAAT, terrain, ITM,
+  // nearby primaries, and the engine compute itself — its result feeds
+  // only the cross-check warnings and the cover/provenance sections,
+  // none of which read it until after step 7.  Wrap the whole block in
+  // a deferred Promise so the network call runs concurrently with
+  // steps 3-6 (terrain HAAT, SPLAT probe, NEC, multi-source DEM, ITM
+  // coverage, SDR pre-attach, identity, nearby primaries).  We await
+  // the promise just before step 7 (engine compute) so any side-effects
+  // on `evidence` + `warnings` are in place before the engine runs.
+  //
+  // On a typical FM compute the fcc_lms call takes ~10 s; with this
+  // restructure that 10 s now overlaps with the ~10-30 s of terrain
+  // and DEM work in steps 3-3d instead of adding to it.
   let lmsResp = null;
-  if (sidecars.fccLms && (inputs.call || inputs.facility_id)){
-    lmsResp = await budget.withDeadline('fcc_lms',
-      () => sidecars.fccLms.getStationRecord({
-        call:        inputs.call         || null,
-        facility_id: inputs.facility_id  || null,
-        service:     inputs.service      || null
-      }), { minMs: 4_000 });
-    if (lmsResp?.available){
+  const fccLmsPromise = (sidecars.fccLms && (inputs.call || inputs.facility_id))
+    ? (async () => {
+      lmsResp = await budget.withDeadline('fcc_lms',
+        () => sidecars.fccLms.getStationRecord({
+          call:        inputs.call         || null,
+          facility_id: inputs.facility_id  || null,
+          service:     inputs.service      || null
+        }), { minMs: 4_000 });
+      await _processFccLmsResult(lmsResp, inputs, evidence, warnings, W);
+      return lmsResp;
+    })()
+    : Promise.resolve(null);
+
+  /* prettier-ignore */ async function _processFccLmsResult(lmsResp, inputs, evidence, warnings, W){
+    if (!lmsResp) return;
+    if (lmsResp.available){
       // Cross-check ZTR/inputs vs FCC LMS row.  Tolerances kept loose
       // because FMQ rounds frequency to 0.1 MHz and ERP to 0.1 kW.
       const license = lmsResp.license || {};
@@ -1218,6 +1240,12 @@ export async function computeExhibit(req){
       }
     }
   }
+
+  // Resolve the deferred FCC LMS lookup (kicked off at step 2b-2) so
+  // any side-effects on `evidence` + `warnings` are in place before
+  // the engine compute reads them.  The promise ran concurrently with
+  // steps 3-6; on a typical FM compute this overlap saves ~10 s.
+  await fccLmsPromise;
 
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {

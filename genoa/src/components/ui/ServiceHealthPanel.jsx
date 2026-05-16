@@ -33,7 +33,7 @@ const ROWS = [
   ['map',         'Map render',                'sidecar'],
   ['identity',    'Identity (RadioDNS)',       'sidecar'],
   ['nec',         'NEC2++',                    'sidecar'],
-  ['measurement', 'Measurement',               'sidecar'],
+  ['measurement', 'SDR captures (via ZTR)',    'sidecar'],
   ['los',         'LOS (ZTR)',                 'sidecar'],
   ['facility',    'Facility (ZTR)',            'upstream'],
   ['asr',         'ASR (FCC opendata)',        'upstream'],
@@ -43,8 +43,13 @@ const ROWS = [
   ['fccLms',      'FCC LMS',                   'upstream']
 ];
 
-function ledFor(entry){
+function ledFor(entry, key){
   if (!entry) return 'offline';
+  // Measurement is an optional adapter — the live SDR-capture path is
+  // the ZTR rich-station endpoint (covered by the `facility` LED), so
+  // an unconfigured measurement sidecar is the EXPECTED state, not a
+  // problem.  Don't show it as OFFLINE / red.
+  if (!entry.configured && key === 'measurement') return 'nominal';
   if (!entry.configured) return 'offline';
   if (!entry.healthy) return 'blocked';
   if (entry.latency_ms != null && entry.latency_ms > SLOW_MS) return 'degraded';
@@ -53,7 +58,16 @@ function ledFor(entry){
 
 function detailFor(key, entry){
   if (!entry) return '—';
-  if (!entry.configured) return key === 'db' ? 'stateless mode' : 'not configured';
+  if (!entry.configured){
+    if (key === 'db')          return 'stateless mode';
+    // The measurement sidecar is an OPTIONAL adapter (genoa/src/sidecars/
+    // measurement/) — SDR captures flow directly from the ZTR rich-
+    // station endpoint, so the LED reading "not configured" is a
+    // misleading "OFFLINE — broken" signal when really the upstream
+    // capture path is live and working.  Surface that here.
+    if (key === 'measurement') return 'captures via ZTR (sidecar adapter optional)';
+    return 'not configured';
+  }
   if (!entry.healthy) return entry.latency_ms != null ? `unreachable · ${entry.latency_ms} ms` : 'unreachable';
   return entry.latency_ms != null ? `${entry.latency_ms} ms` : 'reachable';
 }
@@ -138,7 +152,7 @@ export default function ServiceHealthPanel(){
     >
       <ul className="divide-y divide-rule">
         {rows.map(({ key, label, kind, entry }) => {
-          const status = ledFor(entry);
+          const status = ledFor(entry, key);
           return (
             <li key={key} className="flex items-center justify-between py-1.5 gap-3">
               <div className="flex items-center gap-2 min-w-0">
