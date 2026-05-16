@@ -245,7 +245,7 @@ export async function exportPdf(exhibit){
     emitMonoBlock(builder, [
       `Engine          : ${val(ap.engine || 'somnec2d')}`,
       `Method          : ${val(ap.method || 'Modified Sommerfeld integral evaluation')}`,
-      `EPR (εᵣ)        : ${val(inp.epr)}${inp.epr_source === 'default' ? ' (default)' : ''}`,
+      `EPR (eps_r)     : ${val(inp.epr)}${inp.epr_source === 'default' ? ' (default)' : ''}`,
       `Conductivity    : ${val(inp.sig_s_m)} S/m${inp.sigma_ms_m != null ? `  (${inp.sigma_ms_m} mS/m)` : ''}${inp.sigma_source === 'default' ? ' (default)' : ''}`,
       `Frequency       : ${val(inp.frequency_mhz)} MHz`,
       `Grid file       : ${val(out.grid_file)}`,

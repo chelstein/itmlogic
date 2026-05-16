@@ -714,8 +714,8 @@ export function buildAppendixSections(exhibit){
         rows: [
           ['Engine',                physics.engine || 'somnec2d'],
           ['Method',                physics.method || 'Modified Sommerfeld integral evaluation (NEC-family ground-field solver)'],
-          ['EPR (εᵣ)',              `${fmtNum(inp.epr, 3)}${eprSrc}`],
-          ['Conductivity σ',        `${fmtNum(inp.sig_s_m, 6)} S/m  (${fmtNum(inp.sigma_ms_m, 2)} mS/m)${sigmaSrc}`],
+          ['Dielectric constant',   `${fmtNum(inp.epr, 3)} (NEC EPR)${eprSrc}`],
+          ['Conductivity',          `${fmtNum(inp.sig_s_m, 6)} S/m  (${fmtNum(inp.sigma_ms_m, 2)} mS/m)${sigmaSrc}`],
           ['Frequency',             `${fmtNum(inp.frequency_mhz, 6)} MHz`],
           ['Grid file',             out.grid_file || '—'],
           ['Grid SHA-256',          out.grid_sha256 || '—'],

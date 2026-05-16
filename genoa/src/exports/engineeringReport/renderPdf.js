@@ -77,12 +77,33 @@ const PDF_UNICODE_FOLD = {
   'Ω': 'ohm',   // Ω (U+03A9)
   'λ': 'lambda',// λ (U+03BB) — wavelength
   'θ': 'theta', // θ (U+03B8) — angle
-  'φ': 'phi'    // φ (U+03C6) — phase
+  'φ': 'phi',   // φ (U+03C6) — phase
+  'ε': 'epsilon', // ε (U+03B5) — permittivity (NEC EPR)
+  'Σ': 'Sigma',   // Σ (U+03A3) — RSS sum
+  'α': 'alpha',   // α (U+03B1)
+  'β': 'beta',    // β (U+03B2)
+  'γ': 'gamma',   // γ (U+03B3)
+  'ω': 'omega',   // ω (U+03C9) — angular frequency
+  // Latin subscript letters (U+1D62…U+1D6A) — used for εᵣ, σᵧ, etc.
+  // PDFKit base-14 fonts have no glyph and silently shift bytes when
+  // encountered; adding them here keeps the content stream aligned.
+  'ᵢ': '_i', 'ᵣ': '_r', 'ᵤ': '_u', 'ᵥ': '_v',
+  'ₐ': '_a', 'ₑ': '_e', 'ₒ': '_o', 'ₓ': '_x',
+  // Common technical glyphs that have crept into section builders.
+  '²': '^2',  '³': '^3',  '⁻¹': '^-1', '½': '1/2',
+  '·': '.',   // U+00B7 middle dot (we render KV separators with dots elsewhere)
+  '≤': '<=', '≥': '>=', '≠': '!=', '≈': '~=', '±': '+/-',
+  '⋅': '.',
+  '°': ' deg',
+  'µ': 'u',   // U+00B5 micro sign (distinct from Greek μ U+03BC)
+  '∞': 'inf'
 };
 function pdfSafeText(s){
   if (typeof s !== 'string') return s;
-  return s.replace(/[→←↔–—‘’“”…ΔδσπμΩλθφ]/g,
-                   ch => PDF_UNICODE_FOLD[ch] || ch);
+  return s.replace(
+    /[→←↔–—‘’“”…ΔδσπμΩλθφεΣαβγωᵢᵣᵤᵥₐₑₒₓ²³½·≤≥≠≈±⋅°µ∞]/g,
+    (ch) => PDF_UNICODE_FOLD[ch] || ch
+  );
 }
 
 export async function renderEngineeringReportPdf(doc){
