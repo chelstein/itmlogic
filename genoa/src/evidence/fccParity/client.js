@@ -124,9 +124,17 @@ export function makeFccParityClient({
       const samples = stratifiedSample(samples_in, maxSamples);
 
       const fetched_at = new Date().toISOString();
-      const out = [];
       const errors = [];
-      for (const s of samples){
+
+      // Per-sample fetch.  geo.fcc.gov/api/contours/distance.json is a
+      // single-request endpoint (one HAAT × ERP × channel × field per
+      // call), so an N-sample report is N HTTP requests.  Sequentially
+      // that's N × ~500 ms which busts the compute budget on real
+      // stations; here we fan out with bounded concurrency (default 6)
+      // so a 24-sample report finishes in 4 batches instead of 24.
+      // The upstream rate limit is generous; FCC publishes the endpoint
+      // for public use and 6 concurrent connections is well within it.
+      async function fetchOne(s){
         const url = `${endpoint}?haat=${encodeURIComponent(haat_m)}`
                   + `&erp=${encodeURIComponent(erp_kw)}`
                   + `&channel=${encodeURIComponent(channel)}`
@@ -137,31 +145,40 @@ export function makeFccParityClient({
           const r = await fetchFn(url, { signal: AbortSignal.timeout(timeoutMs) });
           if (!r.ok){
             errors.push(`HTTP ${r.status} on ${url}`);
-            out.push({ ...s, fcc_distance_km: null, delta_km: null,
-                       within_tolerance: null, error: `HTTP ${r.status}` });
-            continue;
+            return { ...s, fcc_distance_km: null, delta_km: null,
+                     within_tolerance: null, error: `HTTP ${r.status}` };
           }
           const j = await r.json();
           const fcc_km = Number(j?.distance_km ?? j?.distance ?? j?.km);
           if (!Number.isFinite(fcc_km)){
             errors.push(`bad JSON on ${url}: ${JSON.stringify(j).slice(0, 100)}`);
-            out.push({ ...s, fcc_distance_km: null, delta_km: null,
-                       within_tolerance: null, error: 'bad upstream JSON' });
-            continue;
+            return { ...s, fcc_distance_km: null, delta_km: null,
+                     within_tolerance: null, error: 'bad upstream JSON' };
           }
           const delta = Number((s.genoa_distance_km - fcc_km).toFixed(6));
-          out.push({
+          return {
             ...s,
             fcc_distance_km:  Number(fcc_km.toFixed(4)),
             delta_km:         delta,
             within_tolerance: Math.abs(delta) <= toleranceKm
-          });
+          };
         } catch (e){
           errors.push(`fetch failed on ${url}: ${e.message}`);
-          out.push({ ...s, fcc_distance_km: null, delta_km: null,
-                     within_tolerance: null, error: String(e.message) });
+          return { ...s, fcc_distance_km: null, delta_km: null,
+                   within_tolerance: null, error: String(e.message) };
         }
       }
+
+      const concurrency = Number(process.env.FCC_PARITY_CONCURRENCY) || 6;
+      const out = new Array(samples.length);
+      let cursor = 0;
+      async function worker(){
+        while (cursor < samples.length){
+          const i = cursor++;
+          out[i] = await fetchOne(samples[i]);
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(concurrency, samples.length) }, worker));
 
       const evaluated  = out.filter(s => Number.isFinite(s.delta_km));
       const max_error  = evaluated.length ? Math.max(...evaluated.map(s => Math.abs(s.delta_km))) : null;
