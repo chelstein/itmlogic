@@ -15,6 +15,7 @@ import Login         from '@components/ui/Login.jsx';
 import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
 import PeSealCard     from '@components/ui/PeSealCard.jsx';
 import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
+import AllotmentSearchPanel from '@components/ui/AllotmentSearchPanel.jsx';
 import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
 
 /* =========================================================================
@@ -54,6 +55,7 @@ const TABS = [
   { id: 'evidence',   label: 'Evidence' },
   { id: 'validation', label: 'Validation' },
   { id: 'sweep',      label: 'Find best config' },
+  { id: 'allotment',  label: 'FM channel search' },
   { id: 'am_da',      label: 'AM DA designer' },
   { id: 'filing',     label: 'Filing package' },
   { id: 'provenance', label: 'Provenance' },
@@ -887,6 +889,14 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
   }
   if (id === 'am_da'){
     return <AmDaDesigner baseInputs={inputs} onApplyPattern={onApplyAmDaPattern} />;
+  }
+  if (id === 'allotment'){
+    return <AllotmentSearchPanel baseInputs={inputs} onPickChannel={(ch) => {
+      // Picking a channel pushes its frequency into the FacilityRack
+      // so the operator can re-compute the exhibit on the new
+      // allotment without re-typing.  FM is always in MHz.
+      onApplyCombo?.({ frequency: ch.frequency_mhz });
+    }} />;
   }
   if (id === 'filing'){
     return <FilingPackagePanel exhibit={exhibit} />;

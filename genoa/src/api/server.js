@@ -15,6 +15,7 @@ import sweepRoutes      from './routes/sweep.js';
 import peCertificationRoutes from './routes/peCertification.js';
 import amDaDesignRoutes from './routes/amDaDesign.js';
 import amNightRoutes    from './routes/amNight.js';
+import allotmentRoutes  from './routes/allotment.js';
 import lmsFilingRoutes from './routes/lmsFiling.js';
 import captureRoutes   from './routes/captures.js';
 import geodataRoutes   from './routes/geodata.js';
@@ -71,6 +72,7 @@ app.use('/api', sweepRoutes);        // parameter-sweep endpoint (POST /api/exhi
 app.use('/api', peCertificationRoutes); // PE certify / verify-cert (POST /api/exhibits/{certify,verify-cert,verify-build,verify-replay-token})
 app.use('/api', amDaDesignRoutes);   // AM DA pattern design (POST /api/am-da/{design,null})
 app.use('/api', amNightRoutes);      // AM nighttime allocation (POST /api/am-night/nif — §73.182 NIF contour)
+app.use('/api', allotmentRoutes);    // FM allotment search (POST /api/allotment/search — §73.201/§73.207/§73.215)
 app.use('/api', lmsFilingRoutes);    // FCC Form 301-FM filing package (POST /api/exhibits/filing-package{,/download,/summary})
 app.use('/api', captureRoutes);      // SDR capture audio proxy (GET /api/captures/:id/audio)
 app.use('/api', geodataRoutes);      // geodata evidence layers (GET /api/geodata/{sample,clutter,vegetation,conductivity,terrain/status,manifest})
