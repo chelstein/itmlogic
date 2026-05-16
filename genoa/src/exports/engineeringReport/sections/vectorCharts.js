@@ -220,3 +220,134 @@ export function buildFortranParityChartSection(exhibit){
     caption:     captionBits
   };
 }
+
+// ---------------------------------------------------------------------------
+// Tree-canopy rose polar plot — visualizes the 12-azimuth canopy density
+// around the tx so an engineer can see the environmental clutter pattern
+// at a glance.  Pulls from evidence.geo_rf_evidence.datasets.tree_canopy.rose
+// which the Geo-RF Evidence sidecar populates as part of every compute.
+// ADVISORY — does not modify FCC contour distances.
+// ---------------------------------------------------------------------------
+export function buildCanopyRosePolarSection(exhibit){
+  const ge = exhibit?.evidence?.geo_rf_evidence;
+  if (!ge || ge.status !== 'run') return null;
+  const tc = (ge.datasets?.tree_canopy && ge.datasets.tree_canopy.available)
+               ? ge.datasets.tree_canopy
+               : (ge.datasets?.tree_canopy_conus || {});
+  const rose = tc.rose;
+  if (!rose || !Array.isArray(rose.samples) || rose.samples.length < 6) return null;
+  const data = rose.samples
+    .map(s => ({
+      azimuth_deg: Number(s.azimuth_deg),
+      value:       Number(s.value_numeric)
+    }))
+    .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value));
+  if (data.length < 6) return null;
+  const vals = data.map(p => p.value);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return {
+    id:        'canopy-rose-chart',
+    type:      'polar-chart',
+    heading:   'Tree-canopy rose — environmental clutter around tx',
+    data,
+    r_unit:    '%',
+    r_max:     Math.max(20, Math.ceil(max * 1.15)),
+    caption:   `Per-azimuth canopy density at ${rose.distance_km} km radius from the transmitter, ` +
+               `from the USFS Tree Canopy CONUS 2022 (${tc.dataset || 'science_tcc_CONUS_2022_v2023-5'}) advisory raster.  ` +
+               `${rose.n_azimuths} azimuths · min ${min}% · max ${max}% · mean ${mean.toFixed(1)}%.  ` +
+               `Larger spread between min and max indicates directional environmental heterogeneity ` +
+               `(e.g. transmitter on a cleared peak surrounded by forest on one heading).  ` +
+               `ADVISORY ONLY: does not modify FCC §73.x contour distances or any filing-controlling rule output.`
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Per-radial HAAT polar plot — shows tower elevation advantage by azimuth.
+// Useful: a station with high HAAT to the south + low HAAT to the north
+// produces an asymmetric service contour even on a non-directional antenna.
+// Pulls from exhibit.radial_table which is populated for FM / FX / LPFM /
+// TV exhibits with terrain HAAT (either ZTR or multi-source DEM path).
+// ---------------------------------------------------------------------------
+export function buildHaatPolarChartSection(exhibit){
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  if (svc === 'AM') return null;     // §73.184 grid is sigma/distance, not HAAT
+  const rows = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];
+  if (rows.length < 6) return null;
+  const data = rows
+    .map(r => ({
+      azimuth_deg: Number(r.azimuth_deg ?? r.az_deg),
+      value:       Number(r.haat_m)
+    }))
+    .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value) && p.value > 0);
+  if (data.length < 6) return null;
+  const vals = data.map(p => p.value);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const spread = max - min;
+  // Only emit when there's enough variation to be visually informative;
+  // a constant-HAAT exhibit (e.g. CONSTANT_HAAT_ASSUMED) renders as a
+  // flat circle and adds no signal.
+  if (spread < 5) return null;
+  return {
+    id:        'haat-polar-chart',
+    type:      'polar-chart',
+    heading:   'Per-radial HAAT polar — terrain elevation advantage by azimuth',
+    data,
+    r_unit:    'm',
+    r_max:     Math.ceil(max * 1.08),
+    caption:   `Height Above Average Terrain (HAAT) per 47 CFR §73.313 evaluated on each ${
+                 rows.length >= 36 ? Math.round(360 / rows.length) : 'recorded'} ` +
+               `degree azimuth.  Range ${min.toFixed(0)}–${max.toFixed(0)} m, mean ${mean.toFixed(0)} m, spread ${spread.toFixed(0)} m.  ` +
+               `Higher HAAT on a given heading yields longer §73.333 service contours on that same heading; ` +
+               `this plot makes terrain-driven coverage asymmetry visible at a glance even on non-directional antennas.`
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Service-contour polar plot — the primary (60 dBu / 0.5 mV/m) contour
+// distance per azimuth, drawn as a closed polar polygon.  Renders the
+// actual shape of the protected service area.  For non-directional + flat
+// terrain this is a circle; with directional antennas or terrain variation
+// it shows the real footprint shape that V-Soft tabulates as a number list.
+// ---------------------------------------------------------------------------
+export function buildContourPolarChartSection(exhibit){
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const rows = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];
+  if (rows.length < 6) return null;
+  // Pick the "primary" contour id per service.
+  const primaryId = svc === 'AM' ? 'primary_5mvm'
+                  : svc === 'LPFM' ? 'service_60dbu'
+                  : 'service_60dbu';
+  const data = rows
+    .map(r => {
+      const dKm = r.contour_distances_km?.[primaryId];
+      return {
+        azimuth_deg: Number(r.azimuth_deg ?? r.az_deg),
+        value:       Number(dKm)
+      };
+    })
+    .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value) && p.value > 0);
+  if (data.length < 6) return null;
+  const vals = data.map(p => p.value);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return {
+    id:        'service-contour-polar',
+    type:      'polar-chart',
+    heading:   svc === 'AM'
+                 ? 'Primary service contour polar — 5 mV/m per 47 CFR §73.184'
+                 : 'Service contour polar — 60 dBu (1 mV/m) per 47 CFR §73.333',
+    data,
+    r_unit:    'km',
+    r_max:     Math.ceil(max * 1.08),
+    caption:   `Per-azimuth service-contour distance from the transmitter.  ` +
+               `Range ${min.toFixed(1)}–${max.toFixed(1)} km, mean ${mean.toFixed(1)} km.  ` +
+               `Drawn from the same per-radial values that populate Appendix A — visualizes the actual ` +
+               `shape of the protected service footprint, including directional-antenna shaping and ` +
+               `terrain-driven asymmetry.`
+  };
+}

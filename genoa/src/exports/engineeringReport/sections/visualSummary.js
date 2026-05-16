@@ -39,11 +39,19 @@ export function buildVisualSummarySection(exhibit){
   // Build a stable, ordered palette of rings — outermost first so the
   // renderer paints back-to-front (large washes underneath, tight rings
   // on top).  IDs follow the engine's contour ID convention.
+  // Higher opacity so the rings actually read at print size.  Previously
+  // 0.05-0.28 produced rings nearly invisible on the PDF.  Bumped to
+  // 0.20-0.55 — readable from across the room, still translucent enough
+  // that overlapping rings show their nesting.
   const PALETTE = {
-    night_intf:      { color: '#2b4a5d', label: '0.025 mV/m night',  fill_opacity: 0.05,  dashed: true  },
-    secondary_05mvm: { color: '#d6a85d', label: '0.5 mV/m secondary',fill_opacity: 0.10,  dashed: false },
-    primary_2mvm:    { color: '#c8843c', label: '2 mV/m primary',    fill_opacity: 0.18,  dashed: false },
-    city_5mvm:       { color: '#a8412a', label: '5 mV/m city grade', fill_opacity: 0.28,  dashed: false }
+    night_intf:      { color: '#2b4a5d', label: '0.025 mV/m night',  fill_opacity: 0.20,  dashed: true  },
+    secondary_05mvm: { color: '#d6a85d', label: '0.5 mV/m secondary',fill_opacity: 0.32,  dashed: false },
+    primary_2mvm:    { color: '#c8843c', label: '2 mV/m primary',    fill_opacity: 0.45,  dashed: false },
+    city_5mvm:       { color: '#a8412a', label: '5 mV/m city grade', fill_opacity: 0.55,  dashed: false },
+    // FM/FX/LPFM/TV dBu contours use the same warm-to-deep ramp.
+    protected_40dbu: { color: '#2b4a5d', label: '40 dBu protected',  fill_opacity: 0.20,  dashed: true  },
+    city_54dbu:      { color: '#d6a85d', label: '54 dBu city grade', fill_opacity: 0.40,  dashed: false },
+    service_60dbu:   { color: '#a8412a', label: '60 dBu (1 mV/m)',   fill_opacity: 0.55,  dashed: false }
   };
 
   const labelById = new Map(defs.map(d => [String(d?.id || '').toLowerCase(), d?.label]));
