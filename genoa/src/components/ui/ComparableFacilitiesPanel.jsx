@@ -15,11 +15,12 @@ const DEFAULT_RADIUS_KM = 300;
 const DEFAULT_TOP_K     = 20;
 
 export default function ComparableFacilitiesPanel({ baseInputs }){
-  const [radiusKm,  setRadiusKm]  = useState(DEFAULT_RADIUS_KM);
-  const [topK,      setTopK]      = useState(DEFAULT_TOP_K);
-  const [busy,      setBusy]      = useState(false);
-  const [error,     setError]     = useState('');
-  const [result,    setResult]    = useState(null);
+  const [radiusKm,        setRadiusKm]        = useState(DEFAULT_RADIUS_KM);
+  const [topK,            setTopK]            = useState(DEFAULT_TOP_K);
+  const [includeCoverage, setIncludeCoverage] = useState(false);
+  const [busy,            setBusy]            = useState(false);
+  const [error,           setError]           = useState('');
+  const [result,          setResult]          = useState(null);
   const abortRef = useRef(null);
 
   const subject = useMemo(() => ({
@@ -46,8 +47,14 @@ export default function ComparableFacilitiesPanel({ baseInputs }){
     abortRef.current = ctrl;
     setBusy(true);
     setError('');
+    // When the engineer toggles "Include coverage", we POST to the
+    // SPLAT-fan-out endpoint (parallel ITM coverage per peer); the
+    // base /comparables/fm endpoint stays the fast path for
+    // metadata-only ranking.
+    const endpoint = includeCoverage ? '/api/comparables/fm/with-coverage'
+                                     : '/api/comparables/fm';
     try {
-      const r = await fetch('/api/comparables/fm', {
+      const r = await fetch(endpoint, {
         method:      'POST',
         credentials: 'same-origin',
         headers:     { 'content-type': 'application/json' },
@@ -116,12 +123,22 @@ export default function ComparableFacilitiesPanel({ baseInputs }){
               className="w-20 bg-black/70 border border-rule rounded px-2 py-1 text-cream"
             />
           </Field>
+          <label className="text-[11px] flex items-center gap-1.5 text-textDim"
+                 title="Fan SPLAT ITM coverage per peer in parallel — slower (10-60s) but shows actual coverage rings, not just metadata.">
+            <input
+              type="checkbox"
+              checked={includeCoverage}
+              onChange={(e) => setIncludeCoverage(e.target.checked)}
+            />
+            Include ITM coverage
+          </label>
           <button
             onClick={runSearch}
             disabled={busy || !subjectComplete}
             className="ml-auto text-[10px] tracking-rack uppercase bg-gradient-to-b from-gold/30 to-gold/10 hover:from-gold/40 hover:to-gold/20 border border-gold/50 rounded px-3 py-1 disabled:opacity-40"
           >
-            {busy ? 'Ranking…' : 'Run benchmark'}
+            {busy ? (includeCoverage ? 'Ranking + fanning SPLAT…' : 'Ranking…')
+                  : (includeCoverage ? 'Run benchmark + coverage' : 'Run benchmark')}
           </button>
         </div>
 
@@ -150,9 +167,10 @@ export default function ComparableFacilitiesPanel({ baseInputs }){
               </div>
             </div>
           )}
+          {result.coverage && <CoverageSummary coverage={result.coverage} />}
           <div className="rounded-md border border-rule p-3 space-y-2">
             <div className="text-textDim text-[10px] tracking-rack uppercase">Top {result.results?.length ?? 0} comparable facilities</div>
-            <ResultsTable rows={result.results} subject={result.subject} />
+            <ResultsTable rows={result.results} subject={result.subject} coverage={result.coverage} />
           </div>
         </>
       )}
@@ -185,10 +203,21 @@ function SummaryRow({ result }){
   );
 }
 
-function ResultsTable({ rows, subject }){
+function ResultsTable({ rows, subject, coverage }){
   if (!rows || rows.length === 0){
     return <div className="text-textDim text-[11px]">No comparators in radius.</div>;
   }
+  // When the with-coverage endpoint ran, build a lookup from
+  // facility_id|call → coverage summary so each row can show
+  // mean / area alongside its metadata.
+  const covByKey = new Map();
+  if (coverage?.comparators){
+    for (const c of coverage.comparators){
+      if (c.id        != null) covByKey.set(String(c.id), c);
+      if (c.call           )   covByKey.set(c.call.toUpperCase(), c);
+    }
+  }
+  const showCoverage = !!coverage?.comparators?.length;
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-[11px]">
@@ -203,11 +232,22 @@ function ResultsTable({ rows, subject }){
             <th className="text-right">Dist (km)</th>
             <th className="text-right">Score</th>
             <th className="text-right">Headroom (ERP/HAAT)</th>
+            {showCoverage && <th className="text-right">Mean ITM (km)</th>}
+            {showCoverage && <th className="text-right">Service area (km²)</th>}
           </tr>
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <ResultRow key={row.facility_id || row.call || i} rank={i + 1} row={row} subject={subject} />
+            <ResultRow
+              key={row.facility_id || row.call || i}
+              rank={i + 1} row={row} subject={subject}
+              coverage={
+                covByKey.get(String(row.facility_id))
+                || (row.call && covByKey.get(row.call.toUpperCase()))
+                || null
+              }
+              showCoverage={showCoverage}
+            />
           ))}
         </tbody>
       </table>
@@ -215,7 +255,37 @@ function ResultsTable({ rows, subject }){
   );
 }
 
-function ResultRow({ rank, row, subject }){
+function CoverageSummary({ coverage }){
+  const proposed = coverage?.proposed;
+  return (
+    <div className="rounded-md border border-rule p-3 space-y-1 text-[11px]">
+      <div className="text-textDim text-[10px] tracking-rack uppercase">
+        ITM coverage fan-out · {coverage.n_ok}/{coverage.n_attempted} ok
+        {coverage.n_failed > 0 && (
+          <span className="text-amber-400"> · {coverage.n_failed} failed</span>
+        )}
+        <span className="text-textDim ml-2">
+          (concurrency {coverage.fanout_concurrency}, {coverage.elapsed_ms} ms wall)
+        </span>
+      </div>
+      {proposed?.available && (
+        <div className="text-cream">
+          Proposed: mean {proposed.mean_radial_km?.toFixed?.(1) || '—'} km
+          · area {proposed.service_area_km2?.toFixed?.(0) || '—'} km²
+          · n_radials {proposed.n_radials}
+          {proposed.n_blocked ? ` · ${proposed.n_blocked} blocked` : ''}
+        </div>
+      )}
+      {proposed && !proposed.available && (
+        <div className="text-amber-400">
+          Proposed coverage unavailable: {proposed.error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResultRow({ rank, row, subject, coverage = null, showCoverage = false }){
   const sameClass = subject?.fcc_class && row.fcc_class === subject.fcc_class;
   return (
     <tr className="border-t border-rule/40">
@@ -239,6 +309,21 @@ function ResultRow({ rank, row, subject }){
           </span>
         ) : '—'}
       </td>
+      {showCoverage && (
+        <td className={`text-right ${coverage && !coverage.available ? 'text-amber-400' : ''}`}
+            title={coverage && !coverage.available ? coverage.error : null}>
+          {coverage?.available && Number.isFinite(coverage.mean_radial_km)
+            ? coverage.mean_radial_km.toFixed(1)
+            : (coverage ? '—' : '·')}
+        </td>
+      )}
+      {showCoverage && (
+        <td className="text-right text-textDim">
+          {coverage?.available && Number.isFinite(coverage.service_area_km2)
+            ? Math.round(coverage.service_area_km2)
+            : (coverage ? '—' : '·')}
+        </td>
+      )}
     </tr>
   );
 }
