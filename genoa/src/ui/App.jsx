@@ -16,6 +16,7 @@ import PeCertifyDialog from '@components/ui/PeCertifyDialog.jsx';
 import PeSealCard     from '@components/ui/PeSealCard.jsx';
 import AmDaDesigner   from '@components/ui/AmDaDesigner.jsx';
 import AmNightNifPreview from '@components/ui/AmNightNifPreview.jsx';
+import AmSunAuthorityPanel from '@components/ui/AmSunAuthorityPanel.jsx';
 import AllotmentSearchPanel from '@components/ui/AllotmentSearchPanel.jsx';
 import ComparableFacilitiesPanel from '@components/ui/ComparableFacilitiesPanel.jsx';
 import ExhibitDiffPanel from '@components/ui/ExhibitDiffPanel.jsx';
@@ -63,6 +64,7 @@ const TABS = [
   { id: 'comparables', label: 'Peer benchmarking' },
   { id: 'am_da',      label: 'AM DA designer' },
   { id: 'am_night',   label: 'AM nighttime (§73.182)' },
+  { id: 'am_sun',     label: 'AM sunrise/sunset (§73.99)' },
   { id: 'short_spacing', label: 'Short-spacing showing' },
   { id: 'diff',       label: 'Move-in / what-if diff' },
   { id: 'filing',     label: 'Filing package' },
@@ -924,6 +926,9 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
         />
       </div>
     );
+  }
+  if (id === 'am_sun'){
+    return <AmSunAuthorityPanel baseInputs={inputs} />;
   }
   if (id === 'allotment'){
     return <AllotmentSearchPanel baseInputs={inputs} onPickChannel={(ch) => {

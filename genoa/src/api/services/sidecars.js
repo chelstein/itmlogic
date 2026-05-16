@@ -39,6 +39,7 @@ import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
 import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
 import { makeFccamClient }       from '../../evidence/fccamClient.js';
 import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
+import { makeFccSunClient }      from '../../evidence/fccSunClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -150,7 +151,15 @@ export const sidecars = Object.freeze({
   // disable the Berry fallback entirely with
   // GENOA_BERRY_SKYWAVE_FALLBACK=false (then AM-night degrades to
   // the existing "FCCAM not configured" diagnostic instead).
-  fccam:       makeFccamClient() || makeBerrySkywaveClient()
+  fccam:       makeFccamClient() || makeBerrySkywaveClient(),
+
+  // FCC Sunrise/Sunset Authority (SRSSTIME) sidecar.  Opt-in via
+  // FCC_SUN_SIDECAR_URL on the deploy (+ FCC_SUN_API_TOKEN for
+  // bearer auth).  Used by the AM Sunrise / Sunset Authority panel
+  // and the (forthcoming) §73.99 PSRA / PSSA reduced-power calc.
+  // When unset the panel renders the "sidecar unavailable" warning
+  // and the study still ships — no block.
+  sun:         makeFccSunClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
