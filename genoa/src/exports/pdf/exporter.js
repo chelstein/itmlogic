@@ -206,6 +206,58 @@ export async function exportPdf(exhibit){
       const np = ev.nearby_primaries_provenance;
       emitBody(builder, `Nearby      : ${val(np.source)}    radius=${val(np.radius_km)} km    n=${val(np.n_in_radius)}    enriched=${val(np.ztr_enrichment?.n_enriched)}`);
     }
+    if (ev.am_physics){
+      const ap = ev.am_physics;
+      emitBody(builder, `AM Physics  : ${val(ap.engine || 'somnec2d')}    status=${val(ap.status)}    advisory=yes    filing_effect=none`);
+    }
+    emitGap(builder, 4);
+  }
+
+  // Section 7b — INDEPENDENT AM PHYSICS EVIDENCE (advisory only)
+  //
+  // ADVISORY ONLY.  This block appears when SOMNEC2D ran (or was
+  // attempted) for an AM exhibit.  It surfaces the independent
+  // physics-engine result BESIDE the deterministic FCC §73.183 /
+  // §73.184 / §73.190 / §73.182 calculations.  Per the regulatory
+  // posture statement, this section must NEVER be construed as
+  // overriding, modifying, or substituting for FCC curve-derived
+  // contour distances or any filing-controlling rule math.
+  if (exhibit.evidence?.am_physics){
+    const ap = exhibit.evidence.am_physics;
+    emitH1(builder, 'Independent AM Physics Evidence');
+    emitBody(builder,
+      'An independent AM physics sidecar was executed using SOMNEC2D,');
+    emitBody(builder,
+      'a NEC-family FORTRAN solver that numerically evaluates modified');
+    emitBody(builder,
+      'Sommerfeld integrals for lossy-ground field components and');
+    emitBody(builder,
+      'generates a NEC ground interpolation grid.  This evidence is');
+    emitBody(builder,
+      'advisory only.  It does not modify FCC §73.184 curve-derived');
+    emitBody(builder,
+      'contour distances, §73.183 allocation results, or any filing-');
+    emitBody(builder,
+      'controlling rule calculation.');
+    emitGap(builder, 1);
+    const inp = ap.inputs || {};
+    const out = ap.outputs || {};
+    emitMonoBlock(builder, [
+      `Engine          : ${val(ap.engine || 'somnec2d')}`,
+      `Method          : ${val(ap.method || 'Modified Sommerfeld integral evaluation')}`,
+      `EPR (εᵣ)        : ${val(inp.epr)}${inp.epr_source === 'default' ? ' (default)' : ''}`,
+      `Conductivity    : ${val(inp.sig_s_m)} S/m${inp.sigma_ms_m != null ? `  (${inp.sigma_ms_m} mS/m)` : ''}${inp.sigma_source === 'default' ? ' (default)' : ''}`,
+      `Frequency       : ${val(inp.frequency_mhz)} MHz`,
+      `Grid file       : ${val(out.grid_file)}`,
+      `Grid SHA-256    : ${val(out.grid_sha256)}`,
+      `Status          : ${val(ap.status)}`,
+      `Advisory        : Yes`,
+      `Filing effect   : None`
+    ]);
+    if (ap.warning){
+      emitGap(builder, 1);
+      emitBody(builder, `Warning: ${ap.warning}`);
+    }
     emitGap(builder, 4);
   }
 
