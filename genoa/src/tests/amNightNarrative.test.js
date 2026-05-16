@@ -180,6 +180,48 @@ test('buildAmNightNarrative: all-no-service emits the cannot-qualify opener', ()
   assert.match(r.paragraphs[0], /pattern redesign|class change/i);
 });
 
+/* ---------- engine-identity adaptive prose ---------- */
+
+test('methodology + closing name FCCAM Wang when engine=fccam', () => {
+  const r = buildAmNightNarrative(mkExhibit({ ...FULL_NIF_PASS, engine: 'fccam', source: 'fccam' }));
+  assert.match(r.paragraphs[1], /FCCAM \(Wang 1985 model/);
+  assert.match(r.paragraphs[1], /filing-grade/);
+  assert.doesNotMatch(r.paragraphs[1], /Berry/);
+  // Closing references FCCAM source SHA + does NOT include screening warning.
+  const closing = r.paragraphs[r.paragraphs.length - 1];
+  assert.match(closing, /FCCAM/);
+  assert.doesNotMatch(closing, /SCREENING-grade/);
+});
+
+test('methodology + closing name Berry analytical when engine=berry-1968-screening', () => {
+  const r = buildAmNightNarrative(mkExhibit({
+    ...FULL_NIF_PASS,
+    engine: 'berry-1968-screening', source: 'berry-1968-screening'
+  }));
+  // Methodology names Berry + the screening grade + the §73.190(c) cite.
+  assert.match(r.paragraphs[1], /Berry analytical model/);
+  assert.match(r.paragraphs[1], /SCREENING-grade/);
+  assert.match(r.paragraphs[1], /73\.190\(c\)/);
+  assert.match(r.paragraphs[1], /re-run with FCCAM/);
+  assert.doesNotMatch(r.paragraphs[1], /Wang 1985 model/);
+  // Closing: drops the "same FCCAM source SHA" claim (since Berry has
+  // no source SHA), adds the screening warning.
+  const closing = r.paragraphs[r.paragraphs.length - 1];
+  assert.match(closing, /Berry analytical model/);
+  assert.match(closing, /SCREENING-grade/);
+  assert.match(closing, /Re-run with FCCAM/);
+  assert.doesNotMatch(closing, /FCCAM source SHA/);
+});
+
+test('engine identity defaults to FCCAM when missing (older orchestrator shape)', () => {
+  const nifWithoutEngine = { ...FULL_NIF_PASS };
+  delete nifWithoutEngine.engine;
+  delete nifWithoutEngine.source;
+  const r = buildAmNightNarrative(mkExhibit(nifWithoutEngine));
+  assert.match(r.paragraphs[1], /FCCAM/);
+  assert.doesNotMatch(r.paragraphs[1], /Berry/);
+});
+
 /* ---------- determinism ---------- */
 
 test('buildAmNightNarrative: deterministic — same inputs produce identical paragraphs', () => {

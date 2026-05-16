@@ -272,6 +272,23 @@ export async function solveNifContour(input, ctx){
   if (!fccamClient){
     return { available: false, error: 'FCCAM sidecar not configured (FCCAM_SIDECAR_URL unset)' };
   }
+  // Engine-identity sniff — read /version once so the per-azimuth
+  // results carry the actual skywave engine that ran (FCCAM Wang,
+  // Berry-1968-screening, …) instead of a hard-coded 'fccam'.  The
+  // narrative + appendix preface key off this to render screening
+  // vs filing-grade prose.  Defaults to 'fccam' if the client
+  // doesn't expose version() (older shape).
+  let engineId = 'fccam';
+  let engineWarning = null;
+  try {
+    if (typeof fccamClient.version === 'function'){
+      const v = await fccamClient.version();
+      if (v?.available){
+        engineId      = v.engine || v.source || engineId;
+        engineWarning = v.warning || null;
+      }
+    }
+  } catch { /* leave engineId at default */ }
   if (!proposed?.lat || !proposed?.lon || !proposed?.freq_khz || !proposed?.erp_kw){
     return { available: false, error: 'proposed station requires lat, lon, freq_khz, erp_kw' };
   }
@@ -304,7 +321,9 @@ export async function solveNifContour(input, ctx){
 
   return {
     available:        failures.length === 0,
-    source:           'fccam',
+    source:           engineId,
+    engine:           engineId,
+    engine_warning:   engineWarning,
     fetched_at:       new Date().toISOString(),
     proposed,
     n_interferers:    interferers.length,
