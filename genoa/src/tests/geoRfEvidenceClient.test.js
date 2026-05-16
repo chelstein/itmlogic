@@ -112,6 +112,29 @@ test('sampleTreeCanopy: WFAN value_raw "35" → numeric 35, moderate canopy inte
   assert.equal(r.interpretation, 'moderate canopy / vegetation context');
 });
 
+test('sampleTreeCanopy: empty value_raw "" → numeric null with "no coverage" interpretation (out-of-CONUS station)', async () => {
+  // Canada / Mexico / HI / AK / PR stations are outside USFS TCC CONUS
+  // coverage.  gdallocationinfo returns empty stdout in that case; we
+  // MUST NOT coerce "" to numeric 0 — that would render as "0 (low
+  // canopy / open ground)" which is wrong for an out-of-coverage point.
+  const CANOPY_OUT_OF_CONUS = {
+    ok: true,
+    dataset: 'science_tcc_CONUS_2022_v2023-5',
+    lat: 19.0, lon: -99.0,           // Mexico City
+    value_raw: '',
+    stderr: '',
+    advisory: true
+  };
+  const c = makeGeoRfEvidenceClient({ baseUrl: 'http://x',
+    fetchFn: async () => ({ ok: true, json: async () => CANOPY_OUT_OF_CONUS }) });
+  const r = await c.sampleTreeCanopy({ lat: 19.0, lon: -99.0 });
+  assert.equal(r.available, true);
+  assert.equal(r.value_raw, '');
+  assert.equal(r.value_numeric, null,
+    'empty raster sample must NOT be coerced to numeric 0');
+  assert.match(r.interpretation, /no coverage/i);
+});
+
 test('sampleTreeCanopy: KAZM value_raw "14" → numeric 14, sparse canopy', async () => {
   const c = makeGeoRfEvidenceClient({ baseUrl: 'http://x',
     fetchFn: async () => ({ ok: true, json: async () => CANOPY_KAZM }) });

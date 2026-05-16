@@ -123,11 +123,15 @@ export function makeGeoRfEvidenceClient({
                    endpoint: url, elapsed_ms: Date.now() - t0 };
         }
         // value_raw is a string from the raster sample (e.g. "35").
-        // Surface both raw and numeric so reviewers and downstream code
-        // get the original token AND a parsed numeric they can chart.
-        const value_numeric = j?.value_raw === undefined || j?.value_raw === null
+        // Empty / whitespace-only stdout means the point is outside the
+        // raster's coverage (e.g. Canada / Mexico / HI / AK / PR for the
+        // CONUS-only USFS TCC dataset) — treat as "no coverage" rather
+        // than coercing the empty string to a misleading numeric 0.
+        const raw = j?.value_raw;
+        const rawTrim = (raw == null ? '' : String(raw).trim());
+        const value_numeric = rawTrim === ''
           ? null
-          : (Number.isFinite(Number(j.value_raw)) ? Number(j.value_raw) : null);
+          : (Number.isFinite(Number(rawTrim)) ? Number(rawTrim) : null);
         return {
           available:     true,
           endpoint:      url,
@@ -136,7 +140,7 @@ export function makeGeoRfEvidenceClient({
           dataset:       j.dataset || null,
           lat:           j.lat ?? fLat,
           lon:           j.lon ?? fLon,
-          value_raw:     j.value_raw ?? null,
+          value_raw:     raw ?? null,
           value_numeric,
           stderr:        j.stderr || null,
           advisory:      j.advisory !== false,
@@ -236,7 +240,8 @@ function geoRfEnvelope({ status, inputs, datasets = {}, error, ...extra }){
  *  canopy values are 0–100 % closed canopy).  Used only for the
  *  appendix "interpretation" label; never feeds back into FCC math. */
 function interpretCanopy(v){
-  if (v == null || !Number.isFinite(v)) return 'unavailable';
+  if (v == null) return 'no coverage at this location (outside CONUS canopy dataset)';
+  if (!Number.isFinite(v)) return 'unavailable';
   if (v <  10) return 'low canopy / open ground';
   if (v <  30) return 'sparse canopy';
   if (v <  60) return 'moderate canopy / vegetation context';
