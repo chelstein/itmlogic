@@ -1556,7 +1556,129 @@ export async function computeExhibit(req){
     }
   }
 
-  // ---- 8e. AM §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit ----
+  // ---- 8e. AM physics independent evidence (SOMNEC2D) ----
+  //
+  // Independent NEC-family FORTRAN ground-field solver.  ADVISORY ONLY
+  // — never modifies FCC §73.184 contour distances, §73.183 allocation
+  // results, or any filing-controlling rule math.  When
+  // AM_PHYSICS_SIDECAR_URL is unset, attaches a not_configured stub so
+  // reviewers see the gap explicitly; on sidecar failure, attaches a
+  // failed status with the error.  Either way the exhibit ships.
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && options.am_physics !== false){
+    const t0 = Date.now();
+    if (!sidecars.amPhysics){
+      evidence.am_physics = {
+        status:    'not_configured',
+        advisory:  true,
+        engine:    'somnec2d',
+        method:    'NEC-family modified Sommerfeld integral ground-field solver',
+        filing_effect: 'none',
+        notes: [
+          'Independent physics evidence only.',
+          'Does not modify FCC §73.184 curve-derived contour distances.',
+          'AM_PHYSICS_SIDECAR_URL unset — sidecar not invoked.'
+        ],
+        elapsed_ms: Date.now() - t0
+      };
+    } else {
+      try {
+        const { DEFAULT_EPR, DEFAULT_GROUND_SIGMA_MS_M, sigmaMsmToSm, khzToMhz } =
+          await import('../../evidence/amPhysicsClient.js');
+        const freq_khz = Number(inputs.frequency);
+        const frequency_mhz = Number.isFinite(freq_khz) && freq_khz > 0
+                                ? khzToMhz(freq_khz)
+                                : null;
+        if (!frequency_mhz){
+          evidence.am_physics = {
+            status:    'not_run',
+            advisory:  true,
+            engine:    'somnec2d',
+            warning:   'frequency missing — SOMNEC2D requires a positive AM-band frequency',
+            filing_effect: 'none',
+            elapsed_ms: Date.now() - t0
+          };
+        } else {
+          let sigma_ms_m  = Number(inputs.ground_sigma_mS_m);
+          let sigma_source = 'input';
+          if (!Number.isFinite(sigma_ms_m) || sigma_ms_m <= 0){
+            sigma_ms_m   = DEFAULT_GROUND_SIGMA_MS_M;
+            sigma_source = 'default';
+          }
+          const sig_s_m = sigmaMsmToSm(sigma_ms_m);
+
+          let epr = Number(inputs.ground_epr);
+          let epr_source = 'input';
+          if (!Number.isFinite(epr) || epr <= 0){
+            epr = DEFAULT_EPR;
+            epr_source = 'default';
+          }
+
+          const out = await budget.withDeadline('am_physics',
+            () => sidecars.amPhysics.runSomnec({
+                    epr, sig_s_m, frequency_mhz, print_grid: 1 }),
+            { minMs: 30_000 });
+
+          if (out?.available){
+            evidence.am_physics = {
+              status:    'run',
+              advisory:  true,
+              engine:    out.engine || 'somnec2d',
+              method:    'NEC-family modified Sommerfeld integral ground-field solver',
+              source_path: '/opt/genoa/knowledge/am-groundwave/github/necpp/testharness/FORTRAN/somnec2d.f',
+              sidecar_configured: true,
+              inputs: {
+                epr,
+                epr_source,
+                sig_s_m,
+                sigma_ms_m,
+                sigma_source,
+                frequency_mhz
+              },
+              outputs:  out.outputs || null,
+              stdout_summary: out.stdout_summary || null,
+              filing_effect: 'none',
+              notes: [
+                'Independent physics evidence only.',
+                'Does not modify FCC §73.184 curve-derived contour distances.'
+              ],
+              elapsed_ms: out.elapsed_ms ?? (Date.now() - t0),
+              fetched_at: out.fetched_at || new Date().toISOString()
+            };
+          } else {
+            evidence.am_physics = {
+              status:    'failed',
+              advisory:  true,
+              engine:    'somnec2d',
+              method:    'NEC-family modified Sommerfeld integral ground-field solver',
+              sidecar_configured: true,
+              warning:   out?.error || 'SOMNEC2D sidecar did not return a result',
+              inputs: {
+                epr, epr_source, sig_s_m, sigma_ms_m, sigma_source, frequency_mhz
+              },
+              filing_effect: 'none',
+              notes: [
+                'Independent physics evidence only.',
+                'Does not modify FCC §73.184 curve-derived contour distances.'
+              ],
+              elapsed_ms: Date.now() - t0
+            };
+          }
+        }
+      } catch (e){
+        evidence.am_physics = {
+          status:    'failed',
+          advisory:  true,
+          engine:    'somnec2d',
+          warning:   `am_physics compute failed: ${e?.message || e}`,
+          filing_effect: 'none',
+          elapsed_ms: Date.now() - t0
+        };
+      }
+    }
+  }
+
+  // ---- 8f. AM §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit ----
   //
   // Runs the closed-form reduced-power formula for the proposed AM
   // station against the same nearby-primaries pool used by step 8d.
@@ -1641,6 +1763,9 @@ export async function computeExhibit(req){
   }
   if (evidence.am_night_nif){
     exhibit.evidence.am_night_nif = evidence.am_night_nif;
+  }
+  if (evidence.am_physics){
+    exhibit.evidence.am_physics = evidence.am_physics;
   }
   if (evidence.am_psra_pssa){
     exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;

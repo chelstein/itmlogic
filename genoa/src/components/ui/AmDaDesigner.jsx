@@ -3,6 +3,7 @@ import PolarPattern from './PolarPattern.jsx';
 import AmNightNifPreview   from './AmNightNifPreview.jsx';
 import AmSunAuthorityPanel from './AmSunAuthorityPanel.jsx';
 import AmPsraPssaPanel     from './AmPsraPssaPanel.jsx';
+import AmPhysicsEvidencePanel from './AmPhysicsEvidencePanel.jsx';
 import TabStrip            from './TabStrip.jsx';
 import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
@@ -33,7 +34,8 @@ const SUB_TABS = [
   { id: 'pattern',  label: 'Pattern · §73.150' },
   { id: 'nif',      label: 'Night NIF · §73.182' },
   { id: 'sun',      label: 'Sun & windows · §73.99/1209' },
-  { id: 'power',    label: 'Reduced power · §73.99(b)' }
+  { id: 'power',    label: 'Reduced power · §73.99(b)' },
+  { id: 'physics',  label: 'Physics · SOMNEC2D (advisory)' }
 ];
 
 export default function AmDaDesigner({ baseInputs, onApplyPattern }){
@@ -79,6 +81,7 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
         )}
         {sub === 'sun'   && <AmSunAuthorityPanel baseInputs={baseInputs} />}
         {sub === 'power' && <AmPsraPssaPanel     baseInputs={baseInputs} />}
+        {sub === 'physics' && <AmPhysicsEvidencePanel baseInputs={baseInputs} />}
       </div>
     </div>
   );

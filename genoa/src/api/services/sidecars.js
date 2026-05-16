@@ -40,6 +40,7 @@ import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
 import { makeFccamClient }       from '../../evidence/fccamClient.js';
 import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
 import { makeFccSunClient }      from '../../evidence/fccSunClient.js';
+import { makeAmPhysicsClient }   from '../../evidence/amPhysicsClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -159,7 +160,18 @@ export const sidecars = Object.freeze({
   // and the (forthcoming) §73.99 PSRA / PSSA reduced-power calc.
   // When unset the panel renders the "sidecar unavailable" warning
   // and the study still ships — no block.
-  sun:         makeFccSunClient()
+  sun:         makeFccSunClient(),
+
+  // AM Physics (SOMNEC2D) sidecar — NEC-family FORTRAN ground-field
+  // solver that numerically evaluates modified Sommerfeld integrals
+  // to produce the SOM2D.NEC interpolation grid used by NEC-2 /
+  // NEC2++ for AM directional-array near-field / far-field analysis
+  // over lossy ground.  ADVISORY ONLY — never modifies §73.184 contour
+  // distances, §73.183 allocation results, or any filing-controlling
+  // rule math.  Opt-in via AM_PHYSICS_SIDECAR_URL on the deploy; when
+  // unset the AM exhibit attaches evidence.am_physics =
+  // { status:'not_configured' } and the study still ships.
+  amPhysics:   makeAmPhysicsClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
