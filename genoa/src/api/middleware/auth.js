@@ -112,9 +112,16 @@ export function clearSessionCookie(){
 //                      NEC-family ground-field solver, advisory only;
 //                      never modifies §73.184 contour math or any
 //                      filing-controlling rule output)
+//   /facilities/*    — read-only adapter into public FCC data (FMQ/AMQ
+//                      pipe-delim + ZTR broadcast_stations).  Returns
+//                      facility metadata only; never writes; same data
+//                      that's publicly available at transition.fcc.gov.
+//                      Used by CI to smoke-test the AM class auto-
+//                      populate path (FCC AMQ enrichment).
 export const SERVICE_TOKEN_ROUTE_PATTERNS = [
   /^\/geodata(\/|$)/,
-  /^\/am\/physics(\/|$)/
+  /^\/am\/physics(\/|$)/,
+  /^\/facilities(\/|$)/
 ];
 
 export function isServiceTokenRoute(reqPath){
