@@ -2281,8 +2281,13 @@ export async function computeExhibit(req){
   exhibit.compute_budget = {
     budget_ms:   budget.budget_ms,
     elapsed_ms:  budget.elapsed_ms(),
-    skipped
+    skipped,
+    timings:     budget.timings()
   };
+  // Always log a one-line per-stage breakdown so operators can see
+  // exactly where wall-clock went on slow computes without redeploying.
+  // Threshold 500 ms hides cache-hit noise.
+  console.log(`[exhibit-perf] elapsed=${budget.elapsed_ms()}ms  ${budget.timingSummary(500)}`);
 
   exhibit.warnings         = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
