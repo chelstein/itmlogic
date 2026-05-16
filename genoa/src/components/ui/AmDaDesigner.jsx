@@ -3,19 +3,23 @@ import PolarPattern from './PolarPattern.jsx';
 import AmNightNifPreview   from './AmNightNifPreview.jsx';
 import AmSunAuthorityPanel from './AmSunAuthorityPanel.jsx';
 import AmPsraPssaPanel     from './AmPsraPssaPanel.jsx';
+import TabStrip            from './TabStrip.jsx';
 import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
-// AM DA pattern designer.  Operator builds an array geometry (towers
-// with distance / bearing / drive amplitude / drive phase / electrical
-// height) and the panel synthesizes the §73.150 ground-wave horizontal
-// pattern via POST /api/am-da/design.  The "Place null" tool calls
-// /api/am-da/null to nudge a single tower's drive phase so a null
-// lands at a target bearing — useful for short-spaced co-channel
-// protection.
+// AM rack panel — single workbench tab housing four engineer-grade
+// sub-tools, each on its own internal sub-tab so the operator gets
+// one tool at a time instead of a long stacked scroll:
 //
-// "Apply to facility" pushes the resulting pattern_table back into the
-// FacilityRack as inputs.pattern_table, sets pattern_mode='DA', and
-// nudges the user to re-compute.
+//   PATTERN          — §73.150 directional array synthesis
+//   NIGHT NIF        — §73.182 nighttime interference-free contour
+//   SUN & WINDOWS    — §73.99 / §73.1209 sunrise/sunset + PSRA/PSSA windows
+//   REDUCED POWER    — §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit
+//
+// VISIBILITY
+//   AM only.  For FM / LPFM / FX / TV the entire panel collapses to
+//   a single "applies to AM stations only" line — no carrier auto-
+//   convert from 90.5 MHz → 91 kHz (the prior behavior, which made
+//   the designer compute nonsense for FM facilities).
 
 const STARTER = {
   frequency_khz: 1000,
@@ -25,7 +29,69 @@ const STARTER = {
   ]
 };
 
+const SUB_TABS = [
+  { id: 'pattern',  label: 'Pattern · §73.150' },
+  { id: 'nif',      label: 'Night NIF · §73.182' },
+  { id: 'sun',      label: 'Sun & windows · §73.99/1209' },
+  { id: 'power',    label: 'Reduced power · §73.99(b)' }
+];
+
 export default function AmDaDesigner({ baseInputs, onApplyPattern }){
+  const isAm = String(baseInputs?.service || '').toUpperCase() === 'AM';
+  const [sub, setSub] = useState('pattern');
+
+  if (!isAm){
+    return (
+      <div className="space-y-2 font-mono text-[12px]">
+        <div className="text-textDim text-[10px] tracking-rack uppercase">AM designer</div>
+        <div className="rounded-md border border-rule p-3 text-[11px] text-textDim">
+          The AM designer applies to AM stations (service = AM).&nbsp;
+          The currently-loaded facility is <span className="text-cream">{baseInputs?.service || 'unset'}</span>; load an AM station to design a §73.150 array, run the §73.182 NIF, view §73.99 windows, or compute §73.99(b) reduced power.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 font-mono text-[12px]">
+      <div className="flex items-center gap-3">
+        <div className="text-textDim text-[10px] tracking-rack uppercase">
+          AM designer — {baseInputs?.call || 'no call'} · {baseInputs?.facility_id || '—'}
+        </div>
+      </div>
+      <TabStrip tabs={SUB_TABS} activeId={sub} onChange={setSub} />
+      <div className="pt-2">
+        {sub === 'pattern' && (
+          <PatternDesigner baseInputs={baseInputs} onApplyPattern={onApplyPattern} />
+        )}
+        {sub === 'nif' && (
+          <AmNightNifPreview
+            lat={baseInputs?.lat}
+            lon={baseInputs?.lon}
+            freq_khz={amFreqKhzFromBase(baseInputs)}
+            erp_kw={baseInputs?.erp_kw}
+            fcc_class={baseInputs?.fcc_class}
+            pattern_mode={Array.isArray(baseInputs?.pattern) ? 'DA' : 'omni'}
+            pattern_table={Array.isArray(baseInputs?.pattern)
+                            ? Object.fromEntries(baseInputs.pattern)
+                            : null}
+          />
+        )}
+        {sub === 'sun'   && <AmSunAuthorityPanel baseInputs={baseInputs} />}
+        {sub === 'power' && <AmPsraPssaPanel     baseInputs={baseInputs} />}
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// PATTERN DESIGNER — §73.150 ground-wave synthesis
+// (Extracted from the prior top-level component so the AM designer
+// can render it as one of N sub-tabs without forcing the operator
+// past it to reach NIF / Sun / PSRA-PSSA.)
+// ────────────────────────────────────────────────────────────────────
+
+function PatternDesigner({ baseInputs, onApplyPattern }){
   const [spec, setSpec]       = useState(() => deriveStarter(baseInputs));
   const [pattern, setPattern] = useState(null);
   const [busy, setBusy]       = useState(false);
@@ -33,11 +99,6 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
   const [nullTarget, setNullTarget] = useState(270);
   const [appliedAt, setAppliedAt]   = useState(null);
 
-  // Carrier-band validation.  AM is 535-1705 kHz on a 10-kHz grid;
-  // FCCAM and the §73.182 orchestrator both reject anything outside,
-  // so we surface the same diagnostic at the designer input rather
-  // than letting users build a pattern at 89 kHz that no downstream
-  // engine will evaluate.
   const carrierCheck = useMemo(
     () => describeAmKhz(spec.frequency_khz),
     [spec.frequency_khz]
@@ -134,7 +195,7 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
   const f180 = pattern?.pattern_table?.[180]?.[1];
 
   return (
-    <div className="space-y-4 font-mono text-[12px]">
+    <div className="space-y-4">
       <div className="text-textDim text-[10px] tracking-rack uppercase">
         AM directional array — §73.150 ground-wave synthesis
       </div>
@@ -147,9 +208,6 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
             value={spec.frequency_khz}
             onChange={(e) => setSpec({ ...spec, frequency_khz: Number(e.target.value) || 0 })}
             onBlur={(e) => {
-              // Snap to nearest 10-kHz grid value on blur if the
-              // typed value is close enough to a real channel; clear
-              // otherwise so the bad value can't survive in state.
               const snapped = normalizeAmKhz(e.target.value);
               if (snapped !== null && snapped !== spec.frequency_khz){
                 setSpec({ ...spec, frequency_khz: snapped });
@@ -204,9 +262,7 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
                       className="w-12 bg-black/70 border border-rule rounded px-1.5 py-0.5 text-cream"
                     />
                   </td>
-                  <td>
-                    <NumCell value={t.distance_m} onChange={(v) => setTower(i, 'distance_m', v)} step="1" />
-                  </td>
+                  <td><NumCell value={t.distance_m} onChange={(v) => setTower(i, 'distance_m', v)} step="1" /></td>
                   <td><NumCell value={t.bearing_deg} onChange={(v) => setTower(i, 'bearing_deg', v)} step="1" /></td>
                   <td><NumCell value={t.current_ratio} onChange={(v) => setTower(i, 'current_ratio', v)} step="0.05" /></td>
                   <td><NumCell value={t.phase_deg} onChange={(v) => setTower(i, 'phase_deg', v)} step="1" /></td>
@@ -295,42 +351,6 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
           </div>
         </div>
       </div>
-
-      {/* Live §73.182 NIF preview — driven by the FACILITY inputs
-          (frequency / pattern / class) so the numbers reflect the
-          currently-loaded facility, not the designer's draft.
-          Operator gets the right answer for "is my real station
-          protected at night?" without first re-typing it into the
-          designer.  When the operator clicks "Apply to facility"
-          above, the synthesized pattern flows into baseInputs and
-          the preview re-computes against the new pattern.
-          Regression caught by Codex on #180. */}
-      <AmNightNifPreview
-        lat={baseInputs?.lat}
-        lon={baseInputs?.lon}
-        freq_khz={Number.isFinite(Number(baseInputs?.frequency))
-                    ? Math.round(Number(baseInputs.frequency)
-                        * (Number(baseInputs.frequency) < 30 ? 1000 : 1))
-                    : null}
-        erp_kw={baseInputs?.erp_kw}
-        fcc_class={baseInputs?.fcc_class}
-        pattern_mode={Array.isArray(baseInputs?.pattern) ? 'DA' : 'omni'}
-        pattern_table={Array.isArray(baseInputs?.pattern)
-                         ? Object.fromEntries(baseInputs.pattern)
-                         : null}
-      />
-
-      {/* §73.99 sunrise / sunset authority — monthly windows + the
-          regulator's PSRA/PSSA framework.  Only renders monthly
-          table for AM facilities; for FM/FX falls back to the
-          panel's own "not applicable" hint. */}
-      <AmSunAuthorityPanel baseInputs={baseInputs} />
-
-      {/* §73.99(b)(1)/(2) reduced-power exhibit — POST /api/am/psra-pssa.
-          Threads the FCCAM (or Berry-screening) skywave engine, nearby
-          primaries, and the closed-form scaling to produce PSSA and
-          PSRA reduced powers with binding-pair attribution. */}
-      <AmPsraPssaPanel baseInputs={baseInputs} />
     </div>
   );
 }
@@ -355,11 +375,39 @@ function Kv({ k, v }){
   );
 }
 
+// Derive a sensible AM-band starter carrier from baseInputs.  Only
+// converts when the source frequency is plausibly AM — if the loaded
+// facility is on 90.5 MHz the right answer is "fall back to 1000 kHz"
+// not "Math.round(90.5) = 91 kHz" (which the prior code did, then
+// flagged red as out-of-band on every FM facility).
 function deriveStarter(baseInputs){
   const f = Number(baseInputs?.frequency);
   let frequency_khz = STARTER.frequency_khz;
   if (Number.isFinite(f) && f > 0){
-    frequency_khz = f < 30 ? Math.round(f * 1000) : Math.round(f);
+    // AM values arrive as kHz (e.g. 1240) or as small MHz (e.g. 1.24).
+    if (f >= 535 && f <= 1705){
+      frequency_khz = Math.round(f);
+    } else if (f >= 0.5 && f < 30){
+      frequency_khz = Math.round(f * 1000);
+      if (frequency_khz < 535 || frequency_khz > 1705){
+        frequency_khz = STARTER.frequency_khz;
+      }
+    }
+    // else: out-of-band (FM 88-108 MHz, TV, etc.) → keep STARTER 1000.
   }
   return { ...STARTER, frequency_khz, towers: STARTER.towers.map(t => ({ ...t })) };
+}
+
+// Helper for the NIF preview sub-tab — same shape as PatternDesigner's
+// deriveStarter but returns kHz or null (NIF preview accepts null and
+// shows "needs frequency" when not AM-band).
+function amFreqKhzFromBase(baseInputs){
+  const f = Number(baseInputs?.frequency);
+  if (!Number.isFinite(f) || f <= 0) return null;
+  if (f >= 535 && f <= 1705) return Math.round(f);
+  if (f >= 0.5 && f < 30){
+    const khz = Math.round(f * 1000);
+    return (khz >= 535 && khz <= 1705) ? khz : null;
+  }
+  return null;
 }
