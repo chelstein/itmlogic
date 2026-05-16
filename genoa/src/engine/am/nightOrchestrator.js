@@ -130,14 +130,27 @@ export async function nighttimeNifStudy(input, ctx){
     .filter(Boolean);
 
   const max_interferers = Number(options.max_interferers) || DEFAULT_MAX_INTERFERERS;
-  // Pre-sort by distance — strongest are typically closest.  The
-  // solver still applies the §73.182(k) 25% rule per receiver, so the
-  // cap doesn't accidentally include a far station that turns out to
-  // dominate at the contour boundary.  Cap is a budget knob, not a
-  // correctness knob.
+  // Pre-sort by ESTIMATED field at the proposed transmitter, not raw
+  // distance.  A 50 kW Class A at 600 km contributes far more skywave
+  // RSS than a 1 kW Class D at 400 km, but the older distance-only
+  // ordering would have dropped the louder station off the bottom of
+  // the cap.  Estimator is closed-form (no skywave-engine cost):
+  //   E_est ∝ erp_kw / max(1, distance_km^1.2)
+  // The exponent 1.2 is the Berry-screening regime in §73.190(c) (≈1.0
+  // + a small latitude pull at mid-CONUS); it ranks correctly without
+  // claiming a real Wang field at this stage.  Cap is still a budget
+  // knob — the §73.182(k) 25% per-receiver rule downstream remains the
+  // correctness gate.
+  const estField = (x) => {
+    const d = Number(x?.distance_km);
+    const erp = Number(x?.erp_kw);
+    if (!Number.isFinite(erp) || erp <= 0) return 0;
+    const denom = Math.max(1, Math.pow(Number.isFinite(d) && d > 0 ? d : 1, 1.2));
+    return erp / denom;
+  };
   const interferers = normalized
     .slice()
-    .sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity))
+    .sort((a, b) => estField(b) - estField(a))
     .slice(0, max_interferers);
 
   // 3. Solve.
@@ -199,6 +212,16 @@ export async function nighttimeNifStudy(input, ctx){
     polygon:     contour.polygon,
     du_db_by_relation: contour.du_db_by_relation,
     summary,
+    // FUTURE: VOACAP HF propagation advisory hook.  When a VOACAP
+    // sidecar comes online (operator-hosted ITS HF-PROPLOSS / IONCAP
+    // family — public domain), the orchestrator will populate this
+    // slot with a per-azimuth ionospheric advisory band (sporadic-E,
+    // F2-MUF excursions) ALONGSIDE the §73.190(c) Wang result.  The
+    // FCC engineering charts remain the authoritative §73.182 input;
+    // VOACAP output is advisory only and never changes NIF radii.
+    // Reserved here so consumers can rely on the field shape today
+    // without a downstream schema migration when wiring lands.
+    advisory_voacap: null,
     regulation:  '47 CFR §73.182 / §73.183 / §73.190(c)',
     provenance:  {
       module:           'src/engine/am/nightOrchestrator.js',

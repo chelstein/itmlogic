@@ -20,6 +20,28 @@ r.get('/health',  (_req, res) => res.type('text').send('ok'));
 //   readiness probe failed.  Liveness (the container is up) is the
 //   appropriate semantic for this status code; readiness (the app is
 //   wired correctly) is the body.
+// /readyz JSON shape (additive-only — fields below are appended, never
+// removed, so existing consumers keep working):
+//   {
+//     ok:            boolean,
+//     db_configured: boolean,
+//     db_healthy:    boolean,
+//     sidecars: {
+//       <name>: {
+//         configured:    boolean,
+//         healthy:       boolean,
+//         baseUrl?:      string|null,
+//         latency_ms?:   number,
+//         role?:         'fcc'|'advisory_physics'|'environmental'|
+//                        'identity'|'rendering'|'reference_engine'|
+//                        'observability'|null,
+//         filing_effect?:'authoritative'|'none'|null
+//       }, ...
+//     }
+//   }
+// `role` and `filing_effect` are sourced from SIDECAR_REGISTRY in
+// services/sidecars.js so operators can answer "did losing this sidecar
+// move a §73.* number?" at a glance without leaving the readiness probe.
 r.get('/readyz', async (_req, res) => {
   const db = await dbHealthy();
   const sc = await sidecarStatus();

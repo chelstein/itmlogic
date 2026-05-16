@@ -55,12 +55,29 @@ import { karneyInverse } from '../geometry/wgs84.js';
 import { studyContourPair, classifyFmOffsetKhz } from './_du_pair_study.js';
 
 // §74.1204(a) D/U gates per channel relationship.  Values are dB.
+// §74.1204(f) is the third-adjacent (Δf = ±600 kHz) channel restriction:
+// the -40 dB gate is the same as second-adjacent / IF in numeric terms,
+// but the rule has its OWN paragraph (f) because the FCC treats third-
+// adjacent translator interference as a distinct enforcement category
+// — the gate must be evaluated and cited separately on the exhibit.
 export const TRANSLATOR_DU_GATES = Object.freeze({
   cochannel:        20,
   first_adjacent:    6,
   second_adjacent: -40,
   third_adjacent:  -40,
   if_offset:       -40
+});
+
+// Cite map — channel-relationship → paragraph of §74.1204 that governs.
+// Used by the §74.1204(f) verification helper and by the reasoning
+// helper so the exhibit can cite the exact subparagraph instead of a
+// generic "§74.1204".
+export const TRANSLATOR_DU_GATE_CITES = Object.freeze({
+  cochannel:       '47 CFR §74.1204(a)',
+  first_adjacent:  '47 CFR §74.1204(a)',
+  second_adjacent: '47 CFR §74.1204(a)',
+  third_adjacent:  '47 CFR §74.1204(f)',
+  if_offset:       '47 CFR §74.1204(a)'
 });
 
 export const TRANSLATOR_DEFAULT_PROTECTED_FIELD_DBU_BY_CLASS = Object.freeze({
@@ -177,9 +194,14 @@ export function checkTranslatorInterference({ translator, primaries = [] } = {})
     const study = studyOnePrimary(translator, p);
     studies.push(study);
     if (study.pass === false){
+      // §74.1204(f) governs third-adjacent restrictions specifically;
+      // cite the right subparagraph so the exhibit + reasoning narrative
+      // reflect the actual rule the engineer must satisfy.
+      const rel_key = relationshipKey(study.relationship);
+      const cite    = TRANSLATOR_DU_GATE_CITES[rel_key] || '47 CFR §74.1204(a)';
       violations.push({
-        cite:    '47 CFR §74.1204(a)',
-        message: `D/U ${study.du_actual_db.toFixed(1)} dB at ${study.translator_distance_to_protected_edge_km.toFixed(2)} km into ${study.primary_call || study.primary_facility_id || 'primary'} (${study.relationship}) fails the ${study.du_threshold_db} dB §74.1204 gate.`,
+        cite,
+        message: `D/U ${study.du_actual_db.toFixed(1)} dB at ${study.translator_distance_to_protected_edge_km.toFixed(2)} km into ${study.primary_call || study.primary_facility_id || 'primary'} (${study.relationship}) fails the ${study.du_threshold_db} dB ${cite.replace('47 CFR ', '')} gate.`,
         detail:  study
       });
     }
@@ -235,6 +257,7 @@ function studyOnePrimary(translator, primary){
 
   // Re-shape pair-study output into the §74.1204 study schema.
   // Translator is U; primary is D.
+  const rel_key = relationshipKey(pair.relationship);
   return {
     primary_call:                            pair.d_call,
     primary_facility_id:                     pair.d_facility_id,
@@ -243,6 +266,8 @@ function studyOnePrimary(translator, primary){
     translator_frequency_mhz:                pair.u_frequency_mhz,
     delta_khz,
     relationship:                            pair.relationship,
+    relationship_key:                        rel_key,
+    rule_cite:                               TRANSLATOR_DU_GATE_CITES[rel_key] || '47 CFR §74.1204(a)',
     du_threshold_db:                         pair.du_threshold_db,
     primary_protected_field_dbu:             pair.d_protected_field_dbu,
     separation_km:                           pair.separation_km,
@@ -255,4 +280,82 @@ function studyOnePrimary(translator, primary){
     skipped_reason:                          pair.skipped_reason,
     notes_internal_translator_inside_primary:pair.inside_protected_contour || undefined
   };
+}
+
+// Internal helper — map free-text relationship labels back to the
+// gate / cite keys.  Tolerates both label and key inputs.
+function relationshipKey(rel){
+  if (!rel) return null;
+  const s = String(rel).toLowerCase();
+  if (s.startsWith('co'))      return 'cochannel';
+  if (s.includes('1st') || s.includes('first'))   return 'first_adjacent';
+  if (s.includes('2nd') || s.includes('second'))  return 'second_adjacent';
+  if (s.includes('3rd') || s.includes('third'))   return 'third_adjacent';
+  if (s.includes('if'))                            return 'if_offset';
+  return null;
+}
+
+/**
+ * §74.1204(f) third-adjacent verification helper.  Returns the subset
+ * of a §74.1204 study that pertains to third-adjacent (±600 kHz)
+ * relationships, plus a structured verdict + a per-pair narrative.
+ *
+ * §74.1204(f) is procedurally distinct: an applicant proposing a
+ * translator that creates a NEW third-adjacent relationship to a
+ * full-service FM must affirmatively demonstrate that the D/U gate is
+ * satisfied at every point within the primary's 60/54 dBu protected
+ * contour.  This helper lets the spacing/contour-protection sections
+ * cite §74.1204(f) explicitly when third-adjacent pairs are in play.
+ *
+ * @param {object} result  the return shape of checkTranslatorInterference
+ * @returns {{
+ *   cite: '47 CFR §74.1204(f)',
+ *   applicable: boolean,
+ *   n_pairs: number,
+ *   pass: boolean|null,
+ *   pairs: Array<{primary_call, du_actual_db, du_threshold_db, pass, narrative}>
+ * }}
+ */
+export function verifyThirdAdjacent_741204f(result){
+  const cite = '47 CFR §74.1204(f)';
+  const studies = Array.isArray(result?.studies) ? result.studies : [];
+  const pairs = studies
+    .filter(s => relationshipKey(s.relationship) === 'third_adjacent' && !s.skipped)
+    .map(s => ({
+      primary_call:      s.primary_call || s.primary_facility_id || '—',
+      primary_class:     s.primary_class || '—',
+      delta_khz:         s.delta_khz,
+      du_actual_db:      s.du_actual_db,
+      du_threshold_db:   s.du_threshold_db,
+      pass:              s.pass,
+      narrative:         buildThirdAdjacentNarrative(s)
+    }));
+  if (pairs.length === 0){
+    return {
+      cite,
+      applicable: false,
+      n_pairs:    0,
+      pass:       null,
+      pairs,
+      reason:     'No third-adjacent (±600 kHz) relationships among the supplied primaries — §74.1204(f) does not apply.'
+    };
+  }
+  const fails = pairs.filter(p => p.pass === false).length;
+  return {
+    cite,
+    applicable: true,
+    n_pairs:    pairs.length,
+    pass:       fails === 0,
+    pairs
+  };
+}
+
+function buildThirdAdjacentNarrative(s){
+  const du     = Number.isFinite(s.du_actual_db)    ? s.du_actual_db.toFixed(1)    : '—';
+  const gate   = Number.isFinite(s.du_threshold_db) ? String(s.du_threshold_db)    : '—';
+  const margin = (Number.isFinite(s.du_actual_db) && Number.isFinite(s.du_threshold_db))
+    ? (s.du_actual_db - s.du_threshold_db).toFixed(1)
+    : '—';
+  const verb = s.pass ? 'satisfies' : 'fails';
+  return `Third-adjacent (Δf = ${s.delta_khz} kHz) D/U ${du} dB ${verb} the §74.1204(f) gate of ${gate} dB (margin ${margin} dB).`;
 }

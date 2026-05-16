@@ -19,6 +19,7 @@ import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
 import { buildMeasurementsSection }                from './sections/measurements.js';
+import { buildSdrObservabilitySection }            from './sections/sdrObservability.js';
 import { buildRegulatoryContextSection }           from './sections/regulatoryContext.js';
 import { buildItmCoverageSection }                 from './sections/itmCoverage.js';
 import { buildMapPackageSection }                  from './sections/mapPackage.js';
@@ -52,6 +53,13 @@ export function buildEngineeringReport(exhibit, options){
   push(buildEngineeringConsiderationsSection(exhibit, opt));
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildMeasurementsSection(exhibit, opt));
+  // SDR observability — advisory per-capture surface that adds
+  // observed-vs-predicted columns when a calibrated residual table is
+  // attached, or an advisory notice when only audio captures exist.
+  // Strictly observational; never modifies radial_table /
+  // contour_definitions.  Sits right after Measurements so a reviewer
+  // sees the raw audio record then the engineering comparison.
+  push(buildSdrObservabilitySection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
   // Printable contour map — embedded PNG composed by the map sidecar
   // (genoa/src/sidecars/map/, headless Chromium + Leaflet).  The HTTP

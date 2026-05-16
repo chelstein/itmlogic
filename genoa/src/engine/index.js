@@ -15,6 +15,8 @@ import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
 import { fxRadialTable, FX_DEFAULT_CONTOURS, FX_METHOD, FX_REGULATORY_METADATA, fxInputGuards } from './translators/contour.js';
 import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.js';
+import { FCC_AM_PROVENANCE } from './curves/fcc/index.mjs';
+import crypto from 'node:crypto';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
 import { checkSection73215 }            from './regulatory/section_73_215.js';
@@ -423,12 +425,32 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     warnings.push(W.make('CURVE_VALIDATION_MISSING'));
   }
 
+  // Surface σ resolution metadata (input vs. used vs. clamp/rounding
+  // direction) on AM exhibits.  This is the audit fix for gwave MAJOR 1:
+  // operators previously could not see whether the FCC M3 integer-grid
+  // lookup had rounded their typed σ to a neighbor or clamped it to the
+  // 1..8 mS/m boundary.  When the rounding/clamp is non-zero we emit
+  // a SIGMA_CLAMP warning so the exhibit narrative + readiness scoring
+  // surfaces it; |rounding|=0 (e.g. typed σ=4) stays silent.
+  const groundConstants = (service === 'AM' && radial_table && radial_table._ground_constants)
+    ? radial_table._ground_constants
+    : null;
+  if (groundConstants && Number.isFinite(groundConstants.sigma_rounding)
+      && Math.abs(groundConstants.sigma_rounding) > 0){
+    const dir = groundConstants.sigma_clamp
+      ? `${groundConstants.sigma_clamp}-clamped`
+      : 'rounded';
+    warnings.push(W.make('SIGMA_CLAMP',
+      `AM σ input ${groundConstants.sigma_input} mS/m → FCC M3 grid σ ${groundConstants.sigma_used} mS/m (${dir}; Δ=${groundConstants.sigma_rounding} mS/m).  Distances reflect the boundary curve, not the typed σ.`));
+  }
+
   const evidenceBlock = {
     terrain:      evidence.terrain      || { available: false, source: null, profiles: [] },
     measurements: evidence.measurements || { available: false, source: null, calibrated: false, records: [] },
     identity:     evidence.identity     || { available: false, sources: [], confirmations: [] },
     itm_coverage: evidence.itm_coverage || null,
-    uncertainty:  evidence.uncertainty  || null
+    uncertainty:  evidence.uncertainty  || null,
+    ground_constants: groundConstants
   };
   if (!evidenceBlock.measurements.available){
     warnings.push(W.make('SDR_MEASUREMENTS_MISSING'));
@@ -454,10 +476,30 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
         source:      '47 CFR §73.184 groundwave (vendored gwave.js; bivariate over σ × distance per Figure M3)' }
     : (fmEngine === 'fcc-canonical' ? FM_INTERP_FCC : FM_INTERP);
 
+  // AM exhibits MUST stamp the AM curve_dataset provenance (gwave.js
+  // SHA + data/gwave_field.json SHA from FCC_AM_PROVENANCE), NOT the
+  // FM/TV f5050/f5010 manifest SHAs.  Prior bug: AM service inherited
+  // FM curve_prov here, producing exhibits whose curve_dataset SHA did
+  // not reflect the code that actually computed the AM contour.  See
+  // gwave audit MAJOR 2.
+  const curveDatasetBlock = service === 'AM'
+    ? {
+        curve_version:   'fcc-contours-api-node@' + FCC_AM_PROVENANCE.commit.slice(0, 10),
+        meta_sha256:     null,
+        dataset_sha256:  FCC_AM_PROVENANCE.files.reduce((acc, f) => {
+          // gwave.js -> 'gwave_js', data/gwave_field.json -> 'gwave_field_json'
+          const key = f.path.split('/').pop().replace(/\./g, '_');
+          acc[key] = f.sha256;
+          return acc;
+        }, {}),
+        source_dir:      'src/engine/curves/fcc',
+        upstream:        FCC_AM_PROVENANCE
+      }
+    : curve_prov;
   exhibit.method_versions   = {
     method,
     regulations:    regs,
-    curve_dataset:  curve_prov,
+    curve_dataset:  curveDatasetBlock,
     curve_engine:   service === 'AM' ? null : fmEngine,
     interp:         interpBlock,
     projection,
@@ -605,6 +647,29 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // the exhibit's content hash + canonical inputs/evidence hashes.
   // Verify via POST /api/exhibits/verify-build.
   exhibit.build_attestation = buildAttestation();
+  // ---- Curve-dataset SHA folded into build_fingerprint -------------
+  // The base buildAttestation() is module-level and does NOT include the
+  // curve dataset SHA (it can't — the curve set is loaded at runtime).
+  // For audit-replay parity, an exhibit produced against a different
+  // curve dataset MUST have a different fingerprint, even if the engine
+  // SHA is identical.  We compose a per-exhibit curve_aware_fingerprint
+  // = sha256(base_fingerprint || canonical(curve_dataset)) and stamp it
+  // alongside the original.  See audit fix DB M1.
+  const _curveSha = JSON.stringify({
+    curve_dataset: exhibit.method_versions.curve_dataset || null,
+    service
+  });
+  const _composedFp = crypto.createHash('sha256')
+    .update(String(exhibit.build_attestation.fingerprint_sha256 || '') + '|' + _curveSha, 'utf8')
+    .digest('hex');
+  exhibit.build_attestation = {
+    ...exhibit.build_attestation,
+    curve_dataset_fingerprint_sha256: _composedFp,
+    curve_dataset_fingerprint_inputs: [
+      'base=' + (exhibit.build_attestation.fingerprint_sha256 || ''),
+      'curve_dataset=' + _curveSha
+    ]
+  };
   const _replay = buildReplayToken(exhibit, {
     inputs:   exhibit.station_inputs,
     evidence: evidenceBlock

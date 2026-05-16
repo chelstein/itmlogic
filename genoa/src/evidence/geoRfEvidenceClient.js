@@ -52,6 +52,8 @@
 //   Environmental RF evidence is advisory only.  Does not modify FCC
 //   filing-controlling contour or allocation calculations.
 
+import { GEO_RF_DATASET_SLOTS, makeEmptyDatasetMap } from '../types/geoRfEvidence.schema.js';
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 export function makeGeoRfEvidenceClient({
@@ -193,14 +195,70 @@ export function makeGeoRfEvidenceClient({
     },
 
     /**
-     * Composite "everything we know for a facility" sample.  Pulls the
-     * tree-canopy point sample plus a fresh health probe so we surface
-     * which auxiliary datasets are available even though we don't
-     * sample tau/landcover for a single point in this pass.
+     * Attempt a single-call composite point sample via `/sample/all`.  The
+     * sidecar's `/sample/all` endpoint (when implemented) returns a per-
+     * slot payload in one round trip:
+     *
+     *   GET /sample/all?lat=&lon=
+     *     → 200 { ok:true, datasets: { tree_canopy:{...}, landcover:{...},
+     *                                  tau_rf_models:{...}, ... } }
+     *
+     * Returns `{available:true, datasets:{...}}` on success, or
+     * `{available:false, error}` if the endpoint is not implemented (404)
+     * or the call fails — callers then fall back to parallel per-point
+     * endpoints.  Never throws.
+     */
+    async sampleAll({ lat, lon } = {}, opts = {}){
+      const fLat = Number(lat), fLon = Number(lon);
+      if (!Number.isFinite(fLat) || !Number.isFinite(fLon)){
+        return { available: false, error: 'lat / lon must be finite numbers' };
+      }
+      const url = joinUrl(baseUrl, '/sample/all')
+                  + `?lat=${encodeURIComponent(fLat.toFixed(6))}`
+                  + `&lon=${encodeURIComponent(fLon.toFixed(6))}`;
+      const t0 = Date.now();
+      try {
+        const r = await fetchWithTimeout(fetchFn, url,
+          { headers: auth(apiToken) }, opts.timeoutMs ?? timeoutMs);
+        if (!r.ok){
+          return { available: false, error: `HTTP ${r.status}`,
+                   endpoint: url, elapsed_ms: Date.now() - t0 };
+        }
+        const j = await r.json().catch(() => null);
+        if (!j || j.ok === false || !j.datasets || typeof j.datasets !== 'object'){
+          return { available: false,
+                   error: j?.error || 'sidecar /sample/all returned no datasets',
+                   endpoint: url, elapsed_ms: Date.now() - t0 };
+        }
+        return {
+          available:  true,
+          datasets:   j.datasets,
+          endpoint:   url,
+          elapsed_ms: Date.now() - t0,
+          fetched_at: new Date().toISOString()
+        };
+      } catch (e){
+        return { available: false, error: String(e?.message || e),
+                 endpoint: url, elapsed_ms: Date.now() - t0 };
+      }
+    },
+
+    /**
+     * Composite "everything we know for a facility" sample.  Strategy:
+     *
+     *   1. Try `/sample/all` (single round trip) — if the sidecar exposes
+     *      it, prefer that.  When the sidecar omits a dataset slot we
+     *      record `{available:false}` rather than inventing values.
+     *   2. Fall back to parallel per-point endpoints (`/healthz` +
+     *      `/sample/tree-canopy`) and synthesize the multi-slot envelope
+     *      from the health probe's dataset-availability map.
      *
      * Optional `canopy_rose_distance_km` triggers a second-tier rose
-     * sample (12 azimuths at that distance) attached as
-     * datasets.tree_canopy_conus.rose.
+     * sample (12 azimuths at that distance) attached under both
+     * `tree_canopy` (canonical) and `tree_canopy_conus` (back-compat).
+     *
+     * Always emits `map_marker` (lat/lon/label/popup_text) at the
+     * facility point so the contour map can render an advisory marker.
      *
      * @returns the normalized evidence.geo_rf_evidence object shape
      */
@@ -220,53 +278,175 @@ export function makeGeoRfEvidenceClient({
         return geoRfEnvelope({
           status: 'failed',
           inputs,
+          datasets: makeEmptyDatasetMap(),
           error:  'coordinates_missing'
         });
       }
       const roseDist = Number(canopy_rose_distance_km);
       const wantRose = Number.isFinite(roseDist) && roseDist > 0;
-      const [health, canopy, rose] = await Promise.all([
+
+      // ── Path 1: try /sample/all first ────────────────────────────────
+      const [all, health, rose] = await Promise.all([
+        this.sampleAll({ lat: fLat, lon: fLon }, opts),
         this.healthDetail(),
-        this.sampleTreeCanopy({ lat: fLat, lon: fLon }, opts),
         wantRose
           ? this.sampleCanopyRose({ lat: fLat, lon: fLon, distance_km: roseDist }, opts)
           : Promise.resolve(null)
       ]);
-      const sidecarDatasets = (health && health.ok && health.datasets) || {};
-      return geoRfEnvelope({
-        status: canopy.available ? 'run' : (health.ok ? 'failed' : 'offline'),
-        inputs,
-        datasets: {
-          tree_canopy_conus: canopy.available
-            ? {
-                available:      true,
-                dataset:        canopy.dataset,
-                value_raw:      canopy.value_raw,
-                value_numeric:  canopy.value_numeric,
-                interpretation: canopy.interpretation,
-                ...(rose ? { rose } : {})
-              }
-            : {
-                available: !!sidecarDatasets.tree_canopy_conus,
-                error:     canopy.error || null,
-                ...(rose ? { rose } : {})
-              },
+
+      let canopy = null;          // tree_canopy_conus shape (back-compat)
+      let datasets;
+      let elapsed_ms;
+
+      if (all.available){
+        // Use the sidecar's multi-slot payload; backfill any missing
+        // slots with {available:false} — NEVER invent data.
+        datasets = mergeDatasetSlots(all.datasets, makeEmptyDatasetMap());
+        // For back-compat: synthesize `tree_canopy_conus` from
+        // `tree_canopy` so existing renderers continue to work.
+        if (datasets.tree_canopy && datasets.tree_canopy.available && !datasets.tree_canopy_conus.available){
+          datasets.tree_canopy_conus = { ...datasets.tree_canopy };
+        }
+        canopy = datasets.tree_canopy_conus;
+        elapsed_ms = all.elapsed_ms;
+      } else {
+        // ── Path 2: per-point fallback ─────────────────────────────────
+        const c = await this.sampleTreeCanopy({ lat: fLat, lon: fLon }, opts);
+        const sidecarDatasets = (health && health.ok && health.datasets) || {};
+        const canopySlot = c.available
+          ? {
+              available:      true,
+              dataset:        c.dataset,
+              value_raw:      c.value_raw,
+              value_numeric:  c.value_numeric,
+              interpretation: c.interpretation
+            }
+          : {
+              available: !!sidecarDatasets.tree_canopy_conus,
+              error:     c.error || null
+            };
+        datasets = {
+          ...makeEmptyDatasetMap(),
+          tree_canopy:       canopySlot,
+          tree_canopy_conus: canopySlot,
           tau_rf_models: {
             available: !!sidecarDatasets.tau_rf_models,
             role:      'RF/environment statistical model artifact'
           },
+          landcover: {
+            available: !!(sidecarDatasets.landcover || sidecarDatasets.canada_landcover),
+            role:      'NLCD / NRCan landcover (CONUS + cross-border)'
+          },
           canada_landcover: {
             available: !!sidecarDatasets.canada_landcover,
             role:      'available for Canadian coordinates / cross-border studies'
+          },
+          fcc_m3_conductivity_availability: {
+            available: !!sidecarDatasets.fcc_m3_conductivity_availability,
+            role:      'FCC §73.190 Fig. M3 ground conductivity coverage indicator (advisory)'
+          },
+          water_proximity: {
+            available: !!sidecarDatasets.water_proximity,
+            role:      'surface-water / coastal proximity (advisory propagation context)'
+          },
+          climate_projection_availability: {
+            available: !!sidecarDatasets.climate_projection_availability,
+            role:      'climate-projection raster availability flag (advisory)'
+          },
+          sdr_residual_support: {
+            available: !!sidecarDatasets.sdr_residual_support,
+            role:      'observed-vs-predicted residual support (advisory)'
           }
-        },
+        };
+        canopy = canopySlot;
+        elapsed_ms = c.elapsed_ms;
+      }
+
+      if (rose){
+        // Attach to both slot names so old + new readers see it.
+        if (datasets.tree_canopy && typeof datasets.tree_canopy === 'object'){
+          datasets.tree_canopy.rose = rose;
+        }
+        if (datasets.tree_canopy_conus && typeof datasets.tree_canopy_conus === 'object'){
+          datasets.tree_canopy_conus.rose = rose;
+        }
+      }
+
+      const canopyAvail   = !!(canopy && canopy.available);
+      const anyAvail      = Object.values(datasets).some(d => d && d.available);
+      const sidecarUp     = !!(health && health.ok) || all.available;
+      const status        = (canopyAvail || anyAvail) ? 'run' : (sidecarUp ? 'failed' : 'offline');
+
+      // Map marker — always emitted when we have facility coordinates, so
+      // the contour map can render an advisory pin even when no canopy
+      // value is available.  Point sample only — never a raster tile.
+      const canopyValue = canopy?.value_numeric;
+      const popupText   = canopyValue != null
+        ? `Tree canopy value: ${canopyValue}. Advisory environmental RF evidence only.`
+        : `Tree canopy value: N. Advisory environmental RF evidence only.`;
+
+      const map_marker = {
+        lat:        fLat,
+        lon:        fLon,
+        label:      'Geo-RF Evidence (advisory)',
+        popup_text: popupText
+      };
+
+      // Confidence-scoring context: short, structured, deterministic so
+      // Appendix I and the panel can both reference it.  Never feeds back
+      // into FCC math.
+      const confidence_scoring_context = {
+        role:      'advisory_inputs_only',
+        canopy_density:    canopyValue ?? null,
+        canopy_interpretation: canopy?.interpretation || null,
+        contributes_to:  ['observed_vs_predicted_residual_explanation',
+                          'confidence_scoring_advisory_context'],
+        filing_effect:   'none'
+      };
+
+      // Observed-vs-predicted residual support — flag-shaped; the actual
+      // residuals live in evidence.sdr_residuals, this is just the
+      // advisory cross-link.
+      const residual_support = {
+        slot:           'sdr_residual_support',
+        available:      !!datasets.sdr_residual_support?.available,
+        role:           'cross-references SDR observed-vs-predicted residuals (advisory context)',
+        filing_effect:  'none'
+      };
+
+      return geoRfEnvelope({
+        status,
+        inputs,
+        datasets,
+        map_marker,
+        confidence_scoring_context,
+        residual_support,
         sidecar_service: health?.service || 'genoa-geo-rf-evidence',
         baseUrl,
-        elapsed_ms: canopy.elapsed_ms,
+        elapsed_ms,
         fetched_at: new Date().toISOString()
       });
     }
   };
+}
+
+// Merge sidecar-returned dataset slots over a default `{available:false}`
+// map.  Sidecar slots win, but unknown slots are dropped — keeps the
+// envelope shape stable for downstream readers.
+function mergeDatasetSlots(sidecarSlots, defaults){
+  const out = { ...defaults };
+  if (!sidecarSlots || typeof sidecarSlots !== 'object') return out;
+  for (const slot of GEO_RF_DATASET_SLOTS){
+    const v = sidecarSlots[slot];
+    if (v == null) continue;
+    if (typeof v === 'object' && !Array.isArray(v)){
+      // Normalize available to boolean.
+      out[slot] = { ...v, available: !!v.available };
+    } else if (typeof v === 'boolean'){
+      out[slot] = { available: v };
+    }
+  }
+  return out;
 }
 
 /* ---------- helpers ---------- */
@@ -343,11 +523,7 @@ export function geoRfNotConfigured(inputs){
   return geoRfEnvelope({
     status: 'not_configured',
     inputs: inputs || { lat: null, lon: null, service: null, call: null, facility_id: null },
-    datasets: {
-      tree_canopy_conus: { available: false },
-      tau_rf_models:     { available: false },
-      canada_landcover:  { available: false }
-    },
+    datasets: makeEmptyDatasetMap(),
     error: 'GEO_RF_EVIDENCE_SIDECAR_URL unset — sidecar not invoked'
   });
 }

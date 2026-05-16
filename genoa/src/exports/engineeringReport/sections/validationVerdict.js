@@ -11,6 +11,24 @@
 //   HIGH    — VERIFIED
 //   MEDIUM  — PARTIAL
 //   LOW     — UNVERIFIED
+//
+// Ontology alignment
+// ------------------
+// In addition to the legacy {status, confidence} tuple, the returned
+// verdict object now carries an `ontology` block sourced from
+// `verdictFor()` so a SCREENING or INCOMPLETE component is surfaced
+// honestly in the same shape used by the conclusion section.  The
+// legacy {status, confidence} values are preserved bit-for-bit so
+// existing TXT/PDF renderers and downstream tests are unchanged.
+
+import {
+  FindingStatus,
+  Confidence,
+  Scope,
+  verdictFor,
+  capConfidence
+} from '../../../engine/finding/ontology.js';
+import { rewordForReport } from '../../../engine/finding/serviceWording.js';
 
 export function buildValidationVerdictSection(exhibit){
   // Read both keys.  Newer exhibits stamp `validation_context` directly;
@@ -313,10 +331,85 @@ export function buildValidationVerdictSection(exhibit){
     'Genoa does not certify FCC filings.  Final certification is the responsibility of the qualified broadcast engineer of record.'
   ];
 
+  // ---------- Ontology surface (additive, never overrides legacy fields) -
+  //
+  // Translate the section-local component statuses into the finding
+  // ontology so a SCREENING or INCOMPLETE (= "no record attached")
+  // component cannot silently be promoted past PARTIAL/MEDIUM.
+
+  const ontologyComponents = components.map(c => ({
+    name:   c.name,
+    status: mapLegacyStatusToOntology(c.status, c.detail),
+    detail: c.detail
+  }));
+  const ov = verdictFor({ components: ontologyComponents, blockers: [], warnings: [] });
+
+  // Ontology-driven invariants — apply ONLY downgrading caps so the
+  // legacy verdict cannot be silently relaxed.  We deliberately do not
+  // promote a PARTIAL up to VERIFIED based on the ontology; the legacy
+  // logic above already encodes the spec's promotion rules.
+  //
+  // Critical caps:
+  //   * INCOMPLETE component anywhere ⇒ scope=UNVERIFIED in the
+  //     ontology output ⇒ force legacy UNVERIFIED/LOW.
+  //   * SCREENING_* anywhere ⇒ scope=SCREENING in the ontology output
+  //     ⇒ cap legacy to PARTIAL/MEDIUM (the legacy code already does
+  //     this, but the cap makes it explicit and defends against future
+  //     regressions).
+  //   * NOT_RUN alone does NOT downgrade — the validation verdict
+  //     treats advisory NOT_RUN rows (e.g. AM §73.182 without FCCAM
+  //     configured) as orthogonal to the core curve/cross-check/parity
+  //     gates that drive VERIFIED.
+  if (ov.scope === Scope.UNVERIFIED){
+    status = 'UNVERIFIED';
+    confidence = 'LOW';
+  } else if (ov.scope === Scope.SCREENING){
+    if (status === 'VERIFIED') status = 'PARTIAL';
+    confidence = capConfidence(confidence, Confidence.MEDIUM);
+  }
+
   return {
     id:      'validation',
     type:    'verdict',
     heading: 'VALIDATION VERDICT',
-    verdict: { status, confidence, components, interpretation, limitations }
+    verdict: {
+      status,
+      confidence,
+      components,
+      interpretation: rewordForReport(interpretation),
+      limitations,
+      // Ontology surface — additive.
+      ontology: {
+        verdict:             ov.status,
+        confidence:          ov.confidence,
+        scope:               ov.scope,
+        narrative_fragments: ov.narrative_fragments
+      }
+    }
   };
+}
+
+/**
+ * Map the legacy per-component status string to a FindingStatus.
+ * Section-internal — only this file uses it.
+ */
+function mapLegacyStatusToOntology(status, detail){
+  switch (status){
+    case 'PASS':     return FindingStatus.PASS;
+    case 'FALLBACK': return FindingStatus.PASS;       // deterministic-tier success
+    case 'FAIL':
+      // "no <foo> record attached" detail strings represent INCOMPLETE,
+      // not a clean filing-grade FAIL.  Same rationale as the absent-cr
+      // branches above: data-loss / attachment failure.
+      if (typeof detail === 'string' && /no [a-z_]+ record attached/i.test(detail)){
+        return FindingStatus.INCOMPLETE;
+      }
+      return FindingStatus.FAIL;
+    case 'WARN':     return FindingStatus.ADVISORY;
+    case 'SKIP':     return FindingStatus.SKIP;
+    case 'PARTIAL':  return FindingStatus.ADVISORY;
+    case 'NOT_RUN':  return FindingStatus.NOT_RUN;
+    case 'SCREENING': return FindingStatus.SCREENING_PASS;
+    default:          return FindingStatus.INFO;
+  }
 }

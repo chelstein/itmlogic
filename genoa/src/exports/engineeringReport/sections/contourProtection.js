@@ -1,4 +1,12 @@
 // Contour protection — 47 CFR §73.215.
+//
+// Per-pair reasoning narratives (binding D/U margin + alternate-route
+// note) come from _fmReasoning.js so the table renders the kind of
+// engineering paragraph legacy tools (V-Soft, RFi) emit alongside
+// every §73.215 study.
+
+import { buildFmReasoning } from './_fmReasoning.js';
+import { summarizeFortranParity } from '../../../evidence/fortranFccClient.js';
 
 export function buildContourProtectionSection(exhibit){
   const svc = String(exhibit.station_inputs?.service || '').toUpperCase();

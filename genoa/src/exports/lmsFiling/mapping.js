@@ -1,38 +1,76 @@
-// Form 301-FM mapping: exhibit → filled fields.
+// LMS filing-package mapping — service-aware router.
 //
-// Pure function.  Given (exhibit, optional applicant overrides),
-// resolves every field in FORM_301_FM_FIELDS to one of:
-//   { status: 'filled',    value, provenance } — Genoa knows it (with source)
-//   { status: 'suggested', value, provenance } — Genoa pre-stages a value
-//                                                 (e.g. ERP-V = ERP-H for ND);
-//                                                 engineer must confirm
-//   { status: 'gap',       value: null }       — manual entry required
-//   { status: 'unknown',   value: null }       — Genoa SHOULD know but evidence missing
+// Genoa's filing-package machinery used to assume every exhibit
+// targeted Form 301-FM.  That was wrong: AM filings should
+// produce Form 301-AM language (§73.183/.184/.182/.187/.190/.99,
+// "power" not "ERP", no HAAT), FM-translator filings should
+// produce Form 349 (Part 74 Subpart L), and LPFM filings should
+// produce Form 318 (Part 73 Subpart G).  This module is the
+// dispatcher: based on station_inputs.service it picks the right
+// schema + field-set and runs the same generic mapper over it.
 //
-// `provenance` is a plain object: { source, fetched_at?, dataset?, note? }
-// rendered next to the value in the HTML/CSV/JSON cheatsheet so engineers
-// can see "this came from FCC FMQ at 2026-05-08T18:14Z" vs "operator typed".
+//   AM   → form301am  (FORM_301_AM_FIELDS / FORM_301_AM_META)
+//   FM   → form301fm  (FORM_301_FM_FIELDS / FORM_301_FM_META) — unchanged
+//   FX   → form349    (FORM_349_FIELDS    / FORM_349_META)
+//   LPFM → form318    (FORM_318_FIELDS    / FORM_318_META)
+//
+// `mapForm301Fm` is kept as a back-compat alias of
+// `mapFilingPackage` so existing callers (the lmsFiling route, the
+// packager, older tests) continue to work.  When the incoming
+// exhibit's service is anything other than FM, the alias still
+// routes to the correct mapper — the FM-specific name is purely
+// historical at this point.
+//
+// Per-field output shape (single source of truth across services):
+//   {
+//     id, lms_label, section, subsection, type, unit, options,
+//     required, cite, source, notes,
+//     value,                    null when no value resolved
+//     status,                   one of FieldStatus (FILLED / SUGGESTED /
+//                               NEEDS_INPUT / EVIDENCE_MISSING / NOT_APPLICABLE)
+//                               OR the legacy 'filled' / 'suggested' /
+//                               'gap' / 'unknown' for back-compat with the
+//                               existing FM cheatsheet renderer
+//     provenance,               { source, fetched_at?, dataset?, ... }
+//     engineer_confirmation_required?  hoisted from the schema when
+//                                      the field is operator-overridable
+//   }
 
 import { FORM_301_FM_FIELDS, FORM_301_FM_META } from './form301fm.js';
+import { FORM_301_AM_FIELDS, FORM_301_AM_META } from './form301am.js';
+import { FORM_349_FIELDS,    FORM_349_META    } from './form349.js';
+import { FORM_318_FIELDS,    FORM_318_META    } from './form318.js';
+import { gateFilingReady, FieldStatus } from './_readiness.js';
 
 function dotPath(obj, path){
   if (!obj || !path) return undefined;
   return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 }
 
-// Resolve a sensible provenance block for a filled field, given which
-// dot-path it came from in the exhibit.  Inspects the standard exhibit
-// blocks (facility_metadata, evidence.terrain, evidence.fcc_lms,
-// population_estimate) so the per-field provenance always matches the
-// upstream that delivered the value.
+// Normalize service string for routing.  AM/FM are unambiguous; FX
+// covers FM translator filings (FCC service code 'FX').  'FB' (FM
+// booster) also routes to Form 349.  'LPFM' and 'LP' both route to
+// Form 318.
+function selectSchemaForService(service){
+  const svc = String(service || '').toUpperCase();
+  if (svc === 'AM')                  return { fields: FORM_301_AM_FIELDS, meta: FORM_301_AM_META, key: 'AM' };
+  if (svc === 'FX' || svc === 'FB')  return { fields: FORM_349_FIELDS,    meta: FORM_349_META,    key: 'FX' };
+  if (svc === 'LPFM' || svc === 'LP') return { fields: FORM_318_FIELDS,   meta: FORM_318_META,    key: 'LPFM' };
+  // Default — FM full-service.  Preserves prior behavior for every
+  // exhibit that didn't carry a service hint or shipped 'FM'.
+  return { fields: FORM_301_FM_FIELDS, meta: FORM_301_FM_META, key: 'FM' };
+}
+
+// Resolve provenance for a filled field, consistent across services.
+// Inspects standard exhibit blocks (facility_metadata, evidence.terrain,
+// evidence.fcc_lms, evidence.am_physics, population_estimate).
 function resolveProvenance(exhibit, def){
   const fm  = exhibit?.facility_metadata     || {};
   const evt = exhibit?.evidence?.terrain     || {};
   const lms = exhibit?.evidence?.fcc_lms     || {};
   const pop = exhibit?.population_estimate   || {};
+  const amp = exhibit?.evidence?.am_physics  || {};
 
-  // station_inputs fields: prefer facility_metadata source if a lookup
-  // happened; otherwise the value came from operator input.
   if (def.mapping?.startsWith('station_inputs.')){
     if (fm.facility_lookup_source){
       return {
@@ -44,8 +82,6 @@ function resolveProvenance(exhibit, def){
     }
     return { source: 'operator input', note: 'manually entered in workbench' };
   }
-
-  // evidence.terrain.* fields: terrain sidecar.
   if (def.mapping?.startsWith('evidence.terrain.')){
     return {
       source:     evt.source || 'terrain-sidecar',
@@ -55,8 +91,6 @@ function resolveProvenance(exhibit, def){
       fetched_at: evt.fetched_at || null
     };
   }
-
-  // evidence.fcc_lms fields.
   if (def.mapping?.startsWith('evidence.fcc_lms.') ||
       def.mapping?.startsWith('evidence.fcc_lms_attempt.')){
     return {
@@ -65,8 +99,13 @@ function resolveProvenance(exhibit, def){
       fetched_at: lms.fetched_at || null
     };
   }
-
-  // population_estimate fields.
+  if (def.mapping?.startsWith('evidence.am_physics.')){
+    return {
+      source:     'am-physics (SOMNEC2D advisory)',
+      fetched_at: amp.fetched_at || null,
+      note:       'AM physics evidence is advisory; values shown here are still required to come through §73.184 curve method for filing'
+    };
+  }
   if (def.mapping?.startsWith('population_estimate.')){
     return {
       source:     pop.source || 'fcc-census',
@@ -78,37 +117,24 @@ function resolveProvenance(exhibit, def){
       note:       'INFORMATIONAL — not a §73.x compliance input'
     };
   }
-
-  // Derived (no static mapping): provenance = the engine itself.
-  return {
-    source:    'genoa-engine',
-    note:      'computed from exhibit',
-    method:    def.id
-  };
+  return { source: 'genoa-engine', note: 'computed from exhibit', method: def.id };
 }
 
-export function mapForm301Fm(exhibit, applicant = {}){
-  if (!exhibit || typeof exhibit !== 'object'){
-    throw new Error('mapForm301Fm: exhibit is required');
-  }
+// Run the schema-agnostic mapper.  Same logic for every form: the
+// difference is the FIELDS array passed in.  Status codes use the
+// legacy strings (`filled`/`suggested`/`gap`/`unknown`) for back-
+// compat with the existing FM packager renderer; the readiness gate
+// in _readiness.js maps these onto the 5-state FieldStatus enum.
+function mapFields(exhibit, fields, applicant){
   const filled = [];
-  for (const def of FORM_301_FM_FIELDS){
+  for (const def of fields){
     let value = null;
     let status = 'gap';
     let provenance = null;
 
     if (def.source === 'genoa-auto'){
-      // Operator-typed engineer field wins over Genoa derivation
-      // ALWAYS — including for genoa-auto fields with derive() / mapping.
-      // The PR #79 schema change (3E fields manual-engineer → genoa-auto
-      // with derive() pulling from evidence.asr / faa_oe / tower_compliance)
-      // had the side effect of locking out the FilingPackagePanel's
-      // localStorage form: when an engineer typed ASR / tower height /
-      // FAA determination / painting / lighting in the panel, the values
-      // landed in applicant.engineer[def.id] but the genoa-auto branch
-      // ignored them and still showed EVIDENCE MISSING.  Now operator
-      // input has the same priority on genoa-auto fields as it has on
-      // manual-engineer fields: operator-wins, evidence-second.
+      // Operator override has priority on every genoa-auto field
+      // (matches FM behavior — see PR #79 / mapping.js prior art).
       const operatorVal = applicant?.engineer?.[def.id];
       if (operatorVal !== undefined && operatorVal !== null && operatorVal !== ''){
         value = operatorVal;
@@ -128,15 +154,12 @@ export function mapForm301Fm(exhibit, applicant = {}){
         }
       }
     } else if (def.source === 'manual-engineer'){
-      // Operator-provided value wins over a Genoa suggestion.
       const v = applicant?.engineer?.[def.id];
       if (v !== undefined && v !== null && v !== ''){
         value = v;
         status = 'filled';
         provenance = { source: 'engineer of record', note: 'operator input via workbench' };
       } else if (typeof def.suggest === 'function'){
-        // Pre-stage a Genoa-derived candidate.  Engineer must confirm
-        // before filing; status='suggested' so the UI flags it distinctly.
         const sv = def.suggest(exhibit);
         if (sv !== undefined && sv !== null && sv !== ''){
           value = sv;
@@ -152,11 +175,33 @@ export function mapForm301Fm(exhibit, applicant = {}){
         status = 'gap';
       }
     } else {
-      // manual-applicant — out of scope; surface as gap.
+      // manual-applicant — out of scope.
       status = 'gap';
     }
-    filled.push({ ...def, value: value ?? null, status, provenance });
+    const row = { ...def, value: value ?? null, status, provenance };
+    // Hoist engineer_confirmation_required: every field that landed
+    // 'suggested' or 'gap' for a manual-* source needs operator
+    // confirmation before filing.  Schemas may also flag this
+    // explicitly via the def.engineer_confirmation_required key.
+    if (def.engineer_confirmation_required
+        || status === 'suggested'
+        || (def.source === 'manual-engineer' && status !== 'filled')){
+      row.engineer_confirmation_required = true;
+    }
+    filled.push(row);
   }
+  return filled;
+}
+
+// Service-aware mapper.  Pick the schema, run mapFields, compute
+// summary + filing_ready + metadata.  Returns the same shape as the
+// historic mapForm301Fm so the packager + route + tests are agnostic.
+export function mapFilingPackage(exhibit, applicant = {}){
+  if (!exhibit || typeof exhibit !== 'object'){
+    throw new Error('mapFilingPackage: exhibit is required');
+  }
+  const { fields: SCHEMA, meta } = selectSchemaForService(exhibit?.station_inputs?.service);
+  const filled = mapFields(exhibit, SCHEMA, applicant);
 
   const summary = {
     total:         filled.length,
@@ -164,40 +209,36 @@ export function mapForm301Fm(exhibit, applicant = {}){
     suggested:     filled.filter(f => f.status === 'suggested').length,
     gaps:          filled.filter(f => f.status === 'gap').length,
     unknown:       filled.filter(f => f.status === 'unknown').length,
-    // A 'suggested' value still counts as a required gap because the
-    // engineer hasn't confirmed yet; filing-readiness should not flip
-    // to true merely because Genoa pre-staged a candidate.
+    not_applicable: filled.filter(f => f.status === 'na' || f.status === FieldStatus.NOT_APPLICABLE).length,
+    // 'suggested' still counts as a required gap — engineer hasn't
+    // confirmed yet, so filing_ready should not flip true on a pre-
+    // staged candidate.
     required_gaps: filled.filter(f => f.required && f.status !== 'filled').length
   };
 
   const compliance_pass = filled.find(f => f.id === 'compliance-pass')?.value;
   const blockers = exhibit.blockers?.length || 0;
-
-  // AM nighttime allocation (§73.182 NIF) is a filing-controlling rule.
-  // If NIF ran and any azimuth fails OR the worst margin is negative,
-  // the exhibit is NOT filing-ready — regardless of how the §73.207 /
-  // §73.215 checks landed.  Berry-screening source still counts as
-  // not-ready (engineer must re-run with FCCAM before filing) so that
-  // filing_ready never silently flips true on a screening-grade
-  // failure.  Skipping when service !== 'AM' so this never affects
-  // FM/LPFM/FX paths.
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
-  const nif = exhibit?.evidence?.am_night_nif || null;
-  const am_night_blocking = svc === 'AM' && nif && nif.available && (
-    (Number(nif.summary?.n_failing_azimuths) || 0) > 0 ||
-    (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0)
-  );
+  const am_night_nif = svc === 'AM' ? (exhibit?.evidence?.am_night_nif || null) : null;
 
-  const filing_ready = summary.required_gaps === 0
-    && blockers === 0
-    && !am_night_blocking
-    && (compliance_pass === 'PASS' || compliance_pass === 'PASS-via-73.215');
+  // Use the readiness gate from _readiness.js so AM / FM / FX /
+  // LPFM all share the same definition of "filing-ready".  Note:
+  // advisory evidence (am_physics, geo_rf_evidence, sdr_captures)
+  // is INTENTIONALLY not passed to gateFilingReady() — those are
+  // never filing gaps.
+  const gate = gateFilingReady({
+    fields:        filled,
+    blockers,
+    am_night_nif,
+    compliance_pass: compliance_pass || null
+  });
 
   return {
-    form:        FORM_301_FM_META,
+    form:        meta,
     fields:      filled,
     summary,
-    filing_ready,
+    filing_ready: gate.ready,
+    gating_reason: gate.gating_reason,
     blockers_count: blockers,
     compliance_pass: compliance_pass || null,
     exhibit_metadata: {
@@ -210,3 +251,16 @@ export function mapForm301Fm(exhibit, applicant = {}){
     }
   };
 }
+
+// Back-compat alias.  Historically the only mapper was
+// `mapForm301Fm` — callers (the lmsFiling route, the packager,
+// older tests) still import it by that name.  It now routes to the
+// service-appropriate schema; for FM exhibits behavior is
+// byte-identical to the prior implementation.
+export function mapForm301Fm(exhibit, applicant = {}){
+  return mapFilingPackage(exhibit, applicant);
+}
+
+// Helper export — lets the packager pick the right form_meta /
+// schema name for filename stem + cheatsheet title.
+export { selectSchemaForService };

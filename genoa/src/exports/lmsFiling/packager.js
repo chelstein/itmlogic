@@ -11,8 +11,19 @@
 // references the PDF by filename so the licensee uploads both side
 // by side to LMS.
 
-import { mapForm301Fm } from './mapping.js';
+import { mapForm301Fm, selectSchemaForService } from './mapping.js';
 import { FORM_301_FM_META } from './form301fm.js';
+
+// Per-service filename stem suffix.  AM/FM/FX/LPFM each get a
+// distinct token so engineers can tell at a glance which form a
+// cheatsheet was generated for.
+function filingStemForForm(formId){
+  const id = String(formId || '').toUpperCase();
+  if (id === '301-AM') return 'form301am-filing-package';
+  if (id === '349')    return 'form349-filing-package';
+  if (id === '318')    return 'form318-filing-package';
+  return 'form301fm-filing-package';
+}
 
 const STATUS_BADGE = {
   filled:    { color: '#43a85a', label: 'FILLED' },
@@ -59,7 +70,7 @@ export function buildFilingPackage(exhibit, applicant = {}){
   const callTag = (exhibit?.station_inputs?.call || 'unknown')
     .replace(/[^A-Z0-9]/gi, '_')
     .toUpperCase();
-  const filename_stem = `${callTag}-form301fm-filing-package`;
+  const filename_stem = `${callTag}-${filingStemForForm(mapped?.form?.form_id)}`;
 
   // Advisory-only notes surfaced alongside the filing package.  These
   // are NEVER LMS fields, NEVER required, and NEVER affect
@@ -119,12 +130,15 @@ function buildAdvisoryNotes(exhibit){
 }
 
 function jsonOutput(mapped, advisory_notes = []){
+  const formIdSlug = String(mapped?.form?.form_id || '301-FM')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '_');
   return JSON.stringify({
-    schema:        'genoa.filing_package.form_301_fm.v1',
+    schema:        `genoa.filing_package.form_${formIdSlug}.v1`,
     generated_at:  new Date().toISOString(),
     form:          mapped.form,
     summary:       mapped.summary,
     filing_ready:  mapped.filing_ready,
+    gating_reason: mapped.gating_reason ?? null,
     blockers_count: mapped.blockers_count,
     compliance_pass: mapped.compliance_pass,
     exhibit:       mapped.exhibit_metadata,
@@ -142,7 +156,8 @@ function jsonOutput(mapped, advisory_notes = []){
       status:    f.status,
       value:     f.value,
       provenance: f.provenance || null,
-      notes:     f.notes ?? null
+      notes:     f.notes ?? null,
+      engineer_confirmation_required: f.engineer_confirmation_required || false
     }))
   }, null, 2);
 }

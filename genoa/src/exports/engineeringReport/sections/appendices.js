@@ -5,6 +5,11 @@
 // page breaks between them and renderText.js can put each on its own page.
 
 import { buildAmNightNarrative } from './amNightNarrative.js';
+import {
+  validatePhysicsEvidence,
+  PHYSICS_EVIDENCE_SCHEMA_NAME,
+  PHYSICS_EVIDENCE_SCHEMA_VERSION
+} from '../../../types/physicsEvidence.schema.js';
 
 export function buildAppendixSections(exhibit){
   const sections = [];
@@ -438,7 +443,20 @@ export function buildAppendixSections(exhibit){
         });
       }
 
-      // Per-azimuth NIF table.
+      // Per-azimuth NIF table.  binding_interferer column carries
+      // call + facility_id + relation + contributed_field at this
+      // receiver, so the reviewer can attribute each azimuth's
+      // binding constraint to a specific station without cross-
+      // referencing Appendix F-2.
+      const fmtBindingInterferer = (bi) => {
+        if (!bi) return '—';
+        const call = bi.call || '—';
+        const fid  = bi.facility_id ? `#${bi.facility_id}` : '';
+        const rel  = bi.relation || '—';
+        const fld  = Number.isFinite(bi.contributed_uv_m)
+          ? `${bi.contributed_uv_m.toFixed(2)} µV/m` : '—';
+        return `${call}${fid ? ' ' + fid : ''} · ${rel} · ${fld}`;
+      };
       const azRows = (nif.contour || []).map((p) => ({
         az:            Number.isFinite(p.azimuth_deg) ? p.azimuth_deg.toFixed(1) : '—',
         distance_km:   Number.isFinite(p.distance_km) ? p.distance_km.toFixed(2) : '—',
@@ -447,6 +465,7 @@ export function buildAppendixSections(exhibit){
         binding:       p.binding?.relation
                           ? `${p.binding.relation} ${Number.isFinite(p.binding.margin_db) ? p.binding.margin_db.toFixed(1) : '—'} dB`
                           : (p.saturated || '—'),
+        binding_interferer: fmtBindingInterferer(p.binding?.binding_interferer),
         iter:          Number.isFinite(p.iterations) ? p.iterations : '—'
       }));
       if (azRows.length){
@@ -454,16 +473,18 @@ export function buildAppendixSections(exhibit){
           id:      'appendix-f-azimuths',
           type:    'table',
           heading: 'Appendix F-1 — Per-azimuth NIF radius',
-          preface: 'NIF radius per azimuth and the §73.183 protection relation that binds it ' +
-                   '(margin = 20·log10(desired/required), positive = margin above protection).',
+          preface: 'NIF radius per azimuth, the §73.183 protection relation that binds it ' +
+                   '(margin = 20·log10(desired/required), positive = margin above protection), ' +
+                   'and the single dominant interferer in that azimuth\'s §73.182(k) RSS sum.',
           table: {
             columns: [
-              { key: 'az',          label: 'Az (°)',         width: 0.10, align: 'right' },
-              { key: 'distance_km', label: 'NIF (km)',       width: 0.16, align: 'right' },
-              { key: 'lat',         label: 'Lat',            width: 0.16, align: 'right' },
-              { key: 'lon',         label: 'Lon',            width: 0.16, align: 'right' },
-              { key: 'binding',     label: 'Binding · margin', width: 0.30 },
-              { key: 'iter',        label: 'Iter',           width: 0.10, align: 'right' }
+              { key: 'az',                 label: 'Az (°)',             width: 0.07, align: 'right' },
+              { key: 'distance_km',        label: 'NIF (km)',           width: 0.10, align: 'right' },
+              { key: 'lat',                label: 'Lat',                width: 0.10, align: 'right' },
+              { key: 'lon',                label: 'Lon',                width: 0.10, align: 'right' },
+              { key: 'binding',            label: 'Binding · margin',   width: 0.18 },
+              { key: 'binding_interferer', label: 'Binding interferer', width: 0.35 },
+              { key: 'iter',               label: 'Iter',               width: 0.07, align: 'right' }
             ],
             rows: azRows
           }
@@ -666,6 +687,10 @@ export function buildAppendixSections(exhibit){
   const physics = exhibit.evidence?.am_physics;
   const svc_h   = String(exhibit.station_inputs?.service || '').toUpperCase();
   if (svc_h === 'AM' && physics){
+    const schemaCheck   = validatePhysicsEvidence(physics);
+    const schemaConform = schemaCheck.ok
+      ? `${PHYSICS_EVIDENCE_SCHEMA_NAME} v${PHYSICS_EVIDENCE_SCHEMA_VERSION} — PASS`
+      : `${PHYSICS_EVIDENCE_SCHEMA_NAME} v${PHYSICS_EVIDENCE_SCHEMA_VERSION} — FAIL: ${(schemaCheck.errors || []).join('; ')}`;
     const inp = physics.inputs  || {};
     const out = physics.outputs || {};
     const sum = physics.stdout_summary || {};
@@ -694,6 +719,7 @@ export function buildAppendixSections(exhibit){
           ['Status',        String(physics.status || 'unknown').toUpperCase()],
           ['Engine',        physics.engine || 'somnec2d'],
           ['Reason',        reason],
+          ['Schema',        schemaConform],
           ['Filing effect', 'NONE (advisory only)'],
           ['Posture',       'Does not modify §73.184 contour distances or any filing-controlling rule math.']
         ]
@@ -724,6 +750,7 @@ export function buildAppendixSections(exhibit){
           ['Diagnostic (EPSCF)',    sum.epscf || '—'],
           ['Diagnostic (AR1[1,1,1])', sum.ar1_1_1 || '—'],
           ['Sidecar fetched at',    physics.fetched_at || '—'],
+          ['Schema',                schemaConform],
           ['Filing effect',         'NONE (advisory only)'],
           ['Posture',               'Does not modify §73.184 contour distances or any filing-controlling rule math.'],
           ['Regulation',            '47 CFR §73.190 (input conventions) — informational; this appendix establishes no rule compliance.']
@@ -743,38 +770,109 @@ export function buildAppendixSections(exhibit){
   const geoRf = exhibit.evidence?.geo_rf_evidence;
   if (geoRf){
     const inp = geoRf.inputs || {};
-    const tc  = geoRf.datasets?.tree_canopy_conus || {};
-    const tau = geoRf.datasets?.tau_rf_models     || {};
-    const cl  = geoRf.datasets?.canada_landcover  || {};
+    const ds  = geoRf.datasets || {};
+    // Prefer canonical `tree_canopy`; fall back to legacy
+    // `tree_canopy_conus` so older sidecar contracts still render.
+    const tc  = (ds.tree_canopy && ds.tree_canopy.available)
+                  ? ds.tree_canopy
+                  : (ds.tree_canopy_conus || {});
+    const lc  = ds.landcover                         || ds.canada_landcover || {};
+    const tau = ds.tau_rf_models                     || {};
+    const m3  = ds.fcc_m3_conductivity_availability  || {};
+    const wp  = ds.water_proximity                   || {};
+    const cp  = ds.climate_projection_availability   || {};
+    const rs  = ds.sdr_residual_support              || {};
+    const mm  = geoRf.map_marker                     || null;
+    const csx = geoRf.confidence_scoring_context     || {};
+    const rsx = geoRf.residual_support               || {};
+
     const advisoryPreface =
       'Environmental RF evidence was sampled from advisory geospatial ' +
-      'datasets including tree-canopy, landcover, and RF/environment ' +
-      'statistical artifacts.  These data may help explain observed-vs-' +
-      'predicted residuals or confidence scoring in future workflows.  ' +
-      'They do not modify FCC contour distances, AM nighttime allocation, ' +
-      'skywave results, spacing determinations, or filing-controlling ' +
-      'rule calculations.';
+      'datasets including tree-canopy density, landcover, FCC M3 ' +
+      'conductivity-coverage flags, water proximity, climate-projection ' +
+      'availability, and RF/environment statistical artifacts.  These ' +
+      'data provide CONFIDENCE-SCORING CONTEXT and OBSERVED-VS-PREDICTED ' +
+      'RESIDUAL SUPPORT for the engineering narrative; they do not ' +
+      'modify FCC contour distances, AM nighttime allocation, skywave ' +
+      'results, spacing determinations, or any filing-controlling rule ' +
+      'calculation.  FILING EFFECT: NONE.';
 
     const fmtCoord = (v) => Number.isFinite(Number(v)) ? Number(v).toFixed(6) : '—';
     const status   = String(geoRf.status || 'unknown').toUpperCase();
+    const yesNo    = (b) => b ? 'available' : 'unavailable';
+
+    // Optional canopy-rose summary — min / max / mean over the available
+    // azimuth samples.  Surfaces directional canopy heterogeneity without
+    // re-emitting the full per-sample table (which lives in the JSON).
+    const rose = tc?.rose && Array.isArray(tc.rose.samples) ? tc.rose : null;
+    let roseSummary = null;
+    if (rose){
+      const vals = rose.samples
+        .map(s => Number(s.value_numeric))
+        .filter(Number.isFinite);
+      if (vals.length){
+        const min  = Math.min(...vals);
+        const max  = Math.max(...vals);
+        const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+        roseSummary = `${rose.n_azimuths} az @ ${rose.distance_km} km — ` +
+                      `min ${min}, max ${max}, mean ${mean.toFixed(1)} ` +
+                      `(${vals.length}/${rose.samples.length} samples in coverage)`;
+      } else {
+        roseSummary = `${rose.n_azimuths} az @ ${rose.distance_km} km — no samples in canopy coverage`;
+      }
+    }
 
     const rows = [
+      // ── Prominent filing-effect lock at the top ──────────────────────
+      ['Filing effect',                'NONE (advisory only)'],
+      ['Advisory',                     'Yes'],
       ['Status',                       status],
       ['Latitude',                     fmtCoord(inp.lat)],
       ['Longitude',                    fmtCoord(inp.lon)],
+
+      // ── Confidence-scoring context (prominent) ───────────────────────
+      ['Confidence scoring context',   csx.role
+                                         ? `${csx.role} — contributes to ${(csx.contributes_to || []).join(', ') || 'narrative only'}`
+                                         : 'advisory inputs only — narrative context'],
+
+      // ── Observed-vs-predicted residual support (prominent) ───────────
+      ['Observed-vs-predicted residual support',
+                                       rsx.available || rs.available
+                                         ? 'available — cross-references evidence.sdr_residuals (advisory)'
+                                         : 'unavailable — no SDR residual support attached'],
+
+      // ── Tree canopy ──────────────────────────────────────────────────
       ['Tree canopy dataset',          tc.dataset || (tc.available ? '(unspecified)' : 'unavailable')],
       ['Tree canopy value',            tc.value_numeric != null
                                          ? `${tc.value_numeric}${tc.interpretation ? `  (${tc.interpretation})` : ''}`
-                                         : (tc.value_raw || 'unavailable')],
-      ['Tau RF model artifacts',       tau.available ? 'available' : 'unavailable'],
-      ['Canada landcover',             cl.available  ? 'available' : 'unavailable'],
-      ['Filing effect',                'NONE (advisory only)'],
-      ['Advisory',                     'Yes'],
-      ['Fetched at',                   geoRf.fetched_at || '—'],
-      ['Posture',                      'Does not modify FCC rule outputs; informational context only.']
+                                         : (tc.value_raw || 'unavailable')]
     ];
+    if (roseSummary){
+      rows.push(['Tree canopy rose',   roseSummary]);
+    }
+    rows.push(
+      // ── Auxiliary dataset slots ──────────────────────────────────────
+      ['Landcover',                    yesNo(lc.available)],
+      ['Tau RF model artifacts',       yesNo(tau.available)],
+      ['FCC M3 conductivity coverage', yesNo(m3.available)],
+      ['Water proximity',              yesNo(wp.available)],
+      ['Climate projection coverage',  yesNo(cp.available)],
+      ['SDR residual support',         yesNo(rs.available)],
+
+      // ── Provenance ───────────────────────────────────────────────────
+      ['Sidecar service',              geoRf.sidecar_service || 'genoa-geo-rf-evidence'],
+      ['Fetched at',                   geoRf.fetched_at || '—']
+    );
+    if (mm){
+      rows.push(['Map marker',
+        `(${fmtCoord(mm.lat)}, ${fmtCoord(mm.lon)})  "${mm.label}"`]);
+    }
+    rows.push(
+      ['Posture',                      'Does not modify FCC rule outputs; informational context only.']
+    );
+
     if (geoRf.error){
-      rows.splice(1, 0, ['Note', geoRf.error]);
+      rows.splice(3, 0, ['Note', geoRf.error]);
     }
     sections.push({
       id:      'appendix-i',

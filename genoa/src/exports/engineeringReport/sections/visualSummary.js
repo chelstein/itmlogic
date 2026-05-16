@@ -71,11 +71,24 @@ export function buildVisualSummarySection(exhibit){
   const persons = Number.isFinite(Number(pe.persons))
     ? Math.max(0, Math.round(Number(pe.persons)))
     : null;
+  // Cap dot count for huge metros so the dominant ring doesn't render as
+  // a solid black disk.  The renderer enforces a hard max again (defense
+  // in depth) but the model already publishes the planned count so it
+  // can be inspected without instantiating pdfkit.
+  const DOT_CEILING = 680;
+  const plannedDots = persons != null
+    ? Math.min(DOT_CEILING, Math.max(0, Math.ceil(persons / Math.max(1, Math.ceil(persons / DOT_CEILING)))))
+    : 0;
+  const peoplePerDot = persons != null && plannedDots > 0
+    ? Math.max(1, Math.ceil(persons / plannedDots))
+    : null;
   const population = persons != null
     ? {
         persons,
-        source:  pe.source  || null,
-        vintage: pe.vintage || null
+        source:       pe.source  || null,
+        vintage:      pe.vintage || null,
+        planned_dots: plannedDots,
+        people_per_dot: peoplePerDot
       }
     : null;
 
@@ -117,6 +130,20 @@ export function buildVisualSummarySection(exhibit){
     contours,
     population,
     canopy,
-    advisory: 'Environmental RF evidence is advisory only.  Does not modify FCC filing-controlling contour or allocation calculations.  Population values are informational only — FCC §73.x compliance is determined by distance and field-strength tests, not population.'
+    // Typography + layout hints consumed by renderPdf.js.  These are not
+    // required (the renderer falls back to sane defaults) but allow the
+    // visual page to scale with metro density and locale word lengths.
+    display_hints: {
+      station_label_size:    24,   // call-letter headline, oversized for read-at-a-glance
+      sub_label_size:        9,
+      stat_label_size:       8,
+      stat_value_size:       22,
+      advisory_label_size:   8,
+      legend_size:           8,
+      max_dots:              680,
+      wrap_station_subline:  true  // wrap the "Community · Frequency · Service · Class · ERP" line
+                                   // instead of clipping when it exceeds the sidebar width
+    },
+    advisory: 'Environmental RF evidence is advisory only.  Does not modify FCC filing-controlling contour or allocation calculations.  Population values are informational only — FCC compliance is determined by distance and field-strength tests, not population.'
   };
 }

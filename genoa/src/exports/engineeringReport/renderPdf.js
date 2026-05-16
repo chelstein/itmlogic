@@ -1080,7 +1080,12 @@ function renderVisualSummary(pdf, s){
                  || s.contours[s.contours.length - 1];
   if (s.population?.persons && dominant){
     const persons      = s.population.persons;
-    const MAX_DOTS     = 680;
+    // Honor the section builder's cap (visualSummary.js publishes
+    // display_hints.max_dots).  This is a defense-in-depth re-check:
+    // never let a huge-metro exhibit render the dominant ring as a
+    // solid black disk regardless of upstream model state.
+    const MAX_DOTS     = Math.max(60, Math.min(1200,
+                          Number(s.display_hints?.max_dots) || 680));
     const peoplePerDot = Math.max(1, Math.ceil(persons / MAX_DOTS));
     const nDots        = Math.min(MAX_DOTS, Math.ceil(persons / peoplePerDot));
     const rPx          = kmToPx(dominant.radius_km);
@@ -1154,10 +1159,18 @@ function renderVisualSummary(pdf, s){
   let   sbY0 = y0;
 
   // STATION HEADER
+  // Typography sizes come from section.display_hints (visualSummary.js)
+  // so the section can re-tune the headline without a renderer change.
+  const hints = s.display_hints || {};
+  const callSize    = Number.isFinite(hints.station_label_size) ? hints.station_label_size : 20;
+  const subSize     = Number.isFinite(hints.sub_label_size)     ? hints.sub_label_size     : 9;
+  const statLblSize = Number.isFinite(hints.stat_label_size)    ? hints.stat_label_size    : 8;
+  const statValSize = Number.isFinite(hints.stat_value_size)    ? hints.stat_value_size    : 22;
+  const legendSize  = Number.isFinite(hints.legend_size)        ? hints.legend_size        : 8;
   pdf.save();
-  pdf.font(BOLD_FONT).fontSize(20).fillColor(TEAL_DARK)
-     .text(s.tx.call || '—', sbX0, sbY0, { width: STATS_W, lineBreak: false });
-  sbY0 += 24;
+  pdf.font(BOLD_FONT).fontSize(callSize).fillColor(TEAL_DARK)
+     .text(s.tx.call || '—', sbX0, sbY0, { width: STATS_W, lineBreak: false, ellipsis: true });
+  sbY0 += callSize + 4;
   const subParts = [
     s.tx.community,
     s.tx.frequency,
@@ -1165,8 +1178,14 @@ function renderVisualSummary(pdf, s){
     s.tx.fcc_class ? `Class ${s.tx.fcc_class}` : null,
     Number.isFinite(s.tx.erp_kw) ? `${s.tx.erp_kw} kW` : null
   ].filter(Boolean);
-  pdf.font(BODY_FONT).fontSize(9).fillColor(TEXT_DIM)
-     .text(subParts.join(' · '), sbX0, sbY0, { width: STATS_W });
+  // Allow the subline to wrap (long community-of-license names overflow
+  // the 168pt sidebar with lineBreak: false and were getting clipped).
+  pdf.font(BODY_FONT).fontSize(subSize).fillColor(TEXT_DIM)
+     .text(subParts.join(' · '), sbX0, sbY0, {
+        width: STATS_W,
+        lineBreak: hints.wrap_station_subline !== false,
+        ellipsis: hints.wrap_station_subline === false
+     });
   sbY0 = pdf.y + 10;
   pdf.restore();
 
@@ -1174,14 +1193,16 @@ function renderVisualSummary(pdf, s){
   if (s.population?.persons){
     pdf.save();
     pdf.fillColor('#1c2e3a').rect(sbX0, sbY0, STATS_W, 60).fill();
-    pdf.font(BODY_FONT).fontSize(8).fillColor('#f3c86d')
-       .text('PEOPLE INSIDE PRIMARY CONTOUR', sbX0 + 8, sbY0 + 6, { width: STATS_W - 16, characterSpacing: 0.6 });
-    pdf.font(BOLD_FONT).fontSize(22).fillColor('white')
-       .text(`≈ ${fmtPersons(s.population.persons)}`, sbX0 + 8, sbY0 + 18, { width: STATS_W - 16, lineBreak: false });
+    pdf.font(BODY_FONT).fontSize(statLblSize).fillColor('#f3c86d')
+       .text('PEOPLE INSIDE PRIMARY CONTOUR', sbX0 + 8, sbY0 + 6,
+             { width: STATS_W - 16, characterSpacing: 0.6, lineBreak: false, ellipsis: true });
+    pdf.font(BOLD_FONT).fontSize(statValSize).fillColor('white')
+       .text(`~ ${fmtPersons(s.population.persons)}`, sbX0 + 8, sbY0 + 18,
+             { width: STATS_W - 16, lineBreak: false, ellipsis: true });
     const srcLabel = [s.population.source, s.population.vintage].filter(Boolean).join(' · ');
     if (srcLabel){
       pdf.font(BODY_FONT).fontSize(7).fillColor('#a8b4be')
-         .text(srcLabel, sbX0 + 8, sbY0 + 44, { width: STATS_W - 16, lineBreak: false });
+         .text(srcLabel, sbX0 + 8, sbY0 + 44, { width: STATS_W - 16, lineBreak: false, ellipsis: true });
     }
     pdf.restore();
     sbY0 += 70;
@@ -1192,12 +1213,15 @@ function renderVisualSummary(pdf, s){
     const v = s.canopy.value_numeric;
     pdf.save();
     pdf.fillColor('#2c4a2d').rect(sbX0, sbY0, STATS_W, 60).fill();
-    pdf.font(BODY_FONT).fontSize(8).fillColor('#cfe9b6')
-       .text('TREE CANOPY AT TRANSMITTER', sbX0 + 8, sbY0 + 6, { width: STATS_W - 16, characterSpacing: 0.6 });
-    pdf.font(BOLD_FONT).fontSize(22).fillColor('white')
-       .text(v == null ? '—' : `${v}%`, sbX0 + 8, sbY0 + 18, { width: STATS_W - 16, lineBreak: false });
+    pdf.font(BODY_FONT).fontSize(statLblSize).fillColor('#cfe9b6')
+       .text('TREE CANOPY AT TRANSMITTER', sbX0 + 8, sbY0 + 6,
+             { width: STATS_W - 16, characterSpacing: 0.6, lineBreak: false, ellipsis: true });
+    pdf.font(BOLD_FONT).fontSize(statValSize).fillColor('white')
+       .text(v == null ? '—' : `${v}%`, sbX0 + 8, sbY0 + 18,
+             { width: STATS_W - 16, lineBreak: false, ellipsis: true });
     pdf.font(ITALIC_FONT).fontSize(7).fillColor('#cfe9b6')
-       .text(s.canopy.interpretation || '', sbX0 + 8, sbY0 + 44, { width: STATS_W - 16, lineBreak: true, height: 14 });
+       .text(s.canopy.interpretation || '', sbX0 + 8, sbY0 + 44,
+             { width: STATS_W - 16, lineBreak: true, height: 14, ellipsis: true });
     pdf.restore();
     sbY0 += 70;
   }
@@ -1218,7 +1242,7 @@ function renderVisualSummary(pdf, s){
 
   // ── Contour legend ───────────────────────────────────────────────────
   pdf.save();
-  pdf.font(BODY_FONT).fontSize(8).fillColor(TEXT_DIM)
+  pdf.font(BODY_FONT).fontSize(legendSize).fillColor(TEXT_DIM)
      .text('CONTOURS', sbX0, sbY0, { width: STATS_W, characterSpacing: 0.4 });
   sbY0 = pdf.y + 4;
   for (const c of s.contours.slice().reverse()){     // city first (warmest)
@@ -1229,8 +1253,8 @@ function renderVisualSummary(pdf, s){
     pdf.undash();
     pdf.restore();
     const txt = `${c.label}  ·  ${c.radius_km.toFixed(2)} km`;
-    pdf.font(MONO_FONT).fontSize(8).fillColor('#2a3a48')
-       .text(txt, sbX0 + 24, sbY0, { width: STATS_W - 24, lineBreak: false });
+    pdf.font(MONO_FONT).fontSize(legendSize).fillColor('#2a3a48')
+       .text(txt, sbX0 + 24, sbY0, { width: STATS_W - 24, lineBreak: false, ellipsis: true });
     sbY0 += 11;
   }
   pdf.restore();

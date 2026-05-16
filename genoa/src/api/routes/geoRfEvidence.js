@@ -6,6 +6,16 @@
 //   GET /api/geo-rf-evidence/sample?lat=&lon=&service=&call=&facility_id=
 //     → 200 { ...envelope }   (status=run|not_configured|failed|offline)
 //
+//   The envelope carries multiple dataset slots
+//   (tree_canopy, landcover, tau_rf_models,
+//    fcc_m3_conductivity_availability, water_proximity,
+//    climate_projection_availability, sdr_residual_support, and the
+//    legacy tree_canopy_conus / canada_landcover aliases) plus a
+//    `map_marker` for the contour map and a `confidence_scoring_context`
+//    structure for Appendix I.  The client tries `/sample/all` first and
+//    falls back to parallel point endpoints.  Slots the sidecar doesn't
+//    expose appear as `{available:false}` — never invented data.
+//
 // ADVISORY ONLY.  Independent environmental RF evidence beside FCC rule
 // math.  Never overrides §73.184 / §73.182 / §73.190 / §73.313 / §73.207
 // / §73.215 calculations.

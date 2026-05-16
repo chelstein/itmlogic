@@ -6,6 +6,9 @@ import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
 import ServiceHealthPanel from '@components/ui/ServiceHealthPanel.jsx';
+import SidecarHealthRack from '@components/ui/SidecarHealthRack.jsx';
+import EvidenceRack      from '@components/ui/EvidenceRack.jsx';
+import MapPreview        from '@components/ui/MapPreview.jsx';
 import ChartScope    from '@components/ui/ChartScope.jsx';
 import TelemetryRack from '@components/ui/TelemetryRack.jsx';
 import TabStrip      from '@components/ui/TabStrip.jsx';
@@ -857,6 +860,7 @@ function MainApp({ onLogout }) {
           busy={busy}
         />
         <ServiceHealthPanel />
+        <SidecarHealthRack />
       </>)}
       center={(
         <>
@@ -904,6 +908,7 @@ function MainApp({ onLogout }) {
             onClear={() => setExhibit(prev => prev ? { ...prev, pe_certification: undefined } : prev)}
           />
           <TelemetryRack exhibit={exhibit} />
+          <MapPreview tx={{ label: exhibit?.station_inputs?.call_sign || 'TX' }} />
         </>
       )}
     />
@@ -1213,6 +1218,7 @@ function PaneEvidence({ exhibit }){
   const pop = exhibit.population_estimate || {};
   return (
     <div className="space-y-3">
+      <EvidenceRack exhibit={exhibit} />
       <SubHead title="Terrain" />
       <SubKv kv={ev.terrain?.available
         ? [

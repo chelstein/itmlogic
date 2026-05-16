@@ -121,7 +121,7 @@ function methodologyParagraph({ summary, interferers, nif }){
 function describeEngine(nif){
   const engine = nif?.engine || nif?.source || 'fccam';
   if (engine === 'berry-1968-screening' || engine?.startsWith?.('berry')){
-    return 'the Berry analytical model (47 CFR §73.190(c)) — SCREENING-grade conservative analytical approximation; re-run with FCCAM Wang before filing';
+    return 'the Berry analytical model (47 CFR §73.190(c)) — screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing';
   }
   return 'FCCAM (Wang 1985 model, 47 CFR §73.190(c)) — filing-grade';
 }
@@ -169,7 +169,7 @@ function closingParagraph({ nif }){
     ? 'These NIF results are deterministic and replay-verifiable: re-computing the exhibit with the same station inputs produces identical NIF radii and margins.'
     : 'These NIF results are deterministic and replay-verifiable: re-computing the exhibit with the same station inputs against the same FCCAM source SHA produces identical NIF radii and margins.';
   const filingNote = isBerry
-    ? '  SCREENING-grade output — the Berry analytical formula is permitted by §73.190(c) but under-estimates field strength compared to FCCAM Wang in most regimes.  Re-run with FCCAM before filing.'
+    ? '  Screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing.  The Berry analytical formula is permitted by §73.190(c) but under-estimates field strength compared to FCCAM Wang in most regimes.'
     : '';
   return `${determinismClaim}  Skywave engine: ${engineLabel}.${filingNote}  Regulation: ${nif.regulation || '47 CFR §73.182 / §73.183 / §73.190(c)'}.`;
 }

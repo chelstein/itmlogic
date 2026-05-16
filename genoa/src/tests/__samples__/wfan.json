@@ -1,0 +1,19 @@
+{
+  "call": "WFAN-AM",
+  "facility_id": "28617",
+  "service": "AM",
+  "frequency": 660,
+  "erp_kw": 50,
+  "ground_sigma_mS_m": 8,
+  "lat": 40.859833,
+  "lon": -73.785417,
+  "radial_step_deg": 45,
+  "invariants": {
+    "contour_count": 4,
+    "radial_count": 8,
+    "must_not_contain_substrings_in_narrative": ["HAAT (input):"],
+    "must_contain_appendices": ["appendix-c", "appendix-d", "appendix-e"],
+    "page_count_band": { "min": 4, "max": 30 }
+  },
+  "notes": "AM groundwave at WFAN site, NYC. AM exhibits must NOT have FM/HAAT-input wording."
+}

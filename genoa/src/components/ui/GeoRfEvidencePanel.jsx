@@ -66,9 +66,18 @@ export default function GeoRfEvidencePanel({ baseInputs }){
   }
 
   const status = String(result?.status || '').toLowerCase();
-  const tc     = result?.datasets?.tree_canopy_conus || {};
-  const tau    = result?.datasets?.tau_rf_models     || {};
-  const cl     = result?.datasets?.canada_landcover  || {};
+  const ds     = result?.datasets || {};
+  // Prefer canonical `tree_canopy`; fall back to legacy
+  // `tree_canopy_conus` so older sidecar contracts still render.
+  const tc     = (ds.tree_canopy && ds.tree_canopy.available)
+                   ? ds.tree_canopy : (ds.tree_canopy_conus || {});
+  const lc     = ds.landcover                        || ds.canada_landcover || {};
+  const tau    = ds.tau_rf_models                    || {};
+  const m3     = ds.fcc_m3_conductivity_availability || {};
+  const wp     = ds.water_proximity                  || {};
+  const cp     = ds.climate_projection_availability  || {};
+  const rs     = ds.sdr_residual_support             || {};
+  const mm     = result?.map_marker                  || null;
 
   const advisoryBadge = (
     <span
@@ -114,13 +123,20 @@ export default function GeoRfEvidencePanel({ baseInputs }){
               <Kv k="Value"      v={tc.value_numeric != null ? String(tc.value_numeric) : (tc.value_raw || '—')} />
               <Kv k="Context"    v={tc.interpretation || '—'} />
               <Kv k="Coordinates" v={`${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)}`} />
+              {mm && (
+                <Kv k="Map marker"  v={mm.popup_text || `(${mm.lat}, ${mm.lon})`} title={mm.popup_text || ''} />
+              )}
             </div>
             <div className="rounded-md border border-rule p-3 space-y-1">
               <div className="text-textDim text-[10px] tracking-rack uppercase">Auxiliary datasets</div>
-              <Kv k="Tau RF models"     v={tau.available ? 'available' : 'unavailable'} />
-              <Kv k="Canada landcover"  v={cl.available  ? 'available' : 'unavailable'} />
-              <Kv k="Filing effect"     v="None (advisory)" />
-              <Kv k="Fetched at"        v={result.fetched_at || '—'} />
+              <Kv k="Landcover"          v={lc.available  ? 'available' : 'unavailable'} />
+              <Kv k="Tau RF models"      v={tau.available ? 'available' : 'unavailable'} />
+              <Kv k="FCC M3 cond."       v={m3.available  ? 'available' : 'unavailable'} />
+              <Kv k="Water proximity"    v={wp.available  ? 'available' : 'unavailable'} />
+              <Kv k="Climate projection" v={cp.available  ? 'available' : 'unavailable'} />
+              <Kv k="SDR residual"       v={rs.available  ? 'available' : 'unavailable'} />
+              <Kv k="Filing effect"      v="None (advisory)" />
+              <Kv k="Fetched at"         v={result.fetched_at || '—'} />
             </div>
           </div>
         )}

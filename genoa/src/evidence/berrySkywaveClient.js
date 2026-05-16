@@ -68,7 +68,7 @@ export function makeBerrySkywaveClient({
         binary_sha256:  null,
         regulation:     '47 CFR §73.190(c) (Berry analytical formula, screening-grade)',
         license_basis:  '17 USC §105 (FCC regulation text, public domain)',
-        warning:        'SCREENING-GRADE — not for filing.  Use FCCAM Wang for §73.182 filings.',
+        warning:        'screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing',
         fetched_at:     new Date().toISOString()
       };
     },
@@ -151,7 +151,7 @@ export function makeBerrySkywaveClient({
         results,
         engine_version: 'berry-1968-screening',
         source_sha256:  null,
-        warning:        'SCREENING-GRADE — not for filing.  Use FCCAM for §73.182 filings.'
+        warning:        'screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing'
       };
     }
   };
@@ -267,7 +267,7 @@ function wrap(body, extras){
     engine_version: 'berry-1968-screening',
     source_sha256:  null,
     inputs:         body,
-    warning:        'SCREENING-GRADE — re-run with FCCAM Wang before filing',
+    warning:        'screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing',
     ...extras
   };
 }
@@ -285,6 +285,6 @@ export const BERRY_SKYWAVE_PROVENANCE = Object.freeze({
     'Tropospheric / sporadic-E modes',
     'DA-N pattern integration — orchestrator applies pattern factor downstream'
   ],
-  status: 'SCREENING — not for filing.  Use FCCAM Wang for §73.182 filings.',
+  status: 'screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing',
   license_basis: '17 USC §105 (FCC regulation text, public domain)'
 });

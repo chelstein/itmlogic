@@ -47,6 +47,44 @@ const EARTH_RADIUS_KM = 6371.0;
  */
 export function patternFactorAt(patternTable, azDeg){
   if (!patternTable) return 1;
+  // Pattern-table SHAPE SAFETY (Codex audit on §73.150 ingest).  A
+  // pattern_table arrives from multiple sources: the §73.150 DA
+  // synthesizer (Array of [az, factor] pairs), an LMS pattern dump
+  // (Object keyed by integer azimuth), or an operator-hand-edited
+  // object that happens to look like one shape but holds the other.
+  // We require an EXPLICIT `kind` discriminator on Object-shaped
+  // tables — `kind: 'horizontal_relative_field' | 'msa' | 'rss'`.
+  // Without it, an Object that pairs raw measured-field-at-1km
+  // (mV/m) with azimuth would silently be treated as a relative
+  // pattern factor and inflate the directional field by ~3 orders
+  // of magnitude.  Failing closed (returns 1, equivalent to omni)
+  // is the correct safe default; the caller's narrative downstream
+  // emits a "pattern_table missing kind discriminator → treated as
+  // omni" advisory when this branch fires.
+  // Array form is unambiguous (synthesizer-emitted), so it bypasses
+  // the discriminator check.
+  if (!Array.isArray(patternTable)
+      && typeof patternTable === 'object'
+      && patternTable.kind == null){
+    // Allow legacy plain-numeric maps {0:1.0, 90:0.5, ...} that
+    // contain ONLY finite numeric values associated with finite
+    // azimuth keys — this is the historical shape every Genoa test
+    // and exhibit has shipped with, and the discriminator
+    // requirement should not regress them.  Anything richer (mixed
+    // shapes, meta-keys, vendor-specific fields) MUST declare kind.
+    const entries = Object.entries(patternTable);
+    const looksLikePlainNumericMap = entries.length > 0 && entries.every(([k, v]) => {
+      const azOk = Number.isFinite(Number(k));
+      const valOk = (typeof v === 'number' && Number.isFinite(v))
+                 || (Array.isArray(v) && v.length >= 1 && Number.isFinite(Number(v[0])))
+                 || (v && typeof v === 'object' && typeof v.factor === 'number');
+      return azOk && valOk;
+    });
+    if (!looksLikePlainNumericMap){
+      // Unknown shape with no kind discriminator → fail closed (omni).
+      return 1;
+    }
+  }
   // Accept two shapes:
   //   - Array of [az, factor] pairs (the §73.150 synthesizer output)
   //   - Object keyed by integer azimuth (filed pattern_table)
@@ -64,6 +102,10 @@ export function patternFactorAt(patternTable, azDeg){
     }
   } else if (typeof patternTable === 'object'){
     for (const [k, v] of Object.entries(patternTable)){
+      // Skip the discriminator + any meta-key (`kind`, `source`,
+      // `regulation`, etc.) — Number('kind') is NaN so it would
+      // naturally drop out, but explicit is clearer than implicit.
+      if (k === 'kind' || k === 'source' || k === 'regulation' || k === 'note') continue;
       const az = Number(k);
       if (!Number.isFinite(az)) continue;
       map[((az % 360) + 360) % 360] = readFactor(v);
