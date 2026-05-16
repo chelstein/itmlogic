@@ -491,5 +491,152 @@ export function buildAppendixSections(exhibit){
     }
   }
 
+  // ── Appendix G — AM §73.99(b)(1)/(2) PSRA/PSSA reduced-power ─────────
+  // Populated by exhibitService step 8e when service=AM.  Three blocks:
+  //   - summary KV (PSSA + PSRA reduced powers, ceiling flags, binding)
+  //   - §73.99 local-time window schedule (per-month sunrise/sunset)
+  //   - per-pool protected-pair tables with allowed power + scale_factor
+  const psra = exhibit.evidence?.am_psra_pssa;
+  const svc_g = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (svc_g === 'AM' && psra){
+    if (!psra.available){
+      sections.push({
+        id:      'appendix-g',
+        type:    'kv',
+        heading: 'APPENDIX G — §73.99 PSRA/PSSA REDUCED POWER',
+        preface: 'Pre-sunrise / Post-sunset reduced-power exhibit per 47 CFR §73.99(b)(1)/(2).',
+        rows: [
+          ['Status',     'NOT RUN'],
+          ['Reason',     psra.error || 'unavailable'],
+          ['Regulation', '47 CFR §73.99(b)(1) / §73.99(b)(2) / §73.182(k) / §73.190(c)']
+        ]
+      });
+    } else {
+      const pssa = psra.power?.pssa || {};
+      const psraPool = psra.power?.psra || {};
+      const ceiling = psra.power?.ceiling_w ?? 500;
+      const fmtW = (v) => Number.isFinite(v) ? `${Number(v).toFixed(v >= 100 ? 0 : 1)} W` : '—';
+      const bindLabel = (b) => b
+        ? `${b.call || b.facility_id || 'unknown'} (${b.relation || 'co_channel'})`
+        : '— (ceiling-only)';
+
+      const gSummary = [
+        ['§73.99(b)(1) ceiling',     `${ceiling} W`],
+        ['PSSA reduced power',       fmtW(pssa.p_reduced_w) + (pssa.ceiling_applied ? '  (ceiling clipped)' : '')],
+        ['PSSA binding pair',        bindLabel(pssa.binding)],
+        ['PSSA pool available',      pssa.available === false ? 'NO — all pairs NaN' : 'yes'],
+        ['PSRA reduced power',       fmtW(psraPool.p_reduced_w) + (psraPool.ceiling_applied ? '  (ceiling clipped)' : '')],
+        ['PSRA binding pair',        bindLabel(psraPool.binding)],
+        ['PSRA pool available',      psraPool.available === false ? 'NO — all pairs NaN' : 'yes'],
+        ['Skywave engine',           psra.provenance?.skywave_engine || 'unconfigured'],
+        ['Sun authority',            psra.sun?.source || 'unavailable'],
+        ['Regulation',               psra.regulation || '47 CFR §73.99(b)(1) / §73.99(b)(2)']
+      ];
+      sections.push({
+        id:      'appendix-g',
+        type:    'kv',
+        heading: 'APPENDIX G — §73.99 PSRA/PSSA REDUCED POWER',
+        preface: 'Pre-sunrise / Post-sunset reduced-power exhibit per 47 CFR §73.99(b)(1)/(2).  ' +
+                 'PSSA uses 50% (SS-1) skywave; PSRA uses 10% (SS-2) per §73.190.  ' +
+                 'Per-pair allowed power P = P_daytime · (E_max_allowed / E_actual)² ' +
+                 'with E_max_allowed embedding the §73.182(k) RSS share.  ' +
+                 'The §73.99(b)(1) 500 W ceiling clips any binding pair that allows more.',
+        rows: gSummary
+      });
+
+      // Window schedule (per-month local-time sunrise/sunset bracket
+      // the PSRA/PSSA windows; FCC convention is 6 AM local for PSRA
+      // start and 6 PM local for PSSA end, both anchored to the
+      // resolved timezone).
+      const wins = psra.windows?.windows;
+      if (wins && (wins.psra || wins.pssa)){
+        sections.push({
+          id:      'appendix-g-windows',
+          type:    'kv',
+          heading: 'Appendix G-1 — §73.99 windows (local time)',
+          preface: 'PSRA = pre-sunrise authority window; PSSA = post-sunset authority window.  ' +
+                   'Hours per the FCC sunrise/sunset table for the resolved time zone.',
+          rows: [
+            ['PSRA start',    wins.psra?.start || '—'],
+            ['PSRA end',      wins.psra?.end   || '—'],
+            ['PSSA start',    wins.pssa?.start || '—'],
+            ['PSSA end',      wins.pssa?.end   || '—'],
+            ['Timezone',      psra.sun?.timezone_label || psra.sun?.timezone_code || '—']
+          ]
+        });
+      }
+
+      // Per-pair table — PSSA (50% SS-1)
+      const pssaPairs = Array.isArray(pssa.per_pair) ? pssa.per_pair : [];
+      if (pssaPairs.length){
+        const rows = pssaPairs.map((p) => ({
+          call:                p.call || '—',
+          facility_id:         p.facility_id || '—',
+          fcc_class:           p.fcc_class || '—',
+          relation:            p.relation || '—',
+          e_actual_uv_m:       Number.isFinite(p.e_actual_uv_m)      ? Number(p.e_actual_uv_m).toFixed(2)      : '—',
+          e_max_allowed_uv_m:  Number.isFinite(p.e_max_allowed_uv_m) ? Number(p.e_max_allowed_uv_m).toFixed(2) : '—',
+          scale_factor:        Number.isFinite(p.scale_factor) ? Number(p.scale_factor).toFixed(4) : '—',
+          p_allowed_w:         Number.isFinite(p.p_allowed_w) ? Number(p.p_allowed_w).toFixed(p.p_allowed_w >= 100 ? 0 : 1) : '—'
+        }));
+        sections.push({
+          id:      'appendix-g-pssa-pairs',
+          type:    'table',
+          heading: 'Appendix G-2 — PSSA (50% SS-1) per-pair allowed power',
+          preface: 'P_allowed per protected pair at the §73.99(b)(1) closed-form scaling.  ' +
+                   'Smallest p_allowed_w is the binding pair; result is clipped to the 500 W ceiling.',
+          table: {
+            columns: [
+              { key: 'call',               label: 'Call',         width: 0.10 },
+              { key: 'facility_id',        label: 'Facility',     width: 0.10, align: 'right' },
+              { key: 'fcc_class',          label: 'Class',        width: 0.07 },
+              { key: 'relation',           label: 'Relation',     width: 0.13 },
+              { key: 'e_actual_uv_m',      label: 'E_actual (µV/m)',  width: 0.13, align: 'right' },
+              { key: 'e_max_allowed_uv_m', label: 'E_max (µV/m)',     width: 0.13, align: 'right' },
+              { key: 'scale_factor',       label: '(E_max/E_act)²',   width: 0.14, align: 'right' },
+              { key: 'p_allowed_w',        label: 'P_allowed (W)',    width: 0.13, align: 'right' }
+            ],
+            rows
+          }
+        });
+      }
+
+      // Per-pair table — PSRA (10% SS-2)
+      const psraPairs = Array.isArray(psraPool.per_pair) ? psraPool.per_pair : [];
+      if (psraPairs.length){
+        const rows = psraPairs.map((p) => ({
+          call:                p.call || '—',
+          facility_id:         p.facility_id || '—',
+          fcc_class:           p.fcc_class || '—',
+          relation:            p.relation || '—',
+          e_actual_uv_m:       Number.isFinite(p.e_actual_uv_m)      ? Number(p.e_actual_uv_m).toFixed(2)      : '—',
+          e_max_allowed_uv_m:  Number.isFinite(p.e_max_allowed_uv_m) ? Number(p.e_max_allowed_uv_m).toFixed(2) : '—',
+          scale_factor:        Number.isFinite(p.scale_factor) ? Number(p.scale_factor).toFixed(4) : '—',
+          p_allowed_w:         Number.isFinite(p.p_allowed_w) ? Number(p.p_allowed_w).toFixed(p.p_allowed_w >= 100 ? 0 : 1) : '—'
+        }));
+        sections.push({
+          id:      'appendix-g-psra-pairs',
+          type:    'table',
+          heading: 'Appendix G-3 — PSRA (10% SS-2) per-pair allowed power',
+          preface: 'PSRA evaluation uses the 10% (SS-2) skywave field per §73.99(b)(2).  ' +
+                   'Same closed-form scaling and 500 W ceiling as PSSA.',
+          table: {
+            columns: [
+              { key: 'call',               label: 'Call',         width: 0.10 },
+              { key: 'facility_id',        label: 'Facility',     width: 0.10, align: 'right' },
+              { key: 'fcc_class',          label: 'Class',        width: 0.07 },
+              { key: 'relation',           label: 'Relation',     width: 0.13 },
+              { key: 'e_actual_uv_m',      label: 'E_actual (µV/m)',  width: 0.13, align: 'right' },
+              { key: 'e_max_allowed_uv_m', label: 'E_max (µV/m)',     width: 0.13, align: 'right' },
+              { key: 'scale_factor',       label: '(E_max/E_act)²',   width: 0.14, align: 'right' },
+              { key: 'p_allowed_w',        label: 'P_allowed (W)',    width: 0.13, align: 'right' }
+            ],
+            rows
+          }
+        });
+      }
+    }
+  }
+
   return sections;
 }
