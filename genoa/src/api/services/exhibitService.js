@@ -2114,18 +2114,19 @@ export async function computeExhibit(req){
   //            trivially passes.  Recorded with fallback_tier=3.
   if (crossCheckRun){
     exhibit.validation.fcc_cross_check = {
-      source:        crossCheckRun.source,
-      endpoint:      crossCheckRun.endpoint,
-      upstream_api:  crossCheckRun.upstream_api,
-      method:        crossCheckRun.method,
-      tolerance_km:  crossCheckRun.tolerance_km,
-      ran_at:        crossCheckRun.ran_at,
-      n_run:         crossCheckRun.n_run,
-      n_pass:        crossCheckRun.n_pass,
-      max_error_km:  crossCheckRun.max_error_km,
-      result:        crossCheckRun.authoritative_pass ? 'pass'
-                       : (crossCheckRun.reference_cases_present ? 'fail' : 'skipped'),
-      fallback_tier: 1
+      source:               crossCheckRun.source,
+      endpoint:             crossCheckRun.endpoint,
+      upstream_api:         crossCheckRun.upstream_api,
+      method:               crossCheckRun.method,
+      tolerance_km:         crossCheckRun.tolerance_km,
+      ran_at:                crossCheckRun.ran_at,
+      n_run:                 crossCheckRun.n_run,
+      n_pass:                crossCheckRun.n_pass,
+      n_terrain_deviation:   crossCheckRun.n_terrain_deviation || 0,
+      max_error_km:          crossCheckRun.max_error_km,
+      result:               crossCheckRun.authoritative_pass ? 'pass'
+                              : (crossCheckRun.reference_cases_present ? 'fail' : 'skipped'),
+      fallback_tier:        1
     };
   } else {
     // Tier-3 deterministic: engine IS the vendored FCC implementation.

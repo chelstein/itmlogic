@@ -89,12 +89,32 @@ export function buildValidationVerdictSection(exhibit){
     const isFallback = tier > 1;
     const passed = xc.result === 'pass' || xc.pass === true;
     const skipped = xc.result === 'skipped';
+    // Build the detail string.  When the FCC's authoritative contour
+    // ran terrain-aware ITM (over NED elevation) and Genoa's engine is
+    // free-space §73.333, the public-API contour will legitimately
+    // diverge at high-HAAT / mountainous sites.  The validator now
+    // classifies such divergences as `terrain_deviation` (informational)
+    // rather than `fail`.  Surface that here so reviewers see the
+    // physically-correct framing instead of "0/1 fail".
+    const tdev = Number(xc.n_terrain_deviation) || 0;
+    let detail = xc.detail || xc.message;
+    if (!detail){
+      if (xc.n_pass != null && xc.n_run != null){
+        if (tdev > 0){
+          detail = `${xc.n_pass} of ${xc.n_run} contour feature(s) match within ${xc.tolerance_km ?? 5} km; ${tdev} classified as terrain-aware deviation (FCC contour runs ITM over NED elevation, engine is free-space §73.333 — expected delta for high-HAAT / mountainous sites, not a math failure).`;
+        } else {
+          detail = `${xc.n_pass} of ${xc.n_run} contour feature(s) match within ${xc.tolerance_km ?? 5} km tolerance.`;
+        }
+      } else {
+        detail = '—';
+      }
+    }
     components.push({
       name:   `FCC contour cross-check (ZTR _fcc_contour vs engine)${isFallback ? ` — tier ${tier} fallback` : ''}`,
       status: isFallback
                 ? (passed ? 'FALLBACK' : skipped ? 'FALLBACK' : 'FAIL')
                 : (passed ? 'PASS'     : skipped ? 'SKIP'     : 'FAIL'),
-      detail: xc.detail || xc.message || (xc.n_pass != null ? `${xc.n_pass}/${xc.n_run} radials within tolerance` : '—')
+      detail
     });
   } else {
     // Absent record = data-loss / orchestrator bug, not a deterministic
