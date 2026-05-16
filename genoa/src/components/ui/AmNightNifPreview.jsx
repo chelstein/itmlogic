@@ -114,15 +114,42 @@ export default function AmNightNifPreview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, debounceMs]);
 
+  // Identify which skywave engine the orchestrator picked (FCCAM
+  // Wang vs Berry analytical screening).  When evidence carries
+  // engine: 'berry-1968-screening' or source: 'berry-1968-screening',
+  // surface a SCREENING badge so the engineer doesn't mistake the
+  // preview for filing-grade output.
+  const engineId = state.study?.source
+                || state.study?.proposed?.source
+                || (state.study?.engine === 'berry-1968-screening' ? 'berry-1968-screening' : null);
+  const isBerry = engineId === 'berry-1968-screening';
+  const footerText = isBerry
+    ? 'Preview only — exhibit re-compute is what files.  Numbers come from Berry analytical model (§73.190(c)) — SCREENING-grade.  Re-run with FCCAM Wang before filing.'
+    : 'Preview only — exhibit re-compute is what files.  Numbers come from FCCAM (Wang 1985 skywave model, §73.190(c)).';
+
   return (
     <div className="rounded-md border border-rule p-3 space-y-2 font-mono text-[12px]">
       <div className="text-textDim text-[10px] tracking-rack uppercase flex items-center gap-2">
         <span>AM nighttime allocation (§73.182) — live preview</span>
         {state.loading && <span className="text-gold">computing…</span>}
+        {!state.loading && state.study?.available && isBerry && (
+          <span
+            title="Berry analytical formula (§73.190(c)) — under-estimates field strength relative to FCCAM Wang.  SCREENING-grade only.  Re-run with FCCAM before filing."
+            className="ml-auto text-[10px] tracking-rack uppercase border border-amber-400 text-amber-400 rounded px-1.5 py-0.5">
+            Berry · screening
+          </span>
+        )}
+        {!state.loading && state.study?.available && !isBerry && engineId && (
+          <span
+            title="FCCAM Wang 1985 skywave model — filing-grade per §73.190(c)."
+            className="ml-auto text-[10px] tracking-rack uppercase border border-emerald-400 text-emerald-400 rounded px-1.5 py-0.5">
+            FCCAM · filing-grade
+          </span>
+        )}
       </div>
       <NifBody state={state} />
-      <div className="text-[10px] text-textDim">
-        Preview only — exhibit re-compute is what files.  Numbers come from FCCAM (Wang 1985 skywave model, §73.190(c)).
+      <div className={`text-[10px] ${isBerry ? 'text-amber-400' : 'text-textDim'}`}>
+        {footerText}
       </div>
     </div>
   );
