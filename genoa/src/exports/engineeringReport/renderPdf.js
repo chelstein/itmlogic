@@ -318,6 +318,9 @@ function renderSectionInFlow(pdf, s, meta){
     case 'scatter-chart':
       renderScatterChart(pdf, s);
       break;
+    case 'polygon-overlay':
+      renderPolygonOverlay(pdf, s);
+      break;
     default:
       if (Array.isArray(s.rows)) renderKv(pdf, s.rows);
       else if (Array.isArray(s.paragraphs)) renderParagraphs(pdf, s.paragraphs);
@@ -784,6 +787,179 @@ function renderScatterChart(pdf, s){
 
   pdf.y = y0 + plotH + (s.x_label ? 32 : 14);
   renderChartCaption(pdf, s, pdf.y);
+}
+
+// Polygon overlay — multiple lat/lon rings + tx marker + scale bar +
+// north arrow.  Used for §73.314 terrain-aware coverage where we
+// have both the §73.333 free-space contour ring AND the ITM terrain-
+// adjusted ring and want to show how terrain warped the coverage.
+//
+// Section shape:
+//   s.tx = { lat, lon }
+//   s.polygons = [
+//     { ring_latlng: [[lat, lon], ...], label, stroke, fill, fill_opacity, dashed }
+//   ]
+// Equirectangular projection centered on tx (good for <500 km exhibits;
+// preserves direction-from-tx which is what matters for an FCC
+// coverage map).  North is up; scale bar bottom-right; legend top-right.
+function renderPolygonOverlay(pdf, s){
+  renderChartHeader(pdf, s);
+  const polys = Array.isArray(s.polygons) ? s.polygons.filter(p => Array.isArray(p?.ring_latlng) && p.ring_latlng.length >= 4) : [];
+  const tx    = s.tx;
+  if (polys.length === 0 || !tx || !Number.isFinite(Number(tx.lat)) || !Number.isFinite(Number(tx.lon))){
+    pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor(TEXT_DIM)
+       .text('(no polygons to render — tx coords or rings missing)', { align: 'left' });
+    return;
+  }
+  const txLat = Number(tx.lat), txLon = Number(tx.lon);
+
+  // Equirectangular: x = (lon - txLon) * cos(txLat) * km_per_deg_lon
+  //                  y = (lat - txLat) * km_per_deg_lat
+  const KM_PER_DEG_LAT = 111.32;
+  const cosLat = Math.cos(txLat * Math.PI / 180);
+  const KM_PER_DEG_LON = KM_PER_DEG_LAT * cosLat;
+  const toKm = ([lat, lon]) => [
+    (Number(lon) - txLon) * KM_PER_DEG_LON,
+    (Number(lat) - txLat) * KM_PER_DEG_LAT
+  ];
+
+  // Find the bounding box in km space.
+  let xMin = 0, xMax = 0, yMin = 0, yMax = 0;
+  for (const p of polys){
+    for (const v of p.ring_latlng){
+      const [x, y] = toKm(v);
+      if (Number.isFinite(x)){ if (x < xMin) xMin = x; if (x > xMax) xMax = x; }
+      if (Number.isFinite(y)){ if (y < yMin) yMin = y; if (y > yMax) yMax = y; }
+    }
+  }
+  // Add 10% padding + force square.
+  const rangeX = Math.max(1, xMax - xMin);
+  const rangeY = Math.max(1, yMax - yMin);
+  const half   = Math.max(rangeX, rangeY) * 0.55;  // includes padding
+  const cxKm = (xMin + xMax) / 2;
+  const cyKm = (yMin + yMax) / 2;
+  xMin = cxKm - half; xMax = cxKm + half;
+  yMin = cyKm - half; yMax = cyKm + half;
+
+  // Plot bounds in PDF space.
+  const w = pdf.page.width - 2 * MARGIN;
+  const captionH = s.caption ? 56 : 12;
+  const availH = pdf.page.height - pdf.y - MARGIN - FOOTER_AREA - captionH;
+  const plotSize = Math.min(w, Math.max(280, availH - 8));
+  const x0 = MARGIN + (w - plotSize) / 2;
+  const y0 = pdf.y + 4;
+  const xScale = plotSize / (xMax - xMin);
+  // y is FLIPPED in PDF space (y grows downward), so y up = larger lat
+  const project = ([lat, lon]) => {
+    const [xk, yk] = toKm([lat, lon]);
+    return [
+      x0 + (xk - xMin) * xScale,
+      y0 + plotSize - (yk - yMin) * xScale
+    ];
+  };
+  const txPt = project([txLat, txLon]);
+
+  pdf.save();
+  // Plot frame.
+  pdf.strokeColor('#888').lineWidth(0.4);
+  pdf.rect(x0, y0, plotSize, plotSize).stroke();
+  // Bounding-box ticks (km).
+  pdf.font(MONO_FONT).fontSize(7).fillColor(TEXT_DIM);
+  for (let i = 1; i < 4; i++){
+    const x = x0 + plotSize * (i / 4);
+    const y = y0 + plotSize * (i / 4);
+    pdf.strokeColor('#bbb').lineWidth(0.2);
+    pdf.moveTo(x, y0).lineTo(x, y0 + plotSize).stroke();
+    pdf.moveTo(x0, y).lineTo(x0 + plotSize, y).stroke();
+  }
+  // Crosshair at tx.
+  pdf.strokeColor('#666').lineWidth(0.3).dash(2, { space: 2 });
+  pdf.moveTo(txPt[0], y0).lineTo(txPt[0], y0 + plotSize).stroke();
+  pdf.moveTo(x0, txPt[1]).lineTo(x0 + plotSize, txPt[1]).stroke();
+  pdf.undash();
+
+  // Polygons (back-to-front so first listed renders bottom-most).
+  for (const p of polys){
+    const path = p.ring_latlng.map(project);
+    if (path.length < 3) continue;
+    pdf.save();
+    if (p.fill){
+      pdf.fillColor(p.fill).opacity(Number.isFinite(p.fill_opacity) ? p.fill_opacity : 0.12);
+      pdf.moveTo(path[0][0], path[0][1]);
+      for (let i = 1; i < path.length; i++) pdf.lineTo(path[i][0], path[i][1]);
+      pdf.closePath().fill();
+      pdf.opacity(1);
+    }
+    pdf.strokeColor(p.stroke || AMBER).lineWidth(p.line_width || 1.0);
+    if (p.dashed) pdf.dash(3, { space: 2 });
+    pdf.moveTo(path[0][0], path[0][1]);
+    for (let i = 1; i < path.length; i++) pdf.lineTo(path[i][0], path[i][1]);
+    pdf.closePath().stroke();
+    pdf.undash();
+    pdf.restore();
+  }
+
+  // Tx marker.
+  pdf.fillColor(TEAL_DARK).circle(txPt[0], txPt[1], 2.4).fill();
+  pdf.fillColor('white').strokeColor(TEAL_DARK).lineWidth(0.4)
+     .circle(txPt[0], txPt[1], 1.0).fillAndStroke();
+
+  // North arrow (top-left of plot).
+  const naX = x0 + 14;
+  const naY = y0 + 14;
+  pdf.strokeColor(TEAL_DARK).lineWidth(0.8).fillColor(TEAL_DARK);
+  pdf.moveTo(naX, naY + 12).lineTo(naX, naY - 6).stroke();
+  pdf.moveTo(naX - 4, naY - 2).lineTo(naX, naY - 6).lineTo(naX + 4, naY - 2).closePath().fill();
+  pdf.font(BOLD_FONT).fontSize(8).text('N', naX - 3, naY + 14, { lineBreak: false });
+
+  // Scale bar (bottom-right).  Choose a "round" km value ~25% of plot width.
+  const targetKm = (xMax - xMin) * 0.25;
+  const roundKm = roundScaleStep(targetKm);
+  const barLenPdf = roundKm * xScale;
+  const sbX = x0 + plotSize - 14 - barLenPdf;
+  const sbY = y0 + plotSize - 14;
+  pdf.strokeColor(TEAL_DARK).lineWidth(1.0);
+  pdf.moveTo(sbX, sbY).lineTo(sbX + barLenPdf, sbY).stroke();
+  pdf.moveTo(sbX, sbY - 3).lineTo(sbX, sbY + 3).stroke();
+  pdf.moveTo(sbX + barLenPdf, sbY - 3).lineTo(sbX + barLenPdf, sbY + 3).stroke();
+  pdf.font(MONO_FONT).fontSize(7).fillColor(TEXT_DIM)
+     .text(`${roundKm} km`, sbX, sbY + 4, { width: barLenPdf, align: 'center', lineBreak: false });
+
+  // Legend (top-right).
+  const legendW = 130;
+  const legX = x0 + plotSize - legendW - 10;
+  const legY = y0 + 10;
+  pdf.fillColor('white').opacity(0.85)
+     .rect(legX - 4, legY - 4, legendW, 12 + polys.length * 12).fill();
+  pdf.opacity(1);
+  pdf.font(BODY_FONT).fontSize(7.5).fillColor(TEAL_DARK);
+  let ly = legY;
+  for (const p of polys){
+    pdf.strokeColor(p.stroke || AMBER).lineWidth(1.2);
+    if (p.dashed) pdf.dash(3, { space: 2 });
+    pdf.moveTo(legX, ly + 3).lineTo(legX + 16, ly + 3).stroke();
+    pdf.undash();
+    pdf.fillColor(TEAL_DARK).text(p.label || '—', legX + 20, ly, { width: legendW - 22, lineBreak: false });
+    ly += 12;
+  }
+  pdf.restore();
+  pdf.fillColor('black').strokeColor('black');
+
+  pdf.y = y0 + plotSize + 6;
+  renderChartCaption(pdf, s, pdf.y);
+}
+
+// Choose a "round" scale-bar step (1, 2, 5, 10, 20, 50, …).
+function roundScaleStep(km){
+  if (!Number.isFinite(km) || km <= 0) return 10;
+  const pow = Math.pow(10, Math.floor(Math.log10(km)));
+  const n = km / pow;
+  let mult;
+  if (n < 1.5) mult = 1;
+  else if (n < 3) mult = 2;
+  else if (n < 7) mult = 5;
+  else mult = 10;
+  return mult * pow;
 }
 
 function formatCell(v){

@@ -2,8 +2,10 @@
 // Surfaces engineering data already computed in evidence:
 //   - AM-night NIF contour          → polar plot of NIF radius vs azimuth
 //   - FORTRAN reference-engine parity → scatter plot of Δkm vs azimuth
+//   - Directional-antenna pattern     → polar polygon of f(az)
+//   - §73.314 terrain-aware coverage  → polygon overlay (ITM vs §73.333)
 //
-// Both render only when the upstream computation actually ran AND
+// All render only when their upstream computation actually ran AND
 // produced enough points to plot.  Otherwise the builder returns
 // null and the section is skipped.
 
@@ -52,7 +54,6 @@ export function buildNifPolarChartSection(exhibit){
 // where f is the relative field (0..1).  The chart shows the radiation
 // pattern shape that the §73.150 / §73.316 protection studies actually
 // used; matches what the H&D DA-pattern exhibit page looks like.
-
 export function buildDaPatternChartSection(exhibit){
   const pattern = exhibit?.station_inputs?.pattern;
   if (!Array.isArray(pattern) || pattern.length < 12) return null;
@@ -82,9 +83,101 @@ export function buildDaPatternChartSection(exhibit){
     heading:   'Antenna pattern — horizontal radiation polygon',
     data,
     r_unit:    'f',
-    r_max:     1.0,                  // pattern is normalized; max field = 1
+    r_max:     1.0,
     caption:   captionBits
   };
+}
+
+// §73.314 terrain-aware coverage overlay — renders the ITM (terrain)
+// coverage ring AND the §73.333 free-space ring on the same plot so
+// a reviewer can SEE where terrain warped the predicted coverage.
+//
+// Source data:
+//   - exhibit.itm_polygons[0].ring_latlng (closed ring, lat/lon pairs)
+//   - exhibit.evidence.itm_coverage.radials[].fcc_distance_km
+//     used to synthesize the §73.333 free-space ring
+// Skipped if ITM didn't run or there are <12 radials in the ring.
+export function buildItmCoverageOverlaySection(exhibit){
+  const itm = (exhibit?.itm_polygons || [])[0];
+  if (!itm?.closed || !Array.isArray(itm.ring_latlng) || itm.ring_latlng.length < 12) return null;
+
+  const tx_lat = Number(exhibit?.station_inputs?.lat);
+  const tx_lon = Number(exhibit?.station_inputs?.lon);
+  if (!Number.isFinite(tx_lat) || !Number.isFinite(tx_lon)) return null;
+
+  // Build the §73.333 free-space ring by projecting fcc_distance_km
+  // along each ITM radial's azimuth.  Same projection convention as
+  // engine/index.js#projectVertex (great-circle, NAD83/WGS84 sphere).
+  const radials = exhibit?.evidence?.itm_coverage?.radials || [];
+  const fccRing = [];
+  for (const r of radials){
+    const d  = Number(r?.fcc_distance_km);
+    const az = Number(r?.az ?? r?.azimuth_deg);
+    if (!Number.isFinite(d) || d <= 0 || !Number.isFinite(az)) continue;
+    fccRing.push(projectVertex(tx_lat, tx_lon, az, d));
+  }
+  if (fccRing.length >= 4){
+    const [first] = fccRing;
+    fccRing.push([first[0], first[1]]);
+  }
+
+  const polygons = [];
+  if (fccRing.length >= 4){
+    polygons.push({
+      ring_latlng: fccRing,
+      label:       '§73.333 free-space contour',
+      stroke:      '#1c2e3a',
+      fill:        '#1c2e3a',
+      fill_opacity: 0.06,
+      line_width:  0.8,
+      dashed:      true
+    });
+  }
+  polygons.push({
+    ring_latlng: itm.ring_latlng,
+    label:       'Terrain-aware (ITM)',
+    stroke:      '#c4745a',
+    fill:        '#f3c86d',
+    fill_opacity: 0.18,
+    line_width:  1.3
+  });
+
+  const delta = itm.delta_mean_km;
+  const captionBits = [
+    'Terrain-aware coverage (§73.314 supplementary) overlaid on the §73.333 free-space contour.',
+    'Solid amber = ITM-modeled service area (Bullington smooth-earth + ITU-R P.526 single-knife-edge diffraction over DEM elevations, or full Longley-Rice when the SPLAT sidecar runs).',
+    'Dashed teal = §73.333 free-space prediction (compliance reference).',
+    Number.isFinite(delta)
+      ? `Mean radial delta: ${delta >= 0 ? '+' : ''}${delta.toFixed(2)} km (terrain ${delta >= 0 ? 'extends' : 'falls short of'} free-space).`
+      : null,
+    itm.engine ? `Engine: ${itm.engine}${itm.tier ? ' (' + itm.tier + ')' : ''}.` : null,
+    itm.dem_source ? `DEM: ${itm.dem_source}.` : null
+  ].filter(Boolean).join('  ');
+
+  return {
+    id:        'itm-coverage-overlay',
+    type:      'polygon-overlay',
+    heading:   '§73.314 — terrain-aware coverage overlay',
+    tx:        { lat: tx_lat, lon: tx_lon },
+    polygons,
+    caption:   captionBits
+  };
+}
+
+// Great-circle vertex projection — same math as engine/index.js
+// uses for ring closure.  az: 0° = N, clockwise; d in km.
+function projectVertex(lat0, lon0, az_deg, d_km){
+  const R = 6371.0088;
+  const az = az_deg * Math.PI / 180;
+  const dr = d_km / R;
+  const lat1 = lat0 * Math.PI / 180;
+  const lon1 = lon0 * Math.PI / 180;
+  const sinLat2 = Math.sin(lat1) * Math.cos(dr) + Math.cos(lat1) * Math.sin(dr) * Math.cos(az);
+  const lat2 = Math.asin(sinLat2);
+  const y = Math.sin(az) * Math.sin(dr) * Math.cos(lat1);
+  const x = Math.cos(dr) - Math.sin(lat1) * sinLat2;
+  const lon2 = lon1 + Math.atan2(y, x);
+  return [lat2 * 180 / Math.PI, ((lon2 * 180 / Math.PI) + 540) % 360 - 180];
 }
 
 export function buildFortranParityChartSection(exhibit){
