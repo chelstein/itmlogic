@@ -21,6 +21,7 @@ import { buildEngineeringInterpretationSection }  from './sections/engineeringIn
 import { buildMeasurementsSection }                from './sections/measurements.js';
 import { buildRegulatoryContextSection }           from './sections/regulatoryContext.js';
 import { buildItmCoverageSection }                 from './sections/itmCoverage.js';
+import { buildMapPackageSection }                  from './sections/mapPackage.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -45,6 +46,18 @@ export function buildEngineeringReport(exhibit, options){
   push(buildEngineeringInterpretationSection(exhibit, opt));
   push(buildMeasurementsSection(exhibit, opt));
   push(buildContourResultsSection(exhibit, opt));
+  // Printable contour map — embedded PNG composed by the map sidecar
+  // (genoa/src/sidecars/map/, headless Chromium + Leaflet).  The HTTP
+  // entry points (api/routes/exhibits.js for stateless PDF,
+  // api/services/jobRunner.js for async-job PDF) fetch the render
+  // BEFORE calling buildEngineeringReport and pass it through
+  // options.contour_map_png.  When no render is attached
+  // (sidecar unconfigured / unreachable / timed out) the section
+  // emits a deferred-to-engineer placeholder rather than silently
+  // dropping — so the operator knows the page is missing AND why.
+  // This sits right after the §73.333 contour-results table so the
+  // map appears next to the numerical contours it visualizes.
+  push(buildMapPackageSection(exhibit, opt));
   // Terrain-aware ITM coverage (47 CFR §73.314) — conditional, only
   // present when exhibit.itm_polygons[0] is a closed ring (the engine
   // ran ITM under options.use_itm=true).  Sits AFTER the §73.333
