@@ -93,16 +93,7 @@ export function makeBerrySkywaveClient({
         percent_time, mode: 'distance_to_field', field_uv_m
       });
       if (!norm.ok) return { available: false, error: norm.error };
-      // Bisection — closed-form inverse exists but bisection is
-      // robust and fast (24 iterations to ≤ 0.5 km).
-      let lo = 1, hi = 8000, mid = 0;
-      for (let i = 0; i < 24; i++){
-        mid = (lo + hi) / 2;
-        const f = berryFieldUvm({ ...norm.body, distance_km: mid });
-        if (f > field_uv_m) lo = mid; else hi = mid;
-        if (hi - lo < 0.5) break;
-      }
-      const distOut = Number(mid.toFixed(2));
+      const distOut = bisectDistanceForField(norm.body);
       return wrap({ ...norm.body, distance_km: distOut }, { distance_km: distOut });
     },
 
@@ -123,6 +114,22 @@ export function makeBerrySkywaveClient({
         if (!norm.ok){
           return { ok: false, engine: BERRY_ENGINE_ID,
                    flag: 'INVALID_INPUT', error: norm.error };
+        }
+        // Mode-aware compute (Codex P2 on #174).  fccamClient routes
+        // distance_to_field through its inverse-solve on the FCC
+        // FORTRAN binary; mirror that contract here so a batch
+        // request mixing forward/inverse doesn't silently corrupt
+        // the inverse rows.
+        if (norm.body.mode === 'distance_to_field'){
+          const distOut = bisectDistanceForField(norm.body);
+          return {
+            ok:           true,
+            engine:       BERRY_ENGINE_ID,
+            distance_km:  distOut,
+            flag:         null,
+            input_sha256: hashInputs({ ...norm.body, distance_km: distOut }),
+            inputs:       { ...norm.body, distance_km: distOut }
+          };
         }
         const field = berryFieldUvm(norm.body);
         return {
@@ -172,6 +179,25 @@ export function berryFieldUvm({ erp_kw, freq_khz, distance_km, midpoint_lat, per
   return Number(E_uvm.toFixed(4));
 }
 
+/**
+ * Bisect on distance to find where berryFieldUvm equals
+ * body.field_uv_m.  Caller MUST have validated body.field_uv_m is
+ * finite + > 0 already (normalize() does this for distance_to_field
+ * mode).  Returns the distance in km, rounded to 0.01 km.  Used by
+ * both distanceToField() and runBatch() so the inverse-solve is
+ * computed identically in both call paths.
+ */
+function bisectDistanceForField(body){
+  let lo = 1, hi = 8000, mid = 0;
+  for (let i = 0; i < 24; i++){
+    mid = (lo + hi) / 2;
+    const f = berryFieldUvm({ ...body, distance_km: mid });
+    if (f > body.field_uv_m) lo = mid; else hi = mid;
+    if (hi - lo < 0.5) break;
+  }
+  return Number(mid.toFixed(2));
+}
+
 function normalize(input){
   const body = {
     erp_kw:       Number(input.erp_kw),
@@ -184,6 +210,16 @@ function normalize(input){
   if (input.field_uv_m !== undefined) body.field_uv_m = Number(input.field_uv_m);
   if (![body.erp_kw, body.freq_khz, body.distance_km, body.midpoint_lat].every(Number.isFinite)){
     return { ok: false, error: 'erp_kw / freq_khz / distance_km / midpoint_lat must all be finite numbers' };
+  }
+  // Mode-specific validation (Codex P1 on #174).  fccamClient enforces
+  // this at the body-construction layer; mirror it here so a
+  // distance_to_field call without a positive target field surfaces
+  // as an explicit error instead of silently bisecting against
+  // undefined and returning a fabricated distance.
+  if (body.mode === 'distance_to_field'){
+    if (!Number.isFinite(body.field_uv_m) || body.field_uv_m <= 0){
+      return { ok: false, error: 'field_uv_m (>0) is required when mode=distance_to_field' };
+    }
   }
   if (![10, 50].includes(body.percent_time)){
     return { ok: false, error: 'percent_time must be 10 or 50' };
