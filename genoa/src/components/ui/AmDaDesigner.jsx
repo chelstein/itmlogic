@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import PolarPattern from './PolarPattern.jsx';
 import AmNightNifPreview   from './AmNightNifPreview.jsx';
 import AmSunAuthorityPanel from './AmSunAuthorityPanel.jsx';
+import AmPsraPssaPanel     from './AmPsraPssaPanel.jsx';
 import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
 // AM DA pattern designer.  Operator builds an array geometry (towers
@@ -324,6 +325,12 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
           table for AM facilities; for FM/FX falls back to the
           panel's own "not applicable" hint. */}
       <AmSunAuthorityPanel baseInputs={baseInputs} />
+
+      {/* §73.99(b)(1)/(2) reduced-power exhibit — POST /api/am/psra-pssa.
+          Threads the FCCAM (or Berry-screening) skywave engine, nearby
+          primaries, and the closed-form scaling to produce PSSA and
+          PSRA reduced powers with binding-pair attribution. */}
+      <AmPsraPssaPanel baseInputs={baseInputs} />
     </div>
   );
 }
