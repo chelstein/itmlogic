@@ -24,7 +24,8 @@ import { buildItmCoverageSection }                 from './sections/itmCoverage.
 import { buildMapPackageSection }                  from './sections/mapPackage.js';
 import {
   buildNifPolarChartSection,
-  buildFortranParityChartSection
+  buildFortranParityChartSection,
+  buildDaPatternChartSection
 }                                                  from './sections/vectorCharts.js';
 
 export function buildEngineeringReport(exhibit, options){
@@ -82,6 +83,7 @@ export function buildEngineeringReport(exhibit, options){
   // of it."  Both builders return null when their upstream data
   // isn't present, so the chart pages only appear on exhibits that
   // actually ran the relevant computation.
+  push(buildDaPatternChartSection(exhibit));       // AM/FM DA: filed pattern polygon
   push(buildFortranParityChartSection(exhibit));   // FM/LPFM/FX: FORTRAN parity scatter
   push(buildNifPolarChartSection(exhibit));        // AM: nighttime NIF polar contour
 

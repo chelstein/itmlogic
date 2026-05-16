@@ -46,6 +46,47 @@ export function buildNifPolarChartSection(exhibit){
   };
 }
 
+// Directional-antenna polar pattern — the V-Soft signature visual.
+// Plots the filed pattern_table as a closed polar polygon.  Data
+// already exists on exhibit.station_inputs.pattern as [[az, f], ...]
+// where f is the relative field (0..1).  The chart shows the radiation
+// pattern shape that the §73.150 / §73.316 protection studies actually
+// used; matches what the H&D DA-pattern exhibit page looks like.
+
+export function buildDaPatternChartSection(exhibit){
+  const pattern = exhibit?.station_inputs?.pattern;
+  if (!Array.isArray(pattern) || pattern.length < 12) return null;
+
+  const data = pattern
+    .map((row) => {
+      const az = Array.isArray(row) ? Number(row[0]) : Number(row?.az ?? row?.azimuth_deg);
+      const f  = Array.isArray(row) ? Number(row[1]) : Number(row?.f  ?? row?.relative_field);
+      return { azimuth_deg: az, value: f };
+    })
+    .filter((p) => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value) && p.value >= 0);
+  if (data.length < 12) return null;
+
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const erp = Number(exhibit?.station_inputs?.erp_kw);
+  const mode = svc === 'AM' ? '§73.150 ground-wave' : '§73.316 horizontal';
+  const captionBits = [
+    `Filed directional-antenna horizontal radiation pattern — relative field f(az) per ${mode}.`,
+    'Polygon shows the pattern shape that drove every contour distance, §73.207/§73.215 protection check, and (for AM) the §73.182 NIF + §73.99 reduced-power compute.',
+    Number.isFinite(erp) ? `Maximum ERP at f=1.0: ${erp.toFixed(2)} kW.` : null,
+    'f(az)² scales the ERP per radial; the polygon below is f, not f² (matches FCC filing convention).'
+  ].filter(Boolean).join('  ');
+
+  return {
+    id:        'da-pattern-chart',
+    type:      'polar-chart',
+    heading:   'Antenna pattern — horizontal radiation polygon',
+    data,
+    r_unit:    'f',
+    r_max:     1.0,                  // pattern is normalized; max field = 1
+    caption:   captionBits
+  };
+}
+
 export function buildFortranParityChartSection(exhibit){
   const ev = exhibit?.evidence?.fcc_curve_parity;
   if (!ev || !ev.available) return null;
