@@ -94,10 +94,19 @@ export function reducedPowerForOnePair({
  * @returns {object}
  */
 export function computePsraPssaPower(input){
-  const { proposed, protected_pairs = [] } = input || {};
+  const { proposed, protected_pairs: rawPairs } = input || {};
   if (!proposed || !Number.isFinite(Number(proposed.p_daytime_kw)) || Number(proposed.p_daytime_kw) <= 0){
     return { ok: false, error: 'proposed.p_daytime_kw must be a positive number (kW)' };
   }
+  // protected_pairs may arrive as null/undefined from JSON/db layers
+  // (Codex P2 on #181) — normalize to [] before iterating instead of
+  // throwing a TypeError.  Non-arrays (object/scalar) are rejected
+  // explicitly so misshapen inputs surface as a validation error,
+  // not silent zero-pairs.
+  if (rawPairs != null && !Array.isArray(rawPairs)){
+    return { ok: false, error: 'protected_pairs must be an array (or null/undefined)' };
+  }
+  const protected_pairs = Array.isArray(rawPairs) ? rawPairs : [];
 
   const pssaPairs = [];
   const psraPairs = [];
@@ -143,14 +152,39 @@ export function computePsraPssaPower(input){
 
   const windowFor = (pairs, percent_time) => {
     const valid = pairs.filter((p) => Number.isFinite(p.p_allowed_w));
+    // Two distinct "no valid pair" cases — distinguish so the
+    // appendix doesn't fail-open on malformed upstream data
+    // (Codex P1 on #181).
+    //
+    //   - Genuine zero pairs (pairs.length === 0) → there are no
+    //     protected stations in this pool; the §73.99(b)(1) ceiling
+    //     IS the right answer.  Surfaced as available with note.
+    //
+    //   - Pairs were supplied but every one produced NaN — upstream
+    //     skywave data is malformed (e_actual_uv_m ≤ 0, missing
+    //     fields, etc.).  This is NOT a permissive 500 W result;
+    //     surface as available:false so the appendix shows the
+    //     diagnostic instead of a falsely-permissive filing power.
+    if (valid.length === 0 && pairs.length > 0){
+      return {
+        available:       false,
+        p_reduced_w:     null,
+        binding:         null,
+        per_pair:        pairs,
+        percent_time,
+        ceiling_applied: false,
+        error:           `All ${pairs.length} protected pair(s) produced NaN power — upstream skywave fields are missing or non-positive.  §73.99(b)(1) ceiling NOT applied; reviewer must investigate.`
+      };
+    }
     if (valid.length === 0){
       return {
-        p_reduced_w:    POWER_CEILING_W,
-        binding:        null,
-        per_pair:       pairs,
+        available:       true,
+        p_reduced_w:     POWER_CEILING_W,
+        binding:         null,
+        per_pair:        pairs,
         percent_time,
         ceiling_applied: true,
-        note:           'No protected pairs evaluable — only the §73.99(b)(1) 500 W ceiling applies.'
+        note:            'No protected pairs evaluable — only the §73.99(b)(1) 500 W ceiling applies.'
       };
     }
     const sorted = valid.slice().sort((a, b) => a.p_allowed_w - b.p_allowed_w);
@@ -158,6 +192,7 @@ export function computePsraPssaPower(input){
     const p_from_pairs = binding.p_allowed_w;
     const p_reduced = Math.min(POWER_CEILING_W, p_from_pairs);
     return {
+      available:       true,
       p_reduced_w:     Number(p_reduced.toFixed(2)),
       binding,
       per_pair:        pairs,

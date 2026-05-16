@@ -148,6 +148,70 @@ test('computePsraPssaPower: regulation + ceiling stamped on response', () => {
   assert.ok(Array.isArray(r.notes) && r.notes.length >= 2);
 });
 
+/* ---------- Codex P2: null protected_pairs ---------- */
+
+test('computePsraPssaPower: protected_pairs=null does not throw — treats as empty', () => {
+  const r = computePsraPssaPower({ proposed: PROPOSED, protected_pairs: null });
+  assert.equal(r.ok, true);
+  assert.equal(r.pssa.p_reduced_w, 500);   // ceiling-only path
+  assert.equal(r.psra.p_reduced_w, 500);
+});
+
+test('computePsraPssaPower: protected_pairs=undefined treats as empty', () => {
+  const r = computePsraPssaPower({ proposed: PROPOSED });
+  assert.equal(r.ok, true);
+  assert.equal(r.pssa.p_reduced_w, 500);
+});
+
+test('computePsraPssaPower: protected_pairs as non-array rejected', () => {
+  for (const bad of [{ pssa: {} }, 'wat', 42]){
+    const r = computePsraPssaPower({ proposed: PROPOSED, protected_pairs: bad });
+    assert.equal(r.ok, false);
+    assert.match(r.error, /protected_pairs/);
+  }
+});
+
+/* ---------- Codex P1: all-NaN pool fails closed, not open ---------- */
+
+test('computePsraPssaPower: pool of all-NaN pairs → available:false (NOT 500 W fail-open)', () => {
+  // Bad upstream data: e_actual_uv_m === 0 → NaN p_allowed_w.
+  // If the engine fell open to 500 W, an engineer would file a
+  // filing-grade power that wasn't actually computed.  Surface
+  // as available:false instead.
+  const r = computePsraPssaPower({
+    proposed: PROPOSED,
+    protected_pairs: [
+      { call: 'WBAD', pssa: { e_actual_uv_m: 0,   e_max_allowed_uv_m: 10 } },
+      { call: 'WWAR', pssa: { e_actual_uv_m: NaN, e_max_allowed_uv_m: 10 } }
+    ]
+  });
+  assert.equal(r.ok, true);
+  assert.equal(r.pssa.available, false);
+  assert.equal(r.pssa.p_reduced_w, null);
+  assert.equal(r.pssa.ceiling_applied, false);
+  assert.match(r.pssa.error, /NaN/);
+});
+
+test('computePsraPssaPower: mixed valid + NaN pool still computes from the valid ones', () => {
+  const r = computePsraPssaPower({
+    proposed: PROPOSED,
+    protected_pairs: [
+      { call: 'WBAD',   pssa: { e_actual_uv_m: 0,   e_max_allowed_uv_m: 10 } },
+      { call: 'WGOOD',  pssa: { e_actual_uv_m: 100, e_max_allowed_uv_m: 10 } }
+    ]
+  });
+  assert.equal(r.pssa.available, true);
+  assert.equal(r.pssa.binding.call, 'WGOOD');
+  assert.equal(r.pssa.p_reduced_w, 50);   // (10/100)^2 · 5kW = 50 W
+});
+
+test('computePsraPssaPower: genuine zero protected pairs still uses ceiling (NOT the NaN-error path)', () => {
+  const r = computePsraPssaPower({ proposed: PROPOSED, protected_pairs: [] });
+  assert.equal(r.pssa.available, true);
+  assert.equal(r.pssa.p_reduced_w, 500);
+  assert.equal(r.pssa.ceiling_applied, true);
+});
+
 /* ---------- provenance ---------- */
 
 test('PSRA_PSSA_POWER_PROVENANCE names §73.99(b)(1)/(2) + 17 USC §105', () => {
