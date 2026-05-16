@@ -85,7 +85,18 @@ function opener({ proposed, summary }){
   if ((summary.n_no_service_azimuths || 0) === summary.n_azimuths && summary.n_azimuths){
     return `Under 47 CFR §73.182, the proposed ${cls} ${tag} cannot provide interference-free nighttime service at any azimuth — every one of the ${summary.n_azimuths} evaluated bearings is dominated by RSS-aggregated co- or adjacent-channel interference.  The facility as proposed does not qualify under §73.182 and would require either pattern redesign or class change before filing.`;
   }
-  return `Under 47 CFR §73.182, the proposed ${cls} ${tag} provides interference-free nighttime service over ${summary.n_azimuths - (summary.n_failing_azimuths || 0) - (summary.n_no_service_azimuths || 0)} of ${summary.n_azimuths || 0} evaluated azimuths.  ${summary.n_failing_azimuths || 0} azimuth(s) fail the §73.183 protection ratio for the binding relation; ${summary.n_no_service_azimuths || 0} azimuth(s) cannot provide service at any radius (RSS interference dominates everywhere).  Worst binding margin ${fmtMargin(summary.worst_margin_db)}.`;
+  // n_no_service_azimuths is a SUBSET of n_failing_azimuths in the
+  // orchestrator's accounting — no-service rows carry binding.pass=false
+  // by construction (see nifContour.js nifRadiusAtAzimuth).  Subtract
+  // only n_failing_azimuths to avoid the double-count Codex caught
+  // on #173.
+  const n_failing = summary.n_failing_azimuths || 0;
+  const n_no_serv = summary.n_no_service_azimuths || 0;
+  const n_served  = (summary.n_azimuths || 0) - n_failing;
+  const failBreakdown = n_no_serv > 0
+    ? `${n_failing} azimuth(s) fail the §73.183 protection ratio for the binding relation (of which ${n_no_serv} cannot provide service at any radius — RSS interference dominates everywhere)`
+    : `${n_failing} azimuth(s) fail the §73.183 protection ratio for the binding relation`;
+  return `Under 47 CFR §73.182, the proposed ${cls} ${tag} provides interference-free nighttime service over ${n_served} of ${summary.n_azimuths || 0} evaluated azimuths.  ${failBreakdown}.  Worst binding margin ${fmtMargin(summary.worst_margin_db)}.`;
 }
 
 function methodologyParagraph({ summary, interferers, nif }){

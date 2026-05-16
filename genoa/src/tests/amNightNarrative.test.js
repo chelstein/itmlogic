@@ -117,6 +117,45 @@ test('buildAmNightNarrative: passing exhibit emits 4 paragraphs (no failure roll
   assert.match(r.paragraphs[3], /FCCAM/);
 });
 
+/* ---------- no-double-count regression (Codex P1 on #173) ---------- */
+
+test('buildAmNightNarrative: opener does NOT double-subtract no-service from served count', () => {
+  // n_no_service_azimuths is a subset of n_failing_azimuths
+  // (no-service rows have binding.pass=false), so subtracting both
+  // undercounted served azimuths.  Pin the correct arithmetic:
+  // served = n_azimuths - n_failing.
+  //
+  // Scenario: 36 total, 5 failing (of which 2 are no-service) → 31 served.
+  const exhibit = mkExhibit({
+    ...FULL_NIF_PASS,
+    summary: {
+      ...FULL_NIF_PASS.summary,
+      n_failing_azimuths:    5,
+      n_no_service_azimuths: 2,
+      worst_margin_db:       -1.5
+    }
+  });
+  const r = buildAmNightNarrative(exhibit);
+  assert.equal(r.ok, true);
+  assert.match(r.paragraphs[0], /service over 31 of 36/);
+  // Roll-up sentence still mentions both counts so the engineer
+  // sees 5 failing AND 2 no-service explicitly.
+  assert.match(r.paragraphs[0], /5 azimuth\(s\) fail/);
+  assert.match(r.paragraphs[0], /of which 2 cannot provide service/);
+});
+
+test('buildAmNightNarrative: opener with zero no-service uses the simple breakdown', () => {
+  const exhibit = mkExhibit({
+    ...FULL_NIF_PASS,
+    summary: { ...FULL_NIF_PASS.summary, n_failing_azimuths: 3, n_no_service_azimuths: 0,
+               worst_margin_db: -1.0 }
+  });
+  const r = buildAmNightNarrative(exhibit);
+  assert.match(r.paragraphs[0], /service over 33 of 36/);
+  assert.match(r.paragraphs[0], /3 azimuth\(s\) fail/);
+  assert.doesNotMatch(r.paragraphs[0], /of which/);
+});
+
 /* ---------- failing exhibit ---------- */
 
 test('buildAmNightNarrative: failing exhibit names the failing-azimuth count + worst margin', () => {
