@@ -800,7 +800,20 @@ export async function computeExhibit(req){
     const SPLAT_DEFAULT_STEP_DEG      = Number(process.env.SPLAT_RADIAL_STEP_DEG) || 10;
     const SPLAT_DEFAULT_MAX_KM        = Number(process.env.SPLAT_MAX_DISTANCE_KM) || 100;
     const SPLAT_DEFAULT_BUDGET_MIN_MS = Number(process.env.SPLAT_BUDGET_MIN_MS)   || 30_000;
-    const step = Number(inputs.radial_step_deg) || SPLAT_DEFAULT_STEP_DEG;
+    // Clamp the radial step to a sane positive integer band before
+    // building the azimuth list.  Without this, a misconfigured
+    // SPLAT_RADIAL_STEP_DEG=-5 (or per-request override) makes the
+    // for (az < 360; az += step) loop never terminate, hanging the
+    // exhibit request and tying up worker CPU indefinitely.  Bounds:
+    // 0.5° (720 radials, the practical SPLAT-output ceiling) up to
+    // 90° (4 radials, the coarsest screening pass).  Out-of-range
+    // values are coerced to the default rather than failing the
+    // request — a screening run with degraded fidelity beats a
+    // hung worker.
+    const _stepRequested = Number(inputs.radial_step_deg) || SPLAT_DEFAULT_STEP_DEG;
+    const step = Number.isFinite(_stepRequested) && _stepRequested >= 0.5 && _stepRequested <= 90
+                   ? _stepRequested
+                   : SPLAT_DEFAULT_STEP_DEG;
     const radials = [];
     for (let az = 0; az < 360; az += step) radials.push(az);
     const target = service73215Threshold(inputs.fcc_class) || 60;
