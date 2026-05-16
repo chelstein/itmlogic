@@ -6,6 +6,7 @@ import { asyncHandler } from '../middleware/errors.js';
 import { exportJson, JSON_CONTENT_TYPE }       from '../../exports/json/exporter.js';
 import { exportTxt,  TXT_CONTENT_TYPE  }       from '../../exports/txt/exporter.js';
 import { exportGeoJson, GEOJSON_CONTENT_TYPE } from '../../exports/geojson/exporter.js';
+import { serializeAmNightNifGeoJson } from '../../exports/geojson/amNightNif.js';
 import { exportPdf,  PDF_CONTENT_TYPE  }       from '../../exports/pdf/exporter.js';
 
 import { buildEngineeringReport }           from '../../exports/engineeringReport/index.js';
@@ -139,6 +140,21 @@ r.get('/exhibits/:id/export/geojson', asyncHandler(async (req, res) => {
   res.set('X-Genoa-Exports-Generated-At', exhibit.exports.generated_at);
   res.set('Content-Disposition', `attachment; filename="${stem(row)}.contours.geojson"`);
   res.send(body);
+}));
+
+// GET /api/exhibits/:id/export/am-night-nif.geojson — AM nighttime
+// NIF contour as a self-describing FeatureCollection.  Empty body
+// with 404 when the exhibit doesn't carry am_night_nif evidence.
+r.get('/exhibits/:id/export/am-night-nif.geojson', asyncHandler(async (req, res) => {
+  const row = await getExhibit(req.params.id);
+  if (!row) return res.status(404).json({ error: 'NOT_FOUND' });
+  const out = serializeAmNightNifGeoJson(row.payload, { pretty: true });
+  if (!out.ok){
+    return res.status(404).json({ error: 'NO_AM_NIGHT_NIF', detail: out.error });
+  }
+  res.type(out.content_type);
+  res.set('Content-Disposition', `attachment; filename="${stem(row)}.am-night-nif.geojson"`);
+  res.send(out.body);
 }));
 
 // GET /api/exhibits/:id/export/pdf  — filing-grade PDF via @pdfme/generator.
