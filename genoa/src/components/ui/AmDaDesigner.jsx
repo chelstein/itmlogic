@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PolarPattern from './PolarPattern.jsx';
-import AmNightNifPreview from './AmNightNifPreview.jsx';
+import AmNightNifPreview   from './AmNightNifPreview.jsx';
+import AmSunAuthorityPanel from './AmSunAuthorityPanel.jsx';
 import { describeAmKhz, normalizeAmKhz } from '../../engine/am/band.js';
 
 // AM DA pattern designer.  Operator builds an array geometry (towers
@@ -304,6 +305,12 @@ export default function AmDaDesigner({ baseInputs, onApplyPattern }){
         pattern_mode={pattern?.pattern_table ? 'DA' : 'omni'}
         pattern_table={pattern?.pattern_table || null}
       />
+
+      {/* §73.99 sunrise / sunset authority — monthly windows + the
+          regulator's PSRA/PSSA framework.  Only renders monthly
+          table for AM facilities; for FM/FX falls back to the
+          panel's own "not applicable" hint. */}
+      <AmSunAuthorityPanel baseInputs={baseInputs} />
     </div>
   );
 }
