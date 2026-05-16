@@ -184,7 +184,13 @@ export async function nighttimeNifStudy(input, ctx){
 
   return {
     available:   true,
-    source:      'fccam',
+    // Pass through the actual engine identity solveNifContour
+    // sniffed from the skywave client's /version (FCCAM Wang or
+    // Berry-1968-screening); narrative + appendix preface key off
+    // this to render screening-vs-filing-grade prose.
+    source:      contour.source || contour.engine || 'fccam',
+    engine:      contour.engine || contour.source || 'fccam',
+    engine_warning: contour.engine_warning || null,
     fetched_at:  new Date().toISOString(),
     proposed:    contour.proposed,
     interferers,

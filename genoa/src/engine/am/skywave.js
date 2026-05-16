@@ -288,7 +288,12 @@ export async function skywaveFieldAtReceivers(fccamClient, tx, receivers, opts =
   });
   return {
     available:    true,
-    source:       'fccam',
+    // Pass through the actual engine identity the sidecar reported
+    // (fccam, berry-1968-screening, …) so callers and the appendix
+    // narrative can adapt prose + render the right screening / filing
+    // badge.  Defaults to 'fccam' for back-compat when an older
+    // sidecar shape omits source.
+    source:       batch.source || 'fccam',
     percent_time: opts.percent_time ?? 50,
     n_requests:   batch.n_requests,
     n_ok:         results.filter((x) => x.ok).length,

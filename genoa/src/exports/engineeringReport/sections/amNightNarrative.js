@@ -108,7 +108,22 @@ function methodologyParagraph({ summary, interferers, nif }){
   const capText = cap
     ? `  The interferer pool was capped at ${n_used} (of ${n_seen} pulled from FCC AM Query within 1500 km); the cap is sorted by distance so the strongest interferers always survive.`
     : '';
-  return `The §73.182(k) RSS aggregation uses ${n_used} nearby AM station${n_used === 1 ? '' : 's'} (of ${n_seen} candidates within the 1500 km LMS query radius), covering the ${relText} channel relations the §73.183 D/U table protects.  The 25% exclusion threshold of §73.182(k) is applied per receiver — a station that contributes at one azimuth may be excluded at another.  Skywave field strengths come from FCCAM (Wang 1985 model permitted under §73.190(c)); pattern-factor application uses the §73.150 horizontal pattern when a directional pattern_table is attached, omni otherwise.${capText}`;
+  const engineText = describeEngine(nif);
+  return `The §73.182(k) RSS aggregation uses ${n_used} nearby AM station${n_used === 1 ? '' : 's'} (of ${n_seen} candidates within the 1500 km LMS query radius), covering the ${relText} channel relations the §73.183 D/U table protects.  The 25% exclusion threshold of §73.182(k) is applied per receiver — a station that contributes at one azimuth may be excluded at another.  Skywave field strengths come from ${engineText}; pattern-factor application uses the §73.150 horizontal pattern when a directional pattern_table is attached, omni otherwise.${capText}`;
+}
+
+// Engine-aware methodology + closing prose.  Reads the engine
+// identity threaded through from the skywave client (FCCAM Wang
+// vs Berry-1968-screening) so the appendix doesn't claim "FCCAM"
+// when Berry actually ran.  When Berry ran, the prose includes the
+// explicit "SCREENING-grade — re-run with FCCAM Wang before filing"
+// disclaimer the reviewer needs to see.
+function describeEngine(nif){
+  const engine = nif?.engine || nif?.source || 'fccam';
+  if (engine === 'berry-1968-screening' || engine?.startsWith?.('berry')){
+    return 'the Berry analytical model (47 CFR §73.190(c)) — SCREENING-grade conservative analytical approximation; re-run with FCCAM Wang before filing';
+  }
+  return 'FCCAM (Wang 1985 model, 47 CFR §73.190(c)) — filing-grade';
 }
 
 function bindingParagraph({ binding, proposed }){
@@ -145,7 +160,18 @@ function failureRollupParagraph({ summary, contour }){
 }
 
 function closingParagraph({ nif }){
-  return `These NIF results are deterministic and replay-verifiable: re-computing the exhibit with the same station inputs against the same FCCAM source SHA produces identical NIF radii and margins.  Skywave engine: ${nif.provenance?.upstream_skywave || 'FCCAM (Fccam.for / Wang 1985)'}.  Regulation: ${nif.regulation || '47 CFR §73.182 / §73.183 / §73.190(c)'}.`;
+  const engine = nif?.engine || nif?.source || 'fccam';
+  const isBerry = engine === 'berry-1968-screening' || engine?.startsWith?.('berry');
+  const engineLabel = isBerry
+    ? 'Berry analytical model (47 CFR §73.190(c), screening-grade)'
+    : (nif.provenance?.upstream_skywave || 'FCCAM (Fccam.for / Wang 1985)');
+  const determinismClaim = isBerry
+    ? 'These NIF results are deterministic and replay-verifiable: re-computing the exhibit with the same station inputs produces identical NIF radii and margins.'
+    : 'These NIF results are deterministic and replay-verifiable: re-computing the exhibit with the same station inputs against the same FCCAM source SHA produces identical NIF radii and margins.';
+  const filingNote = isBerry
+    ? '  SCREENING-grade output — the Berry analytical formula is permitted by §73.190(c) but under-estimates field strength compared to FCCAM Wang in most regimes.  Re-run with FCCAM before filing.'
+    : '';
+  return `${determinismClaim}  Skywave engine: ${engineLabel}.${filingNote}  Regulation: ${nif.regulation || '47 CFR §73.182 / §73.183 / §73.190(c)'}.`;
 }
 
 // ---------------------------------------------------------------------------
