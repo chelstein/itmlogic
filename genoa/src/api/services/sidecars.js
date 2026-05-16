@@ -38,6 +38,7 @@ import { makeLosClient }         from '../../evidence/losClient.js';
 import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
 import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
 import { makeFccamClient }       from '../../evidence/fccamClient.js';
+import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -141,7 +142,15 @@ export const sidecars = Object.freeze({
   // degrades explicitly rather than substituting a different engine.
   // See genoa/src/sidecars/fccam/ for the sidecar code + deploy doc
   // and src/evidence/fccamClient.js for the contract.
-  fccam:       makeFccamClient()
+  // FCCAM is the primary AM skywave engine.  When FCCAM_SIDECAR_URL
+  // is unset the registry falls through to the Berry analytical
+  // implementation (47 CFR §73.190(c) explicitly permits it),
+  // labeled as SCREENING-grade so reviewers can tell at a glance
+  // which engine produced the §73.182 NIF numbers.  Operator can
+  // disable the Berry fallback entirely with
+  // GENOA_BERRY_SKYWAVE_FALLBACK=false (then AM-night degrades to
+  // the existing "FCCAM not configured" diagnostic instead).
+  fccam:       makeFccamClient() || makeBerrySkywaveClient()
 });
 
 // Probe one sidecar.  Health() if the client provides it; otherwise GET
