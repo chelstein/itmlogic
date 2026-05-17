@@ -405,7 +405,18 @@ export function buildAppendixSections(exhibit){
   // When the engine ran uniform-σ (no segments, sparse corpus, sidecar
   // down) the appendix says so explicitly instead of leaving the
   // operator to wonder why every radial returned the same distance.
+  // For AM exhibits we ALWAYS surface a row — if the evidence block is
+  // missing entirely, that's a step-6d-didn't-execute diagnostic and we
+  // print it explicitly rather than silently omitting (which made the
+  // KDUS 2026-05-17 PDF impossible to debug remotely).
   const gcr = exhibit.evidence?.ground_conductivity_per_radial;
+  const svc_for_m3_diag = String(exhibit.station_inputs?.service || '').toUpperCase();
+  if (!gcr && svc_for_m3_diag === 'AM'){
+    dRows.push(
+      ['σ per-radial status',  'NOT RECORDED — step 6d did not populate evidence.ground_conductivity_per_radial; check orchestrator wiring (gsvc not bound, service mismatch, or early throw before step 6d)'],
+      ['σ per-radial fallback', 'engine ran uniform-σ path (single value across all azimuths)']
+    );
+  }
   if (gcr){
     if (gcr.available){
       dRows.push(
