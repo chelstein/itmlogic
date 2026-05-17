@@ -169,6 +169,12 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
         erp_kW,
         frequency_khz:    Number(freq),
         conductivity_msm: Number(sigma),
+        // Per-radial M3 conductivity segments — orchestrator passes
+        // this when the operator hasn't disabled segmentation AND the
+        // geodata sidecar returned crossings for the radials.  Engine
+        // falls back to uniform σ per-radial when missing/empty.  See
+        // groundwave.js#pathWeightedSigma for the stage-2 approximation.
+        sigmaSegmentsByRadial: inputs.sigma_segments_by_radial || null,
         patternFactorFn:  factorFn,
         radials_deg,
         contours

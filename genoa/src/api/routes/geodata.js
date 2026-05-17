@@ -31,6 +31,13 @@ function getSvc(){
 // Test-only override hook (e.g. injecting a stub raster sampler).
 export function _setGeodataServiceForTesting(svc){ _svc = svc; }
 
+// In-process accessor — exhibitService uses this for per-radial M3
+// conductivity fan-out without an HTTP round-trip.  Returns null if
+// the service hasn't been initialized yet (manifest-only / no DB).
+export function getGeodataServiceForOrchestrator(){
+  try { return getSvc(); } catch { return null; }
+}
+
 function parseLatLon(req){
   const lat = Number(req.query.lat);
   const lon = Number(req.query.lon);

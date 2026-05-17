@@ -30,13 +30,39 @@ export function amReferenceField_mVm_at_1km(erp_kW){
   return 100 * Math.sqrt(Math.max(0, erp_kW));
 }
 
+// Path-length weighted σ across a radial's constant-σ segments.
+// Stage-2 approximation for §73.184 mixed-conductivity paths — the
+// FCC's blessed method is Millington's reciprocal-incremental sum,
+// which we'll wire later.  Weighted-σ gets us asymmetric contours
+// honestly (different bearings see different σ, different distance)
+// without claiming Millington-grade accuracy.  Returns null when the
+// segments are empty or all-null so the caller can fall back to the
+// uniform-σ path cleanly.
+export function pathWeightedSigma(segments){
+  if (!Array.isArray(segments) || segments.length === 0) return null;
+  let num = 0;
+  let den = 0;
+  for (const s of segments){
+    const dx = Number(s?.to_km) - Number(s?.from_km);
+    const σ  = Number(s?.sigma_mS_m);
+    if (!Number.isFinite(dx) || dx <= 0 || !Number.isFinite(σ) || σ <= 0) continue;
+    num += σ * dx;
+    den += dx;
+  }
+  return den > 0 ? num / den : null;
+}
+
 /**
  * Compute the AM contour radial table.
  *
  * @param {object}   args
  * @param {number}   args.erp_kW            ERP in kW
  * @param {number}   args.frequency_khz     AM carrier frequency in kHz (530..1700)
- * @param {number}   args.conductivity_msm  Ground conductivity σ in mS/m (FCC M3: 1..8)
+ * @param {number}   args.conductivity_msm  Ground conductivity σ in mS/m (FCC M3: 1..8) — uniform-σ fallback
+ * @param {object}   [args.sigmaSegmentsByRadial]  optional { az_deg: [{from_km,to_km,sigma_mS_m}], … }
+ *                                          When present and non-empty for an azimuth, the engine uses
+ *                                          path-length-weighted σ from those segments instead of the
+ *                                          uniform conductivity_msm.  Produces asymmetric contours.
  * @param {function} args.patternFactorFn   az_deg → relative-field factor (0..1)
  * @param {number[]} args.radials_deg       list of azimuths in degrees
  * @param {object[]} [args.contours]        contour list (default = AM_DEFAULT_CONTOURS)
@@ -46,27 +72,42 @@ export function amRadialTable({
   erp_kW,
   frequency_khz,
   conductivity_msm,
+  sigmaSegmentsByRadial = null,
   patternFactorFn,
   radials_deg,
   contours = AM_DEFAULT_CONTOURS,
   dielectric = AM_DEFAULT_DIELECTRIC
 }){
   // Capture σ clamp/rounding metadata from the first successful FCC
-  // call; the σ used is identical for every radial (M3 grid is keyed
-  // on σ alone), so one sample suffices.  Exposed as the table's
-  // `_ground_constants` sidecar so the orchestrator can plumb it onto
+  // call; even with per-radial σ each call still hits the same FCC M3
+  // grid and clamp logic.  Exposed as the table's `_ground_constants`
+  // sidecar so the orchestrator can plumb it onto
   // exhibit.evidence.ground_constants and emit SIGMA_CLAMP warnings.
   let groundConstants = null;
+  let radialsUsingSegments = 0;
   const rows = radials_deg.map(az => {
     const f = patternFactorFn(az);
     const erp_az = erp_kW * f * f;
+    // Per-radial σ resolution: if the orchestrator handed us segments
+    // for this azimuth, use the path-length-weighted σ; else fall back
+    // to the uniform conductivity_msm.  Crucially, the SAME contour
+    // call shape is used either way — only the σ number changes — so
+    // the FCC §73.184 grid lookup stays bit-identical to the uniform-σ
+    // case.  This is the stage-2 approximation; stage-3 will replace
+    // the weighted-σ call with a real Millington integration that
+    // walks the segments instead of collapsing them.
+    const segs = sigmaSegmentsByRadial?.[az] || sigmaSegmentsByRadial?.[String(az)] || null;
+    const σ_seg = pathWeightedSigma(segs);
+    const σ_use = (σ_seg != null && Number.isFinite(σ_seg)) ? σ_seg : conductivity_msm;
+    const usedSegments = (σ_seg != null && Number.isFinite(σ_seg));
+    if (usedSegments) radialsUsingSegments += 1;
     const distances = {};
     for (const c of contours){
       try {
         const r = fccAmDistanceKm({
           frequency_khz,
           target_mvm:        c.field_mvm,
-          conductivity_msm,
+          conductivity_msm:  σ_use,
           dielectric,
           erp_kw:            erp_az
         });
@@ -106,7 +147,20 @@ export function amRadialTable({
       haat_source:                'n/a (AM groundwave)',
       terrain_profile_source:     null,
       reference_field_mVm_at_1km: 100 * Math.sqrt(Math.max(0, erp_az)),
-      contour_distances_km:       distances
+      contour_distances_km:       distances,
+      // Per-radial M3 conductivity evidence — null when uniform-σ.
+      sigma_path: usedSegments ? {
+        method:            'path-length weighted (stage-2)',
+        sigma_used_mS_m:   σ_use,
+        sigma_uniform_mS_m: conductivity_msm,
+        segments:          segs.map((s) => ({
+          from_km:    Number(s.from_km),
+          to_km:      Number(s.to_km),
+          sigma_mS_m: Number(s.sigma_mS_m)
+        })),
+        n_segments:        segs.length,
+        regulation:        '47 CFR §73.184 mixed-conductivity path (Millington method to replace weighted-σ in stage-3)'
+      } : null
     };
   });
   // Attach the ground-constants sidecar on the array without changing
@@ -114,6 +168,20 @@ export function amRadialTable({
   // per-radial array.
   Object.defineProperty(rows, '_ground_constants', {
     value:        groundConstants,
+    enumerable:   false,
+    configurable: false
+  });
+  // Attach summary of segmentation use so the orchestrator can decide
+  // whether to surface the "M3 per-radial segmentation: ENABLED" badge
+  // on the PDF / verdict.
+  Object.defineProperty(rows, '_sigma_segmentation', {
+    value: {
+      enabled:                radialsUsingSegments > 0,
+      radials_with_segments:  radialsUsingSegments,
+      radials_total:          radials_deg.length,
+      method:                 'path-length weighted (stage-2)',
+      uniform_sigma_fallback: conductivity_msm
+    },
     enumerable:   false,
     configurable: false
   });

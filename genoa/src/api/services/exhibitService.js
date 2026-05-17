@@ -16,6 +16,7 @@ import { compute }              from '../../engine/index.js';
 import { runValidationSuite }   from '../../engine/validation/runner.js';
 import { renderNarrative }      from '../../narrative/generator.js';
 import { sidecars }             from './sidecars.js';
+import { getGeodataServiceForOrchestrator } from '../routes/geodata.js';
 import { getCached, putCached } from './facilityCache.js';
 import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFccContourValidator.js';
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
@@ -1246,6 +1247,95 @@ export async function computeExhibit(req){
   // the engine compute reads them.  The promise ran concurrently with
   // steps 3-6; on a typical FM compute this overlap saves ~10 s.
   await fccLmsPromise;
+
+  // ---- 6d. Per-radial M3 conductivity segmentation (AM only) ----
+  // For AM groundwave under §73.184, σ varies across the radial — a
+  // station sited in a conductivity transition zone can have a 5×
+  // contour-distance swing between bearings.  Fan out the radials
+  // against the geodata sidecar's M3 boundary linestrings, collect
+  // per-radial constant-σ segments, and stash on inputs for the
+  // engine.  The engine collapses each segment list to a path-weighted
+  // σ (stage-2 approximation; Millington in stage-3) — but the σ now
+  // varies BY RADIAL, so the resulting contour polygon is asymmetric
+  // and reflects ground reality instead of an isotropic assumption.
+  //
+  // Bounded budget: every radial gets at most ~150 ms; whole fan-out
+  // capped at 8 s.  If the geodata service isn't bound or the corpus
+  // is sparse, segmentation silently falls back to uniform σ (engine
+  // handles missing/empty segments transparently).  Failure is NEVER
+  // a blocker — uniform σ is the safe regression.
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))
+      && options.skip_per_radial_m3 !== true){
+    const gsvc = getGeodataServiceForOrchestrator();
+    if (gsvc && typeof gsvc.sampleConductivityRadial === 'function'){
+      try {
+        const step  = Number(inputs.radial_step_deg) || 10;
+        const azs   = [];
+        for (let a = 0; a < 360; a += step) azs.push(a);
+        // 500 km covers night-intf (0.025 mV/m) for typical AM TPO.
+        const max_km = 500;
+        const site_sigma = Number.isFinite(Number(inputs.ground_sigma_mS_m))
+                            ? Number(inputs.ground_sigma_mS_m) : null;
+        const results = await budget.withDeadline('m3_per_radial', () =>
+          Promise.all(azs.map((az) =>
+            gsvc.sampleConductivityRadial({
+              lat: Number(inputs.lat),
+              lon: Number(inputs.lon),
+              bearing_deg: az,
+              max_km,
+              site_sigma_mS_m: site_sigma
+            }).catch((e) => ({ available: false, bearing_deg: az, error: String(e?.message || e) }))
+          )),
+          { minMs: 8_000 }
+        );
+        const segmentsByRadial = {};
+        let n_with_crossings = 0;
+        for (const r of results){
+          if (r?.available && Array.isArray(r.segments) && r.segments.length > 0){
+            segmentsByRadial[String(r.bearing_deg)] = r.segments;
+            if ((r.crossings || []).length > 0) n_with_crossings += 1;
+          }
+        }
+        if (Object.keys(segmentsByRadial).length > 0){
+          inputs.sigma_segments_by_radial = segmentsByRadial;
+          evidence.ground_conductivity_per_radial = {
+            available:           true,
+            method:              'path-length-weighted-sigma (stage-2; Millington pending stage-3)',
+            radials_total:       azs.length,
+            radials_segmented:   Object.keys(segmentsByRadial).length,
+            radials_with_crossings: n_with_crossings,
+            max_km,
+            site_sigma_mS_m:     site_sigma,
+            data_source:         'geodata sidecar /api/geodata/conductivity/radial (M3 boundary linestrings, PostGIS)',
+            regulation:          '47 CFR §73.184 mixed-conductivity path',
+            fetched_at:          new Date().toISOString()
+          };
+        } else {
+          evidence.ground_conductivity_per_radial = {
+            available: false,
+            reason:    'no M3 boundary crossings on any radial; engine falls back to uniform σ',
+            radials_total: azs.length,
+            data_source: 'geodata sidecar /api/geodata/conductivity/radial',
+            fetched_at:  new Date().toISOString()
+          };
+        }
+      } catch (e){
+        evidence.ground_conductivity_per_radial = {
+          available: false,
+          reason:    `per-radial M3 fan-out failed: ${String(e?.message || e)}`,
+          fetched_at: new Date().toISOString()
+        };
+      }
+    } else {
+      evidence.ground_conductivity_per_radial = {
+        available: false,
+        reason:    'geodata sidecar not bound (no PG pool or service factory unavailable)',
+        fetched_at: new Date().toISOString()
+      };
+    }
+  }
 
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {
