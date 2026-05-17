@@ -23,12 +23,42 @@ export function buildAppendixSections(exhibit){
       for (const id of Object.keys(cd)) contourIds.add(id);
     }
     const cidList = Array.from(contourIds);
-    const columns = [
-      { key: 'azimuth_deg', label: 'Az (°)',     width: 0.10, align: 'right' },
-      { key: 'haat_m',      label: 'HAAT (m)',   width: 0.14, align: 'right' },
-      { key: 'erp_kw',      label: 'ERP (kW)',   width: 0.14, align: 'right' }
-    ];
-    const widthPerContour = Math.max(0.08, (1 - 0.38) / Math.max(1, cidList.length));
+
+    // AM vs FM/TV radial schema — these are physically different
+    // allocations and the operator-facing columns differ.  AM uses
+    // §73.184 groundwave (TPO + σ + inverse-distance field at 1 km);
+    // FM/TV uses §73.313 HAAT + ERP.  Showing HAAT/ERP for an AM
+    // exhibit reads as FM architecture leaked into an AM filing —
+    // exactly the credibility hit an AM engineer flags.
+    const svc = String(exhibit.station_inputs?.service || '').toUpperCase();
+    const isAm = svc === 'AM';
+    const hasDaPattern = Array.isArray(exhibit.station_inputs?.pattern)
+                        && exhibit.station_inputs.pattern.length > 0;
+    const anySigmaPath = isAm && rt.some((r) => r?.sigma_path);
+
+    let columns;
+    if (isAm){
+      // AM-native columns.  Pattern factor column is only meaningful
+      // for DA; suppressed for NDA so the table doesn't show "1.000"
+      // 36 times.  σ-used column always present so the operator can
+      // see whether per-radial segmentation engaged on this azimuth.
+      columns = [
+        { key: 'azimuth_deg',  label: 'Az (°)',                 width: 0.09, align: 'right' },
+        { key: 'sigma_msm',    label: 'σ used (mS/m)',          width: 0.13, align: 'right' },
+        { key: 'ref_field',    label: 'E @ 1 km (mV/m)',        width: 0.14, align: 'right' }
+      ];
+      if (hasDaPattern){
+        columns.splice(1, 0, { key: 'pat_factor', label: 'Pattern f', width: 0.10, align: 'right' });
+      }
+    } else {
+      columns = [
+        { key: 'azimuth_deg', label: 'Az (°)',     width: 0.10, align: 'right' },
+        { key: 'haat_m',      label: 'HAAT (m)',   width: 0.14, align: 'right' },
+        { key: 'erp_kw',      label: 'ERP (kW)',   width: 0.14, align: 'right' }
+      ];
+    }
+    const used = columns.reduce((a, c) => a + c.width, 0);
+    const widthPerContour = Math.max(0.08, (1 - used) / Math.max(1, cidList.length));
     for (const id of cidList){
       columns.push({ key: `c_${id}`, label: `${id} (km)`, width: widthPerContour, align: 'right' });
     }
@@ -60,28 +90,56 @@ export function buildAppendixSections(exhibit){
         if (Number.isFinite(a) && Number.isFinite(f)) erpByAz.set(a, stationErp * f * f);
       }
     }
+    // Uniform-σ fallback for AM rows when per-radial segmentation isn't active.
+    const uniformSigma = isAm
+      ? (Number.isFinite(Number(exhibit.station_inputs?.ground_sigma_mS_m))
+         ? Number(exhibit.station_inputs.ground_sigma_mS_m)
+         : (Number.isFinite(Number(exhibit.station_inputs?.ground_sigma_ms_m))
+            ? Number(exhibit.station_inputs.ground_sigma_ms_m) : null))
+      : null;
 
     const rows = rt.map(r => {
       const az = Number.isFinite(r.azimuth_deg) ? Number(r.azimuth_deg) : null;
       const azKey = az != null ? Math.round(az) : null;
-      // The FM/LPFM/FX radial builders emit per-radial rows with
-      // `haat_computed_m` + `haat_input_m` (see src/engine/fm/contour.js).
-      // Reading just `r.haat_m` (the operator's station-wide input)
-      // misses the DEM-derived per-azimuth value the engine actually
-      // used, so every row of Appendix A would print "—" even on an
-      // exhibit that ran the terrain sidecar.
-      const haat  = Number.isFinite(r.haat_computed_m) ? Number(r.haat_computed_m)
-                  : Number.isFinite(r.haat_input_m)    ? Number(r.haat_input_m)
-                  : Number.isFinite(r.haat_m)          ? Number(r.haat_m)
-                  : (azKey != null && haatByAz.has(azKey) ? haatByAz.get(azKey) : null);
-      const erp   = Number.isFinite(r.erp_kw) ? Number(r.erp_kw)
-                  : (azKey != null && erpByAz.has(azKey) ? erpByAz.get(azKey)
-                  : (Number.isFinite(stationErp) && !pattern ? stationErp : null));
-      const row = {
-        azimuth_deg: az != null  ? az.toFixed(1)   : '—',
-        haat_m:      haat != null ? haat.toFixed(1) : '—',
-        erp_kw:      erp != null  ? erp.toFixed(3)  : '—'
-      };
+      let row;
+      if (isAm){
+        // σ for THIS azimuth — segmented value if step 6d found
+        // crossings, otherwise the operator's uniform σ.
+        const sigmaUsed = Number.isFinite(r?.sigma_path?.sigma_used_mS_m)
+                          ? Number(r.sigma_path.sigma_used_mS_m)
+                          : uniformSigma;
+        const refField  = Number.isFinite(r?.reference_field_mVm_at_1km)
+                          ? Number(r.reference_field_mVm_at_1km)
+                          : null;
+        row = {
+          azimuth_deg: az != null ? az.toFixed(1) : '—',
+          sigma_msm:   sigmaUsed != null ? sigmaUsed.toFixed(2) : '—',
+          ref_field:   refField != null ? refField.toFixed(1) : '—'
+        };
+        if (hasDaPattern){
+          const f = Number.isFinite(r?.relative_field) ? Number(r.relative_field) : null;
+          row.pat_factor = f != null ? f.toFixed(3) : '—';
+        }
+      } else {
+        // The FM/LPFM/FX radial builders emit per-radial rows with
+        // `haat_computed_m` + `haat_input_m` (see src/engine/fm/contour.js).
+        // Reading just `r.haat_m` (the operator's station-wide input)
+        // misses the DEM-derived per-azimuth value the engine actually
+        // used, so every row of Appendix A would print "—" even on an
+        // exhibit that ran the terrain sidecar.
+        const haat  = Number.isFinite(r.haat_computed_m) ? Number(r.haat_computed_m)
+                    : Number.isFinite(r.haat_input_m)    ? Number(r.haat_input_m)
+                    : Number.isFinite(r.haat_m)          ? Number(r.haat_m)
+                    : (azKey != null && haatByAz.has(azKey) ? haatByAz.get(azKey) : null);
+        const erp   = Number.isFinite(r.erp_kw) ? Number(r.erp_kw)
+                    : (azKey != null && erpByAz.has(azKey) ? erpByAz.get(azKey)
+                    : (Number.isFinite(stationErp) && !pattern ? stationErp : null));
+        row = {
+          azimuth_deg: az != null  ? az.toFixed(1)   : '—',
+          haat_m:      haat != null ? haat.toFixed(1) : '—',
+          erp_kw:      erp != null  ? erp.toFixed(3)  : '—'
+        };
+      }
       const cd = r.contour_distances_km || {};
       for (const id of cidList){
         row[`c_${id}`] = Number.isFinite(cd[id]) ? Number(cd[id]).toFixed(2) : '—';
@@ -92,9 +150,15 @@ export function buildAppendixSections(exhibit){
       id:      'appendix-a',
       type:    'table',
       heading: 'APPENDIX A — RADIAL DATA',
-      preface: 'Per-radial HAAT, ERP, and contour distances.  Radial step shown in METHODOLOGY.  ' +
-               (pattern ? 'ERP per radial computed from filed pattern table (ERP × (relative field)² per §73.316).'
-                        : 'Non-directional antenna; ERP constant across all azimuths.'),
+      preface: isAm
+        ? `Per-radial conductivity (σ), inverse-distance field at 1 km, and §73.184 groundwave contour distances.  Radial step shown in METHODOLOGY.  ${anySigmaPath
+            ? 'σ varies by azimuth where step 6d found M3 boundary crossings (path-length-weighted; stage-3 Millington pending).'
+            : 'σ is uniform across all azimuths — per-radial M3 segmentation either found no crossings or was unavailable (see Appendix D).'}  ${hasDaPattern
+            ? 'Pattern factor f is the §73.150 relative field; field at azimuth scales as f × E₁ₖₘ.'
+            : 'Non-directional antenna (NDA); pattern factor is 1.0 at every azimuth.'}`
+        : 'Per-radial HAAT, ERP, and contour distances.  Radial step shown in METHODOLOGY.  ' +
+          (pattern ? 'ERP per radial computed from filed pattern table (ERP × (relative field)² per §73.316).'
+                   : 'Non-directional antenna; ERP constant across all azimuths.'),
       table:   { columns, rows }
     });
   }
