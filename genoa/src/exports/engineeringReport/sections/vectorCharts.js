@@ -222,7 +222,74 @@ export function buildFortranParityChartSection(exhibit){
 }
 
 // ---------------------------------------------------------------------------
-// Tree-canopy rose polar plot — visualizes the 12-azimuth canopy density
+// Nearby Stations Distribution — every protected station drawn at its
+// (bearing, distance) from the subject TX, color-coded by §73.215 pass/fail.
+// Lets an engineer eyeball the regulatory neighborhood — "all the fails are
+// to the northwest at < 80 km" — instead of paging through the table in
+// Appendix B.  V-Soft tabulates this data; nobody else plots it.
+// ---------------------------------------------------------------------------
+export function buildNearbyStationsChartSection(exhibit){
+  const isr = exhibit?.interference_study;
+  if (!isr || !Array.isArray(isr.stations) || isr.stations.length === 0) return null;
+  const txLat = Number(exhibit?.station_inputs?.lat);
+  const txLon = Number(exhibit?.station_inputs?.lon);
+  if (!Number.isFinite(txLat) || !Number.isFinite(txLon)) return null;
+  const nearby = Array.isArray(exhibit.evidence?.nearby_primaries)
+    ? exhibit.evidence.nearby_primaries : [];
+  const byCall = new Map();
+  const byFid  = new Map();
+  for (const n of nearby){
+    if (n?.call)        byCall.set(String(n.call).toUpperCase(), n);
+    if (n?.facility_id) byFid.set(String(n.facility_id), n);
+  }
+  const lookupLatLon = (s) => {
+    const hit = (s?.call && byCall.get(String(s.call).toUpperCase()))
+             || (s?.facility_id && byFid.get(String(s.facility_id)));
+    if (!hit) return null;
+    const lat = Number(hit.lat ?? hit.latitude);
+    const lon = Number(hit.lon ?? hit.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+  };
+  // Great-circle initial bearing from (lat1, lon1) to (lat2, lon2), 0..360.
+  const bearingDeg = (lat1, lon1, lat2, lon2) => {
+    const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  };
+  const data = [];
+  let n_pass = 0, n_fail = 0;
+  for (const st of isr.stations){
+    const dKm = Number(st.distance_km);
+    if (!Number.isFinite(dKm) || dKm <= 0) continue;
+    const ll  = lookupLatLon(st);
+    if (!ll) continue;
+    const bear = bearingDeg(txLat, txLon, ll.lat, ll.lon);
+    const ok   = st.pass_overall !== false;
+    if (ok) n_pass++; else n_fail++;
+    data.push({ x: bear, y: dKm, ok });
+  }
+  if (data.length < 3) return null;
+  return {
+    id:        'nearby-stations-chart',
+    type:      'scatter-chart',
+    heading:   'Nearby protected stations — bearing × distance',
+    data,
+    x_label:     'Bearing from subject TX (deg, 0 = north)',
+    y_label:     'Distance (km)',
+    x_min:       0,
+    x_max:       360,
+    caption:     `${data.length} protected station(s) plotted at their great-circle ` +
+                 `(bearing, distance) from the subject TX.  Amber points pass under ` +
+                 `§73.207 / §73.215; red points fail.  ` +
+                 `${n_pass} pass / ${n_fail} fail.  ` +
+                 `Use this plot to spot directional clustering of conflicts — ` +
+                 `e.g. all failures concentrated on one heading often indicates a ` +
+                 `single co-channel cluster, while scattered failures suggest a ` +
+                 `wide-area allocation problem.  Subject TX is at (0, 0) by construction.`
+  };
+}
 // around the tx so an engineer can see the environmental clutter pattern
 // at a glance.  Pulls from evidence.geo_rf_evidence.datasets.tree_canopy.rose
 // which the Geo-RF Evidence sidecar populates as part of every compute.

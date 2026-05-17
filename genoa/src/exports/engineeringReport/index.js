@@ -30,7 +30,8 @@ import {
   buildItmCoverageOverlaySection,
   buildCanopyRosePolarSection,
   buildHaatPolarChartSection,
-  buildContourPolarChartSection
+  buildContourPolarChartSection,
+  buildNearbyStationsChartSection
 }                                                  from './sections/vectorCharts.js';
 import { buildVisualSummarySection }               from './sections/visualSummary.js';
 
@@ -112,6 +113,7 @@ export function buildEngineeringReport(exhibit, options){
   push(buildContourPolarChartSection(exhibit));    // ALL: primary contour polar (real footprint shape)
   push(buildHaatPolarChartSection(exhibit));       // FM/FX/LPFM/TV: per-radial HAAT polar (terrain advantage)
   push(buildCanopyRosePolarSection(exhibit));      // ALL: 12-az tree canopy rose (env clutter, advisory)
+  push(buildNearbyStationsChartSection(exhibit));  // ALL: protected stations bearing × distance scatter
 
   const s   = exhibit.station_inputs || {};
   const mv  = exhibit.method_versions || {};
