@@ -14,6 +14,7 @@ import {
   sampleNalcmsMexico,
   sampleVegetationDeparture,
   sampleM3Conductivity,
+  sampleM3PolylineCrossings,
   reportTerrainStatus
 } from './layers.js';
 
@@ -116,6 +117,29 @@ export function makeGeodataService({
     return reportTerrainStatus({ layerCfg: config.layers.terrain_globe, listDir });
   }
 
+  // Per-radial M3 boundary crossings — drives asymmetric AM contours.
+  // Same backing table as point sample (M3 boundary linestrings) but
+  // returns sorted crossings + constant-σ segments along a bearing.
+  async function sampleConductivityRadial({ lat, lon, bearing_deg, max_km, site_sigma_mS_m = null }){
+    validateCoords(lat, lon);
+    const cfg = config.layers.m3_conductivity_postgis;
+    if (!cfg){
+      return { available: false, error: GEODATA_LAYER_NOT_FOUND, layer: 'm3_conductivity_postgis' };
+    }
+    if (!query){
+      return {
+        available: false, lat, lon, bearing_deg, max_km,
+        layer: 'm3_conductivity_postgis',
+        warnings: ['no postgres query function bound — geodata sidecar is not configured for SQL access'],
+        sampled_at: (now || new Date()).toISOString()
+      };
+    }
+    return sampleM3PolylineCrossings({
+      lat, lon, bearing_deg, max_km, site_sigma_mS_m,
+      layerCfg: cfg, query, now
+    });
+  }
+
   // /api/geodata/manifest — list every configured layer with status
   // (available / partial / pending_georef / unavailable), path, sha256
   // (if attested in MASTER_SHA256SUMS.txt), and crs.
@@ -179,7 +203,7 @@ export function makeGeodataService({
     };
   }
 
-  return { sample, sampleAll, terrainStatus, manifest };
+  return { sample, sampleAll, terrainStatus, manifest, sampleConductivityRadial };
 }
 
 function validateCoords(lat, lon){

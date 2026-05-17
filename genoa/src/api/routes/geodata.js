@@ -70,6 +70,27 @@ r.get('/geodata/conductivity', asyncHandler(async (req, res) => {
   res.json(await getSvc().sample({ layer: 'm3_conductivity_postgis', lat, lon }));
 }));
 
+// Per-radial M3 boundary crossings — returns sorted crossings and
+// constant-σ segments along bearing_deg out to max_km.  Used by the
+// AM groundwave engine to produce asymmetric contours instead of
+// assuming uniform-σ across all azimuths.
+r.get('/geodata/conductivity/radial', asyncHandler(async (req, res) => {
+  const { lat, lon } = parseLatLon(req);
+  const bearing_deg = Number(req.query.bearing_deg ?? req.query.bearing);
+  const max_km      = Number(req.query.max_km ?? 500);
+  const site_sigma  = req.query.site_sigma_mS_m != null ? Number(req.query.site_sigma_mS_m) : null;
+  if (!Number.isFinite(bearing_deg)){
+    return res.status(400).json({ error: 'bearing_deg required (0..360)' });
+  }
+  if (!Number.isFinite(max_km) || max_km <= 0 || max_km > 5000){
+    return res.status(400).json({ error: 'max_km must be (0, 5000]' });
+  }
+  res.json(await getSvc().sampleConductivityRadial({
+    lat, lon, bearing_deg, max_km,
+    site_sigma_mS_m: Number.isFinite(site_sigma) ? site_sigma : null
+  }));
+}));
+
 r.get('/geodata/terrain/status', asyncHandler(async (_req, res) => {
   res.json(await getSvc().terrainStatus());
 }));
