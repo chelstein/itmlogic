@@ -58,6 +58,31 @@ export function buildFacilityParametersSection(exhibit){
     : ['Terrain source',
        ev.terrain?.source || (ev.terrain_haat_per_radial?.length ? 'per-radial DEM' : 'flat HAAT (CONSTANT_HAAT_ASSUMED)')];
 
+  // AM parameter vocabulary differs from FM/TV.  Per 47 CFR §73.183 /
+  // §73.184 an AM allocation is described by transmitter power (TPO),
+  // unattenuated RMS field at 1 km (inverse-distance reference field),
+  // ground conductivity σ, and antenna mode (DA / NDA).  ERP and HAAT
+  // are FM/TV terms and don't apply.  Field labels diverge accordingly.
+  const tpoLabel = isAm ? 'Transmitter power (TPO)' : 'ERP';
+  const tpoUnit  = 'kW';
+
+  // Inverse-distance reference field — for non-DA AM the unattenuated
+  // RMS field at 1 km, in mV/m.  When the operator entered a licensed
+  // value (inputs.rms_field_1km) prefer that; otherwise omit (the
+  // groundwave engine computes one from TPO + pattern but we don't
+  // surface a derived number as if it were filed).
+  const rmsField = isAm && (s.rms_field_1km != null && s.rms_field_1km !== '')
+                   ? Number(s.rms_field_1km) : null;
+  const rmsFieldRow = isAm && Number.isFinite(rmsField)
+                      ? ['Inverse-distance field @ 1 km', `${rmsField} mV/m (filed / licensed value)`]
+                      : null;
+
+  // Pattern row — AM has explicit DA / NDA terminology; FM/TV just says
+  // directional / non-directional.
+  const patternRow = isAm
+    ? ['Antenna mode', s.pattern_mode === 'DA' ? 'DA (directional, per pattern_table)' : 'NDA (non-directional)']
+    : ['Antenna pattern', s.pattern_mode === 'DA' ? 'Directional (per pattern_table)' : 'Non-directional'];
+
   return {
     id:      'parameters',
     type:    'kv',
@@ -65,10 +90,11 @@ export function buildFacilityParametersSection(exhibit){
     rows: [
       ['Frequency',           fmt(s.frequency, s.frequency_unit || (isAm ? 'kHz' : 'MHz'))],
       channel != null ? ['Channel', String(channel)] : null,
-      ['ERP',                 fmt(s.erp_kw, 'kW')],
+      [tpoLabel,              fmt(s.erp_kw, tpoUnit)],
+      rmsFieldRow,
       heightOrConductivity,
       ['Coordinates (NAD83 / WGS-84)', coordRow],
-      ['Antenna pattern',     s.pattern_mode === 'DA' ? 'Directional (per pattern_table)' : 'Non-directional'],
+      patternRow,
       ['Radial resolution',   fmt(s.radial_step_deg || 10, '° step')],
       terrainRow,
       ['Facility source',     exhibit.facility_metadata?.source

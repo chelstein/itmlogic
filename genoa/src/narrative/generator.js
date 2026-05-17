@@ -69,6 +69,7 @@ function section_provenance(x){
   const fm  = x.facility_metadata || {};
   const ev  = x.evidence || {};
   const v   = x.validation || {};
+  const s   = x.station_inputs || {};
   // Two INDEPENDENT validation systems, surfaced separately:
   //   curve_reference_validation — internal golden fixture suite that
   //     pins engine + curve dataset + interpolation.  Drives
@@ -83,9 +84,17 @@ function section_provenance(x){
   const lines = [hr('Evidence Provenance')];
   lines.push(`Facility       : ${fm.facility_lookup_source || '—'}${fm.facility_endpoint ? '  · ' + fm.facility_endpoint : ''}`);
   if (fm.facility_updated_at) lines.push(`               (updated ${fm.facility_updated_at})`);
-  lines.push(`Terrain HAAT   : ${ev.terrain?.available
-    ? `${ev.terrain.source} · ${ev.terrain.method} · ${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`
-    : 'not attached'}`);
+  // Terrain provenance line — labelled "HAAT" for FM/TV (per §73.313),
+  // "Ground σ" for AM since §73.183 keys on conductivity, not terrain
+  // elevation.  Same evidence packet for AM is the conductivity source.
+  const isAmFacility = String(s.service || '').toUpperCase() === 'AM';
+  lines.push(isAmFacility
+    ? `Ground σ source: ${ev.terrain?.available
+        ? `${ev.terrain.source} · ${ev.terrain.method || 'M3'}`
+        : 'inputs only (no FCC M3 segmentation attached)'}`
+    : `Terrain HAAT   : ${ev.terrain?.available
+        ? `${ev.terrain.source} · ${ev.terrain.method} · ${ev.terrain.dem?.source || '—'} ${ev.terrain.dem?.dataset || ''}`
+        : 'not attached'}`);
   if (ev.terrain?.endpoint)    lines.push(`               (${ev.terrain.endpoint})`);
   // Curve dataset validation (authoritative — drives CURVE_VALIDATION_MISSING).
   if (cr){
@@ -198,15 +207,28 @@ function section_summary(x){
 }
 
 function section_inputs(s){
+  // AM narrative uses §73.183 vocabulary: TPO + ground conductivity +
+  // DA/NDA mode.  ERP/HAAT are FM/TV concepts and would look like an
+  // FM exhibit imported onto an AM filing — exactly the credibility
+  // hit an AM engineer would flag.
+  const isAm = String(s.service || '').toUpperCase() === 'AM';
   return [
     hr('Station / Facility Inputs'),
     `Frequency:       ${fmt(s.frequency)} ${s.frequency_unit || ''}`,
-    `ERP (h):         ${fmt(s.erp_kw)} kW`,
-    `HAAT (input):    ${s.service === 'AM' ? 'n/a (AM)' : fmt(s.haat_m_input) + ' m'}`,
+    isAm
+      ? `TPO:             ${fmt(s.erp_kw)} kW`
+      : `ERP (h):         ${fmt(s.erp_kw)} kW`,
+    isAm
+      ? (Number.isFinite(Number(s.rms_field_1km))
+         ? `RMS field @1 km: ${fmt(s.rms_field_1km)} mV/m (filed)`
+         : `RMS field @1 km: — (derived from TPO + pattern)`)
+      : `HAAT (input):    ${fmt(s.haat_m_input)} m`,
     `Coordinates:     ${fmt(s.lat, 5)}, ${fmt(s.lon, 5)}`,
-    `Pattern:         ${Array.isArray(s.pattern) ? `directional (${s.pattern.length} points)` : 'non-directional'}`,
+    isAm
+      ? `Antenna mode:    ${Array.isArray(s.pattern) ? `DA (${s.pattern.length}-point pattern)` : 'NDA'}`
+      : `Pattern:         ${Array.isArray(s.pattern) ? `directional (${s.pattern.length} points)` : 'non-directional'}`,
     `Radial step:     ${s.radial_step_deg}°`,
-    s.service === 'AM' ? `Ground σ:        ${fmt(s.ground_sigma_mS_m)} mS/m` : null
+    isAm ? `Ground σ:        ${fmt(s.ground_sigma_mS_m)} mS/m` : null
   ].filter(Boolean).join('\n');
 }
 

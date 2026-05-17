@@ -56,8 +56,19 @@ export default function TelemetryRack({ exhibit }) {
         <MetricReadout label="Facility"    value={s.facility_id || '—'} />
         <MetricReadout label="Service"     value={`${s.service || '—'} ${s.fcc_class || ''}`.trim()} />
         <MetricReadout label="Frequency"   value={s.frequency ?? '—'}   unit={s.frequency_unit || ''} tone="gold" />
-        <MetricReadout label="ERP"         value={s.erp_kw ?? '—'}      unit="kW" tone="gold" />
-        <MetricReadout label="HAAT"        value={s.haat_m_input ?? '—'} unit="m" tone="gold" />
+        {String(s.service || '').toUpperCase() === 'AM' ? (
+          <>
+            {/* AM: transmitter power + ground conductivity drive the
+                §73.183 groundwave field.  Show TPO and σ, not ERP/HAAT. */}
+            <MetricReadout label="TPO"         value={s.erp_kw ?? '—'}            unit="kW"   tone="gold" />
+            <MetricReadout label="σ (ground)"  value={s.ground_sigma_mS_m ?? '—'} unit="mS/m" tone="gold" />
+          </>
+        ) : (
+          <>
+            <MetricReadout label="ERP"         value={s.erp_kw ?? '—'}      unit="kW" tone="gold" />
+            <MetricReadout label="HAAT"        value={s.haat_m_input ?? '—'} unit="m"  tone="gold" />
+          </>
+        )}
         <MetricReadout label="Lat / Lon"   value={s.lat != null && s.lon != null ? `${Number(s.lat).toFixed(4)}, ${Number(s.lon).toFixed(4)}` : '—'} />
         <MetricReadout label="Radials"     value={(exhibit?.radial_table || []).length || '—'} />
       </RackPanel>

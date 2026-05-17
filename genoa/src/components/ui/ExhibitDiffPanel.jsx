@@ -168,7 +168,18 @@ function DiffBody({ diff }){
 
 function StationInputsBlock({ d }){
   if (!d) return null;
-  const rows = [
+  // AM uses transmitter power + ground conductivity, not ERP/HAAT.
+  // Diff rows track the operator's vocabulary so a side-by-side AM
+  // diff reads as "TPO 5 kW → 10 kW", not "ERP 5 kW → 10 kW".
+  const isAm = String(d.service || '').toUpperCase() === 'AM';
+  const rows = isAm ? [
+    ['Frequency',          d.frequency],
+    ['TPO (kW)',           d.erp_kw],
+    ['σ (mS/m)',           d.ground_sigma_mS_m ?? d.ground_sigma_ms_m],
+    ['RMS field @ 1 km',   d.rms_field_1km],
+    ['FCC class',          d.fcc_class],
+    ['Antenna mode',       d.pattern_mode]
+  ] : [
     ['Frequency',     d.frequency],
     ['ERP (kW)',      d.erp_kw],
     ['HAAT (m)',      d.haat_m],
