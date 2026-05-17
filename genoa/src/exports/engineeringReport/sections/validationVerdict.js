@@ -435,10 +435,19 @@ export function buildValidationVerdictSection(exhibit){
   //      SHA-match is NOT a live re-check; reported as TIER-3.
   //   3. Filing readiness — combination plus the engineer-of-record
   //      review requirement.  READY / REVIEW / DO_NOT_FILE.
-  const compStatuses = (n) => {
-    const c = components.find((x) => x.name === n);
+  // Component lookup by name-prefix — the producer above appends
+  // " — tier N fallback" to the name when a check fell back to a
+  // deterministic tier, so an exact-equality match misses every
+  // fallback case.  KDUS 2026-05-17 (engine dcc95b32) hit exactly
+  // that: components[] showed FCC parity FALLBACK but the 3-category
+  // verdict said EXTERNAL: SKIP because the exact-match returned null.
+  // Prefix-match catches both the bare and the fallback-suffixed form.
+  const compStatuses = (prefix) => {
+    const c = components.find((x) => typeof x?.name === 'string' && x.name.startsWith(prefix));
     return c?.status || null;
   };
+  const findComponent = (prefix) =>
+    components.find((x) => typeof x?.name === 'string' && x.name.startsWith(prefix)) || null;
   // Computational = curve_validation + radial_parity.  Both PASS ⇒ PASS.
   const cvStatus = compStatuses('Curve validation (golden suite)');
   const rpStatus = compStatuses('Radial parity (per-radial spherical-vs-Karney delta)');
@@ -453,11 +462,14 @@ export function buildValidationVerdictSection(exhibit){
   // TIER-3 (code-identity evidence, not a live re-check).
   const ccStatus  = compStatuses('FCC contour cross-check (ZTR _fcc_contour vs engine)');
   const parStatus = compStatuses('FCC parity (live geo.fcc.gov/api/contours/distance.json)');
-  const parIsFallback = (components.find((x) => x.name === 'FCC parity (live geo.fcc.gov/api/contours/distance.json)')?.status === 'FALLBACK');
+  // FALLBACK on either external check counts as tier-3.  Use prefix
+  // matching so the fallback-suffixed component names still register.
+  const parIsFallback = findComponent('FCC parity (live geo.fcc.gov/api/contours/distance.json)')?.status === 'FALLBACK';
+  const ccIsFallback  = findComponent('FCC contour cross-check (ZTR _fcc_contour vs engine)')?.status === 'FALLBACK';
   let external;
   if (parStatus === 'FAIL' || ccStatus === 'FAIL'){
     external = { status: 'FAIL', detail: 'external parity check did not match the engine; investigate before filing' };
-  } else if (parIsFallback){
+  } else if (parIsFallback || ccIsFallback){
     external = { status: 'TIER-3', detail: 'live geo.fcc.gov not fetched; code-identity SHA match only (re-run for live cross-check before filing)' };
   } else if (parStatus === 'PASS' || ccStatus === 'PASS'){
     external = { status: 'PASS', detail: 'live FCC cross-check or FORTRAN parity confirmed' };
