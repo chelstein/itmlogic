@@ -305,7 +305,11 @@ export function buildCanopyRosePolarSection(exhibit){
   if (!rose || !Array.isArray(rose.samples) || rose.samples.length < 6) return null;
   const data = rose.samples
     .map(s => ({
-      azimuth_deg: Number(s.azimuth_deg),
+      // Sidecar emits the per-sample azimuth as `az_deg` (see
+      // geoRfEvidenceClient.sampleCanopyRose); the older internal
+      // shape used `azimuth_deg`.  Accept both so we keep working
+      // across contract drifts.
+      azimuth_deg: Number(s.az_deg ?? s.azimuth_deg),
       value:       Number(s.value_numeric)
     }))
     .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value));

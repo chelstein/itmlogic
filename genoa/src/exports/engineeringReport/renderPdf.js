@@ -276,7 +276,18 @@ function maybeBreak(pdf){
 
 function renderSectionInFlow(pdf, s, meta){
   const w = pdf.page.width;
-  if (s.heading){
+  // Chart types (polar-chart, scatter-chart, polygon-overlay,
+  // visual-summary, image) call renderChartHeader() inside their own
+  // pdf.addPage() context — meaning if we also draw the heading here,
+  // it lands at the bottom of the prior page, addPage() bumps to a
+  // fresh page, and the chart's own header re-renders, wasting the
+  // intermediate page entirely (observed on WFMR page 23: just a
+  // heading and nothing else).  Skip the in-flow heading for these
+  // section types; their own header function is the single source.
+  const CHART_TYPES = new Set(['polar-chart', 'scatter-chart',
+                               'polygon-overlay', 'image', 'visual-summary']);
+  const isChart = CHART_TYPES.has(s.type);
+  if (s.heading && !isChart){
     const ruleY = pdf.y;
     pdf.strokeColor(AMBER).lineWidth(0.6)
        .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
