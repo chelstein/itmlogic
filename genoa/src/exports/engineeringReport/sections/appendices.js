@@ -602,12 +602,17 @@ export function buildAppendixSections(exhibit){
                    'the 25% exclusion is applied per-receiver, not per-station, so a row ' +
                    'may contribute at some azimuths and not others.',
           table: {
+            // The interferer pool is exclusively AM stations (§73.182(k)
+            // is an AM-only RSS sum), so the power column is TPO, not
+            // ERP — the field name on the row stays erp_kw to avoid
+            // breaking the upstream FCCAM-fed row shape, but the label
+            // surfaced to the engineer is AM-correct.
             columns: [
               { key: 'call',        label: 'Call',     width: 0.12 },
               { key: 'facility_id', label: 'Facility', width: 0.10, align: 'right' },
               { key: 'class',       label: 'Class',    width: 0.08 },
               { key: 'freq_khz',    label: 'kHz',      width: 0.10, align: 'right' },
-              { key: 'erp_kw',      label: 'ERP (kW)', width: 0.12, align: 'right' },
+              { key: 'erp_kw',      label: 'TPO (kW)', width: 0.12, align: 'right' },
               { key: 'distance_km', label: 'Dist (km)', width: 0.14, align: 'right' },
               { key: 'relation',    label: 'Relation', width: 0.22 }
             ],

@@ -69,12 +69,20 @@ export function buildDaPatternChartSection(exhibit){
 
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
   const erp = Number(exhibit?.station_inputs?.erp_kw);
-  const mode = svc === 'AM' ? '§73.150 ground-wave' : '§73.316 horizontal';
+  const isAmPat = svc === 'AM';
+  const mode = isAmPat ? '§73.150 ground-wave' : '§73.316 horizontal';
+  // Power label / scaling caption must reflect the service vocabulary.
+  // AM is TPO (transmitter output power) and the §73.183 inverse-distance
+  // field scales as TPO × f²; FM/TV is ERP × f² per §73.316.  Mixing the
+  // two reads as FM-engine architecture leaking into an AM filing.
+  const powerLabel = isAmPat ? 'TPO' : 'ERP';
   const captionBits = [
     `Filed directional-antenna horizontal radiation pattern — relative field f(az) per ${mode}.`,
     'Polygon shows the pattern shape that drove every contour distance, §73.207/§73.215 protection check, and (for AM) the §73.182 NIF + §73.99 reduced-power compute.',
-    Number.isFinite(erp) ? `Maximum ERP at f=1.0: ${erp.toFixed(2)} kW.` : null,
-    'f(az)² scales the ERP per radial; the polygon below is f, not f² (matches FCC filing convention).'
+    Number.isFinite(erp) ? `Maximum ${powerLabel} at f=1.0: ${erp.toFixed(2)} kW.` : null,
+    isAmPat
+      ? 'f(az)² scales TPO per radial; the polygon below is f, not f² (matches FCC AM filing convention).'
+      : 'f(az)² scales the ERP per radial; the polygon below is f, not f² (matches FCC filing convention).'
   ].filter(Boolean).join('  ');
 
   return {
