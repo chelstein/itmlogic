@@ -12,8 +12,9 @@ const SERVICES = [
   { v: 'FX',   label: 'FM translator (§74.1204)' },
   { v: 'AM',   label: 'AM (§73.183 groundwave)' }
 ];
-// FCC class options vary by service.  Showing the FM list to an AM
-// operator means WKNV (AM Class D) can't be entered — which actually
+// FCC class options vary by service — AM gets A/B/C/D, FM gets the
+// alphabet soup.  Showing the FM list to an AM operator means an AM
+// Class D station like WKNV can't be entered — which actually
 // blocks compute for any AM daytimer.  Per 47 CFR §73.21:
 //   AM:   A (clear), B (regional), C (local), D (daytime / nighttime
 //         secondary, post-Docket 80-90 abolition retained for legacy
