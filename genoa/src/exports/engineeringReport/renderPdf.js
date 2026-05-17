@@ -490,9 +490,38 @@ function drawTableHeader(pdf, cols, widths){
 
 function renderVerdict(pdf, v){
   if (!v) return;
-  pdf.font(BOLD_FONT).fontSize(BODY_SIZE + 1).fillColor('black')
-     .text(`Status: ${v.status || '—'}    Confidence: ${v.confidence || '—'}`);
-  pdf.moveDown(0.4);
+  // Three-category headline replaces the single "Status / Confidence"
+  // line, which produced contradictions like "UNVERIFIED / LOW"
+  // immediately above "Curve validation (golden suite): PASS  36/36".
+  // The three categories report orthogonal concerns: internal math,
+  // external cross-check, filing decision.  When the verdict producer
+  // didn't emit `categories` (older code path), fall back to the
+  // legacy single line.
+  const cats = v.categories;
+  if (cats && cats.computational && cats.external && cats.filing){
+    const rows = [
+      ['COMPUTATIONAL VALIDATION',     cats.computational.status, cats.computational.detail],
+      ['EXTERNAL PARITY VERIFICATION', cats.external.status,      cats.external.detail],
+      ['FILING READINESS',             cats.filing.status,        cats.filing.detail]
+    ];
+    pdf.font(BOLD_FONT).fontSize(BODY_SIZE + 1).fillColor('black');
+    for (const [label, status, detail] of rows){
+      if (pageBottomReached(pdf)) pdf.addPage();
+      pdf.font(BOLD_FONT).fontSize(BODY_SIZE + 1).fillColor('black')
+         .text(`${label}: ${status}`);
+      if (detail){
+        pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor(TEXT_DIM)
+           .text(detail, { indent: 14 });
+        pdf.fillColor('black');
+      }
+      pdf.moveDown(0.15);
+    }
+    pdf.moveDown(0.4);
+  } else {
+    pdf.font(BOLD_FONT).fontSize(BODY_SIZE + 1).fillColor('black')
+       .text(`Status: ${v.status || '—'}    Confidence: ${v.confidence || '—'}`);
+    pdf.moveDown(0.4);
+  }
   pdf.font(BODY_FONT).fontSize(BODY_SIZE);
   for (const c of (v.components || [])){
     if (pageBottomReached(pdf)) pdf.addPage();

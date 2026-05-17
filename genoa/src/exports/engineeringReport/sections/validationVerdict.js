@@ -421,13 +421,82 @@ export function buildValidationVerdictSection(exhibit){
     confidence = capConfidence(confidence, Confidence.MEDIUM);
   }
 
+  // Three-category headline — replaces the single "Status: X /
+  // Confidence: Y" line that produced contradictions like
+  // "UNVERIFIED / LOW" appearing immediately after 36/36 golden-suite
+  // pass.  These three categories are DIFFERENT CONCEPTS and should
+  // be reported independently so a reader doesn't try to reconcile
+  // "the math is solid but the verdict says UNVERIFIED":
+  //
+  //   1. Computational validation — internal math: golden curve suite,
+  //      per-radial parity, replay determinism.  PASS/FAIL/INCOMPLETE.
+  //   2. External parity — cross-checks against the public FCC API
+  //      and the FORTRAN reference engine.  PASS/SKIP/FAIL.  Tier-3
+  //      SHA-match is NOT a live re-check; reported as TIER-3.
+  //   3. Filing readiness — combination plus the engineer-of-record
+  //      review requirement.  READY / REVIEW / DO_NOT_FILE.
+  const compStatuses = (n) => {
+    const c = components.find((x) => x.name === n);
+    return c?.status || null;
+  };
+  // Computational = curve_validation + radial_parity.  Both PASS ⇒ PASS.
+  const cvStatus = compStatuses('Curve validation (golden suite)');
+  const rpStatus = compStatuses('Radial parity (per-radial spherical-vs-Karney delta)');
+  const computational = (cvStatus === 'PASS' && (rpStatus === 'PASS' || rpStatus == null))
+    ? { status: 'PASS',         detail: 'golden suite + per-radial geometry verified' }
+    : (cvStatus === 'FAIL' || rpStatus === 'FAIL')
+      ? { status: 'FAIL',         detail: 'internal math did not pass; do not file' }
+      : { status: 'INCOMPLETE',   detail: 'curve validation or radial parity not attached' };
+
+  // External parity = fcc_cross_check + fcc_parity + FORTRAN parity.
+  // Tier-3 SHA-fallback shows up as "FALLBACK"; we report that as
+  // TIER-3 (code-identity evidence, not a live re-check).
+  const ccStatus  = compStatuses('FCC contour cross-check (ZTR _fcc_contour vs engine)');
+  const parStatus = compStatuses('FCC parity (live geo.fcc.gov/api/contours/distance.json)');
+  const parIsFallback = (components.find((x) => x.name === 'FCC parity (live geo.fcc.gov/api/contours/distance.json)')?.status === 'FALLBACK');
+  let external;
+  if (parStatus === 'FAIL' || ccStatus === 'FAIL'){
+    external = { status: 'FAIL', detail: 'external parity check did not match the engine; investigate before filing' };
+  } else if (parIsFallback){
+    external = { status: 'TIER-3', detail: 'live geo.fcc.gov not fetched; code-identity SHA match only (re-run for live cross-check before filing)' };
+  } else if (parStatus === 'PASS' || ccStatus === 'PASS'){
+    external = { status: 'PASS', detail: 'live FCC cross-check or FORTRAN parity confirmed' };
+  } else {
+    external = { status: 'SKIP', detail: 'no live external check ran and no tier-3 fallback recorded' };
+  }
+
+  // Filing readiness — a separate judgment, NOT a tautology of the
+  // other two.  This is the line the engineer-of-record cares about.
+  let filing;
+  if (computational.status === 'FAIL'){
+    filing = { status: 'DO NOT FILE', detail: 'computational validation failed' };
+  } else if (computational.status === 'INCOMPLETE'){
+    filing = { status: 'REVIEW',     detail: 'computational validation incomplete — attach missing evidence before filing' };
+  } else if (external.status === 'FAIL'){
+    filing = { status: 'DO NOT FILE', detail: 'external parity check failed' };
+  } else if (external.status === 'PASS'){
+    filing = { status: 'READY',      detail: 'computational + external both verified; engineer of record signs' };
+  } else {
+    // External SKIP or TIER-3 — math is solid but no live cross-check
+    filing = { status: 'REVIEW',     detail: 'computational verified; re-run with live FCC parity before filing if definitive cross-verification is required' };
+  }
+
   return {
     id:      'validation',
     type:    'verdict',
     heading: 'VALIDATION VERDICT',
     verdict: {
+      // Legacy single-headline fields kept for downstream consumers
+      // that read them (narrative TXT, exhibit JSON, ontology surface).
+      // The PDF renderer prefers `categories` when present.
       status,
       confidence,
+      // Three orthogonal categories — the new primary surface.
+      categories: {
+        computational,
+        external,
+        filing
+      },
       components,
       interpretation: rewordForReport(interpretation),
       limitations,
