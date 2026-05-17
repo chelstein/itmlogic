@@ -600,7 +600,16 @@ function renderImage(pdf, s){
 // ────────────────────────────────────────────────────────────────────
 
 function renderChartHeader(pdf, s){
-  pdf.addPage();
+  // Only add a fresh page when there isn't enough room left on the
+  // current page for the chart itself.  The section loop's maybeBreak()
+  // already does the "out of room" page-break before chart sections,
+  // so calling addPage() unconditionally here produces a blank page
+  // immediately after the section-loop-added one — visible in the WKNV
+  // PDF as a blank page 19 between the NIF polar (18) and the canopy
+  // rose (20).  Threshold ≈ 320 pt is enough for any chart + caption.
+  const MIN_CHART_HEIGHT = 320;
+  const remaining = pdf.page.height - MARGIN - FOOTER_AREA - pdf.y;
+  if (remaining < MIN_CHART_HEIGHT) pdf.addPage();
   if (s.heading){
     const w = pdf.page.width;
     const ruleY = pdf.y;
