@@ -12,7 +12,28 @@ const SERVICES = [
   { v: 'FX',   label: 'FM translator (§74.1204)' },
   { v: 'AM',   label: 'AM (§73.183 groundwave)' }
 ];
-const FCC_CLASSES = ['A','B1','B','C3','C2','C1','C0','C','L1'];
+// FCC class options vary by service.  Showing the FM list to an AM
+// operator means WKNV (AM Class D) can't be entered — which actually
+// blocks compute for any AM daytimer.  Per 47 CFR §73.21:
+//   AM:   A (clear), B (regional), C (local), D (daytime / nighttime
+//         secondary, post-Docket 80-90 abolition retained for legacy
+//         operations)
+// Per 47 CFR §73.211:
+//   FM:   A, B1, B, C3, C2, C1, C0, C
+// Per 47 CFR §73.811:
+//   LPFM: L1
+const FCC_CLASSES_BY_SERVICE = {
+  AM:   ['A', 'B', 'C', 'D'],
+  FM:   ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C'],
+  FX:   ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C'],   // translators inherit primary class
+  LPFM: ['L1'],
+  TV:   ['LP', 'CP', 'LD']                                // low-power TV classes (placeholder)
+};
+const FCC_CLASSES_DEFAULT = ['A', 'B1', 'B', 'C3', 'C2', 'C1', 'C0', 'C', 'D', 'L1'];
+function classesFor(service){
+  const k = String(service || '').toUpperCase();
+  return FCC_CLASSES_BY_SERVICE[k] || FCC_CLASSES_DEFAULT;
+}
 const RADIAL_STEPS = [
   { v: 45,    label: '45°' },
   { v: 22.5,  label: '22.5°' },
@@ -115,7 +136,7 @@ export default function FacilityRack({
             <FccClassSourceChip source={inputs.fcc_class_source} hasValue={!!inputs.fcc_class} />
           </label>
           <select className="rack-input" value={inputs.fcc_class || 'A'} onChange={(e) => set('fcc_class', e.target.value, 'manual')}>
-            {FCC_CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
+            {classesFor(inputs.service).map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
 
