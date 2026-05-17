@@ -336,6 +336,32 @@ export function buildAppendixSections(exhibit){
       [srcLabel('driver.for', ffe.driver_for_size), ffe.driver_for_sha256 || '—']
     );
   }
+  // Per-radial M3 conductivity segmentation status — surfaces what
+  // step 6d (per-radial M3 fan-out) actually returned for this exhibit.
+  // When the engine ran uniform-σ (no segments, sparse corpus, sidecar
+  // down) the appendix says so explicitly instead of leaving the
+  // operator to wonder why every radial returned the same distance.
+  const gcr = exhibit.evidence?.ground_conductivity_per_radial;
+  if (gcr){
+    if (gcr.available){
+      dRows.push(
+        ['σ per-radial method',     gcr.method || '—'],
+        ['σ per-radial radials',    `${gcr.radials_segmented ?? '—'} of ${gcr.radials_total ?? '—'} azimuths segmented`],
+        ['σ per-radial crossings',  `${gcr.radials_with_crossings ?? 0} radial(s) crossed at least one M3 boundary`],
+        ['σ per-radial max range',  Number.isFinite(gcr.max_km) ? `${gcr.max_km} km` : '—'],
+        ['σ per-radial fallback σ', Number.isFinite(gcr.site_sigma_mS_m) ? `${gcr.site_sigma_mS_m} mS/m (operator site value)` : '—'],
+        ['σ per-radial source',     gcr.data_source || 'geodata sidecar /api/geodata/conductivity/radial'],
+        ['σ per-radial regulation', gcr.regulation || '47 CFR §73.184 mixed-conductivity path']
+      );
+    } else {
+      dRows.push(
+        ['σ per-radial status',     `NOT applied — ${gcr.reason || 'reason not recorded'}`],
+        ['σ per-radial fallback',   'engine ran uniform-σ path (single value across all azimuths)'],
+        ['σ per-radial source',     gcr.data_source || 'geodata sidecar /api/geodata/conductivity/radial']
+      );
+    }
+  }
+
   sections.push({
     id:      'appendix-d',
     type:    'kv',

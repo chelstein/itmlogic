@@ -2282,8 +2282,10 @@ export async function computeExhibit(req){
   //            (reserved; in-memory only today, not yet persistent).
   //   Tier 3 — Dataset SHA-256 match: when the dataset hash pinned in this
   //            exhibit matches the upstream fcc/contours-api-node commit,
-  //            live parity is guaranteed by code+data identity.  Recorded
-  //            with fallback_tier=3, overall_pass=true, n_samples=0.
+  //            code-identity is strong evidence of parity (same code + same
+  //            curves) — but it is NOT a live cross-check; numerical paths
+  //            and FCC server-side post-processing can still diverge.
+  //            Recorded with fallback_tier=3, overall_pass=true, n_samples=0.
   //
   // Operators can OPT OUT per request via options.fcc_parity_report=false.
   // The compute budget caps live-fetch latency; on timeout/error we fall
@@ -2349,7 +2351,7 @@ export async function computeExhibit(req){
         overall_pass:             !!matches,
         fallback_tier:            3,
         detail:                   matches
-          ? `Dataset SHA-256 ${datasetSha} matches upstream ${upstream}.  Live parity is guaranteed by code+data identity (Genoa runs the same vendored implementation as the public FCC API).  ${reason}.`
+          ? `Dataset SHA-256 ${datasetSha} matches upstream ${upstream}.  Code-identity evidence of parity (Genoa runs the same vendored implementation as the public FCC API), but this is NOT a live cross-check against geo.fcc.gov — numerical paths and FCC server-side post-processing can still diverge.  ${reason}.`
           : `Dataset SHA-256 ${datasetSha || 'unknown'} did NOT match the pinned upstream commit; live parity could not be confirmed.  ${reason}.`,
         tier3_dataset_sha:        datasetSha,
         tier3_expected_upstream:  upstream,
@@ -2363,7 +2365,7 @@ export async function computeExhibit(req){
       };
       if (matches){
         warnings.push(W.make('FCC_PARITY_VERIFIED',
-          `Tier-3 deterministic: dataset SHA-256 matches upstream ${upstream}.  Live fetch was not completed (${reason}); parity guaranteed by code identity.`));
+          `Tier-3 deterministic: dataset SHA-256 matches upstream ${upstream}.  Live fetch was not completed (${reason}); code-identity evidence (not a live re-check) — engineer of record should re-run with live parity before filing if definitive cross-verification is required.`));
       } else {
         warnings.push(W.make('FCC_PARITY_DELTA',
           `Tier-3 fallback could not verify parity: dataset SHA mismatch or absent.  ${reason}.`));
