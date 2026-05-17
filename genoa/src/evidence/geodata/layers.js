@@ -197,6 +197,149 @@ export async function sampleM3Conductivity({ lat, lon, layerCfg, query, now }){
   };
 }
 
+// ── M3 conductivity along a radial — per-azimuth boundary crossings ──
+//
+// For an AM groundwave compute under §73.184 we need to know which
+// conductivity zones each radial passes through, not just the σ at
+// the tower site.  The current corpus is boundary LINESTRINGs, which
+// is exactly the right shape for crossings: we cast the radial as a
+// great-circle linestring out to max_km and ask PostGIS for every
+// boundary segment that intersects, sorted by distance from the
+// origin.  Between adjacent crossings, σ is constant (the zone
+// enclosed by those boundaries).  The σ associated with each segment
+// is the m3_value attribute of the BOUNDARY (which encodes the value
+// on the "interior" side per the FCC Figure M3 SEQ legend); first
+// segment (origin → first crossing) inherits the operator-supplied
+// site σ since no boundary has been crossed yet.
+//
+// Returns: { available, lat, lon, bearing_deg, max_km,
+//            crossings: [{ km, sigma_mS_m, boundary_pk_or_label }],
+//            segments: [{ from_km, to_km, sigma_mS_m }],
+//            warnings, replay, sampled_at }
+//
+// A great-circle bearing endpoint in WGS-84 — close enough for the
+// 50..500 km AM contour distances; for thousands of km we'd use a
+// geographic 2-point geodesic but at FCC contour scales the planar
+// approximation is well under 1 km of cross-track error.
+function bearingDestinationLatLon(lat, lon, bearing_deg, max_km){
+  const R = 6371.0088;
+  const br = (bearing_deg * Math.PI) / 180;
+  const d  = max_km / R;
+  const φ1 = (lat * Math.PI) / 180;
+  const λ1 = (lon * Math.PI) / 180;
+  const φ2 = Math.asin(Math.sin(φ1) * Math.cos(d) + Math.cos(φ1) * Math.sin(d) * Math.cos(br));
+  const λ2 = λ1 + Math.atan2(Math.sin(br) * Math.sin(d) * Math.cos(φ1),
+                             Math.cos(d) - Math.sin(φ1) * Math.sin(φ2));
+  return [(φ2 * 180) / Math.PI, (((λ2 * 180) / Math.PI + 540) % 360) - 180];
+}
+
+export async function sampleM3PolylineCrossings({
+  lat, lon, bearing_deg, max_km,
+  site_sigma_mS_m = null,
+  layerCfg, query, now
+}){
+  const [lat2, lon2] = bearingDestinationLatLon(lat, lon, bearing_deg, max_km);
+  // Build a 2-point LINESTRING; PostGIS handles segmenting internally
+  // for the ST_Intersects + ST_Intersection calls.  Geographic types
+  // for accurate distance; cast to geometry for ST_Intersection.
+  const sql = `
+    WITH radial AS (
+      SELECT ST_SetSRID(ST_MakeLine(
+                ST_MakePoint($2, $1),
+                ST_MakePoint($4, $3)
+             ), 4326) AS line,
+             ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography AS origin
+    ),
+    hits AS (
+      SELECT
+        b.m3_value,
+        b.id AS boundary_id,
+        ST_Distance(
+          radial.origin,
+          (ST_Dump(ST_Intersection(b.geom, radial.line))).geom::geography
+        ) / 1000.0 AS km
+      FROM ${layerCfg.table} b, radial
+      WHERE ST_Intersects(b.geom, radial.line)
+    )
+    SELECT m3_value, boundary_id, km
+    FROM hits
+    WHERE km IS NOT NULL AND km > 0 AND km <= $5
+    ORDER BY km ASC
+  `;
+  const replay =
+    `psql -c "WITH radial AS (SELECT ST_SetSRID(ST_MakeLine(` +
+    `ST_MakePoint(${lon}, ${lat}), ST_MakePoint(${lon2}, ${lat2})), 4326) AS line) ` +
+    `SELECT m3_value, id, ST_Distance(...) FROM ${layerCfg.table}, radial ` +
+    `WHERE ST_Intersects(geom, line) ORDER BY km;"`;
+
+  const warnings = [];
+  let crossings = [];
+  let available = true;
+  try {
+    const r = await query(sql, [lat, lon, lat2, lon2, max_km]);
+    crossings = (r?.rows || []).map((row) => ({
+      km:           Number(row.km),
+      sigma_mS_m:   row.m3_value != null ? Number(row.m3_value) : null,
+      boundary_id:  row.boundary_id ?? null
+    })).filter((c) => Number.isFinite(c.km));
+  } catch (e){
+    available = false;
+    warnings.push(`postgis polyline crossings query failed: ${String(e?.message || e)}`);
+  }
+
+  // Build constant-σ segments from origin → first crossing → next → …
+  // Origin-segment σ is the operator-supplied site value when present
+  // (we haven't crossed any boundary yet), otherwise the σ on the
+  // NEAREST crossing as a best-effort guess.
+  const segments = [];
+  let cursor_km   = 0;
+  let cursor_sigma = Number.isFinite(Number(site_sigma_mS_m))
+                       ? Number(site_sigma_mS_m)
+                       : (crossings[0]?.sigma_mS_m ?? null);
+  for (const x of crossings){
+    if (x.km > cursor_km && cursor_sigma != null){
+      segments.push({
+        from_km:    cursor_km,
+        to_km:      x.km,
+        sigma_mS_m: cursor_sigma
+      });
+    }
+    cursor_km    = x.km;
+    cursor_sigma = x.sigma_mS_m ?? cursor_sigma;
+  }
+  if (cursor_km < max_km && cursor_sigma != null){
+    segments.push({
+      from_km:    cursor_km,
+      to_km:      max_km,
+      sigma_mS_m: cursor_sigma
+    });
+  }
+
+  if (crossings.length === 0){
+    warnings.push(`no M3 boundary crossings within ${max_km} km — radial is entirely within a single conductivity zone (or corpus is sparse)`);
+  }
+
+  return {
+    available,
+    lat, lon, bearing_deg, max_km,
+    layer:        'm3_conductivity_postgis',
+    source:       {
+      path:           layerCfg.geojson_source,
+      table:          layerCfg.table,
+      crs:            layerCfg.crs,
+      dataset_class:  layerCfg.dataset_class
+    },
+    crossings,
+    segments,
+    interpretation: crossings.length === 0
+      ? 'no M3 boundary crossings — radial uniform-σ'
+      : `radial crosses ${crossings.length} M3 boundary segment(s); ${segments.length} constant-σ zone(s) along path`,
+    warnings,
+    replay,
+    sampled_at: (now || new Date()).toISOString()
+  };
+}
+
 // ── GLOBE terrain status (no sampling yet) ───────────────────────
 //
 // GLOBE tiles are present on disk but georeferencing has not been
