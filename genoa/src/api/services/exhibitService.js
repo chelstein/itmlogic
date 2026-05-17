@@ -300,15 +300,37 @@ export async function computeExhibit(req){
   // status, last action, public-file folder index) to surface
   // alongside the engine output.  Public upstreams (no auth);
   // wrapped in budget so a slow upstream doesn't stall the exhibit.
+  //
+  // PARALLELIZATION: this lookup is independent of HAAT, terrain, ITM,
+  // nearby primaries, and the engine compute itself — its result feeds
+  // only the cross-check warnings and the cover/provenance sections,
+  // none of which read it until after step 7.  Wrap the whole block in
+  // a deferred Promise so the network call runs concurrently with
+  // steps 3-6 (terrain HAAT, SPLAT probe, NEC, multi-source DEM, ITM
+  // coverage, SDR pre-attach, identity, nearby primaries).  We await
+  // the promise just before step 7 (engine compute) so any side-effects
+  // on `evidence` + `warnings` are in place before the engine runs.
+  //
+  // On a typical FM compute the fcc_lms call takes ~10 s; with this
+  // restructure that 10 s now overlaps with the ~10-30 s of terrain
+  // and DEM work in steps 3-3d instead of adding to it.
   let lmsResp = null;
-  if (sidecars.fccLms && (inputs.call || inputs.facility_id)){
-    lmsResp = await budget.withDeadline('fcc_lms',
-      () => sidecars.fccLms.getStationRecord({
-        call:        inputs.call         || null,
-        facility_id: inputs.facility_id  || null,
-        service:     inputs.service      || null
-      }), { minMs: 4_000 });
-    if (lmsResp?.available){
+  const fccLmsPromise = (sidecars.fccLms && (inputs.call || inputs.facility_id))
+    ? (async () => {
+      lmsResp = await budget.withDeadline('fcc_lms',
+        () => sidecars.fccLms.getStationRecord({
+          call:        inputs.call         || null,
+          facility_id: inputs.facility_id  || null,
+          service:     inputs.service      || null
+        }), { minMs: 4_000 });
+      await _processFccLmsResult(lmsResp, inputs, evidence, warnings, W);
+      return lmsResp;
+    })()
+    : Promise.resolve(null);
+
+  /* prettier-ignore */ async function _processFccLmsResult(lmsResp, inputs, evidence, warnings, W){
+    if (!lmsResp) return;
+    if (lmsResp.available){
       // Cross-check ZTR/inputs vs FCC LMS row.  Tolerances kept loose
       // because FMQ rounds frequency to 0.1 MHz and ERP to 0.1 kW.
       const license = lmsResp.license || {};
@@ -894,6 +916,25 @@ export async function computeExhibit(req){
         evidence.itm_coverage_attempted = { available: false, error: String(err.message) };
       }
     }
+
+    // If ITM was requested (options.use_itm) but neither SPLAT nor the
+    // JS fallback produced closed-ring coverage, attach an explicit
+    // "attempted, unavailable" diagnostic on the exhibit so the report
+    // and UI can surface WHY the §73.314 section is missing instead of
+    // silently dropping it.  Operators who checked the "compute terrain
+    // ITM" box deserve to see what happened.
+    if (!evidence.itm_coverage){
+      evidence.itm_coverage_unavailable = {
+        attempted:        true,
+        reason:           'neither SPLAT sidecar nor JS Bullington/P.526 fallback produced closed-ring coverage within compute budget',
+        splat_attempt:    splatAttempt
+          ? { available: !!splatAttempt.available, error: splatAttempt.error || null,
+              endpoint:  splatAttempt.endpoint || null,
+              sidecar_enhancement_required: splatAttempt.sidecar_enhancement_required || null }
+          : { available: false, error: 'SPLAT sidecar not configured' },
+        guidance:         'Re-run with a longer SPLAT_TIMEOUT_SECONDS / COMPUTE_BUDGET_MS, or check the SPLAT sidecar health (see Service Health rack).  ITM coverage is supplementary §73.314 evidence; filing-controlling §73.333 contours are NOT affected.'
+      };
+    }
   }
 
   // ---- 4. SDR evidence — pre-attach so engine sees it ----
@@ -1199,6 +1240,12 @@ export async function computeExhibit(req){
       }
     }
   }
+
+  // Resolve the deferred FCC LMS lookup (kicked off at step 2b-2) so
+  // any side-effects on `evidence` + `warnings` are in place before
+  // the engine compute reads them.  The promise ran concurrently with
+  // steps 3-6; on a typical FM compute this overlap saves ~10 s.
+  await fccLmsPromise;
 
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {
@@ -2095,18 +2142,19 @@ export async function computeExhibit(req){
   //            trivially passes.  Recorded with fallback_tier=3.
   if (crossCheckRun){
     exhibit.validation.fcc_cross_check = {
-      source:        crossCheckRun.source,
-      endpoint:      crossCheckRun.endpoint,
-      upstream_api:  crossCheckRun.upstream_api,
-      method:        crossCheckRun.method,
-      tolerance_km:  crossCheckRun.tolerance_km,
-      ran_at:        crossCheckRun.ran_at,
-      n_run:         crossCheckRun.n_run,
-      n_pass:        crossCheckRun.n_pass,
-      max_error_km:  crossCheckRun.max_error_km,
-      result:        crossCheckRun.authoritative_pass ? 'pass'
-                       : (crossCheckRun.reference_cases_present ? 'fail' : 'skipped'),
-      fallback_tier: 1
+      source:               crossCheckRun.source,
+      endpoint:             crossCheckRun.endpoint,
+      upstream_api:         crossCheckRun.upstream_api,
+      method:               crossCheckRun.method,
+      tolerance_km:         crossCheckRun.tolerance_km,
+      ran_at:                crossCheckRun.ran_at,
+      n_run:                 crossCheckRun.n_run,
+      n_pass:                crossCheckRun.n_pass,
+      n_terrain_deviation:   crossCheckRun.n_terrain_deviation || 0,
+      max_error_km:          crossCheckRun.max_error_km,
+      result:               crossCheckRun.authoritative_pass ? 'pass'
+                              : (crossCheckRun.reference_cases_present ? 'fail' : 'skipped'),
+      fallback_tier:        1
     };
   } else {
     // Tier-3 deterministic: engine IS the vendored FCC implementation.
@@ -2281,8 +2329,13 @@ export async function computeExhibit(req){
   exhibit.compute_budget = {
     budget_ms:   budget.budget_ms,
     elapsed_ms:  budget.elapsed_ms(),
-    skipped
+    skipped,
+    timings:     budget.timings()
   };
+  // Always log a one-line per-stage breakdown so operators can see
+  // exactly where wall-clock went on slow computes without redeploying.
+  // Threshold 500 ms hides cache-hit noise.
+  console.log(`[exhibit-perf] elapsed=${budget.elapsed_ms()}ms  ${budget.timingSummary(500)}`);
 
   exhibit.warnings         = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');

@@ -220,3 +220,205 @@ export function buildFortranParityChartSection(exhibit){
     caption:     captionBits
   };
 }
+
+// ---------------------------------------------------------------------------
+// Nearby Stations Distribution — every protected station drawn at its
+// (bearing, distance) from the subject TX, color-coded by §73.215 pass/fail.
+// Lets an engineer eyeball the regulatory neighborhood — "all the fails are
+// to the northwest at < 80 km" — instead of paging through the table in
+// Appendix B.  V-Soft tabulates this data; nobody else plots it.
+// ---------------------------------------------------------------------------
+export function buildNearbyStationsChartSection(exhibit){
+  const isr = exhibit?.interference_study;
+  if (!isr || !Array.isArray(isr.stations) || isr.stations.length === 0) return null;
+  const txLat = Number(exhibit?.station_inputs?.lat);
+  const txLon = Number(exhibit?.station_inputs?.lon);
+  if (!Number.isFinite(txLat) || !Number.isFinite(txLon)) return null;
+  const nearby = Array.isArray(exhibit.evidence?.nearby_primaries)
+    ? exhibit.evidence.nearby_primaries : [];
+  const byCall = new Map();
+  const byFid  = new Map();
+  for (const n of nearby){
+    if (n?.call)        byCall.set(String(n.call).toUpperCase(), n);
+    if (n?.facility_id) byFid.set(String(n.facility_id), n);
+  }
+  const lookupLatLon = (s) => {
+    const hit = (s?.call && byCall.get(String(s.call).toUpperCase()))
+             || (s?.facility_id && byFid.get(String(s.facility_id)));
+    if (!hit) return null;
+    const lat = Number(hit.lat ?? hit.latitude);
+    const lon = Number(hit.lon ?? hit.longitude);
+    return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+  };
+  // Great-circle initial bearing from (lat1, lon1) to (lat2, lon2), 0..360.
+  const bearingDeg = (lat1, lon1, lat2, lon2) => {
+    const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  };
+  const data = [];
+  let n_pass = 0, n_fail = 0;
+  for (const st of isr.stations){
+    const dKm = Number(st.distance_km);
+    if (!Number.isFinite(dKm) || dKm <= 0) continue;
+    const ll  = lookupLatLon(st);
+    if (!ll) continue;
+    const bear = bearingDeg(txLat, txLon, ll.lat, ll.lon);
+    const ok   = st.pass_overall !== false;
+    if (ok) n_pass++; else n_fail++;
+    data.push({ x: bear, y: dKm, ok });
+  }
+  if (data.length < 3) return null;
+  return {
+    id:        'nearby-stations-chart',
+    type:      'scatter-chart',
+    heading:   'Nearby protected stations — bearing × distance',
+    data,
+    x_label:     'Bearing from subject TX (deg, 0 = north)',
+    y_label:     'Distance (km)',
+    x_min:       0,
+    x_max:       360,
+    caption:     `${data.length} protected station(s) plotted at their great-circle ` +
+                 `(bearing, distance) from the subject TX.  Amber points pass under ` +
+                 `§73.207 / §73.215; red points fail.  ` +
+                 `${n_pass} pass / ${n_fail} fail.  ` +
+                 `Use this plot to spot directional clustering of conflicts — ` +
+                 `e.g. all failures concentrated on one heading often indicates a ` +
+                 `single co-channel cluster, while scattered failures suggest a ` +
+                 `wide-area allocation problem.  Subject TX is at (0, 0) by construction.`
+  };
+}
+// around the tx so an engineer can see the environmental clutter pattern
+// at a glance.  Pulls from evidence.geo_rf_evidence.datasets.tree_canopy.rose
+// which the Geo-RF Evidence sidecar populates as part of every compute.
+// ADVISORY — does not modify FCC contour distances.
+// ---------------------------------------------------------------------------
+export function buildCanopyRosePolarSection(exhibit){
+  const ge = exhibit?.evidence?.geo_rf_evidence;
+  if (!ge || ge.status !== 'run') return null;
+  const tc = (ge.datasets?.tree_canopy && ge.datasets.tree_canopy.available)
+               ? ge.datasets.tree_canopy
+               : (ge.datasets?.tree_canopy_conus || {});
+  const rose = tc.rose;
+  if (!rose || !Array.isArray(rose.samples) || rose.samples.length < 6) return null;
+  const data = rose.samples
+    .map(s => ({
+      // Sidecar emits the per-sample azimuth as `az_deg` (see
+      // geoRfEvidenceClient.sampleCanopyRose); the older internal
+      // shape used `azimuth_deg`.  Accept both so we keep working
+      // across contract drifts.
+      azimuth_deg: Number(s.az_deg ?? s.azimuth_deg),
+      value:       Number(s.value_numeric)
+    }))
+    .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value));
+  if (data.length < 6) return null;
+  const vals = data.map(p => p.value);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return {
+    id:        'canopy-rose-chart',
+    type:      'polar-chart',
+    heading:   'Tree-canopy rose — environmental clutter around tx',
+    data,
+    r_unit:    '%',
+    r_max:     Math.max(20, Math.ceil(max * 1.15)),
+    caption:   `Per-azimuth canopy density at ${rose.distance_km} km radius from the transmitter, ` +
+               `from the USFS Tree Canopy CONUS 2022 (${tc.dataset || 'science_tcc_CONUS_2022_v2023-5'}) advisory raster.  ` +
+               `${rose.n_azimuths} azimuths · min ${min}% · max ${max}% · mean ${mean.toFixed(1)}%.  ` +
+               `Larger spread between min and max indicates directional environmental heterogeneity ` +
+               `(e.g. transmitter on a cleared peak surrounded by forest on one heading).  ` +
+               `ADVISORY ONLY: does not modify FCC §73.x contour distances or any filing-controlling rule output.`
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Per-radial HAAT polar plot — shows tower elevation advantage by azimuth.
+// Useful: a station with high HAAT to the south + low HAAT to the north
+// produces an asymmetric service contour even on a non-directional antenna.
+// Pulls from exhibit.radial_table which is populated for FM / FX / LPFM /
+// TV exhibits with terrain HAAT (either ZTR or multi-source DEM path).
+// ---------------------------------------------------------------------------
+export function buildHaatPolarChartSection(exhibit){
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  if (svc === 'AM') return null;     // §73.184 grid is sigma/distance, not HAAT
+  const rows = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];
+  if (rows.length < 6) return null;
+  const data = rows
+    .map(r => ({
+      azimuth_deg: Number(r.azimuth_deg ?? r.az_deg),
+      value:       Number(r.haat_m)
+    }))
+    .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value) && p.value > 0);
+  if (data.length < 6) return null;
+  const vals = data.map(p => p.value);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  const spread = max - min;
+  // Only emit when there's enough variation to be visually informative;
+  // a constant-HAAT exhibit (e.g. CONSTANT_HAAT_ASSUMED) renders as a
+  // flat circle and adds no signal.
+  if (spread < 5) return null;
+  return {
+    id:        'haat-polar-chart',
+    type:      'polar-chart',
+    heading:   'Per-radial HAAT polar — terrain elevation advantage by azimuth',
+    data,
+    r_unit:    'm',
+    r_max:     Math.ceil(max * 1.08),
+    caption:   `Height Above Average Terrain (HAAT) per 47 CFR §73.313 evaluated on each ${
+                 rows.length >= 36 ? Math.round(360 / rows.length) : 'recorded'} ` +
+               `degree azimuth.  Range ${min.toFixed(0)}–${max.toFixed(0)} m, mean ${mean.toFixed(0)} m, spread ${spread.toFixed(0)} m.  ` +
+               `Higher HAAT on a given heading yields longer §73.333 service contours on that same heading; ` +
+               `this plot makes terrain-driven coverage asymmetry visible at a glance even on non-directional antennas.`
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Service-contour polar plot — the primary (60 dBu / 0.5 mV/m) contour
+// distance per azimuth, drawn as a closed polar polygon.  Renders the
+// actual shape of the protected service area.  For non-directional + flat
+// terrain this is a circle; with directional antennas or terrain variation
+// it shows the real footprint shape that V-Soft tabulates as a number list.
+// ---------------------------------------------------------------------------
+export function buildContourPolarChartSection(exhibit){
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const rows = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];
+  if (rows.length < 6) return null;
+  // Pick the "primary" contour id per service.
+  const primaryId = svc === 'AM' ? 'primary_5mvm'
+                  : svc === 'LPFM' ? 'service_60dbu'
+                  : 'service_60dbu';
+  const data = rows
+    .map(r => {
+      const dKm = r.contour_distances_km?.[primaryId];
+      return {
+        azimuth_deg: Number(r.azimuth_deg ?? r.az_deg),
+        value:       Number(dKm)
+      };
+    })
+    .filter(p => Number.isFinite(p.azimuth_deg) && Number.isFinite(p.value) && p.value > 0);
+  if (data.length < 6) return null;
+  const vals = data.map(p => p.value);
+  const min  = Math.min(...vals);
+  const max  = Math.max(...vals);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length;
+  return {
+    id:        'service-contour-polar',
+    type:      'polar-chart',
+    heading:   svc === 'AM'
+                 ? 'Primary service contour polar — 5 mV/m per 47 CFR §73.184'
+                 : 'Service contour polar — 60 dBu (1 mV/m) per 47 CFR §73.333',
+    data,
+    r_unit:    'km',
+    r_max:     Math.ceil(max * 1.08),
+    caption:   `Per-azimuth service-contour distance from the transmitter.  ` +
+               `Range ${min.toFixed(1)}–${max.toFixed(1)} km, mean ${mean.toFixed(1)} km.  ` +
+               `Drawn from the same per-radial values that populate Appendix A — visualizes the actual ` +
+               `shape of the protected service footprint, including directional-antenna shaping and ` +
+               `terrain-driven asymmetry.`
+  };
+}

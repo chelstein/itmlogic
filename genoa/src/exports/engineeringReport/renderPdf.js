@@ -276,7 +276,18 @@ function maybeBreak(pdf){
 
 function renderSectionInFlow(pdf, s, meta){
   const w = pdf.page.width;
-  if (s.heading){
+  // Chart types (polar-chart, scatter-chart, polygon-overlay,
+  // visual-summary, image) call renderChartHeader() inside their own
+  // pdf.addPage() context — meaning if we also draw the heading here,
+  // it lands at the bottom of the prior page, addPage() bumps to a
+  // fresh page, and the chart's own header re-renders, wasting the
+  // intermediate page entirely (observed on WFMR page 23: just a
+  // heading and nothing else).  Skip the in-flow heading for these
+  // section types; their own header function is the single source.
+  const CHART_TYPES = new Set(['polar-chart', 'scatter-chart',
+                               'polygon-overlay', 'image', 'visual-summary']);
+  const isChart = CHART_TYPES.has(s.type);
+  if (s.heading && !isChart){
     const ruleY = pdf.y;
     pdf.strokeColor(AMBER).lineWidth(0.6)
        .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
@@ -589,7 +600,16 @@ function renderImage(pdf, s){
 // ────────────────────────────────────────────────────────────────────
 
 function renderChartHeader(pdf, s){
-  pdf.addPage();
+  // Only add a fresh page when there isn't enough room left on the
+  // current page for the chart itself.  The section loop's maybeBreak()
+  // already does the "out of room" page-break before chart sections,
+  // so calling addPage() unconditionally here produces a blank page
+  // immediately after the section-loop-added one — visible in the WKNV
+  // PDF as a blank page 19 between the NIF polar (18) and the canopy
+  // rose (20).  Threshold ≈ 320 pt is enough for any chart + caption.
+  const MIN_CHART_HEIGHT = 320;
+  const remaining = pdf.page.height - MARGIN - FOOTER_AREA - pdf.y;
+  if (remaining < MIN_CHART_HEIGHT) pdf.addPage();
   if (s.heading){
     const w = pdf.page.width;
     const ruleY = pdf.y;
@@ -646,13 +666,21 @@ function renderPolarChart(pdf, s){
     const r = radius * (i / 4);
     pdf.circle(cx, cy, r).stroke();
   }
-  // Range ring labels (along east axis).
+  // Range ring labels — placed just INSIDE each ring along the east
+  // axis so they never collide with the "E" cardinal label and never
+  // get clipped by the page edge on the outermost ring.  Background-
+  // tint padding box (1pt off-white) keeps them readable when they
+  // sit on top of a filled polygon (e.g. the NIF or service-contour
+  // polar plot).  Was: `cx + r + 2, cy - 4` outside the ring, which
+  // pushed the outermost label past the chart frame (visible on WFMR
+  // / WKNV PDFs as "B2.0 km" / "B50 km" with the leading digit cut).
   pdf.font(MONO_FONT).fontSize(7).fillColor(TEXT_DIM);
   for (let i = 1; i <= 4; i++){
     const r  = radius * (i / 4);
     const rv = rMax  * (i / 4);
-    pdf.text(`${rv.toFixed(rv >= 100 ? 0 : 1)} ${s.r_unit || 'km'}`,
-             cx + r + 2, cy - 4, { lineBreak: false });
+    const txt = `${rv.toFixed(rv >= 100 ? 0 : 1)} ${s.r_unit || 'km'}`;
+    const tw  = pdf.widthOfString(txt);
+    pdf.text(txt, cx + r - tw - 4, cy + 4, { lineBreak: false });
   }
 
   // Compass spokes every 30°.
@@ -1209,10 +1237,16 @@ function renderVisualSummary(pdf, s){
   }
 
   // ── ENVIRONMENT (canopy) stat tile ──────────────────────────────────
+  // Shows the TX-point canopy value AND, when sampled, the rose summary
+  // (min / max / mean at the rose distance).  The spread between point
+  // and rose is the engineering signal — a TX on a clearing surrounded
+  // by forest reads very differently from a uniformly open site.
   if (s.canopy){
     const v = s.canopy.value_numeric;
+    const rose = s.canopy.rose;
+    const tileH = rose ? 78 : 60;
     pdf.save();
-    pdf.fillColor('#2c4a2d').rect(sbX0, sbY0, STATS_W, 60).fill();
+    pdf.fillColor('#2c4a2d').rect(sbX0, sbY0, STATS_W, tileH).fill();
     pdf.font(BODY_FONT).fontSize(statLblSize).fillColor('#cfe9b6')
        .text('TREE CANOPY AT TRANSMITTER', sbX0 + 8, sbY0 + 6,
              { width: STATS_W - 16, characterSpacing: 0.6, lineBreak: false, ellipsis: true });
@@ -1222,8 +1256,14 @@ function renderVisualSummary(pdf, s){
     pdf.font(ITALIC_FONT).fontSize(7).fillColor('#cfe9b6')
        .text(s.canopy.interpretation || '', sbX0 + 8, sbY0 + 44,
              { width: STATS_W - 16, lineBreak: true, height: 14, ellipsis: true });
+    if (rose){
+      pdf.font(MONO_FONT).fontSize(6.5).fillColor('#cfe9b6')
+         .text(`rose @ ${rose.distance_km} km  ·  min ${rose.min}  max ${rose.max}  mean ${rose.mean}`,
+               sbX0 + 8, sbY0 + tileH - 14,
+               { width: STATS_W - 16, lineBreak: false, ellipsis: true });
+    }
     pdf.restore();
-    sbY0 += 70;
+    sbY0 += tileH + 10;
   }
 
   // ── COVERAGE area stat tile ──────────────────────────────────────────
@@ -1252,7 +1292,15 @@ function renderVisualSummary(pdf, s){
     pdf.moveTo(sbX0, sbY0 + 4).lineTo(sbX0 + 18, sbY0 + 4).stroke();
     pdf.undash();
     pdf.restore();
-    const txt = `${c.label}  ·  ${c.radius_km.toFixed(2)} km`;
+    // Strip parentheticals from the label so "60 dBu (1 mV/m service)"
+    // becomes "60 dBu service".  The full string overflowed the
+    // 144pt sidebar and pdfkit's lineBreak:false didn't suppress
+    // wrapping when the text width physically exceeded the bounds —
+    // result on WFMR PDF page 6 was a chopped legend with the
+    // distance falling onto its own line and the next contour's
+    // label crashing into it.
+    const shortLabel = String(c.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    const txt = `${shortLabel}  ·  ${c.radius_km.toFixed(1)} km`;
     pdf.font(MONO_FONT).fontSize(legendSize).fillColor('#2a3a48')
        .text(txt, sbX0 + 24, sbY0, { width: STATS_W - 24, lineBreak: false, ellipsis: true });
     sbY0 += 11;

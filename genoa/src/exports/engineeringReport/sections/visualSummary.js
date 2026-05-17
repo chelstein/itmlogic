@@ -26,33 +26,46 @@ export function buildVisualSummarySection(exhibit){
   const txLon = Number(inp.lon);
   if (!Number.isFinite(txLat) || !Number.isFinite(txLon)) return null;
 
-  // Contour definitions from the engine.  Shape:
-  //   { id, label, mean_km, min_km, max_km, area_km2 }  (non-DA: all same)
-  // Plus optionally per-radial polygons on exhibit.radial_table.
+  // Contour radii live on exhibit.polygons (engine/index.js:337) as
+  //   { contour_id, label, mean_radial_km, area_km2, field_strength, ... }
+  // exhibit.contour_definitions carries only { id, label, field_strength }
+  // — it does NOT include radii, so we key off polygons here.  When
+  // polygons is empty (coordinates missing / non-coord exhibit) the
+  // section is skipped.
+  const polys = Array.isArray(exhibit?.polygons) ? exhibit.polygons : [];
+  if (polys.length === 0) return null;
   const defs = Array.isArray(exhibit?.contour_definitions) ? exhibit.contour_definitions : [];
-  if (defs.length === 0) return null;
 
   // Build a stable, ordered palette of rings — outermost first so the
   // renderer paints back-to-front (large washes underneath, tight rings
   // on top).  IDs follow the engine's contour ID convention.
+  // Higher opacity so the rings actually read at print size.  Previously
+  // 0.05-0.28 produced rings nearly invisible on the PDF.  Bumped to
+  // 0.20-0.55 — readable from across the room, still translucent enough
+  // that overlapping rings show their nesting.
   const PALETTE = {
-    night_intf:      { color: '#2b4a5d', label: '0.025 mV/m night',  fill_opacity: 0.05,  dashed: true  },
-    secondary_05mvm: { color: '#d6a85d', label: '0.5 mV/m secondary',fill_opacity: 0.10,  dashed: false },
-    primary_2mvm:    { color: '#c8843c', label: '2 mV/m primary',    fill_opacity: 0.18,  dashed: false },
-    city_5mvm:       { color: '#a8412a', label: '5 mV/m city grade', fill_opacity: 0.28,  dashed: false }
+    night_intf:      { color: '#2b4a5d', label: '0.025 mV/m night',  fill_opacity: 0.20,  dashed: true  },
+    secondary_05mvm: { color: '#d6a85d', label: '0.5 mV/m secondary',fill_opacity: 0.32,  dashed: false },
+    primary_2mvm:    { color: '#c8843c', label: '2 mV/m primary',    fill_opacity: 0.45,  dashed: false },
+    city_5mvm:       { color: '#a8412a', label: '5 mV/m city grade', fill_opacity: 0.55,  dashed: false },
+    // FM/FX/LPFM/TV dBu contours use the same warm-to-deep ramp.
+    protected_40dbu: { color: '#2b4a5d', label: '40 dBu protected',  fill_opacity: 0.20,  dashed: true  },
+    city_54dbu:      { color: '#d6a85d', label: '54 dBu city grade', fill_opacity: 0.40,  dashed: false },
+    service_60dbu:   { color: '#a8412a', label: '60 dBu (1 mV/m)',   fill_opacity: 0.55,  dashed: false }
   };
 
-  const contours = defs
-    .map((d) => {
-      const km = Number(d?.mean_km ?? d?.max_km);
+  const labelById = new Map(defs.map(d => [String(d?.id || '').toLowerCase(), d?.label]));
+  const contours = polys
+    .map((p) => {
+      const km = Number(p?.mean_radial_km);
       if (!Number.isFinite(km) || km <= 0) return null;
-      const id = String(d?.id || '').toLowerCase();
-      const style = PALETTE[id] || { color: '#666666', label: d?.label || id, fill_opacity: 0.08, dashed: false };
+      const id = String(p?.contour_id || '').toLowerCase();
+      const style = PALETTE[id] || { color: '#666666', label: p?.label || id, fill_opacity: 0.08, dashed: false };
       return {
         id,
-        label:        d?.label || style.label,
+        label:        p?.label || labelById.get(id) || style.label,
         radius_km:    km,
-        area_km2:     Number(d?.area_km2),
+        area_km2:     Number(p?.area_km2),
         color:        style.color,
         fill_opacity: style.fill_opacity,
         dashed:       style.dashed,
@@ -92,17 +105,46 @@ export function buildVisualSummarySection(exhibit){
       }
     : null;
 
-  // Environmental RF evidence — geo-RF tree canopy at tx site.
+  // Environmental RF evidence — geo-RF tree canopy at tx site.  Both
+  // the canonical `tree_canopy` slot and the legacy `tree_canopy_conus`
+  // slot are checked so older sidecar contracts still render.  The
+  // 12-azimuth canopy rose summary (when present) carries far more
+  // engineering signal than the single TX-point value alone: a TX on a
+  // cleared peak surrounded by heavy forest (e.g. WNBZ at 32 % TX-point
+  // but rose mean 80 %) is a different propagation environment than a
+  // TX on a uniform open plain.  Surface the rose stats here so the
+  // visual showpiece carries the actual environmental context.
   const ge = exhibit?.evidence?.geo_rf_evidence;
-  const tc = ge?.datasets?.tree_canopy_conus || {};
-  const canopy = (ge?.status === 'run' && tc.available)
-    ? {
-        value_numeric:  Number.isFinite(Number(tc.value_numeric)) ? Number(tc.value_numeric) : null,
-        value_raw:      tc.value_raw || null,
-        dataset:        tc.dataset || null,
-        interpretation: tc.interpretation || null
+  const tc = (ge?.datasets?.tree_canopy && ge.datasets.tree_canopy.available)
+               ? ge.datasets.tree_canopy
+               : (ge?.datasets?.tree_canopy_conus || {});
+  let canopy = null;
+  if (ge?.status === 'run' && tc.available){
+    canopy = {
+      value_numeric:  Number.isFinite(Number(tc.value_numeric)) ? Number(tc.value_numeric) : null,
+      value_raw:      tc.value_raw || null,
+      dataset:        tc.dataset || null,
+      interpretation: tc.interpretation || null,
+      rose:           null
+    };
+    const rose = tc.rose && Array.isArray(tc.rose.samples) ? tc.rose : null;
+    if (rose){
+      const vals = rose.samples
+        .map(s => Number(s.value_numeric))
+        .filter(Number.isFinite);
+      if (vals.length){
+        canopy.rose = {
+          n_azimuths:   rose.n_azimuths,
+          distance_km:  rose.distance_km,
+          min:          Math.min(...vals),
+          max:          Math.max(...vals),
+          mean:         Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1)),
+          n_in_coverage: vals.length,
+          n_total:      rose.samples.length
+        };
       }
-    : null;
+    }
+  }
 
   const fmtKhz = (f) => {
     const n = Number(f);

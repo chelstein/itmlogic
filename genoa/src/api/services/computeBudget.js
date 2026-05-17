@@ -55,6 +55,7 @@ export function makeBudget(budgetMs){
   const start_ms = Date.now();
   const deadline_ms = start_ms + budget;
   const skipped = [];                  // [{ name, reason, elapsed_ms }]
+  const timings = [];                  // [{ name, ms, ok, started_ms }]
 
   return {
     budget_ms:    budget,
@@ -87,22 +88,28 @@ export function makeBudget(budgetMs){
       const remaining = deadline_ms - Date.now();
       if (remaining < minMs){
         skipped.push({ name, reason: 'budget exhausted before start', elapsed_ms: Date.now() - start_ms, remaining_ms: remaining });
+        timings.push({ name, ms: 0, ok: false, started_ms: Date.now() - start_ms, note: 'skipped' });
         return null;
       }
       const work = typeof produce === 'function' ? produce() : produce;
+      const stage_t0 = Date.now();
       let timer = null;
       try {
-        return await Promise.race([
+        const result = await Promise.race([
           work,
           new Promise((_resolve, reject) => {
             timer = setTimeout(() => reject(new BudgetTimeoutError(name, remaining)), remaining);
           })
         ]);
+        timings.push({ name, ms: Date.now() - stage_t0, ok: true, started_ms: stage_t0 - start_ms });
+        return result;
       } catch (e){
         if (e instanceof BudgetTimeoutError){
           skipped.push({ name, reason: 'budget timeout', elapsed_ms: Date.now() - start_ms, deadline_ms_into_request: e.elapsed_ms });
+          timings.push({ name, ms: Date.now() - stage_t0, ok: false, started_ms: stage_t0 - start_ms, note: 'timeout' });
           return null;
         }
+        timings.push({ name, ms: Date.now() - stage_t0, ok: false, started_ms: stage_t0 - start_ms, note: 'error' });
         throw e;
       } finally {
         if (timer) clearTimeout(timer);
@@ -112,6 +119,23 @@ export function makeBudget(budgetMs){
      * Snapshot of skipped fetches for the warning payload.
      */
     skipped: () => skipped.slice(),
+    /**
+     * Per-stage timings (every withDeadline call) — ok and not-ok.
+     * Sorted descending by ms so the slowest stage is first.
+     */
+    timings: () => timings.slice().sort((a, b) => b.ms - a.ms),
+    /**
+     * Pretty-print a one-line breakdown of all stages over a minimum
+     * threshold.  Default 500 ms hides noise from fast cache-hits.
+     */
+    timingSummary: (minMs = 500) => {
+      const top = timings
+        .filter(t => t.ms >= minMs)
+        .sort((a, b) => b.ms - a.ms)
+        .map(t => `${t.name}=${t.ms}ms${t.note ? '/' + t.note : ''}`)
+        .join(' ');
+      return top || '(all stages under threshold)';
+    },
     /**
      * Total elapsed wall clock at this moment.
      */

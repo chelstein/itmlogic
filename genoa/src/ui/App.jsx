@@ -6,7 +6,6 @@ import AppShell      from '@components/ui/AppShell.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
 import ServiceHealthPanel from '@components/ui/ServiceHealthPanel.jsx';
-import SidecarHealthRack from '@components/ui/SidecarHealthRack.jsx';
 import EvidenceRack      from '@components/ui/EvidenceRack.jsx';
 import MapPreview        from '@components/ui/MapPreview.jsx';
 import ChartScope    from '@components/ui/ChartScope.jsx';
@@ -860,7 +859,6 @@ function MainApp({ onLogout }) {
           busy={busy}
         />
         <ServiceHealthPanel />
-        <SidecarHealthRack />
       </>)}
       center={(
         <>

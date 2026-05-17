@@ -56,15 +56,22 @@ export function buildCoverSection(exhibit){
       // available — never silently substitute mv.fcc_orchestration.commit.
       ['Engine SHA',           fmt((sig.hash || mv.engine_sha)?.slice?.(0, 12))],
       // Curve dataset: prefer the explicit `dataset` label set by the engine.
-      // Fall back to the curve-dataset's own metadata (vendored tvfm_curves.js
-      // for FM/TV, gwave.js for AM), or the dataset SHA-256 as a last resort
-      // identifier so the row never shows just "—".
+      // AM exhibits stamp curve_dataset.curve_version (e.g.
+      // "fcc-contours-api-node@b55870d3f2") and curve_dataset.dataset_sha256
+      // (a per-file SHA-256 object for gwave.js + gwave_field.json), not the
+      // FM-style `meta_sha256` scalar.  FM/TV use the older curve_engine
+      // "fcc-canonical" string.  Fall through every shape so the row never
+      // shows "—" on a real exhibit.
       ['Curve dataset',        fmt(mv.dataset
                                 || mv.curve_dataset?.label
                                 || mv.curve_dataset?.name
+                                || mv.curve_dataset?.curve_version
                                 || (mv.curve_engine === 'fcc-canonical' ? 'FCC tvfm_curves.js (vendored, fcc/contours-api-node)' : null)
                                 || (mv.curve_dataset?.meta_sha256 ? `dataset SHA-256 ${String(mv.curve_dataset.meta_sha256).slice(0, 12)}…` : null)
-                                || (mv.dataset_meta_sha256 ? `dataset SHA-256 ${String(mv.dataset_meta_sha256).slice(0, 12)}…` : null))],
+                                || (mv.dataset_meta_sha256 ? `dataset SHA-256 ${String(mv.dataset_meta_sha256).slice(0, 12)}…` : null)
+                                || (mv.curve_dataset?.dataset_sha256 && typeof mv.curve_dataset.dataset_sha256 === 'object'
+                                      ? `dataset SHA-256 ${String(Object.values(mv.curve_dataset.dataset_sha256)[0] || '').slice(0, 12)}…`
+                                      : null))],
       ['Date',                 new Date().toISOString().slice(0, 10)]
     ].filter(Boolean)
   };

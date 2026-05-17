@@ -828,38 +828,50 @@ export function buildAppendixSections(exhibit){
       ['Advisory',                     'Yes'],
       ['Status',                       status],
       ['Latitude',                     fmtCoord(inp.lat)],
-      ['Longitude',                    fmtCoord(inp.lon)],
-
-      // ── Confidence-scoring context (prominent) ───────────────────────
-      ['Confidence scoring context',   csx.role
-                                         ? `${csx.role} — contributes to ${(csx.contributes_to || []).join(', ') || 'narrative only'}`
-                                         : 'advisory inputs only — narrative context'],
-
-      // ── Observed-vs-predicted residual support (prominent) ───────────
-      ['Observed-vs-predicted residual support',
-                                       rsx.available || rs.available
-                                         ? 'available — cross-references evidence.sdr_residuals (advisory)'
-                                         : 'unavailable — no SDR residual support attached'],
-
-      // ── Tree canopy ──────────────────────────────────────────────────
-      ['Tree canopy dataset',          tc.dataset || (tc.available ? '(unspecified)' : 'unavailable')],
-      ['Tree canopy value',            tc.value_numeric != null
-                                         ? `${tc.value_numeric}${tc.interpretation ? `  (${tc.interpretation})` : ''}`
-                                         : (tc.value_raw || 'unavailable')]
+      ['Longitude',                    fmtCoord(inp.lon)]
     ];
+
+    // Confidence-scoring context — only surface when the sidecar attached
+    // a role.  An empty stub line ("advisory inputs only — narrative
+    // context") added no information and read as noise on review.
+    if (csx.role){
+      rows.push(['Confidence scoring context',
+        `${csx.role} — contributes to ${(csx.contributes_to || []).join(', ') || 'narrative only'}`]);
+    }
+
+    // Observed-vs-predicted residual support — only surface when SDR
+    // residuals are actually attached.  Skip the row entirely when not.
+    if (rsx.available || rs.available){
+      rows.push(['Observed-vs-predicted residual support',
+        'available — cross-references evidence.sdr_residuals (advisory)']);
+    }
+
+    // Tree canopy — always show when sampled; skip rows when no value.
+    if (tc.dataset || tc.value_numeric != null || tc.value_raw){
+      rows.push(['Tree canopy dataset', tc.dataset || '(unspecified)']);
+      if (tc.value_numeric != null){
+        rows.push(['Tree canopy value',
+          `${tc.value_numeric}${tc.interpretation ? `  (${tc.interpretation})` : ''}`]);
+      } else if (tc.value_raw){
+        rows.push(['Tree canopy value', tc.value_raw]);
+      }
+    }
     if (roseSummary){
       rows.push(['Tree canopy rose',   roseSummary]);
     }
-    rows.push(
-      // ── Auxiliary dataset slots ──────────────────────────────────────
-      ['Landcover',                    yesNo(lc.available)],
-      ['Tau RF model artifacts',       yesNo(tau.available)],
-      ['FCC M3 conductivity coverage', yesNo(m3.available)],
-      ['Water proximity',              yesNo(wp.available)],
-      ['Climate projection coverage',  yesNo(cp.available)],
-      ['SDR residual support',         yesNo(rs.available)],
+    // Auxiliary dataset slots — only list datasets that actually have
+    // data attached.  Listing every queryable layer as "unavailable"
+    // surfaced as noise on the engineering review; the absence of a row
+    // already communicates "not sampled on this exhibit".
+    if (lc.available)  rows.push(['Landcover',                    lc.dataset || 'available']);
+    if (tau.available) rows.push(['Tau RF model artifacts',       tau.dataset || 'available']);
+    if (m3.available)  rows.push(['FCC M3 conductivity coverage', m3.dataset || 'available']);
+    if (wp.available)  rows.push(['Water proximity',              wp.dataset || 'available']);
+    if (cp.available)  rows.push(['Climate projection coverage',  cp.dataset || 'available']);
+    if (rs.available)  rows.push(['SDR residual support',         rs.dataset || 'available']);
 
-      // ── Provenance ───────────────────────────────────────────────────
+    // ── Provenance ───────────────────────────────────────────────────
+    rows.push(
       ['Sidecar service',              geoRf.sidecar_service || 'genoa-geo-rf-evidence'],
       ['Fetched at',                   geoRf.fetched_at || '—']
     );

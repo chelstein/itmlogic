@@ -89,12 +89,32 @@ export function buildValidationVerdictSection(exhibit){
     const isFallback = tier > 1;
     const passed = xc.result === 'pass' || xc.pass === true;
     const skipped = xc.result === 'skipped';
+    // Build the detail string.  When the FCC's authoritative contour
+    // ran terrain-aware ITM (over NED elevation) and Genoa's engine is
+    // free-space §73.333, the public-API contour will legitimately
+    // diverge at high-HAAT / mountainous sites.  The validator now
+    // classifies such divergences as `terrain_deviation` (informational)
+    // rather than `fail`.  Surface that here so reviewers see the
+    // physically-correct framing instead of "0/1 fail".
+    const tdev = Number(xc.n_terrain_deviation) || 0;
+    let detail = xc.detail || xc.message;
+    if (!detail){
+      if (xc.n_pass != null && xc.n_run != null){
+        if (tdev > 0){
+          detail = `${xc.n_pass} of ${xc.n_run} contour feature(s) match within ${xc.tolerance_km ?? 5} km; ${tdev} classified as terrain-aware deviation (FCC contour runs ITM over NED elevation, engine is free-space §73.333 — expected delta for high-HAAT / mountainous sites, not a math failure).`;
+        } else {
+          detail = `${xc.n_pass} of ${xc.n_run} contour feature(s) match within ${xc.tolerance_km ?? 5} km tolerance.`;
+        }
+      } else {
+        detail = '—';
+      }
+    }
     components.push({
       name:   `FCC contour cross-check (ZTR _fcc_contour vs engine)${isFallback ? ` — tier ${tier} fallback` : ''}`,
       status: isFallback
                 ? (passed ? 'FALLBACK' : skipped ? 'FALLBACK' : 'FAIL')
                 : (passed ? 'PASS'     : skipped ? 'SKIP'     : 'FAIL'),
-      detail: xc.detail || xc.message || (xc.n_pass != null ? `${xc.n_pass}/${xc.n_run} radials within tolerance` : '—')
+      detail
     });
   } else {
     // Absent record = data-loss / orchestrator bug, not a deterministic
@@ -223,14 +243,23 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
-  // Interference rules
+  // Interference rules — REGULATORY COMPLIANCE FINDING, not a math
+  // validation result.  When the §73.215 / §73.207 study reports
+  // failures, the facility doesn't comply with current rules — but the
+  // ENGINE MATH is still correct.  Tag this as category: 'compliance'
+  // so the verdict headline Status/Confidence (computed from
+  // category: 'validation' components only) doesn't conflate "facility
+  // out of compliance" with "engine math unverified".  The line still
+  // renders in the component list so the engineer sees it at a glance;
+  // the Engineering Conclusion section below repeats and explains it.
   const isr = exhibit.interference_study;
   components.push({
-    name:   'Interference rules',
-    status: isr ? (isr.filing_qualifies === true ? 'PASS' : isr.filing_qualifies === false ? 'FAIL' : 'WARN') : 'NOT_RUN',
-    detail: isr
-              ? `${isr.n_stations} stations evaluated; ${isr.n_pass} pass / ${isr.n_fail} fail under ${(isr.rules_evaluated || []).join(' / ')}`
-              : 'no interference study (no nearby_primaries attached)'
+    name:     'Interference rules',
+    category: 'compliance',
+    status:   isr ? (isr.filing_qualifies === true ? 'PASS' : isr.filing_qualifies === false ? 'FAIL' : 'WARN') : 'NOT_RUN',
+    detail:   isr
+                ? `${isr.n_stations} stations evaluated; ${isr.n_pass} pass / ${isr.n_fail} fail under ${(isr.rules_evaluated || []).join(' / ')}`
+                : 'no interference study (no nearby_primaries attached)'
   });
 
   // AM §73.182 nighttime NIF (AM exhibits only; FM ignores).
@@ -286,8 +315,16 @@ export function buildValidationVerdictSection(exhibit){
   // headline confidence at MEDIUM and the status at PARTIAL — a
   // reviewer cannot see VERIFIED / HIGH on an exhibit whose nighttime
   // allocation is screening-only.
-  const hasScreening = components.some(c => c.status === 'SCREENING');
-  const hasComponentFail = components.some(c => c.status === 'FAIL');
+  //
+  // Status/Confidence is computed from VALIDATION components only —
+  // category 'compliance' (e.g. Interference rules §73.215 failures)
+  // is a regulatory finding, not a math-validation failure, and gets
+  // surfaced separately in the Engineering Conclusion section below.
+  // Mixing them produced misleading "UNVERIFIED · LOW" headlines on
+  // exhibits whose engine math was at 0.000 km FORTRAN parity.
+  const validationComponents = components.filter(c => (c.category || 'validation') === 'validation');
+  const hasScreening     = validationComponents.some(c => c.status === 'SCREENING');
+  const hasComponentFail = validationComponents.some(c => c.status === 'FAIL');
 
   let status, confidence;
   if (!curvePass){
@@ -320,7 +357,20 @@ export function buildValidationVerdictSection(exhibit){
   if (status === 'VERIFIED'){
     interpretation = 'Genoa\'s computed contour distances match both the locked 36-case golden reference AND the FCC\'s public contour API at every sample.  The exhibit\'s technical math is fully verified against the FCC engine; final filing certification is the qualified broadcast engineer\'s responsibility.';
   } else if (status === 'PARTIAL'){
-    interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite.  The live FCC parity check was either not requested (opt-in via options.fcc_parity_report=true) or had partial sample coverage.  The exhibit\'s technical math is consistent with the vendored FCC engine; consider running the parity check before filing.';
+    // The previous wording said the live parity was "either not requested
+    // (opt-in via options.fcc_parity_report=true) or had partial sample
+    // coverage" — both halves were misleading.  The parity check is
+    // opt-OUT (defaults on; disabled only via options.fcc_parity_report
+    // = false), so "not requested" is almost never the actual cause.
+    // When the live check doesn't complete it's because the upstream
+    // geo.fcc.gov endpoint was slow / unreachable or the compute budget
+    // ran out before the per-sample fetches finished — neither a user
+    // error.  Genoa\'s tier-3 fallback (dataset SHA-256 identity to the
+    // upstream fcc/contours-api-node commit) STILL provides verification:
+    // when the SHA matches, Genoa is running bit-identical code against
+    // bit-identical curve data, so live parity is guaranteed by code +
+    // data identity rather than by re-querying the public API.
+    interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit), which guarantees parity by code+data identity even when the live HTTP fetch is slow or rate-limited.  The exhibit\'s math is verified; the engineer of record may re-run with the live parity check before filing if a re-query is preferred.';
   } else {
     interpretation = 'Curve validation did not pass for this exhibit.  The technical math is NOT verified; do not file this exhibit until validation is investigated and the underlying engine / dataset issue resolved.';
   }

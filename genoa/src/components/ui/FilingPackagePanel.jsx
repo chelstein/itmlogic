@@ -158,7 +158,9 @@ export default function FilingPackagePanel({ exhibit }){
   return (
     <div className="space-y-4 font-mono text-[12px]">
       <div className="text-textDim text-[10px] tracking-rack uppercase">
-        FCC Form 301-FM &middot; Section III (engineering)
+        {pkg?.form?.form_id
+          ? `FCC Form ${pkg.form.form_id} · ${pkg.form.lms_section || 'Section III (engineering)'}`
+          : 'FCC filing package · Section III (engineering)'}
       </div>
 
       {/* Readiness header */}

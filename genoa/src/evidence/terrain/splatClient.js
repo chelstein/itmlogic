@@ -143,7 +143,7 @@ export function makeSplatClient({
 
     async predictItmCoverage({ tx, max_distance_km = 80, target_field_dbu = 60,
                                 radial_step_deg = 10, climate_code = 5,
-                                timeout_seconds = 180,
+                                timeout_seconds = Number(process.env.SPLAT_TIMEOUT_SECONDS) || 60,
                                 auto_provision_dem = true,
                                 provision_concurrency = 3 } = {}){
       if (!tx || !Number.isFinite(Number(tx.lat)) || !Number.isFinite(Number(tx.lon))){

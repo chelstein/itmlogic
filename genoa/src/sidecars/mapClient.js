@@ -31,7 +31,15 @@
 // 240 s (4 min) default matches the engineering-statement PDF
 // generation envelope the operator described.  Operator can override
 // via MAP_SIDECAR_TIMEOUT_MS for short-budget pipelines.
-const DEFAULT_TIMEOUT_MS = Number(process.env.MAP_SIDECAR_TIMEOUT_MS) || 240_000;
+// The map sidecar is OPTIONAL — when it's slow or unreachable, the
+// PDF embeds a "deferred to engineer" placeholder instead of a render.
+// 60 seconds is the right ceiling: under healthy load the chromium /
+// Leaflet render returns in 5–15 s, so 60 s is 4× headroom; beyond
+// that we'd rather ship the PDF with a placeholder than block the
+// engineer's compute for another three minutes.  Operators who run a
+// custom map sidecar on slower hardware can bump this via
+// MAP_SIDECAR_TIMEOUT_MS on the deploy.
+const DEFAULT_TIMEOUT_MS = Number(process.env.MAP_SIDECAR_TIMEOUT_MS) || 60_000;
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
 
 function isPng(buf){

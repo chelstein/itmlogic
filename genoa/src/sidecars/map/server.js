@@ -39,6 +39,12 @@ const PORT          = parseInt(process.env.SIDECAR_PORT || '8086', 10);
 const CHROMIUM_PATH = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
 const WIDTH         = parseInt(process.env.RENDER_WIDTH_PX  || '1500', 10);
 const HEIGHT        = parseInt(process.env.RENDER_HEIGHT_PX || '1000', 10);
+// HiDPI rendering — Chromium renders text + vector layers at this
+// multiple of the viewport pixel size, producing a sharper PNG that
+// embeds in the engineering-statement PDF at ~460 DPI instead of the
+// blurry ~230 DPI you get with deviceScaleFactor=1.  PNG payload size
+// scales ~4x at dsf=2 but stays well under the multi-MB ceiling.
+const SCALE_FACTOR  = parseInt(process.env.RENDER_SCALE_FACTOR || '2', 10);
 const TIMEOUT_MS    = parseInt(process.env.RENDER_TIMEOUT_MS || '20000', 10);
 
 let browser = null;
@@ -117,7 +123,7 @@ app.post('/render', async (req, res) => {
   try {
     const b = await getBrowser();
     page = await b.newPage();
-    await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: 1 });
+    await page.setViewport({ width: WIDTH, height: HEIGHT, deviceScaleFactor: SCALE_FACTOR });
 
     // Inject exhibit + options BEFORE the page navigates so render.html
     // can read them at module-init time.

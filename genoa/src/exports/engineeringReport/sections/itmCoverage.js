@@ -19,7 +19,35 @@
 export function buildItmCoverageSection(exhibit, options){
   const itm = (exhibit?.itm_polygons || [])[0];
   const evidence = exhibit?.evidence?.itm_coverage;
-  if (!itm || !itm.closed) return null;
+  // When ITM coverage was REQUESTED but both SPLAT and the JS fallback
+  // failed to produce closed-ring evidence, render a transparent
+  // placeholder instead of silently dropping the section.  The operator
+  // checked the "compute terrain ITM" box and deserves to see why their
+  // §73.314 study didn't make it into the PDF.
+  if (!itm || !itm.closed){
+    const unavail = exhibit?.evidence?.itm_coverage_unavailable;
+    if (unavail?.attempted){
+      const splat = unavail.splat_attempt || {};
+      const rows = [
+        ['Method',          '47 CFR §73.314 supplementary terrain-aware coverage (attempted)'],
+        ['Status',          'UNAVAILABLE — coverage not closed within compute budget'],
+        ['SPLAT sidecar',   splat.available
+                              ? 'reached'
+                              : `unavailable${splat.error ? ' — ' + splat.error : ''}`],
+        ['JS fallback',     'attempted (Bullington + ITU-R P.526)'],
+        ['Filing effect',   'NONE — §73.314 ITM is supplementary; §73.333 contour distances are unaffected'],
+        ['Guidance',        unavail.guidance || 'Re-run with longer SPLAT timeout or check SPLAT sidecar health.']
+      ];
+      return {
+        id:      'itm-coverage',
+        type:    'kv',
+        heading: 'ITM COVERAGE — 47 CFR §73.314 (ATTEMPTED, UNAVAILABLE)',
+        preface: 'Terrain-aware Longley-Rice ITM coverage was requested for this exhibit but did not complete.  This is SUPPLEMENTARY EVIDENCE under §73.314; the §73.333 deterministic contour distances reported elsewhere remain the filing-controlling reference and are unaffected by this section.',
+        rows
+      };
+    }
+    return null;
+  }
 
   const meanT = itm.mean_radial_km;
   const meanF = itm.fcc_mean_km;
