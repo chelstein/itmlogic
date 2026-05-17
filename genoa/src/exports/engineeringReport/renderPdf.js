@@ -666,13 +666,21 @@ function renderPolarChart(pdf, s){
     const r = radius * (i / 4);
     pdf.circle(cx, cy, r).stroke();
   }
-  // Range ring labels (along east axis).
+  // Range ring labels — placed just INSIDE each ring along the east
+  // axis so they never collide with the "E" cardinal label and never
+  // get clipped by the page edge on the outermost ring.  Background-
+  // tint padding box (1pt off-white) keeps them readable when they
+  // sit on top of a filled polygon (e.g. the NIF or service-contour
+  // polar plot).  Was: `cx + r + 2, cy - 4` outside the ring, which
+  // pushed the outermost label past the chart frame (visible on WFMR
+  // / WKNV PDFs as "B2.0 km" / "B50 km" with the leading digit cut).
   pdf.font(MONO_FONT).fontSize(7).fillColor(TEXT_DIM);
   for (let i = 1; i <= 4; i++){
     const r  = radius * (i / 4);
     const rv = rMax  * (i / 4);
-    pdf.text(`${rv.toFixed(rv >= 100 ? 0 : 1)} ${s.r_unit || 'km'}`,
-             cx + r + 2, cy - 4, { lineBreak: false });
+    const txt = `${rv.toFixed(rv >= 100 ? 0 : 1)} ${s.r_unit || 'km'}`;
+    const tw  = pdf.widthOfString(txt);
+    pdf.text(txt, cx + r - tw - 4, cy + 4, { lineBreak: false });
   }
 
   // Compass spokes every 30°.
@@ -1284,7 +1292,15 @@ function renderVisualSummary(pdf, s){
     pdf.moveTo(sbX0, sbY0 + 4).lineTo(sbX0 + 18, sbY0 + 4).stroke();
     pdf.undash();
     pdf.restore();
-    const txt = `${c.label}  ·  ${c.radius_km.toFixed(2)} km`;
+    // Strip parentheticals from the label so "60 dBu (1 mV/m service)"
+    // becomes "60 dBu service".  The full string overflowed the
+    // 144pt sidebar and pdfkit's lineBreak:false didn't suppress
+    // wrapping when the text width physically exceeded the bounds —
+    // result on WFMR PDF page 6 was a chopped legend with the
+    // distance falling onto its own line and the next contour's
+    // label crashing into it.
+    const shortLabel = String(c.label || '').replace(/\s*\([^)]*\)\s*/g, ' ').replace(/\s+/g, ' ').trim();
+    const txt = `${shortLabel}  ·  ${c.radius_km.toFixed(1)} km`;
     pdf.font(MONO_FONT).fontSize(legendSize).fillColor('#2a3a48')
        .text(txt, sbX0 + 24, sbY0, { width: STATS_W - 24, lineBreak: false, ellipsis: true });
     sbY0 += 11;
