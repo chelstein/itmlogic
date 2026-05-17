@@ -129,7 +129,9 @@ export function buildValidationVerdictSection(exhibit){
   // ----- FCC parity (live distance.json) -----
   // Three-tier: tier 1 = live geo.fcc.gov, tier 2 = (cached, reserved),
   // tier 3 = dataset-SHA-256 match — when the dataset hash matches the
-  // upstream commit, live parity is guaranteed by code+data identity.
+  // upstream commit it's strong evidence of parity (same code + same
+  // curves), not a guarantee.  Numerical paths, edge cases, and any
+  // downstream FCC server-side post-processing can still diverge.
   if (par){
     const tier  = par.fallback_tier ?? 1;
     const isFallback = tier > 1;
@@ -143,7 +145,7 @@ export function buildValidationVerdictSection(exhibit){
                    failed ? 'FAIL' :
                    par.available === false ? 'SKIP' : 'PARTIAL'),
       detail: passed && isFallback
-                ? (par.detail || `dataset SHA matches upstream — live parity guaranteed by code identity`)
+                ? (par.detail || `dataset SHA matches upstream — code-identity evidence (not a live re-check)`)
                 : par.available
                 ? `${par.n_pass}/${par.n_samples} samples within ${par.tolerance_km} km tolerance; max delta ${par.max_error_km} km`
                 : (par.detail || par.reason || par.error || 'parity report not available')
@@ -365,12 +367,13 @@ export function buildValidationVerdictSection(exhibit){
     // When the live check doesn't complete it's because the upstream
     // geo.fcc.gov endpoint was slow / unreachable or the compute budget
     // ran out before the per-sample fetches finished — neither a user
-    // error.  Genoa\'s tier-3 fallback (dataset SHA-256 identity to the
-    // upstream fcc/contours-api-node commit) STILL provides verification:
-    // when the SHA matches, Genoa is running bit-identical code against
-    // bit-identical curve data, so live parity is guaranteed by code +
-    // data identity rather than by re-querying the public API.
-    interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit), which guarantees parity by code+data identity even when the live HTTP fetch is slow or rate-limited.  The exhibit\'s math is verified; the engineer of record may re-run with the live parity check before filing if a re-query is preferred.';
+    // error.  Tier-3 fallback (dataset SHA-256 identity to the upstream
+    // fcc/contours-api-node commit) provides STRONG EVIDENCE of parity
+    // (same code + same curves) but does not constitute a live re-check
+    // against the public API.  An engineer of record should re-run with
+    // the live check before filing if a definitive cross-verification
+    // is required.
+    interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit).  Code-identity is strong evidence of parity but is NOT a live cross-check; engineer of record should re-run with the live parity check before filing if definitive cross-verification is required.';
   } else {
     interpretation = 'Curve validation did not pass for this exhibit.  The technical math is NOT verified; do not file this exhibit until validation is investigated and the underlying engine / dataset issue resolved.';
   }
