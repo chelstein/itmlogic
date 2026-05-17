@@ -1264,6 +1264,18 @@ export async function computeExhibit(req){
   // is sparse, segmentation silently falls back to uniform σ (engine
   // handles missing/empty segments transparently).  Failure is NEVER
   // a blocker — uniform σ is the safe regression.
+  // Diagnostic sentinel — set BEFORE any conditional so a missing
+  // evidence.ground_conductivity_per_radial on an AM exhibit means
+  // step 6d truly never executed (e.g. early throw above, AM check
+  // mis-fired on service vocabulary, or this file isn't deployed).
+  // Subsequent branches overwrite with the real result.
+  if (String(inputs.service || '').toUpperCase() === 'AM'){
+    evidence.ground_conductivity_per_radial = {
+      available: false,
+      reason:    'step 6d entered but no resolution path completed (sentinel)',
+      fetched_at: new Date().toISOString()
+    };
+  }
   if (String(inputs.service || '').toUpperCase() === 'AM'
       && Number.isFinite(Number(inputs.lat))
       && Number.isFinite(Number(inputs.lon))
