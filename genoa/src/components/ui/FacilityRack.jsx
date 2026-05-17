@@ -165,14 +165,36 @@ export default function FacilityRack({
           <label className="rack-label">Frequency</label>
           <input className="rack-input" value={inputs.frequency ?? ''} onChange={e => set('frequency', e.target.value)} placeholder="MHz / kHz" />
         </div>
-        <div>
-          <label className="rack-label">ERP (kW)</label>
-          <input className="rack-input" value={inputs.erp_kw ?? ''} onChange={e => set('erp_kw', e.target.value)} placeholder="e.g. 100" />
-        </div>
-        <div>
-          <label className="rack-label">HAAT (m)</label>
-          <input className="rack-input" value={inputs.haat_m ?? ''} onChange={e => set('haat_m', e.target.value)} placeholder="e.g. 561" />
-        </div>
+        {inputs.service === 'AM' ? (
+          <>
+            {/* AM uses 47 CFR §73.183 groundwave — TPO drives the
+                unattenuated RMS field at 1 km, ground conductivity
+                (AM σ below) drives the propagation curve.  ERP/HAAT
+                are FM/TV concepts and don't apply.  Internal field
+                is still erp_kw so the engine's existing §73.183 math
+                keeps working untouched (for non-DA AM, TPO ≈ "ERP"
+                for the inverse-distance reference). */}
+            <div>
+              <label className="rack-label">TPO (kW)</label>
+              <input className="rack-input" value={inputs.erp_kw ?? ''} onChange={e => set('erp_kw', e.target.value)} placeholder="e.g. 10" />
+            </div>
+            <div>
+              <label className="rack-label">RMS field @ 1 km (mV/m)</label>
+              <input className="rack-input" value={inputs.rms_field_1km ?? ''} onChange={e => set('rms_field_1km', e.target.value)} placeholder="from license" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="rack-label">ERP (kW)</label>
+              <input className="rack-input" value={inputs.erp_kw ?? ''} onChange={e => set('erp_kw', e.target.value)} placeholder="e.g. 100" />
+            </div>
+            <div>
+              <label className="rack-label">HAAT (m)</label>
+              <input className="rack-input" value={inputs.haat_m ?? ''} onChange={e => set('haat_m', e.target.value)} placeholder="e.g. 561" />
+            </div>
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2 mt-3">
