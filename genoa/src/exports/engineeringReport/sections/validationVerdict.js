@@ -289,6 +289,30 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
+  // International AM treaty zone — surfaced as compliance-category
+  // ADVISORY whenever the site falls inside the US/Mexico or US/Canada
+  // bilateral protection radius.  Real treaty compliance still requires
+  // per-station overlap checks against nearby_primaries; this component
+  // tells the engineer the obligation EXISTS.
+  const ibd = exhibit.international_border;
+  if (ibd && ibd.available && Array.isArray(ibd.treaties) && ibd.treaties.length){
+    const treatyNames = ibd.treaties.map((t) => t.treaty).join(' + ');
+    const nearestKm = Number.isFinite(ibd.nearest_border_km) ? ibd.nearest_border_km.toFixed(1) : '—';
+    components.push({
+      name:     'International AM treaty zone',
+      category: 'compliance',
+      status:   'WARN',
+      detail:   `Site is ${nearestKm} km from ${ibd.nearest_border}; ${treatyNames} applies.  Verify co-channel / first-adjacent Mexican (US/MX) and / or Canadian (US/CA) AM stations are protected per the relevant treaty — nearby_primaries query should include international stations within the treaty radius (US/MX: 320 km, US/CA: 800 km).`
+    });
+  } else if (ibd && ibd.available){
+    components.push({
+      name:     'International AM treaty zone',
+      category: 'compliance',
+      status:   'PASS',
+      detail:   `Site is outside both US/Mexico (${ibd.distances?.us_mx_km} km) and US/Canada (${ibd.distances?.us_ca_km} km) AM treaty zones — no bilateral protection obligations triggered.`
+    });
+  }
+
   // §73.24(j) AM principal-community coverage — 5 mV/m contour must
   // encompass legal boundary of city of license.  See Mullaney KELP
   // 1989 Section I for the canonical 'substantial compliance' showing.
