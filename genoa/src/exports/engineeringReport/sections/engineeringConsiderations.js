@@ -56,7 +56,15 @@ export function buildEngineeringConsiderationsSection(exhibit){
         ['Terrain severity score',     Number.isFinite(ec.terrain_severity_score) ? Number(ec.terrain_severity_score).toFixed(3) : 'n/a (no DEM input)']
       ].filter(Boolean);
 
-  if (!rows.length){
+  // When the exhibit is UNMEASURED across the board, render the
+  // no-table form — the explanation already says "no measurement
+  // basis" once.  Listing 360 identical "UNMEASURED / 0.00 / 0.0"
+  // rows (the previous behavior) just wastes 5+ pages with redundant
+  // noise.  Same logic for any all-equal-flagged exhibit where every
+  // row carries the same reason code: collapse to summary only.
+  const allUnmeasured = ec.level === 'UNMEASURED'
+                     || (rows.length > 0 && rows.every((r) => r.confidence === 'UNMEASURED'));
+  if (!rows.length || allUnmeasured){
     return {
       id:      'engineering-considerations',
       type:    'paragraphs-with-kv',
