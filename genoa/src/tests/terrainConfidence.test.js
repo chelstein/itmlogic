@@ -142,14 +142,17 @@ test('aggregateEngineeringConfidence is LOW when ≥20% of radials are LOW', () 
 test('analyzeTerrainConfidence produces aggregate summary on a real exhibit', async () => {
   const x = await buildExhibit(FM_CLASS_A);
   const ec = analyzeTerrainConfidence(x);
-  assert.ok(['HIGH', 'MODERATE', 'LOW'].includes(ec.level));
+  // UNMEASURED is now valid for exhibits without DEM or drive-test data
+  // (the FM_CLASS_A fixture doesn't attach terrain profiles or SDR data).
+  // Previously the analyzer fabricated HIGH on no-evidence runs.
+  assert.ok(['HIGH', 'MODERATE', 'LOW', 'UNMEASURED'].includes(ec.level));
   assert.ok(typeof ec.explanation === 'string' && ec.explanation.length > 20);
 });
 
 test('engine attaches exhibit.engineering_confidence after compute', async () => {
   const x = await buildExhibit(FM_CLASS_A);
   assert.ok(x.engineering_confidence, 'exhibit should carry engineering_confidence');
-  assert.ok(['HIGH', 'MODERATE', 'LOW'].includes(x.engineering_confidence.level));
+  assert.ok(['HIGH', 'MODERATE', 'LOW', 'UNMEASURED'].includes(x.engineering_confidence.level));
 });
 
 test('engineering report includes Engineering Considerations and methodology mention', async () => {

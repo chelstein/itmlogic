@@ -75,9 +75,16 @@ export function radialConfidence({
   //   read as "we measured perfection" — when we didn't measure
   //   anything at all.  AM under §73.184 has no DEM input by design,
   //   so without SDR drive-tests the honest disposition is UNMEASURED.
+  // Measurement-basis check.  CAREFUL: Number(null) === 0 and
+  // Number.isFinite(0) === true, so the obvious
+  //   Number.isFinite(Number(sdr_residual_db))
+  // returns TRUE for null/undefined — exactly the AM-without-drive-test
+  // case we're trying to detect.  Use Number.isFinite directly (strict
+  // version that returns false for non-numbers) and only treat actual
+  // finite numeric values as evidence.
   const hasTerrainEvidence = terrain && terrain.available === true;
-  const hasResidualEvidence = Number.isFinite(Number(sdr_residual_db))
-                            || Number.isFinite(Number(itm_delta_db));
+  const hasResidualEvidence = (typeof sdr_residual_db === 'number' && Number.isFinite(sdr_residual_db))
+                            || (typeof itm_delta_db    === 'number' && Number.isFinite(itm_delta_db));
   let confidence;
   if (terrainBucket === 'severe' || residualBucket === 'severe'
       || reasons.includes('model_limit')){
