@@ -182,3 +182,46 @@ export const REGULATORY_CONTEXT_DISCLAIMER =
   'conflicts may reflect grandfathered, waived, historically authorized, ' +
   'or otherwise licensed operating conditions.  Genoa does not determine ' +
   'legal authorization status.';
+
+// 47 CFR §73.311 explicitly limits what predicted field-strength contours
+// are FOR — and it does NOT include real-world listenable coverage.  We
+// surface the rule text verbatim so a reviewer can never confuse the
+// regulatory-compliance contour with the actual signal an audience hears.
+// This matches consulting-industry practice (cf. Beverage, Radio World
+// "Propagation Analysis for Profit", June 2017 p. 16): "the FCC itself,
+// in FCC Rule 73.311, says that field strength contours are to be used
+// 'for the following purposes only…' Those purposes include in an
+// application for construction permit, to assist in selecting a
+// transmitter site and city of license coverage determination, and in
+// the protection of other stations based on contour clearance."
+export const CFR_73_311_CONTOUR_USE =
+  'Per 47 CFR §73.311, predicted field-strength contours are authorized ' +
+  'for use ONLY in (a) construction-permit applications, (b) transmitter-' +
+  'site selection and city-of-license coverage determination, and (c) ' +
+  'protection of other stations via contour clearance.  They are NOT a ' +
+  'real-world listenable-coverage prediction — real coverage requires ' +
+  'drive-test measurement, terrain-aware (Longley-Rice / ITM) modeling, ' +
+  'and consideration of local noise, multipath, and seasonal effects ' +
+  'that the §73.184 / §73.333 contour math does not capture.';
+
+// AM-specific caveat — the FCC §73.190 Figure M3 conductivity map is the
+// regulatory reference but is well-known among AM consultants to
+// over-state coverage in many regions.  Source: Beverage, Radio World
+// "Propagation Analysis for Profit", June 2017 p. 16-17 — "AM coverage
+// maps are often created using the FCC M3 conductivity map. In many
+// areas of the country, this significantly over-states the size of the
+// contour."  Surfacing this on every AM exhibit keeps the prediction
+// honest about what M3 actually represents.
+export const AM_M3_OVERSTATEMENT_CAVEAT =
+  'AM groundwave contours computed from the §73.190 Figure M3 ' +
+  'conductivity map are a regulatory reference, not a measured-coverage ' +
+  'prediction.  Industry consulting practice (cf. Beverage, "Propagation ' +
+  'Analysis for Profit", Radio World, June 2017) documents that M3 ' +
+  'frequently over-states actual coverage in many regions — particularly ' +
+  'in urban/suburban areas where manmade noise raises the listenable ' +
+  'threshold above the 2 mV/m primary contour, and in regions where ' +
+  'summer-vs-winter soil-moisture changes can shift effective σ by an ' +
+  'order of magnitude (a station that is solidly listenable in January ' +
+  'may be intermittent in May and unlistenable in August in the same ' +
+  'reception area).  Drive-test measurement remains the only real ' +
+  'coverage check.';
