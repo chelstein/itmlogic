@@ -34,7 +34,18 @@ export function buildExecutiveSummarySection(exhibit){
   const isAm      = svc === 'AM' || svc === 'AX';
   const call      = s.call || '— (call sign not stated)';
   const facId     = s.facility_id || '— (facility ID not stated)';
-  const community = s.community_of_license || fm.community_of_license || '— (community-of-license not stated)';
+  // Community lookup must match cover.js — many keys carry it across
+  // operator inputs, facility metadata, and the licensing block.  KAZM
+  // PDF (engine 0e9ce1b) surfaced "from — (community-of-license not
+  // stated)" because the narrow s.community_of_license / fm.community_
+  // of_license lookup missed the actual key path (.community).
+  const lic       = exhibit?.licensing || {};
+  const community = s.community_of_license || s.community || s.city
+                 || s.licensing_community
+                 || lic.community_of_license || lic.community || lic.city
+                 || fm.community_of_license  || fm.community  || fm.city
+                 || null;
+  const communityText = community || '— (community-of-license not stated)';
   const freq      = Number.isFinite(Number(s.frequency)) ? Number(s.frequency) : null;
   const freqUnit  = s.frequency_unit || (isAm ? 'kHz' : 'MHz');
   const fccClass  = s.fcc_class || '—';
@@ -55,7 +66,7 @@ export function buildExecutiveSummarySection(exhibit){
   }
 
   // ¶1 — facility identity
-  const para1 = `${call} (Facility ID ${facId}) operates on ${freq != null ? `${freq} ${freqUnit}` : 'an unstated frequency'} from ${community}, ${isAm ? 'as a' : 'as an'} ${svc || 'broadcast'} ${fccClass !== '—' ? `Class ${fccClass} ` : ''}facility${isAm ? ' under 47 CFR Part 73 Subpart A' : ''}${tpoOrErp != null ? `, ${tpoOrErp} kW ${tpoLabel}` : ''}${modal}.  This engineering exhibit was prepared by Genoa FCC Propagation Studio to support ${intentText} for this facility.`;
+  const para1 = `${call} (Facility ID ${facId}) operates on ${freq != null ? `${freq} ${freqUnit}` : 'an unstated frequency'} from ${communityText}, ${isAm ? 'as a' : 'as an'} ${svc || 'broadcast'} ${fccClass !== '—' ? `Class ${fccClass} ` : ''}facility${isAm ? ' under 47 CFR Part 73 Subpart A' : ''}${tpoOrErp != null ? `, ${tpoOrErp} kW ${tpoLabel}` : ''}${modal}.  This engineering exhibit was prepared by Genoa FCC Propagation Studio to support ${intentText} for this facility.`;
 
   // ¶2 — what was evaluated
   const checks = [];
@@ -73,17 +84,42 @@ export function buildExecutiveSummarySection(exhibit){
   }
   const para2 = `The exhibit evaluates ${checks.join('; ')}.  Methodology, curve dataset SHA-256, projection (WGS-84 Karney 2013), and per-radial spherical-vs-Karney validation are documented in the appendix evidence so the exhibit is replay-deterministic — the same inputs always produce the same numbers, with the same SHA-256 hashes.`;
 
-  // ¶3 — verdict in plain English
-  const compStatus    = v?.status              || '—';
-  const filingStatus  = v?.categories?.filing?.status         || '—';
-  const compCategory  = v?.categories?.computational?.status  || '—';
-  const extCategory   = v?.categories?.external?.status       || '—';
-  const conclusion    = (cc?.status || cc?.conclusion || '—').toString().toUpperCase();
-  const niceVerdict   = filingStatus === 'READY'        ? 'meets the technical and regulatory bar to file'
-                    :  filingStatus === 'REVIEW'        ? 'is computationally verified but requires engineer-of-record review before filing'
-                    :  filingStatus === 'DO NOT FILE'   ? 'should NOT be filed in its current form — see Engineering Conclusion for the blocker(s)'
-                    :  'is in review (see Validation Verdict)';
-  const para3 = `Genoa's computational validation came back ${compCategory}; the external-parity cross-check came back ${extCategory}.  Overall the proposed exhibit ${niceVerdict}.  The Engineering Conclusion further reports the regulatory disposition as ${conclusion}.  This Executive Summary is INFORMATIONAL — the actual filing decision rests with the qualified broadcast engineer of record reviewing the technical body.`;
+  // ¶3 — verdict in plain English.  The 3-category surface lives on
+  // the SECTION builder output, not on exhibit.validation directly,
+  // so we have to derive equivalent text from the legacy fields here
+  // OR from the conclusion section.  Order of preference:
+  //   1. cc.status / cc.conclusion (Engineering Conclusion ran)
+  //   2. exhibit.am_blanket_compliance / am_da_pattern / am_city_coverage
+  //      (compliance summary)
+  //   3. v.status (legacy single-headline)
+  const concRaw = cc?.status || cc?.conclusion || null;
+  const conclusion = concRaw ? String(concRaw).toUpperCase() : null;
+  const legacyStatus = v?.status ? String(v.status).toUpperCase() : null;
+  // Translate the legacy single status into a plain-English phrase.
+  const niceVerdict = conclusion === 'COMPLIANT'      ? 'is compliant with the FCC rules under the proposed mode'
+                   :  conclusion === 'NON-COMPLIANT'  ? 'does NOT comply with one or more FCC rules — see Engineering Conclusion for the specific blocker(s)'
+                   :  conclusion === 'PARTIAL'        ? 'meets some but not all of the regulatory checks — see Engineering Conclusion for details'
+                   :  legacyStatus === 'VERIFIED'     ? 'is computationally verified and meets the regulatory bar'
+                   :  legacyStatus === 'PARTIAL'      ? 'is computationally verified but one or more regulatory checks are partial — see Validation Verdict'
+                   :  legacyStatus === 'UNVERIFIED'   ? 'has computational gaps that the engineer of record must close before filing'
+                   :  'is in review (see Validation Verdict and Engineering Conclusion for details)';
+  // Specific blockers, surfaced regardless of conclusion fidelity.
+  const blockerHints = [];
+  if (exhibit?.am_blanket_compliance?.overall_pass === false)       blockerHints.push('§73.24(g) blanket-population fail');
+  if (exhibit?.am_da_pattern_compliance?.overall_pass === false)    blockerHints.push('§73.150 DA-pattern shape fail');
+  if (exhibit?.am_city_coverage_compliance?.overall_pass === false) blockerHints.push('§73.24(j) community-coverage fail');
+  if (exhibit?.evidence?.am_night_nif?.summary?.n_failing_azimuths > 0) blockerHints.push('§73.182 nighttime NIF fail');
+  const blockerText = blockerHints.length
+    ? `  Specific findings flagged in this run: ${blockerHints.join('; ')}.`
+    : '';
+  const concText = conclusion ? `  The Engineering Conclusion reports the regulatory disposition as ${conclusion}.` : '';
+  const para3 = `Overall the proposed exhibit ${niceVerdict}.${concText}${blockerText}  This Executive Summary is INFORMATIONAL — the actual filing decision rests with the qualified broadcast engineer of record reviewing the technical body.`;
+  // Surface filingStatus from conclusion / blockers so recommendations
+  // section below still works without categories.
+  const filingStatus = conclusion === 'COMPLIANT' && blockerHints.length === 0 ? 'READY'
+                     : conclusion === 'NON-COMPLIANT' || blockerHints.length ? 'DO NOT FILE'
+                     : 'REVIEW';
+  const extCategory  = (exhibit?.validation?.fcc_curve_parity?.fallback_tier > 1) ? 'TIER-3' : null;
 
   // ¶4 — recommendations / where to look
   const recs = [];
