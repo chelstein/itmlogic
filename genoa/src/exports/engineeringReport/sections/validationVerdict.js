@@ -268,6 +268,27 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
+  // §73.24(g) AM blanket-interference compliance — 1000 mV/m blanket
+  // population vs 25 mV/m groundwave population.  See Mullaney KELP
+  // 1989 Section II.E for the canonical real-world filing format.
+  const ambl = exhibit.am_blanket_compliance;
+  if (ambl && ambl.applicable){
+    const blFailed = ambl.findings.filter((f) => f.pass === false).map((f) => f.rule);
+    const blNotMeasured = ambl.findings.filter((f) => f.pass === null).map((f) => f.rule);
+    components.push({
+      name:     '§73.24(g) AM blanket-interference compliance',
+      category: 'compliance',
+      status:   ambl.overall_pass === true ? 'PASS'
+              : ambl.overall_pass === false ? 'FAIL'
+              : 'PARTIAL',
+      detail:   blFailed.length
+                  ? `Failed: ${blFailed.join(', ')}.  ${ambl.summary}`
+                  : (blNotMeasured.length
+                      ? `Population data not attached for blanket and/or intl-25 contours; the 1% ratio check cannot run.  Add per-contour population (sidecars.population.populationForContour) to enable.`
+                      : ambl.summary)
+    });
+  }
+
   // Interference rules — REGULATORY COMPLIANCE FINDING, not a math
   // validation result.  When the §73.215 / §73.207 study reports
   // failures, the facility doesn't comply with current rules — but the

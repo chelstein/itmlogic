@@ -152,7 +152,7 @@ export function buildAppendixSections(exhibit){
       heading: 'APPENDIX A — RADIAL DATA',
       preface: isAm
         ? `Per-radial conductivity (σ), inverse-distance field at 1 km, and §73.184 groundwave contour distances.  Radial step shown in METHODOLOGY.  ${anySigmaPath
-            ? 'σ varies by azimuth where step 6d found M3 boundary crossings (path-length-weighted; stage-3 Millington pending).'
+            ? 'σ varies by azimuth where step 6d found M3 boundary crossings (path-length-weighted; stage-3 Millington pending).  Full per-azimuth (σ, cumulative km) tabulation in Appendix A-1.'
             : 'σ is uniform across all azimuths — per-radial M3 segmentation either found no crossings or was unavailable (see Appendix D).'}  ${hasDaPattern
             ? 'Pattern factor f is the §73.150 relative field; field at azimuth scales as f × E₁ₖₘ.'
             : 'Non-directional antenna (NDA); pattern factor is 1.0 at every azimuth.'}`
@@ -161,6 +161,65 @@ export function buildAppendixSections(exhibit){
                    : 'Non-directional antenna; ERP constant across all azimuths.'),
       table:   { columns, rows }
     });
+
+    // ── Appendix A-1 — M-3 Conductivity Tabulation (AM with crossings) ──
+    // Mullaney KELP 1989 Table 1 format: per-azimuth, list every
+    // constant-σ segment along the radial as (σ_mS/m, cumulative_km).
+    // This is the consultant-grade output an AM engineer expects to
+    // see when per-radial M3 segmentation actually engaged.  Only
+    // surfaces when at least one radial has sigma_path with segments
+    // (i.e. step 6d found crossings).
+    if (isAm && anySigmaPath){
+      const a1Rows = [];
+      for (const r of rt){
+        const az = Number.isFinite(r.azimuth_deg) ? Number(r.azimuth_deg) : null;
+        if (az == null) continue;
+        const segs = Array.isArray(r?.sigma_path?.segments) ? r.sigma_path.segments : null;
+        const refField = Number.isFinite(r?.reference_field_mVm_at_1km)
+                         ? Number(r.reference_field_mVm_at_1km) : null;
+        if (!segs || segs.length === 0){
+          // Uniform-σ radial — single-row entry so the azimuth is
+          // still listed and the reader can see which radials had
+          // no crossings vs which had several.
+          a1Rows.push({
+            azimuth_deg: az.toFixed(1),
+            radiation:   refField != null ? refField.toFixed(1) : '—',
+            seg_index:   '1',
+            sigma_msm:   Number.isFinite(Number(r?.sigma_path?.sigma_uniform_mS_m))
+                          ? Number(r.sigma_path.sigma_uniform_mS_m).toFixed(1)
+                          : (Number.isFinite(uniformSigma) ? uniformSigma.toFixed(1) : '—'),
+            cum_km:      'uniform across radial'
+          });
+          continue;
+        }
+        for (let i = 0; i < segs.length; i++){
+          const s = segs[i];
+          a1Rows.push({
+            azimuth_deg: i === 0 ? az.toFixed(1) : '',
+            radiation:   i === 0 && refField != null ? refField.toFixed(1) : '',
+            seg_index:   String(i + 1),
+            sigma_msm:   Number.isFinite(Number(s.sigma_mS_m)) ? Number(s.sigma_mS_m).toFixed(1) : '—',
+            cum_km:      Number.isFinite(Number(s.to_km)) ? Number(s.to_km).toFixed(1) : '—'
+          });
+        }
+      }
+      sections.push({
+        id:      'appendix-a-1',
+        type:    'table',
+        heading: 'APPENDIX A-1 — M-3 CONDUCTIVITY TABULATION',
+        preface: 'Per-azimuth listing of constant-σ segments along each radial, in the Mullaney KELP 1989 Table 1 format.  Distance is CUMULATIVE from the transmitter; the entry "8.0 mS/m | 13.3 km" means σ=8 from 0 km to 13.3 km along that bearing.  Source: geodata sidecar /api/geodata/conductivity/radial (FCC §73.190 Figure M3 boundary linestrings, PostGIS).  Segmented σ is the path-length-weighted average used by the groundwave engine (stage-2 approximation; Millington integration pending stage-3).',
+        table: {
+          columns: [
+            { key: 'azimuth_deg', label: 'Az (°)',         width: 0.10, align: 'right' },
+            { key: 'radiation',   label: 'E @ 1 km (mV/m)', width: 0.16, align: 'right' },
+            { key: 'seg_index',   label: 'Seg',            width: 0.08, align: 'right' },
+            { key: 'sigma_msm',   label: 'σ (mS/m)',       width: 0.14, align: 'right' },
+            { key: 'cum_km',      label: 'Cumulative km',  width: 0.20, align: 'right' }
+          ],
+          rows: a1Rows
+        }
+      });
+    }
   }
 
   // ── Appendix B — Interference study ─────────────────────────────────────
