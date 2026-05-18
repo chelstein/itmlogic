@@ -1060,5 +1060,104 @@ export function buildAppendixSections(exhibit){
     });
   }
 
+  // ── Appendix J — Other Services within 8 km (Mullaney KELP Table 3) ──
+  // Site-survey context: every broadcast / tower / airport within
+  // 8 km of the proposed site.  Standard consultant-grade output
+  // because Part 17 co-location, blanketing interference, RF
+  // intermodulation, and antenna-coupling effects all start at this
+  // proximity.  Surfaces only when at least one category has data.
+  const ss = exhibit.evidence?.site_survey_8km;
+  if (ss && (ss.towers?.n > 0 || ss.airports?.n > 0
+             || ss.towers?.error || ss.airports?.error)){
+    const surveyRows = [];
+    // Broadcast facilities — pulled from nearby_primaries (already
+    // computed for §73.207 / §73.182(k)) filtered to ≤8 km.
+    const nearby = Array.isArray(exhibit.evidence?.nearby_primaries)
+      ? exhibit.evidence.nearby_primaries
+      : [];
+    for (const p of nearby){
+      const d = Number(p?.distance_km);
+      if (!Number.isFinite(d) || d > ss.radius_km) continue;
+      surveyRows.push({
+        type:        (p.service || 'AM').toUpperCase(),
+        ident:       p.call || p.facility_id || '—',
+        name_or_class: p.fcc_class ? `Class ${p.fcc_class}` : '—',
+        freq_or_alt: Number.isFinite(Number(p.freq_khz))
+                      ? `${p.freq_khz} kHz`
+                      : (Number.isFinite(Number(p.frequency)) ? `${p.frequency}` : '—'),
+        city_state:  [p.city, p.state].filter(Boolean).join(', ') || '—',
+        bearing_deg: Number.isFinite(Number(p.bearing_deg)) ? Number(p.bearing_deg).toFixed(1) + '°' : '—',
+        distance_km: d.toFixed(2)
+      });
+    }
+    // Towers — ASR records.
+    for (const t of (ss.towers?.records || [])){
+      const distKm = Number.isFinite(Number(t?.distance_m)) ? Number(t.distance_m) / 1000 : null;
+      if (distKm != null && distKm > ss.radius_km) continue;
+      surveyRows.push({
+        type:        'TW',
+        ident:       t?.asr_number ? `ASR ${t.asr_number}` : (t?.registration_number || '—'),
+        name_or_class: t?.structure_type || t?.owner || '—',
+        freq_or_alt: Number.isFinite(Number(t?.overall_height_m))
+                      ? `${Number(t.overall_height_m).toFixed(0)} m AGL`
+                      : '—',
+        city_state:  [t?.city, t?.state].filter(Boolean).join(', ') || '—',
+        bearing_deg: Number.isFinite(Number(t?.bearing_deg)) ? Number(t.bearing_deg).toFixed(1) + '°' : '—',
+        distance_km: distKm != null ? distKm.toFixed(2) : '—'
+      });
+    }
+    // Airports / heliports — FAA records.
+    for (const a of (ss.airports?.records || [])){
+      const distKm = Number.isFinite(Number(a?.distance_km)) ? Number(a.distance_km) : null;
+      if (distKm != null && distKm > ss.radius_km) continue;
+      const t = String(a?.type || a?.facility_use || '').toUpperCase();
+      const typeCode = t.includes('HELI') ? 'HP'
+                     : t.includes('SEA')  ? 'SP'
+                     : t.includes('BAL')  ? 'BL'
+                     : 'AP';
+      surveyRows.push({
+        type:        typeCode,
+        ident:       a?.ident || a?.icao || '—',
+        name_or_class: a?.name || '—',
+        freq_or_alt: Number.isFinite(Number(a?.elevation_ft))
+                      ? `${Math.round(Number(a.elevation_ft) * 0.3048)} m AMSL`
+                      : '—',
+        city_state:  [a?.city, a?.state].filter(Boolean).join(', ') || '—',
+        bearing_deg: Number.isFinite(Number(a?.bearing_deg)) ? Number(a.bearing_deg).toFixed(1) + '°' : '—',
+        distance_km: distKm != null ? distKm.toFixed(2) : '—'
+      });
+    }
+    // Sort by distance ascending for consultant-grade readability.
+    surveyRows.sort((a, b) => Number(a.distance_km) - Number(b.distance_km));
+
+    let surveyPreface =
+      `Other broadcast facilities, registered antenna structures, and airports / heliports within ${ss.radius_km} km of the proposed site.  Mirrors the standard consulting-engineer site survey (cf. Mullaney KELP 1989 Engineering Statement, Table 3).  Type codes: AM/FM/TV = broadcast service; TW = registered tower (FCC ASR); AP = airport, HP = heliport, SP = seaplane base, BL = balloon port (FAA NASR).`;
+    if (ss.towers?.error){
+      surveyPreface += `  Tower lookup: ${ss.towers.error}.`;
+    }
+    if (ss.airports?.error){
+      surveyPreface += `  Airport lookup: ${ss.airports.error}.`;
+    }
+
+    sections.push({
+      id:      'appendix-j',
+      type:    'table',
+      heading: 'APPENDIX J — OTHER SERVICES WITHIN 8 km',
+      preface: surveyPreface,
+      table: {
+        columns: [
+          { key: 'type',        label: 'Type',     width: 0.06 },
+          { key: 'ident',       label: 'Ident',    width: 0.14 },
+          { key: 'name_or_class', label: 'Name / Class', width: 0.22 },
+          { key: 'freq_or_alt', label: 'Freq / Height', width: 0.14 },
+          { key: 'city_state',  label: 'City, State', width: 0.18 },
+          { key: 'bearing_deg', label: 'Bear (°)', width: 0.10, align: 'right' },
+          { key: 'distance_km', label: 'Dist (km)', width: 0.10, align: 'right' }
+        ],
+        rows: surveyRows
+      }
+    });
+  }
+
   return sections;
 }

@@ -2113,6 +2113,48 @@ export async function computeExhibit(req){
     exhibit.evidence.nearby_primaries_provenance = evidence.nearby_primaries_provenance;
   }
 
+  // Mullaney KELP 1989 Table 3 — "Other Services within 8 km" site
+  // survey.  Fan out the ASR (towers) + FAA airports sidecars in
+  // parallel; combine into a single evidence block that the PDF
+  // renders as a new Appendix.  Fail-soft: missing sidecar / errored
+  // call just omits that row category; never blocks compute.
+  if (Number.isFinite(Number(inputs.lat)) && Number.isFinite(Number(inputs.lon))){
+    const sLat = Number(inputs.lat), sLon = Number(inputs.lon);
+    const SURVEY_RADIUS_KM = 8;   // matches Mullaney's exact radius
+    try {
+      const [towerResp, airportResp] = await Promise.all([
+        sidecars.asr?.getByLocation
+          ? sidecars.asr.getByLocation({ lat: sLat, lon: sLon, radius_m: SURVEY_RADIUS_KM * 1000, limit: 50 })
+            .catch((e) => ({ available: false, error: String(e?.message || e) }))
+          : Promise.resolve({ available: false, reason: 'ASR sidecar not configured' }),
+        sidecars.airports?.getNearby
+          ? sidecars.airports.getNearby({ lat: sLat, lon: sLon, radius_nm: SURVEY_RADIUS_KM / 1.852, limit: 25 })
+            .catch((e) => ({ available: false, error: String(e?.message || e) }))
+          : Promise.resolve({ available: false, reason: 'airports sidecar not configured' })
+      ]);
+      exhibit.evidence.site_survey_8km = {
+        radius_km:  SURVEY_RADIUS_KM,
+        regulation: '47 CFR §73.30, §73.150, §73.155 — site-survey context; not a per-rule check.  Tower / airport entries surface for the engineer to evaluate co-location, blanket interference, and Part 17 lighting/painting interactions.',
+        towers: {
+          available:  towerResp?.available === true || Array.isArray(towerResp?.records),
+          source:     towerResp?.source || 'asr-sidecar',
+          n:          Array.isArray(towerResp?.records) ? towerResp.records.length : (towerResp?.available ? 1 : 0),
+          records:    Array.isArray(towerResp?.records) ? towerResp.records : (towerResp?.available ? [towerResp] : []),
+          error:      towerResp?.error || towerResp?.reason || null,
+          fetched_at: new Date().toISOString()
+        },
+        airports: {
+          available:  airportResp?.available === true,
+          source:     airportResp?.source || 'genoa-faa-airports-sidecar',
+          n:          Array.isArray(airportResp?.airports) ? airportResp.airports.length : 0,
+          records:    Array.isArray(airportResp?.airports) ? airportResp.airports : [],
+          error:      airportResp?.error || airportResp?.reason || null,
+          fetched_at: new Date().toISOString()
+        }
+      };
+    } catch { /* swallow — site survey is informational */ }
+  }
+
   // ---- 10. Reconcile warnings against actual evidence ----
   // The engine pre-emptively emits CONSTANT_HAAT_ASSUMED, FACILITY_LOOKUP_UNAVAILABLE,
   // SDR_MEASUREMENTS_MISSING, and CURVE_VALIDATION_MISSING based on its
