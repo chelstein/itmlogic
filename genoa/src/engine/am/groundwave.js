@@ -32,12 +32,13 @@ import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 // Both contours are pure-add to the existing list; FCC parity and
 // per-radial geometry continue to operate on every entry uniformly.
 export const AM_DEFAULT_CONTOURS = Object.freeze([
-  { id: 'blanket_1000mvm', label: '1000 mV/m (blanket intf. §73.24(g))',  field_mvm: 1000, role: 'blanket'         },
-  { id: 'international_25mvm', label: '25 mV/m (international protection §73.187)', field_mvm: 25, role: 'international' },
-  { id: 'city_5mvm',       label: '5 mV/m (city grade)',                  field_mvm: 5,    role: 'city'            },
-  { id: 'primary_2mvm',    label: '2 mV/m (primary)',                     field_mvm: 2,    role: 'primary'         },
-  { id: 'secondary_05mvm', label: '0.5 mV/m (secondary)',                 field_mvm: 0.5,  role: 'secondary'       },
-  { id: 'night_intf',      label: '0.025 mV/m (night intf.)',             field_mvm: 0.025,role: 'night_interferer'}
+  { id: 'blanket_1000mvm',     label: '1000 mV/m (blanket intf. §73.24(g))',                   field_mvm: 1000, role: 'blanket'         },
+  { id: 'service_25mvm',       label: '25 mV/m (service / §73.24(g) reference)',               field_mvm: 25,   role: 'service_25'      },
+  { id: 'international_25mvm', label: '25 mV/m (international protection §73.187)',            field_mvm: 25,   role: 'international'   },
+  { id: 'city_5mvm',           label: '5 mV/m (city grade)',                                   field_mvm: 5,    role: 'city'            },
+  { id: 'primary_2mvm',        label: '2 mV/m (primary)',                                      field_mvm: 2,    role: 'primary'         },
+  { id: 'secondary_05mvm',     label: '0.5 mV/m (secondary)',                                  field_mvm: 0.5,  role: 'secondary'       },
+  { id: 'night_intf',          label: '0.025 mV/m (night intf.)',                              field_mvm: 0.025,role: 'night_interferer'}
 ]);
 
 // FCC §73.184 default dielectric (relative permittivity).  The pre-
@@ -159,12 +160,15 @@ export function amRadialTable({
         distances[c.id] = null;
       }
     }
+    // AM radial row schema — AM-native, NO HAAT keys.  Audit caught
+    // the prior leak where haat_input_m / haat_computed_m / haat_source
+    // were emitted as nulls on every AM row; the Appendix A renderer
+    // ignored them but the schema itself signaled "FM architecture
+    // applied to AM exhibits".  Removed entirely.  FM/TV radial rows
+    // keep their HAAT keys in their own engine path.
     return {
       azimuth_deg:                az,
       relative_field:             f,
-      haat_input_m:               null,
-      haat_computed_m:            null,
-      haat_source:                'n/a (AM groundwave)',
       terrain_profile_source:     null,
       reference_field_mVm_at_1km: 100 * Math.sqrt(Math.max(0, erp_az)),
       contour_distances_km:       distances,

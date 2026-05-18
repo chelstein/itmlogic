@@ -86,8 +86,8 @@ r.get('/geodata/conductivity/radial', asyncHandler(async (req, res) => {
   const bearing_deg = Number(req.query.bearing_deg ?? req.query.bearing);
   const max_km      = Number(req.query.max_km ?? 500);
   const site_sigma  = req.query.site_sigma_mS_m != null ? Number(req.query.site_sigma_mS_m) : null;
-  if (!Number.isFinite(bearing_deg)){
-    return res.status(400).json({ error: 'bearing_deg required (0..360)' });
+  if (!Number.isFinite(bearing_deg) || bearing_deg < 0 || bearing_deg > 360){
+    return res.status(400).json({ error: 'bearing_deg must be a number in [0, 360]' });
   }
   if (!Number.isFinite(max_km) || max_km <= 0 || max_km > 5000){
     return res.status(400).json({ error: 'max_km must be (0, 5000]' });

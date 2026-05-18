@@ -45,12 +45,19 @@ export function buildEngineerDeclarationSection(exhibit, options){
   // semantics carry over (qualifications, scope, supervision, perjury
   // attestation).  Any field not supplied surfaces as an em-dash so
   // the reviewer can see what's missing.
+  //
+  // AUDIT FIX (2026-05-18): previous wording used `name.endsWith('.')`
+  // as a he/she-vs-they heuristic, producing the ungrammatical
+  // "they ... holds professional engineer license" because the verb
+  // remained third-person-singular regardless.  Rewritten to use
+  // "the declarant" throughout — grammatical, gender-neutral, and
+  // matches consulting-firm convention.
   const para1 =
-    `${name} declares and states that ${name.endsWith('.') ? 'he/she' : 'they'} ` +
-    `${license ? `holds professional engineer license No. ${license}${state ? ` (${state})` : ''}` : 'is a qualified radio engineer'}` +
-    `${firm ? ` and is associated with ${firm}` : ''}` +
-    `, retained by ${licensee} to prepare this engineering exhibit ` +
-    `in support of Radio Station ${callsign}${facility_id ? ` (Facility ID ${facility_id})` : ''}` +
+    `${name}, ${license ? `professional engineer license No. ${license}${state ? ` (${state})` : ''}` : 'a qualified radio engineer'}` +
+    `${firm ? `, associated with ${firm}` : ''}` +
+    `, declares and states that the declarant has been retained by ${licensee} ` +
+    `to prepare this engineering exhibit in support of Radio Station ${callsign}` +
+    `${facility_id ? ` (Facility ID ${facility_id})` : ''}` +
     `${community ? `, ${community}` : ''}.`;
 
   const para2 =

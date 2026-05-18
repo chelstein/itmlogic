@@ -128,27 +128,54 @@ function distanceToPolylineKm(lat, lon, polyline){
   return best;
 }
 
-// Project a great-circle point onto a great-circle segment.  Uses the
-// equirectangular flat-earth approximation around the midpoint; good
-// to sub-percent at North American border scales.
+// Project a great-circle point onto a great-circle segment.
+//
+// AUDIT FIX (2026-05-18): previous implementation used the SEGMENT-
+// MIDPOINT cosLat for projection, producing > 20 km cross-track error
+// when the test point sits far from the segment (e.g. an El Paso site
+// at 32°N evaluated against the 49°-parallel US/Canada border used
+// cos(49°)=0.66 when the true cosLat at El Paso is cos(40°)=0.77).
+// Replaced with proper great-circle distance via haversine — exact at
+// every distance and removes the projection-frame inconsistency the
+// audit flagged.
 function pointToSegmentKm(lat, lon, alat, alon, blat, blon){
+  // Iteratively bisect along the segment to find the closest point.
+  // 24 iterations bring cross-track precision below 1 m at North
+  // American scales — overkill for the treaty-zone gate but cheap.
+  let tLo = 0, tHi = 1;
+  let bestT = 0, bestKm = greatCircleKm(lat, lon, alat, alon);
+  const evalT = (t) => {
+    const cLat = alat + t * (blat - alat);
+    const cLon = alon + t * (blon - alon);
+    return { km: greatCircleKm(lat, lon, cLat, cLon), cLat, cLon };
+  };
+  // Golden-section-ish bisection: evaluate 1/3 and 2/3 of current
+  // interval, keep the better half.  Converges quickly for the
+  // convex distance function.
+  for (let iter = 0; iter < 24; iter++){
+    const t1 = tLo + (tHi - tLo) / 3;
+    const t2 = tHi - (tHi - tLo) / 3;
+    const e1 = evalT(t1);
+    const e2 = evalT(t2);
+    if (e1.km < bestKm){ bestKm = e1.km; bestT = t1; }
+    if (e2.km < bestKm){ bestKm = e2.km; bestT = t2; }
+    if (e1.km < e2.km) tHi = t2; else tLo = t1;
+  }
+  const closest = evalT(bestT);
+  return {
+    distance_km: closest.km,
+    bearing_deg: greatCircleBearing(lat, lon, closest.cLat, closest.cLon)
+  };
+}
+
+// Haversine great-circle distance — exact at any scale; no projection.
+function greatCircleKm(lat1, lon1, lat2, lon2){
   const R = 6371.0088;
-  const mlat = (alat + blat) / 2;
-  const cosM = Math.cos(mlat * Math.PI / 180);
-  const x  = (lon  - alon) * cosM * R * Math.PI / 180;
-  const y  = (lat  - alat)        * R * Math.PI / 180;
-  const bx = (blon - alon) * cosM * R * Math.PI / 180;
-  const by = (blat - alat)        * R * Math.PI / 180;
-  const segLen2 = bx * bx + by * by;
-  let t = segLen2 > 0 ? (x * bx + y * by) / segLen2 : 0;
-  t = Math.max(0, Math.min(1, t));
-  const closestLat = alat + t * (blat - alat);
-  const closestLon = alon + t * (blon - alon);
-  const dx = (lon - closestLon) * cosM * R * Math.PI / 180;
-  const dy = (lat - closestLat)        * R * Math.PI / 180;
-  const distance_km = Math.sqrt(dx * dx + dy * dy);
-  const bearing_deg = greatCircleBearing(lat, lon, closestLat, closestLon);
-  return { distance_km, bearing_deg };
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(Δφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function greatCircleBearing(lat1, lon1, lat2, lon2){

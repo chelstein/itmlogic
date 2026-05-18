@@ -54,9 +54,16 @@ export function checkAm73_24g({ exhibit } = {}){
   // isn't already computed.  Distances also live in radial_table per
   // contour_id; either source is fine.
   const blanketKm    = contourMeanRadiusKm(exhibit, 'blanket_1000mvm');
-  const intl25Km     = contourMeanRadiusKm(exhibit, 'international_25mvm');
+  // §73.24(g) compares blanket pop vs SERVICE 25 mV/m pop (not the
+  // international-protection 25 mV/m which only exists for border
+  // sites).  Audit caught the prior semantic muddle.  Fall back to
+  // international_25mvm only when service_25mvm is missing (older
+  // exhibits without the new contour id).
+  const service25Km  = contourMeanRadiusKm(exhibit, 'service_25mvm')
+                     ?? contourMeanRadiusKm(exhibit, 'international_25mvm');
   const blanketPop   = populationFor(exhibit, 'blanket_1000mvm');
-  const intl25Pop    = populationFor(exhibit, 'international_25mvm');
+  const intl25Pop    = populationFor(exhibit, 'service_25mvm')
+                     ?? populationFor(exhibit, 'international_25mvm');
 
   // Finding 1 — the blanket contour itself must be computable.
   result.findings.push({

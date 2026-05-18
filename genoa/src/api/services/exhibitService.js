@@ -1699,25 +1699,61 @@ export async function computeExhibit(req){
 
       // Surface §73.182 NIF failure as a top-level annotation so the
       // engineering-conclusion logic (which walks exhibit.annotations
-      // for blockers/warnings) sees it.  Berry-1968 screening failures
-      // surface as 'warning' so the conclusion can prompt "re-run with
-      // FCCAM" rather than declare NON-COMPLIANT.  FCCAM/Wang failures
-      // surface as 'blocker'.
+      // for blockers/warnings) sees it.  Tolerance ladder added per
+      // user audit (2026-05-18): real FCC practice doesn't treat a
+      // -0.1 dB worst-margin miss as an existential blocker the way
+      // a -3 dB systemic shortfall is.  Three severity bands:
+      //
+      //   |worst_margin| ≤ 0.5 dB  AND ≤ 10% azimuths failing
+      //                             → ADVISORY (within measurement noise)
+      //   |worst_margin| ≤ 2.0 dB  AND ≤ 25% azimuths failing
+      //                             → WARNING  (review with engineer)
+      //   anything more severe      → BLOCKER (real problem)
+      //
+      // Berry-1968 screening always demotes one level (BLOCKER →
+      // WARNING, WARNING → ADVISORY) because the screening model
+      // itself under-estimates field per §73.190(c).
       const _nif = evidence.am_night_nif;
       if (_nif?.available){
         const _sum = _nif.summary || {};
-        const _isFailing = (Number(_sum.n_failing_azimuths) || 0) > 0
-          || (Number.isFinite(Number(_sum.worst_margin_db)) && Number(_sum.worst_margin_db) < 0);
+        const _nFail = Number(_sum.n_failing_azimuths) || 0;
+        const _nEval = Number(_sum.azimuths_evaluated) || 1;
+        const _fracFail = _nFail / Math.max(_nEval, 1);
+        const _worstAbs = Math.abs(Number(_sum.worst_margin_db) || 0);
+        const _hasWorstFinite = Number.isFinite(Number(_sum.worst_margin_db));
+        const _isFailing = _nFail > 0
+          || (_hasWorstFinite && Number(_sum.worst_margin_db) < 0);
         if (_isFailing){
           const _isScreening = /berry/i.test(String(_nif.provenance?.upstream_skywave || _nif.source || ''));
+          // Tolerance-band classification.
+          let _band;
+          if (_worstAbs <= 0.5 && _fracFail <= 0.10) _band = 'ADVISORY';
+          else if (_worstAbs <= 2.0 && _fracFail <= 0.25) _band = 'WARNING';
+          else _band = 'BLOCKER';
+          // Berry screening demotes one level (it under-estimates field).
+          if (_isScreening){
+            _band = _band === 'BLOCKER' ? 'WARNING'
+                  : _band === 'WARNING' ? 'ADVISORY'
+                  : 'ADVISORY';
+          }
+          const _severityMap = { ADVISORY: 'info', WARNING: 'warning', BLOCKER: 'blocker' };
+          const _codeMap = {
+            ADVISORY: _isScreening ? 'AM_NIGHT_NIF_MARGINAL_SCREENING' : 'AM_NIGHT_NIF_MARGINAL',
+            WARNING:  _isScreening ? 'AM_NIGHT_NIF_FAIL_SCREENING' : 'AM_NIGHT_NIF_REVIEW',
+            BLOCKER:  'AM_NIGHT_NIF_FAIL'
+          };
+          const _detailMap = {
+            ADVISORY: `Worst-margin miss is within typical measurement / model noise (≤ 0.5 dB).  Real FCC practice does not treat a sub-decibel margin as a filing blocker; engineer of record may proceed with normal review.${_isScreening ? '  (Berry 1968 screening under-estimates field; FCCAM Wang 1985 confirmation strengthens the case.)' : ''}`,
+            WARNING:  `Worst-margin miss is meaningful (${_worstAbs.toFixed(2)} dB) but within engineering-discretion range.  ${_isScreening ? 'Re-run with FCCAM (Wang 1985) before filing — Berry 1968 is screening-grade only per §73.190(c).' : 'Engineer of record should review the binding-azimuth detail in Appendix F-1 and decide whether a minor pattern tweak or §73.99 reduced-power authority is warranted.'}`,
+            BLOCKER:  `Worst-margin miss is severe (${_worstAbs.toFixed(2)} dB) across ${(_fracFail*100).toFixed(0)}% of azimuths.  Facility redesign, reduced TPO, daytime-only mode, or §73.99 PSRA/PSSA reduced-power authority required prior to filing.`
+          };
           const _ann = exhibit.annotations = exhibit.annotations || [];
           _ann.push({
-            severity: _isScreening ? 'warning' : 'blocker',
-            code:     _isScreening ? 'AM_NIGHT_NIF_FAIL_SCREENING' : 'AM_NIGHT_NIF_FAIL',
-            message:  `§73.182 nighttime allocation fails at ${_sum.n_failing_azimuths || 0}/${_sum.azimuths_evaluated || 0} azimuths (worst margin ${Number.isFinite(Number(_sum.worst_margin_db)) ? Number(_sum.worst_margin_db).toFixed(2) + ' dB' : 'n/a'})`,
-            detail:   _isScreening
-              ? 'Re-run with FCCAM (Wang 1985) before filing — Berry 1968 is screening-grade only per §73.190(c).'
-              : 'Facility redesign, reduced ERP, daytime-only mode, or §73.99 reduced-power authority required prior to filing.'
+            severity: _severityMap[_band],
+            code:     _codeMap[_band],
+            band:     _band,
+            message:  `§73.182 nighttime allocation: ${_nFail}/${_nEval} azimuths failing, worst margin ${_hasWorstFinite ? Number(_sum.worst_margin_db).toFixed(2) + ' dB' : 'n/a'} — classified ${_band}${_isScreening ? ' (Berry screening; demoted one band)' : ''}.`,
+            detail:   _detailMap[_band]
           });
         }
       }

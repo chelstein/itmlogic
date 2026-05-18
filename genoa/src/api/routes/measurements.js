@@ -39,8 +39,12 @@ r.post('/measurements/ingest', asyncHandler(async (req, res) => {
   if (!Array.isArray(body.points)){
     return res.status(400).json({ available: false, error: 'points array required' });
   }
-  if (body.points.length > 100_000){
-    return res.status(413).json({ available: false, error: 'points array too large (max 100,000)' });
+  // 25,000 points × ~80 bytes/point JSON ≈ 2 MB — well under the 8 MB
+  // Express body limit set in server.js.  Audit caught the prior 100k
+  // cap conflicting with the 8 MB Express limit (Express rejects first
+  // with a different shape than our 413).
+  if (body.points.length > 25_000){
+    return res.status(413).json({ available: false, error: 'points array too large (max 25,000 — split large drive logs into per-day chunks)' });
   }
   const out = ingestMeasurementsToResiduals({
     tx:                         body.tx,

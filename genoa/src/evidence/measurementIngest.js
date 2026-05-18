@@ -174,8 +174,12 @@ export function ingestMeasurementsToResiduals({
     const variance = residuals.reduce((s, v) => s + (v - mean) ** 2, 0) / residuals.length;
     const stddev = Math.sqrt(variance);
     residuals.sort((a, b) => a - b);
-    const p10 = residuals[Math.floor(residuals.length * 0.10)];
-    const p90 = residuals[Math.floor(residuals.length * 0.90)];
+    // Linear-interpolated percentile.  Audit fix — prior Math.floor
+    // approach made p10 the minimum for n ≤ 9, which is wrong for
+    // small bins.  At n=5: position 0.4 between residuals[0] and
+    // residuals[1] yields a real 10th-percentile estimate.
+    const p10 = percentileInterp(residuals, 0.10);
+    const p90 = percentileInterp(residuals, 0.90);
     result.rows.push({
       azimuth_deg:        bin.azimuth_deg,
       n:                  bin.points.length,
@@ -245,3 +249,15 @@ function greatCircleBearingDeg(lat1, lon1, lat2, lon2){
 }
 function round2(x){ return Number.isFinite(x) ? Math.round(x * 100) / 100 : null; }
 function round3(x){ return Number.isFinite(x) ? Math.round(x * 1000) / 1000 : null; }
+
+// Linear-interpolated percentile over a sorted ascending array.  At
+// p=0 returns the min, at p=1 returns the max, between returns a
+// linear blend between the two surrounding order statistics.
+function percentileInterp(sorted, p){
+  if (!Array.isArray(sorted) || sorted.length === 0) return null;
+  if (sorted.length === 1) return sorted[0];
+  const pos = (sorted.length - 1) * Math.max(0, Math.min(1, p));
+  const i   = Math.floor(pos);
+  const f   = pos - i;
+  return i + 1 < sorted.length ? sorted[i] * (1 - f) + sorted[i + 1] * f : sorted[i];
+}
