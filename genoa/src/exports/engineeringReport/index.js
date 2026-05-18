@@ -15,6 +15,7 @@ import { buildContourProtectionSection }  from './sections/contourProtection.js'
 import { buildValidationVerdictSection }  from './sections/validationVerdict.js';
 import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
+import { buildEngineerDeclarationSection } from './sections/engineerDeclaration.js';
 import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
@@ -45,6 +46,10 @@ export function buildEngineeringReport(exhibit, options){
   const push = (s) => { if (s) sections.push(s); };
 
   push(buildCoverSection(exhibit, opt));
+  // Engineer Declaration (Mullaney KELP 1989-style sworn preamble).
+  // Renders only when an engineer_of_record is attached; silently
+  // omitted on un-attributed exhibits so the unsealed format stays clean.
+  push(buildEngineerDeclarationSection(exhibit, opt));
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
