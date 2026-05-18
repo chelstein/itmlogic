@@ -18,6 +18,7 @@ import { amRadialTable, AM_DEFAULT_CONTOURS, amWarnings } from './am/groundwave.
 import { FCC_AM_PROVENANCE } from './curves/fcc/index.mjs';
 import crypto from 'node:crypto';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
+import { checkAmDaPatternCompliance } from './regulatory/section_73_150.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
 import { checkSection73215 }            from './regulatory/section_73_215.js';
 import { checkSection73207 }            from './regulatory/section_73_207.js';
@@ -618,6 +619,17 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
+
+  // §73.150 AM DA pattern-shape compliance — smoothness, max:min,
+  // RMS minimum.  Runs only when an AM exhibit has a DA pattern
+  // attached; surfaces as a separate evidence block (does NOT modify
+  // the contour math; the engine already used the filed pattern).
+  if (service === 'AM' && Array.isArray(pattern) && pattern.length >= 2){
+    exhibit.am_da_pattern_compliance = checkAmDaPatternCompliance({
+      pattern_table:            pattern,
+      authorized_pattern_table: inputs.authorized_pattern_table || null
+    });
+  }
 
   exhibit.interference_study = buildInterferenceStudy({
     subject: {

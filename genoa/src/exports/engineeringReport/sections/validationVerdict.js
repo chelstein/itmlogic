@@ -245,6 +245,29 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
+  // §73.150 AM DA pattern-shape compliance — smoothness (2 dB/10°),
+  // max:min ratio (15 dB), RMS minimum (85% of authorized).  Surfaces
+  // only on AM exhibits that filed a DA pattern.  category:'compliance'
+  // (same as Interference rules) so a §73.150 failure doesn't conflate
+  // with engine-math UNVERIFIED.
+  const ampc = exhibit.am_da_pattern_compliance;
+  if (ampc && ampc.applicable){
+    const failed = ampc.findings.filter((f) => f.pass === false).map((f) => f.rule);
+    const notMeasured = ampc.findings.filter((f) => f.pass === null).map((f) => f.rule);
+    components.push({
+      name:     '§73.150 AM DA pattern compliance',
+      category: 'compliance',
+      status:   ampc.overall_pass === true ? 'PASS'
+              : ampc.overall_pass === false ? 'FAIL'
+              : 'PARTIAL',
+      detail:   failed.length
+                  ? `Failed: ${failed.join(', ')}${notMeasured.length ? `; not measured: ${notMeasured.join(', ')}` : ''}.  ${ampc.summary}`
+                  : (notMeasured.length
+                      ? `Pattern passed all decisive checks (${ampc.findings.length - notMeasured.length} of ${ampc.findings.length}); not measured: ${notMeasured.join(', ')}.`
+                      : ampc.summary)
+    });
+  }
+
   // Interference rules — REGULATORY COMPLIANCE FINDING, not a math
   // validation result.  When the §73.215 / §73.207 study reports
   // failures, the facility doesn't comply with current rules — but the
