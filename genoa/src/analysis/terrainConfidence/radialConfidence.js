@@ -1,20 +1,38 @@
 // Per-radial confidence assessment.
 //
-// Combines terrain metrics with any available measured-vs-predicted
-// residuals (SDR drive-test residual, optional ITM Δ) into a single
-// HIGH/MEDIUM/LOW disposition with reason codes.
+// Produces:
+//   1. CONTINUOUS confidence_score (0..100) — for chart consumers and
+//      operators who want fine-grained per-radial detail
+//   2. BUCKETED disposition (HIGH / MEDIUM / LOW / UNMEASURED) — for the
+//      legacy summary + bullet renderer.  Buckets are derived FROM the
+//      continuous score with explicit thresholds.
 //
-//   HIGH   — terrain is benign AND any measured residual is within tolerance
-//   MEDIUM — moderate terrain or moderate residual; no severe red flags
-//   LOW    — severe terrain (heavy obstruction / very high roughness) OR
-//            a severe measured residual OR an ITM Δ that exceeds the
-//            model-limit threshold.
+// Continuous score function:
+//   confidence_score = 100
+//                    − clamp(100 · obstruction_index, 0, 30)       # terrain shadowing
+//                    − clamp( 25 · roughness_score,   0, 25)       # terrain roughness
+//                    − clamp(  2.5 · |sdr_residual_db|, 0, 35)     # measurement variance
+//                    − clamp(  5 · max(0, |itm_delta_db| − 5), 0, 20)  # ITM Δ
+//   Result is clamped to [0, 100].  When NO measurement basis exists
+//   (no terrain data + no SDR + no ITM), score is null and disposition
+//   is UNMEASURED.
+//
+// Bucket thresholds (derived from continuous score):
+//   score >= 80      → HIGH
+//   score >= 50      → MEDIUM
+//   score >= 0       → LOW
+//   no_evidence      → UNMEASURED
 //
 // Reason codes (keys for the report):
-//   terrain_shadowing      — high obstruction_index (≥ 0.30)
-//   diffraction_possible   — moderate obstruction (0.10 ≤ idx < 0.30)
-//   measurement_variance   — measured residual exceeds tolerance
-//   model_limit            — ITM Δ from FCC curve > 10 dB (model regime gap)
+//   terrain_shadowing      — obstruction_index ≥ 0.30  (28+ points off)
+//   diffraction_possible   — 0.10 ≤ obstruction_index < 0.30
+//   measurement_variance   — |sdr_residual_db| > tolerance
+//   model_limit            — |itm_delta_db| > 10 dB
+//   no_measurement_basis   — no SDR + no DEM + no ITM
+//
+// Reference: per user request gap #3 — replace binary buckets with
+// gradient scores so real-world RF environments can be reported with
+// nuance rather than HIGH-cliff-LOW jumps at threshold boundaries.
 
 import { TOLERANCE_DB, MODERATE_DB, classifyDeviation } from './curveDeviation.js';
 
@@ -85,24 +103,46 @@ export function radialConfidence({
   const hasTerrainEvidence = terrain && terrain.available === true;
   const hasResidualEvidence = (typeof sdr_residual_db === 'number' && Number.isFinite(sdr_residual_db))
                             || (typeof itm_delta_db    === 'number' && Number.isFinite(itm_delta_db));
+
+  // Continuous confidence score in [0, 100] — gradient replacement
+  // for the previous binary buckets.  Each penalty has its own
+  // weight + ceiling so a single severe metric can't drive the score
+  // below the others' contributions.
+  let confidence_score = null;
+  if (hasTerrainEvidence || hasResidualEvidence){
+    const obstr = Number(terrain?.obstruction_index || 0);
+    const rough = Number(terrain?.roughness_score   || 0);
+    const sdr   = Number.isFinite(Number(sdr_residual_db)) ? Math.abs(Number(sdr_residual_db)) : 0;
+    const itm   = Number.isFinite(Number(itm_delta_db))    ? Math.abs(Number(itm_delta_db))    : 0;
+    const pTerrainShadow  = clamp(100 * obstr,                     0, 30);   // up to 30 pts
+    const pTerrainRough   = clamp( 25 * rough,                     0, 25);   // up to 25 pts
+    const pSdrVariance    = clamp(  2.5 * sdr,                     0, 35);   // up to 35 pts
+    const pItmDeparture   = clamp(  5 * Math.max(0, itm - 5),      0, 20);   // up to 20 pts
+    confidence_score = Math.max(0, Math.min(100,
+      100 - pTerrainShadow - pTerrainRough - pSdrVariance - pItmDeparture));
+    confidence_score = Math.round(confidence_score * 10) / 10;
+  }
+
+  // Bucket derived FROM the continuous score.  Thresholds match the
+  // legacy bucket semantics (HIGH = "evidence is sound", MEDIUM =
+  // "moderate caution", LOW = "severe concern"); UNMEASURED is the
+  // no-evidence case.
   let confidence;
-  if (terrainBucket === 'severe' || residualBucket === 'severe'
-      || reasons.includes('model_limit')){
-    confidence = 'LOW';
-  } else if (terrainBucket === 'moderate' || residualBucket === 'moderate'){
-    confidence = 'MEDIUM';
-  } else if (hasTerrainEvidence || hasResidualEvidence){
-    confidence = 'HIGH';
-  } else {
-    // No measurement basis at all — terrain unavailable AND no SDR/ITM.
-    // Honest disposition is UNMEASURED, not a fabricated HIGH.
+  if (confidence_score == null){
     confidence = 'UNMEASURED';
     reasons.push('no_measurement_basis');
+  } else if (confidence_score >= 80){
+    confidence = 'HIGH';
+  } else if (confidence_score >= 50){
+    confidence = 'MEDIUM';
+  } else {
+    confidence = 'LOW';
   }
 
   return {
     azimuth_deg,
     confidence,
+    confidence_score,
     reasons,
     inputs: {
       terrain_available:      !!(terrain && terrain.available),
