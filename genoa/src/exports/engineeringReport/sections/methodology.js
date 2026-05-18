@@ -37,6 +37,24 @@ export function buildMethodologySection(exhibit){
       'This assessment is advisory only; it does not modify FCC curve outputs or §73.207 / §73.215 compliance results.'
     );
   }
+  // Three-variability disclosure (Beverage, Radio World "Propagation
+  // Analysis for Profit", June 2017 p. 19-20).  The F(50,50) and
+  // F(50,10) curve names encode TWO statistical dimensions but a real
+  // RF prediction has THREE.  Reading "F(50,50)" without understanding
+  // what each "50" represents is a common source of false-confidence
+  // among non-RF reviewers.  We document all three here so the verdict
+  // and contour numbers are interpretable.
+  //
+  // FM/TV uses both F(50,50) and F(50,10) explicitly.  AM under
+  // §73.184 is also a statistical curve (50% time / 50% locations
+  // implicit), so the same variability framework applies — surfacing
+  // it on AM exhibits eliminates the misread that "the curve is
+  // deterministic and the contour is a hard line."
+  paragraphs.push(
+    svc === 'AM'
+      ? 'Statistical interpretation (per Beverage, Radio World, June 2017).  AM groundwave field-strength predictions under §73.184 are statistical, not deterministic, and rest on three independent variability dimensions: (1) Time Variability — the percentage of hours during which the actual field meets or exceeds the predicted value (the §73.184 grid is a 50%-time formulation; the night-interference 0.025 mV/m contour uses §73.190 SS-1 50%-time skywave); (2) Location Variability — the percentage of geographic locations along the radial at which the actual field meets or exceeds the predicted value, controlled by ground-conductivity uniformity across the path (M3 reference value is an idealization; actual σ varies seasonally and with soil-moisture / urbanization); and (3) Situation Variability — system-to-system differences (antenna pattern realization, atmospheric ducting that occasionally puts a 5 kW signal 300 miles away, daily noise floor) that the static curve cannot model.  The contour distances reported below are the regulatory-line median; the listenable line for any specific listener depends on all three variabilities simultaneously.'
+      : 'Statistical interpretation (per Beverage, Radio World, June 2017).  FM/TV field-strength predictions under §73.333 are statistical and rest on three independent variability dimensions: (1) Time Variability — F(50,50) means 50% of the time, F(50,10) means 10% of the time (the more conservative interfering-signal curve); (2) Location Variability — F(50,50) means 50% of locations along the radial at the reference receiving height; raising either percentile (e.g. F(90,90)) reduces the predicted field and increases prediction reliability simultaneously; and (3) Situation Variability — system-to-system differences (antenna pattern realization, atmospheric ducting, urban multipath, big-rig reflections passing in real time, daily noise floor) that the static F(L,T) curve cannot model.  The contour distances reported below are the regulatory-line median; the listenable line for any specific listener depends on all three variabilities simultaneously.'
+  );
 
   const cd = mv.curve_dataset || {};
   const isAm = svc === 'AM';
