@@ -29,15 +29,32 @@ export function buildEngineeringConsiderationsSection(exhibit){
     itm_delta_db:       Number.isFinite(r.itm_delta_db)      ? Number(r.itm_delta_db).toFixed(1)      : '—'
   }));
 
-  // Summary key/value rows for context.
-  const kvRows = [
-    ['Engineering confidence',     ec.level || '—'],
-    ['% radials HIGH',             pct(ec.percent_high)],
-    ['% radials MEDIUM',           pct(ec.percent_medium)],
-    ['% radials LOW',              pct(ec.percent_low)],
-    ['RMS measured residual',      ec.rms_residual_db != null ? `${ec.rms_residual_db} dB` : 'n/a (no SDR residuals attached)'],
-    ['Terrain severity score',     Number.isFinite(ec.terrain_severity_score) ? Number(ec.terrain_severity_score).toFixed(3) : '—']
-  ];
+  // Summary key/value rows for context.  UNMEASURED is a separate
+  // disposition (no SDR + no DEM = no measurement basis); reading
+  // "100% HIGH" on an unmeasured exhibit was the most credibility-
+  // damaging thing in the report, so we surface it explicitly.
+  const isUnmeasured = ec.level === 'UNMEASURED';
+  const kvRows = isUnmeasured
+    ? [
+        ['Engineering confidence',  'UNMEASURED — no SDR drive-test or DEM basis attached'],
+        ['% radials measured',      '0%'],
+        ['% radials HIGH',          '—'],
+        ['% radials MEDIUM',        '—'],
+        ['% radials LOW',           '—'],
+        ['RMS measured residual',   'n/a (no SDR residuals attached)'],
+        ['Terrain severity score',  'n/a (§73.184 AM groundwave does not use DEM)']
+      ]
+    : [
+        ['Engineering confidence',     ec.level || '—'],
+        ['% radials HIGH',             pct(ec.percent_high)],
+        ['% radials MEDIUM',           pct(ec.percent_medium)],
+        ['% radials LOW',              pct(ec.percent_low)],
+        Number.isFinite(ec.percent_unmeasured) && ec.percent_unmeasured > 0
+          ? ['% radials UNMEASURED',    pct(ec.percent_unmeasured)]
+          : null,
+        ['RMS measured residual',      ec.rms_residual_db != null ? `${ec.rms_residual_db} dB` : 'n/a (no SDR residuals attached)'],
+        ['Terrain severity score',     Number.isFinite(ec.terrain_severity_score) ? Number(ec.terrain_severity_score).toFixed(3) : 'n/a (no DEM input)']
+      ].filter(Boolean);
 
   if (!rows.length){
     return {

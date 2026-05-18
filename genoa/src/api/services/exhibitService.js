@@ -2019,6 +2019,21 @@ export async function computeExhibit(req){
   if (evidence.am_psra_pssa){
     exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;
   }
+  // Ground conductivity evidence — both the single-point lookup and
+  // the per-radial M3 segmentation result.  engine/index.js builds
+  // exhibit.evidence from a whitelist (terrain / measurements / identity
+  // / itm_coverage / uncertainty / ground_constants), which silently
+  // dropped these.  Result: KDUS PDF showed
+  //   sigma per-radial status   NOT RECORDED -- step 6d did not populate ...
+  // even though step 6d HAD populated evidence.ground_conductivity_per_radial
+  // (the sentinel from PR #203 fired correctly; compute() then discarded it).
+  // Re-attach here so the appendix sees what step 6d / step 6c actually wrote.
+  if (evidence.ground_conductivity){
+    exhibit.evidence.ground_conductivity = evidence.ground_conductivity;
+  }
+  if (evidence.ground_conductivity_per_radial){
+    exhibit.evidence.ground_conductivity_per_radial = evidence.ground_conductivity_per_radial;
+  }
   if (evidence.geo_rf_evidence){
     exhibit.evidence.geo_rf_evidence = evidence.geo_rf_evidence;
   }

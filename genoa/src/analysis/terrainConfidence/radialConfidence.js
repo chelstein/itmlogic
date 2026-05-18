@@ -65,15 +65,32 @@ export function radialConfidence({
     reasons.push('model_limit');
   }
 
-  // Disposition
+  // Disposition.  Critical correctness gate:
+  //   HIGH must mean "we have evidence the prediction is sound" — i.e.
+  //   we actually MEASURED something (SDR residual or ITM Δ within
+  //   tolerance) OR we computed real terrain metrics that came out
+  //   benign.  Defaulting to HIGH on an exhibit with NO terrain data,
+  //   NO SDR residual, and NO ITM Δ produces the "100% HIGH / 0 dB
+  //   residual / terrain severity 0.000" trifecta that AM engineers
+  //   read as "we measured perfection" — when we didn't measure
+  //   anything at all.  AM under §73.184 has no DEM input by design,
+  //   so without SDR drive-tests the honest disposition is UNMEASURED.
+  const hasTerrainEvidence = terrain && terrain.available === true;
+  const hasResidualEvidence = Number.isFinite(Number(sdr_residual_db))
+                            || Number.isFinite(Number(itm_delta_db));
   let confidence;
   if (terrainBucket === 'severe' || residualBucket === 'severe'
       || reasons.includes('model_limit')){
     confidence = 'LOW';
   } else if (terrainBucket === 'moderate' || residualBucket === 'moderate'){
     confidence = 'MEDIUM';
-  } else {
+  } else if (hasTerrainEvidence || hasResidualEvidence){
     confidence = 'HIGH';
+  } else {
+    // No measurement basis at all — terrain unavailable AND no SDR/ITM.
+    // Honest disposition is UNMEASURED, not a fabricated HIGH.
+    confidence = 'UNMEASURED';
+    reasons.push('no_measurement_basis');
   }
 
   return {
