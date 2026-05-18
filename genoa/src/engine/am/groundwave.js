@@ -13,11 +13,31 @@
 import { W } from '../../types/warnings.js';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 
+// AM contour list — full consultant-grade set including the two contours
+// that real AM filings (cf. Mullaney KELP 1989 Tables 1/2) compute but
+// Genoa previously omitted:
+//
+//   blanket_1000mvm — 1000 mV/m blanket interference contour per
+//     §73.24(g).  Population within this contour drives the
+//     "blanketing-interference receiver complaint" obligation; if
+//     the population exceeds 1% of the population within the 25 mV/m
+//     contour the licensee must commit to a complaint-remediation plan.
+//
+//   international_25mvm — 25 mV/m daytime contour per §73.187 and
+//     the US/Mexico and US/Canada AM treaties.  Triggered when the
+//     subject site is near an international border (KELP at 0 km from
+//     the US/Mexico border had to protect XEJPV 1560 kHz on the basis
+//     of a 25 mV/m daytime overlap check).
+//
+// Both contours are pure-add to the existing list; FCC parity and
+// per-radial geometry continue to operate on every entry uniformly.
 export const AM_DEFAULT_CONTOURS = Object.freeze([
-  { id: 'city_5mvm',      label: '5 mV/m (city grade)',       field_mvm: 5    },
-  { id: 'primary_2mvm',   label: '2 mV/m (primary)',          field_mvm: 2    },
-  { id: 'secondary_05mvm',label: '0.5 mV/m (secondary)',      field_mvm: 0.5  },
-  { id: 'night_intf',     label: '0.025 mV/m (night intf.)',  field_mvm: 0.025}
+  { id: 'blanket_1000mvm', label: '1000 mV/m (blanket intf. §73.24(g))',  field_mvm: 1000, role: 'blanket'         },
+  { id: 'international_25mvm', label: '25 mV/m (international protection §73.187)', field_mvm: 25, role: 'international' },
+  { id: 'city_5mvm',       label: '5 mV/m (city grade)',                  field_mvm: 5,    role: 'city'            },
+  { id: 'primary_2mvm',    label: '2 mV/m (primary)',                     field_mvm: 2,    role: 'primary'         },
+  { id: 'secondary_05mvm', label: '0.5 mV/m (secondary)',                 field_mvm: 0.5,  role: 'secondary'       },
+  { id: 'night_intf',      label: '0.025 mV/m (night intf.)',             field_mvm: 0.025,role: 'night_interferer'}
 ]);
 
 // FCC §73.184 default dielectric (relative permittivity).  The pre-

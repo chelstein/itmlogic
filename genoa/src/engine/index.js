@@ -19,6 +19,7 @@ import { FCC_AM_PROVENANCE } from './curves/fcc/index.mjs';
 import crypto from 'node:crypto';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkAmDaPatternCompliance } from './regulatory/section_73_150.js';
+import { checkAm73_24g }              from './regulatory/section_73_24g.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
 import { checkSection73215 }            from './regulatory/section_73_215.js';
 import { checkSection73207 }            from './regulatory/section_73_207.js';
@@ -629,6 +630,15 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       pattern_table:            pattern,
       authorized_pattern_table: inputs.authorized_pattern_table || null
     });
+  }
+
+  // §73.24(g) blanket-interference compliance (AM).  Reads the
+  // 1000 mV/m and 25 mV/m contours from the radial table plus any
+  // attached per-contour population data.  Runs unconditionally for
+  // AM so the verdict always reports a status (PASS / FAIL / null when
+  // population data unavailable).
+  if (service === 'AM'){
+    exhibit.am_blanket_compliance = checkAm73_24g({ exhibit });
   }
 
   exhibit.interference_study = buildInterferenceStudy({
