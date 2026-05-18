@@ -36,6 +36,8 @@
 
 import { TOLERANCE_DB, MODERATE_DB, classifyDeviation } from './curveDeviation.js';
 
+function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
 export const ROUGH_HIGH_SCORE   = 1.0;
 export const ROUGH_MEDIUM_SCORE = 0.5;
 export const OBSTRUCTION_HIGH   = 0.30;
@@ -64,9 +66,12 @@ export function radialConfidence({
     }
   }
 
-  // SDR residual severity
+  // SDR residual severity — typeof guard first, then Number.isFinite,
+  // to avoid the Number(null)===0 → Number.isFinite(0)===true gotcha
+  // that PR #205 / #206 already fixed in the evidence-presence check
+  // but had been left in this severity check.  Same trap; same fix.
   let residualBucket = 'within';
-  if (Number.isFinite(Number(sdr_residual_db))){
+  if (typeof sdr_residual_db === 'number' && Number.isFinite(sdr_residual_db)){
     const cls = classifyDeviation(sdr_residual_db);
     if (cls === 'severe'){
       residualBucket = 'severe';
@@ -78,8 +83,9 @@ export function radialConfidence({
   }
 
   // ITM Δ — drives the "model_limit" code only when very large.
-  if (Number.isFinite(Number(itm_delta_db))
-      && Math.abs(Number(itm_delta_db)) > ITM_MODEL_LIMIT_DB){
+  // Same typeof guard for the same gotcha.
+  if (typeof itm_delta_db === 'number' && Number.isFinite(itm_delta_db)
+      && Math.abs(itm_delta_db) > ITM_MODEL_LIMIT_DB){
     reasons.push('model_limit');
   }
 
@@ -120,6 +126,16 @@ export function radialConfidence({
     const pItmDeparture   = clamp(  5 * Math.max(0, itm - 5),      0, 20);   // up to 20 pts
     confidence_score = Math.max(0, Math.min(100,
       100 - pTerrainShadow - pTerrainRough - pSdrVariance - pItmDeparture));
+    // Severe-signal cap: when any input lands in the severe band the
+    // score must drop into the LOW bucket regardless of other inputs.
+    // Otherwise a -14 dB residual at flat terrain would score ~65
+    // (MEDIUM) which contradicts the legacy semantic that severe
+    // residuals are always LOW.  Cap at 49 so the bucket threshold
+    // (≥ 50 = MEDIUM) is guaranteed missed.
+    if (terrainBucket === 'severe' || residualBucket === 'severe'
+        || reasons.includes('model_limit')){
+      confidence_score = Math.min(confidence_score, 49);
+    }
     confidence_score = Math.round(confidence_score * 10) / 10;
   }
 
