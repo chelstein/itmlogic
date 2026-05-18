@@ -289,6 +289,30 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
+  // §73.24(j) AM principal-community coverage — 5 mV/m contour must
+  // encompass legal boundary of city of license.  See Mullaney KELP
+  // 1989 Section I for the canonical 'substantial compliance' showing.
+  const amcj = exhibit.am_city_coverage_compliance;
+  if (amcj && amcj.applicable){
+    const cjFailed = amcj.findings.filter((f) => f.pass === false).map((f) => f.rule);
+    const cjNotMeasured = amcj.findings.filter((f) => f.pass === null).map((f) => f.rule);
+    const covPct = Number.isFinite(amcj.coverage_pct)
+                    ? ` — ${(amcj.coverage_pct * 100).toFixed(1)}% coverage`
+                    : '';
+    components.push({
+      name:     '§73.24(j) AM principal-community coverage',
+      category: 'compliance',
+      status:   amcj.overall_pass === true ? 'PASS'
+              : amcj.overall_pass === false ? 'FAIL'
+              : 'PARTIAL',
+      detail:   cjFailed.length
+                  ? `Failed${covPct}.  ${amcj.summary}`
+                  : (cjNotMeasured.length
+                      ? `Community boundary not attached; the 5 mV/m coverage check cannot run.  Attach inputs.community_boundary_geojson (RFC 7946 Polygon in WGS-84) to enable.`
+                      : `Passes${covPct}.  ${amcj.summary}`)
+    });
+  }
+
   // Interference rules — REGULATORY COMPLIANCE FINDING, not a math
   // validation result.  When the §73.215 / §73.207 study reports
   // failures, the facility doesn't comply with current rules — but the

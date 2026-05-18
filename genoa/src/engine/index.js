@@ -20,6 +20,7 @@ import crypto from 'node:crypto';
 import { checkLpfmCompliance } from './regulatory/lpfm.js';
 import { checkAmDaPatternCompliance } from './regulatory/section_73_150.js';
 import { checkAm73_24g }              from './regulatory/section_73_24g.js';
+import { checkAm73_24j }              from './regulatory/section_73_24j.js';
 import { checkTranslatorInterference } from './regulatory/translator.js';
 import { checkSection73215 }            from './regulatory/section_73_215.js';
 import { checkSection73207 }            from './regulatory/section_73_207.js';
@@ -639,6 +640,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // population data unavailable).
   if (service === 'AM'){
     exhibit.am_blanket_compliance = checkAm73_24g({ exhibit });
+    exhibit.am_city_coverage_compliance = checkAm73_24j({ exhibit });
   }
 
   exhibit.interference_study = buildInterferenceStudy({

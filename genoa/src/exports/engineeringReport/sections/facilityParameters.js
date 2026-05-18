@@ -1,5 +1,7 @@
 // Facility parameters — inputs to the propagation study.
 
+import { classifyAmDaMode } from '../../../engine/am/daModalClassification.js';
+
 export function buildFacilityParametersSection(exhibit){
   const s = exhibit.station_inputs || {};
   const ev = exhibit.evidence || {};
@@ -79,8 +81,17 @@ export function buildFacilityParametersSection(exhibit){
 
   // Pattern row — AM has explicit DA / NDA terminology; FM/TV just says
   // directional / non-directional.
+  // AM antenna mode + FCC modal notation (DA-D / DA-N / DA-2 / DA-3
+  // / NDA-U / etc.) per Mullaney KELP 1989 industry practice.
+  // classifyAmDaMode derives the modal code from existing inputs
+  // (pattern_mode, night_power_kw, daytime_only, attached pattern
+  // tables) so no schema change is required for first-pass rendering.
+  const amModal = isAm ? classifyAmDaMode({ inputs: s }) : null;
   const patternRow = isAm
-    ? ['Antenna mode', s.pattern_mode === 'DA' ? 'DA (directional, per pattern_table)' : 'NDA (non-directional)']
+    ? ['Antenna mode',
+       amModal
+         ? `${amModal.full_notation} (${amModal.composite})`
+         : (s.pattern_mode === 'DA' ? 'DA (directional, per pattern_table)' : 'NDA (non-directional)')]
     : ['Antenna pattern', s.pattern_mode === 'DA' ? 'Directional (per pattern_table)' : 'Non-directional'];
 
   return {
