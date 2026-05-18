@@ -17,6 +17,7 @@ import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
 import { buildEngineerDeclarationSection } from './sections/engineerDeclaration.js';
 import { buildExecutiveSummarySection }    from './sections/executiveSummary.js';
+import { buildMwEducationalSections }      from './sections/mwEducational.js';
 import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
@@ -58,6 +59,13 @@ export function buildEngineeringReport(exhibit, options){
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
+  // Plain-English educational sub-sections for AM exhibits — Mercer
+  // Slough-style background reading for non-engineer consumers (city
+  // planning, station owner, GM).  Returns [] for non-AM exhibits.
+  // Sections: MW Radio Propagation, FCC 1939 Conductivity Table,
+  // Blanketing Contours, Ground System, plus Maintenance Recommendations
+  // when study_intent === 'existing_facility_review'.
+  for (const sec of buildMwEducationalSections(exhibit, opt)) push(sec);
   // Regulatory-context section is conditional — only present when the
   // classifier ran (exhibit.regulatoryContext is populated).  Sits
   // between methodology and the engineering-considerations block so a
