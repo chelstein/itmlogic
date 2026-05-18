@@ -96,6 +96,20 @@ app.use('/api', measurementsRoutes); // drive-test ingestion (POST /api/measurem
 app.use('/api', amSiteOptimizerRoutes); // AM regional relocation optimizer (POST /api/am/site-optimizer — SCREENING ONLY)
 app.use('/api', exhibitRoutes);
 
+// SPA fallback — any GET request that isn't /api/*, /healthz, /readyz,
+// or a static asset should serve index.html so client-side routes
+// like /am-relocation can be deep-linked.  Mounted after every API
+// route, so JSON 404s for unknown /api/* paths still come from the
+// API layer (no HTML leak).  Skips requests that already accept a
+// non-HTML content type, so curl / fetch / asset probes aren't fed
+// the SPA shell by accident.
+app.get(/^\/(?!api\/|healthz|readyz)(?!.*\.[a-zA-Z0-9]+$).*/, (req, res, next) => {
+  const accept = String(req.headers.accept || '');
+  if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return next();
+  const indexPath = path.join(uiRoot, 'index.html');
+  return res.sendFile(indexPath, (err) => { if (err) next(err); });
+});
+
 // Last-resort error handler
 app.use(errorHandler);
 

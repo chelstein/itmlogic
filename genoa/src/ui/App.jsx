@@ -24,6 +24,33 @@ import ComparableFacilitiesPanel from '@components/ui/ComparableFacilitiesPanel.
 import ExhibitDiffPanel from '@components/ui/ExhibitDiffPanel.jsx';
 import ShortSpacingShowingPanel from '@components/ui/ShortSpacingShowingPanel.jsx';
 import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
+import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx';
+
+// Routes — a minimal client-side dispatch.  The default Contour
+// Studio lives at '/' and any /am-... legacy URL; the standalone AM
+// Relocation Optimizer lives at '/am-relocation' (server.js serves
+// index.html for any non-API, non-file URL so deep-linking works).
+const ROUTE_OPTIMIZER = '/am-relocation';
+
+function navigateTo(path){
+  if (typeof window === 'undefined') return;
+  if (window.location.pathname === path) return;
+  window.history.pushState({}, '', path);
+  // Notify our route hook below; popstate doesn't fire on pushState.
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
+function useRoute(){
+  const [path, setPath] = useState(() =>
+    typeof window === 'undefined' ? '/' : window.location.pathname
+  );
+  useEffect(() => {
+    function onPop(){ setPath(window.location.pathname); }
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+  return path;
+}
 
 /* =========================================================================
    App.jsx — orchestrates inputs, /api/exhibits/compute, /api/facilities/*,
@@ -140,10 +167,32 @@ export default function App(){
   if (authed === false){
     return <Login onSuccess={() => setAuthed(true)} />;
   }
-  return <MainApp onLogout={logout} />;
+  return <AuthedRouter onLogout={logout} />;
 }
 
-function MainApp({ onLogout }) {
+// AuthedRouter — picks the right top-level page for the current URL.
+// MainApp (Contour Studio) and SiteOptimizerApp (AM Relocation
+// Optimizer) are siblings — neither is mounted inside the other so
+// their state, hooks, and Leaflet instances are fully isolated.
+function AuthedRouter({ onLogout }){
+  const path = useRoute();
+  if (path === ROUTE_OPTIMIZER){
+    return (
+      <SiteOptimizerApp
+        onSwitchToContourStudio={() => navigateTo('/')}
+        onLogout={onLogout}
+      />
+    );
+  }
+  return (
+    <MainApp
+      onLogout={onLogout}
+      onOpenOptimizer={() => navigateTo(ROUTE_OPTIMIZER)}
+    />
+  );
+}
+
+function MainApp({ onLogout, onOpenOptimizer }) {
   const [inputs, setInputs] = useState(PRESET_SYNTHETIC);
   const [exhibit, setExhibit] = useState(null);
   const [computing, setComputing] = useState(false);
@@ -795,6 +844,15 @@ function MainApp({ onLogout }) {
 
   return (
     <>
+    {onOpenOptimizer && (
+      <button
+        onClick={onOpenOptimizer}
+        title="Open the AM Regional Relocation Optimizer"
+        className="fixed top-3 right-[5.5rem] z-40 font-mono text-[10px] tracking-rack uppercase text-amber hover:text-cream border border-amber/40 hover:border-amber/80 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
+      >
+        Site&nbsp;Optimizer →
+      </button>
+    )}
     <button
       onClick={onLogout}
       title="Sign out"
