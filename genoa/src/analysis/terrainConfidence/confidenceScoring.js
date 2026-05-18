@@ -32,15 +32,20 @@ export function aggregateEngineeringConfidence(per_radial){
   const list = Array.isArray(per_radial) ? per_radial : [];
   const n    = list.length;
 
-  // Counts
-  let nHigh = 0, nMed = 0, nLow = 0;
+  // Counts.  UNMEASURED is a NEW bucket separate from HIGH/MEDIUM/LOW
+  // that signals "no terrain data + no SDR/ITM measurement basis."
+  // Critical so AM exhibits without drive-tests don't get rolled up
+  // as "100% HIGH 0 dB residual" — which reads as "we measured this
+  // and it was perfect" when the truth is "we didn't measure anything."
+  let nHigh = 0, nMed = 0, nLow = 0, nUnmeasured = 0;
   const reasons = {};
   let sumObstr = 0, nObstr = 0, sumRough = 0, nRough = 0;
   let sqSum = 0, sqN = 0;
   for (const r of list){
-    if (r.confidence === 'HIGH')   nHigh++;
+    if (r.confidence === 'HIGH')        nHigh++;
     else if (r.confidence === 'MEDIUM') nMed++;
     else if (r.confidence === 'LOW')    nLow++;
+    else if (r.confidence === 'UNMEASURED') nUnmeasured++;
     for (const rc of (r.reasons || [])){
       reasons[rc] = (reasons[rc] || 0) + 1;
     }
@@ -52,18 +57,27 @@ export function aggregateEngineeringConfidence(per_radial){
     if (Number.isFinite(res)){ sqSum += res * res; sqN++; }
   }
 
-  const percent_high   = pct(nHigh, n);
-  const percent_medium = pct(nMed,  n);
-  const percent_low    = pct(nLow,  n);
+  const percent_high       = pct(nHigh, n);
+  const percent_medium     = pct(nMed,  n);
+  const percent_low        = pct(nLow,  n);
+  const percent_unmeasured = pct(nUnmeasured, n);
   const rms_residual_db = sqN ? Number(Math.sqrt(sqSum / sqN).toFixed(2)) : null;
   const meanObstr  = nObstr ? sumObstr / nObstr : 0;
   const meanRough  = nRough ? sumRough / nRough : 0;
-  const terrain_severity_score = round3(meanRough + 2 * meanObstr);
+  const terrain_severity_score = nObstr || nRough
+                                  ? round3(meanRough + 2 * meanObstr)
+                                  : null;   // null, not 0 — distinguishes "no DEM" from "DEM said zero"
 
-  const lowFraction    = n ? nLow / n : 0;
-  const nonHighFraction = n ? (nLow + nMed) / n : 0;
+  const lowFraction         = n ? nLow / n : 0;
+  const nonHighFraction     = n ? (nLow + nMed) / n : 0;
+  const unmeasuredFraction  = n ? nUnmeasured / n : 0;
   let level;
-  if (lowFraction >= LOW_FRACTION_GATE
+  // Aggregate UNMEASURED takes precedence when the majority of radials
+  // have no measurement basis.  Producing 'HIGH' for an exhibit where
+  // we never measured anything is the worst kind of false-confidence.
+  if (unmeasuredFraction >= 0.5){
+    level = 'UNMEASURED';
+  } else if (lowFraction >= LOW_FRACTION_GATE
       || (rms_residual_db != null && rms_residual_db > RMS_LOW_GATE_DB)){
     level = 'LOW';
   } else if (nonHighFraction >= NONHIGH_FRACTION_GATE
@@ -93,6 +107,7 @@ export function aggregateEngineeringConfidence(per_radial){
     percent_high,
     percent_medium,
     percent_low,
+    percent_unmeasured,
     n_radials:               n,
     rms_residual_db,
     terrain_severity_score,
@@ -107,6 +122,14 @@ function composeExplanation({ level, n, percent_high, percent_low, rms_residual_
     return 'No radials were available for terrain-aware confidence analysis; ' +
            'engineering confidence cannot be computed for this exhibit.';
   }
+  if (level === 'UNMEASURED'){
+    return 'Engineering confidence: UNMEASURED.  No SDR drive-test residuals were attached ' +
+           'and no terrain DEM was sampled for this exhibit (AM groundwave under §73.184 does not ' +
+           'use terrain elevation by design).  This means the confidence layer has no measurement ' +
+           'basis — the FCC curve prediction stands on its own and the engineer of record should ' +
+           'attach drive-test data before relying on a "HIGH" confidence claim.  Advisory only; ' +
+           'does NOT modify §73.207 / §73.215 compliance results.';
+  }
   const parts = [];
   parts.push(`Engineering confidence: ${level}.`);
   parts.push(`${percent_high}% of radials assessed HIGH, ${percent_low}% LOW.`);
@@ -115,7 +138,11 @@ function composeExplanation({ level, n, percent_high, percent_low, rms_residual_
   } else {
     parts.push('No SDR residual was attached; assessment is terrain-only.');
   }
-  parts.push(`Terrain severity score ${terrain_severity_score}.`);
+  if (terrain_severity_score != null){
+    parts.push(`Terrain severity score ${terrain_severity_score}.`);
+  } else {
+    parts.push('Terrain severity not computed (no DEM input — §73.184 AM groundwave by design).');
+  }
   if (reasons.terrain_shadowing){
     parts.push(`${reasons.terrain_shadowing} radial(s) flagged for likely terrain shadowing.`);
   }
