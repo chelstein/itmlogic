@@ -27,6 +27,7 @@ import lmsFilingRoutes from './routes/lmsFiling.js';
 import captureRoutes   from './routes/captures.js';
 import geodataRoutes   from './routes/geodata.js';
 import measurementsRoutes from './routes/measurements.js';
+import amSiteOptimizerRoutes from './routes/amSiteOptimizer.js';
 import authRoutes       from './routes/auth.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
@@ -92,6 +93,7 @@ app.use('/api', lmsFilingRoutes);    // FCC Form 301-FM filing package (POST /ap
 app.use('/api', captureRoutes);      // SDR capture audio proxy (GET /api/captures/:id/audio)
 app.use('/api', geodataRoutes);      // geodata evidence layers (GET /api/geodata/{sample,clutter,vegetation,conductivity,terrain/status,manifest})
 app.use('/api', measurementsRoutes); // drive-test ingestion (POST /api/measurements/ingest)
+app.use('/api', amSiteOptimizerRoutes); // AM regional relocation optimizer (POST /api/am/site-optimizer — SCREENING ONLY)
 app.use('/api', exhibitRoutes);
 
 // Last-resort error handler
