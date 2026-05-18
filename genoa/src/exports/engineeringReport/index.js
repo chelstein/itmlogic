@@ -16,6 +16,7 @@ import { buildValidationVerdictSection }  from './sections/validationVerdict.js'
 import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
 import { buildEngineerDeclarationSection } from './sections/engineerDeclaration.js';
+import { buildExecutiveSummarySection }    from './sections/executiveSummary.js';
 import { buildAppendixSections }          from './sections/appendices.js';
 import { buildEngineeringConsiderationsSection } from './sections/engineeringConsiderations.js';
 import { buildEngineeringInterpretationSection }  from './sections/engineeringInterpretation.js';
@@ -50,6 +51,10 @@ export function buildEngineeringReport(exhibit, options){
   // Renders only when an engineer_of_record is attached; silently
   // omitted on un-attributed exhibits so the unsealed format stays clean.
   push(buildEngineerDeclarationSection(exhibit, opt));
+  // Executive Summary (Hatfield & Dawson Mercer Slough 2002 style) —
+  // plain-English overview that reads cover-to-cover for the GM /
+  // station owner / city planner before the technical body.
+  push(buildExecutiveSummarySection(exhibit, opt));
   push(buildPurposeSection(exhibit, opt));
   push(buildFacilityParametersSection(exhibit, opt));
   push(buildMethodologySection(exhibit, opt));
