@@ -36,6 +36,7 @@ import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 import { makeAsrClient }         from '../../evidence/asrClient.js';
 import { makeLosClient }         from '../../evidence/losClient.js';
 import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
+import { makeAirportsClient }    from '../../evidence/airportsClient.js';
 import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
 import { makeFccamClient }       from '../../evidence/fccamClient.js';
 import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
@@ -129,6 +130,7 @@ export const sidecars = Object.freeze({
   // FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape (unimplemented
   // in this build).
   faaOe:       makeFaaOeClient(),
+  airports:    makeAirportsClient(),
   // FCC FORTRAN reference engine (chelstein/fcc-fortran-engine — a
   // microservice that links and calls the FCC/REC TVFMFS_METRIC routine
   // directly).  Used as a deterministic PARITY reference against
