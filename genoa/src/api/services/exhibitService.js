@@ -22,7 +22,7 @@ import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFcc
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
 import { W }                    from '../../types/warnings.js';
-import { computeHaatMultiSource } from '../../evidence/terrain/elevationClient.js';
+import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
 import { makeBudget }              from './computeBudget.js';
 
 let _validationCache = null;
@@ -69,6 +69,73 @@ function synthDefaultAmArray(inputs){
 
 // FM service-contour threshold per §73.211 — used by §73.215 and the
 // ITM-aware coverage analysis.  Returns null for non-FM services.
+// Resolve antenna AMSL (height above mean sea level, metres) for the
+// per-radial terrain pipeline.  The §73.313(d) HAAT formula is
+//
+//     HAAT_per_radial = tx_amsl_m - mean(terrain_elevations_along_radial)
+//
+// so what gets passed in as tx_amsl_m MUST be the antenna's height
+// above sea level — NOT the operator's HAAT figure.  Earlier code
+// passed `inputs.haat_m` as `tx_amsl_m` (a confusion of two completely
+// different quantities), which produced negative HAAT values for
+// every station whose surrounding terrain averaged higher than the
+// HAAT input (e.g. KZLZ in the Tucson area: HAAT=581 m, surrounding
+// terrain ~750 m AMSL → wrong "HAAT" of −169 m everywhere).
+//
+// Priority order:
+//   1. inputs.overall_height_amsl_m if the operator supplied it
+//      (this is the field FCC LMS asks for at filing time and is
+//      authoritative).
+//   2. Else probe the tx site's ground elevation via the elevation
+//      client and add the operator's HAAT — `terrain_at_tx + haat_m`
+//      approximates the antenna's true AMSL for sites where the
+//      reference terrain plane is close to the local ground.  Logged
+//      as a "derived" result for transparency.
+//   3. Else fall back to the legacy (wrong) behavior of `haat_m`
+//      directly — emit a warning so the engineer can see the
+//      per-radial HAAT column is unreliable.
+//
+// The resolved value is cached on the exhibit so all downstream
+// terrain compute sites (radial HAAT, SPLAT ITM, JS ITM) read the
+// same number, avoiding repeated terrain probes.
+async function resolveTxAmslM({ inputs, evidence, warnings, logger = console }){
+  if (Number.isFinite(Number(inputs?.overall_height_amsl_m))){
+    const amsl = Number(inputs.overall_height_amsl_m);
+    evidence.tx_amsl_resolved = { value_m: amsl, source: 'operator_supplied', haat_m_input: Number(inputs.haat_m) };
+    return amsl;
+  }
+  const lat = Number(inputs?.lat);
+  const lon = Number(inputs?.lon);
+  const haat = Number(inputs?.haat_m);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(haat)){
+    return null;
+  }
+  try {
+    const r = await fetchElevationsFallback([{ lat, lon }]);
+    const groundAmsl = Array.isArray(r?.elevations) ? Number(r.elevations[0]) : NaN;
+    if (Number.isFinite(groundAmsl)){
+      const amsl = groundAmsl + haat;
+      evidence.tx_amsl_resolved = {
+        value_m:        Math.round(amsl * 10) / 10,
+        source:         'derived',
+        tx_ground_amsl_m: Math.round(groundAmsl * 10) / 10,
+        haat_m_input:   haat,
+        elevation_source: r.source_id || 'unknown',
+        note: 'tx_amsl derived as ground_elevation_at_tx + haat_m; replace with operator-supplied overall_height_amsl_m at filing time'
+      };
+      return amsl;
+    }
+  } catch (err){
+    logger.warn?.('[resolveTxAmslM] elevation probe failed:', err?.message || err);
+  }
+  // Last resort — keep the legacy behavior so we don't break the
+  // pipeline, but make the confusion visible.
+  warnings?.push?.(W.make('TX_AMSL_UNRESOLVED',
+    `Antenna AMSL could not be resolved: neither inputs.overall_height_amsl_m supplied nor ground elevation at (${lat.toFixed(4)}, ${lon.toFixed(4)}) reachable.  Falling back to haat_m=${haat} as tx_amsl_m, which means the per-radial HAAT column in Appendix A reports (haat_m − terrain_avg_at_radial), not true HAAT.  Supply overall_height_amsl_m to fix.`));
+  evidence.tx_amsl_resolved = { value_m: haat, source: 'legacy_fallback', haat_m_input: haat };
+  return haat;
+}
+
 function service73215Threshold(klass){
   if (!klass) return 60;                  // default to Class A 60 dBu
   const k = String(klass).toUpperCase().replace(/\s+/g, '').replace('CLASS', '');
@@ -713,12 +780,16 @@ export async function computeExhibit(req){
     const step      = Number(inputs.radial_step_deg) || 10;
     const radials   = [];
     for (let az = 0; az < 360; az += step) radials.push(az);
+    // Resolve antenna AMSL once; cached on evidence.tx_amsl_resolved so
+    // the SPLAT and JS ITM call sites below reuse the same value
+    // without re-probing the elevation API.
+    const tx_amsl_m = await resolveTxAmslM({ inputs, evidence, warnings });
     try {
       const tr = await budget.withDeadline('multi_source_dem',
         () => computeHaatMultiSource({
           tx_lat:      Number(inputs.lat),
           tx_lon:      Number(inputs.lon),
-          tx_amsl_m:   Number(inputs.haat_m),   // antenna AMSL (best available)
+          tx_amsl_m,
           radials_deg: radials,
           from_km:     3,
           to_km:       16,
@@ -841,6 +912,14 @@ export async function computeExhibit(req){
     for (let az = 0; az < 360; az += step) radials.push(az);
     const target = service73215Threshold(inputs.fcc_class) || 60;
 
+    // Resolve antenna AMSL here too — this code path runs even when
+    // the §3c multi-source-DEM block above was skipped (no use_terrain,
+    // sidecar terrain already available, etc.), so we can't rely on
+    // evidence.tx_amsl_resolved being populated.  resolveTxAmslM()
+    // returns the cached value when one already exists.
+    const tx_amsl_m = evidence.tx_amsl_resolved?.value_m
+      ?? await resolveTxAmslM({ inputs, evidence, warnings });
+
     // Tier 1: SPLAT sidecar (high-fidelity).
     let splatAttempt = null;
     if (sidecars.splat && options.itm_engine !== 'js'){
@@ -851,7 +930,7 @@ export async function computeExhibit(req){
               call:              inputs.call || null,
               lat:               Number(inputs.lat),
               lon:               Number(inputs.lon),
-              amsl_m:            Number(inputs.haat_m),
+              amsl_m:            tx_amsl_m ?? Number(inputs.haat_m),
               antenna_height_m:  Number(inputs.haat_m),
               frequency_mhz:     Number(inputs.frequency),
               erp_kw:            Number(inputs.erp_kw),
@@ -889,7 +968,7 @@ export async function computeExhibit(req){
           () => computeItmCoverage({
             tx_lat:           Number(inputs.lat),
             tx_lon:           Number(inputs.lon),
-            tx_amsl_m:        Number(inputs.haat_m),
+            tx_amsl_m:        tx_amsl_m ?? Number(inputs.haat_m),
             erp_kw:           Number(inputs.erp_kw),
             haat_m:           Number(inputs.haat_m),
             frequency_mhz:    Number(inputs.frequency),
