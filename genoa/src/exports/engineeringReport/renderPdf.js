@@ -585,10 +585,26 @@ function pageBottomReached(pdf){
   return pdf.y > pdf.page.height - MARGIN - FOOTER_AREA - 12;
 }
 
+// Read PNG width × height from the IHDR chunk (bytes 16..23, big-endian).
+// Returns null for any non-PNG / truncated input.  Used by renderImage()
+// to size the figure frame to the actual image aspect ratio instead of
+// trusting pdfkit's `fit:` option to set pdf.y for us (it doesn't —
+// `fit:` preserves aspect but the surrounding layout has no idea what
+// the resulting box height is, so the caption used to float ~250pt
+// below a landscape contour map embedded on a portrait page).
+function readPngSize(buf){
+  if (!Buffer.isBuffer(buf) || buf.length < 24) return null;
+  if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4E || buf[3] !== 0x47) return null;
+  const width  = buf.readUInt32BE(16);
+  const height = buf.readUInt32BE(20);
+  if (width <= 0 || height <= 0) return null;
+  return { width, height };
+}
+
 // Render an image section.  `image_buffer` is a Node Buffer; pdfkit
-// accepts it directly via pdf.image().  We force the image onto its
-// own page so the contour map gets a clean print frame, and reserve
-// ~80pt at the bottom for the caption + footer.
+// accepts it directly via pdf.image().  The contour map gets its own
+// printable page with a thin survey-frame around the image and the
+// caption anchored immediately below (no floating whitespace).
 function renderImage(pdf, s){
   const buf = s.image_buffer;
   if (!buf || !Buffer.isBuffer(buf)){
@@ -597,27 +613,58 @@ function renderImage(pdf, s){
     return;
   }
   pdf.addPage();
+  const pageW = pdf.page.width;
   if (s.heading){
-    const w = pdf.page.width;
     const ruleY = pdf.y;
     pdf.strokeColor(AMBER).lineWidth(0.6)
-       .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
+       .moveTo(MARGIN, ruleY).lineTo(pageW - MARGIN, ruleY).stroke();
     pdf.y = ruleY + RULE_GAP;
+    const figurePrefix = s.figure_number ? `FIGURE ${s.figure_number} — ` : '';
     const headingText = s.exhibit_number
       ? `EXHIBIT ${s.exhibit_number} — ${s.heading.toUpperCase()}`
-      : s.heading.toUpperCase();
+      : `${figurePrefix}${s.heading.toUpperCase()}`;
     pdf.font(BOLD_FONT).fontSize(HEADING_SIZE).fillColor(TEAL_DARK)
-       .text(headingText, MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
+       .text(headingText, MARGIN, pdf.y, { width: pageW - 2 * MARGIN, characterSpacing: 0.4 });
     pdf.fillColor('black').moveDown(0.4);
   }
-  const w = pdf.page.width  - 2 * MARGIN;
-  const captionH = s.caption ? 56 : 12;
-  const availH = pdf.page.height - pdf.y - MARGIN - FOOTER_AREA - captionH;
-  pdf.image(buf, MARGIN, pdf.y, { fit: [w, Math.max(220, availH)], align: 'center' });
-  pdf.y = pdf.y + Math.max(220, availH) + 6;
+  const boxW   = pageW - 2 * MARGIN;
+  const availH = pdf.page.height - pdf.y - MARGIN - FOOTER_AREA - 10;
+  const dims   = readPngSize(buf);
+
+  // Compute the actual draw box.  When we know the PNG's intrinsic
+  // dimensions, scale to fit while preserving aspect ratio.  When we
+  // don't (non-PNG or truncated header), fall back to the legacy fit
+  // box so we never refuse to draw a valid image.
+  let drawW, drawH;
+  if (dims){
+    const aspect = dims.width / dims.height;
+    drawW = boxW;
+    drawH = drawW / aspect;
+    if (drawH > availH){
+      drawH = availH;
+      drawW = drawH * aspect;
+    }
+  } else {
+    drawW = boxW;
+    drawH = Math.max(220, availH);
+  }
+  const drawX = MARGIN + (boxW - drawW) / 2;
+  const drawY = pdf.y;
+
+  pdf.image(buf, drawX, drawY, { width: drawW, height: drawH });
+
+  // Thin survey-style frame outlining the figure — ties the image
+  // tightly to the page so it reads as an engineered figure rather
+  // than a floating screenshot.
+  pdf.save()
+     .strokeColor(TEAL_DARK).lineWidth(0.75)
+     .rect(drawX, drawY, drawW, drawH).stroke()
+     .restore();
+
+  pdf.y = drawY + drawH + 8;
   if (s.caption){
     pdf.font(ITALIC_FONT).fontSize(BODY_SIZE - 1).fillColor(TEXT_DIM)
-       .text(s.caption, MARGIN, pdf.y, { width: w, align: 'left' });
+       .text(s.caption, MARGIN, pdf.y, { width: boxW, align: 'left' });
     pdf.fillColor('black');
   }
 }
