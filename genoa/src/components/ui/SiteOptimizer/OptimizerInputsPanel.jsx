@@ -5,6 +5,11 @@ import RackPanel from '../RackPanel.jsx';
 // owns no fetch logic.  Goals checkboxes that are not yet wired
 // backend-side render a "(SCREENING ONLY)" hint so the operator
 // is never lied to about which signals reached the ranking.
+//
+// Adds (Genoa AM Co-Location Engine):
+//   • Search mode selector (GRID / INFRASTRUCTURE / HYBRID).
+//   • Infrastructure Filters fieldset (only visible when not GRID).
+//   • Grid spacing input is greyed when mode === 'INFRASTRUCTURE'.
 
 const GOAL_KEYS = [
   { key: 'maximize_col_coverage',    label: 'Maximize COL coverage'     },
@@ -15,17 +20,35 @@ const GOAL_KEYS = [
   { key: 'minimize_int_treaty_zone', label: "Minimize int'l treaty zone", screening: true }
 ];
 
-function NumField({ label, value, onChange, step, suffix, hint }){
+const SEARCH_MODES = [
+  { key: 'GRID',           label: 'Grid sweep' },
+  { key: 'INFRASTRUCTURE', label: 'Existing infrastructure only' },
+  { key: 'HYBRID',         label: 'Hybrid grid + infrastructure' }
+];
+
+const INFRA_TOGGLES = [
+  { key: 'include_towers',   label: 'Towers'    },
+  { key: 'include_asr',      label: 'ASR'       },
+  { key: 'include_am_sites', label: 'AM sites'  },
+  { key: 'include_fm_sites', label: 'FM sites'  },
+  { key: 'include_tv_sites', label: 'TV sites'  }
+];
+
+function NumField({ label, value, onChange, step, suffix, hint, disabled }){
   return (
-    <label className="block">
+    <label className={['block', disabled ? 'opacity-40' : ''].join(' ')}>
       <span className="block rack-eyebrow mb-1">{label}</span>
       <span className="flex items-center gap-2">
         <input
           type="number"
           value={value ?? ''}
           step={step || 'any'}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.value === '' ? '' : Number(e.target.value))}
-          className="bg-panelDeep border border-rule rounded-sm px-2 py-1 font-mono text-[12px] text-cream w-full focus:outline-none focus:border-gold/60"
+          className={[
+            'bg-panelDeep border border-rule rounded-sm px-2 py-1 font-mono text-[12px] text-cream w-full focus:outline-none focus:border-gold/60',
+            disabled ? 'cursor-not-allowed' : ''
+          ].join(' ')}
         />
         {suffix && <span className="font-mono text-[10px] text-textDim uppercase tracking-rack">{suffix}</span>}
       </span>
@@ -58,6 +81,11 @@ export default function OptimizerInputsPanel({
   error
 }){
   const setGoal = (k, v) => onChange('optimization_goals', { ...inputs.optimization_goals, [k]: v });
+  const setInfra = (k, v) => onChange('infrastructure_filters', { ...inputs.infrastructure_filters, [k]: v });
+  const mode = inputs.search_mode || 'HYBRID';
+  const showInfra = mode !== 'GRID';
+  const gridSpacingDisabled = mode === 'INFRASTRUCTURE';
+  const filters = inputs.infrastructure_filters || {};
   return (
     <RackPanel
       eyebrow="Mission Inputs"
@@ -66,6 +94,34 @@ export default function OptimizerInputsPanel({
       tone="cyan"
     >
       <div className="grid grid-cols-1 gap-3">
+        {/* Search mode selector — sits above the Callsign field so the
+            operator sets the discovery strategy before anything else. */}
+        <fieldset className="border border-rule rounded-sm p-3">
+          <legend className="rack-eyebrow px-1">Search mode</legend>
+          <div className="space-y-1.5 mt-1">
+            {SEARCH_MODES.map((m) => (
+              <label key={m.key} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="search_mode"
+                  value={m.key}
+                  checked={mode === m.key}
+                  onChange={() => onChange('search_mode', m.key)}
+                  className="accent-amber"
+                />
+                <span className="font-mono text-[11px] text-text">{m.label}</span>
+                <span className="font-mono text-[9px] tracking-rack uppercase text-textDim ml-auto">{m.key}</span>
+              </label>
+            ))}
+          </div>
+          {showInfra && (
+            <div className="mt-2 font-mono text-[10px] text-cyan/80 italic leading-snug">
+              Co-location goal: prefer existing structures over greenfield grid points so the
+              owner / ASR / structural / RF-MPE workstreams can ride existing approvals.
+            </div>
+          )}
+        </fieldset>
+
         <TxtField
           label="Callsign"
           value={inputs.callsign}
@@ -110,7 +166,8 @@ export default function OptimizerInputsPanel({
             onChange={(v) => onChange('grid_spacing_km', v)}
             step="0.5"
             suffix="km"
-            hint="Finer = more candidates."
+            disabled={gridSpacingDisabled}
+            hint={gridSpacingDisabled ? 'n/a in infrastructure-only mode' : 'Finer = more candidates.'}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -170,6 +227,53 @@ export default function OptimizerInputsPanel({
             })}
           </div>
         </fieldset>
+
+        {showInfra && (
+          <fieldset className="border border-rule rounded-sm p-3">
+            <legend className="rack-eyebrow px-1">Infrastructure filters</legend>
+            <div className="space-y-1.5 mt-1">
+              {INFRA_TOGGLES.map((t) => {
+                const checked = filters[t.key] !== false;
+                return (
+                  <label key={t.key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => setInfra(t.key, e.target.checked)}
+                      className="accent-cyan"
+                    />
+                    <span className="font-mono text-[11px] text-text">{t.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <div className="grid grid-cols-2 gap-3 mt-3">
+              <NumField
+                label="Min tower height"
+                value={filters.min_tower_height_m}
+                onChange={(v) => setInfra('min_tower_height_m', v)}
+                step="1"
+                suffix="m"
+              />
+              <NumField
+                label="Max tower height"
+                value={filters.max_tower_height_m}
+                onChange={(v) => setInfra('max_tower_height_m', v)}
+                step="1"
+                suffix="m"
+              />
+            </div>
+            <div className="mt-3">
+              <TxtField
+                label="Owner contains"
+                value={filters.owner_contains}
+                onChange={(v) => setInfra('owner_contains', v)}
+                placeholder="e.g. American Tower"
+                hint="Case-insensitive substring match on owner / operator field."
+              />
+            </div>
+          </fieldset>
+        )}
 
         {error && (
           <div className="font-mono text-[11px] text-red border border-red/40 bg-red/10 rounded-sm px-3 py-2">

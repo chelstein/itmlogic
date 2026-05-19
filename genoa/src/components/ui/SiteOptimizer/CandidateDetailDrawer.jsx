@@ -43,9 +43,104 @@ function MiniContourPreview({ daytimeReachKm }){
   );
 }
 
+// Inline chip helpers for the co-location analysis section.  Kept local
+// because they only matter inside this drawer; the table uses StatusChip.
+function YesNoChip({ value, yesTone = 'amber' }){
+  const yes = !!value;
+  const palette = yes
+    ? (yesTone === 'red'
+        ? { fg: '#ff5a5a', bg: 'rgba(255,90,90,0.12)',  border: 'rgba(255,90,90,0.55)' }
+        : { fg: '#ffb347', bg: 'rgba(255,179,71,0.12)', border: 'rgba(255,179,71,0.55)' })
+    : { fg: '#63d471', bg: 'rgba(99,212,113,0.10)', border: 'rgba(99,212,113,0.45)' };
+  return (
+    <span
+      className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1.5 py-0.5 text-[9px]"
+      style={{ color: palette.fg, background: palette.bg, borderColor: palette.border }}
+    >
+      {yes ? 'YES' : 'NO'}
+    </span>
+  );
+}
+
+function RiskChip({ risk }){
+  const r = (risk || 'UNKNOWN').toString().toUpperCase();
+  const palette = (
+    r === 'HIGH'   ? { fg: '#ff5a5a', bg: 'rgba(255,90,90,0.12)',  border: 'rgba(255,90,90,0.55)' } :
+    r === 'MEDIUM' ? { fg: '#ffb347', bg: 'rgba(255,179,71,0.12)', border: 'rgba(255,179,71,0.55)' } :
+    r === 'LOW'    ? { fg: '#63d471', bg: 'rgba(99,212,113,0.12)', border: 'rgba(99,212,113,0.55)' } :
+                     { fg: '#a89c84', bg: 'rgba(168,156,132,0.10)', border: 'rgba(168,156,132,0.45)' }
+  );
+  return (
+    <span
+      className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1.5 py-0.5 text-[9px]"
+      style={{ color: palette.fg, background: palette.bg, borderColor: palette.border }}
+    >
+      {r}
+    </span>
+  );
+}
+
+function ColocationAnalysisSection({ analysis }){
+  if (!analysis) return null;
+  const dist = analysis.distance_to_host_m;
+  return (
+    <div>
+      <div className="rack-eyebrow mb-1">Co-Location Analysis</div>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
+        <div>
+          <span className="text-textDim">Distance to host</span>{' '}
+          <span className="text-cream">{(dist == null || Number.isNaN(Number(dist))) ? '—' : `${Number(dist).toFixed(0)} m`}</span>
+        </div>
+        <div>
+          <span className="text-textDim">Host kind</span>{' '}
+          <span className="text-cream">{(analysis.host_kind || '—').toString().replace(/_/g, ' ')}</span>
+        </div>
+        <div>
+          <span className="text-textDim">Host owner</span>{' '}
+          <span className="text-cream">{analysis.host_owner || '—'}</span>
+        </div>
+        <div>
+          <span className="text-textDim">Host height</span>{' '}
+          <span className="text-cream">{analysis.host_height_m != null ? `${analysis.host_height_m} m` : '—'}</span>
+        </div>
+        <div className="col-span-2">
+          <span className="text-textDim">Tower loading advisory</span><br/>
+          <span className="text-cream">{analysis.tower_loading_advisory || '—'}</span>
+        </div>
+        <div>
+          <span className="text-textDim">Same-band interference</span>{' '}
+          <RiskChip risk={analysis.same_band_interference_risk} />
+        </div>
+        <div>
+          <span className="text-textDim">Structural eng. req'd</span>{' '}
+          <YesNoChip value={analysis.structural_engineering_required} yesTone="amber" />
+        </div>
+        <div>
+          <span className="text-textDim">Shared-lease advantage</span>{' '}
+          <YesNoChip value={analysis.shared_lease_advantage} yesTone="amber" />
+        </div>
+        <div>
+          <span className="text-textDim">Diplexing required</span>{' '}
+          <YesNoChip value={analysis.diplexing_required} yesTone="amber" />
+        </div>
+      </div>
+
+      {Array.isArray(analysis.regulatory_notes) && analysis.regulatory_notes.length > 0 && (
+        <div className="mt-3">
+          <div className="rack-eyebrow mb-1">Regulatory notes</div>
+          <ul className="font-mono text-[11px] text-text list-disc list-inside space-y-0.5">
+            {analysis.regulatory_notes.map((n, i) => <li key={i}>{n}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CandidateDetailDrawer({ candidate, onClose }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
+  const isInfra = candidate.source === 'INFRASTRUCTURE';
   return (
     <div
       role="dialog"
@@ -62,6 +157,9 @@ export default function CandidateDetailDrawer({ candidate, onClose }){
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-2">
+            {candidate.status_category && (
+              <StatusChip status={candidate.status_category} dense />
+            )}
             {(candidate.status_labels || []).map(s => (
               <StatusChip key={s} label={s} dense />
             ))}
@@ -107,6 +205,9 @@ export default function CandidateDetailDrawer({ candidate, onClose }){
             <div><span className="text-textDim">Treaty zone</span>             <span className="text-cream">{candidate.treaty_zone ?? '—'}</span></div>
           </div>
         </div>
+
+        {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
+        {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} />}
 
         {/* Schematic contour preview */}
         <div>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import RackPanel from '../RackPanel.jsx';
 import { primaryStatus, rankColor } from './statusUtil.js';
+import InfrastructureLegend, { INFRA_MARKER_SPEC } from './InfrastructureLegend.jsx';
 
 // OptimizerMap — Leaflet container.  Uses window.L (Leaflet is loaded
 // globally from index.html, matching the existing Genoa contour map).
@@ -12,6 +13,10 @@ import { primaryStatus, rankColor } from './statusUtil.js';
 //   • candidate heat-circles     — semi-transparent overlay, shown when
 //                                  zoomed out (z <= 9), simulating a
 //                                  "heatmap of ranked candidates"
+//   • infrastructure markers     — 9 visual treatments (5 kinds ×
+//                                  selected/unselected + 1 non-evaluated
+//                                  reserve).  Only added when
+//                                  searchMode !== 'GRID'.
 //
 // All state changes flow through props.  When `selectedRank` changes
 // the map pans to the candidate and opens its popup.
@@ -45,19 +50,71 @@ function svgDivIcon(L, color, label){
   });
 }
 
+// Per-kind SVG glyph for infrastructure markers.  Two visual states are
+// supported via the `selected` flag — selected markers get a bright
+// outer ring.  The "non-evaluated" treatment is reserved for V1+ but
+// rendered the same way as the spec so the legend stays accurate.
+function infraDivIcon(L, kind, { selected }){
+  const spec  = INFRA_MARKER_SPEC[kind] || INFRA_MARKER_SPEC.NON_EVAL;
+  const color = spec.color;
+  const ring  = selected
+    ? `<circle cx="11" cy="11" r="10" fill="none" stroke="#ffe9b3" stroke-width="1.6"/>`
+    : '';
+  let body;
+  switch (spec.shape){
+    case 'square':
+      body = `<rect x="4" y="4" width="14" height="14" fill="${color}" stroke="#0a1a25" stroke-width="1.4"/>`;
+      break;
+    case 'diamond':
+      body = `<polygon points="11,2 20,11 11,20 2,11" fill="${color}" stroke="#0a1a25" stroke-width="1.4"/>`;
+      break;
+    case 'triangle':
+      body = `<polygon points="11,3 20,19 2,19" fill="${color}" stroke="#0a1a25" stroke-width="1.4"/>`;
+      break;
+    case 'hexagon':
+      body = `<polygon points="11,2 19,6 19,16 11,20 3,16 3,6" fill="${color}" stroke="#0a1a25" stroke-width="1.4"/>`;
+      break;
+    case 'ring':
+      body = `<circle cx="11" cy="11" r="7" fill="none" stroke="${color}" stroke-width="1.6" stroke-dasharray="3 2"/>`;
+      break;
+    case 'circle':
+    default:
+      body = `<circle cx="11" cy="11" r="7" fill="${color}" stroke="#0a1a25" stroke-width="1.4"/>`;
+  }
+  const html = `<svg viewBox="0 0 22 22" width="22" height="22">${ring}${body}</svg>`;
+  return L.divIcon({
+    html,
+    className: `optimizer-infra-icon optimizer-infra-${kind.toLowerCase()}${selected ? ' is-selected' : ''}`,
+    iconSize:  [22, 22],
+    iconAnchor:[11, 11]
+  });
+}
+
+function inferInfraKind(candidate){
+  const ref = candidate?.infrastructure_ref;
+  if (ref && typeof ref.kind === 'string'){
+    const k = ref.kind.toUpperCase();
+    if (INFRA_MARKER_SPEC[k]) return k;
+  }
+  return 'NON_EVAL';
+}
+
 export default function OptimizerMap({
   currentSite,
   callsign,
   candidates,
   selectedRank,
   onSelectCandidate,
-  searchRadiusKm
+  searchRadiusKm,
+  searchMode = 'GRID',
+  infrastructureSites = []
 }){
   const elRef    = useRef(null);
   const ctxRef   = useRef({
     map:           null,
     candLayer:     null,
     heatLayer:     null,
+    infraLayer:    null,
     currentMarker: null,
     radiusCircle:  null,
     popupsByRank:  new Map()
@@ -76,9 +133,10 @@ export default function OptimizerMap({
       maxZoom: 19,
       attribution: '© OpenStreetMap · © CARTO'
     }).addTo(map);
-    ctxRef.current.map      = map;
-    ctxRef.current.candLayer = L.layerGroup().addTo(map);
-    ctxRef.current.heatLayer = L.layerGroup().addTo(map);
+    ctxRef.current.map        = map;
+    ctxRef.current.candLayer  = L.layerGroup().addTo(map);
+    ctxRef.current.heatLayer  = L.layerGroup().addTo(map);
+    ctxRef.current.infraLayer = L.layerGroup().addTo(map);
     // toggle the heatmap layer based on zoom — collapsed to a single
     // boolean so we don't have to track listeners by hand.
     const onZoom = () => {
@@ -188,6 +246,38 @@ export default function OptimizerMap({
     });
   }, [candidates, onSelectCandidate]);
 
+  // re-draw infrastructure layer (one marker per infrastructure-source
+  // candidate, plus its 9-treatment glyph from INFRA_MARKER_SPEC).
+  useEffect(() => {
+    const L = window.L;
+    const ctx = ctxRef.current;
+    if (!L || !ctx.map || !ctx.infraLayer) return;
+    ctx.infraLayer.clearLayers();
+    if (searchMode === 'GRID') return;
+
+    const list = Array.isArray(infrastructureSites) ? infrastructureSites : [];
+    list.forEach((c) => {
+      const ref = c.infrastructure_ref || {};
+      const lat = Number(ref.lat ?? c.lat);
+      const lon = Number(ref.lon ?? c.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+      const kind = inferInfraKind(c);
+      const isSel = c.rank === selectedRank;
+      const icon = infraDivIcon(L, kind, { selected: isSel });
+      const marker = L.marker([lat, lon], { icon, zIndexOffset: 500 });
+      const name   = ref.name || c.notes || `Rank #${c.rank}`;
+      const owner  = ref.owner || '—';
+      const height = (ref.height_m != null) ? `${ref.height_m} m` : '—';
+      const kindL  = kind.replace(/_/g, ' ');
+      marker.bindTooltip(
+        `<b>${escapeHtml(name)}</b><br/>${escapeHtml(owner)} · ${escapeHtml(kindL)} · ${escapeHtml(height)}`,
+        { direction: 'top', offset: [0, -8] }
+      );
+      marker.on('click', () => { if (onSelectCandidate) onSelectCandidate(c.rank); });
+      marker.addTo(ctx.infraLayer);
+    });
+  }, [infrastructureSites, searchMode, selectedRank, onSelectCandidate]);
+
   // pan + open popup when selection changes
   useEffect(() => {
     const ctx = ctxRef.current;
@@ -226,6 +316,7 @@ export default function OptimizerMap({
         <div className="scope-grid relative" style={{ height: 560 }}>
           <div ref={elRef} className="absolute inset-0 rounded-md" />
           <div className="scanline" />
+          <InfrastructureLegend visible={searchMode !== 'GRID'} />
         </div>
       </div>
     </RackPanel>
