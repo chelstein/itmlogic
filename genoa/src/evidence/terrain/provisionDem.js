@@ -29,8 +29,33 @@
 
 import { tilesForBounds, missingFrom, urlFor } from './srtmCatalog.js';
 
-const FETCH_TIMEOUT_MS  = 60_000;   // public mirrors can be slow
-const CONVERT_TIMEOUT_MS = 90_000;  // srtm2sdf is fast but allow buffer
+// Two-layer timeout: AbortController for graceful cancellation, plus
+// a Promise.race hard cap that fires even if the underlying socket is
+// wedged (a real Node-20 / undici failure mode we've observed against
+// public SRTM mirrors — abort signals the fetch but the TCP read stays
+// blocked in the kernel and the promise never resolves).  The hard cap
+// is FETCH_TIMEOUT_MS + a small grace window so a healthy fetch finishing
+// at the AbortController boundary doesn't race with the kill switch.
+const FETCH_TIMEOUT_MS    = 30_000;   // public mirrors can be slow
+const FETCH_HARD_CAP_MS   = 35_000;   // wall-clock kill switch
+const CONVERT_TIMEOUT_MS  = 90_000;   // srtm2sdf is fast but allow buffer
+
+// Fetch wrapper: AbortController for graceful, Promise.race for hard.
+async function fetchWithHardCap(url, { abortMs = FETCH_TIMEOUT_MS, hardCapMs = FETCH_HARD_CAP_MS } = {}){
+  const ac = new AbortController();
+  const abortTimer = setTimeout(() => ac.abort(), abortMs);
+  const hardCap = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(`hard-cap timeout after ${hardCapMs}ms`)), hardCapMs).unref?.();
+  });
+  try {
+    return await Promise.race([
+      fetch(url, { signal: ac.signal }),
+      hardCap
+    ]);
+  } finally {
+    clearTimeout(abortTimer);
+  }
+}
 
 export async function provisionDemForCoverage({
   tx,
@@ -76,17 +101,23 @@ export async function provisionDemForCoverage({
   async function provisionOne(tile){
     const url = urlFor(`${tile.name}.zip`, url_template || undefined);
     let zipBytes;
+    const t0 = Date.now();
+    log.info?.(`[provisionDem] fetch tile=${tile.name} url=${url}`);
     try {
-      const ac = new AbortController();
-      const t  = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
-      const r  = await fetch(url, { signal: ac.signal });
-      clearTimeout(t);
+      const r = await fetchWithHardCap(url);
       if (!r.ok){
+        log.warn?.(`[provisionDem] fetch tile=${tile.name} HTTP ${r.status} (${Date.now() - t0}ms)`);
         failed.push({ tile: tile.name, stage: 'fetch', status: r.status, url, error: `HTTP ${r.status}` });
         return;
       }
-      zipBytes = new Uint8Array(await r.arrayBuffer());
+      // arrayBuffer() can also hang on a half-closed socket — wrap it too.
+      zipBytes = new Uint8Array(await Promise.race([
+        r.arrayBuffer(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('arrayBuffer hard-cap')), FETCH_HARD_CAP_MS).unref?.())
+      ]));
+      log.info?.(`[provisionDem] fetched tile=${tile.name} ${zipBytes.byteLength}B (${Date.now() - t0}ms)`);
     } catch (err){
+      log.warn?.(`[provisionDem] fetch tile=${tile.name} FAILED after ${Date.now() - t0}ms: ${err?.message || err}`);
       failed.push({ tile: tile.name, stage: 'fetch', url, error: String(err?.message || err) });
       return;
     }
