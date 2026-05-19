@@ -2613,6 +2613,24 @@ export async function computeExhibit(req){
   // Threshold 500 ms hides cache-hit noise.
   console.log(`[exhibit-perf] elapsed=${budget.elapsed_ms()}ms  ${budget.timingSummary(500)}`);
 
+  // Phase-1 HAAT sanity gate.  Runs AFTER terrain/HAAT compute has
+  // populated evidence.terrain_haat_per_radial + tx_amsl_resolved so
+  // the validator can read everything it needs.  Each issue is
+  // promoted to a warning/blocker on the exhibit so it flows through
+  // the existing readiness pipeline without special-casing.
+  try {
+    const { validateHaat } = await import('../../engine/haat/validate.js');
+    const haatReport = validateHaat(exhibit);
+    exhibit.haat_validation = haatReport;
+    for (const issue of haatReport.issues || []){
+      if (issue.severity === 'blocker' || issue.severity === 'warning'){
+        warnings.push(W.make(issue.code, issue.detail));
+      }
+    }
+  } catch (err){
+    console.warn('[exhibitService] haat validation failed:', err?.message || err);
+  }
+
   exhibit.warnings         = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
   exhibit.degraded_mode    = exhibit.warnings.length > 0;

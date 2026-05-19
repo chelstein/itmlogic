@@ -55,6 +55,22 @@ export const WARNING_CODES = Object.freeze({
     title: 'Reference validation cases missing',
     description: 'The reference validation suite has zero cases for this service. Cannot certify the engine.' },
 
+  HAAT_IMPOSSIBLE:               { severity: 'blocker', phase: 'engine',
+    title: 'Per-radial HAAT outside physical bounds',
+    description: 'One or more per-radial HAAT values fall outside the [-200, 4000] m physical range, almost always indicating a tx_amsl_m / haat_m confusion in the terrain pipeline.  Filing readiness is blocked until the bundle is recomputed.' },
+
+  HAAT_MEAN_INCONSISTENT:        { severity: 'blocker', phase: 'engine',
+    title: 'Per-radial HAAT inconsistent with operator HAAT',
+    description: 'Mean per-radial HAAT differs from the operator-supplied HAAT by more than ±300 m. Suggests the antenna AMSL was substituted with HAAT (or vice-versa) somewhere in the terrain pipeline.' },
+
+  HAAT_SUSPECT_OUTLIERS:         { severity: 'warning', phase: 'engine',
+    title: 'Per-radial HAAT outliers',
+    description: 'One or more per-radial HAAT values are physically possible but uncommon (below -50 m). Engineer of record should confirm the antenna is intentionally below surrounding terrain.' },
+
+  TX_AMSL_UNRESOLVED:            { severity: 'warning', phase: 'engine',
+    title: 'Antenna AMSL unresolved',
+    description: 'Could not resolve antenna AMSL: neither inputs.overall_height_amsl_m supplied nor ground-elevation probe at the transmitter site succeeded.  Per-radial HAAT column reflects (haat_m − terrain_avg_at_radial), not true HAAT.' },
+
   SIDECAR_UNAVAILABLE:           { severity: 'warning', phase: 'sidecar',
     title: 'Optional sidecar unavailable',
     description: 'An optional sidecar (terrain / measurement / identity) is not configured or did not respond.' },

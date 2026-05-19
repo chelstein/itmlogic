@@ -24,6 +24,7 @@ import comparablesRoutes from './routes/comparables.js';
 import exhibitDiffRoutes from './routes/exhibitDiff.js';
 import section73215ShowingRoutes from './routes/section73215Showing.js';
 import lmsFilingRoutes from './routes/lmsFiling.js';
+import readinessRoutes from './routes/readiness.js';
 import captureRoutes   from './routes/captures.js';
 import geodataRoutes   from './routes/geodata.js';
 import measurementsRoutes from './routes/measurements.js';
@@ -91,6 +92,7 @@ app.use('/api', comparablesRoutes);  // Comparable-facility benchmarking (POST /
 app.use('/api', exhibitDiffRoutes);  // Move-in / what-if exhibit diff (POST /api/exhibits/diff)
 app.use('/api', section73215ShowingRoutes);  // §73.215 short-spacing showing (POST /api/exhibits/short-spacing-showing)
 app.use('/api', lmsFilingRoutes);    // FCC Form 301-FM filing package (POST /api/exhibits/filing-package{,/download,/summary})
+app.use('/api', readinessRoutes);    // Filing-readiness score (POST /api/exhibits/readiness — Phase-7 readiness)
 app.use('/api', captureRoutes);      // SDR capture audio proxy (GET /api/captures/:id/audio)
 app.use('/api', geodataRoutes);      // geodata evidence layers (GET /api/geodata/{sample,clutter,vegetation,conductivity,terrain/status,manifest})
 app.use('/api', measurementsRoutes); // drive-test ingestion (POST /api/measurements/ingest)
