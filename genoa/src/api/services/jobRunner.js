@@ -30,6 +30,39 @@ const PROGRESS = Object.freeze({
   FINALIZING:       'Finalizing artifact…'
 });
 
+// Heartbeat interval for long synchronous phases.  The job-reaper's
+// stale_after window is 15 min and the COMPUTING phase (computeExhibit
+// → SPLAT terrain calls + multi-source DEM provisioning + ITM coverage)
+// regularly runs 5–8 min on a fresh station with no terrain cache.
+// Without an in-phase heartbeat the row's updated_at never moves
+// while the work runs, so the UI sees no progress AND the reaper kills
+// jobs that are merely slow.  A 30 s tick is enough resolution for both:
+// it bumps updated_at well inside the reaper window and lets the UI
+// show an elapsed-time counter that advances visibly.
+const HEARTBEAT_INTERVAL_MS = 30_000;
+
+// Run an async step while emitting periodic setProgress() heartbeats
+// against the job row.  The heartbeat re-uses the same phase message
+// the caller already set, so the UI sees "Computing exhibit… (5m12s)"
+// rather than a frozen progress line.  Always clears the timer on
+// completion, including the error path.
+async function withHeartbeat(jobId, message, fn){
+  const startedAt = Date.now();
+  setProgress(jobId, message);
+  const timer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const mm = Math.floor(elapsed / 60);
+    const ss = String(elapsed % 60).padStart(2, '0');
+    setProgress(jobId, `${message} (${mm}m${ss}s)`);
+  }, HEARTBEAT_INTERVAL_MS);
+  timer.unref?.();  // don't block process shutdown on a stale interval
+  try {
+    return await fn();
+  } finally {
+    clearInterval(timer);
+  }
+}
+
 export async function runJob(id){
   const r = getJob(id);
   if (!r) throw new Error(`runJob: no such job ${id}`);
@@ -77,8 +110,8 @@ function computeReq(r){
 // ─────────── kind dispatchers ───────────
 
 async function runExhibitJob(r){
-  setProgress(r.id, PROGRESS.COMPUTING);
-  const exhibit = await computeExhibit(computeReq(r));
+  const exhibit = await withHeartbeat(r.id, PROGRESS.COMPUTING,
+    () => computeExhibit(computeReq(r)));
   setProgress(r.id, PROGRESS.FINALIZING);
   completeJob(r.id, {
     result:       { exhibit },
@@ -106,7 +139,6 @@ async function runReportJob(r, ext){
   // also re-fetches upstream evidence like ZTR rich-station, FCC
   // parity, nearby_primaries — none of which should be inherited
   // from a stale snapshot).
-  setProgress(r.id, PROGRESS.COMPUTING);
   const cached = (r.input && r.input.exhibit && typeof r.input.exhibit === 'object')
     ? r.input.exhibit
     : null;
@@ -116,7 +148,12 @@ async function runReportJob(r, ext){
         options: r.options || {}
       })
     : computeReq(r);
-  const exhibit = await computeExhibit(req);
+  // computeExhibit() is the long pole: SPLAT terrain calls (~5 min for
+  // a fresh station), multi-source DEM provisioning, ITM coverage
+  // compute, FCC nearby-primary lookups.  Heartbeat the row so the UI
+  // shows elapsed time and the reaper never confuses "slow" for "dead."
+  const exhibit = await withHeartbeat(r.id, PROGRESS.COMPUTING,
+    () => computeExhibit(req));
 
   // 2. Validation pass — exhibitService.computeExhibit already runs the
   //    standard validation.  Surfacing the milestone separately is
@@ -160,8 +197,8 @@ async function runReportJob(r, ext){
       artifact_url: artifactUrl(r.id)
     });
   } else {
-    setProgress(r.id, PROGRESS.RENDERING_PDF);
-    const body = await renderEngineeringReportPdf(doc);
+    const body = await withHeartbeat(r.id, PROGRESS.RENDERING_PDF,
+      () => renderEngineeringReportPdf(doc));
     completeJob(r.id, {
       result: {
         kind:         'engineering_report_pdf',
