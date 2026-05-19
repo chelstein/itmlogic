@@ -64,6 +64,13 @@ test('mapPackage section: no PNG → placeholder paragraphs (never silently drop
   assert.match(map.paragraphs[0], /map sidecar|no contour map/i);
 });
 
+test('mapPackage section: figure_number is set so PDF heading reads "FIGURE N — Contour Map"', () => {
+  const doc = buildEngineeringReport(mkExhibit(), { contour_map_png: TINY_PNG });
+  const map = doc.sections.find((s) => s.id === 'map-package');
+  assert.ok(map);
+  assert.equal(map.figure_number, 1, 'figure_number must be set on the image section so renderImage() emits "FIGURE 1 — CONTOUR MAP"');
+});
+
 test('mapPackage section ordering: appears after methodology, before validation/conclusion', () => {
   // contour-results / itm-coverage are both conditional on the
   // exhibit having data — assert against sections that always render
