@@ -8,6 +8,7 @@ import CandidateTable from './CandidateTable.jsx';
 import CandidateDetailDrawer from './CandidateDetailDrawer.jsx';
 import BaselinePanel from './BaselinePanel.jsx';
 import FuturePlaceholders from './FuturePlaceholders.jsx';
+import ColocationDoctrineBlock from './ColocationDoctrineBlock.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -19,6 +20,16 @@ import FuturePlaceholders from './FuturePlaceholders.jsx';
 //   [ map (center, big) ] [ inputs rail (left) ] — using AppShell's
 //   three-column grid, but inputs on the LEFT and map dominant in
 //   center.  Bottom: candidate table.  Drawer is a fixed overlay.
+//
+// Two backend endpoints are used:
+//   /api/am/site-optimizer            — when search_mode === 'GRID'
+//   /api/am/colocation-opportunities  — when search_mode is INFRASTRUCTURE
+//                                       or HYBRID (default).  The latter
+//                                       returns the same shape plus a
+//                                       per-candidate `source`,
+//                                       `infrastructure_ref`,
+//                                       `colocation_analysis` and
+//                                       `status_category` enum.
 
 const DEFAULT_INPUTS = {
   callsign:         'KAZM',
@@ -36,7 +47,20 @@ const DEFAULT_INPUTS = {
     prefer_high_conductivity:    true,
     avoid_wildfire_risk:         false,
     minimize_int_treaty_zone:    false
-  }
+  },
+  search_mode:           'HYBRID',
+  infrastructure_source: 'MANUAL',
+  infrastructure_filters: {
+    include_towers:     true,
+    include_asr:        true,
+    include_am_sites:   true,
+    include_fm_sites:   true,
+    include_tv_sites:   true,
+    min_tower_height_m: 0,
+    max_tower_height_m: 500,
+    owner_contains:     ''
+  },
+  candidate_limit: 20
 };
 
 export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
@@ -55,16 +79,20 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
     setRunning(true);
     setResult(null);
     setSelectedRank(null);
+    const useColocation = inputs.search_mode !== 'GRID';
+    const endpoint = useColocation
+      ? '/api/am/colocation-opportunities'
+      : '/api/am/site-optimizer';
     try {
-      const r = await fetch('/api/am/site-optimizer', {
+      const r = await fetch(endpoint, {
         method:  'POST',
         headers: { 'content-type': 'application/json' },
         credentials: 'same-origin',
         body:    JSON.stringify(inputs)
       });
       if (r.status === 404){
-        setError('Site-optimizer endpoint is not yet deployed on this server.  Showing demo data so the UI is reviewable.');
-        setResult(DEMO_RESULT);
+        setError(`${endpoint} is not yet deployed on this server.  Showing demo data so the UI is reviewable.`);
+        setResult(useColocation ? DEMO_COLOCATION_RESULT : DEMO_RESULT);
         return;
       }
       if (!r.ok){
@@ -90,6 +118,15 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
 
   const baseline = result?.current_site_baseline || null;
   const candidates = result?.candidates || [];
+
+  // Infrastructure-source sites drive the InfrastructureLegend layer
+  // inside OptimizerMap.  GRID-source candidates remain on the regular
+  // ranked-candidate layer.
+  const infrastructureSites = useMemo(() => {
+    return (candidates || []).filter(c => c?.source === 'INFRASTRUCTURE');
+  }, [candidates]);
+
+  const isColocationMode = inputs.search_mode !== 'GRID';
 
   return (
     <>
@@ -145,6 +182,8 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
               selectedRank={selectedRank}
               onSelectCandidate={setSelectedRank}
               searchRadiusKm={inputs.search_radius_km}
+              searchMode={inputs.search_mode}
+              infrastructureSites={infrastructureSites}
             />
             <CandidateTable
               candidates={candidates}
@@ -156,30 +195,36 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
           </>
         )}
         right={(
-          <RackPanel
-            eyebrow="Doctrine"
-            title="What this page is for"
-            italicAccent="Screening, not filing."
-            dense
-          >
-            <div className="font-mono text-[11px] text-textDim leading-relaxed space-y-2">
-              <p>
-                This is a <span className="text-cream">regional planning console</span>.  Every score
-                here is an explainable screening signal: COL coverage, blanket population,
-                conductivity, nighttime survivability proxies, optional environmental signals.
-              </p>
-              <p>
-                A <span className="text-amber">PROMISING</span> candidate is a desk-study seed —
-                not a filing.  Promote to the main Contour Studio to run the deterministic
-                §73.183 / §73.184 / §73.182 pipeline and to attach evidence + PE seal.
-              </p>
-              <p className="italic text-amberDim">
-                Status labels are explicit on every row and marker tooltip.  When a goal
-                is not yet wired (wildfire, treaty zone), the checkbox is tagged
-                "Screening only" so the operator can't be fooled.
-              </p>
-            </div>
-          </RackPanel>
+          <>
+            {isColocationMode ? (
+              <ColocationDoctrineBlock candidates={candidates} />
+            ) : (
+              <RackPanel
+                eyebrow="Doctrine"
+                title="What this page is for"
+                italicAccent="Screening, not filing."
+                dense
+              >
+                <div className="font-mono text-[11px] text-textDim leading-relaxed space-y-2">
+                  <p>
+                    This is a <span className="text-cream">regional planning console</span>.  Every score
+                    here is an explainable screening signal: COL coverage, blanket population,
+                    conductivity, nighttime survivability proxies, optional environmental signals.
+                  </p>
+                  <p>
+                    A <span className="text-amber">PROMISING</span> candidate is a desk-study seed —
+                    not a filing.  Promote to the main Contour Studio to run the deterministic
+                    §73.183 / §73.184 / §73.182 pipeline and to attach evidence + PE seal.
+                  </p>
+                  <p className="italic text-amberDim">
+                    Status labels are explicit on every row and marker tooltip.  When a goal
+                    is not yet wired (wildfire, treaty zone), the checkbox is tagged
+                    "Screening only" so the operator can't be fooled.
+                  </p>
+                </div>
+              </RackPanel>
+            )}
+          </>
         )}
       />
       <CandidateDetailDrawer
@@ -216,6 +261,10 @@ const DEMO_RESULT = {
         ranking_rationale: 'Highest COL coverage and population in pool; conductivity 8 mS/m is M3-zone max for region.'
       },
       status_labels: ['PROMISING', 'ENGINEER REVIEW REQUIRED'],
+      status_category: 'PROMISING',
+      source: 'GRID',
+      infrastructure_ref: null,
+      colocation_analysis: null,
       limitations: ['Wildfire scoring not yet wired', 'Parcel availability not checked', 'NIF status is SCREENING-grade only']
     },
     {
@@ -230,6 +279,10 @@ const DEMO_RESULT = {
         ranking_rationale: 'Strong overall — second only on COL coverage; fuel-risk score positive.'
       },
       status_labels: ['PROMISING', 'REVIEW REQUIRED'],
+      status_category: 'REVIEW_REQUIRED',
+      source: 'GRID',
+      infrastructure_ref: null,
+      colocation_analysis: null,
       limitations: ['NIF status REVIEW — engineering DA pattern may be required']
     },
     {
@@ -244,6 +297,10 @@ const DEMO_RESULT = {
         ranking_rationale: 'Conductivity wins offset lower coverage; wildfire flag pulled the score down.'
       },
       status_labels: ['ENGINEER REVIEW REQUIRED'],
+      status_category: 'REVIEW_REQUIRED',
+      source: 'GRID',
+      infrastructure_ref: null,
+      colocation_analysis: null,
       limitations: ['Moderate wildfire exposure — manual review of fuel maps required']
     },
     {
@@ -259,7 +316,110 @@ const DEMO_RESULT = {
         ranking_rationale: 'NIF fails screening + advisory treaty zone — kept for completeness only.'
       },
       status_labels: ['NON-COMPLIANT'],
+      status_category: 'NON_COMPLIANT',
+      source: 'GRID',
+      infrastructure_ref: null,
+      colocation_analysis: null,
       limitations: ['§73.182 NIF projected to fail', 'US/MX treaty advisory in scope']
+    }
+  ]
+};
+
+// Co-location demo payload — used when the colocation endpoint is not
+// yet deployed.  Builds on DEMO_RESULT and appends two infrastructure-
+// source rows demonstrating the new shape (`source`, `infrastructure_ref`,
+// `colocation_analysis`, `status_category`).
+const DEMO_COLOCATION_RESULT = {
+  ...DEMO_RESULT,
+  n_candidates_evaluated: 312,
+  n_candidates_returned:  6,
+  candidates: [
+    ...DEMO_RESULT.candidates,
+    {
+      rank: 5, lat: 34.88, lon: -111.85,
+      distance_from_current_km: 3.4, score: 88.7,
+      col_coverage_pct: 0.94, nif_status: 'PROMISING',
+      daytime_reach_km: 33.0, blanket_population_pct: 0.5,
+      ground_sigma_mS_m: 7, treaty_zone: null, fuel_risk: 'LOW',
+      notes: 'Existing 122 m guyed tower — shared-lease advantage; same-band caution.',
+      explanation: {
+        score_breakdown: { col_coverage: 32, population: 26, blanket: 13, conductivity: 9, wildfire: 3, treaty_zone: 4 },
+        ranking_rationale: 'Strong COL coverage with parcel + ASR + grounding already in place.'
+      },
+      status_labels: ['PROMISING', 'REVIEW REQUIRED'],
+      status_category: 'RECOVERABLE_WITH_DA',
+      source: 'INFRASTRUCTURE',
+      infrastructure_ref: {
+        id: 'ASR-1062845',
+        kind: 'TOWER',
+        name: 'Sedona Ridge Tower 4',
+        owner: 'Verde Broadcasting LLC',
+        lat: 34.88, lon: -111.85,
+        height_m: 122,
+        structure_type: 'GUYED',
+        asr_number: '1062845',
+        frequency_khz: null,
+        station_call: null
+      },
+      colocation_analysis: {
+        distance_to_host_m: 0,
+        host_kind: 'TOWER',
+        host_owner: 'Verde Broadcasting LLC',
+        host_height_m: 122,
+        tower_loading_advisory: 'Loading study required — antenna mass + wind area must be re-computed for the added array.',
+        same_band_interference_risk: 'MEDIUM',
+        structural_engineering_required: true,
+        shared_lease_advantage: true,
+        diplexing_required: false,
+        regulatory_notes: [
+          'ASR registered — FAA/FCC notification of structure change may apply.',
+          'RF MPE must be re-evaluated with all existing tenants in place.'
+        ]
+      },
+      limitations: ['Shared-lease only; site not owned outright.']
+    },
+    {
+      rank: 6, lat: 34.81, lon: -111.78,
+      distance_from_current_km: 6.0, score: 76.1,
+      col_coverage_pct: 0.86, nif_status: 'REVIEW',
+      daytime_reach_km: 29.4, blanket_population_pct: 0.9,
+      ground_sigma_mS_m: 6, treaty_zone: null, fuel_risk: 'LOW',
+      notes: 'Co-located on existing AM site — diplexing required, same-band HIGH.',
+      explanation: {
+        score_breakdown: { col_coverage: 28, population: 22, blanket: 10, conductivity: 7, wildfire: 5, treaty_zone: 4 },
+        ranking_rationale: 'Existing AM facility already authorized — diplexing path well-trodden.'
+      },
+      status_labels: ['REVIEW REQUIRED'],
+      status_category: 'RECOVERABLE_WITH_DA',
+      source: 'INFRASTRUCTURE',
+      infrastructure_ref: {
+        id: 'AM-KVRD-790',
+        kind: 'AM_SITE',
+        name: 'KVRD 790 kHz transmitter',
+        owner: 'Red Rock Radio Group',
+        lat: 34.81, lon: -111.78,
+        height_m: 90,
+        structure_type: 'SERIES_FED',
+        asr_number: null,
+        frequency_khz: 790,
+        station_call: 'KVRD'
+      },
+      colocation_analysis: {
+        distance_to_host_m: 0,
+        host_kind: 'AM_SITE',
+        host_owner: 'Red Rock Radio Group',
+        host_height_m: 90,
+        tower_loading_advisory: 'Series-fed tower — diplexer + isolator engineering required.',
+        same_band_interference_risk: 'HIGH',
+        structural_engineering_required: true,
+        shared_lease_advantage: true,
+        diplexing_required: true,
+        regulatory_notes: [
+          'Co-channel adjacency — full §73.182 NIF re-projection with host pattern required.',
+          'Diplexer specification and re-grounding plan must accompany the filing.'
+        ]
+      },
+      limitations: ['Host carrier at 790 kHz — only 10 kHz spacing from proposed 780 kHz.']
     }
   ]
 };

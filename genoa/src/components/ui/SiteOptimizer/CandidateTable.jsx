@@ -6,10 +6,20 @@ import { primaryStatus, rankColor } from './statusUtil.js';
 // CandidateTable — sortable ranked-candidates ledger.  Click a column
 // header to sort; click a row to open the detail drawer.  Renders a
 // muted "no candidates yet" message before the first search.
+//
+// Adds (Genoa AM Co-Location Engine):
+//   • Source column — GRID / INFRA chip (so the operator knows whether
+//     this row comes from greenfield grid scanning or an existing site).
+//   • Host column — host_kind + truncated host_owner from
+//     colocation_analysis.
+//   • Status column — uses StatusChip with the enum status_category if
+//     present, otherwise falls back to legacy free-text labels.
 
 const COLUMNS = [
   { key: 'rank',                       label: '#',                  align: 'right' },
   { key: 'score',                      label: 'Score',              align: 'right' },
+  { key: '_source',                    label: 'Source',             align: 'left',  unsortable: true },
+  { key: '_host',                      label: 'Host',               align: 'left',  unsortable: true },
   { key: 'distance_from_current_km',   label: 'Dist',               align: 'right' },
   { key: 'col_coverage_pct',           label: 'COL %',              align: 'right' },
   { key: 'nif_status',                 label: 'NIF',                align: 'left'  },
@@ -20,7 +30,7 @@ const COLUMNS = [
 ];
 
 function cellValue(c, key){
-  if (key === '_status') return primaryStatus(c.status_labels);
+  if (key === '_status') return c.status_category || primaryStatus(c.status_labels);
   if (key === 'col_coverage_pct') return Number(c.col_coverage_pct) || 0;
   return c[key];
 }
@@ -34,6 +44,37 @@ function fmt(key, v){
   if (key === 'daytime_reach_km')         return `${Number(v).toFixed(1)} km`;
   if (key === 'notes') return String(v);
   return String(v);
+}
+
+function SourceChip({ source }){
+  const isInfra = source === 'INFRASTRUCTURE';
+  const fg     = isInfra ? '#6fd3ff' : '#d6a36a';
+  const bg     = isInfra ? 'rgba(111,211,255,0.10)' : 'rgba(214,163,106,0.10)';
+  const border = isInfra ? 'rgba(111,211,255,0.45)' : 'rgba(214,163,106,0.45)';
+  const text   = isInfra ? 'INFRA' : (source ? 'GRID' : '—');
+  return (
+    <span
+      className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1.5 py-0.5 text-[9px]"
+      style={{ color: fg, background: bg, borderColor: border }}
+      title={source || 'GRID'}
+    >
+      {text}
+    </span>
+  );
+}
+
+function HostCell({ candidate }){
+  const a = candidate?.colocation_analysis;
+  if (!a) return <span className="text-textDim">—</span>;
+  const kind = (a.host_kind || '').replace(/_/g, ' ');
+  const owner = (a.host_owner || '').toString();
+  const ownerShort = owner.length > 22 ? owner.slice(0, 21) + '…' : owner;
+  return (
+    <span className="text-cream" title={`${a.host_kind || '—'} · ${owner || '—'}`}>
+      <span className="text-textDim">{kind || '—'}</span>
+      {ownerShort && <span className="ml-1">· {ownerShort}</span>}
+    </span>
+  );
 }
 
 export default function CandidateTable({ candidates, selectedRank, onSelect, evaluated, returned }){
@@ -111,7 +152,8 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
             <tbody>
               {rows.map(c => {
                 const isSel = c.rank === selectedRank;
-                const status = primaryStatus(c.status_labels);
+                const statusCode = c.status_category;
+                const statusLegacy = primaryStatus(c.status_labels);
                 return (
                   <tr
                     key={c.rank}
@@ -132,12 +174,18 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-right text-cream">{fmt('score', c.score)}</td>
+                    <td className="px-2 py-1.5"><SourceChip source={c.source} /></td>
+                    <td className="px-2 py-1.5"><HostCell candidate={c} /></td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('distance_from_current_km', c.distance_from_current_km)}</td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('col_coverage_pct', c.col_coverage_pct)}</td>
                     <td className="px-2 py-1.5 text-textDim">{c.nif_status || '—'}</td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('daytime_reach_km', c.daytime_reach_km)}</td>
                     <td className="px-2 py-1.5 text-textDim">{c.fuel_risk || '—'}</td>
-                    <td className="px-2 py-1.5"><StatusChip label={status} dense /></td>
+                    <td className="px-2 py-1.5">
+                      {statusCode
+                        ? <StatusChip status={statusCode} dense />
+                        : <StatusChip label={statusLegacy} dense />}
+                    </td>
                     <td className="px-2 py-1.5 text-textDim truncate max-w-[260px]" title={c.notes || ''}>
                       {c.notes || ''}
                     </td>
