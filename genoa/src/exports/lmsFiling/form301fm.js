@@ -657,7 +657,23 @@ export const FORM_301_FM_META = Object.freeze({
   form_id:     '301-FM',
   form_title:  'Application for Construction Permit for Commercial Broadcast Station — FM',
   cite:        '47 CFR §73.3539, §73.3540',
-  fcc_url:     'https://transition.fcc.gov/Forms/Form301/301f.pdf',
+  fcc_url:     'https://www.fcc.gov/media/radio/broadcast-applications-and-forms',
+  lms_portal_url: 'https://enterpriseefiling.fcc.gov/dataentry/login.html',
+  lms_schedule:   'Schedule 301-FM',
+  lms_filing_path:
+    'LMS → File New Application → Media Bureau (Audio) → Construction Permit ' +
+    'or Modification → Service: FM Full-Service → Schedule 301-FM → Section III (Engineering Data)',
   lms_section: 'III (Engineering Data)',
+  submission_checklist: Object.freeze([
+    'Engineering Statement PDF signed by a qualified broadcast engineer (Mullaney-style declaration on the second page)',
+    'PE signature / seal on the certification page (sealed exhibit via POST /api/exhibits/certify, or signed-and-stamped by hand)',
+    'OET-65 RF-exposure exhibit attached (controlled / uncontrolled MPE evaluation per §1.1310; OET Bulletin 65 Supplement A for broadcast)',
+    'Tower / antenna structure: ASR # (if >60.96 m AGL or otherwise required), FAA Form 7460-1 determination, marking & lighting per FCC Part 17',
+    '§73.207 minimum-distance separations satisfied OR §73.215 contour-protection showing attached',
+    'Community of license inside the predicted 70 dBu (60 dBu Class C-series) contour per §73.315',
+    'Antenna pattern table (filed by engineer) if directional; horizontal + vertical patterns per §73.316',
+    'Filing fee verified (Schedule of Fees published in CFR; pay via Fee Filer in LMS before final submission)',
+    'Section I (Applicant), Section II (Legal), and Section IV (Ownership) prepared by licensee / FCC counsel — NOT in this exhibit'
+  ]),
   scope_note:  'Genoa fills Section III (engineering).  Sections I (applicant), II (legal), and IV (ownership) are the licensee\'s and counsel\'s responsibility and are intentionally out of scope here.'
 });

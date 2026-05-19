@@ -297,7 +297,23 @@ export const FORM_318_META = Object.freeze({
   form_title:   'Application for Construction Permit for a Low Power FM Broadcast Station',
   cite:         '47 CFR §73.870, §73.811',
   lms_revision: '2024-consolidated',
-  fcc_url:      'https://www.fcc.gov/media/radio/lpfm',
+  fcc_url:      'https://www.fcc.gov/media/radio/broadcast-applications-and-forms',
+  lms_portal_url: 'https://enterpriseefiling.fcc.gov/dataentry/login.html',
+  lms_schedule:   'Schedule 318',
+  lms_filing_path:
+    'LMS → File New Application → Media Bureau (Audio) → LPFM Construction Permit → ' +
+    'Schedule 318 → Section III (Engineering Data).  Filing windows are limited; check current FCC LPFM filing-window notice before assembling.',
   lms_section:  'III (Engineering Data)',
+  submission_checklist: Object.freeze([
+    'Engineering Statement PDF signed by a qualified broadcast engineer (LPFM applicants commonly are not engineers — engage one)',
+    '§73.811 power and antenna height: ERP ≤ 100 W; HAAT presumptive 30 m (operator must meet §73.811(c) if non-standard)',
+    '§73.807 minimum-distance separations satisfied for co/1st/2nd/3rd-adjacent and IF-channel full-service / NCE / translator stations (no §73.215 path)',
+    '§73.853 / §73.854 eligibility: applicant is an eligible entity (educational, public-safety, or Tribal Nation) — operator certifies',
+    '§73.872 / §73.872(b) point system (mutually-exclusive applications): tie-breaker certifications attached if needed',
+    'OET-65 RF-exposure showing for the LPFM tx site (low-power; categorical exclusion analysis usually applies)',
+    'Tower / antenna structure compliance: ASR / FAA 7460-1 if heights trigger Part 17',
+    'No filing fee for LPFM (47 CFR §1.1116) — confirm before submitting',
+    'Section I (Applicant), Section II (Legal) prepared by applicant / counsel — NOT in this exhibit'
+  ]),
   scope_note:   'SKELETON.  LPFM engineering schema under Subpart G of Part 73.  §73.811 caps ERP at 100 W and HAAT default at 30 m; §73.807 governs minimum-distance separations (no §73.215 contour-protection path is available for LPFM).'
 });

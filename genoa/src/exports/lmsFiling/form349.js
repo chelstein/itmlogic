@@ -309,7 +309,23 @@ export const FORM_349_META = Object.freeze({
   form_title:   'Application for Authority to Construct or Make Changes in an FM Translator or FM Booster Station',
   cite:         '47 CFR §74.1233',
   lms_revision: '2024-consolidated',
-  fcc_url:      'https://www.fcc.gov/media/radio/fm-translators',
+  fcc_url:      'https://www.fcc.gov/media/radio/broadcast-applications-and-forms',
+  lms_portal_url: 'https://enterpriseefiling.fcc.gov/dataentry/login.html',
+  lms_schedule:   'Schedule 349',
+  lms_filing_path:
+    'LMS → File New Application → Media Bureau (Audio) → FM Translator / Booster → ' +
+    'Schedule 349 → Section III (Engineering Data)',
   lms_section:  'III (Engineering Data)',
+  submission_checklist: Object.freeze([
+    'Engineering Statement PDF signed by a qualified broadcast engineer',
+    'Primary-station identification: call sign, facility ID, and §74.1232 eligibility statement (commercial primary vs. NCE primary)',
+    '§74.1204 protection compliance: contour-overlap analysis vs. all co/1st/2nd/3rd-adjacent stations and Class D applications within the protected contour',
+    'Fill-in vs. cross-service translator: justification per §74.1232(e) (fill-in within primary 60 dBu) or §74.1232(d) (cross-service for AM primary)',
+    '§74.1235 frequency-coordination: confirm channel selection is consistent with §73.207 if co-channel-adjacent to a full-service FM',
+    'OET-65 RF-exposure showing for the translator tx site',
+    'Tower / antenna structure: ASR #, FAA Form 7460-1 determination, marking & lighting per FCC Part 17',
+    'Filing fee verified — pay via Fee Filer in LMS before final submission',
+    'Section I (Applicant), Section II (Legal) prepared by licensee / FCC counsel — NOT in this exhibit'
+  ]),
   scope_note:   'SKELETON.  Genoa fills FM-translator engineering data inherited from the FM core (frequency, ERP, HAAT, antenna, OET-65) plus §74.1204 protection compliance.  Translator-specific fields (primary-station identification, fill-in justification, translator class) require engineer-of-record input.'
 });

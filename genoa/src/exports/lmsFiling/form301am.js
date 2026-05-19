@@ -607,7 +607,24 @@ export const FORM_301_AM_META = Object.freeze({
   form_title:   'Application for Construction Permit for Commercial Broadcast Station — AM',
   cite:         '47 CFR §73.3539, §73.3540',
   lms_revision: '2024-consolidated (post-2017-AM-revitalization, post-2023 §73.99 cleanup)',
-  fcc_url:      'https://www.fcc.gov/media/radio/am-fm-distance-program',
+  fcc_url:      'https://www.fcc.gov/media/radio/broadcast-applications-and-forms',
+  lms_portal_url: 'https://enterpriseefiling.fcc.gov/dataentry/login.html',
+  lms_schedule:   'Schedule 301-AM',
+  lms_filing_path:
+    'LMS → File New Application → Media Bureau (Audio) → Construction Permit ' +
+    'or Modification → Service: AM → Schedule 301-AM → Section III (Engineering Data)',
   lms_section:  'III (Engineering Data)',
+  submission_checklist: Object.freeze([
+    'Engineering Statement PDF signed by a qualified broadcast engineer; AM-specific narrative (skywave + groundwave + ground system) included',
+    'PE signature / seal on the certification page',
+    'Method-of-Moments (MoM) proof attached if directional and §73.151(c) is invoked; sample-system schematic + reference field per §73.152',
+    'Ground system description per §73.189 (120 buried 90° radials minimum for non-directional, or as filed for directional)',
+    '§73.182 nighttime interference / RSS aggregation: nighttime NIF contour computed; protected stations listed',
+    '§73.187 pre-sunrise / post-sunset operation tables included if PSRA/PSSA requested',
+    'OET-65 RF-exposure exhibit attached (AM tower base-current → near-field MPE check at fence line)',
+    'Tower lighting / marking per FCC Part 17; FAA 7460-1 determination on file',
+    'Filing fee verified — pay via Fee Filer in LMS before final submission',
+    'Section I (Applicant), Section II (Legal), and Section IV (Ownership) prepared by licensee / FCC counsel — NOT in this exhibit'
+  ]),
   scope_note:   'Genoa fills Section III (AM engineering): groundwave (§73.183/.184), nighttime allocation (§73.182), and tower / RF safety.  Sections I (applicant), II (legal), IV (ownership) are out of scope.'
 });
