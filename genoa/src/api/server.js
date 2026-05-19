@@ -28,6 +28,7 @@ import captureRoutes   from './routes/captures.js';
 import geodataRoutes   from './routes/geodata.js';
 import measurementsRoutes from './routes/measurements.js';
 import amSiteOptimizerRoutes from './routes/amSiteOptimizer.js';
+import amColocationOpportunitiesRoutes from './routes/amColocationOpportunities.js';
 import authRoutes       from './routes/auth.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
@@ -94,6 +95,7 @@ app.use('/api', captureRoutes);      // SDR capture audio proxy (GET /api/captur
 app.use('/api', geodataRoutes);      // geodata evidence layers (GET /api/geodata/{sample,clutter,vegetation,conductivity,terrain/status,manifest})
 app.use('/api', measurementsRoutes); // drive-test ingestion (POST /api/measurements/ingest)
 app.use('/api', amSiteOptimizerRoutes); // AM regional relocation optimizer (POST /api/am/site-optimizer — SCREENING ONLY)
+app.use('/api', amColocationOpportunitiesRoutes); // AM co-location opportunity engine (POST /api/am/colocation-opportunities — SCREENING ONLY)
 app.use('/api', exhibitRoutes);
 
 // SPA fallback — any GET request that isn't /api/*, /healthz, /readyz,
