@@ -365,3 +365,74 @@ test('mapForm301Fm alias routes AM exhibit to Form 301-AM (not FM)', () => {
   const m = mapForm301Fm(KAZM_AM);
   assert.equal(m.form.form_id, '301-AM');
 });
+
+// ── 10. Submission scaffolding: every form has LMS portal + checklist ──
+//
+// The cheatsheet's whole purpose is to get an engineer to "submission
+// ready".  Each form META must therefore carry:
+//   - lms_portal_url    (the actual FCC LMS portal entry)
+//   - lms_schedule      (Schedule 301-FM / Schedule 349 / etc.)
+//   - lms_filing_path   (one-line breadcrumb of clicks inside LMS)
+//   - submission_checklist (array of pre-flight items the engineer
+//                           verifies before upload)
+// Missing any of these means the cheatsheet won't tell the engineer
+// where to file or what to attach — which defeats the point.
+
+import { FORM_301_FM_META } from '../exports/lmsFiling/form301fm.js';
+const ALL_FORM_METAS = [
+  ['301-FM', FORM_301_FM_META],
+  ['301-AM', FORM_301_AM_META],
+  ['349',    FORM_349_META],
+  ['318',    FORM_318_META]
+];
+
+for (const [label, meta] of ALL_FORM_METAS){
+  test(`${label} META carries LMS portal URL + schedule + filing path`, () => {
+    assert.match(meta.lms_portal_url, /^https:\/\/enterpriseefiling\.fcc\.gov/,
+      `${label}.lms_portal_url must point at the FCC LMS entry`);
+    assert.match(meta.lms_schedule, /Schedule/, `${label}.lms_schedule should reference its LMS Schedule`);
+    assert.ok(meta.lms_filing_path && meta.lms_filing_path.length > 40,
+      `${label}.lms_filing_path must be a usable breadcrumb`);
+  });
+  test(`${label} META carries a non-trivial submission checklist`, () => {
+    assert.ok(Array.isArray(meta.submission_checklist), `${label}.submission_checklist must be an array`);
+    assert.ok(meta.submission_checklist.length >= 5,
+      `${label} checklist has ${meta.submission_checklist.length} items — too thin to be useful pre-flight`);
+    for (const item of meta.submission_checklist){
+      assert.equal(typeof item, 'string');
+      assert.ok(item.length > 20, `checklist item too terse: "${item}"`);
+    }
+  });
+}
+
+test('cheatsheet HTML embeds the portal URL + schedule + checklist for FM CP', () => {
+  const pkg = buildFilingPackage({
+    station_inputs: { call: 'WTST', service: 'FM', frequency: 100.7, lat: 40, lon: -75,
+                      erp_kw: 6, haat_m: 100, fcc_class: 'A' },
+    evidence: {}
+  });
+  assert.match(pkg.html, /enterpriseefiling\.fcc\.gov/, 'HTML must surface the LMS portal URL');
+  assert.match(pkg.html, /Schedule 301-FM/, 'HTML must surface the LMS schedule name');
+  assert.match(pkg.html, /Pre-flight checklist/i, 'HTML must include the pre-flight checklist section');
+  assert.match(pkg.html, /Engineering Statement PDF/, 'HTML must list the PDF as a required attachment');
+  // Header used to be hardcoded "Form 301-FM" — verify the form_id is now templated.
+  assert.match(pkg.html, /FCC Form 301-FM/);
+});
+
+test('cheatsheet HTML retitles correctly for an AM filing (no "Form 301-FM" hardcode)', () => {
+  const pkg = buildFilingPackage(KAZM_AM);
+  assert.match(pkg.html, /FCC Form 301-AM/, 'AM filing must render as Form 301-AM, not Form 301-FM');
+  assert.doesNotMatch(pkg.html, /<h1>[^<]*Form 301-FM[^<]*<\/h1>/, 'AM filing must not render an FM h1');
+  assert.match(pkg.html, /Schedule 301-AM/);
+});
+
+test('cheatsheet plain-text retitles correctly for FM translator (Form 349)', () => {
+  const pkg = buildFilingPackage({
+    station_inputs: { call: 'W123XY', service: 'FX', frequency: 92.1, lat: 40, lon: -75,
+                      erp_kw: 0.250, haat_m: 30 },
+    evidence: {}
+  });
+  assert.match(pkg.plain_text, /FCC FORM 349/, 'translator filing must render as Form 349');
+  assert.match(pkg.plain_text, /SUBMISSION PORTAL/);
+  assert.match(pkg.plain_text, /PRE-FLIGHT CHECKLIST/);
+});

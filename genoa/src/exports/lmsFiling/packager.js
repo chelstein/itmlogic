@@ -188,8 +188,10 @@ function csvOutput(mapped){
 
 function plainTextOutput(mapped, advisory_notes = []){
   const out = [];
+  const form = mapped.form || {};
+  const formId = form.form_id || '301-FM';
   out.push('='.repeat(80));
-  out.push('  FCC FORM 301-FM — ENGINEERING (SECTION III) FILING CHEATSHEET');
+  out.push(`  FCC FORM ${formId} — ENGINEERING (SECTION III) FILING CHEATSHEET`);
   out.push(`  Station: ${mapped.exhibit_metadata.call || 'unknown'}  ·  Facility ${mapped.exhibit_metadata.facility_id || '—'}`);
   out.push(`  Build SHA: ${mapped.exhibit_metadata.build_sha || 'unknown'}`);
   out.push(`  Generated: ${new Date().toISOString()}`);
@@ -197,6 +199,24 @@ function plainTextOutput(mapped, advisory_notes = []){
   out.push(`  Filled: ${mapped.summary.filled} / ${mapped.summary.total}  ·  Suggested: ${mapped.summary.suggested ?? 0}  ·  Required gaps: ${mapped.summary.required_gaps}`);
   out.push('='.repeat(80));
   out.push('');
+  if (form.lms_portal_url){
+    out.push('-- SUBMISSION PORTAL --------------------------------------------------------');
+    out.push(`  Portal:    ${form.lms_portal_url}`);
+    if (form.lms_schedule)     out.push(`  Schedule:  ${form.lms_schedule}`);
+    if (form.lms_filing_path)  out.push(`  Path:      ${form.lms_filing_path}`);
+    if (form.fcc_url)          out.push(`  Reference: ${form.fcc_url}`);
+    out.push('');
+  }
+  if (Array.isArray(form.submission_checklist) && form.submission_checklist.length){
+    out.push('-- PRE-FLIGHT CHECKLIST -----------------------------------------------------');
+    out.push('Verify each item before filing.  Items are NOT auto-checked by Genoa —');
+    out.push('the engineer of record signs off that they have been satisfied.');
+    out.push('');
+    for (const item of form.submission_checklist){
+      out.push(`  [ ] ${item}`);
+    }
+    out.push('');
+  }
   out.push('Per H&D-style filing convention, paste these values into LMS Section III.');
   out.push('SUGGESTED entries are pre-staged by Genoa from the exhibit and require');
   out.push('engineer confirmation before filing — they are not auto-certified.');
@@ -250,7 +270,26 @@ function plainTextOutput(mapped, advisory_notes = []){
 
 function htmlOutput(mapped){
   const meta = mapped.exhibit_metadata;
+  const form = mapped.form || {};
+  const formId = form.form_id || '301-FM';
+  const formTitle = form.form_title || 'Application for Construction Permit for Commercial Broadcast Station — FM';
   const ready = mapped.filing_ready;
+  const portalHtml = form.lms_portal_url ? `
+  <h2>Where to file</h2>
+  <table class="portal">
+    <tr><th>Portal</th><td><a href="${escapeHtml(form.lms_portal_url)}" target="_blank" rel="noopener">${escapeHtml(form.lms_portal_url)}</a></td></tr>
+    ${form.lms_schedule    ? `<tr><th>Schedule</th><td>${escapeHtml(form.lms_schedule)}</td></tr>` : ''}
+    ${form.lms_filing_path ? `<tr><th>Filing path</th><td>${escapeHtml(form.lms_filing_path)}</td></tr>` : ''}
+    ${form.fcc_url         ? `<tr><th>FCC reference</th><td><a href="${escapeHtml(form.fcc_url)}" target="_blank" rel="noopener">${escapeHtml(form.fcc_url)}</a></td></tr>` : ''}
+  </table>
+` : '';
+  const checklistHtml = Array.isArray(form.submission_checklist) && form.submission_checklist.length ? `
+  <h2>Pre-flight checklist</h2>
+  <p style="font-size:12px">Verify each item before filing. Items are <b>not</b> auto-checked by Genoa — the engineer of record signs off that they have been satisfied.</p>
+  <ul class="checklist">
+    ${form.submission_checklist.map(item => `<li>${escapeHtml(item)}</li>`).join('\n    ')}
+  </ul>
+` : '';
   const fieldsHtml = mapped.fields.map(f => {
     const badge = STATUS_BADGE[f.status] || STATUS_BADGE.gap;
     const provText = fmtProvenance(f.provenance);
@@ -285,7 +324,7 @@ function htmlOutput(mapped){
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Form 301-FM Filing Cheatsheet — ${escapeHtml(meta.call || 'Subject Facility')}</title>
+  <title>Form ${escapeHtml(formId)} Filing Cheatsheet — ${escapeHtml(meta.call || 'Subject Facility')}</title>
   <style>
     body { font-family: 'Times New Roman', serif; max-width: 1100px; margin: 32px auto; padding: 0 24px; color: #1c2e3a; }
     h1   { font-size: 22px; margin-bottom: 4px; }
@@ -299,10 +338,17 @@ function htmlOutput(mapped){
     code { font-family: 'Courier New', monospace; font-size: 12px; color: #1c2e3a; }
     .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #c4745a; font-size: 10px; color: #666; }
     .replay { font-family: monospace; font-size: 9px; word-break: break-all; background: #f6f1e1; padding: 8px; border-radius: 4px; }
+    table.portal { font-size: 12px; }
+    table.portal th { background: #f3c86d; color: #1c2e3a; padding: 4px 10px; text-align: left; font-family: monospace; font-size: 10px; letter-spacing: 1px; }
+    table.portal td { padding: 4px 10px; border-bottom: 1px solid #e7e2d4; }
+    ul.checklist { font-size: 12px; padding-left: 20px; }
+    ul.checklist li { margin-bottom: 6px; list-style: none; position: relative; padding-left: 22px; }
+    ul.checklist li::before { content: '[ ]'; position: absolute; left: 0; font-family: monospace; color: #c4745a; }
   </style>
 </head>
 <body>
-  <h1>FCC Form 301-FM — Engineering (Section III) Filing Cheatsheet</h1>
+  <h1>FCC Form ${escapeHtml(formId)} — Engineering (Section III) Filing Cheatsheet</h1>
+  <div style="font-size:12px;color:#666;margin-bottom:8px;font-style:italic">${escapeHtml(formTitle)}</div>
   <div class="meta">
     Station <b>${escapeHtml(meta.call || 'unknown')}</b> · Facility ${escapeHtml(meta.facility_id || '—')} · Service ${escapeHtml(meta.service || '—')}<br>
     Build SHA <code>${escapeHtml((meta.build_sha || 'unknown').slice(0, 12))}…</code> · Generated ${escapeHtml(new Date().toISOString())}
@@ -318,6 +364,8 @@ function htmlOutput(mapped){
     </span>
   </div>
 
+${portalHtml}
+${checklistHtml}
   <h2>How to use this</h2>
   <p style="font-size:12px">
     Per H&D-style filing convention, paste the <i>filled</i> values below into the
@@ -362,7 +410,7 @@ function htmlOutput(mapped){
   <div class="footer">
     Generated by Genoa FCC Propagation Studio.  This cheatsheet is the
     engineering-data deliverable a broadcast engineer hands to the licensee
-    or FCC counsel for upload to LMS.  ${escapeHtml(FORM_301_FM_META.scope_note)}
+    or FCC counsel for upload to LMS.  ${escapeHtml(form.scope_note || FORM_301_FM_META.scope_note)}
   </div>
 </body>
 </html>
