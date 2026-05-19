@@ -146,11 +146,41 @@ export function buildAppendixSections(exhibit){
       }
       return row;
     });
+    // HAAT validation footnote — when present, label the basis
+    // (operator-supplied vs terrain-derived) and surface any sanity
+    // issues right alongside the radial table so a reviewing
+    // engineer doesn't have to scroll to Validation Verdict to know
+    // whether the HAAT column is trustworthy.
+    const haatV = exhibit?.haat_validation;
+    let haatFootnote = '';
+    if (haatV && !isAm){
+      const basisLabel = {
+        operator_supplied: 'operator-supplied (inputs.overall_height_amsl_m)',
+        terrain_derived:   `terrain-derived (ground at tx + haat_m via ${haatV.tx_amsl_resolved?.elevation_source || 'multi-source DEM'})`,
+        flat:              'flat-earth fallback (no terrain DEM)',
+        unknown:           'unresolved'
+      }[haatV.basis] || haatV.basis;
+      const statusLabel = {
+        PASS:    'PASS',
+        SUSPECT: 'SUSPECT — outliers present',
+        INVALID: 'INVALID — engineer review required',
+        NOT_RUN: 'NOT RUN'
+      }[haatV.status] || haatV.status;
+      const s = haatV.stats || {};
+      haatFootnote =
+        `\n\nHAAT validation: ${statusLabel}.  Basis: ${basisLabel}.  ` +
+        (Number.isFinite(s.mean_m)
+          ? `Per-radial range [${s.min_m}, ${s.max_m}] m, mean ${s.mean_m} m (operator ${s.operator_m ?? '—'} m, Δ ${s.delta_mean_vs_operator_m ?? '—'} m).  `
+          : '') +
+        (haatV.issues?.length
+          ? `Issues: ${haatV.issues.map(i => `${i.code} (${i.severity})`).join('; ')}.`
+          : 'No issues detected.');
+    }
     sections.push({
       id:      'appendix-a',
       type:    'table',
       heading: 'APPENDIX A — RADIAL DATA',
-      preface: isAm
+      preface: (isAm
         ? `Per-radial conductivity (σ), inverse-distance field at 1 km, and §73.184 groundwave contour distances.  Radial step shown in METHODOLOGY.  ${anySigmaPath
             ? 'σ varies by azimuth where step 6d found M3 boundary crossings (path-length-weighted; stage-3 Millington pending).  Full per-azimuth (σ, cumulative km) tabulation in Appendix A-1.'
             : 'σ is uniform across all azimuths — per-radial M3 segmentation either found no crossings or was unavailable (see Appendix D).'}  ${hasDaPattern
@@ -158,7 +188,8 @@ export function buildAppendixSections(exhibit){
             : 'Non-directional antenna (NDA); pattern factor is 1.0 at every azimuth.'}`
         : 'Per-radial HAAT, ERP, and contour distances.  Radial step shown in METHODOLOGY.  ' +
           (pattern ? 'ERP per radial computed from filed pattern table (ERP × (relative field)² per §73.316).'
-                   : 'Non-directional antenna; ERP constant across all azimuths.'),
+                   : 'Non-directional antenna; ERP constant across all azimuths.')
+      ) + haatFootnote,
       table:   { columns, rows }
     });
 
