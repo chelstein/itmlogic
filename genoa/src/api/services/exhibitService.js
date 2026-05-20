@@ -2619,12 +2619,46 @@ export async function computeExhibit(req){
   // promoted to a warning/blocker on the exhibit so it flows through
   // the existing readiness pipeline without special-casing.
   try {
-    const { validateHaat } = await import('../../engine/haat/validate.js');
+    const { validateHaat, detectHaatContradictions } = await import('../../engine/haat/validate.js');
     const haatReport = validateHaat(exhibit);
     exhibit.haat_validation = haatReport;
     for (const issue of haatReport.issues || []){
-      if (issue.severity === 'blocker' || issue.severity === 'warning'){
+      // Severity enum is uppercase post-rev (BLOCKER/WARNING/ADVISORY/INFO),
+      // but legacy callers still emit lowercase ('blocker'/'warning').
+      const sev = String(issue.severity || '').toLowerCase();
+      if (sev === 'blocker' || sev === 'warning'){
         warnings.push(W.make(issue.code, issue.detail));
+      }
+    }
+    // When the validator says display is suppressed AND we're not in
+    // an AM-by-design situation, flag the exhibit TERRAIN_LIMITED
+    // (req #5) so downstream renderers / readiness know to suppress
+    // per-radial terrain views and severity scoring.
+    if (haatReport.terrain_limited === true){
+      exhibit.terrain_limited = true;
+      warnings.push(W.make('TERRAIN_LIMITED',
+        `Exhibit in terrain-limited mode (haat_validation.status=${haatReport.status}). Per-radial HAAT column suppressed; operator HAAT used for contour interpolation.`));
+    }
+    // Suppress display values upstream (req #1 + #4 + #5): strip the
+    // computed-HAAT field from radial_table so Appendix A and any
+    // other consumer can never render a misleading number.  The
+    // contour distances themselves remain — those are computed from
+    // the operator-supplied haat_m via the FCC curves, not from
+    // per-radial terrain.
+    if (haatReport.display_suppressed && Array.isArray(exhibit.radial_table)){
+      for (const r of exhibit.radial_table){
+        if (r && Object.prototype.hasOwnProperty.call(r, 'haat_computed_m')){
+          r.haat_computed_m = null;
+          r.haat_source     = 'suppressed_no_terrain_basis';
+        }
+      }
+      if (Array.isArray(exhibit.evidence?.terrain_haat_per_radial)){
+        for (const r of exhibit.evidence.terrain_haat_per_radial){
+          if (r && Object.prototype.hasOwnProperty.call(r, 'haat_m')){
+            r.haat_m_raw_suppressed = r.haat_m;  // keep for debugging
+            r.haat_m = null;
+          }
+        }
       }
     }
   } catch (err){
@@ -2633,6 +2667,25 @@ export async function computeExhibit(req){
 
   exhibit.warnings         = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
+
+  // Consistency guard (req #3): detect contradictions between the
+  // HAAT validator's verdict and the values actually present in the
+  // exhibit.  Promote any contradiction to a blocker so the report
+  // never goes out saying "No issues detected" alongside garbage.
+  try {
+    const { detectHaatContradictions } = await import('../../engine/haat/validate.js');
+    const contradictions = detectHaatContradictions(exhibit);
+    if (contradictions.length > 0){
+      for (const c of contradictions){
+        warnings.push(W.make(c.code, c.detail));
+      }
+      exhibit.warnings = W.dedupe(warnings);
+      exhibit.blockers = exhibit.warnings.filter(w => w.severity === 'blocker');
+    }
+  } catch (err){
+    console.warn('[exhibitService] haat contradiction check failed:', err?.message || err);
+  }
+
   exhibit.degraded_mode    = exhibit.warnings.length > 0;
   exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
 

@@ -127,6 +127,12 @@ export function buildAppendixSections(exhibit){
         // misses the DEM-derived per-azimuth value the engine actually
         // used, so every row of Appendix A would print "—" even on an
         // exhibit that ran the terrain sidecar.
+        // HAAT display suppression (req #1): when the validator says
+        // the per-radial bundle has no real terrain basis, we render
+        // "UNAVAILABLE" instead of a misleading number.  The contour
+        // distances are still authoritative (computed under FCC
+        // §73.333 curves from operator haat_m).
+        const haatSuppressed = exhibit?.haat_validation?.display_suppressed === true;
         const haat  = Number.isFinite(r.haat_computed_m) ? Number(r.haat_computed_m)
                     : Number.isFinite(r.haat_input_m)    ? Number(r.haat_input_m)
                     : Number.isFinite(r.haat_m)          ? Number(r.haat_m)
@@ -136,7 +142,9 @@ export function buildAppendixSections(exhibit){
                     : (Number.isFinite(stationErp) && !pattern ? stationErp : null));
         row = {
           azimuth_deg: az != null  ? az.toFixed(1)   : '—',
-          haat_m:      haat != null ? haat.toFixed(1) : '—',
+          haat_m:      haatSuppressed
+                         ? 'UNAVAILABLE'
+                         : (haat != null ? haat.toFixed(1) : '—'),
           erp_kw:      erp != null  ? erp.toFixed(3)  : '—'
         };
       }
@@ -146,11 +154,12 @@ export function buildAppendixSections(exhibit){
       }
       return row;
     });
-    // HAAT validation footnote — when present, label the basis
-    // (operator-supplied vs terrain-derived) and surface any sanity
-    // issues right alongside the radial table so a reviewing
-    // engineer doesn't have to scroll to Validation Verdict to know
-    // whether the HAAT column is trustworthy.
+    // HAAT validation footnote — structured output (req #4).  When
+    // the validator suppressed the column we tell the reader exactly
+    // why and what the fallback posture is, instead of a single line
+    // that could be read as "everything is fine."  The block is
+    // built as a small multi-line string so the PDF renderer's
+    // paragraph wrap keeps it readable.
     const haatV = exhibit?.haat_validation;
     let haatFootnote = '';
     if (haatV && !isAm){
@@ -160,21 +169,46 @@ export function buildAppendixSections(exhibit){
         flat:              'flat-earth fallback (no terrain DEM)',
         unknown:           'unresolved'
       }[haatV.basis] || haatV.basis;
-      const statusLabel = {
-        PASS:    'PASS',
-        SUSPECT: 'SUSPECT — outliers present',
-        INVALID: 'INVALID — engineer review required',
-        NOT_RUN: 'NOT RUN'
-      }[haatV.status] || haatV.status;
       const s = haatV.stats || {};
-      haatFootnote =
-        `\n\nHAAT validation: ${statusLabel}.  Basis: ${basisLabel}.  ` +
-        (Number.isFinite(s.mean_m)
-          ? `Per-radial range [${s.min_m}, ${s.max_m}] m, mean ${s.mean_m} m (operator ${s.operator_m ?? '—'} m, Δ ${s.delta_mean_vs_operator_m ?? '—'} m).  `
-          : '') +
-        (haatV.issues?.length
-          ? `Issues: ${haatV.issues.map(i => `${i.code} (${i.severity})`).join('; ')}.`
-          : 'No issues detected.');
+      const lines = [];
+      lines.push('');
+      lines.push('');
+      lines.push(`HAAT Validation Status: ${haatV.status}`);
+      lines.push(`Basis: ${basisLabel}`);
+
+      if (haatV.status === 'INVALID' || haatV.status === 'FALLBACK_ONLY' || haatV.status === 'NOT_RUN'){
+        // Suppression posture (req #4 + #5)
+        lines.push('');
+        lines.push('Reason:');
+        if (haatV.issues && haatV.issues.length){
+          for (const i of haatV.issues) lines.push(`  - ${i.code} (${i.severity}): ${i.detail}`);
+        } else if (haatV.status === 'NOT_RUN'){
+          lines.push('  Terrain DEM unavailable; per-radial HAAT computation disabled to avoid invalid engineering output.');
+        }
+        lines.push('');
+        lines.push('Fallback posture:');
+        lines.push(`  Contour distances still computed under 47 CFR §73.333 curves using operator HAAT (${s.operator_m ?? '—'} m).`);
+        lines.push('  Per-radial HAAT values suppressed in this table (shown as UNAVAILABLE).');
+        if (exhibit.terrain_limited){
+          lines.push('  Exhibit marked TERRAIN_LIMITED — per-radial terrain severity scoring and engineering-confidence terrain inputs are unavailable for this run.');
+        }
+      } else if (haatV.status === 'PASS'){
+        lines.push('');
+        lines.push(`Per-radial range [${s.min_m}, ${s.max_m}] m, mean ${s.mean_m} m`);
+        lines.push(`(operator ${s.operator_m ?? '—'} m, Δ ${s.delta_mean_vs_operator_m ?? '—'} m).`);
+        if (haatV.issues && haatV.issues.length){
+          lines.push('');
+          lines.push('Issues:');
+          for (const i of haatV.issues) lines.push(`  - ${i.code} (${i.severity})`);
+        }
+      } else if (haatV.status === 'SUSPECT'){
+        lines.push('');
+        lines.push(`Per-radial range [${s.min_m}, ${s.max_m}] m, mean ${s.mean_m} m (operator ${s.operator_m ?? '—'} m).`);
+        lines.push('');
+        lines.push('Outliers present — engineer of record should confirm:');
+        for (const i of (haatV.issues || [])) lines.push(`  - ${i.code} (${i.severity}): ${i.detail}`);
+      }
+      haatFootnote = lines.join('\n');
     }
     sections.push({
       id:      'appendix-a',

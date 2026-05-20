@@ -63,9 +63,25 @@ export const WARNING_CODES = Object.freeze({
     title: 'Per-radial HAAT inconsistent with operator HAAT',
     description: 'Mean per-radial HAAT differs from the operator-supplied HAAT by more than ±300 m. Suggests the antenna AMSL was substituted with HAAT (or vice-versa) somewhere in the terrain pipeline.' },
 
+  HAAT_SUPPRESSED_NO_TERRAIN_BASIS: { severity: 'blocker', phase: 'engine',
+    title: 'Per-radial HAAT invalid due to missing terrain basis',
+    description: 'Per-radial HAAT values were computed without a real terrain basis (no inputs.overall_height_amsl_m, no successful tx-site DEM probe).  Display suppressed; contour distances still authoritative under FCC §73.333 curves using operator HAAT.' },
+
+  HAAT_FALLBACK_ONLY:            { severity: 'warning', phase: 'engine',
+    title: 'Per-radial HAAT in fallback-only mode',
+    description: 'Per-radial HAAT bundle present but no terrain basis attached. Column suppressed in Appendix A; operator HAAT is used for contour interpolation.' },
+
+  HAAT_CONTRADICTION:            { severity: 'blocker', phase: 'engine',
+    title: 'HAAT validation contradiction detected',
+    description: 'Consistency guard found a divergence between haat_validation.status and the per-radial HAAT actually present in the exhibit. Release blocked to prevent misleading Appendix A output.' },
+
   HAAT_SUSPECT_OUTLIERS:         { severity: 'warning', phase: 'engine',
     title: 'Per-radial HAAT outliers',
     description: 'One or more per-radial HAAT values are physically possible but uncommon (below -50 m). Engineer of record should confirm the antenna is intentionally below surrounding terrain.' },
+
+  TERRAIN_LIMITED:               { severity: 'warning', phase: 'engine',
+    title: 'Exhibit in terrain-limited mode',
+    description: 'Per-radial terrain analysis suppressed (DEM unavailable or no resolved AMSL). Contour distances still computed under FCC §73.333 curves using operator HAAT, but the per-radial HAAT column, terrain severity scoring, and engineering-confidence terrain inputs are unavailable.' },
 
   TX_AMSL_UNRESOLVED:            { severity: 'warning', phase: 'engine',
     title: 'Antenna AMSL unresolved',

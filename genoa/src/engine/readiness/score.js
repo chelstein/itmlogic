@@ -78,12 +78,19 @@ export function computeReadinessScore(exhibit){
       ? AXES.haat_validation                    // AM doesn't use DEM-HAAT
       : Math.round(AXES.haat_validation * 0.4); // FM-without-terrain gets partial
     if (inputs.service !== 'AM'){
-      advisoryOut.push({
+      warningsOut.push({
         code:   'HAAT_NOT_TERRAIN_DERIVED',
-        detail: 'Per-radial HAAT was not computed from a terrain DEM (flat-earth or sidecar unavailable).',
+        detail: 'Per-radial HAAT was not computed from a terrain DEM (flat-earth or sidecar unavailable).  Caps readiness at REVIEW (req #2).',
         remedy: 'Run with use_terrain=true and terrain sidecar configured for the highest-confidence HAAT column.'
       });
     }
+  } else if (haatV?.status === 'FALLBACK_ONLY'){
+    breakdown.haat_validation = Math.round(AXES.haat_validation * 0.3);
+    warningsOut.push({
+      code:   'HAAT_FALLBACK_ONLY',
+      detail: 'Per-radial HAAT bundle present but no terrain basis attached — column suppressed.  Caps readiness at REVIEW (req #2).',
+      remedy: 'Supply inputs.overall_height_amsl_m or restore terrain DEM probe to upgrade to a real per-radial HAAT analysis.'
+    });
   } else if (haatV?.status === 'SUSPECT'){
     breakdown.haat_validation = Math.round(AXES.haat_validation * 0.5);
     warningsOut.push({
@@ -287,6 +294,18 @@ export function computeReadinessScore(exhibit){
   } else if (score >= 70){
     status = 'FILING_CANDIDATE';
   } else {
+    status = 'REVIEW';
+  }
+
+  // HAAT readiness cap (req #2): NOT_RUN / INVALID / FALLBACK_ONLY
+  // never reach FILING_CANDIDATE or ENGINEER_CERTIFICATION_READY,
+  // regardless of how many other axes scored.  AM exhibits are
+  // exempted because §73.184 groundwave compute doesn't use a DEM
+  // by design — for AM, NOT_RUN is correct, not a gap.
+  const haatStatus = haatV?.status;
+  const haatGates = inputs.service !== 'AM'
+    && (haatStatus === 'NOT_RUN' || haatStatus === 'INVALID' || haatStatus === 'FALLBACK_ONLY');
+  if (haatGates && (status === 'FILING_CANDIDATE' || status === 'ENGINEER_CERTIFICATION_READY')){
     status = 'REVIEW';
   }
 
