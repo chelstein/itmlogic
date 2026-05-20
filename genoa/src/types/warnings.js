@@ -83,6 +83,10 @@ export const WARNING_CODES = Object.freeze({
     title: 'Exhibit in terrain-limited mode',
     description: 'Per-radial terrain analysis suppressed (DEM unavailable or no resolved AMSL). Contour distances still computed under FCC §73.333 curves using operator HAAT, but the per-radial HAAT column, terrain severity scoring, and engineering-confidence terrain inputs are unavailable.' },
 
+  TERRAIN_HAAT_REJECTED:         { severity: 'warning', phase: 'engine',
+    title: 'Upstream terrain-HAAT response rejected',
+    description: 'A terrain sidecar returned per-radial HAAT values that failed plausibility checks (outside physical bounds or inconsistent with operator HAAT). Bundle rejected; pipeline fell through to the resolver-backed multi-source DEM path.' },
+
   TX_AMSL_UNRESOLVED:            { severity: 'warning', phase: 'engine',
     title: 'Antenna AMSL unresolved',
     description: 'Could not resolve antenna AMSL: neither inputs.overall_height_amsl_m supplied nor ground-elevation probe at the transmitter site succeeded.  Per-radial HAAT column reflects (haat_m − terrain_avg_at_radial), not true HAAT.' },
