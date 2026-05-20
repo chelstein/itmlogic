@@ -127,24 +127,40 @@ export function buildAppendixSections(exhibit){
         // misses the DEM-derived per-azimuth value the engine actually
         // used, so every row of Appendix A would print "—" even on an
         // exhibit that ran the terrain sidecar.
-        // HAAT display suppression (req #1): when the validator says
-        // the per-radial bundle has no real terrain basis, we render
-        // "UNAVAILABLE" instead of a misleading number.  The contour
-        // distances are still authoritative (computed under FCC
-        // §73.333 curves from operator haat_m).
+        // HAAT display policy: always include a value when one is
+        // available.  When the validator suppresses per-radial
+        // terrain output (no terrain basis attached, INVALID, etc.)
+        // we DON'T render "UNAVAILABLE" — we fall back to the
+        // operator-supplied HAAT (haat_input_m or station-level
+        // haat_m), which is the same value the FCC §73.333 curve
+        // interpolation uses, and is authoritative for the
+        // contour-distance column.  The structured footnote below
+        // tells the reader the column is flat across azimuths
+        // because no terrain DEM was applied.  "UNAVAILABLE" is
+        // reserved for the degenerate case where no HAAT was
+        // supplied at all.
         const haatSuppressed = exhibit?.haat_validation?.display_suppressed === true;
-        const haat  = Number.isFinite(r.haat_computed_m) ? Number(r.haat_computed_m)
-                    : Number.isFinite(r.haat_input_m)    ? Number(r.haat_input_m)
-                    : Number.isFinite(r.haat_m)          ? Number(r.haat_m)
-                    : (azKey != null && haatByAz.has(azKey) ? haatByAz.get(azKey) : null);
+        const stationHaat = Number.isFinite(Number(exhibit?.station_inputs?.haat_m))
+                              ? Number(exhibit.station_inputs.haat_m)
+                              : null;
+        let haat;
+        if (haatSuppressed){
+          // Terrain compute couldn't add per-azimuth detail — use
+          // operator HAAT uniformly.  Same value the curve engine
+          // uses for contour distances.
+          haat = Number.isFinite(r.haat_input_m) ? Number(r.haat_input_m) : stationHaat;
+        } else {
+          haat = Number.isFinite(r.haat_computed_m) ? Number(r.haat_computed_m)
+               : Number.isFinite(r.haat_input_m)    ? Number(r.haat_input_m)
+               : Number.isFinite(r.haat_m)          ? Number(r.haat_m)
+               : (azKey != null && haatByAz.has(azKey) ? haatByAz.get(azKey) : null);
+        }
         const erp   = Number.isFinite(r.erp_kw) ? Number(r.erp_kw)
                     : (azKey != null && erpByAz.has(azKey) ? erpByAz.get(azKey)
                     : (Number.isFinite(stationErp) && !pattern ? stationErp : null));
         row = {
           azimuth_deg: az != null  ? az.toFixed(1)   : '—',
-          haat_m:      haatSuppressed
-                         ? 'UNAVAILABLE'
-                         : (haat != null ? haat.toFixed(1) : '—'),
+          haat_m:      haat != null ? haat.toFixed(1) : 'UNAVAILABLE',  // only when no HAAT at all
           erp_kw:      erp != null  ? erp.toFixed(3)  : '—'
         };
       }
@@ -187,8 +203,8 @@ export function buildAppendixSections(exhibit){
         }
         lines.push('');
         lines.push('Fallback posture:');
-        lines.push(`  Contour distances still computed under 47 CFR §73.333 curves using operator HAAT (${s.operator_m ?? '—'} m).`);
-        lines.push('  Per-radial HAAT values suppressed in this table (shown as UNAVAILABLE).');
+        lines.push(`  Contour distances computed under 47 CFR §73.333 curves using operator HAAT (${s.operator_m ?? '—'} m).`);
+        lines.push(`  HAAT column shows operator value uniformly across all azimuths — terrain DEM was not applied to vary it per radial.`);
         if (exhibit.terrain_limited){
           lines.push('  Exhibit marked TERRAIN_LIMITED — per-radial terrain severity scoring and engineering-confidence terrain inputs are unavailable for this run.');
         }

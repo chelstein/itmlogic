@@ -84,13 +84,17 @@ function smallestHaatInText(txt){
 test(`CI gate: rendered exhibit must not emit per-radial HAAT below ${HAAT_FLOOR_M} m`, () => {
   const doc = buildEngineeringReport(kzlzPreFixExhibit(), {});
   const txt = renderEngineeringReportText(doc);
-  // With display suppression active, ALL HAAT cells should be
-  // "UNAVAILABLE" — smallestHaatInText returns Infinity.
+  // Under the always-include-HAAT policy: when display_suppressed
+  // is true, every HAAT cell should fall back to the operator value
+  // (581 m for KZLZ), not the garbage -141..-275 values from the
+  // failed terrain compute.  The floor check below is the gate
+  // regardless of suppression mechanism — no rendered HAAT may be
+  // below -250 m without an explicit override flag.
   const smallest = smallestHaatInText(txt);
   assert.ok(smallest > HAAT_FLOOR_M,
     `Rendered Appendix A contained per-radial HAAT ${smallest} m (below ${HAAT_FLOOR_M} m floor).  ` +
-    `The display suppression in exhibitService.js / appendices.js must replace these with "UNAVAILABLE" when ` +
-    `haat_validation.display_suppressed === true.`);
+    `When haat_validation.display_suppressed === true, appendices.js must fall back to operator HAAT ` +
+    `(haat_input_m / station_inputs.haat_m), not the garbage values in radial_table[i].haat_computed_m.`);
 });
 
 test('CI gate: rendered exhibit must not say "No issues detected" while blockers exist', () => {
