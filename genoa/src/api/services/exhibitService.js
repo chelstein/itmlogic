@@ -551,6 +551,37 @@ export async function computeExhibit(req){
       // step 3c (direct multi-source elevation) is skipped and the
       // exhibit ships flat HAAT under a "OpenTopoData SRTM 30m" banner.
       // Counting first lets step 3c rescue zero-coverage responses.
+      //
+      // ALSO sanity-check the VALUES, not just finite-ness.  ZTR has
+      // been observed returning per-radial HAATs deeply outside the
+      // physical [-200, 4000] m range or wildly inconsistent with the
+      // operator-supplied HAAT (the same tx_amsl_m / haat_m confusion
+      // we already fixed in this service).  KZLZ symptom: operator
+      // HAAT 581 m, ZTR returns values down to -856 m.  When that
+      // happens, REJECT the bundle and fall through to step 3c's
+      // multi-source DEM with the proper resolveTxAmslM() basis.
+      const flat_m = Number(inputs.haat_m);
+      let n_dem = 0, n_flat = 0;
+      const ztrHaats = terrainResp.radials
+        .map(r => Number(r?.haat_m))
+        .filter(Number.isFinite);
+      const ztrMean = ztrHaats.length
+        ? ztrHaats.reduce((a, b) => a + b, 0) / ztrHaats.length
+        : null;
+      const ztrImpl = ztrHaats.filter(h => h < -200 || h > 4000).length;
+      const ztrMeanDelta = (Number.isFinite(ztrMean) && Number.isFinite(flat_m))
+        ? Math.abs(ztrMean - flat_m)
+        : 0;
+      const ztrLooksBroken = ztrImpl > 0 || ztrMeanDelta > 300;
+      if (ztrLooksBroken){
+        warnings.push(W.make('TERRAIN_HAAT_REJECTED',
+          `ZTR terrain-haat response rejected: ${ztrImpl}/${ztrHaats.length} per-radial HAAT outside [-200, 4000] m, ` +
+          `mean ${ztrMean?.toFixed?.(1)} m differs from operator HAAT ${flat_m} m by ${ztrMeanDelta.toFixed(1)} m. ` +
+          `Falling through to multi-source DEM (resolver-backed).`));
+        terrainResp = null;   // skip the candidate build below; step 3c will run
+      }
+    }
+    if (terrainResp?.available && Array.isArray(terrainResp.radials) && terrainResp.radials.length){
       const flat_m = Number(inputs.haat_m);
       let n_dem = 0, n_flat = 0;
       const candidate = terrainResp.radials.map(r => {
