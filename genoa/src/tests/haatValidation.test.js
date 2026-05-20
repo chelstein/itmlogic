@@ -67,9 +67,11 @@ test('missing DEM: NOT_RUN, never fakes a HAAT validation result', () => {
 });
 
 // Case 4 — Inverted subtraction (the KZLZ bug class).  Operator HAAT
-// 581, per-radial HAATs all between -141 and -275.  Validator must
-// catch this and emit a blocker.
-test('inverted-subtraction bug (KZLZ class): INVALID with HAAT_MEAN_INCONSISTENT blocker', () => {
+// 581, per-radial HAATs all between -141 and -275, tx_amsl_resolved
+// shows legacy_fallback (no real terrain basis).  Post-revision the
+// validator catches this earlier with HAAT_SUPPRESSED_NO_TERRAIN_BASIS
+// (the more precise root cause) rather than HAAT_MEAN_INCONSISTENT.
+test('inverted-subtraction bug (KZLZ class): INVALID with HAAT_SUPPRESSED_NO_TERRAIN_BASIS blocker', () => {
   const radials = [-143, -141, -139, -141, -144, -156, -164, -174, -216, -227,
                    -258, -275, -263, -242, -238, -209, -188, -176, -167, -159,
                    -155, -155, -159, -167, -186, -197, -250, -245, -255, -231,
@@ -78,10 +80,10 @@ test('inverted-subtraction bug (KZLZ class): INVALID with HAAT_MEAN_INCONSISTENT
     txAmsl: { value_m: 581, source: 'legacy_fallback' }}));
   assert.equal(r.status, 'INVALID');
   const codes = r.issues.map(i => i.code);
-  assert.ok(codes.includes('HAAT_MEAN_INCONSISTENT'),
-    `must flag mean-vs-operator inconsistency; got ${codes.join(',')}`);
-  assert.ok(r.stats.delta_mean_vs_operator_m < -700,
-    `Δ should be deeply negative, got ${r.stats.delta_mean_vs_operator_m}`);
+  assert.ok(codes.includes('HAAT_SUPPRESSED_NO_TERRAIN_BASIS'),
+    `must flag no-terrain-basis root cause; got ${codes.join(',')}`);
+  assert.equal(r.display_suppressed, true);
+  assert.equal(r.terrain_limited, true);
 });
 
 // Case 5 — Subtle NAD83/WGS84 coordinate mismatch.  Coordinate
@@ -132,18 +134,22 @@ test('negative HAAT in deeper valley: SUSPECT when some radials cross soft floor
   assert.ok(!r.issues.find(i => i.code === 'HAAT_IMPOSSIBLE'));
 });
 
-// Case 7 — Impossible negative HAAT.  Per-radial values below
-// -200 m (the hard floor).  This would imply a transmitter
-// underground or in a 200+ m crater.  Must be blocked.
-test('impossible negative HAAT: INVALID with HAAT_IMPOSSIBLE blocker', () => {
+// Case 7 — Impossible negative HAAT WITH a real terrain basis attached.
+// Per-radial values below -200 m (the hard floor) with terrain_derived
+// basis.  This would imply a transmitter underground or in a 200+ m
+// crater — flagged as HAAT_IMPOSSIBLE blocker.  (When no terrain basis
+// is attached, the validator catches it earlier with the more precise
+// HAAT_SUPPRESSED_NO_TERRAIN_BASIS — see Case 4.)
+test('impossible negative HAAT WITH terrain basis: INVALID with HAAT_IMPOSSIBLE blocker', () => {
   const radials = [-450, -500, -480, -460, -470, -490, -510, -495, -485, -475,
                    -465, -455, -445, -435, -425, -415, -405, -395, -385, -375,
                    -365, -355, -345, -335, -325, -315, -305, -295, -285, -275,
                    -265, -255, -245, -235, -225, -215];
   const r = validateHaat(fmExhibit({ haat_m: 500, perRadial: radials,
-    txAmsl: { value_m: 500, source: 'legacy_fallback' }}));
+    txAmsl: { value_m: 500, source: 'derived', tx_ground_amsl_m: 1000 }}));
   assert.equal(r.status, 'INVALID');
-  assert.ok(r.issues.find(i => i.code === 'HAAT_IMPOSSIBLE'));
+  assert.ok(r.issues.find(i => i.code === 'HAAT_IMPOSSIBLE'),
+    `expected HAAT_IMPOSSIBLE with terrain basis; got ${r.issues.map(i => i.code).join(',')}`);
 });
 
 // Robustness — malformed inputs must not throw.
