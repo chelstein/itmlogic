@@ -78,6 +78,32 @@ const USGS_MAX_CONCURRENT    = 20;
 const OPEN_METEO_BATCH_MAX   = 300;
 const OPENTOPODATA_BATCH_MAX = 100;
 const DEFAULT_TIMEOUT_MS     = 15_000;
+
+// Retry policy.  Each elevation source is wrapped with `withRetry`
+// at the point/chunk level — transient 5xx, socket aborts, and
+// abort-controller timeouts get up to RETRY_ATTEMPTS attempts with
+// exponential backoff before we declare the source dead and fall
+// over to the next one.  This is the "just run the calc reliably"
+// posture: USGS EPQS has ~3-5% transient failure rate, retry
+// alone takes the effective failure rate to single-digit per-mille.
+const RETRY_ATTEMPTS         = 3;
+const RETRY_BASE_DELAY_MS    = 400;
+
+async function withRetry(fn, label, { attempts = RETRY_ATTEMPTS, baseDelayMs = RETRY_BASE_DELAY_MS } = {}){
+  let lastErr;
+  for (let i = 0; i < attempts; i++){
+    try {
+      return await fn();
+    } catch (err){
+      lastErr = err;
+      if (i < attempts - 1){
+        const delay = baseDelayMs * Math.pow(2, i);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw new Error(`${label} failed after ${attempts} attempts: ${lastErr?.message || lastErr}`);
+}
 const CROSS_VALIDATE_TOL_M   = 30;   // 30 m agreement threshold across sources
 
 // ---------------------------------------------------------------------------
@@ -180,6 +206,22 @@ export async function computeHaatMultiSource({
  * @param {string[]} [preferredOrder]  source IDs to try, default all three
  */
 export async function fetchElevationsFallback(pts, timeoutMs = DEFAULT_TIMEOUT_MS, preferredOrder = null){
+  // 1. Cache check.  If every point has a cached elevation, we
+  // return immediately without hitting any external API.  When
+  // some are missing, we live-fetch ALL points (the source clients
+  // don't support sparse fetch), then store back the freshly
+  // resolved values.  Either way, runs of the same exhibit at
+  // the same coords get sub-100ms HAAT instead of waiting on
+  // USGS / Open-Meteo round-trips.
+  let cacheHits = null;
+  try {
+    const { lookupElevationsCache } = await import('./terrainCache.js');
+    cacheHits = await lookupElevationsCache(pts);
+    if (cacheHits.every(v => Number.isFinite(v))){
+      return { source_id: 'cache', elevations: cacheHits };
+    }
+  } catch { /* cache unavailable — fall through to live fetch */ }
+
   const order = preferredOrder || ELEVATION_SOURCES.map(s => s.id);
   const errors = [];
   for (const sourceId of order){
@@ -189,6 +231,12 @@ export async function fetchElevationsFallback(pts, timeoutMs = DEFAULT_TIMEOUT_M
       else if (sourceId === 'open-meteo')        elevs = await fetchElevationsOpenMeteo(pts, timeoutMs);
       else if (sourceId === 'opentopodata-srtm30m') elevs = await fetchElevationsOpenTopoData(pts, timeoutMs);
       else continue;
+      // 3. Write-through.  Store back to cache so the next exhibit
+      // at these coords hits without going off-host.
+      try {
+        const { storeElevationsCache } = await import('./terrainCache.js');
+        storeElevationsCache(pts, elevs, sourceId).catch(() => {}); // fire-and-forget
+      } catch { /* ignore */ }
       return { source_id: sourceId, elevations: elevs };
     } catch (e){
       errors.push(`${sourceId}: ${e.message}`);
@@ -254,7 +302,13 @@ export async function fetchElevationsUsgsEpqs(pts, timeoutMs = DEFAULT_TIMEOUT_M
     await Promise.all(chunk.map(async pt => {
       const idx = pts.indexOf(pt);
       try {
-        elevations[idx] = await _usgsEpqsPoint(pt.lat, pt.lon, timeoutMs);
+        // Retry transient USGS failures (5xx, network blips, abort)
+        // before falling over to the next source.  Three attempts
+        // with 400/800/1600 ms backoff = ~3 s worst case per point.
+        elevations[idx] = await withRetry(
+          () => _usgsEpqsPoint(pt.lat, pt.lon, timeoutMs),
+          `USGS EPQS @ (${pt.lat.toFixed(4)}, ${pt.lon.toFixed(4)})`
+        );
       } catch {
         elevations[idx] = null;
       }
@@ -298,22 +352,22 @@ export async function fetchElevationsOpenMeteo(pts, timeoutMs = DEFAULT_TIMEOUT_
     const lats = chunk.map(p => p.lat.toFixed(6)).join(',');
     const lons = chunk.map(p => p.lon.toFixed(6)).join(',');
     const url  = `https://api.open-meteo.com/v1/elevation?latitude=${lats}&longitude=${lons}`;
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const r = await fetch(url, { signal: ctrl.signal });
-      if (!r.ok) throw new Error(`Open-Meteo HTTP ${r.status}`);
-      const j = await r.json();
-      const vals = j?.elevation;
-      if (!Array.isArray(vals) || vals.length !== chunk.length){
-        throw new Error(`Open-Meteo: expected ${chunk.length} values, got ${vals?.length}`);
-      }
-      for (let i = 0; i < chunk.length; i++){
-        const elev = Number(vals[i]);
-        elevations[offset + i] = (Number.isFinite(elev) && elev > -500 && elev < 9000) ? elev : null;
-      }
-    } finally {
-      clearTimeout(t);
+    const j = await withRetry(async () => {
+      const ctrl = new AbortController();
+      const t    = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) throw new Error(`Open-Meteo HTTP ${r.status}`);
+        return await r.json();
+      } finally { clearTimeout(t); }
+    }, `Open-Meteo ${chunk.length}-pt chunk`);
+    const vals = j?.elevation;
+    if (!Array.isArray(vals) || vals.length !== chunk.length){
+      throw new Error(`Open-Meteo: expected ${chunk.length} values, got ${vals?.length}`);
+    }
+    for (let i = 0; i < chunk.length; i++){
+      const elev = Number(vals[i]);
+      elevations[offset + i] = (Number.isFinite(elev) && elev > -500 && elev < 9000) ? elev : null;
     }
     offset += chunk.length;
   }
@@ -335,25 +389,26 @@ export async function fetchElevationsOpenTopoData(pts, timeoutMs = DEFAULT_TIMEO
   for (const chunk of chunks){
     const locations = chunk.map(p => `${p.lat.toFixed(6)},${p.lon.toFixed(6)}`).join('|');
     const url = `https://api.opentopodata.org/v1/srtm30m?locations=${locations}`;
-    const ctrl = new AbortController();
-    const t    = setTimeout(() => ctrl.abort(), timeoutMs);
-    try {
-      const r = await fetch(url, { signal: ctrl.signal });
-      if (!r.ok) throw new Error(`OpenTopoData HTTP ${r.status}`);
-      const j = await r.json();
-      if (j.status !== 'OK'){
-        throw new Error(`OpenTopoData status: ${j.status} — ${j.error || ''}`);
-      }
-      const results = j?.results;
-      if (!Array.isArray(results) || results.length !== chunk.length){
-        throw new Error(`OpenTopoData: expected ${chunk.length} results, got ${results?.length}`);
-      }
-      for (let i = 0; i < chunk.length; i++){
-        const elev = Number(results[i]?.elevation);
-        elevations[offset + i] = (Number.isFinite(elev) && elev > -500 && elev < 9000) ? elev : null;
-      }
-    } finally {
-      clearTimeout(t);
+    const j = await withRetry(async () => {
+      const ctrl = new AbortController();
+      const t    = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const r = await fetch(url, { signal: ctrl.signal });
+        if (!r.ok) throw new Error(`OpenTopoData HTTP ${r.status}`);
+        const body = await r.json();
+        if (body.status !== 'OK'){
+          throw new Error(`OpenTopoData status: ${body.status} — ${body.error || ''}`);
+        }
+        return body;
+      } finally { clearTimeout(t); }
+    }, `OpenTopoData ${chunk.length}-pt chunk`);
+    const results = j?.results;
+    if (!Array.isArray(results) || results.length !== chunk.length){
+      throw new Error(`OpenTopoData: expected ${chunk.length} results, got ${results?.length}`);
+    }
+    for (let i = 0; i < chunk.length; i++){
+      const elev = Number(results[i]?.elevation);
+      elevations[offset + i] = (Number.isFinite(elev) && elev > -500 && elev < 9000) ? elev : null;
     }
     offset += chunk.length;
   }
