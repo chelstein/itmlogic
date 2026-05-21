@@ -33,7 +33,6 @@ import { makeFccContoursClient } from '../../evidence/fccContoursClient.js';
 import { makeNecClient }         from '../../evidence/nec/client.js';
 import { makeFccLmsClient }      from '../../evidence/fccLmsClient.js';
 import { makeAsrClient }         from '../../evidence/asrClient.js';
-import { makeLosClient }         from '../../evidence/losClient.js';
 import { makeFaaOeClient }       from '../../evidence/faaOeClient.js';
 import { makeAirportsClient }    from '../../evidence/airportsClient.js';
 import { makeFortranFccClient }  from '../../evidence/fortranFccClient.js';
@@ -76,12 +75,8 @@ export const sidecars = Object.freeze({
   // DEM-provisioning state as evidence provenance.
   splat:       makeSplatClient   ({ baseUrl: process.env.SPLAT_SIDECAR_URL    }),
   identity:    makeIdentityClient({ baseUrl: process.env.IDENTITY_SIDECAR_URL }),
-  measurement: process.env.MEASUREMENT_SIDECAR_URL ? { baseUrl: process.env.MEASUREMENT_SIDECAR_URL } : null,
-  // Map sidecar (chelstein/itmlogic — genoa/src/sidecars/map).  Headless
-  // Chromium that renders the §73.333 contour-map exhibit page.  Fail-soft:
-  // when unset, the engineering-statement PDF emits the deferred-to-engineer
-  // placeholder for the map page instead of failing.
-  map:         process.env.MAP_SIDECAR_URL         ? { baseUrl: process.env.MAP_SIDECAR_URL         } : null,
+  // Map sidecar is consumed via fetchMapRender() in sidecars/mapClient.js,
+  // not through this registry — no sidecars.map property needed.
   // Facility lookup is not a sidecar in the propagation sense — it's a
   // read-only adapter into chelstein/zerotrustradio (and optionally the
   // n8n station/analyze webhook).  Lives here so the same /readyz block
@@ -114,20 +109,12 @@ export const sidecars = Object.freeze({
   // public Socrata dataset; no auth required.  Disable with
   // ASR_SOCRATA_DISABLE=1.
   asr:         makeAsrClient(),
-  // ZTR LOS profile client — point-to-point line-of-sight + Fresnel
-  // clearance via ZTR's /api/los/profile.  Same upstream as Facility,
-  // separate row so the panel surfaces ZTR's LOS capability
-  // distinctly from the broadcast-stations endpoint.
-  los:         makeLosClient(),
   // FAA OE/AAA client — Form 7460-1 obstruction-evaluation
   // determinations.  Cross-references the asr.faa_study_number to
   // pull the FAA's verbatim determination + lighting/marking
-  // conditions for the Tower Study exhibit.  Default upstream is
-  // oeaaa.faa.gov (host-reachable check only); set FAA_OE_SIDECAR_URL
-  // for an operator proxy that returns clean JSON, or
-  // FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape (unimplemented
-  // in this build).
-  faaOe:       makeFaaOeClient(),
+  // FAA OE/AAA support: makeFaaOeClient() is imported on-demand by
+  // exhibitService.js (see checkFaaAgainstAsr).  Registry row for the
+  // /api/sidecars/probe panel is kept below; no sidecars.faaOe needed.
   airports:    makeAirportsClient(),
   // FCC FORTRAN reference engine (chelstein/fcc-fortran-engine — a
   // microservice that links and calls the FCC/REC TVFMFS_METRIC routine
@@ -313,14 +300,6 @@ export const SIDECAR_REGISTRY = Object.freeze([
     filing_effect: 'none',
     required_for: ['FM','LPFM','FX','TV','AM'],
     current_url: process.env.MAP_SIDECAR_URL || null
-  },
-  {
-    name: 'measurement',
-    url_env_var: 'MEASUREMENT_SIDECAR_URL',
-    role: 'observability',
-    filing_effect: 'none',
-    required_for: [],
-    current_url: process.env.MEASUREMENT_SIDECAR_URL || null
   },
   {
     name: 'population',
