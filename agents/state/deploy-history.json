@@ -1,0 +1,6 @@
+{
+  "_comment": "Append-only deploy history.  safe-deploy-digitalocean.sh appends after a successful post-deploy smoke; rollback-digitalocean.sh appends on rollback.  last_good_sha is the SHA we'd roll back TO if the current deploy fails its smoke test.",
+  "last_good_sha":    null,
+  "last_good_deploy_id": null,
+  "deploys": []
+}
