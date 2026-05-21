@@ -2487,10 +2487,6 @@ export async function computeExhibit(req){
   // canonical key.  Both keys carry the same data.
   exhibit.validation_context = exhibit.validation;
 
-  if (process.env.TERRAIN_SIDECAR_URL && !sidecars.terrain){
-    warnings.push(W.make('SIDECAR_UNAVAILABLE', 'TERRAIN_SIDECAR_URL configured but client construction failed.'));
-  }
-
   // ---- 7b. FCC parity report (default-on with 3-tier fallback) ----
   //   Tier 1 — Live geo.fcc.gov/api/contours/distance.json per radial × contour.
   //   Tier 2 — Cached parity result for the same engine_signature + dataset_sha

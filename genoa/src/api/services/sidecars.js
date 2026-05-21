@@ -23,7 +23,6 @@
 // recorded as evidence (e.g., evidence.terrain_ztr_attempted) so the
 // exhibit's provenance shows exactly which fallback won.
 
-import { makeTerrainClient }     from '../../evidence/terrain/client.js';
 import { makeSplatClient }       from '../../evidence/terrain/splatClient.js';
 import { makeIdentityClient }    from '../../evidence/identity/index.js';
 import { makeFacilityClient }    from './facilityClient.js';
@@ -72,7 +71,6 @@ function buildPopulationClient(){
 }
 
 export const sidecars = Object.freeze({
-  terrain:     makeTerrainClient ({ baseUrl: process.env.TERRAIN_SIDECAR_URL  }),
   // SPLAT sidecar (chelstein/splat — Genoa Flask sidecar).  When set,
   // Genoa probes its capability and surfaces SPLAT availability /
   // DEM-provisioning state as evidence provenance.
@@ -291,14 +289,6 @@ export const SIDECAR_REGISTRY = Object.freeze([
     filing_effect: 'none',
     required_for: ['AM','FM','LPFM','FX','TV'],
     current_url: process.env.GEO_RF_EVIDENCE_SIDECAR_URL || null
-  },
-  {
-    name: 'terrain',
-    url_env_var: 'TERRAIN_SIDECAR_URL',
-    role: 'reference_engine',
-    filing_effect: 'authoritative',
-    required_for: ['FM','LPFM','FX','TV'],
-    current_url: process.env.TERRAIN_SIDECAR_URL || null
   },
   {
     name: 'splat',
