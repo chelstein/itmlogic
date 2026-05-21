@@ -667,6 +667,15 @@ function renderImage(pdf, s){
        .text(s.caption, MARGIN, pdf.y, { width: boxW, align: 'left' });
     pdf.fillColor('black');
   }
+  // Reserve the rest of the page for this figure so the next section
+  // (typically visual-summary or another full-bleed block) starts on
+  // a fresh page.  Without this, the visual-summary's compass-wheel
+  // composition collided into the contour-map figure's
+  // legend/provenance band, producing a visible overlap.  The
+  // section loop's maybeBreak() reads pdf.y against the page bottom;
+  // pushing pdf.y to the bottom guarantees a clean page break before
+  // the next section renders.
+  pdf.y = pdf.page.height - MARGIN - FOOTER_AREA;
 }
 
 // ────────────────────────────────────────────────────────────────────
