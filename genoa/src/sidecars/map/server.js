@@ -103,6 +103,14 @@ app.get('/render-template', (_req, res) => {
   res.sendFile(path.join(__dirname, 'render.html'));
 });
 
+// No-op favicon handler.  Headless Chromium auto-fetches /favicon.ico
+// when it loads the render template; without a handler it 404s and
+// surfaces as `[render-page] error: Failed to load resource: 404` in
+// the sidecar log.  The render itself isn't affected — Chromium logs
+// and moves on — but the line muddies the log signal when something
+// real does go wrong.
+app.get('/favicon.ico', (_req, res) => res.status(204).end());
+
 app.get('/health', (_req, res) => {
   res.json({
     ok:           browser?.connected !== false,
