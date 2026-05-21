@@ -22,10 +22,10 @@
 // compliance, am_*_compliance, and filing_readiness — no schema change.
 
 import { classifyAmDaMode } from '../../../engine/am/daModalClassification.js';
+import { resolveCommunity, resolveClass } from './_identity.js';
 
 export function buildExecutiveSummarySection(exhibit){
   const s   = exhibit?.station_inputs        || {};
-  const fm  = exhibit?.facility_metadata     || {};
   const v   = exhibit?.validation            || {};
   const rc  = exhibit?.regulatory_compliance || {};
   const cc  = exhibit?.engineering_conclusion || {};
@@ -34,21 +34,13 @@ export function buildExecutiveSummarySection(exhibit){
   const isAm      = svc === 'AM' || svc === 'AX';
   const call      = s.call || '— (call sign not stated)';
   const facId     = s.facility_id || '— (facility ID not stated)';
-  // Community lookup must match cover.js — many keys carry it across
-  // operator inputs, facility metadata, and the licensing block.  KAZM
-  // PDF (engine 0e9ce1b) surfaced "from — (community-of-license not
-  // stated)" because the narrow s.community_of_license / fm.community_
-  // of_license lookup missed the actual key path (.community).
-  const lic       = exhibit?.licensing || {};
-  const community = s.community_of_license || s.community || s.city
-                 || s.licensing_community
-                 || lic.community_of_license || lic.community || lic.city
-                 || fm.community_of_license  || fm.community  || fm.city
-                 || null;
+  // Identity fields share resolveCommunity / resolveClass with cover.js
+  // so the two sections never disagree (KAZM regression class).
+  const community = resolveCommunity(exhibit);
   const communityText = community || '— (community-of-license not stated)';
   const freq      = Number.isFinite(Number(s.frequency)) ? Number(s.frequency) : null;
   const freqUnit  = s.frequency_unit || (isAm ? 'kHz' : 'MHz');
-  const fccClass  = s.fcc_class || '—';
+  const fccClass  = resolveClass(exhibit) || '—';
   const tpoOrErp  = Number.isFinite(Number(s.erp_kw)) ? Number(s.erp_kw) : null;
   const tpoLabel  = isAm ? 'TPO' : 'ERP';
   const intent    = s.study_intent || '—';

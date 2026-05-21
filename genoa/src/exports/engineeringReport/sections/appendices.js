@@ -589,14 +589,27 @@ export function buildAppendixSections(exhibit){
   // contract rests on (engine fingerprint + curve dataset hash + inputs).
   // Surface those directly so the appendix is honest about what makes
   // the exhibit reproducible — same engine + same inputs → same numbers.
+  //
+  // The HMAC-signed replay token also lives in Build Attestation
+  // (sections/buildAttestation.js); it is mirrored here because the
+  // evidence-reporting checklist item 7 asks for the replay token on
+  // Appendix E specifically.
   const replay = exhibit.replay_bundle || prov.replay_bundle || null;
   const inputsHash = sig.fingerprint_sha256
     ? `${String(sig.fingerprint_sha256).slice(0, 12)}…`
     : null;
+  const replayToken = exhibit.replay_token;
   const eRows = [
     ['Determinism contract',      'same engine fingerprint + same curve dataset hash + same station_inputs → same numbers'],
     ['Engine fingerprint',        sig.fingerprint_sha256 || '—'],
     ['Curve dataset hash',        cd.meta_sha256 || '—'],
+    ['Replay token (HMAC-signed)', replayToken
+                                      ? `${String(replayToken).slice(0, 32)}…`
+                                      : '(not attached)'],
+    ['Replay token verifier',     'POST /api/exhibits/verify-replay-token'],
+    ['Replay digest — exhibit',   exhibit.replay_digest?.exhibit_sha256  || '—'],
+    ['Replay digest — inputs',    exhibit.replay_digest?.inputs_sha256   || '—'],
+    ['Replay digest — evidence',  exhibit.replay_digest?.evidence_sha256 || '—'],
     ['Replay bundle (offline)',   replay ? 'attached' : 'not attached'],
     ['Bundle hash',               prov.replay_bundle_hash || (replay && replay.hash) || '—'],
     ['Reproduction',              inputsHash

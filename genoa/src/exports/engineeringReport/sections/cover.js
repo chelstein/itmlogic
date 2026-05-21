@@ -2,36 +2,23 @@
 //
 // Conservative consulting-grade phrasing.  No marketing language.
 
+import { resolveCommunity, resolveClass } from './_identity.js';
+
 export function buildCoverSection(exhibit){
   const s = exhibit.station_inputs || {};
   const mv = exhibit.method_versions || {};
   const sig = exhibit.engine_signature || {};
-  const fm = exhibit.facility_metadata || {};
-  const lic = exhibit.evidence?.fcc_lms?.license || {};
   const fmt = (v, dash = '—') => (v === null || v === undefined || v === '') ? dash : String(v);
   const channel = s.service === 'AM'
     ? null
     : (Number.isFinite(Number(s.frequency)) ? Math.round((Number(s.frequency) - 87.9) / 0.2 + 200) : null);
-  // Multi-source fallback for cover-page identity rows.  Operator
-  // typically types facility_id + call + frequency + coords; the rest
-  // is enriched downstream from FCC FMQ / FCC LMS / facility_metadata.
-  // Reach into every shape these upstreams have used across vintages
-  // (snake_case, camelCase, raw row vs license sub-object) so a
-  // complete record displays even when station_inputs is sparse.
-  const fmRaw = exhibit.facility_metadata?.raw || {};
-  const lmsRaw = exhibit.evidence?.fcc_lms?.raw || {};
-  const community = s.community || s.city || s.licensing_community
-                 || s.community_of_license
-                 || lic.community || lic.community_of_license || lic.city
-                 || lic.licensing_community
-                 || fm.community || fm.community_of_license || fm.city
-                 || fmRaw.community || fmRaw.community_of_license || fmRaw.city || fmRaw.licensing_community
-                 || lmsRaw.community || lmsRaw.community_of_license || lmsRaw.city;
-  const fccClass  = s.fcc_class || s.class || s.station_class
-                 || lic.fcc_class || lic.station_class || lic.class
-                 || fm.fcc_class || fm.station_class || fm.class
-                 || fmRaw.fcc_class || fmRaw.station_class || fmRaw.class
-                 || lmsRaw.fcc_class || lmsRaw.station_class || lmsRaw.class;
+  // Identity fields (community-of-license, station class) walk a
+  // multi-source fallback chain — operator-typed station_inputs may be
+  // sparse and the canonical values often live in evidence.fcc_lms.*
+  // or facility_metadata.raw.  Shared with executiveSummary.js so the
+  // two sections never disagree (KAZM regression class).
+  const community = resolveCommunity(exhibit);
+  const fccClass  = resolveClass(exhibit);
   return {
     id:      'cover',
     type:    'cover',
