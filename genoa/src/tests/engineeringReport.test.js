@@ -70,9 +70,21 @@ test('validation verdict surfaces FALLBACK status with tier label when fallback_
   assert.match(v.components[1].name, /tier 3 fallback/);
   assert.equal(v.components[2].status, 'FALLBACK');
   assert.match(v.components[2].name, /tier 3 fallback/);
-  // FALLBACK counts as a deterministic pass for the verdict contract.
-  assert.equal(v.status, 'VERIFIED');
-  assert.equal(v.confidence, 'HIGH');
+  // Tier-3 fallback on the external surface is code-identity evidence,
+  // NOT a live re-check.  Legacy headline must cap at PARTIAL / MEDIUM
+  // so it agrees with categories.external = TIER-3 and filing = REVIEW.
+  assert.notStrictEqual(v.status, 'VERIFIED', 'tier-3 fallback must not be VERIFIED');
+  assert.notStrictEqual(v.confidence, 'HIGH',  'tier-3 fallback must not be HIGH');
+  assert.equal(v.status, 'PARTIAL');
+  assert.equal(v.confidence, 'MEDIUM');
+  // Interpretation must drop the "fully verified against the FCC engine"
+  // sentence — tier-3 SHA identity does not warrant that claim.
+  assert.ok(!/fully verified against the FCC engine/i.test(v.interpretation || ''),
+    'tier-3 fallback interpretation must not claim "fully verified against the FCC engine"');
+  // The three-category surface must still report tier-3 explicitly and
+  // route filing readiness through REVIEW.
+  assert.equal(v.categories.external.status, 'TIER-3');
+  assert.equal(v.categories.filing.status,   'REVIEW');
 });
 
 test('validation verdict is VERIFIED/HIGH when curve, cross-check, and live parity all pass', async () => {
