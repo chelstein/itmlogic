@@ -1,0 +1,93 @@
+{
+  "agent": "program-director",
+  "timestamp_utc": "2026-05-21T18:51:02Z",
+  "head_sha": "6a25ce7de82bbe5badbc6d6acb33e0412c62ded1",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Deploy BLOCKED at HEAD 6a25ce7 — readiness 56.75/100 (< 70). F-001 (RF-math) and B-1/B-2/B-3 (filing-language) unresolved.",
+  "deploy_recommendation": "BLOCK",
+  "readiness_score": 56.75,
+  "findings": [
+    {
+      "finding_id": "PD-001",
+      "title": "Deploy of HEAD 6a25ce7 BLOCKED — F-001 + B-1/B-2/B-3 unresolved, readiness 56.75/100",
+      "severity": "BLOCKER",
+      "confidence": 0.97,
+      "category": "governance",
+      "affected_files": [
+        "genoa/src/engine/regulatory/section_73_215.js",
+        "genoa/src/exports/engineeringReport/forms/form301am.js",
+        "genoa/src/regulatory/section_73_187.js",
+        "genoa/src/exports/engineeringReport/interferenceStudy.js",
+        "genoa/src/exports/engineeringReport/conclusion.js",
+        "genoa/src/exports/engineeringReport/warnings.js"
+      ],
+      "regulatory_scope": [
+        "47 CFR §73.215",
+        "47 CFR §73.187",
+        "47 CFR §73.99",
+        "47 CFR §73.40"
+      ],
+      "recommended_fix": "Land the §73.215 polygon-overlap fix (F-001) and the §73.187/§73.99/§73.40 citation cluster (B-1/B-2/B-3) as two rollup PRs. F-001 needs three-way approval (principal-rf-engineer + fcc-auditor + program-director). The AM citation cluster lives in exports/, not engine/{fm,am,haat,curves,coverage}/, so it does not trip the engine triplet gate by the letter of AGENTS.md — but I am ratcheting it up to three-way (principal-rf-engineer + fcc-attorney + program-director) because the cites ship into filed exhibit prose. Re-score after both PRs land.",
+      "tests_required": [
+        "genoa/src/tests/section73215Showing.test.js (extend with asymmetric-class repro)",
+        "genoa/src/tests/fccGoldenSuite.test.js",
+        "genoa/src/tests/curveReferenceValidation.test.js"
+      ],
+      "deployment_risk": "high",
+      "human_review_required": true,
+      "reproducibility_notes": "Synthesis of principal-rf-engineer F-001 + fcc-attorney B-1/B-2/B-3 + fcc-auditor conditional sign-off + devsecops MED-1/INFO-1/INFO-2. node --test is harness-gated this run; the BLOCKER is regulatory-correctness, not test-failure-driven."
+    },
+    {
+      "finding_id": "META-001",
+      "title": "agent → PMP JSON contract broken; pipeline cannot file issues or dedupe",
+      "severity": "BLOCKER",
+      "confidence": 1.0,
+      "category": "governance",
+      "affected_files": [
+        "agents/scripts/create-issues-from-findings.sh",
+        "agents/scripts/run-agent.sh",
+        "agents/scripts/validate-findings-json.js",
+        "agents/principal-rf-engineer/last-report.md",
+        "agents/fcc-attorney/last-report.md",
+        "agents/fcc-auditor/last-report.md",
+        "agents/compliance-officer/last-report.md",
+        "agents/senior-station-engineer/last-report.md",
+        "agents/gis-terrain-scientist/last-report.md",
+        "agents/devsecops-agent/last-report.md",
+        "agents/evidence-reporting-agent/last-report.md",
+        "agents/technical-pmp/last-report.md",
+        "agents/program-director/last-report.md"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Adopt the canonical last-findings.json contract from AGENTS.md §\"Finding format\" and route the issue-filing pipeline through it. Every agent now writes BOTH agents/<agent>/last-findings.json (machine) AND agents/<agent>/last-report.md (human). create-issues-from-findings.sh prefers the canonical JSON, falls back to the first ```json fenced block in last-report.md, validates with agents/scripts/validate-findings-json.js, and never crashes the whole run on a single bad input.",
+      "tests_required": [
+        "agents/scripts/tests/fixtures/valid/last-findings.json (validator round-trip)",
+        "agents/scripts/tests/fixtures/malformed/last-report.md (fallback path)",
+        "bash agents/scripts/create-issues-from-findings.sh --dry-run (end-to-end smoke)"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": true,
+      "reproducibility_notes": "Before this fix: the technical-pmp pipeline logged '[create-issues] <agent>: malformed JSON, skipping' for every agent because last-report.md files were narrative markdown. After this fix: `bash agents/scripts/create-issues-from-findings.sh --dry-run` cleanly walks each agent, prefers last-findings.json, and validates before parsing."
+    },
+    {
+      "finding_id": "PD-002",
+      "title": "Rollup PR plan — 33 findings → 3 PRs",
+      "severity": "INFO",
+      "confidence": 0.9,
+      "category": "governance",
+      "affected_files": [
+        "genoa/src/engine/regulatory/section_73_215.js",
+        "genoa/src/exports/engineeringReport/forms/form301am.js",
+        "genoa/src/exports/engineeringReport/sections/facilityParameters.js",
+        "genoa/src/exports/engineeringReport/sections/regulatoryContext.js",
+        "genoa/src/exports/engineeringReport/renderPdf.js"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "PR-A '§73.215 regulatory-correctness' = F-001 BLOCKER + F-002 constants WARNING bundled (F-002 sets the threshold F-001 consumes). PR-B 'form301am citation hygiene' = B-1 + B-2 + B-3 BLOCKERs + 5 cite-review WARNINGs + executiveSummary 'compliant' soften (single attorney-driven sweep). PR-C 'renderer surface gaps' = compliance-officer 001/002/003 + evidence-reporting FIG-NUM-1 + senior-station-engineer F-1/F-5 + gis-terrain-scientist agent.md path fix + devsecops MED-1 rollback comments. PR-C is cosmetic + agent-doc; no three-way needed. PR-A and PR-B do.",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Plan-only; no code change. Three PRs map 1:1 to the natural file-boundary clusters in technical-pmp's rollup table."
+    }
+  ]
+}
