@@ -701,8 +701,9 @@ function renderChartHeader(pdf, s){
     pdf.strokeColor(AMBER).lineWidth(0.6)
        .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
     pdf.y = ruleY + RULE_GAP;
+    const figurePrefix = s.figure_number ? `FIGURE ${s.figure_number} — ` : '';
     pdf.font(BOLD_FONT).fontSize(HEADING_SIZE).fillColor(TEAL_DARK)
-       .text(s.heading.toUpperCase(), MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
+       .text(`${figurePrefix}${s.heading.toUpperCase()}`, MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
     pdf.fillColor('black').moveDown(0.4);
   }
 }

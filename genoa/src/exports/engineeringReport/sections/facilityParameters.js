@@ -94,6 +94,25 @@ export function buildFacilityParametersSection(exhibit){
          : (s.pattern_mode === 'DA' ? 'DA (directional, per pattern_table)' : 'NDA (non-directional)')]
     : ['Antenna pattern', s.pattern_mode === 'DA' ? 'Directional (per pattern_table)' : 'Non-directional'];
 
+  // License + public-file rows from the fcc_lms enrichment (per
+  // compliance-officer F-003 / F-004).  Both surfaces are populated by
+  // genoa/src/evidence/fccLmsClient.js and would otherwise stay hidden
+  // from the rendered exhibit even when the upstream record was
+  // fetched cleanly.  Either row is omitted when its value is absent.
+  const lic     = exhibit.evidence?.fcc_lms?.license || {};
+  const pubFile = exhibit.evidence?.fcc_lms?.public_file || {};
+  const licExp  = lic.license_expiration_date || null;
+  const expSuffix = lic.expiring_soon ? '  (expiring soon)'
+                  : lic.expired       ? '  (EXPIRED — verify status)'
+                  : '';
+  const licenseExpRow = licExp
+    ? ['License expiration (§73.1020)', `${licExp}${expSuffix}`]
+    : null;
+  const publicFileUrl = pubFile.folder_url || null;
+  const publicFileRow = publicFileUrl
+    ? ['Public inspection file (§73.3526 / §73.3527)', publicFileUrl]
+    : null;
+
   return {
     id:      'parameters',
     type:    'kv',
@@ -108,6 +127,8 @@ export function buildFacilityParametersSection(exhibit){
       patternRow,
       ['Radial resolution',   fmt(s.radial_step_deg || 10, '° step')],
       terrainRow,
+      licenseExpRow,
+      publicFileRow,
       ['Facility source',     exhibit.facility_metadata?.source
                               || (exhibit.station_inputs?.facility_id ? 'operator-supplied facility_id' : 'inputs only')]
     ].filter(Boolean)

@@ -29,7 +29,6 @@ export function buildMapPackageSection(exhibit, options = {}){
     id:      'map-package',
     type:    'image',
     heading: 'Contour Map',
-    figure_number: 1,
     caption: 'Service / interfering contours per 47 CFR §73.333.  Transmitter site shown as filled circle; NAD83 datum; scale bar and north arrow at lower-right.  Composed by Genoa map sidecar (Chromium-rendered Leaflet, OSM/CARTO base, sidecar SHA see Build Attestation).',
     image_buffer: buf,
     image_format: 'png'

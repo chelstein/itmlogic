@@ -13,6 +13,9 @@ import { buildContourResultsSection }     from './sections/contourResults.js';
 import { buildSpacingAnalysisSection }    from './sections/spacingAnalysis.js';
 import { buildContourProtectionSection }  from './sections/contourProtection.js';
 import { buildValidationVerdictSection }  from './sections/validationVerdict.js';
+import { buildRfExposureSection }         from './sections/rfExposure.js';
+import { buildTowerStudySection }         from './sections/towerStudy.js';
+import { buildBuildAttestationSection }   from './sections/buildAttestation.js';
 import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
 import { buildEngineerDeclarationSection } from './sections/engineerDeclaration.js';
@@ -114,7 +117,27 @@ export function buildEngineeringReport(exhibit, options){
   push(buildSpacingAnalysisSection(exhibit, opt));
   push(buildContourProtectionSection(exhibit, opt));
   push(buildValidationVerdictSection(exhibit, opt));
+  // RF Exposure (47 CFR §1.1307 / §1.1310 / OET Bulletin 65) — the
+  // categorical-evaluation exhibit FCC requires for transmitters above
+  // 1 kW ERP.  Self-deferring when exhibit.oet65 is absent (renders a
+  // "deferred to engineer of record" note instead of silently dropping
+  // the section).  Slotted after the regulatory verdict and before the
+  // engineering conclusion so a reviewer sees the §73 contour analysis
+  // followed by the §1.1310 exposure check, then the disposition.
+  push(buildRfExposureSection(exhibit, opt));
+  // Tower Study (47 CFR §17.4 + FAA OE/AAA + §17.21/§17.23) — the H&D-
+  // style structural exhibit consolidating ASR registration, FAA
+  // 7460-2 determination, and rules-derived marking/lighting
+  // recommendation.  Self-deferring when upstream evidence is absent.
+  push(buildTowerStudySection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
+  // Build attestation — engine SHA + fingerprint + HMAC signature so a
+  // tampered build cannot pass through unnoticed and a PE-reviewed
+  // exhibit is reproducible from the inputs + the SHA at attestation
+  // time.  Renders only when exhibit.build_attestation is populated;
+  // null otherwise.  Slotted immediately before the certification page
+  // per the section's own header doc.
+  push(buildBuildAttestationSection(exhibit, opt));
   push(buildCertificationSection(exhibit, opt));
   for (const ap of buildAppendixSections(exhibit, opt)) push(ap);
   // Vector charts — rendered pdfkit-native (no PNG, no sidecar) from
@@ -132,6 +155,26 @@ export function buildEngineeringReport(exhibit, options){
   push(buildHaatPolarChartSection(exhibit));       // FM/FX/LPFM/TV: per-radial HAAT polar (terrain advantage)
   push(buildCanopyRosePolarSection(exhibit));      // ALL: 12-az tree canopy rose (env clutter, advisory)
   push(buildNearbyStationsChartSection(exhibit));  // ALL: protected stations bearing × distance scatter
+
+  // Sequential figure numbering across all figure-eligible sections.
+  // Figure-eligible types are the ones renderPdf.js renders with a
+  // chart/image header that supports the `FIGURE N — ` prefix:
+  // polar-chart, scatter-chart, polygon-overlay, image, visual-summary.
+  // Stamping here (after the section list is composed) avoids each
+  // section-builder needing to know its position in the final document,
+  // which was the root cause of EVR-001 — only mapPackage.js carried
+  // a hard-coded figure_number=1 and every other figure rendered
+  // without a number.
+  const FIGURE_TYPES = new Set([
+    'polar-chart', 'scatter-chart', 'polygon-overlay', 'image', 'visual-summary'
+  ]);
+  let figureCounter = 0;
+  for (const sec of sections){
+    if (sec && FIGURE_TYPES.has(sec.type) && sec.figure_number == null){
+      figureCounter += 1;
+      sec.figure_number = figureCounter;
+    }
+  }
 
   const s   = exhibit.station_inputs || {};
   const mv  = exhibit.method_versions || {};
