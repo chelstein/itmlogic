@@ -100,14 +100,17 @@ echo "[run-agent] context prepared at ${CONTEXT_FILE}"
 # needs to be able to Write/Edit agents/<agent>/last-findings.json +
 # last-report.md without an interactive permission prompt — otherwise
 # every cycle prints inline JSON in the markdown narrative and the
-# canonical JSON on disk goes stale.  AGENT_RUNNER=claude-cli passes
-# --dangerously-skip-permissions to the SUBORDINATE invocation so it
-# can persist its outputs.  Scope: one Claude CLI session per agent,
-# bounded by the agent's read_paths/write_paths in agent.md.  The
-# parent harness session remains permission-gated.
+# canonical JSON on disk goes stale.
+#
+# Mechanism: `--permission-mode acceptEdits` auto-accepts Edit/Write
+# tool calls within the subordinate session.  Scoped to one Claude CLI
+# session per agent, bounded by the agent's read_paths/write_paths in
+# agent.md.  The parent harness session remains permission-gated.
+# `--dangerously-skip-permissions` is the heavier alternative but it
+# is gated against root execution and we run the audit as root.
 if [[ "${AGENT_RUNNER:-}" == "claude-cli" ]]; then
-  echo "[run-agent] invoking claude CLI (subordinate session, permissions auto-approved within agent scope)…"
-  (cd "${REPO_ROOT}" && cat "${CONTEXT_FILE}" | claude --print --dangerously-skip-permissions > "${AGENT_DIR}/last-report.md" 2>&1)
+  echo "[run-agent] invoking claude CLI (subordinate session, permission-mode=acceptEdits)…"
+  (cd "${REPO_ROOT}" && cat "${CONTEXT_FILE}" | claude --print --permission-mode acceptEdits > "${AGENT_DIR}/last-report.md" 2>&1)
 fi
 
 # ---------------------------------------------------------------------------
