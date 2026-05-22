@@ -29,28 +29,66 @@ Without all three, `safe-deploy-digitalocean.sh` refuses to push.
 
 ## Finding format
 
-Every agent writes findings to its `last-report.md` in this exact JSON block (the runner parses it):
+Every agent emits TWO artifacts per run:
 
-````markdown
-## Findings (JSON)
+1. `agents/<agent>/last-report.md` — narrative markdown for humans.
+2. `agents/<agent>/last-findings.json` — strict machine-readable JSON, the **source of truth** for issue filing and dedup. Markdown is presentation only.
+
+`last-findings.json` MUST conform to this canonical schema:
+
 ```json
-[
-  {
-    "title":                 "short summary, becomes the GitHub issue title",
-    "severity":              "BLOCKER | WARNING | INFO",
-    "confidence":            0.0,
-    "affected_files":        ["path/to/file.js"],
-    "recommended_fix":       "what to do",
-    "tests_required":        ["test path or test name"],
-    "deployment_risk":       "low | medium | high",
-    "human_review_required": true,
-    "reproducibility_notes": "how to reproduce the finding locally"
-  }
-]
+{
+  "agent":               "principal-rf-engineer",
+  "timestamp_utc":       "2026-05-21T18:51:02Z",
+  "head_sha":            "6a25ce7de82bbe5badbc6d6acb33e0412c62ded1",
+  "branch":              "genoa-audit-remediation-phase2",
+  "summary":             "one-line headline for the run",
+  "deploy_recommendation": "APPROVE | BLOCK | WARN | NO_OP",
+  "readiness_score":      null,
+  "findings": [
+    {
+      "finding_id":            "F-001",
+      "title":                 "short summary, becomes the GitHub issue title",
+      "severity":              "BLOCKER | HIGH | MEDIUM | LOW | WARNING | INFO | SOFT",
+      "confidence":            0.0,
+      "category":              "rf-math | regulatory-citation | renderer | devsec | gis | docs | governance",
+      "affected_files":        ["path/to/file.js"],
+      "regulatory_scope":      ["47 CFR §73.215"],
+      "recommended_fix":       "what to do",
+      "tests_required":        ["test path or test name"],
+      "deployment_risk":       "low | medium | high",
+      "human_review_required": true,
+      "reproducibility_notes": "how to reproduce the finding locally"
+    }
+  ]
+}
 ```
-````
 
-`technical-pmp` dedupes findings against `agents/state/findings-dedup.json` (key = `sha256(severity + sort(affected_files) + recommended_fix_title)`). Findings older than 30 days drop out of the dedup; new occurrences re-file.
+Rules:
+
+- `agent`, `timestamp_utc`, `head_sha`, `branch`, `summary`, `deploy_recommendation`, and `findings` are **required**.
+- `findings` MUST be an array (use `[]` for a clean run).
+- `severity` MUST be one of the seven enum values above.
+- `deploy_recommendation` MUST be one of `APPROVE`, `BLOCK`, `WARN`, `NO_OP`.
+- `readiness_score` is a number `0-100` or `null` (only `program-director` sets it).
+- Validate before commit: `node agents/scripts/validate-findings-json.js agents/<agent>/last-findings.json`.
+
+`last-report.md` MAY embed the same JSON in a fenced ` ```json ` block as a fallback for legacy parsing — but only ONE such block per file, and it MUST match the canonical schema. The pipeline prefers `last-findings.json`; the markdown block is a fallback, not a primary path.
+
+`create-issues-from-findings.sh` dedupes against `agents/state/findings-dedup.json`. The dedup key is:
+
+```
+sha256(agent + "|" + finding_id + "|" + title + "|" + sort(affected_files))
+```
+
+Findings older than 30 days drop out of the dedup; new occurrences re-file.
+
+### Out-of-band artifacts
+
+`program-director` MUST NOT pack multiple JSON blocks into `last-report.md`. Side-channel state lives at:
+
+- `agents/state/deploy-approvals.json` — append-only deploy decisions (managed by `program-director`).
+- `agents/reports/audit/<agent>-<YYYY-MM-DD>.md` — daily audit summaries.
 
 ## Deploy modes
 

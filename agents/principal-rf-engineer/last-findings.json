@@ -1,0 +1,78 @@
+{
+  "agent": "principal-rf-engineer",
+  "timestamp_utc": "2026-05-22T13:10:00Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Four findings, no BLOCKERs at HEAD 28f7942. PRF-001 LOW (validationVerdict.js:663 regex never matches producer's actual detail strings — absent-record cases get FAIL/NON_COMPLIANT instead of INCOMPLETE/ENGINEERING_REVIEW). PRF-002 LOW (engine/haat/validate.js:144 flat-fallback suppression incorrectly gated on operatorHaat>0). PRF-003 INFO (verifies commit 6a25ce7's tier-3 fallback cap at lines 510-521 correctly downgrades VERIFIED→PARTIAL). PRF-004 WARNING (golden suites did not re-execute this cycle — harness-gated). Deploy recommendation: WARN until tests green-light at head 28f7942.",
+  "deploy_recommendation": "WARN",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "PRF-001",
+      "title": "validationVerdict.js:663 regex /no [a-z_]+ record attached/i never matches the producer's actual detail strings; absent-record cases mis-classified",
+      "severity": "LOW",
+      "confidence": 0.9,
+      "category": "regulatory-citation",
+      "affected_files": ["genoa/src/engine/finding/validationVerdict.js"],
+      "regulatory_scope": [],
+      "recommended_fix": "Replace the regex with /\\bINCOMPLETE pending re-compute\\b/i.test(detail). The producer emits 'No <foo> record was attached…' — the 'was' between record and attached breaks adjacency; 'curve-validation' / 'FCC' break the [a-z_]+ class. Legacy headline still correct via the scope === UNVERIFIED cap.",
+      "tests_required": ["test/engine/finding/validationVerdict.test.js — synthesize a 'No curve-validation record was attached' detail and assert INCOMPLETE/ENGINEERING_REVIEW classification"],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Read validationVerdict.js:663 regex, then trace producer detail strings — adjacency mismatch is reproducible by pattern inspection."
+    },
+    {
+      "finding_id": "PRF-002",
+      "title": "engine/haat/validate.js:144 gates KZLZ flat-fallback suppression on operatorHaat > 0; with no operator HAAT and a flat-fallback emitting nominal radial values, validator returns PASS with display_suppressed=false",
+      "severity": "LOW",
+      "confidence": 0.85,
+      "category": "haat",
+      "affected_files": ["genoa/src/engine/haat/validate.js"],
+      "regulatory_scope": ["47 CFR §73.313"],
+      "recommended_fix": "Suppress display whenever basis==='flat' regardless of operatorHaat. Currently the gate hides the suppression when operatorHaat is absent, so Appendix A would show per-radial HAATs with no DEM behind them.",
+      "tests_required": ["test/engine/haat/validate.test.js — synthesize a flat-basis with operatorHaat=0 and assert display_suppressed=true"],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Read haat/validate.js:144 condition; pair with the flat-fallback emitter to reproduce the missed suppression."
+    },
+    {
+      "finding_id": "PRF-003",
+      "title": "Verification — commit 6a25ce7 tier-3 fallback cap at lines 510-521 correctly downgrades VERIFIED→PARTIAL and re-routes the interpretation string",
+      "severity": "INFO",
+      "confidence": 0.95,
+      "category": "regulatory-citation",
+      "affected_files": ["genoa/src/engine/finding/validationVerdict.js"],
+      "regulatory_scope": ["47 CFR §73.311"],
+      "recommended_fix": "No action — recording the passing state. Test enforces notStrictEqual(v.status, 'VERIFIED').",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Matches the agent constraint; tier-3 cap holds at HEAD 28f7942."
+    },
+    {
+      "finding_id": "PRF-004",
+      "title": "Golden suites (curveReferenceValidation, fccGoldenSuite, fccContours, amNifContour, haatValidation, haatStrictBlocker) did not re-execute this cycle — node --test invocations were harness-gated",
+      "severity": "WARNING",
+      "confidence": 1.0,
+      "category": "governance",
+      "affected_files": [
+        "genoa/src/tests/curveReferenceValidation.test.js",
+        "genoa/src/tests/fccGoldenSuite.test.js",
+        "genoa/src/tests/fccContours.test.js",
+        "genoa/src/tests/amNifContour.test.js",
+        "genoa/src/tests/haatValidation.test.js",
+        "genoa/src/tests/haatStrictBlocker.test.js"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Run the six golden suites manually at HEAD 28f7942 once test execution is permitted; hold deploy gate at WARN until tests green-light.",
+      "tests_required": [
+        "node --test genoa/src/tests/curveReferenceValidation.test.js",
+        "node --test genoa/src/tests/fccGoldenSuite.test.js",
+        "node --test genoa/src/tests/haatStrictBlocker.test.js"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Static review found no BLOCKER conditions; only test-execution evidence missing."
+    }
+  ]
+}

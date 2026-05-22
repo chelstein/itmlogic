@@ -1,0 +1,67 @@
+{
+  "agent": "senior-station-engineer",
+  "timestamp_utc": "2026-05-22T13:25:00Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Four SOFT operator-experience advisories — no BLOCKERs, no engine-math defects. All four roll up into PR-DOC per program-director PD-002. Items captured here as canonical findings so dedup catches them next cycle and the autonomous loop does not re-raise.",
+  "deploy_recommendation": "WARN",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "SSE-001",
+      "title": "Operator-facing run summary lacks an at-a-glance 'what to do next' block",
+      "severity": "SOFT",
+      "confidence": 0.7,
+      "category": "operational",
+      "affected_files": ["genoa/src/exports/engineeringReport/sections/executiveSummary.js"],
+      "regulatory_scope": [],
+      "recommended_fix": "Add a 4-line 'Next steps for operator' block at the end of executiveSummary keyed on deploy_recommendation: APPROVE -> 'file as-is'; WARN -> '<numbered punch list>'; BLOCK -> 'do not file'; NO_OP -> 'no action'.",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Operator feedback per technical-pmp PMP-004 PR-DOC cluster."
+    },
+    {
+      "finding_id": "SSE-002",
+      "title": "Field validator should accept call signs in either case",
+      "severity": "SOFT",
+      "confidence": 0.65,
+      "category": "operational",
+      "affected_files": ["genoa/src/api/inputValidator.js"],
+      "regulatory_scope": [],
+      "recommended_fix": "Lower-case input call signs at the boundary, then normalize to upper-case for the canonical record. Currently mixed-case rejects early in form submission.",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Reproducible via POST /api/exhibits with call='wblk'; current handler returns 422."
+    },
+    {
+      "finding_id": "SSE-003",
+      "title": "Per-radial HAAT table column widths can clip 4-digit elevations on Letter-sized print",
+      "severity": "SOFT",
+      "confidence": 0.6,
+      "category": "renderer",
+      "affected_files": ["genoa/src/exports/engineeringReport/sections/appendices.js"],
+      "regulatory_scope": [],
+      "recommended_fix": "Bump elevation-column width by ~6 pts so 4-digit AMSL values render fully on Letter print. Currently clips at the rightmost digit on tall-tower exhibits.",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Render any FM exhibit with antenna AMSL > 999 m and inspect the per-radial table."
+    },
+    {
+      "finding_id": "SSE-004",
+      "title": "Cancel button on long-running exhibit compute returns to dashboard instead of preserving form state",
+      "severity": "SOFT",
+      "confidence": 0.6,
+      "category": "operational",
+      "affected_files": ["genoa/src/ui/jobMonitor.jsx"],
+      "regulatory_scope": [],
+      "recommended_fix": "On cancel, route back to the form with prior inputs hydrated instead of dropping the operator at the dashboard.",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Reproducible by starting a >60s compute and clicking Cancel — current behavior loses entered form state."
+    }
+  ]
+}

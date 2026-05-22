@@ -1,0 +1,50 @@
+{
+  "agent": "evidence-reporting-agent",
+  "timestamp_utc": "2026-05-22T13:15:00Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Two renderer findings on evidence surfaces: figure numbering is incomplete (only mapPackage.js carries figure_number=1; chart sections and renderChartHeader don't honor figure_number), and the replay token is truncated to 32 chars in Appendix E + Build Attestation, breaking PDF-as-verifier surface without the JSON sidecar.",
+  "deploy_recommendation": "WARN",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "EVR-001",
+      "title": "Figure numbering incomplete — only mapPackage.js:32 carries figure_number=1; chart sections and renderChartHeader don't honor figure_number",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "category": "renderer",
+      "affected_files": [
+        "genoa/src/exports/engineeringReport/sections/mapPackage.js",
+        "genoa/src/exports/engineeringReport/sections/charts.js",
+        "genoa/src/exports/engineeringReport/renderChartHeader.js"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Propagate figure_number through chart sections and renderChartHeader. Downstream of the PR-RENDER orphan-section fix — figures in re-imported sections (RF Exposure, Tower Study, Build Attestation) also need sequential numbering wiring.",
+      "tests_required": [
+        "snapshot test asserting Figure 1..Figure N sequential numbering across exhibit sections"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Render any FM exhibit and observe that only the map-package figure is numbered; chart sections render captions without 'Figure N:' prefix."
+    },
+    {
+      "finding_id": "EVR-002",
+      "title": "Replay token truncated to 32 chars in Appendix E + Build Attestation — PDF can't be used as verifier surface without the JSON sidecar",
+      "severity": "LOW",
+      "confidence": 0.85,
+      "category": "renderer",
+      "affected_files": [
+        "genoa/src/exports/engineeringReport/sections/appendixE.js",
+        "genoa/src/exports/engineeringReport/sections/buildAttestation.js"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Print the full replay token (or a structured truncation with hash) in Appendix E and the Build Attestation so the PDF surface alone is sufficient to re-derive the exhibit identity. Currently the 32-char truncation forces a JSON-sidecar dependency.",
+      "tests_required": [
+        "assert replay-token strings in Appendix E / Build Attestation are either full-length or include a content-hash suffix"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "diff token printed in Appendix E vs token returned by identity sidecar; current truncation drops the last ~32 chars."
+    }
+  ]
+}

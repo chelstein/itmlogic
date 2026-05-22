@@ -53,11 +53,31 @@ echo "[run-agent] ${AGENT}  mode=${MODE}  compute=${COMPUTE_MODE}  sha=${CUR_SHA
 # Render the working prompt: prepend the budget knobs + recent diff
 CONTEXT_FILE="${REPO_ROOT}/agents/logs/${AGENT}-context-${RUN_AT//[:]/-}.md"
 mkdir -p "$(dirname "${CONTEXT_FILE}")"
+BRANCH=$(git -C "${REPO_ROOT}" rev-parse --abbrev-ref HEAD)
 {
   echo "# Agent run context — ${AGENT} @ ${RUN_AT}"
   echo "AGENT_TOKEN_MODE=${MODE}"
   echo "COMPUTE_MODE=${COMPUTE_MODE}"
   echo "HEAD_SHA=${CUR_SHA}"
+  echo "BRANCH=${BRANCH}"
+  echo
+  echo "## Required outputs (REQUIRED — both files)"
+  echo
+  echo "You MUST write BOTH of the following, in this order:"
+  echo
+  echo "1. \`agents/${AGENT}/last-findings.json\` — strict machine-readable JSON. This is the source of truth for the pipeline. It MUST validate against the canonical schema in AGENTS.md §\"Finding format\". Required keys: agent, timestamp_utc, head_sha, branch, summary, deploy_recommendation, findings. \`findings\` MUST be an array (use \`[]\` for a clean run). Use the values above:"
+  echo "   - agent:         \"${AGENT}\""
+  echo "   - timestamp_utc: \"${RUN_AT}\""
+  echo "   - head_sha:      \"${CUR_SHA}\""
+  echo "   - branch:        \"${BRANCH}\""
+  echo "2. \`agents/${AGENT}/last-report.md\` — narrative markdown for humans. Presentation only. DO NOT embed multiple \`\`\`json fenced blocks — the pipeline reads JSON from last-findings.json, not from the markdown."
+  echo
+  echo "Out-of-band artifacts (only when relevant — DO NOT pack them into last-report.md):"
+  echo "   - \`agents/state/deploy-approvals.json\` — program-director only."
+  echo "   - \`agents/reports/audit/${AGENT}-${RUN_AT%%T*}.md\` — daily audit summary, if your agent writes one."
+  echo
+  echo "Validate before considering the run complete:"
+  echo "   node agents/scripts/validate-findings-json.js agents/${AGENT}/last-findings.json"
   echo
   echo "## Git diff since last run"
   echo '```diff'
@@ -74,14 +94,21 @@ mkdir -p "$(dirname "${CONTEXT_FILE}")"
 echo "[run-agent] context prepared at ${CONTEXT_FILE}"
 
 # If a CLI runner is configured, invoke it.  Otherwise emit instructions.
-if [[ "${AGENT_RUNNER:-}" == "claude-cli" ]] && command -v claude >/dev/null 2>&1; then
+if [[ "${AGENT_RUNNER:-}" == "claude-cli" ]]; then
   echo "[run-agent] invoking claude CLI…"
-  claude --max-tokens "$(jq -r ".modes.${MODE}.max_output_tokens" "${REPO_ROOT}/agents/runtime/budget.json")" \
-         --prompt-file "${CONTEXT_FILE}" \
-         --write-output "${AGENT_DIR}/last-report.md"
-  echo "${CUR_SHA}" > "${LAST_RUN_FILE}"
+  (cd "${REPO_ROOT}" && cat "${CONTEXT_FILE}" | claude --print > "${AGENT_DIR}/last-report.md" 2>&1)
+
+  # Validate emitted JSON; warn (do not fail) so loop keeps running.
+  if [[ -f "${AGENT_DIR}/last-findings.json" ]]; then
+    if ! node "${REPO_ROOT}/agents/scripts/validate-findings-json.js" "${AGENT_DIR}/last-findings.json"; then
+      echo "[run-agent] WARN: ${AGENT}/last-findings.json failed validation"
+    fi
+  else
+    echo "[run-agent] WARN: ${AGENT} did not produce last-findings.json"
+  fi
 else
   echo "[run-agent] no AGENT_RUNNER configured."
   echo "  next step: have an operator-driven Claude session read ${CONTEXT_FILE}"
-  echo "  and write findings to ${AGENT_DIR}/last-report.md in the AGENTS.md format."
+  echo "  and write BOTH agents/${AGENT}/last-findings.json (canonical) AND"
+  echo "  agents/${AGENT}/last-report.md (narrative) per AGENTS.md §\"Finding format\"."
 fi

@@ -1,0 +1,33 @@
+{
+  "agent": "devsecops-agent",
+  "timestamp_utc": "2026-05-22T14:00:00Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Devsecops agent failed to run a complete audit this cycle — last-report.md persisted at 0 bytes. Recording a single placeholder finding (DSO-001) capturing the empty-audit state so the safe_prod_write gate evaluator sees the explicit UNVERIFIABLE signal rather than silently treating absence as PASS. Re-run after harness Write allowlist is widened (program-director PD-003).",
+  "deploy_recommendation": "BLOCK",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "DSO-001",
+      "title": "Empty devsecops audit at HEAD 28f7942 — crash_loop / secrets_changed / migration_without_rollback gates UNVERIFIABLE",
+      "severity": "BLOCKER",
+      "confidence": 1.0,
+      "category": "devsec",
+      "affected_files": [
+        "agents/devsecops-agent/last-report.md",
+        "agents/devsecops-agent/last-findings.json",
+        "agents/settings.json"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Re-run devsecops-agent after agents/settings.json Write allowlist is widened (PD-003). Audit must populate at minimum: crash_loop status, secrets_changed status, migration_without_rollback status, and an audit_complete=true marker. Until that happens, safe_prod_write cannot be evaluated and program-director PD-001 will continue to BLOCK.",
+      "tests_required": [
+        "test -s agents/devsecops-agent/last-report.md (must succeed)",
+        "node agents/scripts/validate-findings-json.js agents/devsecops-agent/last-findings.json (must exit 0)",
+        "jq -r '.findings | length' agents/devsecops-agent/last-findings.json (must be > 1, i.e. real findings beyond this placeholder)"
+      ],
+      "deployment_risk": "high",
+      "human_review_required": true,
+      "reproducibility_notes": "wc -c agents/devsecops-agent/last-report.md returns 1 (single newline) at HEAD 28f7942. This placeholder canonical doc was synthesized so downstream tooling (create-issues-from-findings.sh, deploy-gate evaluator) can read an explicit UNVERIFIABLE signal rather than treating absent JSON as PASS."
+    }
+  ]
+}
