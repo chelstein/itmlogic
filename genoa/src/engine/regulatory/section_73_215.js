@@ -214,7 +214,7 @@ export function checkSection73215({ subject, nearbyStations = [] } = {}){
     // requires (vs. our single-bearing D/U which is the conservative
     // worst-case).  When the polygons overlap, the station fails
     // §73.215 regardless of the D/U bearing.
-    const polygon_overlap = computePolygonOverlap(subject, N, subjectFieldDbu, N_field_dbu);
+    const polygon_overlap = computePolygonOverlap(subject, N, subjectFieldDbu, N_field_dbu, cls.du_db);
 
     // Pair fails if EITHER the D/U bearing check OR the polygon
     // overlap test fails.  Polygon overlap is the regulation-text
@@ -299,25 +299,54 @@ const POLYGON_RADIAL_STEP_DEG = 10;          // 36-vertex contour ring
 /**
  * Compute the F(50,50) protected and F(50,10) interfering contour
  * polygons for both stations and return the pair-wise overlap status.
- * The check is bidirectional:
- *   - subject's F(50,10) interfering polygon vs nearby's F(50,50)
- *     protected polygon → did the subject's interference reach inside
- *     the nearby's protected contour?
- *   - nearby's F(50,10) interfering polygon vs subject's F(50,50)
- *     protected polygon → vice versa.
  *
- * Either positive overlap is a §73.215 failure.  When neither contour
+ * Each station's F(50,50) PROTECTED polygon is built at its OWN
+ * class-dependent protected field (54 or 60 dBu per §73.211).
+ *
+ * Each station's F(50,10) INTERFERING polygon is the locus where its
+ * F(50,10) field equals `(other_station's protected field) − D/U
+ * threshold` — i.e. the boundary outside which the station's
+ * interfering signal is below the level that would harm the OTHER
+ * station's protected contour at the channel-relationship D/U gate.
+ * Building it at the station's own protected field would produce a
+ * polygon identical (or nearly identical) to the protected polygon and
+ * silently miss every cross-class interference case — that was the
+ * F-001 bug.
+ *
+ * The check is bidirectional:
+ *   - subject's F(50,10) at (nearbyFieldDbu − du_threshold_db) vs
+ *     nearby's F(50,50) protected → did the subject's interference
+ *     reach inside the nearby's protected contour?
+ *   - nearby's F(50,10) at (subjectFieldDbu − du_threshold_db) vs
+ *     subject's F(50,50) protected → vice versa.
+ *
+ * Either positive overlap is a §73.215 failure. When neither contour
  * can be built (missing erp/haat), returns inconclusive=true and the
  * boolean overlap flags are null.
  */
-function computePolygonOverlap(subject, nearby, subjectFieldDbu, nearbyFieldDbu){
+function computePolygonOverlap(subject, nearby, subjectFieldDbu, nearbyFieldDbu, du_threshold_db){
+  // Interfering-contour thresholds per §73.215 / §74.1204(c):
+  //   subject's F(50,10) is built at (nearby protected − D/U gate);
+  //   nearby's F(50,10) is built at (subject protected − D/U gate).
+  // If du_threshold_db is missing (shouldn't happen — caller filters
+  // non_restricted offsets before calling us), fall back to the
+  // station's own protected field so the polygon is at least defined,
+  // and record the fact so reviewers can see the degenerate path.
+  const have_threshold = Number.isFinite(du_threshold_db);
+  const subject_interfering_field_dbu = have_threshold
+    ? (nearbyFieldDbu - du_threshold_db)
+    : subjectFieldDbu;
+  const nearby_interfering_field_dbu  = have_threshold
+    ? (subjectFieldDbu - du_threshold_db)
+    : nearbyFieldDbu;
+
   // Build the four contour polygons.  When fccDistanceKm throws (rare
   // — happens for extreme out-of-range inputs), the polygon is empty
   // and the corresponding overlap is reported as inconclusive.
-  const subject_F50_50 = buildContourFromCurve(subject, subjectFieldDbu, '50,50');
-  const subject_F50_10 = buildContourFromCurve(subject, subjectFieldDbu, '50,10');
-  const nearby_F50_50  = buildContourFromCurve(nearby,  nearbyFieldDbu,  '50,50');
-  const nearby_F50_10  = buildContourFromCurve(nearby,  nearbyFieldDbu,  '50,10');
+  const subject_F50_50 = buildContourFromCurve(subject, subjectFieldDbu,             '50,50');
+  const subject_F50_10 = buildContourFromCurve(subject, subject_interfering_field_dbu, '50,10');
+  const nearby_F50_50  = buildContourFromCurve(nearby,  nearbyFieldDbu,              '50,50');
+  const nearby_F50_10  = buildContourFromCurve(nearby,  nearby_interfering_field_dbu,  '50,10');
 
   if (!subject_F50_50.length || !subject_F50_10.length
    || !nearby_F50_50.length  || !nearby_F50_10.length){
@@ -325,6 +354,9 @@ function computePolygonOverlap(subject, nearby, subjectFieldDbu, nearbyFieldDbu)
       method:        'sutherland-hodgman convex clip in local-tangent projection',
       inconclusive:  true,
       reason:        'one or more contour polygons could not be built (check erp_kw / haat_m)',
+      du_threshold_db:                  have_threshold ? du_threshold_db : null,
+      subject_interfering_field_dbu,
+      nearby_interfering_field_dbu,
       subject_interfering_overlaps_nearby_protected: null,
       nearby_interfering_overlaps_subject_protected: null
     };
@@ -336,8 +368,11 @@ function computePolygonOverlap(subject, nearby, subjectFieldDbu, nearbyFieldDbu)
   const rev = polygonOverlap(nearby_F50_10, subject_F50_50);
 
   return {
-    method:                                        'F(50,50) protected vs F(50,10) interfering polygon overlap (Sutherland-Hodgman, local-tangent projection, area via Karney WGS-84)',
+    method:                                        'F(50,50) protected vs F(50,10) interfering polygon overlap (Sutherland-Hodgman, local-tangent projection, area via Karney WGS-84); interfering threshold = other_protected − D/U gate',
     n_radials:                                     360 / POLYGON_RADIAL_STEP_DEG,
+    du_threshold_db:                               have_threshold ? du_threshold_db : null,
+    subject_interfering_field_dbu,
+    nearby_interfering_field_dbu,
     subject_interfering_overlaps_nearby_protected: fwd.overlap,
     subject_interfering_overlap_area_km2:          fwd.overlap_area_km2,
     nearby_interfering_overlaps_subject_protected: rev.overlap,
