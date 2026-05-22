@@ -1,6 +1,30 @@
 -- Genoa schema v2.  Idempotent; safe on every boot.
 -- Tables namespaced with `genoa_` so multi-tenant Postgres clusters
 -- don't collide with other apps.
+--
+-- ROLLBACK: This migration is purely additive — `CREATE TABLE IF NOT
+-- EXISTS` against a fresh schema.  To revert, drop every table and
+-- every index this file creates.  Blast radius is the whole Genoa
+-- schema, so an emergency revert means losing all stored exhibits,
+-- versions, validation runs, facility-cache rows, evidence records,
+-- export-artifact pointers, and warning events.  Confirm a fresh
+-- backup before running.
+--
+-- DROP INDEX IF EXISTS genoa_warning_event_exhibit_idx;
+-- DROP INDEX IF EXISTS genoa_warning_event_code_idx;
+-- DROP TABLE IF EXISTS genoa_warning_event;
+-- DROP TABLE IF EXISTS genoa_export_artifact;
+-- DROP INDEX IF EXISTS genoa_evidence_kind_idx;
+-- DROP INDEX IF EXISTS genoa_evidence_exhibit_idx;
+-- DROP TABLE IF EXISTS genoa_evidence_record;
+-- DROP TABLE IF EXISTS genoa_facility_cache;
+-- DROP TABLE IF EXISTS genoa_validation_run;
+-- DROP TABLE IF EXISTS genoa_exhibit_version;
+-- DROP INDEX IF EXISTS genoa_exhibit_facility_idx;
+-- DROP INDEX IF EXISTS genoa_exhibit_call_idx;
+-- DROP INDEX IF EXISTS genoa_exhibit_service_idx;
+-- DROP INDEX IF EXISTS genoa_exhibit_created_at_idx;
+-- DROP TABLE IF EXISTS genoa_exhibit;
 
 CREATE TABLE IF NOT EXISTS genoa_exhibit (
   id              BIGSERIAL PRIMARY KEY,
