@@ -28,12 +28,20 @@ function serviceWords(svc){
 }
 
 function applicableRules(svc){
-  if (svc === 'FM' || svc === 'LPFM'){
+  if (svc === 'FM'){
     return [
       '47 CFR §73.207 — Minimum distance separation requirements',
       '47 CFR §73.215 — Contour protection',
       '47 CFR §73.313 — Height Above Average Terrain (HAAT)',
       '47 CFR §73.333 — FM propagation curves'
+    ];
+  }
+  if (svc === 'LPFM'){
+    return [
+      '47 CFR §73.807 — LPFM minimum distance separations',
+      '47 CFR §73.811 — LPFM power and antenna height',
+      '47 CFR §73.313 — Height Above Average Terrain (HAAT)',
+      '47 CFR §73.333 — FM propagation curves (applied with LPFM parameter caps)'
     ];
   }
   if (svc === 'FX'){
@@ -46,11 +54,11 @@ function applicableRules(svc){
   }
   if (svc === 'AM'){
     return [
-      '47 CFR §73.182 — AM service contour standards',
-      '47 CFR §73.183 — Engineering standards of allocation',
-      '47 CFR §73.184 — Groundwave field strength curves',
+      '47 CFR §73.182 — Engineering standards of allocation',
+      '47 CFR §73.183 — Groundwave signals',
+      '47 CFR §73.184 — Groundwave field strength graphs',
       '47 CFR §73.187 — Limitations on daytime radiation',
-      '47 CFR §73.190 — Engineering charts and related formulas (skywave)'
+      '47 CFR §73.190 — Engineering charts and related formulas'
     ];
   }
   return [];

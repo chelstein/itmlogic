@@ -131,14 +131,14 @@ export const WARNING_CODES = Object.freeze({
     title: 'FCC geo contour cross-check skipped',
     description: 'No usable _fcc_contour was returned by the upstream (geo.fcc.gov / ZTR proxy).  The cross-check did not run.  This does not affect curve validation status.' },
 
-  // ---- Regulatory compliance (47 CFR §73.811 / §74.1204) ----
+  // ---- Regulatory compliance (47 CFR §73.807 / §73.811 / §74.1204) ----
   // These warnings are emitted by the regulatory compliance modules
   // (src/engine/regulatory/) when an exhibit fails — or cannot complete
   // — its rule check.
 
   LPFM_RULE_VIOLATION: { severity: 'blocker', phase: 'engine',
-    title: 'LPFM rule violation (47 CFR §73.811)',
-    description: 'The exhibit fails one or more 47 CFR §73.811 LPFM rules (ERP ceiling, service-contour distance).  The exhibit is not filable as an LPFM application.' },
+    title: 'LPFM rule violation (47 CFR §73.807 / §73.811)',
+    description: 'The exhibit fails one or more LPFM rules: §73.807 service-contour distance / minimum-separation, or §73.811 ERP and antenna-height ceiling.  The exhibit is not filable as an LPFM application.' },
 
   TRANSLATOR_INTERFERENCE: { severity: 'blocker', phase: 'engine',
     title: 'FM translator interference (47 CFR §74.1204)',
