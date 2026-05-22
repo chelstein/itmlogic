@@ -455,7 +455,7 @@ export function buildValidationVerdictSection(exhibit){
   }
 
   const limitations = [
-    'Population values (where shown) are INFORMATIONAL ONLY; FCC §73.x compliance is determined by distance and field-strength tests, not population.',
+    'Population values (where shown) are INFORMATIONAL ONLY; FCC Part 73 compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.187 for AM), not population.',
     'Polygon-overlap math uses a local-tangent projection at FCC contour scales; sub-metre accurate vs WGS-84.',
     'Genoa does not certify FCC filings.  Final certification is the responsibility of the qualified broadcast engineer of record.'
   ];

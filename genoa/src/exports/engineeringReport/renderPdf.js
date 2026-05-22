@@ -1132,6 +1132,15 @@ function renderVisualSummary(pdf, s){
   if (!s || !Array.isArray(s.contours) || s.contours.length === 0) return;
   if (!s.tx || !Number.isFinite(s.tx.lat) || !Number.isFinite(s.tx.lon)) return;
 
+  // Render the standard chart heading (heading text + "FIGURE N — "
+  // prefix) so the TOC entry that references this page points at a
+  // visibly-labeled surface.  Without this the visual-summary page
+  // opens with the compass wheel only — an auditable-surface defect
+  // (EVR-003): the FCC reviewer cannot navigate the exhibit because
+  // the TOC entry "COVERAGE & ENVIRONMENT — VISUAL SUMMARY" maps to a
+  // page whose body has no matching heading string.
+  renderChartHeader(pdf, s);
+
   const w        = pdf.page.width - 2 * MARGIN;
   const startY   = pdf.y;
   // Reserve room for stats sidebar (right) + advisory banner (bottom).

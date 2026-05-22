@@ -421,9 +421,9 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     type: 'number',
     source: 'genoa-auto',
     required: false,
-    cite: '47 CFR §73.x informational only',
+    cite: 'INFORMATIONAL — no §73 rule prescribes a population threshold',
     mapping: 'population_estimate.primary',
-    notes: 'FCC §73.x rules are distance/field-strength tests, NOT population.  Provided for completeness.'
+    notes: 'FCC §73.207 / §73.215 / §73.333 compliance is determined by distance and field-strength tests, NOT population.  Provided for completeness.'
   },
   {
     id: 'oet-65-boundary-pass',
@@ -670,7 +670,7 @@ export const FORM_301_FM_META = Object.freeze({
     'OET-65 RF-exposure exhibit attached (controlled / uncontrolled MPE evaluation per §1.1310; OET Bulletin 65 Supplement A for broadcast)',
     'Tower / antenna structure: ASR # (if >60.96 m AGL or otherwise required), FAA Form 7460-1 determination, marking & lighting per FCC Part 17',
     '§73.207 minimum-distance separations satisfied OR §73.215 contour-protection showing attached',
-    'Community of license inside the predicted 70 dBu (60 dBu Class C-series) contour per §73.315',
+    'Community of license inside the predicted 70 dBµV/m (3.16 mV/m) F(50,50) principal-community contour per §73.315(a) — NCE reserved-band stations on channels 200-220 use the §73.515 principal-community contour values instead',
     'Antenna pattern table (filed by engineer) if directional; horizontal + vertical patterns per §73.316',
     'Filing fee verified (Schedule of Fees published in CFR; pay via Fee Filer in LMS before final submission)',
     'Section I (Applicant), Section II (Legal), and Section IV (Ownership) prepared by licensee / FCC counsel — NOT in this exhibit'

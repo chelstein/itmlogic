@@ -190,7 +190,7 @@ export function buildConclusionSection(exhibit){
                         || interp === 'licensed_with_legacy_conflicts';
     if (isLegacyReview){
       narrative =
-        'Under current §73.x rules the subject facility does not qualify under ' +
+        'Under current Part 73 rules, the subject facility does not qualify under ' +
         `${failedPhrase} for all required protected facilities.  This is an ` +
         'existing licensed facility, so the modeled conflicts may reflect ' +
         'grandfathered, waived, or otherwise historically authorized operating ' +

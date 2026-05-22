@@ -80,7 +80,7 @@ export default function PeCertifyDialog({ exhibit, onClose, onSealed }){
             Professional Engineer Seal
           </div>
           <div className="text-textDim text-[10px] tracking-rack uppercase mt-1">
-            §73.x exhibit certification — signs the canonical SHA-256 of the exhibit body
+            Part 73 exhibit certification — signs the canonical SHA-256 of the exhibit body
           </div>
         </div>
 

@@ -30,7 +30,7 @@ const SERVICE_VOCABULARIES = Object.freeze({
     propagation_cite:     '§73.184',
     coverage_rule_cite:   '§73.184',
     allocation_rule_cite: '§73.182',
-    interference_cite:    '§73.183',
+    interference_cite:    '§73.182(k)',
     skywave_cite:         '§73.190(c)',
     daytime_cite:         '§73.182(a)',
     nighttime_cite:       '§73.182(k)',

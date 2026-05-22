@@ -52,7 +52,7 @@ export function buildFacilityParametersSection(exhibit){
     : null;
   const heightOrConductivity = isAm
     ? ['Ground conductivity (σ)',
-       sigma != null ? `${sigma} mS/m (per 47 CFR §73.183 Figure M3)` : '—']
+       sigma != null ? `${sigma} mS/m (per 47 CFR §73.190 Figure M3)` : '—']
     : ['HAAT', fmt(haatDisplay, 'm')];
   const terrainRow = isAm
     ? ['Allocation basis',
