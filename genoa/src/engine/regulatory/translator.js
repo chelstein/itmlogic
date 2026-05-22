@@ -53,6 +53,7 @@
 import { fccDistanceKm, fccFieldDbuAtDistance } from '../curves/fcc/index.mjs';
 import { karneyInverse } from '../geometry/wgs84.js';
 import { studyContourPair, classifyFmOffsetKhz } from './_du_pair_study.js';
+import { FM_PROTECTED_FIELD_DBU_BY_CLASS } from './section_73_215.js';
 
 // §74.1204(a) D/U gates per channel relationship.  Values are dB.
 // §74.1204(f) is the third-adjacent (Δf = ±600 kHz) channel restriction:
@@ -80,20 +81,12 @@ export const TRANSLATOR_DU_GATE_CITES = Object.freeze({
   if_offset:       '47 CFR §74.1204(a)'
 });
 
-export const TRANSLATOR_DEFAULT_PROTECTED_FIELD_DBU_BY_CLASS = Object.freeze({
-  A:    60,                     // Class A primary FM   — 1   mV/m
-  B:    54,                     // Class B              — 0.5 mV/m
-  B1:   54,                     // Class B1
-  C0:   54,                     // Class C0
-  C1:   54,                     // Class C1
-  C2:   54,                     // Class C2
-  C3:   54,                     // Class C3
-  C:    54,                     // Class C
-  LP100:60,                     // LPFM (LP100)
-  LP10: 60,                     // LPFM (LP10, deprecated)
-  D:    60,                     // FM translator/booster as desired
-  FX:   60                      // alias
-});
+// Re-export the canonical FM protected-field map so callers that have
+// historically imported `TRANSLATOR_DEFAULT_PROTECTED_FIELD_DBU_BY_CLASS`
+// continue to work. The single source of truth is
+// `FM_PROTECTED_FIELD_DBU_BY_CLASS` in section_73_215.js — §73.211 and
+// §74.1204 cite the same class→protected-contour table.
+export const TRANSLATOR_DEFAULT_PROTECTED_FIELD_DBU_BY_CLASS = FM_PROTECTED_FIELD_DBU_BY_CLASS;
 
 // 1st-adjacent FM is exactly 200 kHz; FM grid is 200 kHz.  The IF
 // frequencies are 10.6 and 10.8 MHz from the carrier.  Resolves the

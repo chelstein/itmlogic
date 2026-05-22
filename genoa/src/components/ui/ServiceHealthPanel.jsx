@@ -5,10 +5,16 @@ import LedStatus from './LedStatus.jsx';
 // Service-health panel — left rail telemetry block.
 //
 // Polls /readyz every POLL_MS and renders one row per service:
-// the Genoa API, Postgres, every configured sidecar (terrain, splat,
-// identity, map, nec, measurement) and every public upstream
-// (facility, population, fccContours, fccLms).  Each row shows a
+// the Genoa API, Postgres, every configured sidecar (splat, map,
+// nec, identity) and every public upstream (facility, asr,
+// faaOe, population, fccContours, fccLms).  Each row shows a
 // red/amber/green/off LED and a one-word status label.
+//
+// Removed previously-listed but never-actually-wired sidecars:
+// terrain, measurement, los — see chelstein/itmlogic PR
+// 75ad05d (terrain removal) and dd45ab8 (measurement / los /
+// orphan-property removal).  Those rows would have shown
+// "OFFLINE" indefinitely because they were never invoked.
 //
 // LED semantics:
 //   green   = configured AND healthy (probe returned ok)
@@ -26,30 +32,27 @@ const READYZ_URL = '/readyz';
 // table still renders, just at the bottom in alphabetical order.
 const ROWS = [
   // [key, label, kind]
-  ['api',         'Genoa API',                 'core'],
-  ['db',          'Postgres',                  'core'],
-  ['terrain',     'Terrain',                   'sidecar'],
-  ['splat',       'SPLAT (ITM / Longley-Rice)','sidecar'],
-  ['map',         'Map render',                'sidecar'],
-  ['identity',    'Identity (RadioDNS)',       'sidecar'],
-  ['nec',         'NEC2++',                    'sidecar'],
-  ['measurement', 'SDR captures (via ZTR)',    'sidecar'],
-  ['los',         'LOS (ZTR)',                 'sidecar'],
-  ['facility',    'Facility (ZTR)',            'upstream'],
-  ['asr',         'ASR (FCC opendata)',        'upstream'],
-  ['faaOe',       'FAA OE/AAA',                'upstream'],
-  ['population',  'Population',                'upstream'],
-  ['fccContours', 'FCC contours',              'upstream'],
-  ['fccLms',      'FCC LMS',                   'upstream']
+  ['api',           'Genoa API',                       'core'],
+  ['db',            'Postgres',                        'core'],
+  ['splat',         'SPLAT (ITM / Longley-Rice)',      'sidecar'],
+  ['map',           'Map render',                      'sidecar'],
+  ['identity',      'Identity (RadioDNS)',             'sidecar'],
+  ['nec',           'NEC2++',                          'sidecar'],
+  ['amPhysics',     'AM Physics (SOMNEC2D)',           'sidecar'],
+  ['geoRfEvidence', 'Geo-RF Evidence',                 'sidecar'],
+  ['sun',           'AM Sunrise/Sunset (§73.99)',      'sidecar'],
+  ['fortranFcc',    'FCC FORTRAN parity',              'sidecar'],
+  ['fccam',         'FCC AM groundwave dataset',       'sidecar'],
+  ['facility',      'Facility (ZTR)',                  'upstream'],
+  ['asr',           'ASR (FCC opendata)',              'upstream'],
+  ['airports',      'FAA airports proximity',          'upstream'],
+  ['population',    'Population',                      'upstream'],
+  ['fccContours',   'FCC contours',                    'upstream'],
+  ['fccLms',        'FCC LMS',                         'upstream']
 ];
 
-function ledFor(entry, key){
+function ledFor(entry){
   if (!entry) return 'offline';
-  // Measurement is an optional adapter — the live SDR-capture path is
-  // the ZTR rich-station endpoint (covered by the `facility` LED), so
-  // an unconfigured measurement sidecar is the EXPECTED state, not a
-  // problem.  Don't show it as OFFLINE / red.
-  if (!entry.configured && key === 'measurement') return 'nominal';
   if (!entry.configured) return 'offline';
   if (!entry.healthy) return 'blocked';
   if (entry.latency_ms != null && entry.latency_ms > SLOW_MS) return 'degraded';
@@ -59,13 +62,7 @@ function ledFor(entry, key){
 function detailFor(key, entry){
   if (!entry) return '—';
   if (!entry.configured){
-    if (key === 'db')          return 'stateless mode';
-    // The measurement sidecar is an OPTIONAL adapter (genoa/src/sidecars/
-    // measurement/) — SDR captures flow directly from the ZTR rich-
-    // station endpoint, so the LED reading "not configured" is a
-    // misleading "OFFLINE — broken" signal when really the upstream
-    // capture path is live and working.  Surface that here.
-    if (key === 'measurement') return 'captures via ZTR (sidecar adapter optional)';
+    if (key === 'db') return 'stateless mode';
     return 'not configured';
   }
   if (!entry.healthy) return entry.latency_ms != null ? `unreachable · ${entry.latency_ms} ms` : 'unreachable';
@@ -152,7 +149,7 @@ export default function ServiceHealthPanel(){
     >
       <ul className="divide-y divide-rule">
         {rows.map(({ key, label, kind, entry }) => {
-          const status = ledFor(entry, key);
+          const status = ledFor(entry);
           return (
             <li key={key} className="flex items-center justify-between py-1.5 gap-3">
               <div className="flex items-center gap-2 min-w-0">

@@ -62,7 +62,6 @@ export async function probeAllSources(){
   const ztrUrl       = process.env.ZERO_TRUST_RADIO_READONLY_URL || null;
   const n8nUrl       = process.env.N8N_BASE_URL                  || null;
   const popUrl       = process.env.POPULATION_EVIDENCE_URL       || null;
-  const terrainUrl   = process.env.TERRAIN_SIDECAR_URL           || null;
   const splatUrl     = process.env.SPLAT_SIDECAR_URL             || null;
   const identityUrl  = process.env.IDENTITY_SIDECAR_URL          || null;
   const necUrl       = process.env.NEC_SIDECAR_URL               || null;
@@ -70,7 +69,7 @@ export async function probeAllSources(){
 
   // Probe each independently and in parallel.
   const [
-    ztrHealth, n8nHealth, popSidecar, terrainSidecar, splatSidecar, identitySidecar,
+    ztrHealth, n8nHealth, popSidecar, splatSidecar, identitySidecar,
     necSidecar, fortranFccSidecar,
     fccFmq, fccAmq, fccContours, fccCensus,
     publicFiles,
@@ -80,7 +79,6 @@ export async function probeAllSources(){
     probe(ztrUrl       ? ztrUrl       + '/healthz' : null),
     probe(n8nUrl       ? n8nUrl       + '/healthz' : null),
     probe(popUrl       ? popUrl       + '/health'  : null),
-    probe(terrainUrl   ? terrainUrl   + '/health'  : null),
     probe(splatUrl     ? splatUrl     + '/healthz' : null),
     probe(identityUrl  ? identityUrl  + '/health'  : null),
     // NEC sidecar /health must be GET (not HEAD) because the body
@@ -173,7 +171,7 @@ export async function probeAllSources(){
     chains,
     raw_probes: {
       ztr: ztrHealth, n8n: n8nHealth, population_sidecar: popSidecar,
-      terrain_sidecar: terrainSidecar, splat_sidecar: splatSidecar, identity_sidecar: identitySidecar,
+      splat_sidecar: splatSidecar, identity_sidecar: identitySidecar,
       nec_sidecar: necSidecar,
       fortran_fcc_sidecar: fortranFccSidecar,
       fcc_fmq: fccFmq, fcc_amq: fccAmq, fcc_contours: fccContours, fcc_census: fccCensus,

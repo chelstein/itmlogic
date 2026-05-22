@@ -119,7 +119,7 @@ app.use(errorHandler);
 
 const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`[genoa-api] listening on 0.0.0.0:${PORT} (${NODE_ENV}) node=${process.versions.node}`);
-  console.log(`[genoa-api] db_configured=${poolReady()} terrain_sidecar=${!!process.env.TERRAIN_SIDECAR_URL} measurement_sidecar=${!!process.env.MEASUREMENT_SIDECAR_URL} identity_sidecar=${!!process.env.IDENTITY_SIDECAR_URL}`);
+  console.log(`[genoa-api] db_configured=${poolReady()} identity_sidecar=${!!process.env.IDENTITY_SIDECAR_URL}`);
 });
 server.on('error', (err) => { console.error('[genoa-api] listen error:', err && err.stack || err); process.exit(1); });
 

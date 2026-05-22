@@ -47,6 +47,7 @@
 
 import { fmRadialTable } from '../fm/contour.js';
 import { TRANSLATOR_DU_GATES } from '../regulatory/translator.js';
+import { FM_PROTECTED_FIELD_DBU_BY_CLASS } from '../regulatory/section_73_215.js';
 import { W } from '../../types/warnings.js';
 
 export const FX_METHOD =
@@ -105,12 +106,7 @@ export const FX_REGULATORY_METADATA = Object.freeze({
     interfering: { mode: '50,10', source: '47 CFR §73.333 F(50,10)' }
   },
   du_gates_db: TRANSLATOR_DU_GATES,
-  protected_field_thresholds_dbu: {
-    A:  60,  B:  54,  B1: 54,
-    C:  54,  C0: 54,  C1: 54,  C2: 54,  C3: 54,
-    LP100: 60,  LP10: 60,
-    D:  60,  FX: 60
-  },
+  protected_field_thresholds_dbu: FM_PROTECTED_FIELD_DBU_BY_CLASS,
   notes: [
     'IF (±10.6/10.8 MHz), 2nd-adjacent (±400 kHz), and 3rd-adjacent (±600 kHz) D/U gates of -40 dB yield U thresholds of 94 / 100 dBu — geographically tiny contours immediately around the transmitter that are evaluated per-station by the §74.1204 D/U study, not as standalone polygons.',
     'Per-station overlap geometry and D/U comparison run when evidence.nearby_primaries is supplied; without it MISSING_NEARBY_STATIONS is emitted.'

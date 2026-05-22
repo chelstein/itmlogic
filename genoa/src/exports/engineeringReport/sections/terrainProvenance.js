@@ -31,7 +31,7 @@ export function buildTerrainProvenanceSection(exhibit){
       heading: 'Terrain Provenance',
       paragraphs: [
         'No per-radial terrain evidence is attached to this exhibit.  HAAT was treated as the filed value (CONSTANT_HAAT_ASSUMED warning attached at compute time, if present); the engineer of record must confirm the filed HAAT was derived per 47 CFR §73.313 from a recognized DEM source before filing.',
-        'For full filing-grade provenance, re-run the compute with the terrain sidecar configured (TERRAIN_SIDECAR_URL set, USGS EPQS or equivalent reachable).  Genoa will then attach exhibit.evidence.terrain with DEM source, dataset version, sampling method, radial count, and fetch timestamp.'
+        'For full filing-grade provenance, re-run the compute when an upstream terrain HAAT source is reachable (ZTR terrain-haat endpoint, or the in-process multi-source DEM chain via USGS EPQS / Open-Meteo / OpenTopoData).  Genoa will then attach exhibit.evidence.terrain with DEM source, dataset version, sampling method, radial count, and fetch timestamp.'
       ]
     };
   }

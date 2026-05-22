@@ -1,0 +1,109 @@
+name: agent-safe-prod-write
+
+# Scheduled + manual entry point for the autonomous agent loop.
+# Respects AGENT_DEPLOY_MODE — by default does NOT deploy; the
+# operator must explicitly set the repo secret AGENT_DEPLOY_MODE
+# to "safe_prod_write" to enable production writes.
+#
+# Hard safety:
+#   - production lock honored
+#   - per-day deploy cap honored (AGENT_MAX_DEPLOYS_PER_DAY)
+#   - UTC deploy window honored (AGENT_ALLOWED_DEPLOY_WINDOW_{START,END})
+#   - post-deploy smoke failure triggers auto-rollback + lock
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Override AGENT_DEPLOY_MODE'
+        type: choice
+        options: [report_only, pr_only, safe_prod_write]
+        default: report_only
+      reason:
+        description: 'Why is this run being triggered?'
+        type: string
+        required: true
+  schedule:
+    # Every 6h: full agent audit (report_only — no auto-deploy from schedule)
+    - cron: '0 */6 * * *'
+
+permissions:
+  contents:      write
+  issues:        write
+  pull-requests: write
+
+jobs:
+  agent-cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AGENT_DEPLOY_MODE:                  ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'report_only' }}
+      AGENT_TOKEN_MODE:                   ${{ vars.AGENT_TOKEN_MODE || 'balanced' }}
+      COMPUTE_MODE:                       ${{ vars.COMPUTE_MODE || 'parallel_agents' }}
+      AGENT_MAX_DEPLOYS_PER_DAY:          ${{ vars.AGENT_MAX_DEPLOYS_PER_DAY || '2' }}
+      AGENT_ALLOWED_DEPLOY_WINDOW_START:  ${{ vars.AGENT_ALLOWED_DEPLOY_WINDOW_START || '13' }}
+      AGENT_ALLOWED_DEPLOY_WINDOW_END:    ${{ vars.AGENT_ALLOWED_DEPLOY_WINDOW_END || '22' }}
+      AGENT_REQUIRE_MULTI_AGENT_APPROVAL: ${{ vars.AGENT_REQUIRE_MULTI_AGENT_APPROVAL || 'true' }}
+      DIGITALOCEAN_ACCESS_TOKEN:          ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+      DIGITALOCEAN_APP_ID:                ${{ secrets.DIGITALOCEAN_APP_ID }}
+      PRODUCTION_URL:                     ${{ secrets.PRODUCTION_URL }}
+      GITHUB_TOKEN:                       ${{ secrets.GITHUB_TOKEN }}
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: install deps
+        working-directory: genoa
+        run: npm ci --omit=dev
+
+      - name: jq present
+        run: jq --version
+
+      - name: check production lock
+        run: ./agents/scripts/check-production-lock.sh --verbose
+
+      - name: pre-merge gates
+        run: ./agents/scripts/safe-merge.sh
+
+      - name: run all agents (collect findings)
+        run: ./agents/scripts/run-all-agents.sh
+
+      - name: upload agent reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-reports-${{ github.run_id }}
+          path: |
+            agents/*/last-report.md
+            agents/reports/audit/
+            agents/logs/*.log
+          retention-days: 14
+
+      - name: safe deploy (only when AGENT_DEPLOY_MODE=safe_prod_write)
+        if: env.AGENT_DEPLOY_MODE == 'safe_prod_write'
+        run: ./agents/scripts/safe-deploy-digitalocean.sh
+
+      - name: summary
+        if: always()
+        run: |
+          echo "## Agent run summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "- mode: \`${AGENT_DEPLOY_MODE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- compute: \`${COMPUTE_MODE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- token mode: \`${AGENT_TOKEN_MODE}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -f agents/state/production-lock.json ]]; then
+            LOCKED=$(jq -r '.locked' agents/state/production-lock.json)
+            echo "- production locked: \`${LOCKED}\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f agents/state/deploy-history.json ]]; then
+            LAST=$(jq -r '.deploys | sort_by(.at) | last' agents/state/deploy-history.json)
+            echo "- last deploy: \`${LAST}\`" >> "$GITHUB_STEP_SUMMARY"
+          fi

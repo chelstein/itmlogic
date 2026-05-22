@@ -1,0 +1,80 @@
+{
+  "agent": "fcc-auditor",
+  "timestamp_utc": "2026-05-22T13:20:00Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Four findings: A-001 BLOCKER (orphan-section pattern, 3rd cycle — buildBuildAttestationSection, buildRfExposureSection, buildTowerStudySection still not imported by engineeringReport/index.js); A-002 MEDIUM (was HIGH — partial fix landed in 6a25ce7; tier-3 verdict caps PARTIAL/MEDIUM but interpretation at validationVerdict.js:544 still tells AM exhibits to 're-run with the live parity check' — impossible for AM); A-003 WARNING (deploy-history.json shows last_good_sha=null — no smoke-pass entry); A-004 MEDIUM (13 verdict gates, only 5 have corresponding appendix evidence blocks). Deploy recommendation: BLOCK.",
+  "deploy_recommendation": "BLOCK",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "A-001",
+      "title": "Orphan-section pattern (3rd cycle) — buildBuildAttestationSection, buildRfExposureSection, buildTowerStudySection still never imported by engineeringReport/index.js (no remediation in 28f7942; META-001 fix was orthogonal)",
+      "severity": "BLOCKER",
+      "confidence": 0.99,
+      "category": "renderer",
+      "affected_files": [
+        "genoa/src/exports/engineeringReport/index.js",
+        "genoa/src/exports/engineeringReport/sections/buildAttestation.js",
+        "genoa/src/exports/engineeringReport/sections/rfExposure.js",
+        "genoa/src/exports/engineeringReport/sections/towerStudy.js"
+      ],
+      "regulatory_scope": ["47 CFR §1.1310", "47 CFR §17.4", "OET Bulletin 65"],
+      "recommended_fix": "PR-RENDER: import all three section builders into engineeringReport/index.js. Snapshot tests must assert every Genoa exhibit type renders all three sections with non-empty bodies. Three-way co-sign (program-director + fcc-auditor + compliance-officer).",
+      "tests_required": [
+        "grep -F 'buildBuildAttestationSection' genoa/src/exports/engineeringReport/index.js",
+        "grep -F 'buildRfExposureSection' genoa/src/exports/engineeringReport/index.js",
+        "grep -F 'buildTowerStudySection' genoa/src/exports/engineeringReport/index.js",
+        "test/exports/engineeringReport/index.test.js — assert all three builders in rendered FM / LPFM / AM exhibits"
+      ],
+      "deployment_risk": "medium",
+      "human_review_required": true,
+      "reproducibility_notes": "Dedup hash 2601421a5c5ff41d5901ec061fd4a000435f046affd814a99ee3aebf1ad0925f. 3rd consecutive cycle — agent-loop-stalled per agent.md."
+    },
+    {
+      "finding_id": "A-002",
+      "title": "Tier-3 verdict interpretation at validationVerdict.js:544 still tells AM exhibits to 're-run with the live parity check' — impossible for AM (no public distance endpoint)",
+      "severity": "MEDIUM",
+      "confidence": 0.9,
+      "category": "regulatory-citation",
+      "affected_files": ["genoa/src/engine/finding/validationVerdict.js"],
+      "regulatory_scope": ["47 CFR §73.187", "47 CFR §73.190"],
+      "recommended_fix": "Branch the tier-3 interpretation string by service: FM/LPFM gets the 're-run with live parity check' guidance (FCC distance endpoint exists); AM exhibits get 'no FCC public distance endpoint exists for AM groundwave; engine-reference computation is the canonical record'. Partial fix landed in 6a25ce7 — headline now PARTIAL/MEDIUM (was VERIFIED), but interpretation prose still routes to the FM recommendation.",
+      "tests_required": ["test/engine/finding/validationVerdict.test.js — AM exhibit at tier-3 must not contain 're-run with the live parity check'"],
+      "deployment_risk": "low",
+      "human_review_required": true,
+      "reproducibility_notes": "Synthesize an AM exhibit with fcc_curve_parity.fallback_tier=3 and check the interpretation string at line 544."
+    },
+    {
+      "finding_id": "A-003",
+      "title": "deploy-history.json shows deploys=[] and last_good_sha=null — auditor cannot sign off on deploy without a smoke-pass entry",
+      "severity": "WARNING",
+      "confidence": 1.0,
+      "category": "governance",
+      "affected_files": ["agents/state/deploy-history.json"],
+      "regulatory_scope": [],
+      "recommended_fix": "First clean smoke-pass populates last_good_sha and unblocks rollback machinery. Until then auditor BLOCKs.",
+      "tests_required": ["jq '.last_good_sha != null' agents/state/deploy-history.json"],
+      "deployment_risk": "high",
+      "human_review_required": true,
+      "reproducibility_notes": "cat agents/state/deploy-history.json shows {\"deploys\": [], \"last_good_sha\": null}."
+    },
+    {
+      "finding_id": "A-004",
+      "title": "13 verdict gates, only 5 have corresponding appendix evidence blocks (Appendix C covers 1-4, Appendix F covers gate 13; gates 5-12 lack a dedicated row)",
+      "severity": "MEDIUM",
+      "confidence": 0.85,
+      "category": "renderer",
+      "affected_files": [
+        "genoa/src/exports/engineeringReport/sections/appendices.js",
+        "genoa/src/engine/finding/validationVerdict.js"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Add appendix rows for gates 5-12 so each verdict gate has a corresponding evidence block in the exhibit appendix.",
+      "tests_required": ["assert each verdict gate id appears in at least one appendix block"],
+      "deployment_risk": "low",
+      "human_review_required": true,
+      "reproducibility_notes": "Cross-confirmed by technical-pmp PMP-004 PR-VERDICT cluster."
+    }
+  ]
+}

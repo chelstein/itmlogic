@@ -1,0 +1,107 @@
+{
+  "agent": "technical-pmp",
+  "timestamp_utc": "2026-05-22T13:47:59Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Sprint rollup at HEAD 28f7942: 34 raw peer findings, ~29 unique after cross-agent dedup. Two cross-agent BLOCKERs (pipeline persistence still 7/9 broken — 3rd cycle, agent-loop-stalled; orphan-section pattern unanimous between fcc-auditor A-001 + compliance F-001/F-002 — also 3rd cycle) plus one single-agent BLOCKER (devsecops persisted 0-byte audit — safe_prod_write gates unverifiable). Engine triplet untouched. Rolled into 4 PR clusters per program-director PD-003 plan.",
+  "deploy_recommendation": "BLOCK",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "PMP-001",
+      "title": "Pipeline persistence still 7/9 broken at HEAD 28f7942 — META-001 contract landed but harness Write gate still denied per-call; 3rd cycle hits agent-loop-stalled",
+      "severity": "BLOCKER",
+      "confidence": 1.0,
+      "category": "governance",
+      "affected_files": [
+        "agents/compliance-officer/last-report.md",
+        "agents/devsecops-agent/last-report.md",
+        "agents/evidence-reporting-agent/last-report.md",
+        "agents/fcc-auditor/last-report.md",
+        "agents/principal-rf-engineer/last-report.md",
+        "agents/program-director/last-findings.json",
+        "agents/senior-station-engineer/last-report.md",
+        "agents/scripts/run-agent.sh",
+        "agents/settings.json"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "META-001 (canonical findings contract) shipped in 28f7942 — the code is correct, but the harness-level Write(agents/<agent>/**) permission is still gated per-call and 7 peers declined to persist this cycle. (a) Add persistent allowlist to agents/settings.json. (b) Add a fail-loud post-condition in agents/scripts/run-agent.sh that exits non-zero when agents/<agent>/last-findings.json is missing at end of run. Per agent.md 'Stop conditions', findings_repeat >= 3 runs reaches agent-loop-stalled.",
+      "tests_required": [
+        "agents/scripts/run-agent.sh — exits non-zero when agents/<agent>/last-findings.json absent at end of run",
+        "agents/settings.json — Write allowlist covers all ten agents' directories",
+        "bash agents/scripts/create-issues-from-findings.sh --dry-run produces >0 valid JSON inputs across all agents"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": true,
+      "reproducibility_notes": "ls -la agents/*/last-findings.json at HEAD 28f7942 returns only agents/program-director/last-findings.json — and that file's head_sha field is 6a25ce7, i.e. one cycle stale."
+    },
+    {
+      "finding_id": "PMP-002",
+      "title": "Cross-agent BLOCKER (3rd cycle, unanimous) — orphan-section pattern in engineeringReport renderer: build-attestation + RF-exposure (§1.1310 / OET-65) + tower-study (§17.4) section builders exist but are never imported by engineeringReport/index.js; downstream EVR-001 figure-numbering symptom is the same root cause",
+      "severity": "BLOCKER",
+      "confidence": 0.98,
+      "category": "renderer",
+      "affected_files": [
+        "genoa/src/exports/engineeringReport/index.js",
+        "genoa/src/exports/engineeringReport/sections/buildAttestation.js",
+        "genoa/src/exports/engineeringReport/sections/rfExposure.js",
+        "genoa/src/exports/engineeringReport/sections/towerStudy.js"
+      ],
+      "regulatory_scope": ["47 CFR §1.1310", "47 CFR §17.4", "OET Bulletin 65"],
+      "recommended_fix": "PR-RENDER: import all three section builders into engineeringReport/index.js and add them to the build pipeline. Snapshot tests must assert every Genoa exhibit type renders all three sections with non-empty bodies. Co-sign: program-director + fcc-auditor + compliance-officer.",
+      "tests_required": [
+        "test/exports/engineeringReport/index.test.js — assert all three builders present in rendered FM / LPFM / AM exhibits",
+        "grep -F 'buildBuildAttestationSection' genoa/src/exports/engineeringReport/index.js (>=1 line)",
+        "grep -F 'buildRfExposureSection' genoa/src/exports/engineeringReport/index.js (>=1 line)",
+        "grep -F 'buildTowerStudySection' genoa/src/exports/engineeringReport/index.js (>=1 line)"
+      ],
+      "deployment_risk": "medium",
+      "human_review_required": true,
+      "reproducibility_notes": "fcc-auditor A-001 (BLOCKER, 'systemic orphaned-section pattern'); compliance F-001 (HIGH, OET-65 §1.1310); F-002 (HIGH, §17.4). EVR-001 is downstream. A-001 in 3rd cycle."
+    },
+    {
+      "finding_id": "PMP-003",
+      "title": "Single-agent BLOCKER — devsecops-agent persisted 0-byte last-report.md and no last-findings.json this cycle; crash_loop / secrets_changed / migration_without_rollback gates UNVERIFIABLE → blocks safe_prod_write per agent.md",
+      "severity": "BLOCKER",
+      "confidence": 1.0,
+      "category": "devsec",
+      "affected_files": [
+        "agents/devsecops-agent/last-report.md",
+        "agents/devsecops-agent/last-findings.json"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Re-run devsecops-agent and ensure both last-report.md and last-findings.json are persisted. Empty audit means three safe_prod_write gates cannot be evaluated against HEAD 28f7942.",
+      "tests_required": [
+        "test -s agents/devsecops-agent/last-report.md (must succeed)",
+        "node agents/scripts/validate-findings-json.js agents/devsecops-agent/last-findings.json (must exit 0)",
+        "agents/devsecops-agent/last-findings.json — head_sha equals current HEAD"
+      ],
+      "deployment_risk": "high",
+      "human_review_required": true,
+      "reproducibility_notes": "wc -c agents/devsecops-agent/last-report.md returns 1 (single newline); agents/devsecops-agent/last-findings.json does not exist."
+    },
+    {
+      "finding_id": "PMP-004",
+      "title": "Sprint rollup — 34 raw peer findings (~29 unique after cross-agent dedup) at HEAD 28f7942; 2 cross-agent BLOCKERs + 1 single-agent BLOCKER + 4 HIGH; rolled into 4 PR clusters per PD-003 plan; engine triplet untouched",
+      "severity": "INFO",
+      "confidence": 0.95,
+      "category": "governance",
+      "affected_files": [
+        "agents/compliance-officer/last-report.md",
+        "agents/evidence-reporting-agent/last-report.md",
+        "agents/fcc-attorney/last-report.md",
+        "agents/fcc-auditor/last-report.md",
+        "agents/gis-terrain-scientist/last-report.md",
+        "agents/principal-rf-engineer/last-report.md",
+        "agents/program-director/last-report.md",
+        "agents/senior-station-engineer/last-report.md"
+      ],
+      "regulatory_scope": [],
+      "recommended_fix": "Adopt program-director PD-003 PR plan: (1) PR-RENDER = fcc-auditor A-001 + compliance F-001/F-002 + EVR-001; (2) PR-CITE = fcc-attorney F-001..F-009 + auditor A-002 + PRF-001 + compliance F-003..F-005; (3) PR-VERDICT = A-004 + PRF-002 + EVR-002; (4) PR-DOC = GIS-001/GIS-002 + PRF-004 + senior-station 4 SOFT. Engine math untouched this cycle.",
+      "tests_required": [],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "Total raw 34; cross-agent dedup collapses orphan-section pattern A-001/F-001/F-002/EVR-001 (4 -> 1 in PMP-002), pipeline-persistence PD-002+PMP-001 (2 -> 1), AM tier-3 wording A-002+PRF-historical-F-001 (2 -> 1). Net unique ~29."
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "agent": "gis-terrain-scientist",
+  "timestamp_utc": "2026-05-22T12:48:28Z",
+  "head_sha": "28f794222458c47cae50662e7f535712de0f5213",
+  "branch": "genoa-audit-remediation-phase2",
+  "summary": "Karney geodesic + Sutherland-Hodgman + multi-source DEM math all check out at HEAD 28f7942; only doc-drift findings remain (agent.md path map and cross-validate tolerance disagree with code).",
+  "deploy_recommendation": "WARN",
+  "readiness_score": null,
+  "findings": [
+    {
+      "finding_id": "GIS-001",
+      "title": "agent.md high_risk_globs reference nonexistent paths (genoa/src/engine/geodesy/**, coverage/polygon_clip.js)",
+      "severity": "LOW",
+      "confidence": 1.0,
+      "category": "docs",
+      "affected_files": ["agents/gis-terrain-scientist/agent.md"],
+      "regulatory_scope": [],
+      "recommended_fix": "Replace 'genoa/src/engine/geodesy/**' with 'genoa/src/engine/geometry/**' (wgs84.js, geodesic.js, karneyArea.js, polygon.js, polygonOverlap.js all live there). Replace 'genoa/src/engine/coverage/polygon_clip.js' with 'genoa/src/engine/geometry/polygonOverlap.js' (Sutherland-Hodgman convex clip + buildContourPolygon live there, not under coverage/). Same fix already enumerated in PD-002 PR-C; close the loop with a canonical finding so it dedupes against future runs.",
+      "tests_required": [
+        "grep -F 'engine/geodesy' agents/gis-terrain-scientist/agent.md (should be empty)",
+        "grep -F 'polygon_clip.js' agents/gis-terrain-scientist/agent.md (should be empty)"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "ls genoa/src/engine/ shows no geodesy/ directory and no coverage/polygon_clip.js; geometry/ owns wgs84.js / geodesic.js / karneyArea.js / polygon.js / polygonOverlap.js. Checklist validates the right invariants — only path map is wrong."
+    },
+    {
+      "finding_id": "GIS-002",
+      "title": "CROSS_VALIDATE_TOLERANCE_M drift — agent.md says 25 m default, elevationClient.js uses 30 m",
+      "severity": "LOW",
+      "confidence": 1.0,
+      "category": "docs",
+      "affected_files": [
+        "agents/gis-terrain-scientist/agent.md",
+        "genoa/src/evidence/terrain/elevationClient.js"
+      ],
+      "regulatory_scope": ["47 CFR §73.313(d)"],
+      "recommended_fix": "Lock the constant in one place. Recommend 30 m in BOTH places (agree with code): §73.313 arc-averages 27 samples per radial, single-pixel 30-m disagreement averages well below the published HAAT precision; the 'minor variations' clause does not require <25 m sample-level agreement; existing fixtures already pass at 30 m. Either way, export CROSS_VALIDATE_TOL_M from elevationClient.js and cite it in agent.md, don't restate.",
+      "tests_required": [
+        "grep -F 'CROSS_VALIDATE_TOL_M' genoa/src/evidence/terrain/elevationClient.js",
+        "grep -F 'CROSS_VALIDATE_TOLERANCE_M' agents/gis-terrain-scientist/agent.md"
+      ],
+      "deployment_risk": "low",
+      "human_review_required": false,
+      "reproducibility_notes": "elevationClient.js:107 sets CROSS_VALIDATE_TOL_M = 30; agent.md checklist item 1 documents 'default 25 m'. No exhibit silently flips at the 25–30 m band today, but a future operator reading only the agent doc will mis-tune."
+    }
+  ]
+}
