@@ -182,6 +182,55 @@ test('basis label reflects tx_amsl_resolved.source', () => {
   }
 });
 
+// DEM-source robustness: when the per-radial bundle is DEM-sourced but
+// the tx_amsl_resolved stamp is missing/unrecognized (the stale-cache
+// regression), basis must still be terrain_derived — NOT flat — so the
+// HAAT column isn't suppressed to the operator value on an exhibit whose
+// distances were genuinely terrain-modulated.
+test('basis: DEM-sourced bundle classifies terrain_derived even without tx_amsl_resolved stamp', () => {
+  // Varying terrain HAATs, plausible, consistent with operator 581.
+  const radials = [664.8, 668.8, 669.8, 668.3, 665.2, 656.0, 645.6, 635.8,
+                   596.1, 582.7, 546.1, 532.3, 547.5, 564.2, 573.1, 600.3,
+                   622.5, 633.5, 642.3, 650.7, 654.3, 654.1, 650.0, 641.1,
+                   622.7, 611.8, 562.1, 569.8, 551.3, 582.5, 594.7, 609.0,
+                   626.9, 640.0, 655.0, 660.0];
+  const ex = {
+    station_inputs: { call: 'KZLZ', service: 'FM', frequency: 105.3, haat_m: 581, lat: 32.25, lon: -111.12 },
+    evidence: {
+      // No tx_amsl_resolved stamp at all (the regression condition).
+      tx_amsl_resolved: null,
+      terrain: { available: true, source: 'zerotrustradio', n_radials_dem_sourced: 36 },
+      terrain_haat_per_radial: radials.map((h, i) => ({
+        az: i * 10, haat_m: h, haat_computed_m: h, haat_source: 'arc_averaged_dem'
+      }))
+    }
+  };
+  const r = validateHaat(ex);
+  assert.equal(r.basis, 'terrain_derived', 'DEM-sourced bundle must not be labelled flat');
+  assert.equal(r.status, 'PASS', 'plausible terrain HAAT consistent with operator → PASS');
+  assert.equal(r.display_suppressed, false, 'terrain HAAT column must NOT be suppressed');
+});
+
+// The DEM-source signal must NOT defeat the contamination guard: a
+// DEM-sourced bundle of impossible values (the −857 m KZLZ symptom)
+// still lands at INVALID because the hard-floor check is basis-blind.
+test('basis: DEM-sourced but impossible values still INVALID (contamination guard preserved)', () => {
+  const garbage = Array.from({ length: 36 }, () => -857);
+  const ex = {
+    station_inputs: { call: 'KZLZ', service: 'FM', frequency: 105.3, haat_m: 581, lat: 32.25, lon: -111.12 },
+    evidence: {
+      tx_amsl_resolved: null,
+      terrain: { available: true, source: 'zerotrustradio', n_radials_dem_sourced: 36 },
+      terrain_haat_per_radial: garbage.map((h, i) => ({
+        az: i * 10, haat_m: h, haat_computed_m: h, haat_source: 'arc_averaged_dem'
+      }))
+    }
+  };
+  const r = validateHaat(ex);
+  assert.equal(r.status, 'INVALID', 'impossible HAATs must still fail regardless of DEM-source classification');
+  assert.ok((r.issues || []).some(i => i.code === 'HAAT_IMPOSSIBLE'));
+});
+
 // Operator-HAAT fallback chain: when station_inputs.haat_m is missing
 // but the value is available via haat_m_input or evidence.terrain.haat_m,
 // the validator must still populate stats.operator_m + delta so the
