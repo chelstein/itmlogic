@@ -234,7 +234,14 @@ export function makeFacilityClient({
           dem:        j.dem,
           tx:         j.tx,
           n_radials:  j.n_radials,
-          radials:    j.radials
+          radials:    j.radials,
+          // ZTR's AMSL resolution provenance — exposed since the
+          // FCC-ASR-driven Path 0 fix.  Genoa uses these so the
+          // exhibit can attribute HAAT to the ASR-canonical AMSL
+          // instead of falling back to Genoa's independent DEM probe.
+          facility_amsl_source:    j.facility_amsl_source ?? null,
+          facility_amsl_resolved:  Number.isFinite(j.facility_amsl_resolved) ? j.facility_amsl_resolved : null,
+          ground_amsl_at_tx:       Number.isFinite(j.ground_amsl_at_tx) ? j.ground_amsl_at_tx : null
         };
       } catch (e){
         return { available: false, source: null, error: String(e.message) };

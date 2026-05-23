@@ -95,7 +95,25 @@ function collectAllRadialHaats(exhibit){
 export function validateHaat(exhibit){
   const inputs       = exhibit?.station_inputs || {};
   const evidence     = exhibit?.evidence || {};
-  const operatorHaat = Number(inputs.haat_m);
+  // Operator HAAT fallback chain.  station_inputs.haat_m is the
+  // primary, but the engineering report renderer also accepts
+  // station_inputs.haat_m_input and evidence.terrain.haat_m as
+  // sources, and we should match — otherwise the Appendix A header
+  // reports "(operator -- m, delta -- m)" even when the cover page
+  // clearly shows the operator value.
+  const operatorHaat = (() => {
+    const candidates = [
+      inputs.haat_m,
+      inputs.haat_m_input,
+      evidence.terrain?.haat_m,
+      evidence.terrain_haat?.operator_haat_m,
+    ];
+    for (const c of candidates){
+      const n = Number(c);
+      if (Number.isFinite(n)) return n;
+    }
+    return NaN;
+  })();
   const haatResolved = evidence.tx_amsl_resolved || null;
   const collected    = collectAllRadialHaats(exhibit);
   const haats        = collected.values;

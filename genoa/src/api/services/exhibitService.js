@@ -607,6 +607,26 @@ export async function computeExhibit(req){
       if (n_dem > 0){
         // Engine accepts the bundle; commit it to evidence.
         evidence.terrain_haat_per_radial = candidate;
+        // When ZTR resolved AMSL through its canonical ASR path
+        // (facility_amsl_source ∈ {asr_overall_height_m,
+        //  asr_height_agl_plus_live_ground, live_ground_plus_structure_height}),
+        // stamp tx_amsl_resolved with that provenance.  This is the
+        // wire that lets validateHaat() classify basis as
+        // 'terrain_derived' instead of falling to 'flat' — which is
+        // what the PDF was previously rendering as "flat-earth
+        // fallback (no terrain DEM)" even though the radial HAATs
+        // were genuinely terrain-modulated.
+        if (Number.isFinite(terrainResp.facility_amsl_resolved) && terrainResp.facility_amsl_source){
+          evidence.tx_amsl_resolved = {
+            value_m:           terrainResp.facility_amsl_resolved,
+            source:            'derived',
+            ztr_amsl_source:   terrainResp.facility_amsl_source,
+            tx_ground_amsl_m:  Number.isFinite(terrainResp.ground_amsl_at_tx) ? terrainResp.ground_amsl_at_tx : undefined,
+            haat_m_input:      Number(inputs.haat_m),
+            elevation_source:  terrainResp.dem?.source || terrainResp.dem?.dataset || 'zerotrustradio',
+            note:              `tx_amsl resolved by ZTR (${terrainResp.facility_amsl_source}); preserves FCC ASR provenance end-to-end`
+          };
+        }
         evidence.terrain = {
           available:  true,
           source:     terrainResp.source || 'zerotrustradio',
