@@ -52,6 +52,41 @@ const ENGINEER_FIELDS = [
   { id: 'antenna-elevation-pattern',  label: 'Elevation pattern reference',   placeholder: 'Manufacturer pattern data, ED-7842' }
 ];
 
+// Auto-fillable EoR fields derived from data already on the exhibit
+// (FCC FMQ + ASR sidecar + ZTR backfill).  The operator's own typed
+// value always wins over these (see mergedEngineer below); autofill
+// only supplies a default when the operator hasn't entered anything.
+// The other four fields (antenna make/model, radiation-center AGL,
+// ERP-vertical, elevation-pattern reference) have no upstream source
+// in any FCC/ASR dataset and remain operator-only.
+function deriveEngineerAutofill(exhibit){
+  if (!exhibit) return {};
+  const si  = exhibit.station_inputs || {};
+  const ev  = exhibit.evidence || {};
+  const asr = ev.asr || {};
+  const faa = ev.faa_oe || {};
+  const tc  = exhibit.tower_compliance || {};
+  const out = {};
+
+  const asrn = si.asr_number || asr.asr_number || asr.asrn;
+  if (asrn != null && String(asrn).trim()) out['asr-number'] = String(asrn).trim();
+
+  const hgt = [si.overall_height_m, asr.overall_height_m, tc.height_agl_m]
+    .map(Number).find(Number.isFinite);
+  if (Number.isFinite(hgt)) out['tower-overall-height-agl-m'] = hgt;
+
+  const det = faa.determination || tc.faa_determination;
+  if (det) out['faa-determination'] = String(det);
+
+  const paint = asr.painting_requirement || tc.marking?.style;
+  if (paint) out['tower-painting'] = String(paint);
+
+  const light = asr.lighting_requirement || tc.lighting?.style;
+  if (light) out['tower-lighting'] = String(light);
+
+  return out;
+}
+
 function loadCachedEngineer(facilityId){
   try {
     const raw = localStorage.getItem(`genoa.filing_engineer.${facilityId || 'default'}`);
@@ -68,7 +103,16 @@ function saveCachedEngineer(facilityId, engineer){
 
 export default function FilingPackagePanel({ exhibit }){
   const facilityId = exhibit?.station_inputs?.facility_id || '';
+  // Operator-typed values (persisted in localStorage) are the source of
+  // truth; autofill from the exhibit only supplies defaults for the
+  // fields we can derive from FCC/ASR data.  mergedEngineer = autofill
+  // first, operator overrides on top — so the operator can always
+  // correct an auto-filled value and the correction wins + persists.
+  const autofill = useMemo(() => deriveEngineerAutofill(exhibit),
+    [exhibit?.replay_digest?.exhibit_sha256]);
   const [engineer, setEngineer] = useState(() => loadCachedEngineer(facilityId));
+  const mergedEngineer = useMemo(() => ({ ...autofill, ...engineer }),
+    [autofill, engineer]);
   const [pkg, setPkg]           = useState(null);
   const [busy, setBusy]         = useState(false);
   const [error, setError]       = useState('');
@@ -89,7 +133,7 @@ export default function FilingPackagePanel({ exhibit }){
       method:      'POST',
       credentials: 'same-origin',
       headers:     { 'content-type': 'application/json' },
-      body:        JSON.stringify({ exhibit, applicant: { engineer } })
+      body:        JSON.stringify({ exhibit, applicant: { engineer: mergedEngineer } })
     })
       .then(r => r.ok ? r.json() : r.json().then(j => Promise.reject(j)))
       .then(j => { if (!cancelled) setPkg(j); })
@@ -97,7 +141,7 @@ export default function FilingPackagePanel({ exhibit }){
       .finally(() => { if (!cancelled) setBusy(false); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [exhibit?.replay_digest?.exhibit_sha256, JSON.stringify(engineer)]);
+  }, [exhibit?.replay_digest?.exhibit_sha256, JSON.stringify(mergedEngineer)]);
 
   function setEngineerField(k, v){
     setEngineer(prev => {
@@ -116,7 +160,7 @@ export default function FilingPackagePanel({ exhibit }){
         method:      'POST',
         credentials: 'same-origin',
         headers:     { 'content-type': 'application/json' },
-        body:        JSON.stringify({ exhibit, applicant: { engineer } })
+        body:        JSON.stringify({ exhibit, applicant: { engineer: mergedEngineer } })
       });
       if (!r.ok){
         const j = await r.json().catch(() => ({}));
@@ -188,14 +232,29 @@ export default function FilingPackagePanel({ exhibit }){
           Engineer-of-record manual fields
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-2">
-          {ENGINEER_FIELDS.map(f => (
-            <EngineerInput key={f.id} field={f} value={engineer[f.id] ?? ''} onChange={v => setEngineerField(f.id, v)} />
-          ))}
+          {ENGINEER_FIELDS.map(f => {
+            // Auto-filled when the operator hasn't typed a value but the
+            // exhibit/ASR data supplied one.  Operator edits override and
+            // clear the auto flag (since engineer[f.id] then exists).
+            const isAuto = (engineer[f.id] == null || engineer[f.id] === '')
+                        && autofill[f.id] != null && autofill[f.id] !== '';
+            return (
+              <EngineerInput
+                key={f.id}
+                field={f}
+                value={mergedEngineer[f.id] ?? ''}
+                autoFilled={isAuto}
+                onChange={v => setEngineerField(f.id, v)}
+              />
+            );
+          })}
         </div>
         <div className="text-[10px] text-textDim">
-          These persist per-facility in localStorage so you don't retype between computes.
-          Sections I (applicant ID), II (legal certs), IV (ownership) are out of scope —
-          handled by the licensee + FCC counsel.
+          Fields tagged <span className="text-[#5a9ec4] font-bold">AUTO</span> are pre-filled
+          from FCC FMQ + ASR registry data — verify before filing; editing overrides them.
+          Manual values persist per-facility in localStorage so you don't retype between
+          computes.  Sections I (applicant ID), II (legal certs), IV (ownership) are out of
+          scope — handled by the licensee + FCC counsel.
         </div>
       </div>
 
@@ -312,15 +371,26 @@ function FieldRow({ field }){
   );
 }
 
-function EngineerInput({ field, value, onChange }){
+function EngineerInput({ field, value, onChange, autoFilled }){
+  const labelRow = (
+    <label className="flex items-center gap-1.5 text-textDim text-[10px] tracking-rack uppercase mb-0.5">
+      <span>{field.label}</span>
+      {autoFilled && (
+        <span className="text-[8px] tracking-wider uppercase text-white bg-[#5a9ec4] rounded px-1 py-px font-bold leading-none">
+          auto
+        </span>
+      )}
+    </label>
+  );
+  const ring = autoFilled ? 'border-[#5a9ec4]/60' : 'border-rule';
   if (field.options){
     return (
       <div>
-        <label className="block text-textDim text-[10px] tracking-rack uppercase mb-0.5">{field.label}</label>
+        {labelRow}
         <select
           value={value}
           onChange={e => onChange(e.target.value)}
-          className="w-full bg-black/70 border border-rule rounded px-2 py-1 text-cream text-[11px]"
+          className={`w-full bg-black/70 border ${ring} rounded px-2 py-1 text-cream text-[11px]`}
         >
           <option value="">—</option>
           {field.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
@@ -330,13 +400,13 @@ function EngineerInput({ field, value, onChange }){
   }
   return (
     <div>
-      <label className="block text-textDim text-[10px] tracking-rack uppercase mb-0.5">{field.label}</label>
+      {labelRow}
       <input
         type={field.type || 'text'}
         value={value}
         onChange={e => onChange(field.type === 'number' ? (e.target.value === '' ? '' : Number(e.target.value)) : e.target.value)}
         placeholder={field.placeholder || ''}
-        className="w-full bg-black/70 border border-rule rounded px-2 py-1 text-cream text-[11px]"
+        className={`w-full bg-black/70 border ${ring} rounded px-2 py-1 text-cream text-[11px]`}
       />
     </div>
   );
