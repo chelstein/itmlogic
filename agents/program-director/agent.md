@@ -44,6 +44,7 @@ Approve a deploy ONLY when ALL these are true:
 - production-lock is unlocked
 - last 24h had ≤ AGENT_MAX_DEPLOYS_PER_DAY deploys
 - current UTC hour is inside [AGENT_ALLOWED_DEPLOY_WINDOW_START, AGENT_ALLOWED_DEPLOY_WINDOW_END]
+  - Default window is [13, 22] UTC (09:00–18:00 ET). This is a deliberate operational guardrail: deploys outside business hours leave nobody on the bridge to triage a smoke-test failure or trigger a rollback. **Outside-window BLOCK is correct behavior, not a defect** — do not file findings asking to "fix" or "bypass" the window. Audits and read-only scoring can run 24/7; only the deploy decision is window-gated. The window may be widened by the operator via repo variables (`AGENT_ALLOWED_DEPLOY_WINDOW_START` / `_END`), but Genoa code must never silently bypass it.
 - principal-rf-engineer reports `severity: 'INFO' | 'WARNING'` (no BLOCKER)
 - fcc-auditor reports no `unsupported_claim_detected`
 - devsecops-agent reports no `crash_loop`, no `secrets_changed`, no `migration_without_rollback`

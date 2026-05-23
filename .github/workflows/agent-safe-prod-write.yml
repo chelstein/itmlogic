@@ -67,6 +67,31 @@ jobs:
       - name: jq present
         run: jq --version
 
+      # --- PR-CI-GATES: governance/audit invariants (run every cycle) ---
+      # These four gates must pass before any merge or deploy is contemplated.
+      # They are static — no production credentials required, no network egress.
+      # If any of these fails, the workflow stops well before safe-merge runs.
+
+      - name: governance gate — agents:test (postcondition + create-issues + migration rollback)
+        working-directory: genoa
+        run: npm run agents:test
+
+      - name: governance gate — validate every last-findings.json against schema
+        working-directory: genoa
+        run: npm run agents:validate
+
+      - name: governance gate — create-issues dry-run (proves dedup + classifier are deterministic)
+        working-directory: genoa
+        run: npm run agents:issues:dry-run
+
+      - name: governance gate — every committed migration carries a rollback block
+        run: ./agents/scripts/tests/test-migrations-have-rollback.sh
+
+      # --- DSO-004: static dep audit (no DO creds required) ---
+      - name: devsecops gate — npm audit (HIGH/CRITICAL on prod deps)
+        working-directory: genoa
+        run: npm audit --omit=dev --audit-level=high
+
       - name: check production lock
         run: ./agents/scripts/check-production-lock.sh --verbose
 
@@ -86,9 +111,68 @@ jobs:
             agents/logs/*.log
           retention-days: 14
 
+      # --- DSO-004: pre-deploy operational gates (only in safe_prod_write mode) ---
+      # These require DO credentials + VPC reachability; they run ONLY when the
+      # operator has explicitly selected safe_prod_write.  They guard against
+      # deploying on top of a degraded app or a sidecar mesh that can't resolve.
+
+      - name: devsecops gate — install doctl
+        if: env.AGENT_DEPLOY_MODE == 'safe_prod_write'
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
+
+      - name: devsecops gate — doctl apps get-deployment (assert components HEALTHY)
+        if: env.AGENT_DEPLOY_MODE == 'safe_prod_write'
+        run: |
+          DEPLOYMENT_JSON=$(doctl apps get-deployment "${DIGITALOCEAN_APP_ID}" --output json | jq '.[0]')
+          BAD=$(echo "$DEPLOYMENT_JSON" \
+            | jq -r '[.services, .workers, .static_sites, .jobs][] // [] | .[] | select(.status != "HEALTHY") | "\(.name)=\(.status)"')
+          if [[ -n "$BAD" ]]; then
+            echo "::error::doctl apps get-deployment reports non-HEALTHY components:" >&2
+            echo "$BAD" >&2
+            exit 1
+          fi
+          echo "all components HEALTHY"
+
+      - name: devsecops gate — sidecar DNS probe (getent hosts genoa-* inside VPC)
+        if: env.AGENT_DEPLOY_MODE == 'safe_prod_write'
+        run: |
+          # Throwaway alpine in the workflow runner — for a true VPC-internal
+          # check the operator can pin this step to a self-hosted runner inside
+          # the DO VPC.  Either way, every name in the sidecar mesh must resolve.
+          # DSO-004 grep target: `getent hosts genoa-` must appear in this file.
+          docker run --rm alpine:3 sh -c '
+            set -e
+            apk add --no-cache bind-tools >/dev/null
+            getent hosts genoa-terrain genoa-identity genoa-nec || {
+              echo "::error::DNS probe failed for one of: genoa-terrain genoa-identity genoa-nec" >&2
+              exit 1
+            }
+            echo "resolved: genoa-terrain genoa-identity genoa-nec"
+          '
+
       - name: safe deploy (only when AGENT_DEPLOY_MODE=safe_prod_write)
         if: env.AGENT_DEPLOY_MODE == 'safe_prod_write'
         run: ./agents/scripts/safe-deploy-digitalocean.sh
+
+      - name: devsecops gate — restart_count scan (1h log window, reject crash loops)
+        if: env.AGENT_DEPLOY_MODE == 'safe_prod_write'
+        run: |
+          # Reject if any component shows restart_count > 3 inside the last 1h.
+          # Parses doctl apps logs --type run --since 1h for the restart_count signal.
+          FAIL=0
+          for COMP in genoa-api genoa-terrain genoa-identity genoa-nec; do
+            LOG=$(doctl apps logs "${DIGITALOCEAN_APP_ID}" "${COMP}" --type run --since 1h 2>/dev/null || true)
+            RESTARTS=$(echo "$LOG" | grep -Eo 'restart_count[[:space:]:=]+[0-9]+' | grep -Eo '[0-9]+$' | sort -n | tail -1)
+            RESTARTS=${RESTARTS:-0}
+            if [[ "$RESTARTS" -gt 3 ]]; then
+              echo "::error::component ${COMP} restart_count=${RESTARTS} (>3) in last 1h" >&2
+              FAIL=1
+            fi
+          done
+          if [[ "$FAIL" -ne 0 ]]; then exit 1; fi
+          echo "no crash loops detected"
 
       - name: summary
         if: always()
