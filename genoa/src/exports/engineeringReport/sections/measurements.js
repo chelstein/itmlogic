@@ -80,7 +80,7 @@ export function buildMeasurementsSection(exhibit){
       'by the SDR sidecar proxy) so a reviewer can audition the off-air capture ' +
       'directly.  This section is advisory only; FCC Part 73 compliance is determined ' +
       'by the distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; ' +
-      '§73.182 / §73.184 / §73.187 for AM) reported elsewhere in this exhibit.'
+      '§73.182 / §73.184 / §73.185 / §73.190 for AM) reported elsewhere in this exhibit.'
     ],
     footnote: sourceNote || null,
     table: {

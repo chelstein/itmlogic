@@ -137,7 +137,7 @@ export function buildConclusionSection(exhibit){
         `The 47 CFR ${vocab.allocation_rule_cite} ${vocab.service_label} nighttime allocation study indicates ` +
         'the facility does not qualify at its proposed nighttime operating mode/' +
         `${vocab.erp_term.toLowerCase()}.  ` +
-        `${s.n_failing_azimuths ?? '?'}/${s.azimuths_evaluated ?? '?'} evaluated azimuths fail the ${vocab.interference_cite} D/U protection ratio; ` +
+        `${s.n_failing_azimuths ?? '?'}/${s.azimuths_evaluated ?? '?'} evaluated azimuths fail the ${vocab.nighttime_interference_cite || vocab.interference_cite} D/U protection ratio; ` +
         `worst binding margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}.  ` +
         `Facility redesign (${vocab.waiver_options}) is required prior to filing.`;
     } else {
@@ -150,7 +150,7 @@ export function buildConclusionSection(exhibit){
       'screening engine (Berry 1968 analytical) and reports ' + (s.n_failing_azimuths ?? '?') + ' failing azimuth(s) ' +
       `(worst margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}).  ` +
       `Re-run with FCCAM (Wang 1985) before filing to obtain a defensible ${vocab.skywave_cite || '§73.190(c)'} result; ` +
-      `a Berry-only failure is advisory and may not bind under ${vocab.interference_cite}/${vocab.skywave_cite || '§73.190(c)'}.`;
+      `a Berry-only failure is advisory and may not bind under ${vocab.nighttime_interference_cite || vocab.interference_cite}/${vocab.skywave_cite || '§73.190(c)'}.`;
   } else if (v.status === Verdict.NON_COMPLIANT && isr && isr.filing_qualifies === false){
     // Reuse the failed-rules synthesis from the prior implementation so
     // the conclusion can't claim §73.207 failed when only §73.215 did.
@@ -161,10 +161,16 @@ export function buildConclusionSection(exhibit){
       }
     }
     const ruleDescriptors = {
-      '§73.207(b)': '§73.207 minimum distance separation',
-      '§73.215':    '§73.215 contour protection',
-      '§74.1204':   '§74.1204 translator-interference protection',
-      '§73.187':    '§73.187 AM nighttime skywave protection'
+      '§73.207(b)':          '§73.207 minimum distance separation',
+      '§73.215':             '§73.215 contour protection',
+      '§74.1204':            '§74.1204 translator-interference protection',
+      // AM nighttime skywave protection — grounded in §73.182(k) (NIF/RSS)
+      // and §73.190 (SS-1/SS-2 charts).  See engine/regulatory/citations.js.
+      // §73.187 is "Limitation on daytime radiation" (a different rule)
+      // and is no longer emitted by the engine as a nighttime cite.
+      '§73.182(k)':          '§73.182(k) AM nighttime interference-free service (NIF / RSS)',
+      '§73.182(k) / §73.190': '§73.182(k)/§73.190 AM nighttime skywave protection',
+      '§73.190':             '§73.190 AM nighttime skywave (SS-1/SS-2 charts)'
     };
     const failedList = [...failedRules]
       .map(c => ruleDescriptors[c] || c)

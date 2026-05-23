@@ -68,7 +68,7 @@ export function buildAssumptionsSection(exhibit){
         : 'Constant HAAT used as filed; no per-radial DEM sampling performed (CONSTANT_HAAT_ASSUMED warning attached).  Filing engineer must confirm the filed HAAT was derived per §73.313.'}`;
 
   const popAssumption = pop?.source
-    ? `Population estimate sourced from ${pop.source} (${pop.dataset || 'dataset unspecified'}, vintage ${pop.vintage || '—'}); contour-weighting via ${pop.method || 'centroid-in-polygon'}.  Provided for context only — Part 73 compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.187 for AM), not population.`
+    ? `Population estimate sourced from ${pop.source} (${pop.dataset || 'dataset unspecified'}, vintage ${pop.vintage || '—'}); contour-weighting via ${pop.method || 'centroid-in-polygon'}.  Provided for context only — Part 73 compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.185 / §73.190 for AM), not population.`
     : 'Population estimate not attached; if required for the filing, the licensee must request a Census-block computation prior to upload.';
 
   // Spacing rule citation — §73.207 is FM-only; §73.37 is AM equivalent.

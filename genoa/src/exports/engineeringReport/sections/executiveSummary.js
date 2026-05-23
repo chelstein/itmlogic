@@ -64,7 +64,7 @@ export function buildExecutiveSummarySection(exhibit){
   const checks = [];
   if (isAm){
     checks.push('the §73.184 groundwave service contours (city / primary / secondary / night-intf)');
-    checks.push('§73.187 nighttime skywave protection of every Class A / B / D station within 1500 km');
+    checks.push('§73.182(k) / §73.190 nighttime skywave protection (RSS combination per §73.185) of every Class A / B / D station within 1500 km');
     if (exhibit?.am_blanket_compliance?.applicable)      checks.push('§73.24(g) blanketing-interference compliance');
     if (exhibit?.am_city_coverage_compliance?.applicable) checks.push('§73.24(j) principal-community coverage');
     if (exhibit?.am_da_pattern_compliance?.applicable)   checks.push('§73.150 directional-antenna pattern shape');

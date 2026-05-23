@@ -16,7 +16,7 @@ export function buildMethodologySection(exhibit){
   } else if (svc === 'AM'){
     paragraphs.push(
       'AM groundwave field strengths were determined using the curves specified in 47 CFR §73.184 and the engineering standards of allocation in 47 CFR §73.183.',
-      'Where applicable, nighttime skywave protection was evaluated under 47 CFR §73.187 using the SS-1 (50%) field strength formulation of 47 CFR §73.190.',
+      'Where applicable, nighttime skywave protection was evaluated under 47 CFR §73.182(k) (nighttime interference-free service / RSS combination per §73.185) using the SS-1 (50%) field strength formulation of 47 CFR §73.190.',
       'Field-strength values were determined by interpolation of FCC tabulated data.'
     );
   }

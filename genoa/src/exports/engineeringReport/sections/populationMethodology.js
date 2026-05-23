@@ -25,7 +25,7 @@ export function buildPopulationMethodologySection(exhibit){
       type:    'paragraphs',
       heading: 'Population Methodology (Informational)',
       paragraphs: [
-        'No population estimate is attached to this exhibit.  Population is informational under 47 CFR Part 73 — FCC compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.187 for AM), not population counts — and is therefore not required for filing.',
+        'No population estimate is attached to this exhibit.  Population is informational under 47 CFR Part 73 — FCC compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.185 / §73.190 for AM), not population counts — and is therefore not required for filing.',
         'If the licensee elects to include a persons-served figure in the filing narrative, the Genoa orchestrator can compute one via the FCC Census Block API once the exhibit carries valid lat/lon coordinates.'
       ]
     };
@@ -59,7 +59,7 @@ export function buildPopulationMethodologySection(exhibit){
   const paragraphs = [
     `Population served within the bounding contour is sourced from ${pop.source}${pop.dataset ? ` (${pop.dataset}` : ''}${pop.vintage ? `, vintage ${pop.vintage}` : ''}${pop.dataset ? ')' : ''}.  Block-level population was retrieved live from the upstream endpoint at compute time; the dataset SHA256 in the table below pins the exact dataset payload returned.`,
     `Aggregation rule: ${pop.method || 'centroid-in-polygon'}.  A Census block is included if its centroid falls inside the closed contour ring; partial-block weighting is not applied.  The choice of bounding contour (${pop.contour_label || '—'}) follows the standard §73.333 city-grade convention for the subject service.`,
-    'Population is reported here for informational reference only.  Under 47 CFR Part 73 the regulatory tests are distance- and field-strength-based (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.187 for AM).  This figure is not used by the engine in any pass/fail determination, nor should it be relied upon by the FCC reviewer as a compliance metric.'
+    'Population is reported here for informational reference only.  Under 47 CFR Part 73 the regulatory tests are distance- and field-strength-based (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.185 / §73.190 for AM).  This figure is not used by the engine in any pass/fail determination, nor should it be relied upon by the FCC reviewer as a compliance metric.'
   ];
 
   return {

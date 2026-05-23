@@ -30,10 +30,22 @@ const SERVICE_VOCABULARIES = Object.freeze({
     propagation_cite:     '§73.184',
     coverage_rule_cite:   '§73.184',
     allocation_rule_cite: '§73.182',
-    interference_cite:    '§73.182(k)',
-    skywave_cite:         '§73.190(c)',
-    daytime_cite:         '§73.182(a)',
-    nighttime_cite:       '§73.182(k)',
+    // AM has two distinct interference-protection regimes — daytime
+    // (Class B / D radiation limits under §73.187 + groundwave overlap
+    // under §73.182/§73.185) and nighttime (§73.182(k) NIF + §73.190
+    // SS-1 skywave RSS).  PRF-008 identified that the day-agnostic
+    // COMPLIANT_VIA_ALT_RULE narrative previously cited only the
+    // nighttime rule for both day and night AM exhibits.  The
+    // generic interference_cite now names both regimes so the
+    // narrative is correct under either; downstream callers that need
+    // a specific regime should read daytime_interference_cite /
+    // nighttime_interference_cite directly.
+    interference_cite:           '§73.182 / §73.187 (daytime) and §73.182(k) / §73.190 (nighttime)',
+    daytime_interference_cite:   '§73.187',
+    nighttime_interference_cite: '§73.182(k)',
+    skywave_cite:                '§73.190(c)',
+    daytime_cite:                '§73.182(a)',
+    nighttime_cite:              '§73.182(k)',
     fcc_cite_root:        '47 CFR Part 73 Subpart A',
     coverage_phrase:      'groundwave field strength',
     pattern_phrase:       'directional antenna pattern',

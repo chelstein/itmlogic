@@ -11,6 +11,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -118,18 +119,26 @@ test('F-003 — assumptions ground-conductivity sentence attributes Figure M3 to
 
 // ── F-004: serviceWording AM.interference_cite = §73.182(k) ──────────
 
-test('F-004 — wordingFor("AM").interference_cite is §73.182(k), not §73.183', () => {
-  // §73.183 is "Groundwave signals" and defines service-class field
-  // strengths.  It does NOT carry D/U interference ratios — those live
-  // in §73.182 (Engineering standards of allocation), with the
-  // nighttime NIF binding rule at §73.182(k).  The serviceWording
-  // token flows into conclusion.js narratives like
-  //   "X/Y evaluated azimuths fail the ${vocab.interference_cite} D/U
-  //    protection ratio"
-  // so an incorrect cite there ships into customer-facing exhibits.
+// ── PRF-008 (PR-CITE2): AM interference_cite covers day AND night ────
+
+test('PRF-008 — wordingFor("AM") splits interference into daytime and nighttime variants', () => {
+  // Day-agnostic narratives (e.g. COMPLIANT_VIA_ALT_RULE in conclusion.js)
+  // used to render only the nighttime cite §73.182(k) for both day and
+  // night AM exhibits.  PR-CITE2 split the AM vocabulary into explicit
+  // daytime_interference_cite (§73.187 — Limitation on daytime radiation)
+  // and nighttime_interference_cite (§73.182(k) — NIF / RSS), with the
+  // generic interference_cite naming BOTH so the narrative is correct
+  // under either regime.  Nighttime-specific narratives in conclusion.js
+  // now consume vocab.nighttime_interference_cite directly.
   const am = wordingFor('AM');
-  assert.equal(am.interference_cite, '§73.182(k)',
-    'AM interference_cite must point at the rule that actually carries D/U / NIF binding');
+  assert.equal(am.daytime_interference_cite,   '§73.187',
+    'AM daytime interference cite must be §73.187 (Limitation on daytime radiation)');
+  assert.equal(am.nighttime_interference_cite, '§73.182(k)',
+    'AM nighttime interference cite must be §73.182(k) (NIF / RSS)');
+  assert.match(am.interference_cite, /§73\.182(?:\(k\))?\b/,
+    'AM generic interference_cite must name §73.182 (or §73.182(k)) — nighttime regime');
+  assert.match(am.interference_cite, /§73\.187\b/,
+    'AM generic interference_cite must also name §73.187 — daytime regime');
   // Spot-check the adjacent cite fields stayed correct.
   assert.equal(am.allocation_rule_cite, '§73.182');
   assert.equal(am.skywave_cite,         '§73.190(c)');
@@ -137,8 +146,130 @@ test('F-004 — wordingFor("AM").interference_cite is §73.182(k), not §73.183'
   assert.equal(am.nighttime_cite,       '§73.182(k)');
 });
 
-// FM and LPFM interference cites should be untouched by PR-D.
-test('F-004 — FM and LPFM interference_cite values are unchanged by PR-D', () => {
+// FM and LPFM interference cites should be untouched.
+test('F-004 / PRF-008 — FM and LPFM interference_cite values are unchanged', () => {
   assert.equal(wordingFor('FM').interference_cite,    '§73.215');
   assert.equal(wordingFor('LPFM').interference_cite,  '§73.809');
+});
+
+// ── PR-CITE2 F-005: §73.187 mis-attribution sweep ────────────────────
+
+// User-facing surfaces where §73.187 was being mis-cited as the basis
+// for AM NIGHTTIME skywave protection.  The actual statutory basis is
+// §73.182(k) (NIF / RSS) + §73.190 (SS-1/SS-2 charts).  §73.187 is
+// "Limitation on daytime radiation" per current eCFR; using it for
+// nighttime mis-tells the reviewer which rule the engine evaluated.
+const F005_SURFACES = [
+  'exports/engineeringReport/sections/conclusion.js',
+  'exports/engineeringReport/sections/executiveSummary.js',
+  'exports/engineeringReport/sections/methodology.js',
+  'exports/engineeringReport/sections/appendices.js',
+  'exports/engineeringReport/sections/_fmReasoning.js',
+  'exports/engineeringReport/sections/populationMethodology.js',
+  'exports/engineeringReport/sections/validationVerdict.js',
+  'exports/engineeringReport/sections/measurements.js',
+  'exports/engineeringReport/sections/assumptions.js',
+  'types/warnings.js',
+  'engine/regulatory/internationalBorderDetect.js',
+];
+
+// Phrases that pair §73.187 with nighttime / skywave / NIF semantics —
+// each one represents the mis-attribution PR-CITE2 swept.
+// Comments are stripped before matching so engineers can leave
+// "// historical: §73.187 nighttime ..." notes in source without
+// re-tripping the gate; only RENDERED string literals fail.
+const NIGHTTIME_VOCAB = /(nighttime|skywave|NIF)/i;
+
+test('PR-CITE2 F-005 — no rendered surface pairs §73.187 with nighttime / skywave / NIF wording', () => {
+  for (const rel of F005_SURFACES){
+    const src = readFileSync(join(REPO_SRC, rel), 'utf8');
+    const stripped = src
+      .replace(/^\s*\/\/.*$/gm, '')       // strip line comments
+      .replace(/\/\*[\s\S]*?\*\//g, '');  // strip block comments
+    // Pair-match: any §73.187 reference within ±120 chars of nighttime/
+    // skywave/NIF vocabulary in the remaining (rendered) text is a fail.
+    const re = /§73\.187[^\n]{0,120}(nighttime|skywave|NIF)|(nighttime|skywave|NIF)[^\n]{0,120}§73\.187/i;
+    const m = stripped.match(re);
+    assert.equal(m, null,
+      `${rel} still pairs §73.187 with nighttime/skywave/NIF wording — fragment: ${m ? m[0].slice(0, 200) : ''}`);
+  }
+});
+
+test('PR-CITE2 F-005 — engine emits §73.182(k) or §73.190 for nighttime skywave narratives', () => {
+  // executiveSummary, methodology, appendices preface for AM all carry
+  // the actual statutory basis — assert at least one of the canonical
+  // nighttime cites is present in each rendered surface.
+  const surfaces = [
+    'exports/engineeringReport/sections/executiveSummary.js',
+    'exports/engineeringReport/sections/methodology.js',
+    'exports/engineeringReport/sections/appendices.js',
+    'types/warnings.js',
+  ];
+  for (const rel of surfaces){
+    const src = readFileSync(join(REPO_SRC, rel), 'utf8');
+    assert.match(src, /§73\.182\(k\)|§73\.190/,
+      `${rel} must cite §73.182(k) and/or §73.190 as the nighttime-skywave basis`);
+  }
+});
+
+// ── PR-CITE2 F-006: Form 349 "within or overlapping" → "entirely within" ─
+
+test('PR-CITE2 F-006 — form349.js fill-in note states the contour is ENTIRELY WITHIN, not "within or overlapping"', () => {
+  const src = readFileSync(join(REPO_SRC, 'exports/lmsFiling/form349.js'), 'utf8');
+  assert.doesNotMatch(src, /within or overlapping/i,
+    'form349.js must not use the loose "within or overlapping" phrasing — §74.1201(g) requires the translator service contour entirely within the primary protected contour');
+  assert.match(src, /entirely within/i,
+    'form349.js must explicitly state "entirely within" for the fill-in contour requirement');
+});
+
+test('PR-CITE2 F-006 — form349.js submission_checklist no longer mis-cites §74.1232(d)/(e)', () => {
+  // §74.1232(e) is about financial-support prohibitions, NOT fill-in
+  // contour scope.  §74.1232(d) is about coverage-area ownership
+  // restrictions, NOT AM-primary cross-service.  Fill-in is §74.1201(g);
+  // AM-primary translator-area defaults are §74.1231(i).
+  const src = readFileSync(join(REPO_SRC, 'exports/lmsFiling/form349.js'), 'utf8');
+  assert.doesNotMatch(src, /§74\.1232\(e\)[^\n]*fill-in/i,
+    'form349.js must not claim §74.1232(e) is the fill-in cite — fill-in lives in §74.1201(g)');
+  assert.doesNotMatch(src, /§74\.1232\(d\)[^\n]*cross-service/i,
+    'form349.js must not claim §74.1232(d) is the cross-service-for-AM-primary cite — that lives in §74.1231');
+});
+
+// ── PR-CITE2 F-007: peCertification.js header cites real authority ───
+
+test('PR-CITE2 F-007 — peCertification.js header does not cite "§73.x"', () => {
+  const src = readFileSync(join(REPO_SRC, 'engine/regulatory/peCertification.js'), 'utf8');
+  assert.doesNotMatch(src, /§73\.x/,
+    'peCertification.js must not cite the non-existent "§73.x" placeholder; PE authority is state PE registration boards + §73.1610 / §73.3539');
+  assert.match(src, /§73\.1610/,
+    'peCertification.js must name §73.1610 as part of the PE-stamp regulatory basis');
+  assert.match(src, /§73\.3539/,
+    'peCertification.js must name §73.3539 as part of the PE-stamp regulatory basis');
+});
+
+// ── PR-CITE2: §73.x placeholder cannot live in ANY *.js under engine/ or exports/ ─
+
+test('PR-CITE2 — repository-wide: no rendered §73.x placeholder anywhere under engine/ or exports/', () => {
+  // Belt + suspenders to the per-file F-002 tests above.  Walks every
+  // .js / .mjs source file under src/engine/ and src/exports/, strips
+  // comments, and fails if "§73.x" appears in any remaining string
+  // literal.  (engine/regulatory/citations.js intentionally describes
+  // every real rule by section number — but never as "§73.x"; the test
+  // catches any reintroduction.)
+  const repoRoot = join(REPO_SRC, '..');
+  const out = execSync(
+    "git ls-files -z 'src/engine/**/*.js' 'src/engine/**/*.mjs' 'src/exports/**/*.js' 'src/exports/**/*.mjs'",
+    { cwd: repoRoot, encoding: 'utf8' }
+  );
+  const files = out.split('\0').filter(Boolean);
+  assert.ok(files.length > 0, 'glob should match at least one engine/exports source file');
+  const offenders = [];
+  for (const rel of files){
+    const src = readFileSync(join(repoRoot, rel), 'utf8');
+    const stripped = src
+      .replace(/^\s*\/\/.*$/gm, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '');
+    if (stripped.includes('§73.x')) offenders.push(rel);
+  }
+  assert.equal(offenders.length, 0,
+    `the literal "§73.x" appears in rendered text of: ${offenders.join(', ')}`);
 });

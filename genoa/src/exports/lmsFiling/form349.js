@@ -247,7 +247,7 @@ export const FORM_349_FIELDS = Object.freeze([
     required: false,
     cite: '47 CFR §74.1201(g)',
     mapping: null,
-    notes: 'Required when translator-class = fill-in; demonstrates 60 dBu service contour is within or overlapping primary station\'s protected contour.',
+    notes: 'Required when translator-class = fill-in; demonstrates the translator 60 dBµV/m predicted service contour is located ENTIRELY WITHIN the primary station protected contour (60 dBu for a commercial FM primary; 2 mV/m for an AM primary under §74.1231(i); the analogous NCE protected contour for an NCE primary).  A translator whose service contour merely overlaps — but is not entirely within — is non-fill-in and falls under §74.1232 eligibility / coordination provisions.',
     engineer_confirmation_required: true
   },
 
@@ -320,7 +320,7 @@ export const FORM_349_META = Object.freeze({
     'Engineering Statement PDF signed by a qualified broadcast engineer',
     'Primary-station identification: call sign, facility ID, and §74.1232 eligibility statement (commercial primary vs. NCE primary)',
     '§74.1204 protection compliance: contour-overlap analysis vs. all co/1st/2nd/3rd-adjacent stations and Class D applications within the protected contour',
-    'Fill-in vs. cross-service translator: justification per §74.1232(e) (fill-in within primary 60 dBu) or §74.1232(d) (cross-service for AM primary)',
+    'Fill-in vs. cross-service translator: justification per §74.1201(g) (fill-in: translator 60 dBµV/m service contour entirely within primary protected contour) and §74.1231 (eligibility and licensing requirements — see §74.1231(i) for AM-primary translator-area and protected-contour definitions); §74.1232 governs additional ownership/eligibility provisions',
     '§74.1235 frequency-coordination: confirm channel selection is consistent with §73.207 if co-channel-adjacent to a full-service FM',
     'OET-65 RF-exposure showing for the translator tx site',
     'Tower / antenna structure: ASR #, FAA Form 7460-1 determination, marking & lighting per FCC Part 17',

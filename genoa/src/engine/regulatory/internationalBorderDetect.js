@@ -83,7 +83,7 @@ export function detectInternationalBorder({ lat, lon } = {}){
       treaty:        'US/Mexico AM Agreement (1986, as amended)',
       distance_km:   mx.distance_km,
       threshold_km:  US_MX_TREATY_ZONE_KM,
-      obligation:    `Daytime 25 mV/m groundwave contour overlap with co-channel and first-adjacent Mexican AM stations must be checked; cross-border interference requires consultation per the bilateral agreement.  Nighttime skywave protection per §73.187 with Mexican stations carrying treaty-level §73.190 thresholds.`,
+      obligation:    `Nighttime: skywave protection per §73.182(k) / §73.190 with Mexican stations carrying treaty-level §73.190 SS-1 thresholds.  Daytime: 25 mV/m groundwave contour overlap with co-channel and first-adjacent Mexican AM stations must be evaluated and cross-border interference requires consultation per the bilateral agreement, with the daytime-radiation rule (§73.187) governing critical-hours power reductions.`,
       treaty_zone:   true
     });
   }
@@ -92,7 +92,7 @@ export function detectInternationalBorder({ lat, lon } = {}){
       treaty:        'US/Canada AM treaty',
       distance_km:   ca.distance_km,
       threshold_km:  US_CA_TREATY_ZONE_KM,
-      obligation:    `AM allocations within 800 km of the US/Canada border require notification and protection per the Canada-US Letter of Understanding.  Section 73.187 nighttime skywave checks must include nearby Canadian AM stations.`,
+      obligation:    `AM allocations within 800 km of the US/Canada border require notification and protection per the Canada-US Letter of Understanding.  Nighttime: skywave checks (§73.182(k) / §73.190 SS-1 RSS) must include nearby Canadian AM stations under the bilateral agreement.  Daytime radiation limits during critical hours are governed by §73.187.`,
       treaty_zone:   true
     });
   }
