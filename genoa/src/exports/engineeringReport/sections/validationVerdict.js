@@ -543,7 +543,18 @@ export function buildValidationVerdictSection(exhibit){
     // is required.
     interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit).  Code-identity is strong evidence of parity but is NOT a live cross-check; engineer of record should re-run with the live parity check before filing if definitive cross-verification is required.';
   } else {
-    interpretation = 'Curve validation did not pass for this exhibit.  The technical math is NOT verified; do not file this exhibit until validation is investigated and the underlying engine / dataset issue resolved.';
+    // status was dragged below PARTIAL by an ontology cap — an
+    // INCOMPLETE component (missing evidence) or a compliance finding
+    // (e.g. §73.215 contour-protection FAIL) — NOT necessarily a curve-
+    // validation failure.  Only assert "curve validation did not pass"
+    // when the golden suite ACTUALLY failed; otherwise name the real
+    // cause so this sentence can't contradict the "Curve validation:
+    // PASS" line + the COMPUTATIONAL: PASS category three lines above.
+    if (!curvePass){
+      interpretation = 'Curve validation did not pass for this exhibit.  The technical math is NOT verified; do not file this exhibit until validation is investigated and the underlying engine / dataset issue resolved.';
+    } else {
+      interpretation = 'The curve math itself is verified (golden-reference suite passes) — but the overall verdict is held below VERIFIED because one or more non-curve gates are open: incomplete validation evidence and/or a regulatory finding such as a §73.215 contour-protection failure (see the Engineering Conclusion).  Resolve the open gate(s) before filing; the engine math is not the blocker.';
+    }
   }
 
   // Three-category headline — replaces the single "Status: X /
@@ -604,6 +615,16 @@ export function buildValidationVerdictSection(exhibit){
 
   // Filing readiness — a separate judgment, NOT a tautology of the
   // other two.  This is the line the engineer-of-record cares about.
+  //
+  // CRITICAL: filing readiness must also reflect REGULATORY findings,
+  // not just engine-math validation.  A §73.215 contour-protection (or
+  // §73.207 spacing) FAIL means the facility does not qualify under the
+  // rule as proposed — the exhibit cannot be "READY" to file as-is even
+  // when the math + external parity are perfect.  Compliance components
+  // are tagged category:'compliance' (Interference rules, §73.150 DA);
+  // a FAIL there forces REVIEW so the READY headline can never sit on
+  // top of a NON-COMPLIANT Engineering Conclusion.
+  const hasComplianceFail = components.some(c => (c.category === 'compliance') && c.status === 'FAIL');
   let filing;
   if (computational.status === 'FAIL'){
     filing = { status: 'DO NOT FILE', detail: 'computational validation failed' };
@@ -611,8 +632,10 @@ export function buildValidationVerdictSection(exhibit){
     filing = { status: 'REVIEW',     detail: 'computational validation incomplete — attach missing evidence before filing' };
   } else if (external.status === 'FAIL'){
     filing = { status: 'DO NOT FILE', detail: 'external parity check failed' };
+  } else if (hasComplianceFail){
+    filing = { status: 'REVIEW',     detail: 'engine math + external parity verified, but a regulatory rule does not pass (e.g. §73.215 contour protection / §73.207 spacing) — facility does not qualify as proposed; resolve, claim a §73.215 alternative, or file a waiver before submitting' };
   } else if (external.status === 'PASS'){
-    filing = { status: 'READY',      detail: 'computational + external both verified; engineer of record signs' };
+    filing = { status: 'READY',      detail: 'computational + external both verified, no regulatory failures; engineer of record signs' };
   } else {
     // External SKIP or TIER-3 — math is solid but no live cross-check
     filing = { status: 'REVIEW',     detail: 'computational verified; re-run with live FCC parity before filing if definitive cross-verification is required' };
