@@ -28,9 +28,11 @@ const NONHIGH_FRACTION_GATE   = 0.20;
 const RMS_LOW_GATE_DB         = 10;
 const RMS_MODERATE_GATE_DB    = 6;
 
-export function aggregateEngineeringConfidence(per_radial){
+export function aggregateEngineeringConfidence(per_radial, opts = {}){
   const list = Array.isArray(per_radial) ? per_radial : [];
   const n    = list.length;
+  const service        = String(opts.service || '').toUpperCase();
+  const terrainSampled = opts.terrain_sampled === true;
 
   // Counts.  UNMEASURED is a NEW bucket separate from HIGH/MEDIUM/LOW
   // that signals "no terrain data + no SDR/ITM measurement basis."
@@ -99,7 +101,7 @@ export function aggregateEngineeringConfidence(per_radial){
 
   const explanation = composeExplanation({
     level, n, percent_high, percent_low, rms_residual_db,
-    terrain_severity_score, reasons
+    terrain_severity_score, reasons, service, terrainSampled
   });
 
   return {
@@ -117,18 +119,27 @@ export function aggregateEngineeringConfidence(per_radial){
   };
 }
 
-function composeExplanation({ level, n, percent_high, percent_low, rms_residual_db, terrain_severity_score, reasons }){
+function composeExplanation({ level, n, percent_high, percent_low, rms_residual_db, terrain_severity_score, reasons, service, terrainSampled }){
   if (n === 0){
     return 'No radials were available for terrain-aware confidence analysis; ' +
            'engineering confidence cannot be computed for this exhibit.';
   }
   if (level === 'UNMEASURED'){
-    return 'Engineering confidence: UNMEASURED.  No SDR drive-test residuals were attached ' +
-           'and no terrain DEM was sampled for this exhibit (AM groundwave under §73.184 does not ' +
-           'use terrain elevation by design).  This means the confidence layer has no measurement ' +
-           'basis — the FCC curve prediction stands on its own and the engineer of record should ' +
-           'attach drive-test data before relying on a "HIGH" confidence claim.  Advisory only; ' +
-           'does NOT modify §73.207 / §73.215 compliance results.';
+    // Service-correct rationale.  Three distinct cases — never assert
+    // the AM-groundwave reason on an FM exhibit, and never claim "no DEM
+    // was sampled" when terrain HAAT was in fact terrain-derived.
+    let basisClause;
+    if (String(service) === 'AM'){
+      basisClause = 'No SDR drive-test residuals were attached, and AM groundwave under §73.184 does not use terrain elevation by design, so the confidence layer has no measurement basis';
+    } else if (terrainSampled){
+      basisClause = 'Per-radial HAAT was terrain-derived from the DEM, but no SDR drive-test residuals were attached, so measured-vs-predicted confidence cannot be computed';
+    } else {
+      basisClause = 'Neither SDR drive-test residuals nor a terrain DEM were attached, so the confidence layer has no measurement basis';
+    }
+    return `Engineering confidence: UNMEASURED.  ${basisClause} — the FCC curve prediction ` +
+           'stands on its own and the engineer of record should attach drive-test data before ' +
+           'relying on a "HIGH" confidence claim.  Advisory only; does NOT modify §73.207 / ' +
+           '§73.215 compliance results.';
   }
   const parts = [];
   parts.push(`Engineering confidence: ${level}.`);

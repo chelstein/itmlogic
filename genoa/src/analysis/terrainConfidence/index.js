@@ -39,7 +39,16 @@ export function analyzeTerrainConfidence(exhibit){
     });
   });
 
-  return aggregateEngineeringConfidence(per_radial);
+  // Thread service + whether a DEM was actually sampled so the
+  // UNMEASURED explanation is service-correct (the §73.184 AM-groundwave
+  // rationale must not leak into an FM exhibit, and we must not claim
+  // "no terrain DEM was sampled" when the per-radial HAAT was in fact
+  // terrain-derived — only the SDR field-measurement basis is missing).
+  const service = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const t = exhibit?.evidence?.terrain;
+  const terrain_sampled = !!(t && t.available === true && Number(t.n_radials_dem_sourced) > 0);
+
+  return aggregateEngineeringConfidence(per_radial, { service, terrain_sampled });
 }
 
 function indexSdrResidualsByAzimuth(exhibit){
