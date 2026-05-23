@@ -181,3 +181,40 @@ test('basis label reflects tx_amsl_resolved.source', () => {
     assert.equal(r.basis, expected, `source=${src} should map to basis=${expected}`);
   }
 });
+
+// Operator-HAAT fallback chain: when station_inputs.haat_m is missing
+// but the value is available via haat_m_input or evidence.terrain.haat_m,
+// the validator must still populate stats.operator_m + delta so the
+// Appendix A footer doesn't render "(operator -- m, delta -- m)".
+test('operator_m falls back through haat_m_input and evidence.terrain.haat_m', () => {
+  const radials = Array.from({ length: 36 }, (_, i) => 580 + (i % 3) * 10);
+  const txAmsl = { value_m: 1391.4, source: 'derived', ztr_amsl_source: 'asr_overall_height_m' };
+
+  // Case 1: primary station_inputs.haat_m present
+  const r1 = validateHaat(fmExhibit({ haat_m: 581, perRadial: radials, txAmsl }));
+  assert.equal(r1.stats.operator_m, 581);
+  assert.ok(Number.isFinite(r1.stats.delta_mean_vs_operator_m), 'delta should be finite');
+
+  // Case 2: station_inputs.haat_m missing — falls back to haat_m_input
+  const ex2 = fmExhibit({ haat_m: 581, perRadial: radials, txAmsl });
+  delete ex2.station_inputs.haat_m;
+  ex2.station_inputs.haat_m_input = 581;
+  const r2 = validateHaat(ex2);
+  assert.equal(r2.stats.operator_m, 581, 'operator_m should fall back to haat_m_input');
+  assert.ok(Number.isFinite(r2.stats.delta_mean_vs_operator_m));
+
+  // Case 3: both station_inputs paths missing — falls back to evidence.terrain.haat_m
+  const ex3 = fmExhibit({ haat_m: 581, perRadial: radials, txAmsl });
+  delete ex3.station_inputs.haat_m;
+  ex3.evidence.terrain = { ...(ex3.evidence.terrain || {}), haat_m: 581 };
+  const r3 = validateHaat(ex3);
+  assert.equal(r3.stats.operator_m, 581, 'operator_m should fall back to evidence.terrain.haat_m');
+  assert.ok(Number.isFinite(r3.stats.delta_mean_vs_operator_m));
+
+  // Case 4: no operator value anywhere — stats stay null (existing behavior preserved)
+  const ex4 = fmExhibit({ haat_m: 581, perRadial: radials, txAmsl });
+  delete ex4.station_inputs.haat_m;
+  const r4 = validateHaat(ex4);
+  assert.equal(r4.stats.operator_m, null);
+  assert.equal(r4.stats.delta_mean_vs_operator_m, null);
+});
