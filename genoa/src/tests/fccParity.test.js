@@ -266,3 +266,75 @@ test('FCC_PARITY_PROVENANCE names regulation + license + upstream commit', () =>
   assert.match(FCC_PARITY_PROVENANCE.license_basis, /17 USC §105/);
   assert.match(FCC_PARITY_PROVENANCE.upstream_engine, /tvfm_curves\.js/);
 });
+
+/* ---------- haat field-name fallback (the TIER-3 regression) ---------- */
+
+test('parity report: reads haat from station_inputs.haat_m_input (canonical exhibit shape)', async () => {
+  // The canonical exhibit (engine/index.js) stores operator HAAT as
+  // `haat_m_input`, NOT `haat_m`.  Before the fix the client read only
+  // `haat_m`, got NaN, and bailed with "haat_m and erp_kw required" —
+  // forcing the TIER-3 code-identity fallback on every real exhibit.
+  const seen = [];
+  const fake = async (url) => {
+    seen.push(url);
+    return { ok: true, json: async () => ({ distance: 90.0, distance_unit: 'km' }) };
+  };
+  const r = await withFetch(fake, () => {
+    const c = makeFccParityClient();
+    return c.report({
+      station_inputs: { service: 'FM', frequency: 100.7, haat_m_input: 100, erp_kw: 6 },
+      contour_definitions: { s60: { field_dBu: 60, mode: '50,50' } },
+      radial_table: [{ azimuth_deg: 0, haat_computed_m: 100, relative_field: 1,
+                       contour_distances_km: { s60: 90.0 } }]
+    });
+  });
+  assert.equal(r.available, true, 'should reach TIER-1 live parity, not bail at the input gate');
+  assert.ok(seen.length > 0, 'should have issued at least one live FCC fetch');
+  assert.ok(seen.every(u => /haat=100\b/.test(u)), 'haat must come through from haat_m_input');
+});
+
+test('parity report: queries FCC per-radial HAAT (terrain-modulated), not a single scalar', async () => {
+  // Each radial carries its own terrain HAAT; the FCC cross-check must
+  // query distance.json with THAT radial's HAAT so the comparison is
+  // like-for-like.  Querying one scalar would manufacture false deltas
+  // on terrain-modulated stations.
+  const seen = [];
+  const fake = async (url) => {
+    seen.push(url);
+    return { ok: true, json: async () => ({ distance: 40.0, distance_unit: 'km' }) };
+  };
+  await withFetch(fake, () => {
+    const c = makeFccParityClient();
+    return c.report({
+      station_inputs: { service: 'FM', frequency: 105.3, haat_m_input: 581, erp_kw: 0.58 },
+      contour_definitions: { s60: { field_dBu: 60, mode: '50,50' } },
+      radial_table: [
+        { azimuth_deg: 0,   haat_computed_m: 664.8, relative_field: 1, contour_distances_km: { s60: 41.8 } },
+        { azimuth_deg: 140, haat_computed_m: 532.3, relative_field: 1, contour_distances_km: { s60: 37.1 } }
+      ]
+    });
+  });
+  assert.ok(seen.some(u => /haat=664\.8\b/.test(u)), 'radial 0 must query its own HAAT 664.8');
+  assert.ok(seen.some(u => /haat=532\.3\b/.test(u)), 'radial 140 must query its own HAAT 532.3');
+  assert.ok(!seen.some(u => /haat=581\b/.test(u)), 'must NOT fall back to the filed scalar when per-radial HAAT exists');
+});
+
+test('parity report: per-radial ERP reconstructed from relative_field (directional)', async () => {
+  // erp_az = erp_kW · f²  (engine/fm/contour.js).  A directional radial
+  // with relative_field 0.5 should be queried at erp = 6 · 0.25 = 1.5 kW.
+  const seen = [];
+  const fake = async (url) => {
+    seen.push(url);
+    return { ok: true, json: async () => ({ distance: 50.0, distance_unit: 'km' }) };
+  };
+  await withFetch(fake, () => {
+    const c = makeFccParityClient();
+    return c.report({
+      station_inputs: { service: 'FM', frequency: 100.7, haat_m_input: 100, erp_kw: 6 },
+      contour_definitions: { s60: { field_dBu: 60, mode: '50,50' } },
+      radial_table: [{ azimuth_deg: 90, haat_computed_m: 100, relative_field: 0.5,
+                       contour_distances_km: { s60: 50.0 } }]
+    });
+  });
+  assert.ok(seen.some(u => /erp=1\.5\b/.test(u)), 'directional ERP must be erp_kw · relative_field²');
+});

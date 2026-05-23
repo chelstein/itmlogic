@@ -98,7 +98,13 @@ export function makeFccParityClient({
       }
 
       const frequency_mhz = Number(exhibit.station_inputs?.frequency);
-      const haat_m        = Number(exhibit.station_inputs?.haat_m);
+      // Canonical exhibit stores the operator HAAT as `haat_m_input`
+      // (engine/index.js); older/raw inputs use `haat_m`.  Accept either.
+      // This scalar is only a FALLBACK — per-radial samples below carry
+      // their own HAAT so the parity compares like-for-like against the
+      // terrain-modulated distances the engine actually produced.
+      const haat_m        = Number(exhibit.station_inputs?.haat_m
+                                ?? exhibit.station_inputs?.haat_m_input);
       const erp_kw        = Number(exhibit.station_inputs?.erp_kw);
       const channel       = frequencyToFmChannel(frequency_mhz);
       if (!Number.isFinite(channel)){
@@ -114,7 +120,7 @@ export function makeFccParityClient({
         };
       }
 
-      const samples_in = collectSamples(exhibit);
+      const samples_in = collectSamples(exhibit, { haat_m, erp_kw });
       if (samples_in.length === 0){
         return {
           available: false, source: null,
@@ -135,8 +141,16 @@ export function makeFccParityClient({
       // The upstream rate limit is generous; FCC publishes the endpoint
       // for public use and 6 concurrent connections is well within it.
       async function fetchOne(s){
-        const url = `${endpoint}?haat=${encodeURIComponent(haat_m)}`
-                  + `&erp=${encodeURIComponent(erp_kw)}`
+        // Use the per-radial HAAT + ERP that actually produced this
+        // radial's Genoa distance, so the FCC cross-check is like-for-
+        // like.  On terrain-modulated stations HAAT varies per azimuth
+        // and ERP varies per azimuth for directional antennas; querying
+        // the FCC with a single scalar would manufacture false deltas.
+        // Falls back to the station scalar when a sample lacks its own.
+        const sHaat = Number.isFinite(s.haat_m) ? s.haat_m : haat_m;
+        const sErp  = Number.isFinite(s.erp_kw) ? s.erp_kw : erp_kw;
+        const url = `${endpoint}?haat=${encodeURIComponent(sHaat)}`
+                  + `&erp=${encodeURIComponent(sErp)}`
                   + `&channel=${encodeURIComponent(channel)}`
                   + `&field=${encodeURIComponent(s.contour_dBu)}`
                   + `&curve=${s.mode === '50,10' ? 1 : 0}`
@@ -238,14 +252,26 @@ export function frequencyToFmChannel(frequency_mhz){
  * keyed defs by id directly; both shapes are accepted here so the
  * parity client keeps working if the engine shape ever flexes.
  */
-function collectSamples(exhibit){
+function collectSamples(exhibit, scalars = {}){
   const samples = [];
   const defs = indexContourDefinitions(exhibit.contour_definitions);
   const rt = Array.isArray(exhibit.radial_table) ? exhibit.radial_table : [];
+  const scalarHaat = Number(scalars.haat_m);
+  const scalarErp  = Number(scalars.erp_kw);
   for (const r of rt){
     const cd = r.contour_distances_km || {};
     // Per-radial overrides (rare; respect them if present).
     const localDefs = r.contour_definitions ? indexContourDefinitions(r.contour_definitions) : null;
+    // Per-radial HAAT (terrain-modulated) + ERP (directional pattern).
+    // engine/fm/contour.js computes each radial distance with
+    // haat = haat_computed_m ?? haat_input_m, and erp_az = erp_kW · f²
+    // where f = relative_field.  Reconstruct both so the FCC query
+    // matches the inputs that produced genoa_distance_km.
+    const rHaat = Number(r.haat_computed_m ?? r.haat_input_m);
+    const f     = Number(r.relative_field);
+    const rErp  = (Number.isFinite(scalarErp) && Number.isFinite(f))
+      ? scalarErp * f * f
+      : scalarErp;
     for (const [contour_id, distance_km] of Object.entries(cd)){
       const d = Number(distance_km);
       if (!Number.isFinite(d) || d <= 0) continue;
@@ -253,10 +279,12 @@ function collectSamples(exhibit){
       if (!def) continue;
       if (!Number.isFinite(def.field_dBu)) continue;
       samples.push({
-        az:               r.az ?? null,
+        az:               r.azimuth_deg ?? r.az ?? null,
         contour:          contour_id,
         mode:             def.mode || '50,50',
         contour_dBu:      def.field_dBu,
+        haat_m:           Number.isFinite(rHaat) ? rHaat : scalarHaat,
+        erp_kw:           Number.isFinite(rErp)  ? rErp  : scalarErp,
         genoa_distance_km: Number(d.toFixed(4))
       });
     }
