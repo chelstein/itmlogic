@@ -456,8 +456,10 @@ export function buildValidationVerdictSection(exhibit){
 
   const limitations = [
     'Population values (where shown) are INFORMATIONAL ONLY; FCC §73.x compliance is determined by distance and field-strength tests, not population.',
-    'Polygon-overlap math uses a local-tangent projection at FCC contour scales; sub-metre accurate vs WGS-84.',
-    'Genoa does not certify FCC filings.  Final certification is the responsibility of the qualified broadcast engineer of record.'
+    'Polygon-overlap math uses a local-tangent projection at FCC contour scales; sub-metre accurate vs WGS-84.'
+    // "Genoa does not certify FCC filings" intentionally lives ONCE, in the
+    // Certification section boilerplate — not repeated here, since both
+    // render on the same page.
   ];
 
   // ---------- Ontology surface (additive, never overrides legacy fields) -
