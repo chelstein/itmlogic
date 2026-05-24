@@ -138,7 +138,6 @@ export function classifyRegulatoryContext(input = {}, evidence = {}, studyResult
       'mean the facility is unauthorized.  Treat as a legacy/grandfathering/' +
       'waiver-risk condition.  Any modification should receive licensed ' +
       'engineering review.';
-    notes.push('Genoa does not determine FCC legal authorization status; this assessment is interpretive only.');
     notes.push('Modeled current-rule conflicts may reflect grandfathered, waived, or otherwise authorized historical operating conditions.');
     warningsToDowngrade.push('FM_CONTOUR_PROTECTION_VIOLATION', 'FM_MINIMUM_SEPARATION_VIOLATION');
   } else if (currentRuleCompliance === 'fails_current_rules'){
@@ -181,7 +180,7 @@ export const REGULATORY_CONTEXT_DISCLAIMER =
   'existing licensed facilities, modeled current-rule spacing or contour ' +
   'conflicts may reflect grandfathered, waived, historically authorized, ' +
   'or otherwise licensed operating conditions.  Genoa does not determine ' +
-  'legal authorization status.';
+  'legal authorization status; this assessment is interpretive only.';
 
 // 47 CFR §73.311 explicitly limits what predicted field-strength contours
 // are FOR — and it does NOT include real-world listenable coverage.  We
