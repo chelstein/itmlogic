@@ -34,6 +34,14 @@ export function buildEngineeringConsiderationsSection(exhibit){
   // "100% HIGH" on an unmeasured exhibit was the most credibility-
   // damaging thing in the report, so we surface it explicitly.
   const isUnmeasured = ec.level === 'UNMEASURED';
+  // Service-aware rationale for an n/a terrain-severity score.  Only AM
+  // (§73.184 groundwave) is terrain-independent by rule; FM/LPFM/FX DO
+  // use terrain, so the AM note must not leak into an FM exhibit (which
+  // would also be factually wrong — those exhibits sample a DEM).
+  const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
+  const terrainSeverityNa = svc === 'AM'
+    ? 'n/a (§73.184 AM groundwave does not use terrain elevation)'
+    : 'n/a (terrain-severity scoring requires the engineering-confidence analysis; no SDR drive-test basis attached)';
   const kvRows = isUnmeasured
     ? [
         ['Engineering confidence',  'UNMEASURED — no SDR drive-test or DEM basis attached'],
@@ -42,7 +50,7 @@ export function buildEngineeringConsiderationsSection(exhibit){
         ['% radials MEDIUM',        '—'],
         ['% radials LOW',           '—'],
         ['RMS measured residual',   'n/a (no SDR residuals attached)'],
-        ['Terrain severity score',  'n/a (§73.184 AM groundwave does not use DEM)']
+        ['Terrain severity score',  terrainSeverityNa]
       ]
     : [
         ['Engineering confidence',     ec.level || '—'],

@@ -134,7 +134,13 @@ export function buildExecutiveSummarySection(exhibit){
   if (recs.length === 0){
     recs.push('No further engineering work is required for this exhibit.  Engineer of record may review the body and Certification page, sign, and file.');
   }
-  recs.push('Detail for every claim above lives in the body (Methodology, Validation Verdict, Engineering Conclusion) and in the appendices (Radial Data, Validation Evidence, Provenance, Replay Determinism, plus per-rule appendices for AM nighttime allocation, PSRA/PSSA, and the 8 km site survey).');
+  // Service-aware appendix list — AM nighttime-allocation + PSRA/PSSA
+  // appendices only render for AM exhibits, so listing them in an FM
+  // summary points the reviewer at sections that don't exist.
+  const perRuleAppendices = isAm
+    ? 'plus per-rule appendices for AM nighttime allocation (§73.182), PSRA/PSSA reduced power (§73.99), and the 8 km site survey'
+    : 'plus the environmental RF evidence and 8 km site-survey appendices';
+  recs.push(`Detail for every claim above lives in the body (Methodology, Validation Verdict, Engineering Conclusion) and in the appendices (Radial Data, Validation Evidence, Provenance, Replay Determinism, ${perRuleAppendices}).`);
   const para4 = recs.join('  ');
 
   return {

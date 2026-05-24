@@ -193,3 +193,32 @@ test('analyzeTerrainConfidence does not mutate the exhibit', async () => {
   analyzeTerrainConfidence(x);
   assert.equal(JSON.stringify(x), before);
 });
+
+// FM/AM template contamination guard: an UNMEASURED FM exhibit must NOT
+// carry the AM §73.184 groundwave rationale, and must not falsely claim
+// "no terrain DEM was sampled" when the per-radial HAAT was DEM-derived.
+test('UNMEASURED explanation is service-correct (no AM §73.184 leak into FM)', () => {
+  const empty = [];  // no radials → but we exercise the UNMEASURED path via opts
+
+  // AM, no terrain: AM groundwave rationale is correct here.
+  const am = aggregateEngineeringConfidence(
+    Array.from({ length: 4 }, () => ({ confidence: 'UNMEASURED', reasons: [], inputs: {} })),
+    { service: 'AM', terrain_sampled: false });
+  assert.equal(am.level, 'UNMEASURED');
+  assert.match(am.explanation, /§73\.184/, 'AM exhibit should cite §73.184 groundwave');
+
+  // FM with terrain sampled: must NOT mention §73.184, must NOT say "no DEM".
+  const fmTerrain = aggregateEngineeringConfidence(
+    Array.from({ length: 4 }, () => ({ confidence: 'UNMEASURED', reasons: [], inputs: {} })),
+    { service: 'FM', terrain_sampled: true });
+  assert.equal(fmTerrain.level, 'UNMEASURED');
+  assert.doesNotMatch(fmTerrain.explanation, /§73\.184/, 'FM exhibit must NOT cite AM §73.184 groundwave');
+  assert.doesNotMatch(fmTerrain.explanation, /no terrain DEM was sampled/i, 'must not claim no DEM when terrain was sampled');
+  assert.match(fmTerrain.explanation, /terrain-derived from the DEM/, 'FM-with-terrain should say HAAT was terrain-derived');
+
+  // FM with no terrain: neutral "neither SDR nor DEM" wording, still no §73.184.
+  const fmFlat = aggregateEngineeringConfidence(
+    Array.from({ length: 4 }, () => ({ confidence: 'UNMEASURED', reasons: [], inputs: {} })),
+    { service: 'FM', terrain_sampled: false });
+  assert.doesNotMatch(fmFlat.explanation, /§73\.184/);
+});
