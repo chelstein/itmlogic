@@ -123,3 +123,42 @@ test('reviewExhibit tolerates non-JSON router output (findings empty, raw preser
     });
   });
 });
+
+/* ---------- fccKb backend selection + OpenSearch helpers ---------- */
+
+import * as fccKb from '../services/fccKb.js';
+
+test('fccKb.pickKbIndex: prefers KB-id fragment, skips system indices, falls back', () => {
+  assert.equal(fccKb.pickKbIndex(['.kibana', 'kb_f53b381b_chunks', 'x'], 'f53b381b'), 'kb_f53b381b_chunks');
+  assert.equal(fccKb.pickKbIndex(['.sys', 'my_knowledge_idx'], null), 'my_knowledge_idx');
+  assert.equal(fccKb.pickKbIndex(['.only-system'], 'zzz'), null);
+  assert.equal(fccKb.pickKbIndex([], 'x'), null);
+});
+
+test('fccKb.hitsToChunks: tolerates content/text/page_content field variation', () => {
+  const out = fccKb.hitsToChunks({ hits: { hits: [
+    { _score: 2, _source: { content: 'A' } },
+    { _score: 1, _source: { page_content: 'B' } },
+    { _source: { irrelevant: 1 } }
+  ] } }, 'idx');
+  assert.equal(out.length, 2);
+  assert.deepEqual(out.map(c => c.text), ['A', 'B']);
+  assert.equal(out[0].source, 'idx');
+});
+
+test('fccKb.retrieve: no backend configured → available:false (no network)', async () => {
+  await withEnv({ FCC_KB_URL: null, FCC_KB_TOKEN: null, FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null }, async () => {
+    const r = await fccKb.retrieve('skywave');
+    assert.equal(r.available, false);
+    assert.match(r.reason, /no KB backend configured/);
+  });
+});
+
+test('fccKb.isEnabled: true when either kbaas token OR OpenSearch creds set', async () => {
+  await withEnv({ FCC_KB_URL: null, FCC_KB_TOKEN: null, FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null },
+    () => assert.equal(fccKb.isEnabled(), false));
+  await withEnv({ FCC_KB_URL: 'https://k/retrieve', FCC_KB_TOKEN: 't', FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null },
+    () => assert.equal(fccKb.isEnabled(), true));
+  await withEnv({ FCC_KB_URL: null, FCC_KB_TOKEN: null, FCC_KB_OS_HOST: 'h', FCC_KB_OS_PASS: 'p' },
+    () => assert.equal(fccKb.isEnabled(), true));
+});
