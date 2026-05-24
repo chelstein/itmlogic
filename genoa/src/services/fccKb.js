@@ -6,10 +6,13 @@
 // actual rule text instead of paraphrase.
 //
 // Credentials from env, never source:
-//   FCC_KB_URL    retrieve endpoint (…/v1/<kb-id>/retrieve)
-//   FCC_KB_TOKEN  KB/agent-scoped bearer (NOTE: distinct from the router
-//                 MODEL_ACCESS_KEY — that key is router-scoped and the
-//                 retrieve endpoint 403s with it)
+//   FCC_KB_URL    kbaas retrieve endpoint
+//                 (…/v1/knowledge_bases/<kb-id>/retrieve)
+//   FCC_KB_TOKEN  a DigitalOcean API PAT (NOT the router MODEL_ACCESS_KEY —
+//                 the kbaas retrieve endpoint 403s with a model-access key;
+//                 it authorizes with a DO account PAT).  A PAT is full-
+//                 account scope, so prefer the OpenSearch-direct backend
+//                 from inside the VPC where a scoped credential exists.
 //
 // Degrades to { available:false } when unset/unauthorized, so the
 // advisory layer runs ungrounded (router-only) rather than failing.
@@ -115,7 +118,7 @@ async function retrieveViaOpenSearch(query, { k = 4, timeoutMs = DEFAULT_TIMEOUT
 
 // Retrieve top-k chunks for a query.  Tolerant of the response-shape
 // variations DO has shipped ({results|data|retrieved_chunks|chunks}).
-export async function retrieve(query, { k = 4, timeoutMs = DEFAULT_TIMEOUT_MS } = {}){
+export async function retrieve(query, { k = 4, alpha = 0.75, filters = null, timeoutMs = DEFAULT_TIMEOUT_MS } = {}){
   if (!query) return { available: false, reason: 'no query', chunks: [] };
   // Prefer the kbaas/agent retrieve endpoint when a KB-scoped token is
   // configured; otherwise fall back to OpenSearch-direct (VPC-only).
@@ -128,11 +131,17 @@ export async function retrieve(query, { k = 4, timeoutMs = DEFAULT_TIMEOUT_MS } 
   const fetchFn = (typeof fetch === 'function') ? fetch : null;
   if (!fetchFn) return { available: false, reason: 'fetch unavailable', chunks: [] };
 
+  // kbaas retrieve contract: POST {query, num_results, alpha, filters?}
+  // with a DO API PAT bearer.  alpha blends BM25 (0) ↔ vector (1);
+  // 0.75 favors semantic recall while keeping lexical CFR-citation hits.
+  const payload = { query: String(query), num_results: k, alpha };
+  if (filters) payload.filters = filters;
+
   try {
     const r = await fetchFn(url, {
       method:  'POST',
       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ query: String(query), k }),
+      body:    JSON.stringify(payload),
       signal:  AbortSignal.timeout(timeoutMs),
     });
     if (!r.ok){
@@ -142,9 +151,10 @@ export async function retrieve(query, { k = 4, timeoutMs = DEFAULT_TIMEOUT_MS } 
     const j = await r.json();
     const raw = j?.results || j?.data || j?.retrieved_chunks || j?.chunks || [];
     const chunks = (Array.isArray(raw) ? raw : []).map(c => ({
-      text:   c?.text || c?.content || c?.chunk || (typeof c === 'string' ? c : ''),
-      score:  c?.score ?? c?.relevance ?? null,
-      source: c?.source || c?.document || c?.metadata?.source || null
+      text:   c?.text || c?.content || c?.chunk || c?.page_content
+                || c?.document_chunk || (typeof c === 'string' ? c : ''),
+      score:  c?.score ?? c?.relevance ?? c?.distance ?? null,
+      source: c?.source || c?.document || c?.metadata?.source || c?.index_name || null
     })).filter(c => c.text);
     return { available: chunks.length > 0, chunks };
   } catch (e){

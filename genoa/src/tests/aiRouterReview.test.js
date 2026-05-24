@@ -154,6 +154,28 @@ test('fccKb.retrieve: no backend configured → available:false (no network)', a
   });
 });
 
+test('fccKb.retrieve (kbaas): posts {query,num_results,alpha} with PAT bearer, parses results', async () => {
+  await withEnv({ FCC_KB_URL: 'https://kb/v1/knowledge_bases/f53b381b/retrieve', FCC_KB_TOKEN: 'dop_v1_pat',
+                  FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null }, async () => {
+    let seenBody = null, seenAuth = null;
+    const fake = async (url, opts) => {
+      seenBody = JSON.parse(opts.body); seenAuth = opts.headers.Authorization;
+      return okJson({ results: [{ text: '§73.190 skywave Formula 1', score: 0.9 }] });
+    };
+    await withFetch(fake, async () => {
+      const r = await fccKb.retrieve('skywave Fc(50)', { k: 5 });
+      assert.equal(r.available, true);
+      assert.equal(r.chunks.length, 1);
+      assert.match(r.chunks[0].text, /73\.190/);
+    });
+    assert.equal(seenBody.query, 'skywave Fc(50)');
+    assert.equal(seenBody.num_results, 5);
+    assert.equal(seenBody.alpha, 0.75);
+    assert.equal('k' in seenBody, false, 'must not send the legacy k field');
+    assert.equal(seenAuth, 'Bearer dop_v1_pat');
+  });
+});
+
 test('fccKb.isEnabled: true when either kbaas token OR OpenSearch creds set', async () => {
   await withEnv({ FCC_KB_URL: null, FCC_KB_TOKEN: null, FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null },
     () => assert.equal(fccKb.isEnabled(), false));
