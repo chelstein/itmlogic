@@ -2778,8 +2778,12 @@ export async function computeExhibit(req){
     console.warn('[exhibitService] haat contradiction check failed:', err?.message || err);
   }
 
-  exhibit.degraded_mode    = exhibit.warnings.length > 0;
-  exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
+  // Degraded mode = an external dependency (sidecar phase) was
+  // unavailable during compute — not merely "has warnings."  Engineering
+  // findings stay in the warnings/REVIEW badge.
+  const _degraded = exhibit.warnings.filter(w => w?.phase === 'sidecar' && w?.severity !== 'info');
+  exhibit.degraded_mode    = _degraded.length > 0;
+  exhibit.degraded_reasons = _degraded.map(w => w.code);
 
   // Classify the regulatory context so downstream readiness scoring +
   // engineering-report rendering can distinguish licensed-existing

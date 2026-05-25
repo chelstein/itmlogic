@@ -618,8 +618,15 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.population_estimate = population_estimate;
   exhibit.warnings     = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
-  exhibit.degraded_mode    = exhibit.warnings.length > 0;
-  exhibit.degraded_reasons = exhibit.warnings.map(w => w.code);
+  // "Degraded mode" = an external dependency (sidecar/upstream) was
+  // unavailable during compute and we fell back — NOT merely "the
+  // exhibit raised warnings."  Engineering/input findings (§73.x,
+  // CONSTANT_HAAT_ASSUMED, etc.) surface in the warnings/REVIEW badge,
+  // not the system-health header, so a clean compute of a non-compliant
+  // facility reads NOMINAL instead of perpetually DEGRADED.
+  const _degraded = exhibit.warnings.filter(w => w?.phase === 'sidecar' && w?.severity !== 'info');
+  exhibit.degraded_mode    = _degraded.length > 0;
+  exhibit.degraded_reasons = _degraded.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
 
