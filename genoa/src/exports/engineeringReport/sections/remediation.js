@@ -21,12 +21,24 @@ export function buildRemediationSection(exhibit, opt){
   const paragraphs = [DISCLAIMER];
 
   if (rem.none_found){
-    paragraphs.push(
-      'No ERP or HAAT reduction within the searched envelope brings the facility into ' +
-      'compliance against all protected stations.  A directional antenna notched toward ' +
-      'the binding facility, a transmitter-site relocation, a negotiated §73.215 consent, ' +
-      'or a rule waiver would be required.'
-    );
+    const triedDirectional = Array.isArray(rem.binding_bearings_deg) && rem.binding_bearings_deg.length;
+    if (triedDirectional){
+      const brg = rem.binding_bearings_deg.map(b => `${b}°`).join(', ');
+      paragraphs.push(
+        `No configuration within the searched envelope — power/height reduction, nor a ` +
+        `directional null (to −20 dB) toward the binding bearing(s) ${brg} — brings the ` +
+        `facility into compliance against all protected facilities.  Deeper or custom ` +
+        `directional pattern shaping, a transmitter-site relocation, a negotiated §73.215 ` +
+        `consent, or a rule waiver would be required.`
+      );
+    } else {
+      paragraphs.push(
+        'No ERP or HAAT reduction within the searched envelope brings the facility into ' +
+        'compliance against all protected stations.  A directional antenna notched toward ' +
+        'the binding facility, a transmitter-site relocation, a negotiated §73.215 consent, ' +
+        'or a rule waiver would be required.'
+      );
+    }
   } else {
     const r = rem.recommended || {};
     const parts = [];

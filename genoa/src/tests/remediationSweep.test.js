@@ -183,6 +183,16 @@ test('buildRemediationSection: none_found points to relocation/waiver', () => {
   assert.match(sec.paragraphs.join('\n'), /relocation|waiver|directional/i);
 });
 
+test('buildRemediationSection: none_found after directional search names the bearings tried', () => {
+  const sec = buildRemediationSection({}, { remediation: {
+    available: true, none_found: true, evaluated: 72, binding_bearings_deg: [90, 270]
+  }});
+  const blob = sec.paragraphs.join('\n');
+  assert.match(blob, /directional null/i);
+  assert.match(blob, /90°/);
+  assert.match(blob, /270°/);
+});
+
 /* ---------- integration: section flows into the full report ---------- */
 
 test('integration: report includes PATH TO COMPLIANCE only when remediation attached', async () => {
