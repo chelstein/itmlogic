@@ -1286,10 +1286,10 @@ function PaneEvidence({ exhibit }){
             ['Fetched at', ev.terrain.fetched_at || '—']
           ]
         : [['Status', 'No terrain evidence attached. Engine ran with flat HAAT (or n/a for AM).']]} />
-      <SubHead title="Population (INFORMATIONAL ONLY — not used for §73.x compliance)" />
+      <SubHead title="Population (INFORMATIONAL ONLY — not used for Part 73 compliance)" />
       <SubKv kv={pop.source && pop.vintage
         ? [
-            ['Disclaimer', 'INFORMATIONAL ONLY. FCC §73.x compliance is determined by distance and field-strength tests, not population.'],
+            ['Disclaimer', 'INFORMATIONAL ONLY. FCC Part 73 compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.187 for AM), not population.'],
             ['Persons',    Number(pop.primary).toLocaleString()],
             ['Contour',    pop.contour_label || '—'],
             ['Source',     pop.source],

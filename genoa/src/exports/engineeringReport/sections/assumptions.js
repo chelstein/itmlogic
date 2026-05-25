@@ -57,7 +57,7 @@ export function buildAssumptionsSection(exhibit){
   const groundLine = isAm
     ? (function(){
         const gcr = exhibit?.evidence?.ground_conductivity_per_radial;
-        const head = `Ground conductivity: ${s.ground_sigma_mS_m ?? '—'} mS/m (per §73.183 Figure M3 reference grid).`;
+        const head = `Ground conductivity: ${s.ground_sigma_mS_m ?? '—'} mS/m (per §73.190 Figure M3 reference grid).`;
         const seg  = gcr?.available
           ? `  Per-radial M3 segmentation applied on ${gcr.radials_segmented ?? '—'} of ${gcr.radials_total ?? '—'} azimuths (${gcr.method || 'path-length weighted, stage-2'}; Millington integration pending stage-3).`
           : `  Per-radial M3 segmentation NOT applied (${gcr?.reason || 'no boundary crossings within the §73.184 range, or geodata sidecar unavailable'}); engine ran with uniform σ across all azimuths.`;
@@ -68,7 +68,7 @@ export function buildAssumptionsSection(exhibit){
         : 'Constant HAAT used as filed; no per-radial DEM sampling performed (CONSTANT_HAAT_ASSUMED warning attached).  Filing engineer must confirm the filed HAAT was derived per §73.313.'}`;
 
   const popAssumption = pop?.source
-    ? `Population estimate sourced from ${pop.source} (${pop.dataset || 'dataset unspecified'}, vintage ${pop.vintage || '—'}); contour-weighting via ${pop.method || 'centroid-in-polygon'}.  Provided for context only — §73.x compliance is determined by distance and field-strength tests, not population.`
+    ? `Population estimate sourced from ${pop.source} (${pop.dataset || 'dataset unspecified'}, vintage ${pop.vintage || '—'}); contour-weighting via ${pop.method || 'centroid-in-polygon'}.  Provided for context only — Part 73 compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.185 / §73.190 for AM), not population.`
     : 'Population estimate not attached; if required for the filing, the licensee must request a Census-block computation prior to upload.';
 
   // Spacing rule citation — §73.207 is FM-only; §73.37 is AM equivalent.

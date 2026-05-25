@@ -49,5 +49,6 @@ read_paths:
 ## Constraints
 
 - Never sign off on a deploy with the deploy-history showing no smoke-test pass.
+  - `agents/state/deploy-history.json` may carry a `pre_first_deploy` sentinel block: `{ acknowledged: true, acknowledged_by, acknowledged_at, reason, rescind_when }`. The sentinel is a governance acknowledgement that Genoa has never deployed via `safe-deploy-digitalocean.sh`, distinct from the file being missing or corrupt. The sentinel does NOT satisfy the smoke-pass requirement: deploys remain BLOCKED until `last_good_sha != null` AND `deploys[]` has at least one entry written by an actual `safe-deploy-digitalocean.sh` run. The sentinel only changes the finding wording from "deploy-history is empty/unverifiable" to "pre-first-deploy acknowledged; awaiting first smoke-pass".
 - Never approve language that implies an FCC outcome ("approved", "compliant under §X") that Genoa cannot verify on its own.
 - Audit findings cite the exhibit hash + page number.

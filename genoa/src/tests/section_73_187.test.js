@@ -91,9 +91,15 @@ test('§73.187: protected-field thresholds — Class A IA 0.025, Class B 0.500',
 });
 
 test('§73.187: missing subject returns guard violation', () => {
+  // PR-CITE2 (F-005): the engine's nighttime-skywave finding cite was
+  // corrected from '47 CFR §73.187' (the daytime-radiation rule) to
+  // '47 CFR §73.182(k) / §73.190' (the actual statutory basis for AM
+  // nighttime skywave protection — NIF/RSS + SS-1 charts).  Engine
+  // namespace identifier "section_73_187" is retained; only the cite
+  // string was changed.  See engine/regulatory/citations.js.
   const r = checkSection73187({ subject: null, nearbyStations: [classBNearby()] });
   assert.equal(r.pass, false);
-  assert.equal(r.cite, '47 CFR §73.187');
+  assert.equal(r.cite, '47 CFR §73.182(k) / §73.190');
   assert.match(r.violations[0].message, /Subject AM station inputs missing/);
 });
 
@@ -158,8 +164,11 @@ test('§73.187: bidirectional study runs both legs', () => {
 });
 
 test('§73.187: subject + cite stamps under method', () => {
+  // PR-CITE2: cite stamp is the corrected nighttime-skywave basis,
+  // not the legacy §73.187 mis-attribution.  See section_73_187.js
+  // header NAMING NOTE for the rationale.
   const r = checkSection73187({ subject: SUBJECT, nearbyStations: [classBNearby()] });
-  assert.equal(r.cite, '47 CFR §73.187');
+  assert.equal(r.cite, '47 CFR §73.182(k) / §73.190');
   assert.match(r.method, /SS-1\/SS-2 skywave/);
   assert.equal(r.subject.call, SUBJECT.call);
   assert.equal(r.subject.frequency_khz, 1240);

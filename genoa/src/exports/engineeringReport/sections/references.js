@@ -61,7 +61,7 @@ export function buildReferencesSection(exhibit){
   }
   if (pop?.source && pop?.dataset){
     cite(`${pop.source} — ${pop.dataset} (vintage ${pop.vintage || '—'})`,
-         `Population dataset.  Aggregation rule: ${pop.method || 'centroid-in-polygon'}.  Dataset SHA256 ${(pop.sha256 || '').slice(0, 16)}${pop.sha256 ? '…' : ''}.  Informational only; not a compliance input under §73.x.`);
+         `Population dataset.  Aggregation rule: ${pop.method || 'centroid-in-polygon'}.  Dataset SHA256 ${(pop.sha256 || '').slice(0, 16)}${pop.sha256 ? '…' : ''}.  Informational only; not a compliance input under Part 73 (FCC tests are distance and field-strength).`);
   }
 
   // ── Standards

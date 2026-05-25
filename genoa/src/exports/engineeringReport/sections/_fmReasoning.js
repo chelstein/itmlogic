@@ -41,7 +41,12 @@ const RULE_CITES = Object.freeze({
   section_73_207:  '§73.207(b)',
   section_73_215:  '§73.215',
   section_74_1204: '§74.1204(a)',
-  section_73_187:  '§73.187'
+  // section_73_187 is the in-engine namespace for AM nighttime skywave
+  // protection, but the actual statutory basis is §73.182(k) (NIF / RSS)
+  // and §73.190 (SS-1/SS-2 charts).  Current 47 CFR §73.187 governs
+  // "Limitation on daytime radiation" (a different rule).  See
+  // engine/regulatory/citations.js for the full cite catalog.
+  section_73_187:  '§73.182(k) / §73.190'
 });
 
 /**
@@ -177,8 +182,8 @@ function evalSec187(r){
     ? r.forward_protected_mvm - r.forward_skywave_mvm
     : null;
   const summary = r.pass
-    ? `§73.187 skywave protection satisfied (margin ${formatMvm(margin)} mV/m)`
-    : `§73.187 skywave protection fails — skywave field ${formatMvm(r.forward_skywave_mvm)} mV/m exceeds protected ${formatMvm(r.forward_protected_mvm)} mV/m`;
+    ? `${RULE_CITES.section_73_187} skywave protection satisfied (margin ${formatMvm(margin)} mV/m)`
+    : `${RULE_CITES.section_73_187} skywave protection fails — skywave field ${formatMvm(r.forward_skywave_mvm)} mV/m exceeds protected ${formatMvm(r.forward_protected_mvm)} mV/m`;
   return { cite: RULE_CITES.section_73_187, pass: r.pass, margin_db: null, margin_km: null, summary, detail: r };
 }
 

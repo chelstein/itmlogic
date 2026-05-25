@@ -26,8 +26,9 @@
 //       average terrain
 //     * carries Class A/B/C/D (NOT FM A/B1/B/C0/C1/C2/C3) per
 //       §73.21
-//     * uses §73.183 / §73.184 / §73.182 / §73.187 / §73.190 /
-//       §73.99 citations — NOT §73.207 / §73.215 / §73.313
+//     * uses §73.182 / §73.183 / §73.184 / §73.187 / §73.190 /
+//       §73.99 (PSRA/PSSA) / §73.37 (co-channel separations)
+//       citations — NOT §73.207 / §73.215 / §73.313
 //     * groundwave-language: "groundwave field at 1 km
 //       (mV/m)", "principal community / city-grade contour",
 //       "primary service contour", "0.5 mV/m and 0.1 mV/m
@@ -37,12 +38,13 @@
 // REFERENCES
 //   FCC Form 301-AM             https://www.fcc.gov/media/radio/am-fm-distance-program
 //   47 CFR §73.21               AM station classes (A, B, C, D)
-//   47 CFR §73.99                AM/FM mileage / co-channel separations
-//   47 CFR §73.182               AM nighttime allocation (NIF / RSS)
-//   47 CFR §73.183               AM groundwave field intensity charts
-//   47 CFR §73.184               AM groundwave field strength curves
-//   47 CFR §73.187               AM limitation on daytime radiation
-//   47 CFR §73.190               AM engineering: skywave conditions
+//   47 CFR §73.37               AM co-channel / adjacent-channel separations
+//   47 CFR §73.99               AM Presunrise (PSRA) / Postsunset (PSSA) service authorization
+//   47 CFR §73.182              Engineering standards of allocation (NIF / RSS)
+//   47 CFR §73.183              AM groundwave signals
+//   47 CFR §73.184              AM groundwave field strength graphs
+//   47 CFR §73.187              AM limitation on daytime radiation
+//   47 CFR §73.190              AM engineering charts and related formulas
 
 function firstNonEmptyPath(exhibit, paths){
   for (const p of paths){
@@ -152,7 +154,7 @@ export const FORM_301_AM_FIELDS = Object.freeze([
     type: 'number', unit: 'kHz',
     source: 'genoa-auto',
     required: true,
-    cite: '47 CFR §73.21, §73.99',
+    cite: '47 CFR §73.21',
     derive: (exhibit) => {
       // Accept input either in kHz directly or in MHz (legacy
       // FM-shaped exhibit).  AM band is 535–1705 kHz so any
@@ -355,7 +357,7 @@ export const FORM_301_AM_FIELDS = Object.freeze([
   },
   {
     id: 'principal-community-contour-mv-m',
-    lms_label: 'Principal community (city-grade) contour — 5 mV/m groundwave (AM-Class A) / 5 mV/m (B/C/D)',
+    lms_label: 'Principal community (city-grade) contour — 5 mV/m groundwave (all AM classes, §73.24(i))',
     section: 'III', subsection: '3C',
     type: 'number', unit: 'mV/m',
     source: 'genoa-auto',
@@ -620,7 +622,7 @@ export const FORM_301_AM_META = Object.freeze({
     'Method-of-Moments (MoM) proof attached if directional and §73.151(c) is invoked; sample-system schematic + reference field per §73.152',
     'Ground system description per §73.189 (120 buried 90° radials minimum for non-directional, or as filed for directional)',
     '§73.182 nighttime interference / RSS aggregation: nighttime NIF contour computed; protected stations listed',
-    '§73.187 pre-sunrise / post-sunset operation tables included if PSRA/PSSA requested',
+    '§73.99 pre-sunrise (PSRA) / post-sunset (PSSA) service-authorization tables included if PSRA/PSSA requested',
     'OET-65 RF-exposure exhibit attached (AM tower base-current → near-field MPE check at fence line)',
     'Tower lighting / marking per FCC Part 17; FAA 7460-1 determination on file',
     'Filing fee verified — pay via Fee Filer in LMS before final submission',

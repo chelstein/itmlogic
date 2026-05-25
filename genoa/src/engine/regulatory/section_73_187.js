@@ -1,16 +1,46 @@
-// 47 CFR §73.187 — AM nighttime skywave protection.
+// AM nighttime skywave protection — engine module.
+//
+// NAMING NOTE
+//   This file is named section_73_187.js for historical reasons (the
+//   engine namespace pre-dates the PR-CITE2 audit).  The actual
+//   statutory basis for AM nighttime skywave protection — what this
+//   module computes — is the cluster:
+//
+//     §73.182        — Engineering standards of allocation (classes +
+//                      protected nighttime/NIF contour values)
+//     §73.182(k)     — Nighttime interference-free service (NIF / RSS
+//                      treatment of multiple interferers)
+//     §73.185        — Computation of interfering signal
+//     §73.190        — Engineering charts and related formulas
+//                      (SS-1 50% and SS-2 10% skywave field-strength
+//                       formulations, Wang)
+//
+//   Current 47 CFR §73.187 governs "Limitation on daytime radiation"
+//   (Class B / Class D daytime radiation restrictions during critical
+//   hours, 2 h after sunrise / 2 h before sunset).  §73.187 is a
+//   daytime rule and is NOT the basis for nighttime protection — see
+//   engine/regulatory/citations.js for the canonical cite catalog.
+//
+//   Filename / exported function names / test-name strings retain the
+//   "73_187" identifier to avoid a churn-y rename cascade across the
+//   engine and test surface; only the rule-citation prose has been
+//   corrected.  When the time comes to rename the namespace, the
+//   citations helper in citations.js will keep all rendered cites
+//   consistent.
 //
 // REGULATION
-//   §73.187 protects every Class A (clear-channel), Class B (regional),
-//   Class C (local), and Class D (daytime/post-sunset) AM station from
-//   excessive nighttime skywave interference from co-channel and
-//   1st-adjacent stations.  The methodology:
+//   The nighttime skywave protection cluster protects every Class A
+//   (clear-channel), Class B (regional), Class C (local), and Class D
+//   (daytime/post-sunset) AM station from excessive nighttime skywave
+//   interference from co-channel and 1st-adjacent stations.  The
+//   methodology:
 //
 //     1. Compute SS-1 (50% skywave field) and/or SS-2 (10% skywave field)
 //        at the protected station's nighttime contour from each
-//        contributing interferer (§73.190).
-//     2. Combine contributions via root-sum-square (RSS) per
-//        §73.187(b)(1).  RSS_50 is the §73.187 reference.
+//        contributing interferer (§73.190 chart formulas).
+//     2. Combine contributions via root-sum-square (RSS) per §73.182(k)
+//        and §73.185 (computation of interfering signal).  RSS_50 is the
+//        reference.
 //     3. Apply class-specific protected-contour thresholds (§73.182(d)–(j)):
 //          Class A 1A: 0.025 mV/m 50% skywave (clear-channel exclusive)
 //          Class A 1B: 0.5   mV/m 50% skywave (clear-channel non-exclusive)
@@ -18,9 +48,9 @@
 //                      against the 50% skywave RSS
 //          Class C:    minimal nighttime protection; class-D-style coverage
 //          Class D:    not protected at night (post-sunset only operations)
-//     4. The proposed station passes §73.187 if it does not increase the
-//        RSS_50 at any nearby protected station beyond the §73.187(c)
-//        exclusion thresholds.
+//     4. The proposed station passes the nighttime test if it does not
+//        increase the RSS_50 at any nearby protected station beyond the
+//        §73.182(k) / §73.190 exclusion thresholds.
 //
 //   Adjacent-channel skywave protection uses analogous gates with
 //   reduced separation requirements per §73.182(j).
@@ -145,11 +175,16 @@ export function checkSection73187({ subject, nearbyStations = [] } = {}){
 
   if (!subject || typeof subject !== 'object'){
     return {
-      cite:        '47 CFR §73.187',
+      cite:        '47 CFR §73.182(k) / §73.190',
       pass:        false,
       subject:     null,
       studies, violations: [{
-        cite:    '47 CFR §73.187(a)',
+        // Data-completeness precondition, not an actual rule violation;
+        // citing the AM nighttime study basis cluster (§73.182(k) NIF +
+        // §73.190 charts) so the reviewer knows which study could not
+        // be executed.  Prior cite §73.187(a) was incorrect — §73.187
+        // governs daytime radiation, not nighttime skywave.
+        cite:    '47 CFR §73.182(k) / §73.190',
         message: 'Subject AM station inputs missing — nighttime skywave study cannot be run.'
       }], notes,
       method:      'FCC §73.190 SS-1/SS-2 skywave (Wang formulation, vendored canonical) bidirectional study'
@@ -166,9 +201,9 @@ export function checkSection73187({ subject, nearbyStations = [] } = {}){
   }
 
   if (!Array.isArray(nearbyStations) || nearbyStations.length === 0){
-    notes.push('No nearby AM stations provided.  §73.187 nighttime study cannot run; reviewer must verify protected-station list independently.');
+    notes.push('No nearby AM stations provided.  §73.182(k) / §73.190 nighttime-skywave study cannot run; reviewer must verify protected-station list independently.');
     return {
-      cite:        '47 CFR §73.187',
+      cite:        '47 CFR §73.182(k) / §73.190',
       pass:        haveSubject,
       subject:     subjectShape(subject),
       studies, violations, notes,
@@ -179,7 +214,7 @@ export function checkSection73187({ subject, nearbyStations = [] } = {}){
 
   if (!haveSubject){
     return {
-      cite:        '47 CFR §73.187',
+      cite:        '47 CFR §73.182(k) / §73.190',
       pass:        false,
       subject:     subjectShape(subject),
       studies, violations, notes,
@@ -246,7 +281,11 @@ export function checkSection73187({ subject, nearbyStations = [] } = {}){
         fail_legs.push(`${N.call || N.facility_id || 'nearby'} SS-1 ${rev.skywave_field_mvm?.toFixed?.(4)} mV/m at subject's ${rev.protected_distance_km?.toFixed?.(1)} km protected edge exceeds ${rev.protected_field_mvm} mV/m`);
       }
       violations.push({
-        cite:    '47 CFR §73.187(c)',
+        // AM nighttime skywave protection failure — cite §73.182(k)
+        // (nighttime interference-free service / RSS) and §73.190
+        // (SS-1 chart formulation).  §73.187 governs daytime
+        // radiation limits and is NOT the basis here.
+        cite:    '47 CFR §73.182(k) / §73.190',
         message: `Nighttime skywave protection failure (${cls.label}): ${fail_legs.join('; ')}.`,
         detail:  study
       });
@@ -254,7 +293,7 @@ export function checkSection73187({ subject, nearbyStations = [] } = {}){
   }
 
   return {
-    cite:       '47 CFR §73.187',
+    cite:       '47 CFR §73.182(k) / §73.190',
     pass:       violations.length === 0,
     subject:    subjectShape(subject),
     studies, violations, notes,

@@ -455,11 +455,9 @@ export function buildValidationVerdictSection(exhibit){
   }
 
   const limitations = [
-    'Population values (where shown) are INFORMATIONAL ONLY; FCC §73.x compliance is determined by distance and field-strength tests, not population.',
-    'Polygon-overlap math uses a local-tangent projection at FCC contour scales; sub-metre accurate vs WGS-84.'
-    // "Genoa does not certify FCC filings" intentionally lives ONCE, in the
-    // Certification section boilerplate — not repeated here, since both
-    // render on the same page.
+    'Population values (where shown) are INFORMATIONAL ONLY; FCC Part 73 compliance is determined by distance and field-strength tests (§73.207 / §73.215 / §73.333 for FM; §73.182 / §73.184 / §73.185 / §73.190 for AM), not population.',
+    'Polygon-overlap math uses a local-tangent projection at FCC contour scales; sub-metre accurate vs WGS-84.',
+    'Genoa does not certify FCC filings.  Final certification is the responsibility of the qualified broadcast engineer of record.'
   ];
 
   // ---------- Ontology surface (additive, never overrides legacy fields) -
@@ -540,10 +538,22 @@ export function buildValidationVerdictSection(exhibit){
     // error.  Tier-3 fallback (dataset SHA-256 identity to the upstream
     // fcc/contours-api-node commit) provides STRONG EVIDENCE of parity
     // (same code + same curves) but does not constitute a live re-check
-    // against the public API.  An engineer of record should re-run with
-    // the live check before filing if a definitive cross-verification
-    // is required.
-    interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit).  Code-identity is strong evidence of parity but is NOT a live cross-check; engineer of record should re-run with the live parity check before filing if definitive cross-verification is required.';
+    // against the public API.
+    //
+    // Service branching: the FCC public distance endpoint that the live
+    // parity check hits (geo.fcc.gov) is FM-only — it exposes the FM
+    // tvfm_curves engine.  AM exhibits have no equivalent public
+    // distance endpoint; the FCC AM toolset is groundwave conductivity
+    // graphs (§73.183/§73.184) and NIF/RSS skywave (§73.190), not a
+    // distance API.  So the "engineer of record should re-run with the
+    // live parity check" guidance is FM-specific; for AM the engine-
+    // reference computation IS the canonical record.
+    const svc = String(exhibit.station_inputs?.service || '').toUpperCase();
+    if (svc === 'AM'){
+      interpretation = 'Genoa\'s computed groundwave / NIF results pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  No FCC public distance endpoint exists for AM (§73.183/§73.184 groundwave and §73.190 skywave are graph-based, not distance-API-based), so engine-reference computation is the canonical record for AM exhibits at tier-3.';
+    } else {
+      interpretation = 'Genoa\'s computed contour distances pass the locked golden-reference suite AND the FORTRAN reference-engine parity check.  The live geo.fcc.gov parity check fell back to tier-3 code-identity verification (curve dataset SHA-256 matches upstream fcc/contours-api-node commit).  Code-identity is strong evidence of parity but is NOT a live cross-check; engineer of record should re-run with the live parity check before filing if definitive cross-verification is required.';
+    }
   } else {
     // status was dragged below PARTIAL by an ontology cap — an
     // INCOMPLETE component (missing evidence) or a compliance finding
@@ -685,7 +695,13 @@ function mapLegacyStatusToOntology(status, detail){
       // "no <foo> record attached" detail strings represent INCOMPLETE,
       // not a clean filing-grade FAIL.  Same rationale as the absent-cr
       // branches above: data-loss / attachment failure.
-      if (typeof detail === 'string' && /no [a-z_]+ record attached/i.test(detail)){
+      // Match the producer's actual detail strings — they all end with
+      // "Treat the … as INCOMPLETE pending re-compute." (curve / cross-
+      // check / parity).  The old regex `/no [a-z_]+ record attached/i`
+      // never fired: the producer says "record was attached" (with a
+      // "was" in the middle) and emits hyphenated tokens like
+      // "curve-validation" that fall outside `[a-z_]+`.
+      if (typeof detail === 'string' && /\bINCOMPLETE pending re-compute\b/i.test(detail)){
         return FindingStatus.INCOMPLETE;
       }
       return FindingStatus.FAIL;

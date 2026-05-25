@@ -1,8 +1,20 @@
-// 47 CFR §73.x — Professional Engineer certification block.
+// Professional Engineer certification block.
+//
+// PE-CERTIFICATION AUTHORITY (regulatory basis)
+//   PE-stamp authority does NOT derive from a single Part 73 rule —
+//   the licensure source is state Professional Engineer registration
+//   boards (each state board defines who may stamp engineering
+//   exhibits).  FCC engineering-data filing requirements that the
+//   PE-stamped exhibit satisfies live in:
+//     47 CFR §73.1610 — FCC right to demand additional engineering data
+//     47 CFR §73.3539 — application filing requirements (renewal /
+//                       major-change applications carrying engineering
+//                       data)
+//   See engine/regulatory/citations.js for the canonical cite catalog.
 //
 // SCOPE
-//   Genoa never certifies a filing.  A licensed PE (Professional
-//   Engineer) reviews the exhibit and stamps it.  This module owns:
+//   Genoa never certifies a filing.  A licensed PE reviews the exhibit
+//   and stamps it.  This module owns:
 //     1. The canonical-JSON hash of the exhibit (the "what was signed")
 //     2. The certification block shape (what gets attached to the exhibit)
 //     3. The verify path (recompute the hash, compare)
