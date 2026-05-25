@@ -161,9 +161,28 @@ export async function getOrRunValidation(){
 // PATH TO COMPLIANCE section).  Fail-soft + gated — returns null when
 // not needed or on any error, so it never breaks an export.  The sweep
 // calls the engine compute() directly, so this is recursion-safe.
-export async function computeRemediation(exhibit, baseInputs){
+export async function computeRemediation(exhibit){
   try {
     if (!needsRemediation(exhibit)) return null;
+    // Normalize the computed exhibit's station_inputs back into the shape
+    // compute() reads — notably HAAT is stamped as haat_m_input but
+    // compute reads inputs.haat_m, so the sweep combos would otherwise
+    // get NaN HAAT.  (Remediation only fires for FM §73.207/§73.215, so
+    // haat_m_input is always populated here.)
+    const si = exhibit?.station_inputs || {};
+    const baseInputs = {
+      call:            si.call,
+      facility_id:     si.facility_id,
+      service:         si.service,
+      fcc_class:       si.fcc_class,
+      frequency:       si.frequency,
+      erp_kw:          si.erp_kw,
+      haat_m:          si.haat_m_input,
+      lat:             si.lat,
+      lon:             si.lon,
+      pattern:         si.pattern,
+      radial_step_deg: si.radial_step_deg
+    };
     const curveRefRun = await runCurveReferenceValidation();
     const legacyRun   = await getOrRunValidation();
     const validation  = {
@@ -171,7 +190,7 @@ export async function computeRemediation(exhibit, baseInputs){
       reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
     };
     return await runRemediationSweep({
-      baseInputs: baseInputs || exhibit?.station_inputs || {},
+      baseInputs,
       evidence:   exhibit?.evidence || {},
       validation
     });
