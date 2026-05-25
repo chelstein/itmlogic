@@ -94,6 +94,7 @@ const PDF_UNICODE_FOLD = {
   '·': '.',   // U+00B7 middle dot (we render KV separators with dots elsewhere)
   '≤': '<=', '≥': '>=', '≠': '!=', '≈': '~=', '±': '+/-',
   '⋅': '.',
+  '−': '-',   // U+2212 MINUS SIGN (not the ASCII hyphen) — base-14 fonts lack it
   '°': ' deg',
   'µ': 'u',   // U+00B5 micro sign (distinct from Greek μ U+03BC)
   '∞': 'inf'
@@ -101,7 +102,7 @@ const PDF_UNICODE_FOLD = {
 function pdfSafeText(s){
   if (typeof s !== 'string') return s;
   return s.replace(
-    /[→←↔–—‘’“”…ΔδσπμΩλθφεΣαβγωᵢᵣᵤᵥₐₑₒₓ²³½·≤≥≠≈±⋅°µ∞]/g,
+    /[→←↔–—‘’“”…ΔδσπμΩλθφεΣαβγωᵢᵣᵤᵥₐₑₒₓ²³½·≤≥≠≈±−⋅°µ∞]/g,
     (ch) => PDF_UNICODE_FOLD[ch] || ch
   );
 }

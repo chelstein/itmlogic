@@ -21,7 +21,7 @@ import { getCached, putCached } from './facilityCache.js';
 import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFccContourValidator.js';
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
-import { needsRemediation, runRemediationSweep, bindingBearings } from '../../engine/parameterSweep/remediation.js';
+import { needsRemediation, runRemediationSweep, bindingBearings, bindingConstraints } from '../../engine/parameterSweep/remediation.js';
 import { W }                    from '../../types/warnings.js';
 import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
 import { makeBudget }              from './computeBudget.js';
@@ -189,12 +189,16 @@ export async function computeRemediation(exhibit){
       runs: [curveRefRun, legacyRun],
       reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
     };
-    return await runRemediationSweep({
+    const rem = await runRemediationSweep({
       baseInputs,
       bearings:   bindingBearings(exhibit),
       evidence:   exhibit?.evidence || {},
       validation
     });
+    // Attach the named binding constraints so the report can explain WHY
+    // no path was found (or what a recommendation must clear).
+    if (rem && rem.available) rem.binding_constraints = bindingConstraints(exhibit);
+    return rem;
   } catch {
     return null;   // advisory; never break the export
   }
