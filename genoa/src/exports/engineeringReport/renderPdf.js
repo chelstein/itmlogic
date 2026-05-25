@@ -153,6 +153,7 @@ export async function renderEngineeringReportPdf(doc){
       tocEntries.push({
         heading:        s.heading,
         exhibit_number: s.exhibit_number || null,
+        sub:            isTocSub(s),
         pageIdx:        pdf.bufferedPageRange().count - 1
       });
     }
@@ -238,6 +239,28 @@ function drawSailMark(pdf, cx, cy, size){
   pdf.fillColor('black').strokeColor('black').lineWidth(1);
 }
 
+// Classify TOC entries that are visualizations or sub-parts of a parent
+// section, so they render as indented sub-items instead of cluttering
+// the contents with same-page top-level rows.  Charts/images, the AM
+// "BACKGROUND --" educational blocks, the contour map, and mixed-case
+// "Appendix X-n -- ..." sub-parts (top-level appendices are UPPERCASE)
+// all fold under their parent.
+function isTocSub(s){
+  const t = s.type;
+  if (t === 'polar-chart' || t === 'scatter-chart' || t === 'polygon-overlay'
+      || t === 'visual-summary' || t === 'image') return true;
+  const h = String(s.heading || '');
+  if (!h) return false;
+  if (/^background\b/i.test(h)) return true;
+  if (h === 'Contour Map') return true;
+  // Top-level appendices are emitted as "APPENDIX X -- ..." (uppercase
+  // word); sub-parts as mixed-case "Appendix X-n -- ...".  Key on the
+  // first word's case so titles with stray lowercase (e.g. "...8 km")
+  // don't misclassify.
+  if (/^Appendix\s/.test(h)) return true;
+  return false;
+}
+
 function renderToc(pdf, entries){
   const w = pdf.page.width;
   pdf.fillColor('black');
@@ -259,10 +282,13 @@ function renderToc(pdf, entries){
     const label = e.exhibit_number
       ? `Exhibit ${e.exhibit_number}.  ${e.heading}`
       : e.heading;
+    const indent = e.sub ? 22 : 4;
     pdf.font(e.exhibit_number ? BOLD_FONT : BODY_FONT)
-       .text(label, MARGIN + 4, startY, {
-         width: w - 2 * MARGIN - 60, continued: false, lineBreak: false
+       .fillColor(e.sub ? '#555555' : 'black')
+       .text(label, MARGIN + indent, startY, {
+         width: w - 2 * MARGIN - 60 - indent, continued: false, lineBreak: false
        });
+    pdf.fillColor('black');
     const pageNum = e.pageIdx + 1;
     if (pageNum !== lastPage){
       pdf.font(BOLD_FONT).text(String(pageNum), MARGIN, startY, {
