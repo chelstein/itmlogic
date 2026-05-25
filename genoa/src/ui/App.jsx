@@ -189,6 +189,7 @@ function AuthedRouter({ onLogout }){
     return (
       <SiteOptimizerApp
         onSwitchToContourStudio={() => navigateTo('/')}
+        onNavigate={navigateTo}
         onLogout={onLogout}
       />
     );

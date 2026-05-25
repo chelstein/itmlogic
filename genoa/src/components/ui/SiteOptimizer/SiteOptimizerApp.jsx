@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import AppShell from '../AppShell.jsx';
 import RackPanel from '../RackPanel.jsx';
+import TopNav from '../TopNav.jsx';
 import OptimizerIntroPanel from './OptimizerIntroPanel.jsx';
 import OptimizerInputsPanel from './OptimizerInputsPanel.jsx';
 import OptimizerMap from './OptimizerMap.jsx';
@@ -63,7 +64,7 @@ const DEFAULT_INPUTS = {
   candidate_limit: 20
 };
 
-export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
+export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, onNavigate }){
   const [inputs, setInputs]     = useState(DEFAULT_INPUTS);
   const [result, setResult]     = useState(null);     // { available, n_..., current_site_baseline, candidates }
   const [running, setRunning]   = useState(false);
@@ -130,24 +131,15 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout }){
 
   return (
     <>
-      {/* sign-out + nav back are pinned via the small chrome row above
-          AppShell, matching the existing contour-studio convention. */}
-      <div className="fixed top-3 right-4 z-40 flex items-center gap-2">
-        <button
-          onClick={onSwitchToContourStudio}
-          className="font-mono text-[10px] tracking-rack uppercase text-textDim hover:text-cream border border-rule hover:border-gold/50 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
-        >
-          ← Contour Studio
-        </button>
-        {onLogout && (
-          <button
-            onClick={onLogout}
-            className="font-mono text-[10px] tracking-rack uppercase text-textDim hover:text-cream border border-rule hover:border-gold/50 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
-          >
-            Sign out
-          </button>
-        )}
-      </div>
+      {/* Shared top nav (Studio / Product + Sign out), matching the
+          contour-studio chrome.  The Studio link replaces the old
+          "← Contour Studio" button.  Falls back to onSwitchToContourStudio
+          for navigation when onNavigate isn't supplied. */}
+      <TopNav
+        authed
+        onNavigate={onNavigate || (() => onSwitchToContourStudio && onSwitchToContourStudio())}
+        onLogout={onLogout}
+      />
       <AppShell
         systemStatus={result ? 'nominal' : 'offline'}
         mode="AM Relocation Optimizer · screening"
