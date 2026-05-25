@@ -67,6 +67,35 @@ probe POST /api/exhibits/readiness "${READINESS_BODY}" 200 'POST /api/exhibits/r
 FILING_BODY='{"exhibit":{"station_inputs":{"call":"SMOKE","facility_id":"99999","service":"FM","frequency":100.1,"lat":40,"lon":-75,"haat_m":100,"erp_kw":6,"fcc_class":"A"},"evidence":{}}}'
 probe POST /api/exhibits/filing-package/summary "${FILING_BODY}" 200 'POST /api/exhibits/filing-package/summary'
 
+# 4b. KZLZ HAAT integration probe — exercises the cross-repo ZTR terrain-haat
+# path end-to-end against a real transmitter site (Mt. Lemmon, Casas Adobes).
+# This is the regression probe for the −856.9 m AMSL-contamination bug.  If
+# the deployed ZTR is serving the old v1 cache or has reverted the
+# live-ground+structure AMSL resolution, Genoa will reject the upstream HAAT
+# and fall back to a flat-earth operator-HAAT exhibit.  We assert PASS:
+#   - haat_validation.status === "PASS"
+#   - per-radial HAAT values vary (max-min > 5 m proves terrain modulation)
+KZLZ_BODY='{"exhibit":{"station_inputs":{"call":"KZLZ","facility_id":"36022","service":"FM","frequency":105.3,"lat":32.2490,"lon":-111.1168,"haat_m":581,"erp_kw":0.58,"fcc_class":"C3"},"evidence":{}}}'
+echo "[smoke] KZLZ HAAT integration probe (cross-repo ZTR pipeline)" | tee -a "${SMOKE_LOG}"
+KZLZ_RESP=$(curl -fsS -X POST -H 'Content-Type: application/json' \
+  --data "${KZLZ_BODY}" \
+  --max-time 120 \
+  "${PRODUCTION_URL}/api/exhibits/readiness" 2>>"${SMOKE_LOG}") || {
+    echo "  [smoke] KZLZ readiness call FAILED" >&2; exit 1; }
+KZLZ_HAAT_STATUS=$(echo "${KZLZ_RESP}" | jq -r '.haat_validation.status // "MISSING"')
+KZLZ_HAAT_MIN=$(echo "${KZLZ_RESP}" | jq -r '[.evidence.terrain_haat_per_radial[]?] | min // 0')
+KZLZ_HAAT_MAX=$(echo "${KZLZ_RESP}" | jq -r '[.evidence.terrain_haat_per_radial[]?] | max // 0')
+KZLZ_HAAT_SPREAD=$(awk -v mx="${KZLZ_HAAT_MAX}" -v mn="${KZLZ_HAAT_MIN}" 'BEGIN { printf "%.2f", mx - mn }')
+echo "  [smoke] KZLZ haat_status=${KZLZ_HAAT_STATUS} spread=${KZLZ_HAAT_SPREAD} m" | tee -a "${SMOKE_LOG}"
+if [[ "${KZLZ_HAAT_STATUS}" != "PASS" ]]; then
+  echo "  [smoke] KZLZ haat_validation.status='${KZLZ_HAAT_STATUS}' (expected PASS) — ZTR pipeline regression suspected; check ../zerotrustradio cache_key=v2 and AMSL resolver" >&2
+  exit 1
+fi
+if awk -v s="${KZLZ_HAAT_SPREAD}" 'BEGIN { exit !(s < 5) }'; then
+  echo "  [smoke] KZLZ per-radial HAAT spread ${KZLZ_HAAT_SPREAD} m < 5 m — flat-earth fallback suspected; terrain not modulating" >&2
+  exit 1
+fi
+
 # 5. p95 latency check — re-run /readyz 10×
 echo "[smoke] p95 latency probe (10× /readyz)" | tee -a "${SMOKE_LOG}"
 declare -a TIMES

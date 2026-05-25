@@ -21,6 +21,13 @@ high_risk_globs:
   - genoa/src/engine/curves/**
   - genoa/src/engine/finding/**
   - genoa/src/evidence/terrain/**
+cross_repo_globs:
+  # Upstream HAAT pipeline lives in the ZTR sibling repo.  Without watching
+  # these paths the agent cannot reason about the KZLZ-class amsl_m
+  # contamination bug (see agents/reports/incidents/ for prior occurrences).
+  - ../zerotrustradio/src/routes/api.js
+  - ../zerotrustradio/src/services/terrain-haat.js
+  - ../zerotrustradio/src/services/los.js
 ```
 
 ## Checklist (each run)
@@ -29,7 +36,7 @@ high_risk_globs:
 2. Re-run the golden curve suite (`node --test genoa/src/tests/curvesGolden*.test.js`)
 3. Re-run §73.215 contour-protection regression
 4. Re-run §73.184 AM groundwave regression
-5. HAAT validator sanity (KZLZ-class bug detector)
+5. HAAT validator sanity (KZLZ-class bug detector) — AND trace the AMSL source: if Genoa rejected ZTR's terrain_haat with `amsl_implausible`, open a finding against `../zerotrustradio/src/routes/api.js` (the upstream resolver), NOT against Genoa's rejection logic. The Genoa-side rejection is correct behavior; the bug is upstream.
 6. Per-radial HAAT plausibility on the FM sample set
 7. Cross-check tier-3 fallback wording (no PASS claimed under fallback)
 8. Verify any new evidence sources are read-only (no engine math change without explicit approval)

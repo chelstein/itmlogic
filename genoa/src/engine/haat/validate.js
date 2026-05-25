@@ -92,10 +92,53 @@ function collectAllRadialHaats(exhibit){
   return { values: [], source: 'none' };
 }
 
+// Robust terrain-basis signal.  The upstream tx_amsl_resolved.source
+// stamp is fragile — it depends on ZTR returning facility_amsl_resolved
+// AND the orchestrator stamping it, and a stale facility-cache entry can
+// drop it between runs (observed: identical contour distances, but one
+// run classified terrain_derived and the next flat).  When the per-radial
+// bundle is ITSELF DEM-sourced — evidence.terrain.n_radials_dem_sourced
+// > 0, or rows carry haat_source ~ 'dem'/'arc_averaged' — terrain was
+// genuinely applied regardless of the stamp.  Keying basis off this fact
+// stops the "flat-earth fallback (no terrain DEM)" label + 581 m-uniform
+// HAAT column from appearing on an exhibit whose contour distances were
+// genuinely terrain-modulated.  Contamination guards downstream
+// (HAAT_IMPOSSIBLE, HAAT_MEAN_INCONSISTENT) are basis-independent, so a
+// DEM-sourced-but-garbage bundle (the −857 m KZLZ symptom) still lands
+// at INVALID.
+function terrainWasApplied(exhibit){
+  const t = exhibit?.evidence?.terrain;
+  if (t && t.available === true && Number(t.n_radials_dem_sourced) > 0) return true;
+  const bundle = exhibit?.evidence?.terrain_haat_per_radial;
+  if (Array.isArray(bundle)){
+    return bundle.some(r => typeof r?.haat_source === 'string'
+      && /dem|arc[_-]?averaged/i.test(r.haat_source));
+  }
+  return false;
+}
+
 export function validateHaat(exhibit){
   const inputs       = exhibit?.station_inputs || {};
   const evidence     = exhibit?.evidence || {};
-  const operatorHaat = Number(inputs.haat_m);
+  // Operator HAAT fallback chain.  station_inputs.haat_m is the
+  // primary, but the engineering report renderer also accepts
+  // station_inputs.haat_m_input and evidence.terrain.haat_m as
+  // sources, and we should match — otherwise the Appendix A header
+  // reports "(operator -- m, delta -- m)" even when the cover page
+  // clearly shows the operator value.
+  const operatorHaat = (() => {
+    const candidates = [
+      inputs.haat_m,
+      inputs.haat_m_input,
+      evidence.terrain?.haat_m,
+      evidence.terrain_haat?.operator_haat_m,
+    ];
+    for (const c of candidates){
+      const n = Number(c);
+      if (Number.isFinite(n)) return n;
+    }
+    return NaN;
+  })();
   const haatResolved = evidence.tx_amsl_resolved || null;
   const collected    = collectAllRadialHaats(exhibit);
   const haats        = collected.values;
@@ -104,15 +147,21 @@ export function validateHaat(exhibit){
   // Basis: how was the antenna AMSL determined?  This is the
   // "terrain basis" question — without a resolved AMSL we have no
   // real basis for per-radial terrain HAAT.
+  const demApplied = terrainWasApplied(exhibit);
   let basis = 'unknown';
   if (haatResolved){
     if (haatResolved.source === 'operator_supplied') basis = 'operator_supplied';
     else if (haatResolved.source === 'derived')      basis = 'terrain_derived';
-    else basis = 'flat';
+    // Resolved stamp present but not a recognized terrain source — defer
+    // to the DEM-applied signal rather than blindly calling it flat.
+    else basis = demApplied ? 'terrain_derived' : 'flat';
   } else if (collected.source === 'none'){
     basis = inputs.service === 'AM' ? 'not_applicable_am' : 'flat';
   } else {
-    basis = 'flat';   // values present without a resolved basis
+    // Per-radial values present but no resolved-AMSL stamp.  If the
+    // bundle is DEM-sourced, terrain WAS applied — classify it as such
+    // so the column isn't suppressed to the flat operator value.
+    basis = demApplied ? 'terrain_derived' : 'flat';
   }
 
   // ── No per-radial HAAT anywhere → NOT_RUN ────────────────────

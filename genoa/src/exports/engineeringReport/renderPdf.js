@@ -575,9 +575,45 @@ function renderCertification(pdf, s){
     if (s.boilerplate){
       pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor('black')
          .text(s.boilerplate, { align: 'left' });
-      pdf.moveDown(0.7);
+      pdf.moveDown(0.8);
     }
-    renderKv(pdf, s.fields);
+    renderSignatureBlock(pdf, s.fields);
+  }
+}
+
+// Professional engineer-of-record signature block.  Renders each field
+// as a label + a ruled fill-in line (with any prefilled value sitting on
+// the line), the way a consulting-engineer certification page reads —
+// instead of a bare key/value list with empty values.  Pure layout; the
+// field set + values come from sections/certification.js.
+function renderSignatureBlock(pdf, fields){
+  if (!Array.isArray(fields) || !fields.length) return;
+  const pageW   = pdf.page.width;
+  const leftX   = MARGIN;
+  const rightEnd = pageW - MARGIN;
+  const labelW  = 150;       // fixed gutter so every rule starts at the same x
+  const rowGap  = 26;        // vertical space per signature row
+  const lineDy  = 11;        // baseline offset of the rule below the label top
+
+  for (const [label, value] of fields){
+    if (pageBottomReached(pdf)) pdf.addPage();
+    const rowY = pdf.y;
+    // Label
+    pdf.font(BOLD_FONT).fontSize(BODY_SIZE).fillColor(TEAL_DARK)
+       .text(`${label}`, leftX, rowY, { width: labelW - 8, lineBreak: false });
+    // Ruled fill-in line
+    const lineX0 = leftX + labelW;
+    const lineY  = rowY + lineDy;
+    pdf.strokeColor('#999999').lineWidth(0.5)
+       .moveTo(lineX0, lineY).lineTo(rightEnd, lineY).stroke();
+    // Prefilled value (if any) sits just above the rule
+    if (value != null && String(value).trim() !== ''){
+      pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor('black')
+         .text(String(value), lineX0 + 2, rowY + 1,
+               { width: rightEnd - lineX0 - 4, lineBreak: false });
+    }
+    pdf.fillColor('black').strokeColor('black');
+    pdf.y = rowY + rowGap;
   }
 }
 

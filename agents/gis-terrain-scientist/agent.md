@@ -19,11 +19,18 @@ high_risk_globs:
   - genoa/src/engine/coverage/itm_radial.js
   - genoa/src/engine/geometry/polygonOverlap.js
   - genoa/src/sidecars/map/render.html
+cross_repo_globs:
+  # ZTR owns the live ground-elevation probe + AMSL resolution that feeds
+  # Genoa's HAAT compute.  Watch them so a DEM-source regression upstream
+  # surfaces here even if Genoa's own code hasn't changed.
+  - ../zerotrustradio/src/services/los.js
+  - ../zerotrustradio/src/services/terrain-haat.js
+  - ../zerotrustradio/src/routes/api.js
 ```
 
 ## Checklist
 
-1. Cross-validate KZLZ tx ground elevation: USGS EPQS vs Open-Meteo vs OpenTopoData → must agree within `CROSS_VALIDATE_TOL_M` (30 m, exported from genoa/src/evidence/terrain/elevationClient.js — not restated; cite the source)
+1. Cross-validate KZLZ tx ground elevation: USGS EPQS vs Open-Meteo vs OpenTopoData → must agree within `CROSS_VALIDATE_TOL_M` (30 m, exported from genoa/src/evidence/terrain/elevationClient.js — not restated; cite the source). Then also assert the ZTR `terrain-haat` endpoint resolved AMSL via `live_ground_plus_structure_height` (NOT `broadcast_stations.amsl_m`) — if the prod response shows `amsl_source: 'broadcast_stations.amsl_m'` unverified, file BLOCKER against `../zerotrustradio/src/routes/api.js`.
 2. Karney geodesic round-trip residual < 1 mm on the 36-case test set (curveGolden test)
 3. Polygon clip determinism: Sutherland-Hodgman convex clip is deterministic — same input always produces same output
 4. Per-radial ring closure: every contour polygon's last vertex == first vertex within 1e-9 deg
