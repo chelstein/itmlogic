@@ -432,11 +432,22 @@ function renderParagraphs(pdf, paragraphs){
   }
 }
 
-function renderTable(pdf, table){
+export function renderTable(pdf, table){
   if (!table || !Array.isArray(table.columns) || !Array.isArray(table.rows)) return;
   const w = pdf.page.width - 2 * MARGIN;
   const cols = table.columns;
   const widths = cols.map(c => Math.max(40, Math.floor(w * (Number(c.width) || (1 / cols.length)))));
+
+  // Ensure the header band + at least one row fit on the current page
+  // before drawing.  drawTableHeader writes each column cell with its own
+  // pdf.text() at a fixed y; when that y is near the page bottom PDFKit
+  // auto-paginates per cell while x keeps accumulating, spilling one
+  // column header per near-blank page (the §73.215 wide-table symptom).
+  // Page-break up front so the whole header lands on one page instead.
+  const HEADER_BLOCK = 84;
+  if (pdf.y > pdf.page.height - MARGIN - FOOTER_AREA - HEADER_BLOCK){
+    pdf.addPage();
+  }
 
   drawTableHeader(pdf, cols, widths);
   pdf.font(BODY_FONT).fontSize(BODY_SIZE - 0.5);
