@@ -151,10 +151,11 @@ export async function retrieve(query, { k = 4, alpha = 0.75, filters = null, tim
     const j = await r.json();
     const raw = j?.results || j?.data || j?.retrieved_chunks || j?.chunks || [];
     const chunks = (Array.isArray(raw) ? raw : []).map(c => ({
-      text:   c?.text || c?.content || c?.chunk || c?.page_content
+      text:   c?.text_content || c?.text || c?.content || c?.chunk || c?.page_content
                 || c?.document_chunk || (typeof c === 'string' ? c : ''),
       score:  c?.score ?? c?.relevance ?? c?.distance ?? null,
-      source: c?.source || c?.document || c?.metadata?.source || c?.index_name || null
+      source: c?.source || c?.document || c?.metadata?.source
+                || c?.metadata?.item_name || c?.index_name || null
     })).filter(c => c.text);
     return { available: chunks.length > 0, chunks };
   } catch (e){
