@@ -9,6 +9,7 @@ import {
   buildRemediationRanges,
   runRemediationSweep,
   bindingBearings,
+  bindingConstraints,
   notchPattern
 } from '../engine/parameterSweep/remediation.js';
 import { buildRemediationSection } from '../exports/engineeringReport/sections/remediation.js';
@@ -90,6 +91,30 @@ test('buildRemediationRanges: adds a directional patterns axis when bearings giv
   assert.equal(r.patterns[0], null);              // ND baseline retained
   assert.ok(Array.isArray(r.patterns[1]));
   assert.equal(buildRemediationRanges({ erp_kw: 50, haat_m: 200 }, []).patterns, undefined);
+});
+
+/* ---------- bindingConstraints ---------- */
+
+test('bindingConstraints: names failing §73.215 pairs, worst leg, most-deficient first', () => {
+  const c = bindingConstraints({ regulatory_compliance: { studies: [
+    { pair_pass: true },  // passing → ignored
+    { pair_pass: false, nearby_call: 'KPSV-FM', relationship: '1st-adjacent',
+      du_threshold_db: 6,   forward: { du_actual_db: 1.6 },    reverse: { du_actual_db: 12.1 },
+      polygon_overlap: { subject_interfering_overlap_area_km2: 532.97 } },
+    { pair_pass: false, nearby_call: 'KHGE', relationship: 'IF (10.6/10.8 MHz)',
+      du_threshold_db: -40, forward: { du_actual_db: -128.8 }, reverse: { du_actual_db: -123.9 },
+      polygon_overlap: { subject_interfering_overlap_area_km2: 225.72, nearby_interfering_overlap_area_km2: 112.55 } }
+  ]}});
+  assert.equal(c.length, 2);
+  // KHGE dominates (88.8 dB short) → sorted first.
+  assert.equal(c[0].call, 'KHGE');
+  assert.equal(c[0].actual_db, -128.8);
+  assert.equal(c[0].required_db, -40);
+  assert.equal(c[0].shortfall_db, 88.8);
+  assert.equal(c[0].overlap_km2, 226);
+  assert.equal(c[1].call, 'KPSV-FM');
+  assert.equal(c[1].shortfall_db, 4.4);
+  assert.deepEqual(bindingConstraints({}), []);
 });
 
 /* ---------- runRemediationSweep ---------- */
@@ -191,6 +216,32 @@ test('buildRemediationSection: none_found after directional search names the bea
   assert.match(blob, /directional null/i);
   assert.match(blob, /90°/);
   assert.match(blob, /270°/);
+});
+
+test('buildRemediationSection: none_found names the binding constraints and shortfalls', () => {
+  const sec = buildRemediationSection({}, { remediation: {
+    available: true, none_found: true, evaluated: 72, binding_bearings_deg: [160, 170],
+    binding_constraints: [
+      { call: 'KHGE', relationship: 'IF (10.6/10.8 MHz)', required_db: -40, actual_db: -128.8, shortfall_db: 88.8, overlap_km2: 226 },
+      { call: 'KPSV-FM', relationship: '1st-adjacent', required_db: 6, actual_db: 1.6, shortfall_db: 4.4, overlap_km2: 533 }
+    ]
+  }});
+  const blob = sec.paragraphs.join('\n');
+  assert.match(blob, /binding constraint/i);
+  assert.match(blob, /KHGE \(IF \(10\.6\/10\.8 MHz\)\)/);
+  assert.match(blob, /-128\.8 vs -40 dB required, ~89 dB short/);
+  assert.match(blob, /KPSV-FM .*~4 dB short/);
+});
+
+test('buildRemediationSection: describes overlap when a pair fails only on contour overlap', () => {
+  const sec = buildRemediationSection({}, { remediation: {
+    available: true, none_found: true, evaluated: 24,
+    binding_constraints: [
+      { call: 'KZZZ', relationship: 'co-channel', required_db: 20, actual_db: 25, shortfall_db: -5, overlap_km2: 410 }
+    ]
+  }});
+  const blob = sec.paragraphs.join('\n');
+  assert.match(blob, /KZZZ \(co-channel\) — interfering contour overlaps the protected contour by 410 km²/);
 });
 
 /* ---------- integration: section flows into the full report ---------- */

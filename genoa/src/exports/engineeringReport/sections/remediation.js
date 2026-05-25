@@ -14,6 +14,28 @@ const DISCLAIMER =
   'determination or conclusion above, and is not a filing recommendation — the engineer ' +
   'of record evaluates the trade-offs.';
 
+// Render the named binding constraints (most-deficient first) into a
+// leading sentence, so a none_found result explains WHICH facilities and
+// by HOW MUCH the facility falls short — e.g. an IF pair ~89 dB short is
+// far beyond any power/height/pattern remedy, vs. a 1st-adjacent a few dB
+// short.  Returns '' when no constraints are attached (older payloads).
+function describeConstraints(list){
+  if (!Array.isArray(list) || !list.length) return '';
+  const items = list.slice(0, 4).map(c => {
+    const rel = c.relationship ? ` (${c.relationship})` : '';
+    let why;
+    if (c.shortfall_db != null && c.shortfall_db > 0 && c.actual_db != null && c.required_db != null){
+      why = `D/U ${c.actual_db} vs ${c.required_db} dB required, ~${Math.round(c.shortfall_db)} dB short`;
+    } else if (c.overlap_km2){
+      why = `interfering contour overlaps the protected contour by ${c.overlap_km2} km²`;
+    } else {
+      why = 'contour-protection conflict';
+    }
+    return `${c.call}${rel} — ${why}`;
+  });
+  return `  The binding constraint(s): ${items.join('; ')}.`;
+}
+
 export function buildRemediationSection(exhibit, opt){
   const rem = opt?.remediation || exhibit?.remediation;
   if (!rem || rem.available !== true) return null;
@@ -21,22 +43,23 @@ export function buildRemediationSection(exhibit, opt){
   const paragraphs = [DISCLAIMER];
 
   if (rem.none_found){
+    const why = describeConstraints(rem.binding_constraints);
     const triedDirectional = Array.isArray(rem.binding_bearings_deg) && rem.binding_bearings_deg.length;
     if (triedDirectional){
       const brg = rem.binding_bearings_deg.map(b => `${b}°`).join(', ');
       paragraphs.push(
         `No configuration within the searched envelope — power/height reduction, nor a ` +
         `directional null (to -20 dB) toward the binding bearing(s) ${brg} — brings the ` +
-        `facility into compliance against all protected facilities.  Deeper or custom ` +
+        `facility into compliance against all protected facilities.${why}  Deeper or custom ` +
         `directional pattern shaping, a transmitter-site relocation, a negotiated §73.215 ` +
         `consent, or a rule waiver would be required.`
       );
     } else {
       paragraphs.push(
-        'No ERP or HAAT reduction within the searched envelope brings the facility into ' +
-        'compliance against all protected stations.  A directional antenna notched toward ' +
-        'the binding facility, a transmitter-site relocation, a negotiated §73.215 consent, ' +
-        'or a rule waiver would be required.'
+        `No ERP or HAAT reduction within the searched envelope brings the facility into ` +
+        `compliance against all protected stations.${why}  A directional antenna notched toward ` +
+        `the binding facility, a transmitter-site relocation, a negotiated §73.215 consent, ` +
+        `or a rule waiver would be required.`
       );
     }
   } else {

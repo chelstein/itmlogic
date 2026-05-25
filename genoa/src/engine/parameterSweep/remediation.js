@@ -83,6 +83,43 @@ export function bindingBearings(exhibit){
   return out;
 }
 
+// Per-pair detail for the §73.215 pairs the subject FAILS — the binding
+// constraints any remediation must clear.  Used to explain WHY no
+// configuration was found: the worst (most-deficient) D/U leg gives the
+// shortfall, and the polygon-overlap area is carried for pairs that fail
+// on contour overlap rather than the bearing-D/U pre-filter.  Sorted
+// most-deficient first, so the dominant blocker is named before minor
+// ones.  Returns [] when there are no failing pairs.
+export function bindingConstraints(exhibit){
+  const studies = exhibit?.regulatory_compliance?.studies;
+  if (!Array.isArray(studies)) return [];
+  const out = [];
+  for (const s of studies){
+    if (s?.pair_pass !== false) continue;
+    const required = Number(s?.du_threshold_db);
+    const legs = [Number(s?.forward?.du_actual_db), Number(s?.reverse?.du_actual_db)]
+      .filter(Number.isFinite);
+    const worst = legs.length ? Math.min(...legs) : null;       // most-deficient D/U
+    const shortfall = (Number.isFinite(required) && worst != null)
+      ? +(required - worst).toFixed(1) : null;
+    const po = s?.polygon_overlap || {};
+    const overlap = Math.max(
+      Number(po.subject_interfering_overlap_area_km2) || 0,
+      Number(po.nearby_interfering_overlap_area_km2)  || 0
+    );
+    out.push({
+      call:         s.nearby_call || s.nearby_facility_id || 'nearby',
+      relationship: s.relationship || null,
+      required_db:  Number.isFinite(required) ? required : null,
+      actual_db:    worst != null ? +worst.toFixed(1) : null,
+      shortfall_db: shortfall,
+      overlap_km2:  overlap > 0 ? Math.round(overlap) : null
+    });
+  }
+  out.sort((a, b) => (b.shortfall_db ?? -Infinity) - (a.shortfall_db ?? -Infinity));
+  return out;
+}
+
 function dbToFactor(db){ return Math.pow(10, db / 20); }
 
 // 1-D azimuth pattern_table [[az_deg, field_factor]] (36 × 10°,
