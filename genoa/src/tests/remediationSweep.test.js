@@ -7,7 +7,9 @@ import assert from 'node:assert/strict';
 import {
   needsRemediation,
   buildRemediationRanges,
-  runRemediationSweep
+  runRemediationSweep,
+  bindingBearings,
+  notchPattern
 } from '../engine/parameterSweep/remediation.js';
 import { buildRemediationSection } from '../exports/engineeringReport/sections/remediation.js';
 
@@ -61,6 +63,35 @@ test('buildRemediationRanges: downward ERP + HAAT envelope, bounded', () => {
   assert.deepEqual(buildRemediationRanges({}), {});
 });
 
+/* ---------- directional: bindingBearings + notchPattern ---------- */
+
+test('bindingBearings: subject→nearby bearings of failing §73.215 pairs (deduped ~10°)', () => {
+  const b = bindingBearings({ regulatory_compliance: { studies: [
+    { pair_pass: true,  forward: { bearings: { u_to_d_deg: 10 } } },     // passes → ignored
+    { pair_pass: false, forward: { bearings: { u_to_d_deg: 92 } } },     // → 90
+    { pair_pass: false, forward: { bearings: { u_to_d_deg: 271.4 } } },  // → 270
+    { pair_pass: false, forward: { bearings: { u_to_d_deg: 88 } } }      // → 90 (dup)
+  ]}});
+  assert.deepEqual(b.sort((x, y) => x - y), [90, 270]);
+  assert.deepEqual(bindingBearings({}), []);
+});
+
+test('notchPattern: peak-normalized 1-D table with a null toward the bearing', () => {
+  const pat = notchPattern([90], 0.25, 35);
+  assert.equal(pat.length, 36);
+  assert.ok(Math.abs(pat.find(p => p[0] === 90)[1] - 0.25) < 1e-6, 'null bottom at the bearing');
+  assert.equal(pat.find(p => p[0] === 270)[1], 1, 'peak away from the null');
+  assert.ok(pat.every(p => p[1] >= 0.25 - 1e-9 && p[1] <= 1 + 1e-9));
+});
+
+test('buildRemediationRanges: adds a directional patterns axis when bearings given', () => {
+  const r = buildRemediationRanges({ erp_kw: 50, haat_m: 200 }, [120]);
+  assert.ok(Array.isArray(r.patterns) && r.patterns.length === 4);
+  assert.equal(r.patterns[0], null);              // ND baseline retained
+  assert.ok(Array.isArray(r.patterns[1]));
+  assert.equal(buildRemediationRanges({ erp_kw: 50, haat_m: 200 }, []).patterns, undefined);
+});
+
 /* ---------- runRemediationSweep ---------- */
 
 test('runRemediationSweep: finds a least-power compliant config', async () => {
@@ -75,6 +106,29 @@ test('runRemediationSweep: finds a least-power compliant config', async () => {
   assert.ok(rem.recommended, 'a compliant config should be found');
   assert.ok(rem.recommended.erp_kw <= 50, 'recommended ERP should reach a compliant level');
   assert.ok(rem.evaluated > 0);
+});
+
+test('runRemediationSweep: recommends a directional pattern when one clears it', async () => {
+  // Compliant only when a directional pattern is applied (combo carries
+  // pattern_table) — power/height alone never qualifies here.
+  const dirCompute = async ({ inputs }) => {
+    const hasPattern = Array.isArray(inputs.pattern_table) && inputs.pattern_table.length > 0;
+    return {
+      polygons: [{ contour_id: 'service', closed: true, area_km2: 4000 }],
+      blockers: [],
+      regulatory_compliance: hasPattern
+        ? { cite: '47 CFR §73.215', pass: true,  section_73_207: { pass: false } }
+        : { cite: '47 CFR §73.215', pass: false, section_73_207: { pass: false } },
+      station_inputs: { erp_kw: inputs.erp_kw, haat_m: inputs.haat_m }
+    };
+  };
+  const rem = await runRemediationSweep({
+    baseInputs: { erp_kw: 50, haat_m: 200 }, bearings: [120],
+    evidence: {}, validation: VALIDATION, computeFn: dirCompute
+  });
+  assert.equal(rem.none_found, false);
+  assert.equal(rem.recommended.directional, true);
+  assert.deepEqual(rem.recommended.notch_bearings_deg, [120]);
 });
 
 test('runRemediationSweep: none_found when nothing in range complies', async () => {
@@ -109,6 +163,19 @@ test('buildRemediationSection: renders recommended config', () => {
   assert.match(blob, /ERP 14 kW/);
   assert.match(blob, /HAAT 120 m/);
   assert.match(blob, /does not modify the compliance determination/i);
+});
+
+test('buildRemediationSection: describes a directional recommendation', () => {
+  const sec = buildRemediationSection({}, { remediation: {
+    available: true, none_found: false, evaluated: 96, binding_bearings_deg: [120],
+    recommended: { erp_kw: 50, haat_m: 200, service_km2: 4000, compliance_path: '§73.215',
+                   directional: true, notch_bearings_deg: [120], notch_depth_db: -12 }
+  }});
+  const blob = sec.paragraphs.join('\n');
+  assert.match(blob, /DIRECTIONAL/);
+  assert.match(blob, /120°/);
+  assert.match(blob, /12 dB/);
+  assert.match(blob, /directional-pattern configurations/);   // footer axis label
 });
 
 test('buildRemediationSection: none_found points to relocation/waiver', () => {

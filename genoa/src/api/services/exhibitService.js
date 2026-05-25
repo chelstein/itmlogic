@@ -21,7 +21,7 @@ import { getCached, putCached } from './facilityCache.js';
 import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFccContourValidator.js';
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
-import { needsRemediation, runRemediationSweep } from '../../engine/parameterSweep/remediation.js';
+import { needsRemediation, runRemediationSweep, bindingBearings } from '../../engine/parameterSweep/remediation.js';
 import { W }                    from '../../types/warnings.js';
 import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
 import { makeBudget }              from './computeBudget.js';
@@ -191,6 +191,7 @@ export async function computeRemediation(exhibit){
     };
     return await runRemediationSweep({
       baseInputs,
+      bearings:   bindingBearings(exhibit),
       evidence:   exhibit?.evidence || {},
       validation
     });
