@@ -209,7 +209,7 @@ r.post('/exhibits/export/engineering-report.txt', asyncHandler(async (req, res) 
   const review = await reviewExhibit(exhibit).catch(() => null);
   if (review) options.advisory_review = review;
   // Path-to-compliance sweep (gated on §73.207/§73.215 failure, fail-soft).
-  const remediation = await computeRemediation(exhibit, exhibit?.station_inputs);
+  const remediation = await computeRemediation(exhibit);
   if (remediation) options.remediation = remediation;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = renderEngineeringReportText(doc);
@@ -238,7 +238,7 @@ r.post('/exhibits/export/engineering-report.pdf', asyncHandler(async (req, res) 
   const review = await reviewExhibit(exhibit).catch(() => null);
   if (review) options.advisory_review = review;
   // Path-to-compliance sweep (gated on §73.207/§73.215 failure, fail-soft).
-  const remediation = await computeRemediation(exhibit, exhibit?.station_inputs);
+  const remediation = await computeRemediation(exhibit);
   if (remediation) options.remediation = remediation;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = await renderEngineeringReportPdf(doc);

@@ -187,7 +187,7 @@ async function runReportJob(r, ext){
   // few seconds to non-compliant reports only; lands the section in this
   // same statement.
   setProgress(r.id, PROGRESS.BUILDING_REPORT);
-  const remediation = await computeRemediation(exhibit, r.input);
+  const remediation = await computeRemediation(exhibit);
   if (remediation) reportOpts.remediation = remediation;
   const doc = buildEngineeringReport(exhibit, reportOpts);
 
