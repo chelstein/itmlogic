@@ -41,6 +41,7 @@ import {
 }                                                  from './sections/vectorCharts.js';
 import { buildVisualSummarySection }               from './sections/visualSummary.js';
 import { buildAdvisoryReviewSection }              from './sections/advisoryReview.js';
+import { buildRemediationSection }                from './sections/remediation.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -140,6 +141,11 @@ export function buildEngineeringReport(exhibit, options){
   // per the section's own header doc.
   push(buildBuildAttestationSection(exhibit, opt));
   push(buildCertificationSection(exhibit, opt));
+  // Advisory "path to compliance" remediation — rendered only when an
+  // export attached opt.remediation (the bounded ERP/HAAT sweep result),
+  // which happens for NON-COMPLIANT spacing/contour exhibits.  Advisory;
+  // omitted entirely otherwise.
+  push(buildRemediationSection(exhibit, opt));
   // Advisory AI consistency review — rendered only when an export entry
   // point ran the advisory pass (src/analysis/exhibitReview.js) and
   // attached opt.advisory_review.  Sits AFTER the certification seal and

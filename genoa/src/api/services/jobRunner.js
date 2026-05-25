@@ -13,7 +13,7 @@ import {
   JOB_KIND, JOB_STATUS,
   getJob, setProgress, completeJob, failJob, updateJob
 } from './jobStore.js';
-import { computeExhibit }                  from './exhibitService.js';
+import { computeExhibit, computeRemediation } from './exhibitService.js';
 import { applyComputeOptionDefaults }      from './computeOptionDefaults.js';
 import { enrichTowerEvidence }             from './enrichTowerEvidence.js';
 import { buildEngineeringReport }          from '../../exports/engineeringReport/index.js';
@@ -182,6 +182,13 @@ async function runReportJob(r, ext){
   // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
   const review = await reviewExhibit(exhibit).catch(() => null);
   if (review) reportOpts.advisory_review = review;
+  // Path-to-compliance sweep — only runs when the exhibit failed
+  // §73.207/§73.215 (gated inside computeRemediation), fail-soft.  Adds a
+  // few seconds to non-compliant reports only; lands the section in this
+  // same statement.
+  setProgress(r.id, PROGRESS.BUILDING_REPORT);
+  const remediation = await computeRemediation(exhibit, r.input);
+  if (remediation) reportOpts.remediation = remediation;
   const doc = buildEngineeringReport(exhibit, reportOpts);
 
   // 4. Render TXT or PDF.

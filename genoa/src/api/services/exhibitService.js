@@ -21,6 +21,7 @@ import { getCached, putCached } from './facilityCache.js';
 import { validateAgainstFccContour } from '../../evidence/curveValidation/ztrFccContourValidator.js';
 import { extractHaatFromContour } from '../../evidence/fccContoursClient.js';
 import { runCurveReferenceValidation } from '../../validation/curveReferenceValidation.js';
+import { needsRemediation, runRemediationSweep } from '../../engine/parameterSweep/remediation.js';
 import { W }                    from '../../types/warnings.js';
 import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
 import { makeBudget }              from './computeBudget.js';
@@ -152,6 +153,31 @@ export async function getOrRunValidation(){
   _validationCache = await runValidationSuite();
   _validationCachedAt = now;
   return _validationCache;
+}
+
+// Advisory "path to compliance" remediation.  When the exhibit failed
+// §73.207/§73.215, run the bounded ERP×HAAT sweep and return the result
+// to attach as options.remediation (rendered by the report's
+// PATH TO COMPLIANCE section).  Fail-soft + gated — returns null when
+// not needed or on any error, so it never breaks an export.  The sweep
+// calls the engine compute() directly, so this is recursion-safe.
+export async function computeRemediation(exhibit, baseInputs){
+  try {
+    if (!needsRemediation(exhibit)) return null;
+    const curveRefRun = await runCurveReferenceValidation();
+    const legacyRun   = await getOrRunValidation();
+    const validation  = {
+      runs: [curveRefRun, legacyRun],
+      reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
+    };
+    return await runRemediationSweep({
+      baseInputs: baseInputs || exhibit?.station_inputs || {},
+      evidence:   exhibit?.evidence || {},
+      validation
+    });
+  } catch {
+    return null;   // advisory; never break the export
+  }
 }
 
 export async function computeExhibit(req){

@@ -14,6 +14,7 @@ import { renderEngineeringReportText }      from '../../exports/engineeringRepor
 import { renderEngineeringReportPdf }       from '../../exports/engineeringReport/renderPdf.js';
 import { fetchMapRender }                   from '../../sidecars/mapClient.js';
 import { reviewExhibit }                     from '../../analysis/exhibitReview.js';
+import { computeRemediation }                from '../services/exhibitService.js';
 
 import { readiness } from '../../types/readiness.js';
 
@@ -207,6 +208,9 @@ r.post('/exhibits/export/engineering-report.txt', asyncHandler(async (req, res) 
   // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
   const review = await reviewExhibit(exhibit).catch(() => null);
   if (review) options.advisory_review = review;
+  // Path-to-compliance sweep (gated on §73.207/§73.215 failure, fail-soft).
+  const remediation = await computeRemediation(exhibit, exhibit?.station_inputs);
+  if (remediation) options.remediation = remediation;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = renderEngineeringReportText(doc);
   res.type(TXT_CONTENT_TYPE);
@@ -233,6 +237,9 @@ r.post('/exhibits/export/engineering-report.pdf', asyncHandler(async (req, res) 
   // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
   const review = await reviewExhibit(exhibit).catch(() => null);
   if (review) options.advisory_review = review;
+  // Path-to-compliance sweep (gated on §73.207/§73.215 failure, fail-soft).
+  const remediation = await computeRemediation(exhibit, exhibit?.station_inputs);
+  if (remediation) options.remediation = remediation;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = await renderEngineeringReportPdf(doc);
   res.type(PDF_CONTENT_TYPE);
