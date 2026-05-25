@@ -176,6 +176,25 @@ test('fccKb.retrieve (kbaas): posts {query,num_results,alpha} with PAT bearer, p
   });
 });
 
+test('fccKb.retrieve (kbaas): extracts chunk text from the real text_content field', async () => {
+  // kbaas /retrieve returns results as { metadata, text_content } — no
+  // `text` field.  Regression: parser previously dropped these (empty
+  // text → filtered out → available:false → advisory ran ungrounded).
+  await withEnv({ FCC_KB_URL: 'https://kb/retrieve', FCC_KB_TOKEN: 'dop_v1_pat',
+                  FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null }, async () => {
+    const fake = async () => okJson({ results: [
+      { metadata: { item_name: 'CFR-part73.pdf', page_number: 1 }, text_content: '§73.215 contour protection ...' }
+    ], total_results: 1 });
+    await withFetch(fake, async () => {
+      const r = await fccKb.retrieve('§73.215', { k: 2 });
+      assert.equal(r.available, true);
+      assert.equal(r.chunks.length, 1);
+      assert.match(r.chunks[0].text, /73\.215 contour protection/);
+      assert.equal(r.chunks[0].source, 'CFR-part73.pdf');
+    });
+  });
+});
+
 test('fccKb.isEnabled: true when either kbaas token OR OpenSearch creds set', async () => {
   await withEnv({ FCC_KB_URL: null, FCC_KB_TOKEN: null, FCC_KB_OS_HOST: null, FCC_KB_OS_PASS: null },
     () => assert.equal(fccKb.isEnabled(), false));
