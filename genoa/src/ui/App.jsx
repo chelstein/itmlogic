@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { stripDomAndReact } from './lib/stripDomAndReact.js';
 import { readJsonOrThrow }  from './lib/readJson.js';
-import { useStudyMusic }    from './lib/studyMusic.js';
 import AppShell      from '@components/ui/AppShell.jsx';
+import TopNav        from '@components/ui/TopNav.jsx';
+import ProductPage   from '@components/ui/ProductPage.jsx';
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
 import ServiceHealthPanel from '@components/ui/ServiceHealthPanel.jsx';
@@ -31,6 +32,7 @@ import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx'
 // Relocation Optimizer lives at '/am-relocation' (server.js serves
 // index.html for any non-API, non-file URL so deep-linking works).
 const ROUTE_OPTIMIZER = '/am-relocation';
+const ROUTE_PRODUCT   = '/product';
 
 function navigateTo(path){
   if (typeof window === 'undefined') return;
@@ -147,6 +149,7 @@ export default function App(){
   // The session cookie is HttpOnly, so the only way to know auth state
   // is asking the server.  /api/auth/me is the canonical probe.
   const [authed, setAuthed] = useState(null);
+  const path = useRoute();
   useEffect(() => {
     fetch('/api/auth/me', { credentials: 'same-origin' })
       .then(r => setAuthed(r.ok))
@@ -156,6 +159,12 @@ export default function App(){
     try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }); }
     catch {}
     setAuthed(false);
+  }
+  // Public + internal: the Product/explainer page renders regardless of
+  // auth state (visitors see it logged-out, the team logged-in), so it
+  // is dispatched BEFORE the session gate below.
+  if (path === ROUTE_PRODUCT){
+    return <ProductPage authed={authed === true} onNavigate={navigateTo} onLogout={logout} />;
   }
   if (authed === null){
     return (
@@ -199,24 +208,7 @@ function MainApp({ onLogout, onOpenOptimizer }) {
   const [busy, setBusy]           = useState(false);
   const [renderingPdf, setRenderingPdf] = useState(false);
   const [statusMsg, setStatusMsg] = useState('Ready · click Compute exhibit');
-  // Bobby Caldwell — each track plays ONLY while its action is
-  // processing.  Stops the moment that action returns.
-  //
-  //   • Open Your Eyes          — while /api/facilities/:id is
-  //                               loading station data (~12-30 s)
-  //   • My Flame                — while exhibit compute is running
-  //                               (~1:40)
-  //   • Down for the Third Time — while PDF / TXT render is running
-  //                               (~2-4 min)
-  //
-  // Phase precedence: pdf > compute > welcome > silence.
-  const [muted, setMuted]                       = useState(false);
   const [lookingUpStation, setLookingUpStation] = useState(false);
-  const musicPhase = renderingPdf     ? 'pdf'
-                   : computing        ? 'compute'
-                   : lookingUpStation ? 'welcome'
-                   : null;
-  const { currentTrack, armed, arm } = useStudyMusic({ phase: musicPhase, muted });
   const [facilitySource, setFacilitySource] = useState('');
   const [activeTab, setActiveTab] = useState('fcc');
   const [history, setHistory]     = useState([]);
@@ -844,43 +836,13 @@ function MainApp({ onLogout, onOpenOptimizer }) {
 
   return (
     <>
-    {onOpenOptimizer && (
-      <button
-        onClick={onOpenOptimizer}
-        title="Open the AM Regional Relocation Optimizer"
-        className="fixed top-3 right-[5.5rem] z-40 font-mono text-[10px] tracking-rack uppercase text-amber hover:text-cream border border-amber/40 hover:border-amber/80 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
-      >
-        Site&nbsp;Optimizer →
-      </button>
-    )}
-    <button
-      onClick={onLogout}
-      title="Sign out"
-      className="fixed top-3 right-4 z-40 font-mono text-[10px] tracking-rack uppercase text-textDim hover:text-cream border border-rule hover:border-gold/50 rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm transition-colors"
-    >
-      Sign&nbsp;out
-    </button>
-    <div
-      className="fixed top-3 right-28 z-40 flex items-center gap-2 font-mono text-[10px] tracking-rack uppercase text-textDim border border-rule rounded px-2.5 py-1 bg-black/60 backdrop-blur-sm"
-      title={currentTrack
-        ? `Now playing: "${currentTrack.title}" — ${currentTrack.artist}`
-        : 'Bobby Caldwell — music plays during compute / PDF render'}
-    >
-      <button
-        onClick={() => { arm(); setMuted(m => !m); }}
-        className="hover:text-cream"
-        title={muted ? 'Unmute' : 'Mute'}
-      >
-        {muted ? '🔇' : '♪'}
-      </button>
-      <span className="text-cream/80 normal-case tracking-normal">
-        {!armed
-          ? <span className="text-textDim">click ♪ to arm music</span>
-          : currentTrack
-            ? <>“{currentTrack.title}” — {currentTrack.artist}</>
-            : <span className="text-textDim">idle</span>}
-      </span>
-    </div>
+    <TopNav
+      current="studio"
+      authed
+      onNavigate={navigateTo}
+      onLogout={onLogout}
+      onOpenOptimizer={onOpenOptimizer}
+    />
     <AppShell
       systemStatus={sysStatus}
       mode={exhibit?.calculation_method?.name || '47 CFR §73.333 F(50,50)'}
