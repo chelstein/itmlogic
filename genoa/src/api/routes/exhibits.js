@@ -13,6 +13,7 @@ import { buildEngineeringReport }           from '../../exports/engineeringRepor
 import { renderEngineeringReportText }      from '../../exports/engineeringReport/renderText.js';
 import { renderEngineeringReportPdf }       from '../../exports/engineeringReport/renderPdf.js';
 import { fetchMapRender }                   from '../../sidecars/mapClient.js';
+import { reviewExhibit }                     from '../../analysis/exhibitReview.js';
 
 import { readiness } from '../../types/readiness.js';
 
@@ -201,7 +202,11 @@ r.post('/exhibits/export/engineering-report.txt', asyncHandler(async (req, res) 
       message: 'POST body must be an exhibit object (or { exhibit: <object> })'
     });
   }
-  const options = req.body?.options || {};
+  const options = { ...(req.body?.options || {}) };
+  // Advisory AI consistency review (fail-soft, no-op without
+  // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
+  const review = await reviewExhibit(exhibit).catch(() => null);
+  if (review) options.advisory_review = review;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = renderEngineeringReportText(doc);
   res.type(TXT_CONTENT_TYPE);
@@ -224,6 +229,10 @@ r.post('/exhibits/export/engineering-report.pdf', asyncHandler(async (req, res) 
   // times out, the map section emits a placeholder note.
   const png = await fetchMapRender(exhibit).catch(() => null);
   if (png) options.contour_map_png = png;
+  // Advisory AI consistency review (fail-soft, no-op without
+  // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
+  const review = await reviewExhibit(exhibit).catch(() => null);
+  if (review) options.advisory_review = review;
   const doc  = buildEngineeringReport(exhibit, options);
   const body = await renderEngineeringReportPdf(doc);
   res.type(PDF_CONTENT_TYPE);
