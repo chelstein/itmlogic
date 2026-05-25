@@ -26,7 +26,7 @@ export function buildRemediationSection(exhibit, opt){
       const brg = rem.binding_bearings_deg.map(b => `${b}°`).join(', ');
       paragraphs.push(
         `No configuration within the searched envelope — power/height reduction, nor a ` +
-        `directional null (to −20 dB) toward the binding bearing(s) ${brg} — brings the ` +
+        `directional null (to -20 dB) toward the binding bearing(s) ${brg} — brings the ` +
         `facility into compliance against all protected facilities.  Deeper or custom ` +
         `directional pattern shaping, a transmitter-site relocation, a negotiated §73.215 ` +
         `consent, or a rule waiver would be required.`
