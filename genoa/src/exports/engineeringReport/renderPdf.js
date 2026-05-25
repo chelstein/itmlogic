@@ -248,6 +248,12 @@ function renderToc(pdf, entries){
   pdf.y = y + 10;
 
   pdf.font(BODY_FONT).fontSize(BODY_SIZE).fillColor('black');
+  // Several short sections legitimately share a page, so print each page
+  // number once — on the first entry that lands on it — instead of
+  // repeating the same number down consecutive rows (which reads as a
+  // duplication bug).  Entries are in render order, so pageIdx only
+  // ever increases.
+  let lastPage = null;
   for (const e of entries){
     const startY = pdf.y;
     const label = e.exhibit_number
@@ -257,9 +263,13 @@ function renderToc(pdf, entries){
        .text(label, MARGIN + 4, startY, {
          width: w - 2 * MARGIN - 60, continued: false, lineBreak: false
        });
-    pdf.font(BOLD_FONT).text(String(e.pageIdx + 1), MARGIN, startY, {
-      width: w - 2 * MARGIN - 4, align: 'right', lineBreak: false
-    });
+    const pageNum = e.pageIdx + 1;
+    if (pageNum !== lastPage){
+      pdf.font(BOLD_FONT).text(String(pageNum), MARGIN, startY, {
+        width: w - 2 * MARGIN - 4, align: 'right', lineBreak: false
+      });
+      lastPage = pageNum;
+    }
     pdf.y = startY + 16;
   }
 }
