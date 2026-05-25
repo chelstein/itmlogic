@@ -142,7 +142,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
       />
       <AppShell
         systemStatus={result ? 'nominal' : 'offline'}
-        mode="AM Relocation Optimizer · screening"
+        mode="AM Relocation Optimizer (beta) · screening"
         engineVersion="genoa-optimizer v0.1.0"
         readinessScore={null}
         readinessStatus={null}

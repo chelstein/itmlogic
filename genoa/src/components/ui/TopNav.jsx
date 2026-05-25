@@ -48,7 +48,7 @@ export default function TopNav({ current, authed, onNavigate, onLogout, onOpenOp
           title="Open the AM Regional Relocation Optimizer"
           className="rounded px-2.5 py-1 border bg-black/60 backdrop-blur-sm transition-colors text-amber border-amber/40 hover:text-cream hover:border-amber/80"
         >
-          Site&nbsp;Optimizer&nbsp;→
+          Site&nbsp;Optimizer&nbsp;(beta)&nbsp;→
         </button>
       )}
 
