@@ -34,17 +34,32 @@ export function buildRemediationSection(exhibit, opt){
     if (r.haat_m  != null) parts.push(`HAAT ${r.haat_m} m`);
     const cfg = parts.join(', ') || 'a reduced configuration';
     const svc = r.service_km2 != null ? ` (≈${Math.round(r.service_km2)} km² service contour)` : '';
-    paragraphs.push(
-      `A compliant configuration exists within the searched envelope: ${cfg} satisfies ` +
-      `${r.compliance_path || '§73.215'}${svc}.  This is one engineering path to ` +
-      `qualifying — reducing power and/or height shrinks the interfering contour and ` +
-      `recovers the required D/U margin; a directional pattern toward the binding ` +
-      `station is an alternative that preserves more coverage.`
-    );
+    if (r.directional){
+      const brg = Array.isArray(r.notch_bearings_deg) && r.notch_bearings_deg.length
+        ? r.notch_bearings_deg.map(b => `${b}°`).join(', ')
+        : 'the binding facilities';
+      const depth = r.notch_depth_db != null ? ` (≈${Math.abs(r.notch_depth_db)} dB null depth)` : '';
+      paragraphs.push(
+        `A compliant configuration exists using a DIRECTIONAL antenna: a pattern with ` +
+        `null(s) toward bearing(s) ${brg}${depth} at ${cfg} satisfies ${r.compliance_path || '§73.215'}` +
+        `${svc}.  A directional notch toward the binding station(s) preserves more service ` +
+        `coverage than an omnidirectional power/height reduction; the engineer of record ` +
+        `must design a §73.316-compliant pattern realizing the required suppression.`
+      );
+    } else {
+      paragraphs.push(
+        `A compliant configuration exists within the searched envelope: ${cfg} satisfies ` +
+        `${r.compliance_path || '§73.215'}${svc}.  Reducing power and/or height shrinks the ` +
+        `interfering contour and recovers the required D/U margin; a directional pattern ` +
+        `toward the binding station is an alternative that can preserve more coverage.`
+      );
+    }
   }
 
+  const axis = (Array.isArray(rem.binding_bearings_deg) && rem.binding_bearings_deg.length)
+    ? 'ERP/HAAT/directional-pattern' : 'ERP/HAAT';
   paragraphs.push(
-    `(Advisory remediation — searched ${rem.evaluated ?? '?'} ERP/HAAT configurations, ` +
+    `(Advisory remediation — searched ${rem.evaluated ?? '?'} ${axis} configurations, ` +
     `free-space §73.333; does not modify the compliance determination.)`
   );
 

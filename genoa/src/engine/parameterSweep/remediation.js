@@ -1,12 +1,15 @@
 // §73.215 / §73.207 "path to compliance" remediation analysis.
 //
 // When an exhibit is NON-COMPLIANT on distance/contour-protection, this
-// runs a BOUNDED, free-space ERP × HAAT parameter sweep (reusing the
-// existing sweep engine + scorer) to find the least-power configuration
-// that would qualify under §73.207 OR §73.215 — i.e. the engineering
-// "alternative route" to authorization.  STRICTLY ADVISORY: it never
-// changes the compliance determination; it surfaces a remediation
-// option for the engineer of record.
+// runs a BOUNDED, free-space ERP × HAAT × directional-pattern parameter
+// sweep (reusing the existing sweep engine + scorer) to find a
+// configuration that would qualify under §73.207 OR §73.215 — i.e. the
+// engineering "alternative route" to authorization.  The directional
+// axis offers notch patterns aimed at the binding stations' bearings;
+// the §73.215 check arbitrates, so a notched candidate only counts as
+// compliant if it genuinely clears the conflicts (no false positives).
+// STRICTLY ADVISORY: it never changes the compliance determination; it
+// surfaces a remediation option for the engineer of record.
 //
 // Recursion-safe by construction: the sweep calls the engine compute()
 // directly (never the job runner / this module), and this module is
@@ -33,7 +36,7 @@ export function needsRemediation(exhibit){
 // from ~10% up to current (≈6 points), HAAT from the §73.333 30 m floor
 // up to current (≈4 points) → ≤ ~24 combos.  Reducing either shrinks
 // the interfering contour and recovers D/U margin.
-export function buildRemediationRanges(baseInputs){
+export function buildRemediationRanges(baseInputs, bearings){
   const ranges = {};
   const erp  = Number(baseInputs?.erp_kw ?? baseInputs?.erp);
   const haat = Number(baseInputs?.haat_m ?? baseInputs?.haat);
@@ -46,17 +49,73 @@ export function buildRemediationRanges(baseInputs){
     const step = Math.max(10, Math.round((haat - 30) / 3));
     ranges.haat_m = { min: 30, max: haat, step };
   }
+  // Directional axis: when binding bearings are known, offer the
+  // non-directional baseline (null) plus notch patterns toward those
+  // bearings at a few depths.  The §73.215 check arbitrates — a notched
+  // pattern only counts as compliant if it genuinely clears the
+  // conflicts, so this can never produce a false positive.
+  if (Array.isArray(bearings) && bearings.length){
+    ranges.patterns = [
+      null,
+      notchPattern(bearings, dbToFactor(-6)),
+      notchPattern(bearings, dbToFactor(-12)),
+      notchPattern(bearings, dbToFactor(-20))
+    ];
+  }
   return ranges;
+}
+
+// Geographic bearings (deg, subject → station) of the §73.215 pairs the
+// subject fails — the directions a directional null must protect.  Reads
+// the per-pair forward study's `bearings.u_to_d_deg` (azimuth from the
+// subject/undesired toward the protected nearby).  Deduped to ~10°.
+export function bindingBearings(exhibit){
+  const studies = exhibit?.regulatory_compliance?.studies;
+  if (!Array.isArray(studies)) return [];
+  const out = [];
+  for (const s of studies){
+    if (s?.pair_pass !== false) continue;
+    const b = Number(s?.forward?.bearings?.u_to_d_deg);
+    if (!Number.isFinite(b)) continue;
+    const r = Math.round((((b % 360) + 360) % 360) / 10) * 10 % 360;
+    if (!out.includes(r)) out.push(r);
+  }
+  return out;
+}
+
+function dbToFactor(db){ return Math.pow(10, db / 20); }
+
+// 1-D azimuth pattern_table [[az_deg, field_factor]] (36 × 10°,
+// peak-normalized to 1.0) with raised-cosine nulls toward each bearing
+// at the given minimum field factor.  The factor at each azimuth is the
+// min across all requested nulls, so multiple binding directions are
+// suppressed simultaneously.
+export function notchPattern(bearings, minFactor, halfWidthDeg = 35){
+  const table = [];
+  for (let az = 0; az < 360; az += 10){
+    let f = 1.0;
+    for (const b of bearings){
+      let d = Math.abs(az - b) % 360;
+      if (d > 180) d = 360 - d;
+      if (d < halfWidthDeg){
+        const g = minFactor + (1 - minFactor) * (0.5 - 0.5 * Math.cos(Math.PI * d / halfWidthDeg));
+        if (g < f) f = g;
+      }
+    }
+    table.push([az, Math.round(f * 1e4) / 1e4]);
+  }
+  return table;
 }
 
 export async function runRemediationSweep({
   baseInputs,
+  bearings    = [],
   evidence    = {},
   validation,
   computeFn,
   maxCombos   = 24
 } = {}){
-  const ranges = buildRemediationRanges(baseInputs);
+  const ranges = buildRemediationRanges(baseInputs, bearings);
   if (!Object.keys(ranges).length){
     return { available: false, reason: 'no ERP/HAAT available to vary' };
   }
@@ -65,31 +124,45 @@ export async function runRemediationSweep({
   // eslint-disable-next-line no-unused-vars
   const { terrain_haat_per_radial, terrain_haat_requested, ...ev } = evidence || {};
 
+  // With a directional axis the grid grows (ERP × HAAT × patterns); raise
+  // the cap so full-power notched candidates aren't downsampled away.
+  const cap = Array.isArray(ranges.patterns) ? Math.max(maxCombos, 120) : maxCombos;
+
   const sweep = await sweepParameters({
     baseInputs,
     sweepRanges: ranges,
     evidence:    ev,
     validation,
-    options:     { max_combinations: maxCombos, top_n: 5, only_compliant: true },
+    options:     { max_combinations: cap, top_n: 5, only_compliant: true },
     computeFn
   });
 
   const best = sweep.best;
+  const bestPat = best?.combo?.pattern_table;
+  const directional = Array.isArray(bestPat) && bestPat.length > 0;
+  const notch_db = directional
+    ? Math.round(20 * Math.log10(Math.min(...bestPat.map(p => Number(p[1]) || 1))))
+    : null;
   return {
     available:   true,
     none_found:  !best,
     evaluated:   sweep.total_evaluated,
     searched:    ranges,
+    binding_bearings_deg: bearings,
     recommended: best ? {
       erp_kw:          best.combo?.erp_kw ?? null,
       haat_m:          best.combo?.haat_m ?? null,
       service_km2:     best.coverage_km2 ?? null,
-      compliance_path: best.compliance?.distance_path || '§73.215'
+      compliance_path: best.compliance?.distance_path || '§73.215',
+      directional,
+      notch_bearings_deg: directional ? bearings : null,
+      notch_depth_db:     notch_db
     } : null,
     candidates: (sweep.top_compliant || []).slice(0, 5).map(r => ({
       erp_kw:      r.combo?.erp_kw ?? null,
       haat_m:      r.combo?.haat_m ?? null,
-      service_km2: r.coverage_km2 ?? null
+      service_km2: r.coverage_km2 ?? null,
+      directional: Array.isArray(r.combo?.pattern_table) && r.combo.pattern_table.length > 0
     }))
   };
 }
