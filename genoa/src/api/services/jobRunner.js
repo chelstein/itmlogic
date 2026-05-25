@@ -20,6 +20,7 @@ import { buildEngineeringReport }          from '../../exports/engineeringReport
 import { renderEngineeringReportText }     from '../../exports/engineeringReport/renderText.js';
 import { renderEngineeringReportPdf }      from '../../exports/engineeringReport/renderPdf.js';
 import { fetchMapRender }                  from '../../sidecars/mapClient.js';
+import { reviewExhibit }                    from '../../analysis/exhibitReview.js';
 
 const PROGRESS = Object.freeze({
   COMPUTING:        'Computing exhibit…',
@@ -177,6 +178,10 @@ async function runReportJob(r, ext){
   // Same enrichment used by the LMS Filing Package routes — the two
   // render paths share render-time evidence.
   await enrichTowerEvidence(exhibit, console);
+  // Advisory AI consistency review (fail-soft, no-op without
+  // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
+  const review = await reviewExhibit(exhibit).catch(() => null);
+  if (review) reportOpts.advisory_review = review;
   const doc = buildEngineeringReport(exhibit, reportOpts);
 
   // 4. Render TXT or PDF.

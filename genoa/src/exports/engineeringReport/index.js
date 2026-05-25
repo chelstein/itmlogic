@@ -37,6 +37,7 @@ import {
   buildNearbyStationsChartSection
 }                                                  from './sections/vectorCharts.js';
 import { buildVisualSummarySection }               from './sections/visualSummary.js';
+import { buildAdvisoryReviewSection }              from './sections/advisoryReview.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -116,6 +117,14 @@ export function buildEngineeringReport(exhibit, options){
   push(buildValidationVerdictSection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
   push(buildCertificationSection(exhibit, opt));
+  // Advisory AI consistency review — rendered only when an export entry
+  // point ran the advisory pass (src/analysis/exhibitReview.js) and
+  // attached opt.advisory_review.  Sits AFTER the certification seal and
+  // is explicitly marked ADVISORY so it is never read as part of the
+  // certified determination.  Omitted entirely when no review is
+  // attached (no MODEL_ACCESS_KEY), so default/offline renders are
+  // unchanged.
+  push(buildAdvisoryReviewSection(exhibit, opt));
   for (const ap of buildAppendixSections(exhibit, opt)) push(ap);
   // Vector charts — rendered pdfkit-native (no PNG, no sidecar) from
   // the same evidence already in exhibit.evidence.  Each chart is a
