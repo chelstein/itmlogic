@@ -36,10 +36,13 @@ const VALIDATION = { runs: [], reference_cases_present: true };
 
 /* ---------- needsRemediation ---------- */
 
-test('needsRemediation: true only on a §73.207/§73.215 failure', () => {
+test('needsRemediation: only when genuinely non-compliant on §73.207/§73.215', () => {
   assert.equal(needsRemediation({ regulatory_compliance: { cite: '47 CFR §73.215', pass: false } }), true);
-  assert.equal(needsRemediation({ regulatory_compliance: { cite: '47 CFR §73.207', pass: false } }), true);
-  assert.equal(needsRemediation({ regulatory_compliance: { section_73_207: { pass: false } } }), true);
+  // COMPLIANT VIA ALTERNATE RULE: §73.207 distance fails but §73.215 saves
+  // it (overall pass=true) → NO remediation (regression: KRDR fired a
+  // spurious "reduce ERP" path despite being compliant).
+  assert.equal(needsRemediation({ regulatory_compliance: { cite: '47 CFR §73.215', pass: true, section_73_207: { pass: false } } }), false);
+  assert.equal(needsRemediation({ regulatory_compliance: { section_73_207: { pass: false } } }), false); // 207-only shortfall, no overall fail
   assert.equal(needsRemediation({ regulatory_compliance: { cite: '47 CFR §73.215', pass: true } }), false);
   assert.equal(needsRemediation({ regulatory_compliance: { cite: '47 CFR §73.182', pass: false } }), false); // AM, not contour
   assert.equal(needsRemediation({}), false);

@@ -15,16 +15,18 @@
 
 import { sweepParameters } from './sweepEngine.js';
 
-// True when the exhibit failed the distance/contour-protection gates
-// (§73.207 spacing or §73.215 contour protection) — the only failures a
-// power/height/pattern sweep can address.
+// True only when the facility is genuinely NON-COMPLIANT on
+// distance/contour protection — i.e. it qualifies under NEITHER §73.207
+// distance NOR the §73.215 contour-protection alternative
+// (regulatory_compliance.pass === false).  A §73.207 distance shortfall
+// by itself is NOT a failure when §73.215 saves it ("COMPLIANT VIA
+// ALTERNATE RULE"), so we must not fire on section_73_207.pass === false
+// alone — that would offer a spurious remediation on an already-
+// compliant facility.
 export function needsRemediation(exhibit){
   const reg = exhibit?.regulatory_compliance;
   if (!reg) return false;
-  const cite = String(reg.cite || '');
-  const failedContour = reg.pass === false && /73\.215|73\.207/.test(cite);
-  const failed207     = reg.section_73_207 && reg.section_73_207.pass === false;
-  return !!(failedContour || failed207);
+  return reg.pass === false && /73\.215|73\.207/.test(String(reg.cite || ''));
 }
 
 // Build a downward ERP × HAAT envelope from the current facility: ERP
