@@ -112,3 +112,24 @@ test('buildRemediationSection: none_found points to relocation/waiver', () => {
   const sec = buildRemediationSection({}, { remediation: { available: true, none_found: true, evaluated: 24 } });
   assert.match(sec.paragraphs.join('\n'), /relocation|waiver|directional/i);
 });
+
+/* ---------- integration: section flows into the full report ---------- */
+
+test('integration: report includes PATH TO COMPLIANCE only when remediation attached', async () => {
+  const { buildExhibit, FM_CLASS_A } = await import('./_helpers.js');
+  const { buildEngineeringReport } = await import('../exports/engineeringReport/index.js');
+  const { renderEngineeringReportText } = await import('../exports/engineeringReport/renderText.js');
+  const x = await buildExhibit(FM_CLASS_A);
+
+  const plain = buildEngineeringReport(x);
+  assert.equal(plain.sections.find(s => s.id === 'remediation'), undefined);
+
+  const withRem = buildEngineeringReport(x, { remediation: {
+    available: true, none_found: false, evaluated: 24,
+    recommended: { erp_kw: 12, haat_m: 100, service_km2: 4200, compliance_path: '§73.215' }
+  }});
+  assert.ok(withRem.sections.some(s => s.id === 'remediation'), 'remediation section present');
+  const txt = renderEngineeringReportText(withRem);
+  assert.match(txt, /PATH TO COMPLIANCE/);
+  assert.match(txt, /ERP 12 kW/);
+});

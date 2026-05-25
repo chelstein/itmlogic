@@ -11,11 +11,9 @@
 
 import {
   JOB_KIND, JOB_STATUS,
-  getJob, createJob, setProgress, completeJob, failJob, updateJob
+  getJob, setProgress, completeJob, failJob, updateJob
 } from './jobStore.js';
-import { computeExhibit, getOrRunValidation } from './exhibitService.js';
-import { runCurveReferenceValidation }    from '../../validation/curveReferenceValidation.js';
-import { needsRemediation, runRemediationSweep } from '../../engine/parameterSweep/remediation.js';
+import { computeExhibit, computeRemediation } from './exhibitService.js';
 import { applyComputeOptionDefaults }      from './computeOptionDefaults.js';
 import { enrichTowerEvidence }             from './enrichTowerEvidence.js';
 import { buildEngineeringReport }          from '../../exports/engineeringReport/index.js';
@@ -77,7 +75,6 @@ export async function runJob(id){
       case JOB_KIND.EXHIBIT:                 await runExhibitJob(r);   break;
       case JOB_KIND.ENGINEERING_REPORT_TXT:  await runReportJob(r, 'txt'); break;
       case JOB_KIND.ENGINEERING_REPORT_PDF:  await runReportJob(r, 'pdf'); break;
-      case JOB_KIND.REMEDIATION_SWEEP:       await runRemediationJob(r); break;
       default: throw new Error(`unknown job kind: ${r.kind}`);
     }
   } catch (err){
@@ -123,46 +120,6 @@ async function runExhibitJob(r){
   });
 }
 
-// Bounded ERP × HAAT remediation sweep — the "path to compliance"
-// analysis for an exhibit that failed §73.207/§73.215.  Runs as its own
-// async job (enqueued by maybeEnqueueRemediation) so it never adds
-// latency to the primary report.  Recursion-safe: the sweep calls the
-// engine compute() directly and never re-enters this path.
-async function runRemediationJob(r){
-  const exhibit = await withHeartbeat(r.id, PROGRESS.COMPUTING,
-    () => computeExhibit(computeReq(r)));
-  setProgress(r.id, 'Computing path-to-compliance sweep…');
-  const curveRefRun = await runCurveReferenceValidation();
-  const legacyRun   = await getOrRunValidation();
-  const validation  = {
-    runs: [curveRefRun, legacyRun],
-    reference_cases_present: curveRefRun.pass || legacyRun.reference_cases_present
-  };
-  const remediation = await runRemediationSweep({
-    baseInputs: r.input || {},
-    evidence:   exhibit?.evidence || {},
-    validation
-  });
-  completeJob(r.id, { result: { remediation } });
-}
-
-// Fire-and-forget: when a freshly-computed exhibit fails the
-// distance/contour gates, enqueue a remediation sweep job.  Defensive —
-// any failure here is swallowed so it can NEVER break the primary report
-// job that triggered it.
-function maybeEnqueueRemediation(r, exhibit){
-  try {
-    if (r.options?._remediation) return;          // don't recurse from a remediation job
-    if (!needsRemediation(exhibit)) return;
-    const job = createJob({
-      kind:    JOB_KIND.REMEDIATION_SWEEP,
-      input:   r.input || {},
-      options: { ...(r.options || {}), _remediation: true }
-    });
-    scheduleJob(job.id);
-  } catch { /* never break the primary job */ }
-}
-
 async function runReportJob(r, ext){
   // 1. Compute — always run a FRESH per-station compute().
   //
@@ -199,10 +156,6 @@ async function runReportJob(r, ext){
   const exhibit = await withHeartbeat(r.id, PROGRESS.COMPUTING,
     () => computeExhibit(req));
 
-  // Auto-run the "path to compliance" sweep as a separate async job when
-  // the exhibit failed §73.207/§73.215 — never blocks this report.
-  maybeEnqueueRemediation(r, exhibit);
-
   // 2. Validation pass — exhibitService.computeExhibit already runs the
   //    standard validation.  Surfacing the milestone separately is
   //    informational (so the UI can show "Running FCC validation…").
@@ -229,6 +182,13 @@ async function runReportJob(r, ext){
   // MODEL_ACCESS_KEY).  Strictly advisory; never alters computed values.
   const review = await reviewExhibit(exhibit).catch(() => null);
   if (review) reportOpts.advisory_review = review;
+  // Path-to-compliance sweep — only runs when the exhibit failed
+  // §73.207/§73.215 (gated inside computeRemediation), fail-soft.  Adds a
+  // few seconds to non-compliant reports only; lands the section in this
+  // same statement.
+  setProgress(r.id, PROGRESS.BUILDING_REPORT);
+  const remediation = await computeRemediation(exhibit, r.input);
+  if (remediation) reportOpts.remediation = remediation;
   const doc = buildEngineeringReport(exhibit, reportOpts);
 
   // 4. Render TXT or PDF.

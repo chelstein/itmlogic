@@ -54,8 +54,7 @@ export const JOB_STATUS = Object.freeze({
 export const JOB_KIND = Object.freeze({
   EXHIBIT:                 'exhibit',
   ENGINEERING_REPORT_TXT:  'engineering_report_txt',
-  ENGINEERING_REPORT_PDF:  'engineering_report_pdf',
-  REMEDIATION_SWEEP:       'remediation_sweep'
+  ENGINEERING_REPORT_PDF:  'engineering_report_pdf'
 });
 
 export const ORPHAN_REASON = 'JOB_ORPHANED';
