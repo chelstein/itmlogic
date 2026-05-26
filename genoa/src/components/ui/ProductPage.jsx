@@ -55,7 +55,7 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
       {/* Hero — benefit first */}
       <header className="max-w-5xl mx-auto px-6 pt-24 pb-12 text-center">
         <div className="flex justify-center mb-6"><LogoMark /></div>
-        <div className="font-mono text-[11px] tracking-rack uppercase text-amber mb-4">Genoa FCC Propagation Studio</div>
+        <div className="font-mono text-[11px] tracking-rack uppercase text-amber mb-4">FCC broadcast engineering, automated</div>
         <h1 className="text-cream text-4xl sm:text-5xl font-bold leading-tight mb-5">
           FCC propagation studies and filing exhibits — in minutes, not weeks.
         </h1>
