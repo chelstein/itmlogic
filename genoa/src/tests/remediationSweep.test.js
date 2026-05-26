@@ -117,6 +117,17 @@ test('bindingConstraints: names failing §73.215 pairs, worst leg, most-deficien
   assert.deepEqual(bindingConstraints({}), []);
 });
 
+test('bindingConstraints: carries beyond_curve_range when a leg is engulfed', () => {
+  const c = bindingConstraints({ regulatory_compliance: { studies: [
+    { pair_pass: false, nearby_call: 'KWID', relationship: 'IF (10.6/10.8 MHz)',
+      du_threshold_db: -40,
+      forward: { du_actual_db: -129.0, du_beyond_curve_range: true },
+      reverse: { du_actual_db: -123.6, du_beyond_curve_range: true },
+      polygon_overlap: { subject_interfering_overlap_area_km2: 442.30 } }
+  ]}});
+  assert.equal(c[0].beyond_curve_range, true);
+});
+
 /* ---------- runRemediationSweep ---------- */
 
 test('runRemediationSweep: finds a least-power compliant config', async () => {
@@ -231,6 +242,19 @@ test('buildRemediationSection: none_found names the binding constraints and shor
   assert.match(blob, /KHGE \(IF \(10\.6\/10\.8 MHz\)\)/);
   assert.match(blob, /-128\.8 vs -40 dB required, ~89 dB short/);
   assert.match(blob, /KPSV-FM .*~4 dB short/);
+});
+
+test('buildRemediationSection: none_found describes engulfed contours instead of a bogus dB short', () => {
+  const sec = buildRemediationSection({}, { remediation: {
+    available: true, none_found: true, evaluated: 96, binding_bearings_deg: [30, 130],
+    binding_constraints: [
+      { call: 'KWID', relationship: 'IF (10.6/10.8 MHz)', required_db: -40, actual_db: -129, shortfall_db: 89, overlap_km2: 442, beyond_curve_range: true }
+    ]
+  }});
+  const blob = sec.paragraphs.join('\n');
+  assert.match(blob, /KWID \(IF \(10\.6\/10\.8 MHz\)\) — interfering contour engulfs the protected contour/);
+  assert.match(blob, /beyond §73\.333 curve range/);
+  assert.doesNotMatch(blob, /~89 dB short/);
 });
 
 test('buildRemediationSection: describes overlap when a pair fails only on contour overlap', () => {
