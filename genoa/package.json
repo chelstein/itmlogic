@@ -46,6 +46,7 @@
     "@pdfme/generator": "^6.1.1",
     "express": "^4.21.1",
     "geographiclib-geodesic": "^2.2.0",
+    "maplibre-gl": "^5.24.0",
     "mathjs": "^15.2.0",
     "pdfkit": "^0.18.0",
     "pg": "^8.13.1",
