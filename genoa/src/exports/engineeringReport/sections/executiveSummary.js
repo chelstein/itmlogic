@@ -64,7 +64,7 @@ export function buildExecutiveSummarySection(exhibit){
   const checks = [];
   if (isAm){
     checks.push('the §73.184 groundwave service contours (city / primary / secondary / night-intf)');
-    checks.push('§73.187 nighttime skywave protection of every Class A / B / D station within 1500 km');
+    checks.push('§73.182(k) / §73.190 nighttime skywave protection (RSS combination per §73.185) of every Class A / B / D station within 1500 km');
     if (exhibit?.am_blanket_compliance?.applicable)      checks.push('§73.24(g) blanketing-interference compliance');
     if (exhibit?.am_city_coverage_compliance?.applicable) checks.push('§73.24(j) principal-community coverage');
     if (exhibit?.am_da_pattern_compliance?.applicable)   checks.push('§73.150 directional-antenna pattern shape');
@@ -87,10 +87,20 @@ export function buildExecutiveSummarySection(exhibit){
   const concRaw = cc?.status || cc?.conclusion || null;
   const conclusion = concRaw ? String(concRaw).toUpperCase() : null;
   const legacyStatus = v?.status ? String(v.status).toUpperCase() : null;
+  // §73.311 limits what predicted-contour outputs may be used for; the
+  // executive-summary verdict is the line most likely to be quoted
+  // standalone, so it must not overstate verification.  When the live
+  // geo.fcc.gov parity check fell back to tier-3 code-identity
+  // verification, the VERIFIED phrasing "meets the regulatory bar" can
+  // be misread as a regulatory finding.  Qualify it to make the
+  // tier-3 status explicit when fallback_tier > 1.
+  const tier3Fallback = (exhibit?.validation?.fcc_curve_parity?.fallback_tier ?? 1) > 1;
   // Translate the legacy single status into a plain-English phrase.
   const niceVerdict = conclusion === 'COMPLIANT'      ? 'is compliant with the FCC rules under the proposed mode'
                    :  conclusion === 'NON-COMPLIANT'  ? 'does NOT comply with one or more FCC rules — see Engineering Conclusion for the specific blocker(s)'
                    :  conclusion === 'PARTIAL'        ? 'meets some but not all of the regulatory checks — see Engineering Conclusion for details'
+                   :  legacyStatus === 'VERIFIED' && tier3Fallback
+                     ? 'is computationally verified against the engine reference (FCC live cross-check not exercised — see Validation Verdict)'
                    :  legacyStatus === 'VERIFIED'     ? 'is computationally verified and meets the regulatory bar'
                    :  legacyStatus === 'PARTIAL'      ? 'is computationally verified but one or more regulatory checks are partial — see Validation Verdict'
                    :  legacyStatus === 'UNVERIFIED'   ? 'has computational gaps that the engineer of record must close before filing'

@@ -425,11 +425,17 @@ test('wordingFor(FM) returns FM-specific terminology (ERP, contour, §73.313 / �
   assert.equal(w.interference_cite, '§73.215');
 });
 
-test('wordingFor(LPFM) returns LPFM terminology (§73.811 / §73.807)', () => {
+test('wordingFor(LPFM) returns LPFM terminology — §73.807 allocation, §73.333 propagation, §73.811 ERP ceiling', () => {
+  // Per fcc-attorney F-006: §73.811 governs LPFM ERP / antenna-height
+  // ceiling, not the propagation methodology.  The 60 dBµV/m LPFM
+  // service contour derives from §73.313 (HAAT method) + §73.333 (FM
+  // curves) applied with LPFM caps — so propagation_cite must be
+  // §73.333, not §73.811.
   const w = wordingFor('LPFM');
   assert.equal(w.service_label, 'LPFM');
   assert.equal(w.allocation_rule_cite, '§73.807');
-  assert.equal(w.propagation_cite, '§73.811');
+  assert.equal(w.propagation_cite, '§73.333');
+  assert.equal(w.erp_ceiling_cite, '§73.811');
 });
 
 test('wordingFor(FX) returns FM-translator terminology (§74.1204)', () => {

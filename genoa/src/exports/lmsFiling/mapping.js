@@ -114,7 +114,7 @@ function resolveProvenance(exhibit, def){
       method:     pop.method || null,
       sha256:     pop.sha256 ? pop.sha256.slice(0, 16) + '…' : null,
       fetched_at: pop.fetched_at || null,
-      note:       'INFORMATIONAL — not a §73.x compliance input'
+      note:       'INFORMATIONAL — not a §73 compliance input (FCC tests are distance and field-strength, not population)'
     };
   }
   return { source: 'genoa-engine', note: 'computed from exhibit', method: def.id };

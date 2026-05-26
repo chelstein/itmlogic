@@ -4,6 +4,16 @@
 -- Rows mirror the in-process job map; artifact bodies (PDF / TXT) live
 -- in-process and are not stored here.  artifact_url points at the
 -- streaming endpoint that reads from the in-process map.
+--
+-- ROLLBACK: Purely additive — single table + two indexes.  Drop all
+-- three.  Losing the table drops job-queue history; in-flight async
+-- export jobs running through jobStore.js will fail because their
+-- result row no longer exists, so confirm the queue is drained before
+-- reverting.  No cross-table FK so the drop is local.
+--
+-- DROP INDEX IF EXISTS engineering_export_jobs_created_idx;
+-- DROP INDEX IF EXISTS engineering_export_jobs_status_idx;
+-- DROP TABLE IF EXISTS engineering_export_jobs;
 
 CREATE TABLE IF NOT EXISTS engineering_export_jobs (
   id                UUID         PRIMARY KEY,

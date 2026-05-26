@@ -187,7 +187,7 @@ export default function Login({ onSuccess }){
           </button>
 
           <div className="font-mono text-[10px] text-textDim tracking-rack uppercase text-center pt-1">
-            Authorized&nbsp;personnel&nbsp;only · §73.x&nbsp;workbench
+            Authorized&nbsp;personnel&nbsp;only · Part&nbsp;73&nbsp;workbench
           </div>
         </form>
       </div>

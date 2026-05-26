@@ -86,11 +86,17 @@ function makeAmExhibit(){
 
 /* ────────────── Appendix B ────────────── */
 
-test('AM Appendix B: columns are §73.187/§73.190 (not §73.207/§73.215)', () => {
+test('AM Appendix B: columns are §73.182(k)/§73.190 (not §73.207/§73.215)', () => {
+  // PR-CITE2 (F-005): AM nighttime skywave protection column header
+  // updated from the prior mis-attribution "§73.187 / §73.190" to the
+  // correct statutory basis "§73.182(k) / §73.190".  §73.187 is the
+  // daytime-radiation rule and is not the basis for nighttime checks.
+  // See engine/regulatory/citations.js for the canonical cite catalog.
   const x = makeAmExhibit();
   const ab = buildAppendixSections(x).find(s => s.id === 'appendix-b');
   const labels = ab.table.columns.map(c => c.label);
-  assert.ok(labels.includes('§73.187 / §73.190'), `AM must show §73.187 column; got ${labels.join('|')}`);
+  assert.ok(labels.includes('§73.182(k) / §73.190'),
+    `AM must show §73.182(k)/§73.190 column; got ${labels.join('|')}`);
   assert.ok(!labels.includes('§73.207'), 'AM must NOT show §73.207 column');
   assert.ok(!labels.includes('§73.215'), 'AM must NOT show §73.215 column');
   assert.ok(labels.includes('Freq (kHz)'), 'AM must show kHz unit');

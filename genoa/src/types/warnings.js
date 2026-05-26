@@ -131,14 +131,14 @@ export const WARNING_CODES = Object.freeze({
     title: 'FCC geo contour cross-check skipped',
     description: 'No usable _fcc_contour was returned by the upstream (geo.fcc.gov / ZTR proxy).  The cross-check did not run.  This does not affect curve validation status.' },
 
-  // ---- Regulatory compliance (47 CFR §73.811 / §74.1204) ----
+  // ---- Regulatory compliance (47 CFR §73.807 / §73.811 / §74.1204) ----
   // These warnings are emitted by the regulatory compliance modules
   // (src/engine/regulatory/) when an exhibit fails — or cannot complete
   // — its rule check.
 
   LPFM_RULE_VIOLATION: { severity: 'blocker', phase: 'engine',
-    title: 'LPFM rule violation (47 CFR §73.811)',
-    description: 'The exhibit fails one or more 47 CFR §73.811 LPFM rules (ERP ceiling, service-contour distance).  The exhibit is not filable as an LPFM application.' },
+    title: 'LPFM rule violation (47 CFR §73.807 / §73.811)',
+    description: 'The exhibit fails one or more LPFM rules: §73.807 service-contour distance / minimum-separation, or §73.811 ERP and antenna-height ceiling.  The exhibit is not filable as an LPFM application.' },
 
   TRANSLATOR_INTERFERENCE: { severity: 'blocker', phase: 'engine',
     title: 'FM translator interference (47 CFR §74.1204)',
@@ -233,8 +233,13 @@ export const WARNING_CODES = Object.freeze({
     description: 'The RMS residual between Genoa\'s predicted field strength (FCC §73.333 / §73.184 curves) and the calibrated SDR-measured field exceeds 10 dB across the captured locations.  This typically indicates terrain shadowing or multipath that the simplified §73.333 model does not capture (use options.use_itm = true for terrain-aware coverage), or a calibration error in the receiver chain.  See evidence.measurements.residuals for the per-row table.' },
 
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
-    title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.187)',
-    description: 'Genoa\'s simplified §73.187/§73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  This is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.187(b)(1) RSS analysis before filing.  Genoa surfaces the §73.187 study results on regulatory_compliance.studies for that review.' },
+    title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.182(k) / §73.190)',
+    description: 'Genoa\'s simplified §73.182(k) / §73.190 SS-1 study (Wang formulation with geographic-lat midpoint approximation, see src/engine/curves/fcc/skywave.mjs header) detected a nighttime-skywave protection violation against one or more nearby AM stations.  Statutory basis: §73.182(k) (nighttime interference-free service / RSS combination per §73.185) using the SS-1 (50%) skywave field-strength formulation of §73.190.  This study is CONSERVATIVE relative to a full IGRF geomagnetic-lat transform with directional-pattern RSS integration over the great-circle azimuth — required for filing-grade go/no-go.  Required next step: licensed-engineer §73.182(k) RSS analysis before filing.  Genoa surfaces the nighttime-skywave study results on regulatory_compliance.studies for that review.' },
+  // Rule-basis note for AM_NIGHTTIME_PROTECTION_VIOLATION (kept in
+  // source comment, not rendered text): the daytime-radiation rule
+  // at 47 CFR §73.187 is a separate provision and is not the basis
+  // for this nighttime check.  See engine/regulatory/citations.js
+  // for the canonical AM_NIGHTTIME_NIF / AM_SKYWAVE_CHARTS entries.
 
   OET65_NEAR_FIELD_REQUIRED: { severity: 'warning', phase: 'engine',
     title: 'OET-65 near-field analysis required (47 CFR §1.1310)',

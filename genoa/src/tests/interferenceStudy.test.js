@@ -157,13 +157,18 @@ test('buildInterferenceStudy: stations sorted by distance ascending', () => {
   assert.deepEqual(r.stations.map(s => s.call), ['KNEAR', 'KMID', 'KFAR']);
 });
 
-test('buildInterferenceStudy: AM service uses §73.187 rule list', () => {
+test('buildInterferenceStudy: AM service uses §73.182(k) + §73.190 rule list (PR-CITE2)', () => {
+  // PR-CITE2 (F-005): the AM rules_evaluated list previously named
+  // '§73.187' as the basis for nighttime skywave protection.  Current
+  // 47 CFR §73.187 is "Limitation on daytime radiation"; the actual
+  // nighttime-skywave basis is §73.182(k) (NIF / RSS) + §73.190 (SS-1
+  // chart formulation).  Engine emissions were corrected at source.
   const r = buildInterferenceStudy({
     subject: { call: 'KAM', facility_id: 'a', frequency_khz: 1240, lat: 33, lon: -112 },
-    regulatory_compliance: { cite: '47 CFR §73.187', pass: true, studies: [] },
+    regulatory_compliance: { cite: '47 CFR §73.182(k) / §73.190', pass: true, studies: [] },
     service: 'AM'
   });
-  assert.deepEqual(r.rules_evaluated, ['§73.187', '§73.190 (Wang skywave)']);
+  assert.deepEqual(r.rules_evaluated, ['§73.182(k)', '§73.190 (Wang skywave)']);
 });
 
 test('buildInterferenceStudy: provenance documents methodology + qualification rule', () => {

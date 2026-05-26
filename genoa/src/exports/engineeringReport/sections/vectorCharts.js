@@ -338,7 +338,7 @@ export function buildCanopyRosePolarSection(exhibit){
                `${rose.n_azimuths} azimuths · min ${min}% · max ${max}% · mean ${mean.toFixed(1)}%.  ` +
                `Larger spread between min and max indicates directional environmental heterogeneity ` +
                `(e.g. transmitter on a cleared peak surrounded by forest on one heading).  ` +
-               `ADVISORY ONLY: does not modify FCC §73.x contour distances or any filing-controlling rule output.`
+               `ADVISORY ONLY: does not modify FCC §73.333 contour distances or any filing-controlling rule output.`
   };
 }
 

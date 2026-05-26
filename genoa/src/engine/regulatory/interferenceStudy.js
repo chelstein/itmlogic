@@ -108,10 +108,14 @@ export function buildInterferenceStudy({ subject, regulatory_compliance, service
   for (const [, st] of stationIndex){
     const r = st.rules;
     const tries = [
-      ['§73.207(b)', r.section_73_207?.pass],
-      ['§73.215',    r.section_73_215?.pass],
-      ['§74.1204',   r.section_74_1204?.pass],
-      ['§73.187',    r.section_73_187?.pass]
+      ['§73.207(b)',         r.section_73_207?.pass],
+      ['§73.215',            r.section_73_215?.pass],
+      ['§74.1204',           r.section_74_1204?.pass],
+      // AM nighttime skywave protection — historical engine namespace
+      // is "section_73_187" but the actual statutory basis is
+      // §73.182(k) (NIF/RSS) + §73.190 (SS-1/SS-2 charts).  §73.187
+      // governs daytime radiation limits — see citations.js.
+      ['§73.182(k) / §73.190', r.section_73_187?.pass]
     ].filter(([, p]) => p === true || p === false);
     const passing = tries.filter(([, p]) => p === true).map(([cite]) => cite);
     const failing = tries.filter(([, p]) => p === false).map(([cite]) => cite);
@@ -202,7 +206,12 @@ function sec1204Row(s){
 
 function sec187Row(s){
   return {
-    cite:                      '47 CFR §73.187 + §73.190 (Wang skywave)',
+    // Historical engine namespace "section_73_187" — the actual cite
+    // for what this row evaluates is §73.182(k) (NIF / RSS) + §73.190
+    // (Wang skywave).  See engine/regulatory/citations.js for the
+    // full catalog.  §73.187 itself is "Limitation on daytime
+    // radiation" (a different rule).
+    cite:                      '47 CFR §73.182(k) / §73.190 (Wang skywave)',
     relationship:              s.relationship                                  ?? null,
     forward_skywave_mvm:       s.forward?.skywave_field_mvm                    ?? null,
     forward_protected_mvm:     s.forward?.protected_field_mvm                  ?? null,
@@ -253,7 +262,7 @@ function subjectShape(s){
 function rulesEvaluated(svc){
   if (svc === 'FM')   return ['§73.207(b) Table A', '§73.215'];
   if (svc === 'FX')   return ['§74.1204(a)+(c)'];
-  if (svc === 'AM')   return ['§73.187', '§73.190 (Wang skywave)'];
+  if (svc === 'AM')   return ['§73.182(k)', '§73.190 (Wang skywave)'];
   if (svc === 'LPFM') return ['§73.807', '§73.811'];
   return [];
 }

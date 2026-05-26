@@ -119,4 +119,16 @@ test('AM sample wfan.json narrative reports HAAT as n/a (AM)', async () => {
   const m = exhibit.narrative.text.match(/HAAT\s*\(input\):\s*([^\n]+)/);
   assert.ok(m, 'AM exhibit should still render a HAAT line for the standard summary');
   assert.match(m[1], /n\/a\s*\(AM\)/, 'AM HAAT line must be the AM-specific n/a label');
+  assert.doesNotMatch(m[1], /\d+(\.\d+)?\s*m\b/,
+    'AM HAAT line MUST NOT carry a metre value (would indicate FM HAAT semantics leaking into AM)');
+});
+
+test('AM sample kdus.json narrative reports HAAT as n/a (AM)', async () => {
+  const sample = loadSample('kdus.json');
+  const exhibit = await buildExhibit(inputsFromSample(sample));
+  const m = exhibit.narrative.text.match(/HAAT\s*\(input\):\s*([^\n]+)/);
+  assert.ok(m, 'AM exhibit should still render a HAAT line for the standard summary');
+  assert.match(m[1], /n\/a\s*\(AM\)/, 'AM HAAT line must be the AM-specific n/a label');
+  assert.doesNotMatch(m[1], /\d+(\.\d+)?\s*m\b/,
+    'AM HAAT line MUST NOT carry a metre value (would indicate FM HAAT semantics leaking into AM)');
 });

@@ -27,7 +27,7 @@
     "agents:loop":           "../agents/scripts/run-loop.sh",
     "agents:validate":       "node ../agents/scripts/validate-findings-json.js ../agents/*/last-findings.json",
     "agents:issues:dry-run": "../agents/scripts/create-issues-from-findings.sh --dry-run",
-    "agents:test":           "../agents/scripts/tests/test-create-issues.sh",
+    "agents:test":           "../agents/scripts/tests/test-create-issues.sh && ../agents/scripts/tests/test-run-agent-postcondition.sh && ../agents/scripts/tests/test-migrations-have-rollback.sh",
     "agents:deploy":         "../agents/scripts/safe-deploy-digitalocean.sh",
     "agents:rollback":       "../agents/scripts/rollback-digitalocean.sh",
     "agents:lock-prod":      "../agents/scripts/lock-prod.sh",

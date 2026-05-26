@@ -785,8 +785,9 @@ function renderChartHeader(pdf, s){
     pdf.strokeColor(AMBER).lineWidth(0.6)
        .moveTo(MARGIN, ruleY).lineTo(w - MARGIN, ruleY).stroke();
     pdf.y = ruleY + RULE_GAP;
+    const figurePrefix = s.figure_number ? `FIGURE ${s.figure_number} — ` : '';
     pdf.font(BOLD_FONT).fontSize(HEADING_SIZE).fillColor(TEAL_DARK)
-       .text(s.heading.toUpperCase(), MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
+       .text(`${figurePrefix}${s.heading.toUpperCase()}`, MARGIN, pdf.y, { width: w - 2 * MARGIN, characterSpacing: 0.4 });
     pdf.fillColor('black').moveDown(0.4);
   }
 }
@@ -1214,6 +1215,15 @@ function textWidth(pdf, str, font, size){
 function renderVisualSummary(pdf, s){
   if (!s || !Array.isArray(s.contours) || s.contours.length === 0) return;
   if (!s.tx || !Number.isFinite(s.tx.lat) || !Number.isFinite(s.tx.lon)) return;
+
+  // Render the standard chart heading (heading text + "FIGURE N — "
+  // prefix) so the TOC entry that references this page points at a
+  // visibly-labeled surface.  Without this the visual-summary page
+  // opens with the compass wheel only — an auditable-surface defect
+  // (EVR-003): the FCC reviewer cannot navigate the exhibit because
+  // the TOC entry "COVERAGE & ENVIRONMENT — VISUAL SUMMARY" maps to a
+  // page whose body has no matching heading string.
+  renderChartHeader(pdf, s);
 
   const w        = pdf.page.width - 2 * MARGIN;
   const startY   = pdf.y;

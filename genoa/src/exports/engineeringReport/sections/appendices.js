@@ -398,7 +398,7 @@ export function buildAppendixSections(exhibit){
       { key: 'distance_km',    label: 'Dist (km)',    width: 0.10, align: 'right' }
     ];
     const ruleCols = isAmExhibit
-      ? [{ key: 'rule_187', label: '§73.187 / §73.190', width: 0.18 }]
+      ? [{ key: 'rule_187', label: '§73.182(k) / §73.190', width: 0.18 }]
       : isFxExhibit
       ? [{ key: 'rule_1204', label: '§74.1204', width: 0.18 }]
       : [
@@ -406,7 +406,7 @@ export function buildAppendixSections(exhibit){
           { key: 'rule_215', label: '§73.215',      width: 0.09 }
         ];
     const preface = isAmExhibit
-      ? 'Per-pair nighttime skywave evaluation under 47 CFR §73.187 using the SS-1 (50%) field-strength formulation of §73.190 (Wang).'
+      ? 'Per-pair nighttime skywave evaluation under 47 CFR §73.182(k) (nighttime interference-free service; RSS combination per §73.185) using the SS-1 (50%) field-strength formulation of §73.190 (Wang).'
       : isFxExhibit
       ? 'Per-pair translator interference evaluation under 47 CFR §74.1204(a)+(c).'
       : 'Consolidated per-pair evaluation under 47 CFR §73.207 (Table A distance spacing) and §73.215 (contour-protection).';
