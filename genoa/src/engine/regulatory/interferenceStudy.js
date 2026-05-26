@@ -174,6 +174,8 @@ function sec215Row(s){
     du_required_db:            s.du_threshold_db        ?? null,
     du_actual_db_forward:      s.forward?.du_actual_db  ?? null,
     du_actual_db_reverse:      s.reverse?.du_actual_db  ?? null,
+    du_forward_beyond_range:   s.forward?.du_beyond_curve_range === true,
+    du_reverse_beyond_range:   s.reverse?.du_beyond_curve_range === true,
     du_pass:                   s.pair_pass_du,
     polygon_overlap_subject_into_nearby_km2: polygon.subject_interfering_overlap_area_km2 ?? null,
     polygon_overlap_nearby_into_subject_km2: polygon.nearby_interfering_overlap_area_km2  ?? null,

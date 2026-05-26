@@ -153,6 +153,54 @@ test('§73.215 binding pass — margin = min(forward, reverse) D/U', () => {
   assert.equal(p.pass, true);
 });
 
+test('§73.215 FAIL with engulfed contour — reasoning says "beyond curve range", not a bogus dB', () => {
+  const study = makeInterferenceStudy({
+    stations: [{
+      call: 'KWID', facility_id: '7', fcc_class: 'B',
+      frequency_mhz: 102.7, channel_relationship: 'IF (10.6/10.8 MHz)',
+      distance_km: 37,
+      rules: {
+        section_73_215: {
+          cite: '47 CFR §73.215',
+          du_required_db: -40,
+          du_actual_db_forward: -129.0, du_actual_db_reverse: -123.6,
+          du_forward_beyond_range: true, du_reverse_beyond_range: true,
+          polygon_pass: false, pass: false
+        }
+      },
+      pass_overall: false, qualified_via: [], failed_rules: ['§73.215']
+    }]
+  });
+  const p = buildFmReasoning(study).pairs[0];
+  assert.equal(p.pass, false);
+  assert.match(p.binding_constraint, /engulfs the protected contour/);
+  assert.match(p.binding_constraint, /beyond the §73\.333 curve range/);
+  assert.doesNotMatch(p.binding_constraint, /actual is -129/);
+});
+
+test('§73.215 FAIL with a real (in-range) shortfall still prints the dB figure', () => {
+  const study = makeInterferenceStudy({
+    stations: [{
+      call: 'KIYQ', facility_id: '8', fcc_class: 'B',
+      frequency_mhz: 91.9, channel_relationship: '1st-adjacent',
+      distance_km: 80,
+      rules: {
+        section_73_215: {
+          cite: '47 CFR §73.215',
+          du_required_db: 6,
+          du_actual_db_forward: 4.1, du_actual_db_reverse: 17.6,
+          du_forward_beyond_range: false, du_reverse_beyond_range: false,
+          polygon_pass: false, pass: false
+        }
+      },
+      pass_overall: false, qualified_via: [], failed_rules: ['§73.215']
+    }]
+  });
+  const p = buildFmReasoning(study).pairs[0];
+  assert.match(p.binding_constraint, /actual is 4\.1 dB/);
+  assert.doesNotMatch(p.binding_constraint, /engulfs/);
+});
+
 // ── §74.1204 translator ─────────────────────────────────────────────────────
 
 test('§74.1204(f) cite is used for third-adjacent translator pairs', () => {

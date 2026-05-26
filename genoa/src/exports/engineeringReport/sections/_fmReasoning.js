@@ -152,9 +152,19 @@ function evalSec215(r){
   const polyTxt = r.polygon_pass === false
     ? '; interfering-contour polygon overlaps the protected contour'
     : '';
+  // The displayed "actual" comes from the worst (most-deficient) leg.
+  // When that leg's protected edge is inside the FCC free-space
+  // boundary, the D/U is a non-physical extrapolation (the contours
+  // engulf one another) — describe the geometry instead of printing a
+  // misleading dB figure.
+  const worstLegIsForward = (fwd != null && rev != null) ? fwd <= rev : (fwd != null);
+  const beyondRange = worstLegIsForward ? r.du_forward_beyond_range === true
+                                        : r.du_reverse_beyond_range === true;
   const summary = r.pass
     ? `§73.215 contour protection satisfied (D/U margin ${formatDb(margin_db)} dB)`
-    : `§73.215 contour protection fails — D/U required ${r.du_required_db} dB but actual is ${formatDb(margin_db != null ? r.du_required_db + margin_db : null)} dB${polyTxt}`;
+    : beyondRange
+      ? `§73.215 contour protection fails — the interfering contour engulfs the protected contour (D/U required ${r.du_required_db} dB; the protected edge lies within the interferer's free-space near field, so the D/U is beyond the §73.333 curve range)${polyTxt}`
+      : `§73.215 contour protection fails — D/U required ${r.du_required_db} dB but actual is ${formatDb(margin_db != null ? r.du_required_db + margin_db : null)} dB${polyTxt}`;
   return { cite: RULE_CITES.section_73_215, pass: r.pass, margin_db, margin_km: null, summary, detail: r };
 }
 

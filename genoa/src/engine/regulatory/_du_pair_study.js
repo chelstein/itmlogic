@@ -30,6 +30,19 @@ import { fccDistanceKm, fccFieldDbuAtDistance } from '../curves/fcc/index.mjs';
 import { karneyInverse } from '../geometry/wgs84.js';
 import { directionalErpAtBearing } from '../pattern/am_directional.js';
 
+// FCC §73.333 near-field boundary.  The vendored FCC routine
+// (tvfm_curves.js) switches to a free-space inverse-distance formula
+// — field = 106.92 − 20·log10(distance) + erp_db — for any distance
+// below 1.5 km.  When a station's protected-contour edge lands within
+// this radius of the interferer (the contours essentially coincide /
+// one engulfs the other), the interferer field is that free-space
+// extrapolation, not a tabulated curve value, so the resulting D/U is
+// off the meaningful scale (e.g. 183 dBu at the 1 m inside-contour
+// clamp → D/U ≈ −129 dB).  Such D/U values are flagged
+// `du_beyond_curve_range` so reporting describes the engulfed geometry
+// rather than printing a non-physical dB figure.
+export const FCC_FIELD_FREESPACE_KM = 1.5;
+
 /**
  * Run a single contour-pair D/U study.
  *
@@ -70,6 +83,10 @@ export function studyContourPair(U, D, {
     u_field_dbu_at_d_edge:             null,
     du_actual_db:                      null,
     inside_protected_contour:          false,
+    // True when the protected edge falls within the FCC free-space
+    // boundary (< 1.5 km) of the interferer, so du_actual_db is a
+    // free-space extrapolation rather than a meaningful curve D/U.
+    du_beyond_curve_range:             false,
     // Directional-pattern application (§73.62 / §73.316).  Reported
     // verbatim regardless of whether either station carries a
     // pattern_table — when both are non-directional the factors are
@@ -169,6 +186,9 @@ export function studyContourPair(U, D, {
     study.inside_protected_contour = true;
   }
   study.u_distance_to_d_protected_edge_km = rEdge;
+  // Below the FCC near-field boundary the field is a free-space
+  // extrapolation, so the resulting D/U is not a meaningful curve value.
+  study.du_beyond_curve_range = rEdge < FCC_FIELD_FREESPACE_KM;
 
   let uField;
   try {

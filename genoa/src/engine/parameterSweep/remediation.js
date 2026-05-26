@@ -113,7 +113,12 @@ export function bindingConstraints(exhibit){
       required_db:  Number.isFinite(required) ? required : null,
       actual_db:    worst != null ? +worst.toFixed(1) : null,
       shortfall_db: shortfall,
-      overlap_km2:  overlap > 0 ? Math.round(overlap) : null
+      overlap_km2:  overlap > 0 ? Math.round(overlap) : null,
+      // When the protected edge is inside the FCC free-space boundary the
+      // D/U is a non-physical extrapolation (engulfed contours); the
+      // shortfall figure is then meaningless and should not be printed.
+      beyond_curve_range: s.forward?.du_beyond_curve_range === true
+                       || s.reverse?.du_beyond_curve_range === true
     });
   }
   out.sort((a, b) => (b.shortfall_db ?? -Infinity) - (a.shortfall_db ?? -Infinity));

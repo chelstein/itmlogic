@@ -59,6 +59,8 @@ export function buildContourProtectionSection(exhibit){
                               ? Number(polygon.nearby_interfering_overlap_area_km2).toFixed(2)
                               : '—',
       pass:                  s.pair_pass === true ? 'PASS' : s.pair_pass === false ? 'FAIL' : '—',
+      beyond_curve_range:    s.forward?.du_beyond_curve_range === true
+                          || s.reverse?.du_beyond_curve_range === true,
       reasoning:             r?.binding_constraint
                               ? (r.binding_constraint + (r.alternate_route_available ? ' (alternate route available)' : ''))
                               : (polygon_pass === false
@@ -74,7 +76,7 @@ export function buildContourProtectionSection(exhibit){
   const summary = failures.length === 0
     ? `The subject facility qualifies under 47 CFR §73.215 for every restricted-channel-relationship pair evaluated above.  ${parity.wording}`
     : 'The subject facility does not qualify under §73.215 with respect to the following facilities:\n  ' +
-      failures.map(f => `  • ${f.call} (${f.relationship}) — D/U required ${f.du_required} dB; forward ${f.du_forward} dB, reverse ${f.du_reverse} dB; subject→nearby polygon overlap ${f.sn_overlap} km², nearby→subject ${f.ns_overlap} km².`).join('\n  ')
+      failures.map(f => `  • ${f.call} (${f.relationship}) — D/U required ${f.du_required} dB; forward ${f.du_forward} dB, reverse ${f.du_reverse} dB; subject→nearby polygon overlap ${f.sn_overlap} km², nearby→subject ${f.ns_overlap} km².${f.beyond_curve_range ? '  The interfering contour engulfs the protected contour — the protected edge lies within the interferer’s free-space near field, so the forward/reverse D/U values are beyond the §73.333 curve range and are not literal field ratios.' : ''}`).join('\n  ')
       + `\n\n  ${parity.wording}`;
 
   // Note about §73.207 alternate-rule passage when applicable.

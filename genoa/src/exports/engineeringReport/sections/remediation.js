@@ -24,7 +24,13 @@ function describeConstraints(list){
   const items = list.slice(0, 4).map(c => {
     const rel = c.relationship ? ` (${c.relationship})` : '';
     let why;
-    if (c.shortfall_db != null && c.shortfall_db > 0 && c.actual_db != null && c.required_db != null){
+    if (c.beyond_curve_range){
+      // The protected contour is engulfed; the D/U is a free-space
+      // extrapolation, so report the geometry, not a bogus dB shortfall.
+      why = c.overlap_km2
+        ? `interfering contour engulfs the protected contour (${c.overlap_km2} km² overlap; D/U beyond §73.333 curve range)`
+        : 'interfering contour engulfs the protected contour (D/U beyond §73.333 curve range)';
+    } else if (c.shortfall_db != null && c.shortfall_db > 0 && c.actual_db != null && c.required_db != null){
       why = `D/U ${c.actual_db} vs ${c.required_db} dB required, ~${Math.round(c.shortfall_db)} dB short`;
     } else if (c.overlap_km2){
       why = `interfering contour overlaps the protected contour by ${c.overlap_km2} km²`;
