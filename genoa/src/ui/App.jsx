@@ -4,6 +4,9 @@ import { readJsonOrThrow }  from './lib/readJson.js';
 import AppShell      from '@components/ui/AppShell.jsx';
 import TopNav        from '@components/ui/TopNav.jsx';
 import ProductPage   from '@components/ui/ProductPage.jsx';
+// Lazy — maplibre-gl is ~400 kB gzip and only needed on /map, so keep it
+// out of the main bundle (loaded on demand when the route is opened).
+const MapPage = React.lazy(() => import('@components/ui/MapPage.jsx'));
 import RackPanel     from '@components/ui/RackPanel.jsx';
 import FacilityRack  from '@components/ui/FacilityRack.jsx';
 import ServiceHealthPanel from '@components/ui/ServiceHealthPanel.jsx';
@@ -33,6 +36,7 @@ import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx'
 // index.html for any non-API, non-file URL so deep-linking works).
 const ROUTE_OPTIMIZER = '/am-relocation';
 const ROUTE_PRODUCT   = '/product';
+const ROUTE_MAP       = '/map';
 
 function navigateTo(path){
   if (typeof window === 'undefined') return;
@@ -185,6 +189,17 @@ export default function App(){
 // their state, hooks, and Leaflet instances are fully isolated.
 function AuthedRouter({ onLogout }){
   const path = useRoute();
+  if (path === ROUTE_MAP){
+    return (
+      <React.Suspense fallback={
+        <div className="min-h-screen flex items-center justify-center bg-black font-mono text-textDim text-[12px] tracking-rack uppercase">
+          Loading map…
+        </div>
+      }>
+        <MapPage authed onNavigate={navigateTo} onLogout={onLogout} />
+      </React.Suspense>
+    );
+  }
   if (path === ROUTE_OPTIMIZER){
     return (
       <SiteOptimizerApp

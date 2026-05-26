@@ -12,6 +12,7 @@ import React from 'react';
 
 const LINKS = [
   { key: 'studio',  label: 'Studio',  path: '/' },
+  { key: 'map',     label: 'Map',     path: '/map' },
   { key: 'product', label: 'Product', path: '/product' },
 ];
 
