@@ -1,9 +1,10 @@
 // Product / explainer page — public (pre-login) AND internal.
 //
-// Phase 1: kill the study-music widget, reclaim the top strip for nav,
-// and give the product a place to be explained.  Sales mechanics
-// (lead capture, "spin up a sample exhibit", collateral) are a later
-// pass — the demo CTA below is a lightweight placeholder for now.
+// Benefit-first: lead with the problem Genoa solves and what a
+// non-specialist gets, then drop into the Part 73 engine internals and
+// trust/architecture details lower down for engineers and buyers who
+// care about implementation. Sales mechanics (lead capture, "spin up a
+// sample exhibit") are a later pass — the demo CTA is a placeholder.
 //
 // Rendered by App before the auth gate, so visitors see it logged-out
 // and the team sees it logged-in (TopNav switches Sign in / Sign out).
@@ -31,23 +32,41 @@ function Card({ title, children }){
   );
 }
 
+// Plain bulleted list with an amber marker — used for the benefit-first
+// "what it does" and "what you get" sections.
+function CheckList({ items }){
+  return (
+    <ul className="space-y-3">
+      {items.map((it, i) => (
+        <li key={i} className="flex gap-3 text-textDim leading-relaxed">
+          <span className="text-amber shrink-0 mt-1" aria-hidden="true">▸</span>
+          <span>{it}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function ProductPage({ authed, onNavigate, onLogout }){
   return (
     <div className="min-h-screen bg-black text-cream">
       <TopNav current="product" authed={!!authed} onNavigate={onNavigate} onLogout={onLogout} />
 
-      {/* Hero */}
+      {/* Hero — benefit first */}
       <header className="max-w-5xl mx-auto px-6 pt-24 pb-12 text-center">
         <div className="flex justify-center mb-6"><LogoMark /></div>
         <div className="font-mono text-[11px] tracking-rack uppercase text-amber mb-4">Genoa FCC Propagation Studio</div>
         <h1 className="text-cream text-4xl sm:text-5xl font-bold leading-tight mb-5">
-          Filing-grade FCC propagation studies, automated.
+          FCC propagation studies and filing exhibits — in minutes, not weeks.
         </h1>
         <p className="text-textDim text-lg max-w-2xl mx-auto leading-relaxed">
-          Genoa turns a station's parameters into a complete, auditable engineering
-          statement — the §73 contour study a broadcaster would otherwise pay a
-          consulting RF firm weeks to produce — in minutes, with the math verified
-          against the FCC's own engine.
+          Genoa turns a broadcast station's parameters into a complete, filing-ready
+          FCC engineering statement — the kind of coverage-and-interference study that
+          normally takes a consulting RF firm weeks — with every number self-checked
+          against the FCC's own reference engine.
+        </p>
+        <p className="text-cream/90 text-base max-w-2xl mx-auto mt-5 font-medium">
+          Less manual work. Faster answers. More confidence before you file.
         </p>
         <div className="mt-8 flex flex-wrap gap-3 justify-center">
           <a href="#start" className="rounded px-5 py-2.5 bg-amber text-black font-semibold text-sm hover:bg-cream transition-colors">
@@ -63,20 +82,77 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
         </div>
       </header>
 
-      {/* What it is */}
-      <Section eyebrow="What it is" title="An engineering statement, generated and self-verified">
+      {/* What it does — plain language */}
+      <Section eyebrow="What Genoa does" title="One workflow, instead of a stack of tools and a consultant's invoice">
+        <p className="text-textDim leading-relaxed mb-6">
+          Preparing an FCC engineering exhibit normally means juggling curve tables,
+          terrain data, and spacing rules across several disconnected tools — or paying
+          a consulting engineer to assemble it all by hand. Genoa brings the whole study
+          into a single workflow.
+        </p>
+        <p className="text-cream font-semibold mb-4">It helps stations and engineers:</p>
+        <CheckList items={[
+          "Check whether a facility meets the FCC's distance-spacing and contour-protection rules",
+          'Map a station’s service and interference coverage over real terrain',
+          'Generate the multi-page engineering statement used to support an FCC filing',
+          'Flag conflicts early — and surface an advisory path back to compliance — before filing',
+          'Reproduce and independently re-verify any study, exactly, on demand',
+        ]} />
+      </Section>
+
+      {/* Why it matters — the problem */}
+      <Section eyebrow="Why it matters" title="Answer “will this pass?” before you spend the time and money">
         <p className="text-textDim leading-relaxed">
-          Feed Genoa a facility — call sign, coordinates, ERP, antenna height and pattern,
-          class — and it produces the multi-page <span className="text-cream">Engineering Statement</span> exhibit
-          used to support FCC filings for AM, FM, and TV broadcast stations. Every contour,
-          spacing check, and HAAT figure is computed deterministically from the actual
-          <span className="text-cream"> 47 CFR Part 73</span> rules, then cross-checked against the FCC's published
-          curves and FORTRAN reference — so the document arrives with its own proof of correctness.
+          FCC engineering is slow, expensive, and unforgiving — one bad contour or a
+          missed spacing conflict can sink a filing or stall a station for months.
+          Genoa lets you get to a defensible answer in minutes, with traceable,
+          self-checked results — so the time goes into making decisions instead of
+          wrangling data.
         </p>
       </Section>
 
+      {/* How it works — three plain steps */}
+      <Section eyebrow="How it works" title="From call sign to signed exhibit">
+        <ol className="space-y-4">
+          {[
+            ['Enter the facility', 'Look it up by call sign or facility ID, or type the parameters in directly.'],
+            ['Analyze', 'Genoa runs the coverage, spacing, antenna-height, and interference analysis over real terrain.'],
+            ['Review', 'See a plain pass / fail verdict, the self-validation results, and an automated consistency check.'],
+            ['Generate', 'Download the engineering-statement PDF for your engineer of record to review and sign.'],
+          ].map(([t, d], i) => (
+            <li key={i} className="flex gap-4">
+              <span className="font-mono text-amber text-sm shrink-0 w-6">{String(i + 1).padStart(2, '0')}</span>
+              <span><span className="text-cream font-semibold">{t}.</span> <span className="text-textDim">{d}</span></span>
+            </li>
+          ))}
+        </ol>
+      </Section>
+
+      {/* Results — outcomes */}
+      <Section eyebrow="The result" title="What you get">
+        <div className="grid sm:grid-cols-2 gap-x-10 gap-y-3">
+          <CheckList items={[
+            'Turnaround in minutes instead of weeks',
+            'Lower consulting cost',
+            'Consistent, reproducible reports',
+          ]} />
+          <CheckList items={[
+            'Math verified against the FCC’s own engine',
+            'Conflicts caught before they reach a filing',
+            'Confidence the numbers will hold up to review',
+          ]} />
+        </div>
+      </Section>
+
+      {/* ---- Deeper / technical layer for engineers and buyers ---- */}
+
       {/* What it computes */}
-      <Section eyebrow="What it computes" title="The Part 73 engine">
+      <Section eyebrow="Under the hood" title="The Part 73 engine">
+        <p className="text-textDim leading-relaxed mb-6">
+          For the engineers evaluating it: every figure is computed deterministically
+          from the actual <span className="text-cream">47 CFR Part 73</span> rules, then
+          cross-checked against the FCC's published curves and FORTRAN reference.
+        </p>
         <div className="grid sm:grid-cols-2 gap-4">
           <Card title="§73.333 FM/TV contours">F(50,50) and F(50,10) curves → service, city-grade, and protected contours, per-radial and terrain-aware.</Card>
           <Card title="§73.207 / §73.215">Minimum distance separation and contour-protection for short-spaced stations, with full interference studies.</Card>
@@ -93,23 +169,6 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
           <Card title="AI consistency audit">An automated reviewer, grounded in the verbatim Part 73 rule text, flags internal contradictions for the engineer of record.</Card>
           <Card title="Engineer-of-record ready">Genoa does the deterministic computation and evidence assembly; a qualified broadcast engineer reviews and certifies. It never certifies on its own.</Card>
         </div>
-      </Section>
-
-      {/* How it works */}
-      <Section eyebrow="How it works" title="From call sign to signed exhibit">
-        <ol className="space-y-4">
-          {[
-            ['Enter the facility', 'Look up by call sign / facility ID, or enter parameters directly.'],
-            ['Compute', 'The engine runs the §73 contours, spacing, HAAT, and interference study over real terrain.'],
-            ['Review the verdict', 'See the self-validation results and the AI consistency audit before anything leaves the building.'],
-            ['Export & certify', 'Download the engineering-statement PDF; the engineer of record reviews and signs.'],
-          ].map(([t, d], i) => (
-            <li key={i} className="flex gap-4">
-              <span className="font-mono text-amber text-sm shrink-0 w-6">{String(i + 1).padStart(2, '0')}</span>
-              <span><span className="text-cream font-semibold">{t}.</span> <span className="text-textDim">{d}</span></span>
-            </li>
-          ))}
-        </ol>
       </Section>
 
       {/* CTA */}
