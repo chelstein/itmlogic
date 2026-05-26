@@ -4,13 +4,13 @@
 // (src/engine/parameterSweep/remediation.js) when an export attaches it
 // via options.remediation (or exhibit.remediation).  STRICTLY ADVISORY:
 // it surfaces an engineering path to compliance; it does not change the
-// §73.x determination or the engineering conclusion.  Returns null when
-// no remediation is attached, so exhibits without it render unchanged.
+// §73.207/§73.215 determination or the engineering conclusion.  Returns
+// null when no remediation is attached, so exhibits render unchanged.
 
 const DISCLAIMER =
   'The subject facility does not qualify under the distance/contour-protection rules as ' +
   'proposed.  The following is an advisory, automatically-computed engineering path to ' +
-  'compliance from a bounded ERP/HAAT parameter sweep.  It does NOT change the §73.x ' +
+  'compliance from a bounded ERP/HAAT parameter sweep.  It does NOT change the §73.207/§73.215 ' +
   'determination or conclusion above, and is not a filing recommendation — the engineer ' +
   'of record evaluates the trade-offs.';
 

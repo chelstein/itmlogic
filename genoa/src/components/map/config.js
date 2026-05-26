@@ -10,7 +10,14 @@
 // adding an entry here — never by hand-coding addLayer calls.  Each entry
 // maps a pg_tileserv source-layer (schema.table) to its MapLibre paint.
 
-export const TILES_BASE = String(import.meta.env.VITE_TILES_BASE || '/tiles').replace(/\/+$/, '');
+// MapLibre needs ABSOLUTE tile URLs — its tile worker calls new Request()
+// with no base, so a leading-slash path ('/tiles/…') throws "Failed to
+// parse URL".  Resolve a same-origin base against window.location.origin
+// (→ https://host/tiles in prod, http://localhost:5173/tiles in dev).
+const RAW_TILES_BASE = String(import.meta.env.VITE_TILES_BASE || '/tiles').replace(/\/+$/, '');
+export const TILES_BASE = (RAW_TILES_BASE.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_TILES_BASE
+  : RAW_TILES_BASE;
 
 // pg_tileserv serves each table at {base}/{schema.table}/{z}/{x}/{y}.pbf.
 export function tileUrl(sourceLayer){
