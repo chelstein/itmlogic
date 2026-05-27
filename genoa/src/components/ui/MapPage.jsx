@@ -10,11 +10,11 @@ import { TILES_BASE, LAYERS } from '@components/map/config.js';
 
 export default function MapPage({ authed, onNavigate, onLogout }){
   const [status, setStatus] = useState(null);
-  const isErr = status?.kind === 'error';
+  const [err, setErr]       = useState(null);   // sticky: errors aren't overwritten by status
   return (
     <div className="relative min-h-screen bg-black text-cream">
       <TopNav current="map" authed={!!authed} onNavigate={onNavigate} onLogout={onLogout} />
-      <MapView onStatus={setStatus} />
+      <MapView onStatus={(s) => { if (s?.kind === 'error') setErr(s.text); else setStatus(s); }} />
 
       <div className="absolute top-3 left-4 z-30 rounded border border-rule bg-black/70 backdrop-blur-sm px-3 py-2 font-mono text-[10px] tracking-rack uppercase">
         <div className="text-cream">Genoa · Live Map</div>
@@ -22,9 +22,10 @@ export default function MapPage({ authed, onNavigate, onLogout }){
           tiles: {TILES_BASE} · {LAYERS.map(l => l.sourceLayer).join(', ')}
         </div>
         {status && (
-          <div className={(isErr ? 'text-red-400' : 'text-textDim') + ' normal-case tracking-normal mt-1 max-w-xs'}>
-            {isErr ? 'error: ' : 'status: '}{status.text}
-          </div>
+          <div className="text-textDim normal-case tracking-normal mt-1 max-w-md">status: {status.text}</div>
+        )}
+        {err && (
+          <div className="text-red-400 normal-case tracking-normal mt-1 max-w-md break-words">error: {err}</div>
         )}
       </div>
     </div>
