@@ -11,7 +11,16 @@
 import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { BASE_STYLE, INITIAL_VIEW, LAYERS, tileUrl } from './config.js';
+import { Protocol } from 'pmtiles';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl } from './config.js';
+
+// Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
+// (referenced from the style.json, served same-origin via /basemap) reads
+// via HTTP range requests.  No-op until a pmtiles source is used.
+if (!globalThis.__genoaPmtilesRegistered){
+  maplibregl.addProtocol('pmtiles', new Protocol().tile);
+  globalThis.__genoaPmtilesRegistered = true;
+}
 
 // Escape feature property values before injecting into popup HTML — tile
 // attributes are external input and could contain markup.
@@ -34,7 +43,7 @@ export default function MapView({ onStatus }){
     const layerIds = LAYERS.map(L => `${L.id}-${L.type}`);
     const map = new maplibregl.Map({
       container:          containerRef.current,
-      style:              BASE_STYLE,
+      style:              MAP_STYLE_URL,
       center:             INITIAL_VIEW.center,
       zoom:               INITIAL_VIEW.zoom,
       attributionControl: { compact: true }
@@ -57,14 +66,18 @@ export default function MapView({ onStatus }){
         if (!map.getSource(srcId)){
           map.addSource(srcId, { type: 'vector', tiles: [tileUrl(L.sourceLayer)], minzoom: 0, maxzoom: 22 });
         }
-        map.addLayer({
-          id:             layerId,
-          type:           L.type,
-          source:         srcId,
-          'source-layer': L.sourceLayer,
-          minzoom:        L.minzoom ?? 0,
-          paint:          L.paint || {}
-        });
+        // Guard: the style.json may already define this layer (e.g. once
+        // it's styled in maputnik) — don't double-add.
+        if (!map.getLayer(layerId)){
+          map.addLayer({
+            id:             layerId,
+            type:           L.type,
+            source:         srcId,
+            'source-layer': L.sourceLayer,
+            minzoom:        L.minzoom ?? 0,
+            paint:          L.paint || {}
+          });
+        }
 
         if (L.type === 'circle'){
           map.on('click', layerId, (ev) => {

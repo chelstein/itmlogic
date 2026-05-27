@@ -1,0 +1,22 @@
+{
+  "version": 8,
+  "name": "Genoa Basemap",
+  "metadata": {
+    "genoa:note": "Same-origin basemap style for the Live Map. Edit visually in maputnik (point it at {origin}/styles/genoa.json). Data layers (geo.stations, future contours/coverage) are added on top in code from the map LAYERS registry, so this file owns only the BASEMAP. To make the basemap blocker-proof, replace the 'carto-dark' raster source with a self-hosted vector source: { \"type\": \"vector\", \"url\": \"pmtiles://https://genoaiq.com/basemap\" } (served by the app's /basemap proxy from Spaces) and style its layers here."
+  },
+  "sources": {
+    "carto-dark": {
+      "type": "raster",
+      "tiles": [
+        "https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+        "https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png"
+      ],
+      "tileSize": 256,
+      "attribution": "© OpenStreetMap contributors © CARTO"
+    }
+  },
+  "layers": [
+    { "id": "bg", "type": "background", "paint": { "background-color": "#0a1a25" } },
+    { "id": "carto-dark", "type": "raster", "source": "carto-dark" }
+  ]
+}
