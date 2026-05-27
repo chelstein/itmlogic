@@ -61,7 +61,7 @@ export default function MapView({ onStatus }){
 
     map.on('load', () => {
       for (const L of LAYERS){
-        const srcId   = `pgts:${L.sourceLayer}`;
+        const srcId   = `genoa:${L.sourceLayer}`;
         const layerId = `${L.id}-${L.type}`;
         if (!map.getSource(srcId)){
           map.addSource(srcId, { type: 'vector', tiles: [tileUrl(L.sourceLayer)], minzoom: 0, maxzoom: 22 });

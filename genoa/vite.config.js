@@ -26,12 +26,12 @@ export default defineConfig({
       '/api':     'http://localhost:8080',
       '/healthz': 'http://localhost:8080',
       '/readyz':  'http://localhost:8080',
-      // Dev mirror of the production /tiles ingress: forward to the
-      // pg_tileserv droplet (override with TILES_DEV_TARGET) and strip
-      // the /tiles prefix, so the default same-origin base works locally
-      // exactly as it will in prod.
+      // Dev mirror of the production /tiles ingress: forward to the Martin
+      // tile server on the droplet (override with TILES_DEV_TARGET) and
+      // strip the /tiles prefix, so the default same-origin base works
+      // locally exactly as in prod.
       '/tiles': {
-        target:       process.env.TILES_DEV_TARGET || 'http://165.245.171.116:7800',
+        target:       process.env.TILES_DEV_TARGET || 'http://165.245.171.116:3000',
         changeOrigin: true,
         rewrite:      (p) => p.replace(/^\/tiles/, '')
       }
