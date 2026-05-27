@@ -32,6 +32,7 @@ import amSiteOptimizerRoutes from './routes/amSiteOptimizer.js';
 import amColocationOpportunitiesRoutes from './routes/amColocationOpportunities.js';
 import authRoutes       from './routes/auth.js';
 import tileRoutes       from './routes/tiles.js';
+import basemapRoutes    from './routes/basemap.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
 import { migrate }   from '../db/migrate.js';
@@ -80,6 +81,9 @@ app.use(express.static(uiRoot, {
 // fetches https://host/tiles/* with no mixed-content block).  Mounted
 // before the /api auth gate and the SPA fallback.
 app.use('/tiles', tileRoutes);
+
+// Self-hosted PMTiles basemap proxy (public; range-forwarding) → Spaces.
+app.use('/basemap', basemapRoutes);
 
 // Auth (publicly accessible: login / logout / me).  Mounted BEFORE the
 // requireAuth gate so the login endpoint itself isn't gated.  Any
