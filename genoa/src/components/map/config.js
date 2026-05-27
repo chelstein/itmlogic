@@ -32,12 +32,12 @@ export const LAYERS = [
     label:       'Stations',
     minzoom:     0,
     paint: {
-      // Big + bright so a station is unmistakable even with no basemap.
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 4, 6, 10, 12, 14, 20],
-      'circle-color':        '#ffb000',     // bright amber
-      'circle-stroke-color': '#ffffff',
+      // Cobalt stations on the navy base; gentle zoom-scaling around r=6.
+      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 4, 4, 9, 6, 14, 9],
+      'circle-color':        '#4fd1ff',     // cobalt
+      'circle-stroke-color': '#001f33',
       'circle-stroke-width': 2,
-      'circle-opacity':      0.95
+      'circle-opacity':      0.9
     }
   }
   // Future (add when the schemas land — config only, no component changes):
