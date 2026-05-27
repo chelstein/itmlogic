@@ -1,14 +1,14 @@
 // Live-map geospatial config.
 //
-// The tile base is env-driven so ONE build works everywhere:
+// Tiles come from Martin (vector tile server) via the same-origin /tiles
+// proxy. The base is env-driven so ONE build works everywhere:
 //   • production  → leave unset; defaults to same-origin '/tiles'
-//                   (the App Platform proxy → droplet pg_tileserv, TLS).
-//   • local dev   → VITE_TILES_BASE=http://165.245.171.116:7800
-//                   (Vite dev server is HTTP, so no mixed-content block).
+//                   (App Platform proxy → droplet Martin :3000, TLS).
+//   • local dev   → the Vite dev server proxies /tiles to Martin.
 //
 // LAYERS is the single source of truth for what renders.  Add a layer by
 // adding an entry here — never by hand-coding addLayer calls.  Each entry
-// maps a pg_tileserv source-layer (schema.table) to its MapLibre paint.
+// maps a Martin source (its source-layer name) to its MapLibre paint.
 
 // MapLibre needs ABSOLUTE tile URLs — its tile worker calls new Request()
 // with no base, so a leading-slash path ('/tiles/…') throws "Failed to
@@ -19,15 +19,15 @@ export const TILES_BASE = (RAW_TILES_BASE.startsWith('/') && typeof window !== '
   ? window.location.origin + RAW_TILES_BASE
   : RAW_TILES_BASE;
 
-// pg_tileserv serves each table at {base}/{schema.table}/{z}/{x}/{y}.pbf.
+// Martin serves each source at {base}/{source}/{z}/{x}/{y} (no extension).
 export function tileUrl(sourceLayer){
-  return `${TILES_BASE}/${sourceLayer}/{z}/{x}/{y}.pbf`;
+  return `${TILES_BASE}/${sourceLayer}/{z}/{x}/{y}`;
 }
 
 export const LAYERS = [
   {
     id:          'stations',        // base for the MapLibre layer id (purpose-suffixed in MapView)
-    sourceLayer: 'geo.stations',    // pg_tileserv table id == MVT source-layer name
+    sourceLayer: 'stations',        // Martin source id == MVT source-layer name (geo.stations → "stations")
     type:        'circle',
     label:       'Stations',
     minzoom:     0,
@@ -41,8 +41,8 @@ export const LAYERS = [
     }
   }
   // Future (add when the schemas land — config only, no component changes):
-  //  { id: 'contours', sourceLayer: 'derived.contours', type: 'line', paint: {...} }
-  //  { id: 'coverage', sourceLayer: 'geo.coverage',     type: 'fill', paint: {...} }
+  //  { id: 'contours', sourceLayer: 'contours', type: 'line', paint: {...} }
+  //  { id: 'coverage', sourceLayer: 'coverage', type: 'fill', paint: {...} }
 ];
 
 // Initial view — centered on the current data (KAZM / Sedona).  Zoomed in
