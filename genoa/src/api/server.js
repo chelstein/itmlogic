@@ -63,7 +63,17 @@ const uiRoot    = (await import('node:fs')).existsSync(distDir) ? distDir : publ
 console.log(`[genoa-api] serving UI from ${path.relative(process.cwd(), uiRoot)}`);
 app.use(express.static(uiRoot, {
   index: 'index.html',
-  maxAge: NODE_ENV === 'production' ? '1h' : 0
+  setHeaders: (res, filePath) => {
+    // index.html must always revalidate, otherwise a cached shell keeps
+    // pointing at a stale (pre-deploy) hashed bundle for up to its TTL —
+    // the "deployed but still see old behavior" trap.  The hashed assets
+    // (index-<hash>.js/.css) are content-addressed, so cache them hard.
+    if (filePath.endsWith('.html')){
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    } else if (NODE_ENV === 'production'){
+      res.setHeader('Cache-Control', 'public, max-age=604800, immutable');
+    }
+  }
 }));
 
 // Vector-tile proxy → pg_tileserv (public; same-origin so the map page
@@ -117,6 +127,7 @@ app.get(/^\/(?!api\/|healthz|readyz)(?!.*\.[a-zA-Z0-9]+$).*/, (req, res, next) =
   const accept = String(req.headers.accept || '');
   if (accept && !accept.includes('text/html') && !accept.includes('*/*')) return next();
   const indexPath = path.join(uiRoot, 'index.html');
+  res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   return res.sendFile(indexPath, (err) => { if (err) next(err); });
 });
 
