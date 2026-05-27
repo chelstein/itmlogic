@@ -31,6 +31,7 @@ import measurementsRoutes from './routes/measurements.js';
 import amSiteOptimizerRoutes from './routes/amSiteOptimizer.js';
 import amColocationOpportunitiesRoutes from './routes/amColocationOpportunities.js';
 import authRoutes       from './routes/auth.js';
+import tileRoutes       from './routes/tiles.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
 import { migrate }   from '../db/migrate.js';
@@ -64,6 +65,11 @@ app.use(express.static(uiRoot, {
   index: 'index.html',
   maxAge: NODE_ENV === 'production' ? '1h' : 0
 }));
+
+// Vector-tile proxy → pg_tileserv (public; same-origin so the map page
+// fetches https://host/tiles/* with no mixed-content block).  Mounted
+// before the /api auth gate and the SPA fallback.
+app.use('/tiles', tileRoutes);
 
 // Auth (publicly accessible: login / logout / me).  Mounted BEFORE the
 // requireAuth gate so the login endpoint itself isn't gated.  Any
