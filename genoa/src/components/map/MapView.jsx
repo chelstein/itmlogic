@@ -80,6 +80,7 @@ export default function MapView({ onStatus }){
         }
 
         if (L.type === 'circle'){
+          // Click → full attribute popup.
           map.on('click', layerId, (ev) => {
             const f = ev.features?.[0];
             if (!f) return;
@@ -90,8 +91,19 @@ export default function MapView({ onStatus }){
               .setHTML(`<div style="font:12px monospace">${rows || 'feature'}</div>`)
               .addTo(map);
           });
-          map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-          map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+          // Hover inspector → lightweight tooltip that follows the cursor.
+          const hover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
+          map.on('mousemove', layerId, (ev) => {
+            const f = ev.features?.[0];
+            if (!f) return;
+            map.getCanvas().style.cursor = 'pointer';
+            const p = f.properties || {};
+            const title = p.callsign || p.id || 'station';
+            hover.setLngLat(ev.lngLat)
+              .setHTML(`<div style="font:600 11px/1.3 monospace;color:#cfeefc">${esc(title)}</div>`)
+              .addTo(map);
+          });
+          map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; hover.remove(); });
         }
       }
       report({ kind: 'info', text: `style loaded · ${LAYERS.length} layer(s) added` });
