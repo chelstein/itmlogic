@@ -4,6 +4,9 @@
 // registry as a pg_tileserv vector source + layer.  Render only; no FCC
 // math, no DB access — PostGIS is the source of truth, pg_tileserv the
 // API, this is just the renderer (per the platform architecture).
+//
+// Reports status (loaded / rendered-feature-count / errors) via onStatus
+// so the page HUD can surface what the map is actually doing.
 
 import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
@@ -18,12 +21,17 @@ function esc(v){
   ));
 }
 
-export default function MapView({ onError }){
+export default function MapView({ onStatus }){
   const containerRef = useRef(null);
-  const mapRef = useRef(null);
+  const mapRef       = useRef(null);
+  // Latest callback via ref so status updates never tear down the map.
+  const statusRef    = useRef(onStatus);
+  statusRef.current  = onStatus;
+  const report = (s) => { if (statusRef.current) statusRef.current(s); };
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
+    const layerIds = LAYERS.map(L => `${L.id}-${L.type}`);
     const map = new maplibregl.Map({
       container:          containerRef.current,
       style:              BASE_STYLE,
@@ -35,7 +43,12 @@ export default function MapView({ onError }){
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-left');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }));
 
-    map.on('error', (e) => { if (onError) onError(e?.error || e); });
+    map.on('error', (e) => {
+      const err = e?.error || e;
+      const status = err?.status ? ` [${err.status}]` : '';
+      const url    = err?.url ? ` ${err.url}` : '';
+      report({ kind: 'error', text: `${err?.message || String(err)}${status}${url}` });
+    });
 
     map.on('load', () => {
       for (const L of LAYERS){
@@ -53,7 +66,6 @@ export default function MapView({ onError }){
           paint:          L.paint || {}
         });
 
-        // Click → attribute popup (point/circle layers).
         if (L.type === 'circle'){
           map.on('click', layerId, (ev) => {
             const f = ev.features?.[0];
@@ -69,10 +81,22 @@ export default function MapView({ onError }){
           map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
         }
       }
+      report({ kind: 'info', text: `style loaded · ${LAYERS.length} layer(s) added` });
+    });
+
+    // Once the map settles, report how many features actually rendered —
+    // distinguishes "tile served but nothing drawn" (source-layer/paint)
+    // from "rendered, just not where you're looking".
+    map.on('idle', () => {
+      try {
+        const present = layerIds.filter(id => map.getLayer(id));
+        const n = present.length ? map.queryRenderedFeatures({ layers: present }).length : 0;
+        report({ kind: 'features', text: `${n} feature(s) rendered` });
+      } catch { /* querying before layers exist — ignore */ }
     });
 
     return () => { map.remove(); mapRef.current = null; };
-  }, [onError]);
+  }, []);   // create the map exactly once
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }

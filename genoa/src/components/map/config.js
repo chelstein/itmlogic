@@ -32,11 +32,12 @@ export const LAYERS = [
     label:       'Stations',
     minzoom:     0,
     paint: {
-      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 3, 3, 12, 8],
-      'circle-color':        '#f0b53f',     // amber — matches the studio theme
-      'circle-stroke-color': '#1b1b1b',
-      'circle-stroke-width': 1.5,
-      'circle-opacity':      0.9
+      // Big + bright so a station is unmistakable even with no basemap.
+      'circle-radius':       ['interpolate', ['linear'], ['zoom'], 4, 6, 10, 12, 14, 20],
+      'circle-color':        '#ffb000',     // bright amber
+      'circle-stroke-color': '#ffffff',
+      'circle-stroke-width': 2,
+      'circle-opacity':      0.95
     }
   }
   // Future (add when the schemas land — config only, no component changes):
@@ -44,12 +45,16 @@ export const LAYERS = [
   //  { id: 'coverage', sourceLayer: 'geo.coverage',     type: 'fill', paint: {...} }
 ];
 
-// Initial view — centered on the current data (KAZM / Sedona).
-export const INITIAL_VIEW = { center: [-111.820544, 34.860547], zoom: 6 };
+// Initial view — centered on the current data (KAZM / Sedona).  Zoomed in
+// enough that a single station reads as placed-on-a-map, not a dot in a
+// void.
+export const INITIAL_VIEW = { center: [-111.820544, 34.860547], zoom: 9 };
 
-// Minimal dark raster basemap (HTTPS, no vendor key) so the first page
-// has no external-key dependency.  Swap for a vector style — e.g. your
-// maputnik output — later without touching MapView.
+// Basemap.  A solid themed background layer sits UNDER an optional CARTO
+// dark raster: if the external tiles load you get a real basemap; if they
+// don't (offline, ad-blocker, CDN hiccup) the map is still a deliberate
+// dark surface rather than a broken black void.  Swap for a vector style
+// — e.g. your maputnik output or self-hosted PMTiles — later.
 export const BASE_STYLE = {
   version: 8,
   sources: {
@@ -63,5 +68,8 @@ export const BASE_STYLE = {
       attribution: '© OpenStreetMap contributors © CARTO'
     }
   },
-  layers: [{ id: 'carto-dark', type: 'raster', source: 'carto-dark' }]
+  layers: [
+    { id: 'bg',         type: 'background', paint: { 'background-color': '#0a1a25' } },
+    { id: 'carto-dark', type: 'raster',     source: 'carto-dark' }
+  ]
 };
