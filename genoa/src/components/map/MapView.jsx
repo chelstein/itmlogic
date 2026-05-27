@@ -51,6 +51,9 @@ export default function MapView({ onStatus }){
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-left');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }));
+    // Safety net: if the container gets its real size after init (lazy
+    // mount / layout), force MapLibre to remeasure so the canvas isn't 0px.
+    requestAnimationFrame(() => { try { map.resize(); } catch {} });
 
     map.on('error', (e) => {
       const err = e?.error || e;
@@ -124,5 +127,7 @@ export default function MapView({ onStatus }){
     return () => { map.remove(); mapRef.current = null; };
   }, []);   // create the map exactly once
 
-  return <div ref={containerRef} className="absolute inset-0" />;
+  // Inline absolute fill as well, so the canvas is sized even if the
+  // utility classes don't resolve a height for any reason.
+  return <div ref={containerRef} className="absolute inset-0" style={{ position: 'absolute', inset: 0 }} />;
 }

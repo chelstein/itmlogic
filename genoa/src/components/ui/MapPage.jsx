@@ -12,7 +12,7 @@ export default function MapPage({ authed, onNavigate, onLogout }){
   const [status, setStatus] = useState(null);
   const [err, setErr]       = useState(null);   // sticky: errors aren't overwritten by status
   return (
-    <div className="relative min-h-screen bg-black text-cream">
+    <div className="relative bg-black text-cream" style={{ height: '100vh', width: '100%', overflow: 'hidden' }}>
       <TopNav current="map" authed={!!authed} onNavigate={onNavigate} onLogout={onLogout} />
       <MapView onStatus={(s) => { if (s?.kind === 'error') setErr(s.text); else setStatus(s); }} />
 
