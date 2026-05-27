@@ -54,9 +54,10 @@ export default function MapView({ onStatus }){
 
     map.on('error', (e) => {
       const err = e?.error || e;
-      const status = err?.status ? ` [${err.status}]` : '';
-      const url    = err?.url ? ` ${err.url}` : '';
-      report({ kind: 'error', text: `${err?.message || String(err)}${status}${url}` });
+      const src = e?.sourceId ? ` [src:${e.sourceId}]` : '';
+      const st  = err?.status ? ` ${err.status}` : '';
+      const url = err?.url ? ` ${err.url}` : '';
+      report({ kind: 'error', text: `${(err?.message || String(err)).slice(0, 200)}${src}${st}${url}` });
     });
 
     map.on('load', () => {
