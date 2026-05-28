@@ -15,6 +15,7 @@
 
 import * as aiRouter from '../services/aiRouter.js';
 import * as fccKb from '../services/fccKb.js';
+import { retrieveFromKb, isKbRetrieveConfigured } from '../api/services/kbRetrieveClient.js';
 
 const SYSTEM_PROMPT =
   'You are an FCC broadcast engineering-exhibit consistency auditor.  You are given a ' +
@@ -63,17 +64,42 @@ export function snapshot(exhibit){
   return lines.join('\n');
 }
 
-// Pull a couple of grounding chunks for any CFR sections the exhibit
-// leans on.  Best-effort; ungrounded if the KB isn't authorized.
+// Pull grounding chunks from both the FCC Part 73 KB and the RF
+// engineering KB in parallel.  Best-effort; ungrounded if neither
+// backend is authorized.  The two sources are complementary: the FCC
+// KB carries verbatim CFR rule text; the RF KB carries engineering
+// reference material (propagation, antenna, field-strength docs).
 async function groundingFor(exhibit){
-  if (!fccKb.isEnabled()) return '';
+  const fccEnabled = fccKb.isEnabled();
+  const rfKbEnabled = isKbRetrieveConfigured();
+  if (!fccEnabled && !rfKbEnabled) return '';
+
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
-  const q = svc === 'AM'
+  const fccQuery = svc === 'AM'
     ? '§73.182 nighttime interference RSS and §73.184 groundwave protected contours'
     : '§73.215 contour protection and §73.207 minimum distance separation';
-  const res = await fccKb.retrieve(q, { k: 2 });
-  if (!res.available) return '';
-  return 'Grounding CFR excerpts:\n' + res.chunks.map(c => c.text.slice(0, 800)).join('\n---\n');
+  const rfQuery = svc === 'AM'
+    ? 'AM groundwave skywave propagation interference field strength groundwave contour'
+    : 'FM contour propagation F(50,50) F(50,10) field strength antenna HAAT';
+
+  const [fccResult, rfResult] = await Promise.all([
+    fccEnabled
+      ? fccKb.retrieve(fccQuery, { k: 2 })
+      : Promise.resolve({ available: false, chunks: [] }),
+    rfKbEnabled
+      ? retrieveFromKb({ query: rfQuery, k: 2 })
+      : Promise.resolve({ available: false, chunks: [] })
+  ]);
+
+  const parts = [];
+  if (fccResult.available && fccResult.chunks?.length) {
+    parts.push('FCC CFR excerpts:\n' + fccResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
+  }
+  if (rfResult.available && rfResult.chunks?.length) {
+    parts.push('RF engineering KB excerpts:\n' + rfResult.chunks.map(c => (c.text || '').slice(0, 800)).join('\n---\n'));
+  }
+  if (!parts.length) return '';
+  return 'Grounding excerpts:\n' + parts.join('\n\n');
 }
 
 export async function reviewExhibit(exhibit){

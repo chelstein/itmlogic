@@ -17,6 +17,7 @@
 //   Rich station / SDR      ZTR /api/radiodns         —                         — (vendor-locked)
 //   Identity / RadioDNS     identity sidecar          ZTR rich-station          — (RadioDNS resolver record)
 //   Antenna modeling        NEC sidecar               —                         — (GPL-isolated; NEC2++/PyNEC)
+//   RF advisory             rfengineer agent          —                         — (DO GenAI agent; advisory only)
 //
 // Each probe is fire-and-forget, capped at 3-5s, and reports:
 //   { configured: bool, reachable: bool, endpoint, latency_ms, error? }
@@ -66,6 +67,10 @@ export async function probeAllSources(){
   const identityUrl  = process.env.IDENTITY_SIDECAR_URL          || null;
   const necUrl       = process.env.NEC_SIDECAR_URL               || null;
   const fortranUrl   = process.env.FORTRAN_FCC_SIDECAR_URL       || null;
+  const rfAgentUrl   = process.env.RFENGINEER_AGENT_URL
+                       || 'https://xpo2v7dvymlx22rk43lh2nuz.agents.do-ai.run';
+  const rfAgentKey   = process.env.RFENGINEER_AGENT_KEY          || null;
+  const rfKbKey      = process.env.RFENGINEER_KB_KEY             || null;
 
   // Probe each independently and in parallel.
   const [
@@ -74,7 +79,8 @@ export async function probeAllSources(){
     fccFmq, fccAmq, fccContours, fccCensus,
     publicFiles,
     usgsEpqs, openMeteo, openTopoData,
-    censusBureau
+    censusBureau,
+    rfAgentHealth
   ] = await Promise.all([
     probe(ztrUrl       ? ztrUrl       + '/healthz' : null),
     probe(n8nUrl       ? n8nUrl       + '/healthz' : null),
@@ -96,8 +102,26 @@ export async function probeAllSources(){
     probe('https://epqs.nationalmap.gov/v1/json?x=-112.06&y=33.33&wkid=4326&units=Meters', { method: 'GET' }),
     probe('https://api.open-meteo.com/v1/elevation?latitude=33.33&longitude=-112.06', { method: 'GET' }),
     probe('https://api.opentopodata.org/v1/srtm30m?locations=33.33,-112.06', { method: 'GET' }),
-    probe('https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:04', { method: 'GET' })
+    probe('https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:04', { method: 'GET' }),
+    // rfengineer DO GenAI agent — probe the base URL only (HEAD);
+    // only configured when the key is set.
+    rfAgentKey
+      ? probe(rfAgentUrl)
+      : Promise.resolve({ configured: false, reachable: false })
   ]);
+
+  // rfengineer KB: POST-only endpoint; report config status only rather
+  // than spending tokens on a live probe.  The retrieve path is exercised
+  // on real exhibit/advisory calls.
+  const rfKbHealth = rfKbKey
+    ? {
+        configured:  true,
+        reachable:   null,
+        note:        'POST-only retrieve endpoint; config confirmed, not probed',
+        endpoint:    process.env.RFENGINEER_KB_RETRIEVE_URL
+                     || 'https://kbaas.do-ai.run/v1/4856fa27-5ab6-11f1-b074-4e013e2ddde4/retrieve'
+      }
+    : { configured: false, reachable: false };
 
   // Build the per-query fallback report.  Each query reports:
   //   primary / secondary / tertiary, with the first reachable one marked.
@@ -155,7 +179,12 @@ export async function probeAllSources(){
     fcc_lms: pickFirst([
       { tier: 'primary',   id: 'fcc-fmq-amq',         health: bestOf([fccFmq, fccAmq]) },
       { tier: 'secondary', id: 'publicfiles.fcc.gov', health: publicFiles }
-    ], 'FCC LMS authoritative-record cross-reference: license expiration / status / public-file folder.  No auth required; degraded but not broken when either upstream is rate-limited.')
+    ], 'FCC LMS authoritative-record cross-reference: license expiration / status / public-file folder.  No auth required; degraded but not broken when either upstream is rate-limited.'),
+    rfengineer_advisory: pickFirst([
+      { tier: 'primary', id: 'rfengineer-agent (DO GenAI)', health: rfAgentHealth }
+    ], rfKbKey
+      ? 'RFENGINEER_KB_KEY set; raw KB grounding enabled for advisory and exhibit-review passes'
+      : 'RFENGINEER_KB_KEY unset; set it to enable raw KB chunk grounding (agent uses its own attached KBs until then)')
   };
 
   // Surface ANY-CRITICAL — does every query have at least one reachable source?
@@ -177,7 +206,9 @@ export async function probeAllSources(){
       fcc_fmq: fccFmq, fcc_amq: fccAmq, fcc_contours: fccContours, fcc_census: fccCensus,
       publicfiles_fcc_gov: publicFiles,
       usgs_epqs: usgsEpqs, open_meteo: openMeteo, opentopodata: openTopoData,
-      us_census_bureau: censusBureau
+      us_census_bureau: censusBureau,
+      rfengineer_agent: rfAgentHealth,
+      rfengineer_kb:    rfKbHealth
     }
   };
 }
