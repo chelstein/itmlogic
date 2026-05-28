@@ -12,7 +12,7 @@ import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl } from './config.js';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL } from './config.js';
 
 // Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
 // (referenced from the style.json, served same-origin via /basemap) reads
@@ -64,6 +64,23 @@ export default function MapView({ onStatus }){
     });
 
     map.on('load', () => {
+      // §73.333 contours (GeoJSON from saved exhibits) — amber glow, drawn
+      // UNDER the station markers.  Colored by contour_id.
+      const contourColor = ['match', ['get', 'contour_id'],
+        'service_60dbu', '#ffb000',
+        'city_54dbu',    '#f0b53f',
+        'protected_40dbu', '#b8860b',
+        /* default */    '#9a7b2e'];
+      if (!map.getSource('genoa:contours')){
+        map.addSource('genoa:contours', { type: 'geojson', data: CONTOURS_URL });
+        map.addLayer({ id: 'contours-fill', type: 'fill', source: 'genoa:contours',
+          paint: { 'fill-color': contourColor, 'fill-opacity': 0.05 } });
+        map.addLayer({ id: 'contours-glow', type: 'line', source: 'genoa:contours',
+          paint: { 'line-color': contourColor, 'line-width': 6, 'line-blur': 4, 'line-opacity': 0.35 } });
+        map.addLayer({ id: 'contours-line', type: 'line', source: 'genoa:contours',
+          paint: { 'line-color': contourColor, 'line-width': 1.4, 'line-opacity': 0.9 } });
+      }
+
       for (const L of LAYERS){
         const srcId   = `genoa:${L.sourceLayer}`;
         const layerId = `${L.id}-${L.type}`;

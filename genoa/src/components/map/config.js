@@ -61,3 +61,10 @@ const RAW_MAP_STYLE = String(import.meta.env.VITE_MAP_STYLE || '/styles/genoa.js
 export const MAP_STYLE_URL = (RAW_MAP_STYLE.startsWith('/') && typeof window !== 'undefined')
   ? window.location.origin + RAW_MAP_STYLE
   : RAW_MAP_STYLE;
+
+// §73.333 contour polygons (GeoJSON), merged from the latest saved
+// exhibit per station — served by the app, no Martin/PostGIS needed.
+const RAW_CONTOURS = String(import.meta.env.VITE_CONTOURS_URL || '/api/map/contours.geojson');
+export const CONTOURS_URL = (RAW_CONTOURS.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_CONTOURS
+  : RAW_CONTOURS;
