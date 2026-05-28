@@ -292,14 +292,19 @@ export default function MapView({ onStatus, selected, overlays }){
         map.addLayer({ id: 'interference-links', type: 'line', source: 'genoa:interference',
           filter: ['==', ['get', 'role'], 'conflict-link'], layout: { visibility: 'none' },
           paint: { 'line-color': '#ff4d4d', 'line-width': 1.2, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
-        // Neighbor stations — red when in conflict (fails all rules), amber
-        // otherwise (nearby co/adjacent-channel but cleared).
+        // Neighbor stations.  Conflicts (fail every rule) are bold red so
+        // they dominate; cleared co/adjacent-channel neighbors recede to a
+        // small faint amber dot for context (an FM site can have hundreds).
         map.addLayer({ id: 'interference-neighbors', type: 'circle', source: 'genoa:interference',
           filter: ['==', ['get', 'role'], 'neighbor'], layout: { visibility: 'none' },
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 9, 5.5, 13, 8],
-            'circle-color': ['case', ['get', 'conflict'], '#ff3b30', '#f0b53f'],
-            'circle-stroke-color': '#1a0f02', 'circle-stroke-width': 0.8, 'circle-opacity': 0.92
+            'circle-radius': ['case', ['get', 'conflict'],
+              ['interpolate', ['linear'], ['zoom'], 5, 5, 9, 8, 13, 11],
+              ['interpolate', ['linear'], ['zoom'], 5, 1.6, 9, 2.6, 13, 4]],
+            'circle-color':        ['case', ['get', 'conflict'], '#ff3b30', '#d8a23a'],
+            'circle-opacity':      ['case', ['get', 'conflict'], 0.95, 0.38],
+            'circle-stroke-color': '#1a0f02',
+            'circle-stroke-width': ['case', ['get', 'conflict'], 1.2, 0]
           } });
         // Subject station — cyan ring so it stands apart from neighbors.
         map.addLayer({ id: 'interference-subject', type: 'circle', source: 'genoa:interference',
