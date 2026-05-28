@@ -7,12 +7,12 @@ import TopNav from './TopNav.jsx';
 import MapView from '@components/map/MapView.jsx';
 
 // Overlays planned for the module — wired in as their data lands.
-const COMING = ['Terrain / hillshade', 'Tree canopy', 'Water', 'Brush', 'Fire risk', 'Soil / conductivity'];
+const COMING = ['Terrain / hillshade', 'Water', 'Brush', 'Fire risk', 'Soil / conductivity'];
 
 export default function MapPage({ authed, onNavigate, onLogout }){
   const [exhibits, setExhibits]     = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true });
+  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true, canopy: false });
   const [status, setStatus]         = useState(null);
   const [err, setErr]               = useState(null);
 
@@ -67,6 +67,10 @@ export default function MapPage({ authed, onNavigate, onLogout }){
         <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
           <input type="checkbox" checked={overlays.towers} onChange={() => toggle('towers')} />
           <span className="inline-block w-2 h-2 rounded-full bg-red-500 ring-1 ring-white" /> FCC towers (ASR)
+        </label>
+        <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
+          <input type="checkbox" checked={overlays.canopy} onChange={() => toggle('canopy')} />
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#3fa53f' }} /> Tree canopy
         </label>
         {COMING.map(name => (
           <label key={name} className="flex items-center gap-2 mt-0.5 text-textDim/50">

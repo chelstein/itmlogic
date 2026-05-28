@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL } from './config.js';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL } from './config.js';
 
 // Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
 // (referenced from the style.json, served same-origin via /basemap) reads
@@ -65,6 +65,10 @@ export default function MapView({ onStatus, selected, overlays }){
   overlaysRef.current     = overlays;
   const rafRef            = useRef(null);
   const towersHasDataRef  = useRef(false);
+  // The tree-canopy grid is expensive to sample, so it's fetched on demand
+  // (only while the overlay is on).  Tracks the report id whose canopy is
+  // currently loaded so toggling off→on doesn't refetch the same area.
+  const canopyKeyRef      = useRef(null);
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
@@ -92,6 +96,23 @@ export default function MapView({ onStatus, selected, overlays }){
     });
 
     map.on('load', () => {
+      // Tree-canopy density field — graduated green dots, drawn at the
+      // BOTTOM of the data stack (under contours/stations/towers) as
+      // environmental context.  Loaded on demand by the canopy effect.
+      if (!map.getSource('genoa:canopy')){
+        map.addSource('genoa:canopy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({ id: 'canopy-dots', type: 'circle', source: 'genoa:canopy',
+          layout: { visibility: 'none' },   // off by default (opt-in)
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 9, 6, 12, 10, 15, 16],
+            'circle-color':  ['interpolate', ['linear'], ['get', 'canopy_pct'],
+              0, '#16361a', 20, '#27632b', 45, '#3fa53f', 70, '#74e07a', 100, '#bdffb4'],
+            'circle-opacity': ['interpolate', ['linear'], ['get', 'canopy_pct'],
+              0, 0.12, 20, 0.42, 55, 0.66, 100, 0.82],
+            'circle-blur': 0.5
+          } });
+      }
+
       // §73.333 contours (GeoJSON from saved exhibits) — amber glow, drawn
       // UNDER the station markers.  Colored by contour_id.
       const contourColor = ['match', ['get', 'contour_id'],
@@ -295,7 +316,37 @@ export default function MapView({ onStatus, selected, overlays }){
     LAYERS.forEach(L => vis(`${L.id}-${L.type}`, overlays.stations !== false));
     ['contours-fill', 'contours-glow', 'contours-line'].forEach(id => vis(id, overlays.contours !== false));
     ['towers-pulse', 'towers-core'].forEach(id => vis(id, overlays.towers !== false));
+    vis('canopy-dots', overlays.canopy === true);   // opt-in, default off
   }, [ready, overlays]);
+
+  // Tree-canopy overlay — sampled on demand (it's expensive).  Fetches the
+  // canopy density grid only while the overlay is on, sampling a fixed
+  // radius around the selected station, and refetches when the report
+  // changes.  Toggling off→on for the same report reuses the loaded grid.
+  const canopyOn = overlays?.canopy === true;
+  useEffect(() => {
+    if (!ready || !mapRef.current || !selected || !canopyOn) return;
+    if (canopyKeyRef.current === selected.id) return;   // already loaded for this report
+    const map = mapRef.current;
+    const src = map.getSource('genoa:canopy');
+    const lat = Number(selected.lat), lon = Number(selected.lon);
+    if (!(src && src.setData) || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    let cancelled = false;
+
+    report({ kind: 'info', text: 'sampling tree canopy…' });
+    fetch(`${CANOPY_URL}?lat=${lat}&lon=${lon}&radius_km=40`, { credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
+      .then(fc => {
+        if (cancelled) return;
+        const safe = fc && Array.isArray(fc.features) ? fc : { type: 'FeatureCollection', features: [] };
+        src.setData(safe);
+        canopyKeyRef.current = selected.id;
+        report({ kind: 'info', text: `tree canopy · ${safe.features.length} sample(s)` });
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; };
+  }, [ready, selected, canopyOn]);
 
   // Inline absolute fill as well, so the canvas is sized even if the
   // utility classes don't resolve a height for any reason.

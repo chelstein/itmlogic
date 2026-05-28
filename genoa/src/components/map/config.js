@@ -76,3 +76,13 @@ const RAW_TOWERS = String(import.meta.env.VITE_TOWERS_URL || '/api/map/towers.ge
 export const TOWERS_URL = (RAW_TOWERS.startsWith('/') && typeof window !== 'undefined')
   ? window.location.origin + RAW_TOWERS
   : RAW_TOWERS;
+
+// USFS tree-canopy density (CONUS), sampled on a grid around a point and
+// returned as GeoJSON points carrying canopy_pct — proxied by the app to
+// the geo-RF evidence sidecar (no raw IPs).  Query: ?lat=&lon=&radius_km=.
+// Heavier than the other layers (many point samples) → loaded on demand
+// when the operator enables the "Tree canopy" overlay.
+const RAW_CANOPY = String(import.meta.env.VITE_CANOPY_URL || '/api/map/canopy.geojson');
+export const CANOPY_URL = (RAW_CANOPY.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_CANOPY
+  : RAW_CANOPY;
