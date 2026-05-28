@@ -2,7 +2,7 @@
 //
 // Runs the assembled exhibit's verdict / conclusion / HAAT / contour
 // surface through the DO inference router's engineering-exhibit-
-// validation policy (grounded in the FCC Part-73 KB when available) and
+// validation policy (grounded in knowledge bases when available) and
 // returns INTERNAL-CONSISTENCY findings — e.g. "FILING READINESS: READY
 // while the conclusion is NON-COMPLIANT", or "flat HAAT but varying
 // per-radial distances".
@@ -15,6 +15,7 @@
 
 import * as aiRouter from '../services/aiRouter.js';
 import * as fccKb from '../services/fccKb.js';
+import * as doKb from '../services/doKb.js';
 import { retrieveFromKb, isKbRetrieveConfigured } from '../api/services/kbRetrieveClient.js';
 
 const SYSTEM_PROMPT =
@@ -64,40 +65,40 @@ export function snapshot(exhibit){
   return lines.join('\n');
 }
 
-// Pull grounding chunks from both the FCC Part 73 KB and the RF
-// engineering KB in parallel.  Best-effort; ungrounded if neither
-// backend is authorized.  The two sources are complementary: the FCC
-// KB carries verbatim CFR rule text; the RF KB carries engineering
-// reference material (propagation, antenna, field-strength docs).
+// Pull grounding chunks from all three KB backends in parallel.
+// fccKb   — verbatim 47 CFR Part 73 rule text
+// doKb    — knowledge-base-05282026 (677cd4af, DO_KB_OS_* / DO_KB_URL)
+// rfKb    — RF engineering KB (RFENGINEER_KB_RETRIEVE_URL)
+// All three are best-effort; any unavailable source is silently skipped.
 async function groundingFor(exhibit){
   const fccEnabled = fccKb.isEnabled();
+  const doKbEnabled = doKb.isEnabled();
   const rfKbEnabled = isKbRetrieveConfigured();
-  if (!fccEnabled && !rfKbEnabled) return '';
+  if (!fccEnabled && !doKbEnabled && !rfKbEnabled) return '';
 
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
   const fccQuery = svc === 'AM'
     ? '§73.182 nighttime interference RSS and §73.184 groundwave protected contours'
     : '§73.215 contour protection and §73.207 minimum distance separation';
-  const rfQuery = svc === 'AM'
-    ? 'AM groundwave skywave propagation interference field strength groundwave contour'
+  const doQuery = svc === 'AM'
+    ? 'AM groundwave skywave propagation interference field strength contour'
     : 'FM contour propagation F(50,50) F(50,10) field strength antenna HAAT';
+  const rfQuery = doQuery;
 
-  const [fccResult, rfResult] = await Promise.all([
-    fccEnabled
-      ? fccKb.retrieve(fccQuery, { k: 2 })
-      : Promise.resolve({ available: false, chunks: [] }),
-    rfKbEnabled
-      ? retrieveFromKb({ query: rfQuery, k: 2 })
-      : Promise.resolve({ available: false, chunks: [] })
+  const [fccResult, doResult, rfResult] = await Promise.all([
+    fccEnabled  ? fccKb.retrieve(fccQuery, { k: 2 })        : Promise.resolve({ available: false, chunks: [] }),
+    doKbEnabled ? doKb.retrieve(doQuery,   { k: 2 })        : Promise.resolve({ available: false, chunks: [] }),
+    rfKbEnabled ? retrieveFromKb({ query: rfQuery, k: 2 })  : Promise.resolve({ available: false, chunks: [] })
   ]);
 
   const parts = [];
-  if (fccResult.available && fccResult.chunks?.length) {
+  if (fccResult.available && fccResult.chunks?.length)
     parts.push('FCC CFR excerpts:\n' + fccResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
-  }
-  if (rfResult.available && rfResult.chunks?.length) {
+  if (doResult.available && doResult.chunks?.length)
+    parts.push('DO KB excerpts:\n' + doResult.chunks.map(c => (c.text || '').slice(0, 800)).join('\n---\n'));
+  if (rfResult.available && rfResult.chunks?.length)
     parts.push('RF engineering KB excerpts:\n' + rfResult.chunks.map(c => (c.text || '').slice(0, 800)).join('\n---\n'));
-  }
+
   if (!parts.length) return '';
   return 'Grounding excerpts:\n' + parts.join('\n\n');
 }
