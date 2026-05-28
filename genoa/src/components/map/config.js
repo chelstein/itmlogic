@@ -77,6 +77,13 @@ export const TOWERS_URL = (RAW_TOWERS.startsWith('/') && typeof window !== 'unde
   ? window.location.origin + RAW_TOWERS
   : RAW_TOWERS;
 
+// Co/adjacent-channel interference (GeoJSON) for one saved exhibit —
+// subject + nearby primaries + conflict links, from the saved payload.
+const RAW_INTERFERENCE = String(import.meta.env.VITE_INTERFERENCE_URL || '/api/map/interference.geojson');
+export const INTERFERENCE_URL = (RAW_INTERFERENCE.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_INTERFERENCE
+  : RAW_INTERFERENCE;
+
 // USFS tree-canopy density (CONUS), sampled on a grid around a point and
 // returned as GeoJSON points carrying canopy_pct — proxied by the app to
 // the geo-RF evidence sidecar (no raw IPs).  Query: ?lat=&lon=&radius_km=.

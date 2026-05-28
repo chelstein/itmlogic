@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL } from './config.js';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL, INTERFERENCE_URL } from './config.js';
 
 // Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
 // (referenced from the style.json, served same-origin via /basemap) reads
@@ -283,6 +283,55 @@ export default function MapView({ onStatus, selected, overlays }){
         rafRef.current = requestAnimationFrame(pulse);
       }
 
+      // Co/adjacent-channel interference — subject + nearby primaries +
+      // conflict links, drawn ON TOP.  Data set per selected report.
+      if (!map.getSource('genoa:interference')){
+        map.addSource('genoa:interference', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        // Conflict links — dashed red lines from subject to stations that
+        // fail every applicable rule.  Bottom of this group.
+        map.addLayer({ id: 'interference-links', type: 'line', source: 'genoa:interference',
+          filter: ['==', ['get', 'role'], 'conflict-link'], layout: { visibility: 'none' },
+          paint: { 'line-color': '#ff4d4d', 'line-width': 1.2, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
+        // Neighbor stations — red when in conflict (fails all rules), amber
+        // otherwise (nearby co/adjacent-channel but cleared).
+        map.addLayer({ id: 'interference-neighbors', type: 'circle', source: 'genoa:interference',
+          filter: ['==', ['get', 'role'], 'neighbor'], layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 3.5, 9, 5.5, 13, 8],
+            'circle-color': ['case', ['get', 'conflict'], '#ff3b30', '#f0b53f'],
+            'circle-stroke-color': '#1a0f02', 'circle-stroke-width': 0.8, 'circle-opacity': 0.92
+          } });
+        // Subject station — cyan ring so it stands apart from neighbors.
+        map.addLayer({ id: 'interference-subject', type: 'circle', source: 'genoa:interference',
+          filter: ['==', ['get', 'role'], 'subject'], layout: { visibility: 'none' },
+          paint: {
+            'circle-radius': 6, 'circle-color': 'rgba(0,0,0,0)',
+            'circle-stroke-color': '#4fd1ff', 'circle-stroke-width': 2.4, 'circle-opacity': 1
+          } });
+
+        map.on('click', 'interference-neighbors', (ev) => {
+          const f = ev.features?.[0];
+          if (!f) return;
+          const p = f.properties || {};
+          const line = (k, v) => (v == null || v === '' ? '' : `<div><b>${esc(k)}</b>: ${esc(v)}</div>`);
+          const freq = p.frequency_mhz != null ? `${p.frequency_mhz} MHz`
+                     : p.frequency_khz != null ? `${p.frequency_khz} kHz` : null;
+          const dist = p.distance_km != null ? `${Math.round(Number(p.distance_km))} km` : null;
+          const verdict = p.conflict ? `CONFLICT — fails ${p.failed_rules || 'all rules'}`
+                                     : (p.qualified_via ? `clears via ${p.qualified_via}` : 'cleared');
+          new maplibregl.Popup({ closeButton: true })
+            .setLngLat(ev.lngLat)
+            .setHTML(`<div style="font:12px monospace;color:#0b1e2d">`
+              + line('call', p.call) + line('service', p.service) + line('class', p.fcc_class)
+              + line('freq', freq) + line('rel', p.channel_relationship) + line('dist', dist)
+              + `<div style="margin-top:3px;color:${p.conflict ? '#b00020' : '#0a6b2e'}"><b>${esc(verdict)}</b></div>`
+              + `</div>`)
+            .addTo(map);
+        });
+        map.on('mouseenter', 'interference-neighbors', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'interference-neighbors', () => { map.getCanvas().style.cursor = ''; });
+      }
+
       report({ kind: 'info', text: `style loaded · ${LAYERS.length} layer(s) added` });
       setReady(true);
     });
@@ -316,9 +365,19 @@ export default function MapView({ onStatus, selected, overlays }){
     const map = mapRef.current;
     const cSrc = map.getSource('genoa:contours');
     const tSrc = map.getSource('genoa:towers');
+    const iSrc = map.getSource('genoa:interference');
     const url = `${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`;
     const lat = Number(selected.lat), lon = Number(selected.lon);
     let cancelled = false;
+
+    // Interference picture (subject + nearby co/adjacent-channel primaries
+    // + conflict links) — cheap saved-payload read, fetched on every select.
+    if (iSrc && iSrc.setData){
+      fetch(`${INTERFERENCE_URL}?exhibit=${encodeURIComponent(selected.id)}`, { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
+        .then(fc => { if (!cancelled) iSrc.setData(fc && Array.isArray(fc.features) ? fc : { type: 'FeatureCollection', features: [] }); })
+        .catch(() => {});
+    }
 
     const flyToStation = () => {
       if (Number.isFinite(lat) && Number.isFinite(lon)){
@@ -378,6 +437,7 @@ export default function MapView({ onStatus, selected, overlays }){
     vis('terrain-hillshade', overlays.terrain === true);   // opt-in, default off
     ['water-hi', 'water-hi-edge', 'water-hi-rivers'].forEach(id => vis(id, overlays.water === true));
     vis('brush-hi', overlays.brush === true);
+    ['interference-links', 'interference-neighbors', 'interference-subject'].forEach(id => vis(id, overlays.interference === true));
   }, [ready, overlays]);
 
   // Tree-canopy overlay — sampled on demand (it's expensive).  Fetches the

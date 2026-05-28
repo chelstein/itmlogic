@@ -12,7 +12,7 @@ const COMING = ['Fire risk', 'Soil / conductivity'];
 export default function MapPage({ authed, onNavigate, onLogout }){
   const [exhibits, setExhibits]     = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true, canopy: false, terrain: false, water: false, brush: false });
+  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true, canopy: false, terrain: false, water: false, brush: false, interference: false });
   const [status, setStatus]         = useState(null);
   const [err, setErr]               = useState(null);
 
@@ -63,6 +63,10 @@ export default function MapPage({ authed, onNavigate, onLogout }){
         </label>
         <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
           <input type="checkbox" checked={overlays.contours} onChange={() => toggle('contours')} /> §73.333 contours
+        </label>
+        <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
+          <input type="checkbox" checked={overlays.interference} onChange={() => toggle('interference')} />
+          <span className="inline-block w-2 h-2 rounded-full bg-amber-400 ring-1 ring-red-500" /> Interference (§73.207/215)
         </label>
         <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
           <input type="checkbox" checked={overlays.towers} onChange={() => toggle('towers')} />

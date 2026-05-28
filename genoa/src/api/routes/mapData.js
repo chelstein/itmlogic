@@ -9,7 +9,7 @@
 //                                        (omit exhibit → latest per station)
 
 import express from 'express';
-import { listExhibits, listExhibitContours, PersistenceUnavailable } from '../services/persistence.js';
+import { listExhibits, listExhibitContours, listExhibitInterference, PersistenceUnavailable } from '../services/persistence.js';
 import { sidecars } from '../services/sidecars.js';
 
 const router = express.Router();
@@ -39,6 +39,20 @@ router.get('/map/contours.geojson', async (req, res) => {
   } catch (err) {
     if (err instanceof PersistenceUnavailable) return res.json(EMPTY_FC);
     res.status(500).json({ error: 'contours unavailable', detail: String(err?.message || err) });
+  }
+});
+
+// Co/adjacent-channel interference picture for one saved exhibit: subject
+// station, nearby primaries, and conflict links (§73.207/§73.215 etc).
+router.get('/map/interference.geojson', async (req, res) => {
+  res.set('cache-control', 'no-cache');
+  try {
+    const exhibitId = req.query.exhibit ? Number(req.query.exhibit) : null;
+    const fc = await listExhibitInterference({ exhibitId });
+    res.json(fc);
+  } catch (err) {
+    if (err instanceof PersistenceUnavailable) return res.json(EMPTY_FC);
+    res.status(500).json({ error: 'interference unavailable', detail: String(err?.message || err) });
   }
 });
 

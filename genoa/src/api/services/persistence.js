@@ -135,3 +135,87 @@ export async function listExhibitContours({ limit = 300, exhibitId = null } = {}
   }
   return { type: 'FeatureCollection', features };
 }
+
+// Co/adjacent-channel interference picture for one saved exhibit, as a
+// GeoJSON FeatureCollection: the subject station, every nearby same/
+// adjacent-channel primary (Point), and a conflict link (LineString) from
+// the subject to each station that fails ALL applicable rules.  Joins the
+// coordinates in evidence.nearby_primaries with the per-station verdict in
+// interference_study.stations (keyed by facility_id||call).  No recompute —
+// read straight from the saved payload.
+export async function listExhibitInterference({ exhibitId = null } = {}){
+  const p = need();
+  if (!exhibitId) return { type: 'FeatureCollection', features: [] };
+  const r = await p.query(
+    `SELECT payload->'evidence'->'nearby_primaries' AS primaries,
+            payload->'interference_study'           AS study,
+            call_sign, lat, lon
+       FROM genoa_exhibit WHERE id = $1`,
+    [exhibitId]);
+  const row = r.rows[0];
+  if (!row) return { type: 'FeatureCollection', features: [] };
+
+  const primaries = Array.isArray(row.primaries) ? row.primaries : [];
+  const study     = row.study || {};
+  const verdict   = new Map();
+  for (const s of (Array.isArray(study.stations) ? study.stations : [])){
+    const k = String(s.facility_id ?? s.call ?? '');
+    if (k) verdict.set(k, s);
+  }
+
+  // Subject coordinates: prefer interference_study.subject, fall back to
+  // the exhibit's own lat/lon columns.
+  const subj  = study.subject || {};
+  const subjLat = Number.isFinite(Number(subj.lat)) ? Number(subj.lat) : Number(row.lat);
+  const subjLon = Number.isFinite(Number(subj.lon)) ? Number(subj.lon) : Number(row.lon);
+  const haveSubj = Number.isFinite(subjLat) && Number.isFinite(subjLon);
+
+  const features = [];
+  if (haveSubj){
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [subjLon, subjLat] },
+      properties: {
+        role: 'subject',
+        call: subj.call || row.call_sign || null,
+        fcc_class: subj.fcc_class ?? null,
+        frequency_mhz: subj.frequency_mhz ?? null,
+        frequency_khz: subj.frequency_khz ?? null
+      }
+    });
+  }
+
+  for (const n of primaries){
+    const lat = Number(n.lat), lon = Number(n.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const v = verdict.get(String(n.facility_id ?? n.call ?? '')) || null;
+    const conflict = v ? v.pass_overall === false : false;
+    const props = {
+      role: 'neighbor',
+      call: n.call ?? null,
+      service: n.service ?? null,
+      fcc_class: n.fcc_class ?? null,
+      frequency_mhz: n.frequency_mhz ?? null,
+      frequency_khz: n.frequency_khz ?? null,
+      distance_km: n.distance_km ?? v?.distance_km ?? null,
+      channel_relationship: n.channel_relationship ?? v?.channel_relationship ?? null,
+      conflict,
+      qualified_via: Array.isArray(v?.qualified_via) && v.qualified_via.length ? v.qualified_via.join(', ') : null,
+      failed_rules:  Array.isArray(v?.failed_rules)  && v.failed_rules.length  ? v.failed_rules.join(', ')  : null
+    };
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [lon, lat] },
+      properties: props
+    });
+    // Conflict link — only for stations that fail every applicable rule.
+    if (haveSubj && conflict){
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[subjLon, subjLat], [lon, lat]] },
+        properties: { role: 'conflict-link', call: props.call, channel_relationship: props.channel_relationship }
+      });
+    }
+  }
+  return { type: 'FeatureCollection', features };
+}
