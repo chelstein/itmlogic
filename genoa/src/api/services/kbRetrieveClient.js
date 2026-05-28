@@ -3,30 +3,23 @@
 // Talks to the DigitalOcean GenAI knowledge-base retrieve endpoint
 // (kbaas.do-ai.run/v1/<kb_id>/retrieve).  Unlike the rfengineer agent,
 // this performs NO LLM generation — it returns the matching source-document
-// chunks (FCC Part 73 / RF-engineering doc text) with relevance scores.
-// That makes it the preferred grounding source: it surfaces authoritative
-// rule text the engineer can verify, with nothing for a model to invent.
+// chunks with relevance scores.  That makes it the preferred grounding
+// source: it surfaces authoritative rule text the engineer can verify,
+// with nothing for a model to invent.
 //
 // BOUNDARY: retrieved text is reference/citation material for the human
 // engineer of record.  It NEVER changes a deterministic value or verdict.
 //
 // CONFIG (server-side only; no secrets in the frontend or git):
 //   RFENGINEER_KB_RETRIEVE_URL   full retrieve URL (includes the KB id)
+//                                defaults to 677cd4af (knowledge-base-05282026)
 //   RFENGINEER_KB_KEY            access key (Bearer).  When unset,
 //                                isKbRetrieveConfigured() is false and every
 //                                call returns { available:false } — clean
 //                                no-op until the operator wires the key.
-//
-// SERVICE CONTRACT — ASSUMED, verify with one live call once the key is set:
-//   POST {url}
-//     headers: Authorization: Bearer <KEY>, Content-Type: application/json
-//     body: { query:string, k?:number }
-//     → 200 { retrieved_data?:[{ filename?, content?/text?, score? }], ... }
-//   Adjust extractChunks() / the body shape after confirming the real
-//   response against the DO KB retrieve API.
 
 const DEFAULT_URL =
-  'https://kbaas.do-ai.run/v1/4856fa27-5ab6-11f1-b074-4e013e2ddde4/retrieve';
+  'https://kbaas.do-ai.run/v1/677cd4af-5ad3-11f1-b074-4e013e2ddde4/retrieve';
 const DEFAULT_TIMEOUT_MS = 20_000;
 
 export function isKbRetrieveConfigured(){
@@ -37,17 +30,6 @@ function retrieveUrl(){
   return (process.env.RFENGINEER_KB_RETRIEVE_URL || DEFAULT_URL).trim();
 }
 
-/**
- * Retrieve grounding chunks for a query.  Always resolves (never throws);
- * degrades to { available:false } so it can never break the deterministic
- * path.
- *
- * @param {object} opts
- * @param {string} opts.query      retrieval query (e.g. a rule cite + topic)
- * @param {number} [opts.k]        max chunks, default 6
- * @param {number} [opts.timeoutMs]
- * @returns {Promise<{available:boolean, chunks?:Array, error?:string}>}
- */
 export async function retrieveFromKb({ query, k = 6, timeoutMs = DEFAULT_TIMEOUT_MS } = {}){
   if (!isKbRetrieveConfigured()){
     return { available: false, error: 'RFENGINEER_KB_KEY unset' };
@@ -82,8 +64,6 @@ export async function retrieveFromKb({ query, k = 6, timeoutMs = DEFAULT_TIMEOUT
   }
 }
 
-// Parse the retrieve response defensively — the exact key names vary by DO
-// API version, so accept several and return [] when absent.
 function extractChunks(json){
   const rows = json?.retrieved_data
             || json?.results
