@@ -1031,9 +1031,16 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
 // Hero banner — outsized PASS / CONDITIONAL / BLOCKED status at the top
 // of the center column.  The TopStatusBar score chip is too easy to
 // miss; this banner gives the operator the disposition at a glance.
-// AM NIF failure surfaces immediately; Berry-screening NIF failure
-// shows as "REVIEW REQUIRED" instead of BLOCKED so the engineer is
-// nudged to re-run with FCCAM before treating the result as binding.
+// AM §73.182 NIF fails are CLASSIFIED — never auto-blocked — into
+// legacy / waiver / block using the regulatory context the engine already
+// computed (FCC LMS license status) plus FCCAM corroboration:
+//   legacy → existing licensed facility (LMS LIC) → grandfather/legacy
+//            condition, not a new violation; an on-air station can't be
+//            "blocked".
+//   waiver → screening-only (Berry) fail, or a §73.182(k) RSS / PSRA-PSSA /
+//            waiver remedy applies → REVIEW REQUIRED, not block.
+//   block  → FCCAM-corroborated hard fail on a new facility with no
+//            existing authorization → genuine BLOCKED (rare).
 function FilingHeroBanner({ exhibit, fr }){
   const blockers = (exhibit?.blockers?.length || 0)
                  + (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'blocker').length;
@@ -1044,21 +1051,41 @@ function FilingHeroBanner({ exhibit, fr }){
     (Number(nif.summary?.n_failing_azimuths) || 0) > 0 ||
     (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0)
   );
-  const nifScreening = nif && /berry/i.test(String(nif.provenance?.upstream_skywave || nif.source || ''));
+  // A Berry-1968 screening result is NOT corroborated by the authoritative
+  // FCCAM Wang-1985 program, so it can never block on its own.
+  const nifScreening    = nif && /berry/i.test(String(nif.provenance?.upstream_skywave || nif.source || ''));
+  const nifCorroborated = nifFailing && !nifScreening;
+  const rc = exhibit?.regulatoryContext || null;
+  const nifLegacy = nifFailing && (
+       rc?.facilityStatus === 'licensed'
+    || rc?.licenseInterpretation === 'licensed_with_legacy_conflicts'
+    || fr?.status === 'licensed_legacy_review'
+  );
+  const nifDisposition = !nifFailing     ? 'pass'
+                       : nifLegacy        ? 'legacy'
+                       : nifCorroborated  ? 'block'
+                       :                    'waiver';
+  const nifFrac = `${nif?.summary?.n_failing_azimuths ?? '?'}/${nif?.summary?.n_azimuths ?? '?'}`;
 
   let tone, label, sub;
-  if (blockers > 0 || (nifFailing && !nifScreening)){
+  if (blockers > 0 || nifDisposition === 'block'){
     tone  = 'bg-red/20 border-red text-red';
     label = 'BLOCKED';
-    sub   = nifFailing && !nifScreening
-      ? `§73.182 NIF fails at ${nif.summary?.n_failing_azimuths ?? '?'}/${nif.summary?.n_azimuths ?? '?'} azimuths — facility redesign required`
+    sub   = nifDisposition === 'block'
+      ? `§73.182 NIF fails at ${nifFrac} azimuths (FCCAM-corroborated, no existing authorization) — redesign or develop a §73.182(k) waiver basis`
       : `${blockers} blocker${blockers === 1 ? '' : 's'} block filing`;
-  } else if (warnings > 0 || (nifFailing && nifScreening) || fr?.status === 'CONDITIONAL'){
+  } else if (warnings > 0 || nifDisposition === 'legacy' || nifDisposition === 'waiver' || fr?.status === 'CONDITIONAL'){
     tone  = 'bg-gold/20 border-gold text-gold';
-    label = 'REVIEW REQUIRED';
-    sub   = nifFailing && nifScreening
-      ? '§73.182 NIF screening-grade fail — re-run with FCCAM (Wang 1985) before filing'
-      : `${warnings} warning${warnings === 1 ? '' : 's'} — engineer review required`;
+    label = nifDisposition === 'legacy' ? 'LEGACY · REVIEW' : 'REVIEW REQUIRED';
+    if (nifDisposition === 'legacy'){
+      sub = `§73.182 NIF conflict at ${nifFrac} azimuths — existing licensed facility; legacy/grandfathered condition, not a new violation. Licensed-engineer review for any modification.`;
+    } else if (nifDisposition === 'waiver'){
+      sub = nifScreening
+        ? `§73.182 NIF screening-grade fail (${nifFrac}) — re-run with FCCAM (Wang 1985), or develop a §73.182(k) RSS / PSRA-PSSA / waiver showing before filing`
+        : `§73.182 NIF fail (${nifFrac}) — develop a §73.182(k) RSS showing, reduced-power (PSRA/PSSA), or waiver basis before filing`;
+    } else {
+      sub = `${warnings} warning${warnings === 1 ? '' : 's'} — engineer review required`;
+    }
   } else {
     tone  = 'bg-emerald-700/30 border-emerald-500 text-emerald-300';
     label = 'READY TO FILE';
