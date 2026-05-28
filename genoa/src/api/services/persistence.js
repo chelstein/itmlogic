@@ -136,7 +136,43 @@ export async function listExhibitContours({ limit = 300, exhibitId = null } = {}
   return { type: 'FeatureCollection', features };
 }
 
-// Co/adjacent-channel interference picture for one saved exhibit, as a
+// FCC §73.190 Figure M3 ground-conductivity boundary segments within a
+// bbox, as a GeoJSON LineString FeatureCollection carrying m3_value (σ).
+// The corpus is imported as boundary LINESTRINGs (zones not reconstructed),
+// which is also how the FCC M3 map is drawn — σ contours.  Degrades to an
+// empty collection when the table isn't present/imported (never throws).
+export async function listConductivityLines({ bbox, limit = 6000 } = {}){
+  const p = need();
+  if (!Array.isArray(bbox) || bbox.length !== 4 || bbox.some(v => !Number.isFinite(v))){
+    return { type: 'FeatureCollection', features: [] };
+  }
+  const [w, s, e, n] = bbox;
+  // Table name is operator config (env), never user input — safe to inline.
+  const table = (process.env.GEODATA_M3_TABLE || 'm3_conductivity').replace(/[^a-zA-Z0-9_."]/g, '');
+  let r;
+  try {
+    r = await p.query(
+      `SELECT m3_value, ST_AsGeoJSON(geom) AS gj
+         FROM ${table}
+        WHERE geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+        LIMIT $5`,
+      [w, s, e, n, Math.min(20000, Math.max(1, limit))]);
+  } catch {
+    // Table missing / corpus not imported / PostGIS absent → empty overlay.
+    return { type: 'FeatureCollection', features: [] };
+  }
+  const features = [];
+  for (const row of r.rows){
+    let geom;
+    try { geom = JSON.parse(row.gj); } catch { continue; }
+    if (!geom) continue;
+    features.push({
+      type: 'Feature', geometry: geom,
+      properties: { m3_value: row.m3_value != null ? Number(row.m3_value) : null }
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
 // GeoJSON FeatureCollection: the subject station, every nearby same/
 // adjacent-channel primary (Point), and a conflict link (LineString) from
 // the subject to each station that fails ALL applicable rules.  Joins the

@@ -90,10 +90,11 @@ export const LAYER_REGISTRY = [
   },
   {
     id: 'soil', label: 'Soil conductivity', group: 'Environment',
-    mapLayerIds: [], defaultVisible: false, zOrder: 12, opacity: 0.5, cost: 'medium', status: 'soon',
+    mapLayerIds: ['conductivity-lines'], clickLayerId: 'conductivity-lines',
+    defaultVisible: false, zOrder: 12, opacity: 0.8, cost: 'medium', status: 'active',
     classification: 'filing-controlling',
-    meaning: 'Ground conductivity σ (mS/m) — drives AM groundwave reach (§73.190 Figure M3).',
-    provenance: { dataset: 'FCC §73.190 Figure M3 conductivity', source: '/api/geodata/conductivity', effect: 'filing-controlling (AM groundwave)' }
+    meaning: 'Ground conductivity σ (mS/m) boundaries — drives AM groundwave reach (§73.190 Figure M3).',
+    provenance: { dataset: 'FCC §73.190 Figure M3 conductivity (boundary segments)', source: '/api/map/conductivity.geojson', effect: 'filing-controlling (AM groundwave)' }
   },
   {
     id: 'fire', label: 'Fire risk', group: 'Environment',

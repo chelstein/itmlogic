@@ -94,6 +94,13 @@ export const CANOPY_URL = (RAW_CANOPY.startsWith('/') && typeof window !== 'unde
   ? window.location.origin + RAW_CANOPY
   : RAW_CANOPY;
 
+// FCC §73.190 M3 ground-conductivity boundary lines (GeoJSON) within a
+// bbox — proxied by the app from the m3_conductivity PostGIS table.
+const RAW_CONDUCTIVITY = String(import.meta.env.VITE_CONDUCTIVITY_URL || '/api/map/conductivity.geojson');
+export const CONDUCTIVITY_URL = (RAW_CONDUCTIVITY.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_CONDUCTIVITY
+  : RAW_CONDUCTIVITY;
+
 // Terrain DEM tiles (Terrarium-encoded RGB) for the hillshade overlay,
 // proxied same-origin via /terrain so MapLibre can read DEM pixels without
 // a CORS taint.  {z}/{x}/{y} are filled by MapLibre, not us.

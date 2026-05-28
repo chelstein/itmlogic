@@ -9,7 +9,7 @@
 //                                        (omit exhibit → latest per station)
 
 import express from 'express';
-import { listExhibits, listExhibitContours, listExhibitInterference, PersistenceUnavailable } from '../services/persistence.js';
+import { listExhibits, listExhibitContours, listExhibitInterference, listConductivityLines, PersistenceUnavailable } from '../services/persistence.js';
 import { sidecars } from '../services/sidecars.js';
 
 const router = express.Router();
@@ -53,6 +53,32 @@ router.get('/map/interference.geojson', async (req, res) => {
   } catch (err) {
     if (err instanceof PersistenceUnavailable) return res.json(EMPTY_FC);
     res.status(500).json({ error: 'interference unavailable', detail: String(err?.message || err) });
+  }
+});
+
+// FCC §73.190 Figure M3 ground-conductivity boundary lines within a bbox
+// ("west,south,east,north"), or a center+radius_km box, as GeoJSON lines.
+router.get('/map/conductivity.geojson', async (req, res) => {
+  res.set('cache-control', 'no-cache');
+  let bbox = null;
+  if (req.query.bbox){
+    const p = String(req.query.bbox).split(',').map(Number);
+    if (p.length === 4 && p.every(Number.isFinite)) bbox = p;
+  } else {
+    const lat = Number(req.query.lat), lon = Number(req.query.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lon)){
+      const radius_km = Math.min(Math.max(Number(req.query.radius_km) || 60, 5), 250);
+      const dLat = radius_km / 111.32;
+      const dLon = radius_km / (111.32 * Math.max(0.1, Math.cos(lat * Math.PI / 180)));
+      bbox = [lon - dLon, lat - dLat, lon + dLon, lat + dLat];
+    }
+  }
+  if (!bbox) return res.json(EMPTY_FC);
+  try {
+    res.json(await listConductivityLines({ bbox }));
+  } catch (err) {
+    if (err instanceof PersistenceUnavailable) return res.json(EMPTY_FC);
+    res.status(500).json({ error: 'conductivity unavailable', detail: String(err?.message || err) });
   }
 });
 

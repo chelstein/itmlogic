@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL, INTERFERENCE_URL } from './config.js';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL, INTERFERENCE_URL, CONDUCTIVITY_URL } from './config.js';
 import { LAYER_REGISTRY } from './layers.js';
 
 // dBu / mV/m label for a contour feature.
@@ -83,6 +83,8 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
   // (only while the overlay is on).  Tracks the report id whose canopy is
   // currently loaded so toggling off→on doesn't refetch the same area.
   const canopyKeyRef      = useRef(null);
+  // Same opt-in pattern for the soil-conductivity layer (medium-cost query).
+  const soilKeyRef        = useRef(null);
   // { id, bounds } of the report whose contours are currently loaded —
   // set by the selected-report effect so the canopy effect can sample the
   // whole contour footprint (not just a circle around the station).
@@ -181,6 +183,43 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
             'fill-color': ['match', ['get', 'kind'], 'scrub', '#9a7d2e', 'grassland', '#6f7a3a', '#8a7d33'],
             'fill-opacity': 0.42
           } });
+      }
+
+      // FCC §73.190 M3 ground-conductivity σ boundary lines — colored from
+      // poor/dry (warm) to highly conductive/wet (cool), the way the FCC M3
+      // map is drawn.  Loaded on demand (opt-in) by the soil effect.
+      if (!map.getSource('genoa:conductivity')){
+        map.addSource('genoa:conductivity', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        const sigma = ['to-number', ['get', 'm3_value'], 0];
+        map.addLayer({ id: 'conductivity-lines', type: 'line', source: 'genoa:conductivity',
+          layout: { visibility: 'none', 'line-cap': 'round', 'line-join': 'round' },
+          paint: {
+            'line-color': ['step', sigma,
+              '#8c3b12', 2, '#b5651d', 4, '#caa12e', 8, '#6f9e3a', 15, '#2f9e8f', 30, '#2f6fd8'],
+            'line-width': ['interpolate', ['linear'], ['zoom'], 5, 0.6, 9, 1.1, 13, 2.0],
+            'line-opacity': 0.82
+          } });
+        const sHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+        map.on('mousemove', 'conductivity-lines', (ev) => {
+          const f = ev.features?.[0]; if (!f) return;
+          map.getCanvas().style.cursor = 'pointer';
+          const v = f.properties?.m3_value;
+          sHover.setLngLat(ev.lngLat)
+            .setHTML(`<div style="font:600 11px/1.3 monospace;color:#bfe3ff">σ ${esc(v ?? '?')} mS/m</div>`)
+            .addTo(map);
+        });
+        map.on('mouseleave', 'conductivity-lines', () => { map.getCanvas().style.cursor = ''; sHover.remove(); });
+        map.on('click', 'conductivity-lines', (ev) => {
+          const f = ev.features?.[0]; if (!f) return;
+          const v = f.properties?.m3_value;
+          emitSelect({
+            layerKey: 'soil',
+            title: `σ ${v ?? '?'} mS/m`,
+            subtitle: '§73.190 M3 conductivity boundary',
+            rows: [['conductivity', v != null ? `${v} mS/m` : null]].filter(r => r[1] != null),
+            properties: f.properties || {}, lngLat: ev.lngLat
+          });
+        });
       }
 
       // §73.333 / §73.184 contours (GeoJSON from saved exhibits).  The inner
@@ -624,6 +663,43 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
 
     return () => { cancelled = true; ac.abort(); };
   }, [ready, selected, canopyOn]);
+
+  // Soil conductivity (§73.190 M3) — medium-cost PostGIS bbox query, loaded
+  // on demand while the overlay is on, over the report's footprint.
+  const soilOn = overlays?.soil === true;
+  useEffect(() => {
+    if (!ready || !mapRef.current || !selected || !soilOn) return;
+    if (soilKeyRef.current === selected.id) return;
+    const map = mapRef.current;
+    const src = map.getSource('genoa:conductivity');
+    const lat = Number(selected.lat), lon = Number(selected.lon);
+    if (!(src && src.setData)) return;
+    let cancelled = false;
+    const ac = new AbortController();
+
+    const info = contourInfoRef.current;
+    let query;
+    if (info && info.id === selected.id && info.bounds){
+      const [[w, s], [e, n]] = info.bounds;
+      const px = (e - w) * 0.1, py = (n - s) * 0.1;
+      query = `bbox=${w - px},${s - py},${e + px},${n + py}`;
+    } else if (Number.isFinite(lat) && Number.isFinite(lon)){
+      query = `lat=${lat}&lon=${lon}&radius_km=80`;
+    } else { return; }
+
+    fetch(`${CONDUCTIVITY_URL}?${query}`, { credentials: 'same-origin', signal: ac.signal })
+      .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
+      .then(fc => {
+        if (cancelled) return;
+        const safe = fc && Array.isArray(fc.features) ? fc : { type: 'FeatureCollection', features: [] };
+        src.setData(safe);
+        soilKeyRef.current = selected.id;
+        report({ kind: 'info', text: `soil σ · ${safe.features.length} segment(s)` });
+      })
+      .catch(() => {});
+
+    return () => { cancelled = true; ac.abort(); };
+  }, [ready, selected, soilOn]);
 
   // Inline absolute fill as well, so the canvas is sized even if the
   // utility classes don't resolve a height for any reason.
