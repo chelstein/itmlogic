@@ -30,6 +30,25 @@ function esc(v){
   ));
 }
 
+// [[minLng,minLat],[maxLng,maxLat]] over every coordinate in a GeoJSON FC,
+// recursing through Polygon/MultiPolygon/LineString nesting.  Returns null
+// when the collection has no usable coordinates (so callers can fall back).
+function boundsOf(fc){
+  if (!fc || !Array.isArray(fc.features) || !fc.features.length) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, seen = false;
+  const visit = (c) => {
+    if (typeof c[0] === 'number'){
+      const [x, y] = c;
+      if (Number.isFinite(x) && Number.isFinite(y)){
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); seen = true;
+      }
+    } else for (const cc of c) visit(cc);
+  };
+  for (const f of fc.features) if (f?.geometry?.coordinates) visit(f.geometry.coordinates);
+  return seen ? [[minX, minY], [maxX, maxY]] : null;
+}
+
 export default function MapView({ onStatus, selected, overlays }){
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
@@ -147,15 +166,38 @@ export default function MapView({ onStatus, selected, overlays }){
     return () => { map.remove(); mapRef.current = null; };
   }, []);   // create the map exactly once
 
-  // Load the picked report's contours into the source + fly to it.
+  // Load the picked report's contours into the source, then SNAP the
+  // viewport to the contour extent.  We fetch the GeoJSON ourselves (rather
+  // than handing setData a URL) so we can frame the map to the geometry —
+  // otherwise the camera relies on lat/lon, which Postgres returns as
+  // strings, so the old Number.isFinite guard silently failed and never
+  // moved the map.
   useEffect(() => {
     if (!ready || !mapRef.current || !selected) return;
     const map = mapRef.current;
     const src = map.getSource('genoa:contours');
-    if (src && src.setData) src.setData(`${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`);
-    if (Number.isFinite(selected.lat) && Number.isFinite(selected.lon)){
-      map.flyTo({ center: [Number(selected.lon), Number(selected.lat)], zoom: 9, speed: 0.8 });
-    }
+    const url = `${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`;
+    let cancelled = false;
+
+    const flyToStation = () => {
+      const lat = Number(selected.lat), lon = Number(selected.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)){
+        map.flyTo({ center: [lon, lat], zoom: 9, speed: 0.8 });
+      }
+    };
+
+    fetch(url, { credentials: 'same-origin' })
+      .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
+      .then(fc => {
+        if (cancelled) return;
+        if (src && src.setData) src.setData(fc);
+        const b = boundsOf(fc);
+        if (b) map.fitBounds(b, { padding: 64, maxZoom: 11, duration: 900 });
+        else flyToStation();
+      })
+      .catch(() => { if (!cancelled) flyToStation(); });
+
+    return () => { cancelled = true; };
   }, [ready, selected]);
 
   // Overlay visibility toggles.
