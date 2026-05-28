@@ -93,23 +93,36 @@ router.get('/map/towers.geojson', async (req, res) => {
 // collection when the sidecar isn't configured.  ADVISORY only.
 router.get('/map/canopy.geojson', async (req, res) => {
   res.set('cache-control', 'no-cache');
-  const lat = Number(req.query.lat);
-  const lon = Number(req.query.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.json(EMPTY_FC);
-  const radius_km = Math.min(Math.max(Number(req.query.radius_km) || 40, 5), 150);
-  const n         = Math.min(Math.max(parseInt(req.query.n, 10) || 11, 4), 14);
   const geo = sidecars.geoRfEvidence;
   if (!geo || typeof geo.sampleTreeCanopy !== 'function') return res.json(EMPTY_FC);
+  const n = Math.min(Math.max(parseInt(req.query.n, 10) || 14, 4), 16);
 
-  // Grid of sample points (equirectangular offsets — fine at this scale).
-  const dLat = radius_km / 111.32;
-  const dLon = radius_km / (111.32 * Math.max(0.1, Math.cos(lat * Math.PI / 180)));
+  // Sample area: a bbox ("west,south,east,north") when supplied (so the
+  // grid covers the report's contour footprint), else a square derived
+  // from a center point + radius_km.
+  let west, south, east, north;
+  if (req.query.bbox){
+    const p = String(req.query.bbox).split(',').map(Number);
+    if (p.length !== 4 || p.some(v => !Number.isFinite(v))) return res.json(EMPTY_FC);
+    [west, south, east, north] = p;
+  } else {
+    const lat = Number(req.query.lat), lon = Number(req.query.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return res.json(EMPTY_FC);
+    const radius_km = Math.min(Math.max(Number(req.query.radius_km) || 40, 5), 200);
+    const dLat = radius_km / 111.32;
+    const dLon = radius_km / (111.32 * Math.max(0.1, Math.cos(lat * Math.PI / 180)));
+    west = lon - dLon; east = lon + dLon; south = lat - dLat; north = lat + dLat;
+  }
+  if (east < west) [west, east] = [east, west];
+  if (north < south) [south, north] = [north, south];
+
+  // Grid of sample points across the bbox.
   const pts = [];
   for (let i = 0; i < n; i++){
     for (let j = 0; j < n; j++){
       pts.push([
-        lon - dLon + (2 * dLon) * (j / (n - 1)),   // gx (lon)
-        lat - dLat + (2 * dLat) * (i / (n - 1))    // gy (lat)
+        west  + (east  - west)  * (j / (n - 1)),   // gx (lon)
+        south + (north - south) * (i / (n - 1))    // gy (lat)
       ]);
     }
   }

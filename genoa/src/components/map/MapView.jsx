@@ -69,6 +69,10 @@ export default function MapView({ onStatus, selected, overlays }){
   // (only while the overlay is on).  Tracks the report id whose canopy is
   // currently loaded so toggling off→on doesn't refetch the same area.
   const canopyKeyRef      = useRef(null);
+  // { id, bounds } of the report whose contours are currently loaded —
+  // set by the selected-report effect so the canopy effect can sample the
+  // whole contour footprint (not just a circle around the station).
+  const contourInfoRef    = useRef({ id: null, bounds: null });
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
@@ -101,15 +105,22 @@ export default function MapView({ onStatus, selected, overlays }){
       // environmental context.  Loaded on demand by the canopy effect.
       if (!map.getSource('genoa:canopy')){
         map.addSource('genoa:canopy', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        map.addLayer({ id: 'canopy-dots', type: 'circle', source: 'genoa:canopy',
+        // Smooth green density wash (weighted by canopy_pct) — reads as a
+        // vegetation layer rather than scattered dots.  0 % samples carry
+        // zero weight, so the valley floor stays transparent.
+        map.addLayer({ id: 'canopy-heat', type: 'heatmap', source: 'genoa:canopy',
           layout: { visibility: 'none' },   // off by default (opt-in)
           paint: {
-            'circle-radius': ['interpolate', ['linear'], ['zoom'], 6, 3, 9, 6, 12, 10, 15, 16],
-            'circle-color':  ['interpolate', ['linear'], ['get', 'canopy_pct'],
-              0, '#16361a', 20, '#27632b', 45, '#3fa53f', 70, '#74e07a', 100, '#bdffb4'],
-            'circle-opacity': ['interpolate', ['linear'], ['get', 'canopy_pct'],
-              0, 0.12, 20, 0.42, 55, 0.66, 100, 0.82],
-            'circle-blur': 0.5
+            'heatmap-weight':    ['interpolate', ['linear'], ['get', 'canopy_pct'], 0, 0, 100, 1],
+            'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 5, 0.7, 9, 1.1, 13, 1.6],
+            'heatmap-color': ['interpolate', ['linear'], ['heatmap-density'],
+              0.00, 'rgba(8,28,10,0)',
+              0.15, 'rgba(27,99,43,0.35)',
+              0.40, 'rgba(63,165,63,0.55)',
+              0.70, 'rgba(116,224,122,0.72)',
+              1.00, 'rgba(189,255,180,0.88)'],
+            'heatmap-radius':    ['interpolate', ['linear'], ['zoom'], 5, 16, 8, 28, 11, 48, 14, 80],
+            'heatmap-opacity':   0.85
           } });
       }
 
@@ -159,7 +170,7 @@ export default function MapView({ onStatus, selected, overlays }){
               .map(([k, v]) => `<div><b>${esc(k)}</b>: ${esc(v)}</div>`).join('');
             new maplibregl.Popup({ closeButton: true })
               .setLngLat(ev.lngLat)
-              .setHTML(`<div style="font:12px monospace">${rows || 'feature'}</div>`)
+              .setHTML(`<div style="font:12px monospace;color:#0b1e2d">${rows || 'feature'}</div>`)
               .addTo(map);
           });
           // Hover inspector → lightweight tooltip that follows the cursor.
@@ -183,13 +194,14 @@ export default function MapView({ onStatus, selected, overlays }){
       // structures) by the selected-report effect; starts empty.
       if (!map.getSource('genoa:towers')){
         map.addSource('genoa:towers', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-        // Expanding white halo (radius + opacity animated each frame).
+        // Faint slow halo (radius + opacity animated each frame) — a gentle
+        // breathing cue, not an attention-grabbing strobe.
         map.addLayer({ id: 'towers-pulse', type: 'circle', source: 'genoa:towers',
-          paint: { 'circle-color': '#ffffff', 'circle-radius': 6, 'circle-opacity': 0.0, 'circle-blur': 0.3 } });
-        // Solid red core with a white outline — reads as an aviation beacon.
+          paint: { 'circle-color': '#ff6b61', 'circle-radius': 4, 'circle-opacity': 0.0, 'circle-blur': 0.6 } });
+        // Small dim-red core with a thin dark outline — subtle on the navy base.
         map.addLayer({ id: 'towers-core', type: 'circle', source: 'genoa:towers',
-          paint: { 'circle-color': '#ff3b30', 'circle-radius': 4.5,
-                   'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.6, 'circle-opacity': 0.95 } });
+          paint: { 'circle-color': '#e0554d', 'circle-radius': 2.6,
+                   'circle-stroke-color': '#2a0d0b', 'circle-stroke-width': 0.6, 'circle-opacity': 0.78 } });
 
         map.on('click', 'towers-core', (ev) => {
           const f = ev.features?.[0];
@@ -200,7 +212,7 @@ export default function MapView({ onStatus, selected, overlays }){
           const where = [p.structure_city, p.structure_state].filter(Boolean).join(', ');
           new maplibregl.Popup({ closeButton: true })
             .setLngLat(ev.lngLat)
-            .setHTML(`<div style="font:12px monospace">`
+            .setHTML(`<div style="font:12px monospace;color:#0b1e2d">`
               + line('ASR', p.asr_number) + line('owner', p.owner) + line('type', p.structure_type)
               + line('height', h) + line('status', p.status) + line('loc', where) + `</div>`)
             .addTo(map);
@@ -217,9 +229,9 @@ export default function MapView({ onStatus, selected, overlays }){
           if (!m){ return; }
           const on = overlaysRef.current?.towers !== false;
           if (on && towersHasDataRef.current && m.getLayer('towers-pulse')){
-            const phase = ((performance.now() - pulseStart) % 1600) / 1600;
-            m.setPaintProperty('towers-pulse', 'circle-radius', 5 + phase * 16);
-            m.setPaintProperty('towers-pulse', 'circle-opacity', 0.5 * (1 - phase));
+            const phase = ((performance.now() - pulseStart) % 2600) / 2600;
+            m.setPaintProperty('towers-pulse', 'circle-radius', 3 + phase * 6);
+            m.setPaintProperty('towers-pulse', 'circle-opacity', 0.18 * (1 - phase));
           }
           rafRef.current = requestAnimationFrame(pulse);
         };
@@ -291,6 +303,7 @@ export default function MapView({ onStatus, selected, overlays }){
         if (cancelled) return;
         if (cSrc && cSrc.setData) cSrc.setData(fc);
         const b = boundsOf(fc);
+        contourInfoRef.current = { id: selected.id, bounds: b };
         if (b){
           map.fitBounds(b, { padding: 64, maxZoom: 11, duration: 900 });
           const cLng = (b[0][0] + b[1][0]) / 2, cLat = (b[0][1] + b[1][1]) / 2;
@@ -316,7 +329,7 @@ export default function MapView({ onStatus, selected, overlays }){
     LAYERS.forEach(L => vis(`${L.id}-${L.type}`, overlays.stations !== false));
     ['contours-fill', 'contours-glow', 'contours-line'].forEach(id => vis(id, overlays.contours !== false));
     ['towers-pulse', 'towers-core'].forEach(id => vis(id, overlays.towers !== false));
-    vis('canopy-dots', overlays.canopy === true);   // opt-in, default off
+    vis('canopy-heat', overlays.canopy === true);   // opt-in, default off
   }, [ready, overlays]);
 
   // Tree-canopy overlay — sampled on demand (it's expensive).  Fetches the
@@ -330,11 +343,25 @@ export default function MapView({ onStatus, selected, overlays }){
     const map = mapRef.current;
     const src = map.getSource('genoa:canopy');
     const lat = Number(selected.lat), lon = Number(selected.lon);
-    if (!(src && src.setData) || !Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    if (!(src && src.setData)) return;
     let cancelled = false;
 
+    // Prefer the full contour footprint (padded 8%) so the canopy field
+    // covers the whole study area, not just a circle around the station.
+    const info = contourInfoRef.current;
+    let query;
+    if (info && info.id === selected.id && info.bounds){
+      const [[w, s], [e, n]] = info.bounds;
+      const px = (e - w) * 0.08, py = (n - s) * 0.08;
+      query = `bbox=${w - px},${s - py},${e + px},${n + py}`;
+    } else if (Number.isFinite(lat) && Number.isFinite(lon)){
+      query = `lat=${lat}&lon=${lon}&radius_km=45`;
+    } else {
+      return;
+    }
+
     report({ kind: 'info', text: 'sampling tree canopy…' });
-    fetch(`${CANOPY_URL}?lat=${lat}&lon=${lon}&radius_km=40`, { credentials: 'same-origin' })
+    fetch(`${CANOPY_URL}?${query}`, { credentials: 'same-origin' })
       .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
       .then(fc => {
         if (cancelled) return;
