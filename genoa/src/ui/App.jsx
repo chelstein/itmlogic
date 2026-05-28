@@ -1051,7 +1051,7 @@ function FilingHeroBanner({ exhibit, fr }){
     tone  = 'bg-red/20 border-red text-red';
     label = 'BLOCKED';
     sub   = nifFailing && !nifScreening
-      ? `§73.182 NIF fails at ${nif.summary?.n_failing_azimuths ?? '?'}/${nif.summary?.azimuths_evaluated ?? '?'} azimuths — facility redesign required`
+      ? `§73.182 NIF fails at ${nif.summary?.n_failing_azimuths ?? '?'}/${nif.summary?.n_azimuths ?? '?'} azimuths — facility redesign required`
       : `${blockers} blocker${blockers === 1 ? '' : 's'} block filing`;
   } else if (warnings > 0 || (nifFailing && nifScreening) || fr?.status === 'CONDITIONAL'){
     tone  = 'bg-gold/20 border-gold text-gold';

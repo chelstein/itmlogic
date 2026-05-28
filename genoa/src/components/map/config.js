@@ -68,3 +68,43 @@ const RAW_CONTOURS = String(import.meta.env.VITE_CONTOURS_URL || '/api/map/conto
 export const CONTOURS_URL = (RAW_CONTOURS.startsWith('/') && typeof window !== 'undefined')
   ? window.location.origin + RAW_CONTOURS
   : RAW_CONTOURS;
+
+// FCC ASR antenna structures (towers) near a point, as GeoJSON points —
+// proxied by the app to the ASR sidecar's /asr/by-location (no raw IPs in
+// the frontend).  Query string: ?lat=&lon=&radius_m=.
+const RAW_TOWERS = String(import.meta.env.VITE_TOWERS_URL || '/api/map/towers.geojson');
+export const TOWERS_URL = (RAW_TOWERS.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_TOWERS
+  : RAW_TOWERS;
+
+// Co/adjacent-channel interference (GeoJSON) for one saved exhibit —
+// subject + nearby primaries + conflict links, from the saved payload.
+const RAW_INTERFERENCE = String(import.meta.env.VITE_INTERFERENCE_URL || '/api/map/interference.geojson');
+export const INTERFERENCE_URL = (RAW_INTERFERENCE.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_INTERFERENCE
+  : RAW_INTERFERENCE;
+
+// USFS tree-canopy density (CONUS), sampled on a grid around a point and
+// returned as GeoJSON points carrying canopy_pct — proxied by the app to
+// the geo-RF evidence sidecar (no raw IPs).  Query: ?lat=&lon=&radius_km=.
+// Heavier than the other layers (many point samples) → loaded on demand
+// when the operator enables the "Tree canopy" overlay.
+const RAW_CANOPY = String(import.meta.env.VITE_CANOPY_URL || '/api/map/canopy.geojson');
+export const CANOPY_URL = (RAW_CANOPY.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_CANOPY
+  : RAW_CANOPY;
+
+// FCC §73.190 M3 ground-conductivity boundary lines (GeoJSON) within a
+// bbox — proxied by the app from the m3_conductivity PostGIS table.
+const RAW_CONDUCTIVITY = String(import.meta.env.VITE_CONDUCTIVITY_URL || '/api/map/conductivity.geojson');
+export const CONDUCTIVITY_URL = (RAW_CONDUCTIVITY.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_CONDUCTIVITY
+  : RAW_CONDUCTIVITY;
+
+// Terrain DEM tiles (Terrarium-encoded RGB) for the hillshade overlay,
+// proxied same-origin via /terrain so MapLibre can read DEM pixels without
+// a CORS taint.  {z}/{x}/{y} are filled by MapLibre, not us.
+const RAW_DEM = String(import.meta.env.VITE_TERRAIN_DEM || '/terrain/{z}/{x}/{y}.png');
+export const TERRAIN_DEM_URL = (RAW_DEM.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_DEM
+  : RAW_DEM;

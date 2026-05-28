@@ -293,7 +293,11 @@ app.get('/asr/by-location', async (req, res) => {
   // match before filing anyway; a wider search beats EVIDENCE MISSING
   // on a tower that actually exists.
   const radius_m = Math.min(parseFloat(req.query.radius_m) || 1000, 200_000);
-  const limit    = Math.min(parseInt(req.query.limit, 10) || 1, 25);
+  // Cap raised 25 → 500 so the live-map "FCC towers" overlay can show
+  // every registered structure in view (the query is bbox-bounded and
+  // distance-ordered, so rural areas still return few).  The filing-
+  // evidence path calls with limit=1 and is unaffected.
+  const limit    = Math.min(parseInt(req.query.limit, 10) || 1, 500);
   // FCC ULS r_tower.zip uses single-letter codes ('C' Constructed,
   // 'G' Granted, 'N' Notified, 'T' Terminated, 'W' Withdrawn,
   // 'X' Cancelled).  Operator can disable the filter via
