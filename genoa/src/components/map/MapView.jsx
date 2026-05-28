@@ -261,6 +261,23 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
                    'line-opacity': ['interpolate', ['linear'], ['zoom'],
                      5,  byContour(0.90, 0.78, 0.62, 0.72),
                      11, byContour(1.0, 0.90, 0.78, 0.85)] } });
+        // Field-strength labels along each contour (e.g. "60 dBu") — the
+        // hallmark of a real RF coverage map.  Placed on the line, repeated,
+        // shown from mid zoom so they don't crowd the wide view.
+        map.addLayer({ id: 'contours-label', type: 'symbol', source: 'genoa:contours',
+          minzoom: 7,
+          layout: {
+            'symbol-placement': 'line', 'symbol-spacing': 260,
+            'text-field': ['case',
+              ['!=', ['to-string', ['get', 'field_strength_dbu']], ''],
+                ['concat', ['to-string', ['get', 'field_strength_dbu']], ' dBu'],
+              ['!=', ['to-string', ['get', 'field_strength_mvm']], ''],
+                ['concat', ['to-string', ['get', 'field_strength_mvm']], ' mV/m'],
+              ''],
+            'text-font': ['Noto Sans Medium'], 'text-size': 10.5,
+            'text-letter-spacing': 0.04, 'text-max-angle': 30, 'text-padding': 4
+          },
+          paint: { 'text-color': '#ffe0a0', 'text-halo-color': '#1a1205', 'text-halo-width': 1.6, 'text-opacity': 0.95 } });
 
         // Hover tooltip (contour name + field strength) and click → detail.
         const cHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });

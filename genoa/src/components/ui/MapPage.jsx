@@ -9,6 +9,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TopNav from './TopNav.jsx';
 import MapView from '@components/map/MapView.jsx';
 import FeatureDetail from '@components/map/FeatureDetail.jsx';
+import MapLegend from '@components/map/MapLegend.jsx';
 import { LAYER_REGISTRY, LAYER_GROUPS, initialOverlayState } from '@components/map/layers.js';
 
 // Panel swatch per layer (presentation only — colors mirror the map paint).
@@ -147,6 +148,7 @@ export default function MapPage({ authed, onNavigate, onLogout }){
       </div>
 
       <FeatureDetail selection={selection} onClose={() => setSelection(null)} />
+      <MapLegend overlays={overlays} />
     </div>
   );
 }

@@ -37,7 +37,7 @@ export const LAYER_REGISTRY = [
   },
   {
     id: 'contours', label: '§73.333 / §73.184 contours', group: 'RF Study',
-    mapLayerIds: ['contours-fill', 'contours-glow', 'contours-line'], clickLayerId: 'contours-line',
+    mapLayerIds: ['contours-fill', 'contours-glow', 'contours-line', 'contours-label'], clickLayerId: 'contours-line',
     defaultVisible: true, zOrder: 50, opacity: 0.9, cost: 'low', status: 'active',
     classification: 'filing-controlling',
     meaning: 'Protected & service field-strength contours that determine filing compliance.',
