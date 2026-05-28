@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL } from './config.js';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL } from './config.js';
 
 // Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
 // (referenced from the style.json, served same-origin via /basemap) reads
@@ -57,6 +57,14 @@ export default function MapView({ onStatus, selected, overlays }){
   const statusRef    = useRef(onStatus);
   statusRef.current  = onStatus;
   const report = (s) => { if (statusRef.current) statusRef.current(s); };
+  // Latest overlays via ref so the pulse animation reads current toggle
+  // state without restarting.  rafRef holds the beacon-pulse rAF handle;
+  // towersHasDataRef gates the pulse so it stays idle (lets the map reach
+  // 'idle') until towers are actually loaded AND the overlay is on.
+  const overlaysRef       = useRef(overlays);
+  overlaysRef.current     = overlays;
+  const rafRef            = useRef(null);
+  const towersHasDataRef  = useRef(false);
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
@@ -148,6 +156,55 @@ export default function MapView({ onStatus, selected, overlays }){
           map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; hover.remove(); });
         }
       }
+
+      // FCC ASR towers — pulsing red/white obstruction-beacon dots, drawn
+      // ON TOP of everything.  Data is set per selected report (nearby
+      // structures) by the selected-report effect; starts empty.
+      if (!map.getSource('genoa:towers')){
+        map.addSource('genoa:towers', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        // Expanding white halo (radius + opacity animated each frame).
+        map.addLayer({ id: 'towers-pulse', type: 'circle', source: 'genoa:towers',
+          paint: { 'circle-color': '#ffffff', 'circle-radius': 6, 'circle-opacity': 0.0, 'circle-blur': 0.3 } });
+        // Solid red core with a white outline — reads as an aviation beacon.
+        map.addLayer({ id: 'towers-core', type: 'circle', source: 'genoa:towers',
+          paint: { 'circle-color': '#ff3b30', 'circle-radius': 4.5,
+                   'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.6, 'circle-opacity': 0.95 } });
+
+        map.on('click', 'towers-core', (ev) => {
+          const f = ev.features?.[0];
+          if (!f) return;
+          const p = f.properties || {};
+          const line = (k, v) => (v == null || v === '' ? '' : `<div><b>${esc(k)}</b>: ${esc(v)}</div>`);
+          const h = p.overall_height_m != null ? `${Math.round(Number(p.overall_height_m))} m AGL` : null;
+          const where = [p.structure_city, p.structure_state].filter(Boolean).join(', ');
+          new maplibregl.Popup({ closeButton: true })
+            .setLngLat(ev.lngLat)
+            .setHTML(`<div style="font:12px monospace">`
+              + line('ASR', p.asr_number) + line('owner', p.owner) + line('type', p.structure_type)
+              + line('height', h) + line('status', p.status) + line('loc', where) + `</div>`)
+            .addTo(map);
+        });
+        map.on('mouseenter', 'towers-core', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'towers-core', () => { map.getCanvas().style.cursor = ''; });
+
+        // Beacon pulse.  Only dirties the map while towers are loaded AND
+        // the overlay is on — otherwise the loop spins cheaply and lets the
+        // map reach 'idle' so the feature-count status can report.
+        const pulseStart = performance.now();
+        const pulse = () => {
+          const m = mapRef.current;
+          if (!m){ return; }
+          const on = overlaysRef.current?.towers !== false;
+          if (on && towersHasDataRef.current && m.getLayer('towers-pulse')){
+            const phase = ((performance.now() - pulseStart) % 1600) / 1600;
+            m.setPaintProperty('towers-pulse', 'circle-radius', 5 + phase * 16);
+            m.setPaintProperty('towers-pulse', 'circle-opacity', 0.5 * (1 - phase));
+          }
+          rafRef.current = requestAnimationFrame(pulse);
+        };
+        rafRef.current = requestAnimationFrame(pulse);
+      }
+
       report({ kind: 'info', text: `style loaded · ${LAYERS.length} layer(s) added` });
       setReady(true);
     });
@@ -163,7 +220,11 @@ export default function MapView({ onStatus, selected, overlays }){
       } catch { /* querying before layers exist — ignore */ }
     });
 
-    return () => { map.remove(); mapRef.current = null; };
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      map.remove();
+      mapRef.current = null;
+    };
   }, []);   // create the map exactly once
 
   // Load the picked report's contours into the source, then SNAP the
@@ -175,27 +236,53 @@ export default function MapView({ onStatus, selected, overlays }){
   useEffect(() => {
     if (!ready || !mapRef.current || !selected) return;
     const map = mapRef.current;
-    const src = map.getSource('genoa:contours');
+    const cSrc = map.getSource('genoa:contours');
+    const tSrc = map.getSource('genoa:towers');
     const url = `${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`;
+    const lat = Number(selected.lat), lon = Number(selected.lon);
     let cancelled = false;
 
     const flyToStation = () => {
-      const lat = Number(selected.lat), lon = Number(selected.lon);
       if (Number.isFinite(lat) && Number.isFinite(lon)){
         map.flyTo({ center: [lon, lat], zoom: 9, speed: 0.8 });
       }
+    };
+
+    // Pull the FCC towers near this report (centered + radius from the
+    // contour extent when we have one, else the station point + 75 km).
+    const loadTowers = (cLng, cLat, radius_m) => {
+      if (!(tSrc && tSrc.setData) || !Number.isFinite(cLng) || !Number.isFinite(cLat)) return;
+      const u = `${TOWERS_URL}?lat=${cLat}&lon=${cLng}&radius_m=${Math.round(radius_m)}`;
+      fetch(u, { credentials: 'same-origin' })
+        .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
+        .then(fc => {
+          if (cancelled) return;
+          const safe = fc && Array.isArray(fc.features) ? fc : { type: 'FeatureCollection', features: [] };
+          tSrc.setData(safe);
+          towersHasDataRef.current = safe.features.length > 0;
+        })
+        .catch(() => {});
     };
 
     fetch(url, { credentials: 'same-origin' })
       .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
       .then(fc => {
         if (cancelled) return;
-        if (src && src.setData) src.setData(fc);
+        if (cSrc && cSrc.setData) cSrc.setData(fc);
         const b = boundsOf(fc);
-        if (b) map.fitBounds(b, { padding: 64, maxZoom: 11, duration: 900 });
-        else flyToStation();
+        if (b){
+          map.fitBounds(b, { padding: 64, maxZoom: 11, duration: 900 });
+          const cLng = (b[0][0] + b[1][0]) / 2, cLat = (b[0][1] + b[1][1]) / 2;
+          const spanLatM = (b[1][1] - b[0][1]) * 111_320;
+          const spanLonM = (b[1][0] - b[0][0]) * 111_320 * Math.cos(cLat * Math.PI / 180);
+          const radius_m = Math.min(200_000, Math.max(40_000, Math.hypot(spanLatM, spanLonM) / 2 * 1.15));
+          loadTowers(cLng, cLat, radius_m);
+        } else {
+          flyToStation();
+          loadTowers(lon, lat, 75_000);
+        }
       })
-      .catch(() => { if (!cancelled) flyToStation(); });
+      .catch(() => { if (!cancelled){ flyToStation(); loadTowers(lon, lat, 75_000); } });
 
     return () => { cancelled = true; };
   }, [ready, selected]);
@@ -207,6 +294,7 @@ export default function MapView({ onStatus, selected, overlays }){
     const vis = (id, on) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); };
     LAYERS.forEach(L => vis(`${L.id}-${L.type}`, overlays.stations !== false));
     ['contours-fill', 'contours-glow', 'contours-line'].forEach(id => vis(id, overlays.contours !== false));
+    ['towers-pulse', 'towers-core'].forEach(id => vis(id, overlays.towers !== false));
   }, [ready, overlays]);
 
   // Inline absolute fill as well, so the canvas is sized even if the

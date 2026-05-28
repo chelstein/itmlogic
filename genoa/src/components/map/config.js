@@ -68,3 +68,11 @@ const RAW_CONTOURS = String(import.meta.env.VITE_CONTOURS_URL || '/api/map/conto
 export const CONTOURS_URL = (RAW_CONTOURS.startsWith('/') && typeof window !== 'undefined')
   ? window.location.origin + RAW_CONTOURS
   : RAW_CONTOURS;
+
+// FCC ASR antenna structures (towers) near a point, as GeoJSON points —
+// proxied by the app to the ASR sidecar's /asr/by-location (no raw IPs in
+// the frontend).  Query string: ?lat=&lon=&radius_m=.
+const RAW_TOWERS = String(import.meta.env.VITE_TOWERS_URL || '/api/map/towers.geojson');
+export const TOWERS_URL = (RAW_TOWERS.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_TOWERS
+  : RAW_TOWERS;

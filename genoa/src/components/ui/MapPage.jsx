@@ -12,7 +12,7 @@ const COMING = ['Terrain / hillshade', 'Tree canopy', 'Water', 'Brush', 'Fire ri
 export default function MapPage({ authed, onNavigate, onLogout }){
   const [exhibits, setExhibits]     = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [overlays, setOverlays]     = useState({ stations: true, contours: true });
+  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true });
   const [status, setStatus]         = useState(null);
   const [err, setErr]               = useState(null);
 
@@ -63,6 +63,10 @@ export default function MapPage({ authed, onNavigate, onLogout }){
         </label>
         <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
           <input type="checkbox" checked={overlays.contours} onChange={() => toggle('contours')} /> §73.333 contours
+        </label>
+        <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
+          <input type="checkbox" checked={overlays.towers} onChange={() => toggle('towers')} />
+          <span className="inline-block w-2 h-2 rounded-full bg-red-500 ring-1 ring-white" /> FCC towers (ASR)
         </label>
         {COMING.map(name => (
           <label key={name} className="flex items-center gap-2 mt-0.5 text-textDim/50">
