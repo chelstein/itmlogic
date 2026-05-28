@@ -82,8 +82,6 @@ function baseUrl(){
 export async function askRfEngineer({
   task,
   grounding = null,
-  maxTokens = 700,
-  temperature = 0.2,
   timeoutMs = DEFAULT_TIMEOUT_MS
 } = {}){
   if (!isRfAgentConfigured()){
@@ -93,20 +91,26 @@ export async function askRfEngineer({
     return { available: false, error: 'task (string) required' };
   }
 
-  const userContent = grounding
-    ? `${task}\n\nDeterministic grounding (reference only — do not recompute):\n` +
+  // The DO agent rejects `system`/`developer` roles (its base instructions
+  // are set in agent config), so our guardrails are prepended to the user
+  // turn as explicit constraints.
+  const groundingBlock = grounding
+    ? '\n\nDeterministic grounding (reference only — do not recompute):\n' +
       '```json\n' + JSON.stringify(grounding, null, 2) + '\n```'
-    : task;
+    : '';
+  const userContent =
+    `${GUARDRAIL_SYSTEM}\n\n--- TASK ---\n${task}${groundingBlock}`;
 
+  // The agent is backed by an Anthropic model with extended thinking
+  // enabled, which rejects `temperature`/`top_p` != 1 and requires
+  // max_tokens > thinking budget.  We therefore send neither — the agent
+  // applies its own configured sampling + token limits.  Citations are
+  // returned natively when the agent's "Include citations" is on.
   const body = {
     messages: [
-      { role: 'system', content: GUARDRAIL_SYSTEM },
-      { role: 'user',   content: userContent }
+      { role: 'user', content: userContent }
     ],
-    stream: false,
-    include_retrieval_info: true,
-    temperature,
-    max_tokens: maxTokens
+    stream: false
   };
 
   const ac = new AbortController();
@@ -146,8 +150,8 @@ export async function askRfEngineer({
 // DO returns retrieval grounding under a few shapes depending on version;
 // parse defensively and return [] when absent rather than asserting a shape.
 function extractCitations(json){
-  const r = json?.retrieval || json?.choices?.[0]?.message?.retrieval || null;
-  const rows = r?.retrieved_data || r?.documents || r?.citations || [];
+  const r = json?.citations || json?.retrieval || json?.choices?.[0]?.message?.retrieval || null;
+  const rows = r?.citations || r?.retrieved_data || r?.documents || (Array.isArray(r) ? r : []);
   if (!Array.isArray(rows)) return [];
   return rows.map((d) => ({
     source:  d?.source || d?.title || d?.document_name || d?.filename || null,
