@@ -2,10 +2,10 @@
 //
 // Runs the assembled exhibit's verdict / conclusion / HAAT / contour
 // surface through the DO inference router's engineering-exhibit-
-// validation policy (grounded in knowledge bases when available) and
-// returns INTERNAL-CONSISTENCY findings — e.g. "FILING READINESS: READY
-// while the conclusion is NON-COMPLIANT", or "flat HAAT but varying
-// per-radial distances".
+// validation policy (grounded in the FCC Part-73 KB and the DO RF-
+// engineering KB when available) and returns INTERNAL-CONSISTENCY
+// findings — e.g. "FILING READINESS: READY while the conclusion is
+// NON-COMPLIANT", or "flat HAAT but varying per-radial distances".
 //
 // STRICTLY ADVISORY.  This never changes contour distances, §73.x
 // compliance determinations, readiness gates, or any deterministic
@@ -16,7 +16,6 @@
 import * as aiRouter from '../services/aiRouter.js';
 import * as fccKb from '../services/fccKb.js';
 import * as doKb from '../services/doKb.js';
-import { retrieveFromKb, isKbRetrieveConfigured } from '../api/services/kbRetrieveClient.js';
 
 const SYSTEM_PROMPT =
   'You are an FCC broadcast engineering-exhibit consistency auditor.  You are given a ' +
@@ -65,42 +64,33 @@ export function snapshot(exhibit){
   return lines.join('\n');
 }
 
-// Pull grounding chunks from all three KB backends in parallel.
-// fccKb   — verbatim 47 CFR Part 73 rule text
-// doKb    — knowledge-base-05282026 (677cd4af, DO_KB_OS_* / DO_KB_URL)
-// rfKb    — RF engineering KB (RFENGINEER_KB_RETRIEVE_URL)
-// All three are best-effort; any unavailable source is silently skipped.
+// Pull grounding chunks from FCC Part 73 KB and the DO RF-engineering KB
+// in parallel.  Best-effort; ungrounded if neither KB is authorized.
 async function groundingFor(exhibit){
-  const fccEnabled = fccKb.isEnabled();
+  const fccEnabled  = fccKb.isEnabled();
   const doKbEnabled = doKb.isEnabled();
-  const rfKbEnabled = isKbRetrieveConfigured();
-  if (!fccEnabled && !doKbEnabled && !rfKbEnabled) return '';
+  if (!fccEnabled && !doKbEnabled) return '';
 
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
   const fccQuery = svc === 'AM'
     ? '§73.182 nighttime interference RSS and §73.184 groundwave protected contours'
     : '§73.215 contour protection and §73.207 minimum distance separation';
   const doQuery = svc === 'AM'
-    ? 'AM groundwave skywave propagation interference field strength contour'
-    : 'FM contour propagation F(50,50) F(50,10) field strength antenna HAAT';
-  const rfQuery = doQuery;
+    ? 'AM broadcast propagation groundwave conductivity terrain interference'
+    : 'FM broadcast contour protection interference distance separation';
 
-  const [fccResult, doResult, rfResult] = await Promise.all([
-    fccEnabled  ? fccKb.retrieve(fccQuery, { k: 2 })        : Promise.resolve({ available: false, chunks: [] }),
-    doKbEnabled ? doKb.retrieve(doQuery,   { k: 2 })        : Promise.resolve({ available: false, chunks: [] }),
-    rfKbEnabled ? retrieveFromKb({ query: rfQuery, k: 2 })  : Promise.resolve({ available: false, chunks: [] })
+  const [fccResult, doResult] = await Promise.all([
+    fccEnabled  ? fccKb.retrieve(fccQuery, { k: 2 }) : Promise.resolve({ available: false, chunks: [] }),
+    doKbEnabled ? doKb.retrieve(doQuery,   { k: 2 }) : Promise.resolve({ available: false, chunks: [] }),
   ]);
 
   const parts = [];
   if (fccResult.available && fccResult.chunks?.length)
-    parts.push('FCC CFR excerpts:\n' + fccResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
+    parts.push('FCC Part 73 excerpts:\n' + fccResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
   if (doResult.available && doResult.chunks?.length)
-    parts.push('DO KB excerpts:\n' + doResult.chunks.map(c => (c.text || '').slice(0, 800)).join('\n---\n'));
-  if (rfResult.available && rfResult.chunks?.length)
-    parts.push('RF engineering KB excerpts:\n' + rfResult.chunks.map(c => (c.text || '').slice(0, 800)).join('\n---\n'));
+    parts.push('RF engineering reference:\n' + doResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
 
-  if (!parts.length) return '';
-  return 'Grounding excerpts:\n' + parts.join('\n\n');
+  return parts.length ? 'Grounding:\n' + parts.join('\n\n') : '';
 }
 
 export async function reviewExhibit(exhibit){

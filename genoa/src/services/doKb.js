@@ -1,25 +1,16 @@
-// DO knowledge-base retrieval client (knowledge-base-05282026, ID 677cd4af).
+// DO knowledge-base retrieval client (knowledge-base-05282026, 677cd4af).
 //
-// Queries the operator's DO Knowledge Base so advisory reasoning can be
-// GROUNDED in source documents instead of paraphrase.  Mirrors fccKb.js
-// exactly in structure and degradation behaviour.
-//
+// Mirrors fccKb.js exactly, but for the DO-hosted RF-engineering KB.
 // Credentials from env, never source:
-//   DO_KB_URL         kbaas retrieve endpoint
-//                     (already set: …/v1/677cd4af-5ad3-11f1-b074-4e013e2ddde4/retrieve)
-//   DO_KB_TOKEN       DO API PAT for the kbaas endpoint.  The kbaas retrieve
-//                     endpoint authorises with a DO account PAT (dop_v1_…),
-//                     NOT a model-access key — those 403.  Try the same PAT
-//                     used for FCC_KB_TOKEN first.
+//   DO_KB_URL    kbaas retrieve endpoint
+//                (…/v1/677cd4af-5ad3-11f1-b074-4e013e2ddde4/retrieve)
+//   DO_KB_TOKEN  a DigitalOcean API PAT (NOT the router MODEL_ACCESS_KEY —
+//                the kbaas retrieve endpoint 403s with a model-access key;
+//                it authorizes with a DO account PAT).  A PAT is full-
+//                account scope, so prefer the OpenSearch-direct backend
+//                from inside the VPC where a scoped credential exists.
 //
-// OpenSearch-direct backend (VPC or public with trusted-source allowlist):
-//   DO_KB_OS_HOST     genai-halibut-do-user-6795049-0.m.db.ondigitalocean.com
-//   DO_KB_OS_PORT     25060 (default)
-//   DO_KB_OS_USER     doadmin (default)
-//   DO_KB_OS_PASS     cluster password (AVNS_…)
-//
-// Degrades to { available:false } when unconfigured so the advisory layer
-// runs ungrounded (router-only) rather than failing.
+// Degrades to { available:false } when unset/unauthorized.
 
 import https from 'node:https';
 
@@ -34,13 +25,6 @@ function kbaasEnabled(){
 function openSearchEnabled(){
   return !!(String(process.env.DO_KB_OS_HOST || '').trim() && String(process.env.DO_KB_OS_PASS || '').trim());
 }
-
-// ---- OpenSearch-direct backend ------------------------------------------
-// The DO Knowledge Base stores its chunks + embeddings in the managed
-// OpenSearch cluster (genai-halibut).  When a kb-scoped token for the
-// kbaas endpoint isn't available, fall back to BM25 text search directly
-// against the OpenSearch cluster (no embedding model needed).  Works from
-// inside the DO VPC or any trusted-source IP.
 
 export function pickKbIndex(indexNames, kbIdFragment){
   const names = (indexNames || []).filter(n => n && !String(n).startsWith('.'));
@@ -110,7 +94,7 @@ async function retrieveViaOpenSearch(query, { k = 4, timeoutMs = DEFAULT_TIMEOUT
 
 export async function retrieve(query, { k = 4, alpha = 0.75, filters = null, timeoutMs = DEFAULT_TIMEOUT_MS } = {}){
   if (!query) return { available: false, reason: 'no query', chunks: [] };
-  const url   = String(process.env.DO_KB_URL   || '').trim();
+  const url   = String(process.env.DO_KB_URL || '').trim();
   const token = String(process.env.DO_KB_TOKEN || '').trim();
   if (!(url && token)){
     if (openSearchEnabled()) return retrieveViaOpenSearch(query, { k, timeoutMs });

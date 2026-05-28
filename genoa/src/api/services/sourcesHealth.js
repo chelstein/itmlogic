@@ -17,14 +17,7 @@
 //   Rich station / SDR      ZTR /api/radiodns         —                         — (vendor-locked)
 //   Identity / RadioDNS     identity sidecar          ZTR rich-station          — (RadioDNS resolver record)
 //   Antenna modeling        NEC sidecar               —                         — (GPL-isolated; NEC2++/PyNEC)
-//   RF advisory             rfengineer agent          —                         — (DO GenAI agent; advisory only)
-//
-// Each probe is fire-and-forget, capped at 3-5s, and reports:
-//   { configured: bool, reachable: bool, endpoint, latency_ms, error? }
-//
-// `configured: false` means the source is intentionally not enabled
-// (env var unset).  `reachable: false` with `configured: true` is the
-// real failure mode that operators want to see in /readyz.
+//   Advisory AI             rfengineer agent          inference router          — (rfengineer grounded; router ungrounded)
 
 const PROBE_TIMEOUT_MS = 3500;
 
@@ -68,9 +61,7 @@ export async function probeAllSources(){
   const necUrl       = process.env.NEC_SIDECAR_URL               || null;
   const fortranUrl   = process.env.FORTRAN_FCC_SIDECAR_URL       || null;
   const rfAgentUrl   = process.env.RFENGINEER_AGENT_URL
-                       || 'https://xpo2v7dvymlx22rk43lh2nuz.agents.do-ai.run';
-  const rfAgentKey   = process.env.RFENGINEER_AGENT_KEY          || null;
-  const rfKbKey      = process.env.RFENGINEER_KB_KEY             || null;
+                     || 'https://xpo2v7dvymlx22rk43lh2nuz.agents.do-ai.run';
 
   // Probe each independently and in parallel.
   const [
@@ -103,28 +94,14 @@ export async function probeAllSources(){
     probe('https://api.open-meteo.com/v1/elevation?latitude=33.33&longitude=-112.06', { method: 'GET' }),
     probe('https://api.opentopodata.org/v1/srtm30m?locations=33.33,-112.06', { method: 'GET' }),
     probe('https://api.census.gov/data/2020/dec/pl?get=NAME&for=state:04', { method: 'GET' }),
-    // rfengineer DO GenAI agent — probe the base URL only (HEAD);
-    // only configured when the key is set.
-    rfAgentKey
+    // rfengineer agent — HEAD the base URL; gated on key being set so we
+    // don't hit the endpoint unnecessarily when unconfigured.
+    process.env.RFENGINEER_AGENT_KEY
       ? probe(rfAgentUrl)
-      : Promise.resolve({ configured: false, reachable: false })
+      : Promise.resolve({ configured: false, reachable: false, endpoint: rfAgentUrl })
   ]);
 
-  // rfengineer KB: POST-only endpoint; report config status only rather
-  // than spending tokens on a live probe.  The retrieve path is exercised
-  // on real exhibit/advisory calls.
-  const rfKbHealth = rfKbKey
-    ? {
-        configured:  true,
-        reachable:   null,
-        note:        'POST-only retrieve endpoint; config confirmed, not probed',
-        endpoint:    process.env.RFENGINEER_KB_RETRIEVE_URL
-                     || 'https://kbaas.do-ai.run/v1/4856fa27-5ab6-11f1-b074-4e013e2ddde4/retrieve'
-      }
-    : { configured: false, reachable: false };
-
-  // Build the per-query fallback report.  Each query reports:
-  //   primary / secondary / tertiary, with the first reachable one marked.
+  // Build the per-query fallback report.
   const chains = {
     facility_metadata: pickFirst([
       { tier: 'primary',   id: 'zerotrustradio',  health: ztrHealth },
@@ -136,12 +113,6 @@ export async function probeAllSources(){
       { tier: 'secondary', id: 'geo-fcc-contours',   health: fccContours },
       { tier: 'tertiary',  id: 'engine-self-compute', health: { configured: true, reachable: true, endpoint: 'engine/curves/fcc/tvfm_curves.js (vendored)' } }
     ]),
-    // §73.333 F(50,50) / F(50,10) distance math — where does the actual
-    // FCC curve solver run.  Primary = the FORTRAN reference engine
-    // (chelstein/fcc-fortran-engine wrapping TVFMFS_METRIC) when
-    // configured; secondary = Genoa's in-process vendored tvfm_curves.js
-    // dataset.  Not marked critical because the secondary is always
-    // available (it ships in-tree).
     fcc_curve_engine: pickFirst([
       { tier: 'primary',   id: 'fcc-tvfmfs-fortran',  health: fortranFccSidecar },
       { tier: 'secondary', id: 'engine-self-compute', health: { configured: true, reachable: true, endpoint: 'engine/curves/fcc/tvfm_curves.js (vendored)' } }
@@ -181,13 +152,11 @@ export async function probeAllSources(){
       { tier: 'secondary', id: 'publicfiles.fcc.gov', health: publicFiles }
     ], 'FCC LMS authoritative-record cross-reference: license expiration / status / public-file folder.  No auth required; degraded but not broken when either upstream is rate-limited.'),
     rfengineer_advisory: pickFirst([
-      { tier: 'primary', id: 'rfengineer-agent (DO GenAI)', health: rfAgentHealth }
-    ], rfKbKey
-      ? 'RFENGINEER_KB_KEY set; raw KB grounding enabled for advisory and exhibit-review passes'
-      : 'RFENGINEER_KB_KEY unset; set it to enable raw KB chunk grounding (agent uses its own attached KBs until then)')
+      { tier: 'primary',   id: 'rfengineer-agent',     health: rfAgentHealth },
+      { tier: 'secondary', id: 'inference-router',     health: { configured: !!process.env.MODEL_ACCESS_KEY, reachable: !!process.env.MODEL_ACCESS_KEY, endpoint: 'inference.do-ai.run/v1 (ungrounded)' } }
+    ], 'rfengineer agent is grounded on 677cd4af KB; inference router is the ungrounded fallback')
   };
 
-  // Surface ANY-CRITICAL — does every query have at least one reachable source?
   const critical = ['facility_metadata', 'fcc_contour', 'terrain_haat', 'population_census', 'nearby_primaries'];
   const all_critical_have_a_reachable_source = critical.every(k =>
     chains[k]?.tiers?.some(t => t.health.reachable));
@@ -208,13 +177,14 @@ export async function probeAllSources(){
       usgs_epqs: usgsEpqs, open_meteo: openMeteo, opentopodata: openTopoData,
       us_census_bureau: censusBureau,
       rfengineer_agent: rfAgentHealth,
-      rfengineer_kb:    rfKbHealth
+      rfengineer_kb_configured: { configured: !!process.env.RFENGINEER_KB_KEY, reachable: null,
+        endpoint: process.env.RFENGINEER_KB_RETRIEVE_URL || 'https://kbaas.do-ai.run/v1/677cd4af-5ad3-11f1-b074-4e013e2ddde4/retrieve',
+        note: 'POST-only; not probed live — check configured status only' }
     }
   };
 }
 
 function pickFirst(tiers, vendorNote = null){
-  // Mark the first reachable source as the active one.
   let active = null;
   for (const t of tiers){
     if (t.health.reachable && !active) active = t.id;
@@ -229,7 +199,6 @@ function pickFirst(tiers, vendorNote = null){
 }
 
 function bestOf(probes){
-  // For an OR-relationship cluster, the cluster is healthy if ANY member is.
   const reachable = probes.find(p => p.reachable);
   if (reachable) return reachable;
   return probes[0] || { configured: false, reachable: false };
