@@ -899,6 +899,7 @@ function MainApp({ onLogout, onOpenOptimizer }) {
       center={(
         <>
           {exhibit && fr ? <FilingHeroBanner exhibit={exhibit} fr={fr} /> : null}
+          {exhibit && fr ? <AdvisoryCrossCheck exhibit={exhibit} fr={fr} /> : null}
           <ChartScope
             mode={exhibit?.calculation_method?.name || '47 CFR §73.333 F(50,50)'}
             status={statusMsg}
@@ -1031,34 +1032,77 @@ function TabBody({ id, exhibit, history, onPickHistory, getBaseInputs, inputs, o
 // Hero banner — outsized PASS / CONDITIONAL / BLOCKED status at the top
 // of the center column.  The TopStatusBar score chip is too easy to
 // miss; this banner gives the operator the disposition at a glance.
-// AM NIF failure surfaces immediately; Berry-screening NIF failure
-// shows as "REVIEW REQUIRED" instead of BLOCKED so the engineer is
-// nudged to re-run with FCCAM before treating the result as binding.
+// AM §73.182 NIF fails are CLASSIFIED — never auto-blocked — into
+// legacy / waiver / block using the regulatory context the engine already
+// computed (FCC LMS license status) plus FCCAM corroboration:
+//   legacy → existing licensed facility (LMS LIC) → grandfather/legacy
+//            condition, not a new violation; an on-air station can't be
+//            "blocked".
+//   waiver → screening-only (Berry) fail, or a §73.182(k) RSS / PSRA-PSSA /
+//            waiver remedy applies → REVIEW REQUIRED, not block.
+//   block  → FCCAM-corroborated hard fail on a new facility with no
+//            existing authorization → genuine BLOCKED (rare).
+// Shared §73.182 NIF disposition — block / legacy / waiver — derived from
+// the deterministic engine outputs (NIF summary + regulatoryContext +
+// readiness).  Used by the hero banner AND the advisory cross-check so the
+// two can never drift.  Pure; no LLM, no side effects.
+export function deriveNifDisposition(exhibit, fr){
+  const nif = exhibit?.evidence?.am_night_nif || null;
+  const nFailing = Number(nif?.summary?.n_failing_azimuths) || 0;
+  const worst    = Number(nif?.summary?.worst_margin_db);
+  const failing  = !!(nif && nif.available && (nFailing > 0 || (Number.isFinite(worst) && worst < 0)));
+  // Berry-1968 screening is not corroborated by the authoritative FCCAM
+  // Wang-1985 program, so it can never block on its own.
+  const screening    = !!(nif && /berry/i.test(String(nif.provenance?.upstream_skywave || nif.source || '')));
+  const corroborated = failing && !screening;
+  const rc = exhibit?.regulatoryContext || null;
+  const legacy = failing && (
+       rc?.facilityStatus === 'licensed'
+    || rc?.licenseInterpretation === 'licensed_with_legacy_conflicts'
+    || fr?.status === 'licensed_legacy_review'
+  );
+  const disposition = !failing    ? 'pass'
+                    : legacy       ? 'legacy'
+                    : corroborated ? 'block'
+                    :                'waiver';
+  return {
+    failing, disposition, screening,
+    n_failing: nFailing,
+    n_total:   nif?.summary?.n_azimuths ?? null,
+    worst_margin_db: Number.isFinite(worst) ? worst : null,
+    frac: `${nif?.summary?.n_failing_azimuths ?? '?'}/${nif?.summary?.n_azimuths ?? '?'}`,
+    rule: '§73.182(k)',
+    facility_status: rc?.facilityStatus || 'unknown',
+    engine: nif?.engine || nif?.source || null
+  };
+}
+
 function FilingHeroBanner({ exhibit, fr }){
   const blockers = (exhibit?.blockers?.length || 0)
                  + (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'blocker').length;
   const warnings = (exhibit?.warnings?.length || 0)
                  + (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'warning').length;
-  const nif = exhibit?.evidence?.am_night_nif || null;
-  const nifFailing = nif && nif.available && (
-    (Number(nif.summary?.n_failing_azimuths) || 0) > 0 ||
-    (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0)
-  );
-  const nifScreening = nif && /berry/i.test(String(nif.provenance?.upstream_skywave || nif.source || ''));
+  const { disposition: nifDisposition, frac: nifFrac, screening: nifScreening } = deriveNifDisposition(exhibit, fr);
 
   let tone, label, sub;
-  if (blockers > 0 || (nifFailing && !nifScreening)){
+  if (blockers > 0 || nifDisposition === 'block'){
     tone  = 'bg-red/20 border-red text-red';
     label = 'BLOCKED';
-    sub   = nifFailing && !nifScreening
-      ? `§73.182 NIF fails at ${nif.summary?.n_failing_azimuths ?? '?'}/${nif.summary?.n_azimuths ?? '?'} azimuths — facility redesign required`
+    sub   = nifDisposition === 'block'
+      ? `§73.182 NIF fails at ${nifFrac} azimuths (FCCAM-corroborated, no existing authorization) — redesign or develop a §73.182(k) waiver basis`
       : `${blockers} blocker${blockers === 1 ? '' : 's'} block filing`;
-  } else if (warnings > 0 || (nifFailing && nifScreening) || fr?.status === 'CONDITIONAL'){
+  } else if (warnings > 0 || nifDisposition === 'legacy' || nifDisposition === 'waiver' || fr?.status === 'CONDITIONAL'){
     tone  = 'bg-gold/20 border-gold text-gold';
-    label = 'REVIEW REQUIRED';
-    sub   = nifFailing && nifScreening
-      ? '§73.182 NIF screening-grade fail — re-run with FCCAM (Wang 1985) before filing'
-      : `${warnings} warning${warnings === 1 ? '' : 's'} — engineer review required`;
+    label = nifDisposition === 'legacy' ? 'LEGACY · REVIEW' : 'REVIEW REQUIRED';
+    if (nifDisposition === 'legacy'){
+      sub = `§73.182 NIF conflict at ${nifFrac} azimuths — existing licensed facility; legacy/grandfathered condition, not a new violation. Licensed-engineer review for any modification.`;
+    } else if (nifDisposition === 'waiver'){
+      sub = nifScreening
+        ? `§73.182 NIF screening-grade fail (${nifFrac}) — re-run with FCCAM (Wang 1985), or develop a §73.182(k) RSS / PSRA-PSSA / waiver showing before filing`
+        : `§73.182 NIF fail (${nifFrac}) — develop a §73.182(k) RSS showing, reduced-power (PSRA/PSSA), or waiver basis before filing`;
+    } else {
+      sub = `${warnings} warning${warnings === 1 ? '' : 's'} — engineer review required`;
+    }
   } else {
     tone  = 'bg-emerald-700/30 border-emerald-500 text-emerald-300';
     label = 'READY TO FILE';
@@ -1071,6 +1115,87 @@ function FilingHeroBanner({ exhibit, fr }){
       <div className="font-mono text-[10px] opacity-70">
         {exhibit?.station_inputs?.call || '—'} · {exhibit?.station_inputs?.facility_id || '—'}
       </div>
+    </div>
+  );
+}
+
+// On-demand advisory cross-check.  Asks the KB-grounded rfengineer agent
+// whether it concurs with the deterministic block/legacy/waiver disposition.
+// Strictly advisory — the agent can agree or question, never override.  Only
+// shown when there is a NIF disposition to review; degrades cleanly when the
+// agent isn't configured.
+function AdvisoryCrossCheck({ exhibit, fr }){
+  const d = deriveNifDisposition(exhibit, fr);
+  const [state, setState] = useState({ status: 'idle' });
+  if (!d.failing) return null;
+
+  async function run(){
+    setState({ status: 'loading' });
+    try {
+      const res = await fetch('/api/advisory/review', {
+        method:      'POST',
+        headers:     { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ disposition: {
+          kind:    'am_night_nif',
+          verdict: d.disposition,
+          rule:    d.rule,
+          facility: {
+            call:            exhibit?.station_inputs?.call    || null,
+            service:         exhibit?.station_inputs?.service || null,
+            facility_status: d.facility_status
+          },
+          facts: {
+            n_failing:       d.n_failing,
+            n_total:         d.n_total,
+            worst_margin_db: d.worst_margin_db,
+            engine:          d.engine,
+            screening:       d.screening
+          },
+          regulatory_summary: exhibit?.regulatoryContext?.userFacingSummary || null
+        }})
+      });
+      setState({ status: 'done', data: await res.json() });
+    } catch (e){
+      setState({ status: 'error', error: String(e?.message || e) });
+    }
+  }
+
+  const data = state.data;
+  return (
+    <div className="rounded-md border border-rule bg-black/40 px-3 py-2 mb-2 font-mono text-[11px]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-textDim uppercase tracking-rack text-[10px]">
+          Advisory cross-check · rfengineer (KB-grounded)
+        </span>
+        {state.status !== 'done' && (
+          <button onClick={run} disabled={state.status === 'loading'}
+            className="px-2 py-0.5 border border-rule rounded text-cyan-300 hover:bg-white/5 disabled:opacity-50">
+            {state.status === 'loading' ? 'Reviewing…' : 'Run review'}
+          </button>
+        )}
+      </div>
+      {state.status === 'error' && (
+        <div className="text-amber-400 mt-1">cross-check failed: {state.error}</div>
+      )}
+      {state.status === 'done' && data && (
+        data.available === false
+          ? <div className="text-textDim/70 mt-1">Agent not configured ({data.reason || 'unavailable'}).</div>
+          : <div className="mt-1 space-y-1">
+              <div className="text-cream/90 whitespace-pre-wrap leading-relaxed">{data.text}</div>
+              {Array.isArray(data.citations) && data.citations.length > 0 && (
+                <div className="text-textDim/80">
+                  <div className="uppercase tracking-rack text-[9px] mt-1">Citations</div>
+                  {data.citations.map((c, i) => (
+                    <div key={i} className="truncate">• {c.source || 'source'}</div>
+                  ))}
+                </div>
+              )}
+              <div className="text-textDim/50 text-[9px] pt-1 mt-1 border-t border-rule/40">
+                Advisory only — does not change the deterministic {d.disposition.toUpperCase()} disposition.
+              </div>
+            </div>
+      )}
     </div>
   );
 }
