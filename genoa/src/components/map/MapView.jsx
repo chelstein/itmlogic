@@ -13,6 +13,14 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL, INTERFERENCE_URL } from './config.js';
+import { LAYER_REGISTRY } from './layers.js';
+
+// dBu / mV/m label for a contour feature.
+function fieldLabel(p){
+  if (p.field_strength_dbu != null) return `${p.field_strength_dbu} dBu`;
+  if (p.field_strength_mvm != null) return `${p.field_strength_mvm} mV/m`;
+  return null;
+}
 
 // Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
 // (referenced from the style.json, served same-origin via /basemap) reads
@@ -49,14 +57,20 @@ function boundsOf(fc){
   return seen ? [[minX, minY], [maxX, maxY]] : null;
 }
 
-export default function MapView({ onStatus, selected, overlays }){
+export default function MapView({ onStatus, selected, overlays, onSelectFeature, onViewport }){
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
   const [ready, setReady] = useState(false);   // map 'load' fired
-  // Latest callback via ref so status updates never tear down the map.
+  // Latest callbacks via refs so the create-once map handlers always call the
+  // current prop without tearing the map down.
   const statusRef    = useRef(onStatus);
   statusRef.current  = onStatus;
   const report = (s) => { if (statusRef.current) statusRef.current(s); };
+  const selectRef    = useRef(onSelectFeature);
+  selectRef.current  = onSelectFeature;
+  const emitSelect   = (sel) => { if (selectRef.current) selectRef.current(sel); };
+  const viewportRef  = useRef(onViewport);
+  viewportRef.current = onViewport;
   // Latest overlays via ref so the pulse animation reads current toggle
   // state without restarting.  rafRef holds the beacon-pulse rAF handle;
   // towersHasDataRef gates the pulse so it stays idle (lets the map reach
@@ -169,22 +183,63 @@ export default function MapView({ onStatus, selected, overlays }){
           } });
       }
 
-      // §73.333 contours (GeoJSON from saved exhibits) — amber glow, drawn
-      // UNDER the station markers.  Colored by contour_id.
+      // §73.333 / §73.184 contours (GeoJSON from saved exhibits).  The inner
+      // SERVICE contour reads brightest/thickest; the outer PROTECTED contour
+      // is thinner and dimmer, with a subtle amber glow underneath.  Width and
+      // opacity scale with zoom so the set stays legible at every scale.
       const contourColor = ['match', ['get', 'contour_id'],
-        'service_60dbu', '#ffb000',
+        'service_60dbu', '#ffc24d',
         'city_54dbu',    '#f0b53f',
-        'protected_40dbu', '#b8860b',
+        'protected_40dbu', '#c08a2a',
         /* default */    '#9a7b2e'];
+      // Per-contour relative weight (service = inner = strongest).
+      const contourWeight = ['match', ['get', 'contour_id'],
+        'service_60dbu', 1.0, 'city_54dbu', 0.75, 'protected_40dbu', 0.55, 0.7];
+      const zoomFactor = ['interpolate', ['linear'], ['zoom'], 5, 0.8, 9, 1.1, 13, 1.7];
       if (!map.getSource('genoa:contours')){
         // Starts empty; the selected-report effect sets the data.
         map.addSource('genoa:contours', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'contours-fill', type: 'fill', source: 'genoa:contours',
-          paint: { 'fill-color': contourColor, 'fill-opacity': 0.05 } });
+          paint: { 'fill-color': contourColor,
+                   'fill-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.03, 11, 0.08] } });
         map.addLayer({ id: 'contours-glow', type: 'line', source: 'genoa:contours',
-          paint: { 'line-color': contourColor, 'line-width': 6, 'line-blur': 4, 'line-opacity': 0.35 } });
+          paint: { 'line-color': contourColor, 'line-blur': 4,
+                   'line-width': ['*', contourWeight, 6],
+                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.18, 11, 0.4]] } });
         map.addLayer({ id: 'contours-line', type: 'line', source: 'genoa:contours',
-          paint: { 'line-color': contourColor, 'line-width': 1.4, 'line-opacity': 0.9 } });
+          paint: { 'line-color': contourColor,
+                   'line-width': ['*', contourWeight, ['*', 2.2, zoomFactor]],
+                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.7, 11, 1.0]] } });
+
+        // Hover tooltip (contour name + field strength) and click → detail.
+        const cHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+        map.on('mousemove', 'contours-line', (ev) => {
+          const f = ev.features?.[0]; if (!f) return;
+          map.getCanvas().style.cursor = 'pointer';
+          const p = f.properties || {};
+          const fl = fieldLabel(p);
+          cHover.setLngLat(ev.lngLat)
+            .setHTML(`<div style="font:600 11px/1.3 monospace;color:#ffd98a">${esc(p.label || p.contour_id || 'contour')}${fl ? ` · ${esc(fl)}` : ''}</div>`)
+            .addTo(map);
+        });
+        map.on('mouseleave', 'contours-line', () => { map.getCanvas().style.cursor = ''; cHover.remove(); });
+        map.on('click', 'contours-line', (ev) => {
+          const f = ev.features?.[0]; if (!f) return;
+          const p = f.properties || {};
+          emitSelect({
+            layerKey: 'contours',
+            title: p.label || p.contour_id || 'Contour',
+            subtitle: [p.call, p.contour_id].filter(Boolean).join(' · ') || 'Contour',
+            rows: [
+              ['field', fieldLabel(p)],
+              ['mean radius', p.mean_radial_km != null ? `${(+p.mean_radial_km).toFixed(1)} km` : null],
+              ['area', p.area_km2 != null ? `${Math.round(+p.area_km2)} km²` : null],
+              ['method', p.method],
+              ['call', p.call]
+            ].filter(r => r[1] != null && r[1] !== ''),
+            properties: p, lngLat: ev.lngLat
+          });
+        });
       }
 
       for (const L of LAYERS){
@@ -207,16 +262,18 @@ export default function MapView({ onStatus, selected, overlays }){
         }
 
         if (L.type === 'circle'){
-          // Click → full attribute popup.
+          // Click → unified feature-detail panel.
           map.on('click', layerId, (ev) => {
             const f = ev.features?.[0];
             if (!f) return;
-            const rows = Object.entries(f.properties || {})
-              .map(([k, v]) => `<div><b>${esc(k)}</b>: ${esc(v)}</div>`).join('');
-            new maplibregl.Popup({ closeButton: true })
-              .setLngLat(ev.lngLat)
-              .setHTML(`<div style="font:12px monospace;color:#0b1e2d">${rows || 'feature'}</div>`)
-              .addTo(map);
+            const p = f.properties || {};
+            emitSelect({
+              layerKey: 'stations',
+              title: p.callsign || p.call || p.id || 'Station',
+              subtitle: [p.service, p.frequency].filter(Boolean).join(' · ') || 'Station',
+              rows: Object.entries(p).slice(0, 8),
+              properties: p, lngLat: ev.lngLat
+            });
           });
           // Hover inspector → lightweight tooltip that follows the cursor.
           const hover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 12 });
@@ -248,22 +305,36 @@ export default function MapView({ onStatus, selected, overlays }){
           paint: { 'circle-color': '#e0554d', 'circle-radius': 2.6,
                    'circle-stroke-color': '#2a0d0b', 'circle-stroke-width': 0.6, 'circle-opacity': 0.78 } });
 
+        const towerHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 10 });
+        map.on('mousemove', 'towers-core', (ev) => {
+          const f = ev.features?.[0]; if (!f) return;
+          map.getCanvas().style.cursor = 'pointer';
+          const p = f.properties || {};
+          const h = p.overall_height_m != null ? ` · ${Math.round(Number(p.overall_height_m))} m` : '';
+          towerHover.setLngLat(ev.lngLat)
+            .setHTML(`<div style="font:600 11px/1.3 monospace;color:#ffd1c9">ASR ${esc(p.asr_number || '?')}${h}</div>`)
+            .addTo(map);
+        });
+        map.on('mouseleave', 'towers-core', () => { map.getCanvas().style.cursor = ''; towerHover.remove(); });
         map.on('click', 'towers-core', (ev) => {
           const f = ev.features?.[0];
           if (!f) return;
           const p = f.properties || {};
-          const line = (k, v) => (v == null || v === '' ? '' : `<div><b>${esc(k)}</b>: ${esc(v)}</div>`);
           const h = p.overall_height_m != null ? `${Math.round(Number(p.overall_height_m))} m AGL` : null;
           const where = [p.structure_city, p.structure_state].filter(Boolean).join(', ');
-          new maplibregl.Popup({ closeButton: true })
-            .setLngLat(ev.lngLat)
-            .setHTML(`<div style="font:12px monospace;color:#0b1e2d">`
-              + line('ASR', p.asr_number) + line('owner', p.owner) + line('type', p.structure_type)
-              + line('height', h) + line('status', p.status) + line('loc', where) + `</div>`)
-            .addTo(map);
+          emitSelect({
+            layerKey: 'towers',
+            title: p.asr_number ? `ASR ${p.asr_number}` : (p.owner || 'Tower'),
+            subtitle: p.structure_type || 'FCC ASR structure',
+            rows: [
+              ['owner', p.owner], ['type', p.structure_type], ['height', h],
+              ['status', p.status], ['location', where || null],
+              ['distance', p.distance_m != null ? `${(p.distance_m / 1000).toFixed(1)} km` : null]
+            ].filter(r => r[1] != null && r[1] !== ''),
+            properties: p, lngLat: ev.lngLat
+          });
         });
         map.on('mouseenter', 'towers-core', () => { map.getCanvas().style.cursor = 'pointer'; });
-        map.on('mouseleave', 'towers-core', () => { map.getCanvas().style.cursor = ''; });
 
         // Beacon pulse.  Only dirties the map while towers are loaded AND
         // the overlay is on — otherwise the loop spins cheaply and lets the
@@ -318,20 +389,21 @@ export default function MapView({ onStatus, selected, overlays }){
           const f = ev.features?.[0];
           if (!f) return;
           const p = f.properties || {};
-          const line = (k, v) => (v == null || v === '' ? '' : `<div><b>${esc(k)}</b>: ${esc(v)}</div>`);
           const freq = p.frequency_mhz != null ? `${p.frequency_mhz} MHz`
                      : p.frequency_khz != null ? `${p.frequency_khz} kHz` : null;
           const dist = p.distance_km != null ? `${Math.round(Number(p.distance_km))} km` : null;
           const verdict = p.conflict ? `CONFLICT — fails ${p.failed_rules || 'all rules'}`
                                      : (p.qualified_via ? `clears via ${p.qualified_via}` : 'cleared');
-          new maplibregl.Popup({ closeButton: true })
-            .setLngLat(ev.lngLat)
-            .setHTML(`<div style="font:12px monospace;color:#0b1e2d">`
-              + line('call', p.call) + line('service', p.service) + line('class', p.fcc_class)
-              + line('freq', freq) + line('rel', p.channel_relationship) + line('dist', dist)
-              + `<div style="margin-top:3px;color:${p.conflict ? '#b00020' : '#0a6b2e'}"><b>${esc(verdict)}</b></div>`
-              + `</div>`)
-            .addTo(map);
+          emitSelect({
+            layerKey: 'interference',
+            title: p.call || 'Station',
+            subtitle: p.channel_relationship || 'co/adjacent-channel',
+            rows: [
+              ['service', p.service], ['class', p.fcc_class], ['freq', freq],
+              ['distance', dist], ['relationship', p.channel_relationship], ['verdict', verdict]
+            ].filter(r => r[1] != null && r[1] !== ''),
+            properties: p, lngLat: ev.lngLat
+          });
         });
         map.on('mouseenter', 'interference-neighbors', () => { map.getCanvas().style.cursor = 'pointer'; });
         map.on('mouseleave', 'interference-neighbors', () => { map.getCanvas().style.cursor = ''; });
@@ -350,6 +422,21 @@ export default function MapView({ onStatus, selected, overlays }){
         const n = present.length ? map.queryRenderedFeatures({ layers: present }).length : 0;
         report({ kind: 'features', text: `${n} feature(s) rendered` });
       } catch { /* querying before layers exist — ignore */ }
+    });
+
+    // Report viewport on move so the page can assemble export-ready state.
+    map.on('moveend', () => {
+      if (!viewportRef.current) return;
+      try {
+        const c = map.getCenter(); const b = map.getBounds();
+        viewportRef.current({
+          center: [+c.lng.toFixed(6), +c.lat.toFixed(6)],
+          zoom:   +map.getZoom().toFixed(3),
+          bearing: +map.getBearing().toFixed(2),
+          pitch:   +map.getPitch().toFixed(2),
+          bounds: [[+b.getWest().toFixed(6), +b.getSouth().toFixed(6)], [+b.getEast().toFixed(6), +b.getNorth().toFixed(6)]]
+        });
+      } catch { /* ignore */ }
     });
 
     return () => {
@@ -374,11 +461,14 @@ export default function MapView({ onStatus, selected, overlays }){
     const url = `${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`;
     const lat = Number(selected.lat), lon = Number(selected.lon);
     let cancelled = false;
+    // Cancel in-flight fetches when the report switches (no stale data wins).
+    const ac = new AbortController();
+    const opts = { credentials: 'same-origin', signal: ac.signal };
 
     // Interference picture (subject + nearby co/adjacent-channel primaries
     // + conflict links) — cheap saved-payload read, fetched on every select.
     if (iSrc && iSrc.setData){
-      fetch(`${INTERFERENCE_URL}?exhibit=${encodeURIComponent(selected.id)}`, { credentials: 'same-origin' })
+      fetch(`${INTERFERENCE_URL}?exhibit=${encodeURIComponent(selected.id)}`, opts)
         .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
         .then(fc => { if (!cancelled) iSrc.setData(fc && Array.isArray(fc.features) ? fc : { type: 'FeatureCollection', features: [] }); })
         .catch(() => {});
@@ -395,7 +485,7 @@ export default function MapView({ onStatus, selected, overlays }){
     const loadTowers = (cLng, cLat, radius_m) => {
       if (!(tSrc && tSrc.setData) || !Number.isFinite(cLng) || !Number.isFinite(cLat)) return;
       const u = `${TOWERS_URL}?lat=${cLat}&lon=${cLng}&radius_m=${Math.round(radius_m)}`;
-      fetch(u, { credentials: 'same-origin' })
+      fetch(u, opts)
         .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
         .then(fc => {
           if (cancelled) return;
@@ -406,7 +496,7 @@ export default function MapView({ onStatus, selected, overlays }){
         .catch(() => {});
     };
 
-    fetch(url, { credentials: 'same-origin' })
+    fetch(url, opts)
       .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
       .then(fc => {
         if (cancelled) return;
@@ -427,22 +517,20 @@ export default function MapView({ onStatus, selected, overlays }){
       })
       .catch(() => { if (!cancelled){ flyToStation(); loadTowers(lon, lat, 75_000); } });
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ac.abort(); };
   }, [ready, selected]);
 
-  // Overlay visibility toggles.
+  // Overlay visibility — driven entirely by the layer registry.  Each active
+  // overlay's MapLibre layer ids are shown when overlays[id] === true.
   useEffect(() => {
     if (!ready || !mapRef.current || !overlays) return;
     const map = mapRef.current;
     const vis = (id, on) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); };
-    LAYERS.forEach(L => vis(`${L.id}-${L.type}`, overlays.stations !== false));
-    ['contours-fill', 'contours-glow', 'contours-line'].forEach(id => vis(id, overlays.contours !== false));
-    ['towers-pulse', 'towers-core'].forEach(id => vis(id, overlays.towers !== false));
-    vis('canopy-heat', overlays.canopy === true);   // opt-in, default off
-    vis('terrain-hillshade', overlays.terrain === true);   // opt-in, default off
-    ['water-hi', 'water-hi-edge', 'water-hi-rivers'].forEach(id => vis(id, overlays.water === true));
-    vis('brush-hi', overlays.brush === true);
-    ['interference-links', 'interference-neighbors', 'interference-subject'].forEach(id => vis(id, overlays.interference === true));
+    for (const L of LAYER_REGISTRY){
+      if (L.status !== 'active') continue;
+      const on = overlays[L.id] === true;
+      for (const mid of L.mapLayerIds) vis(mid, on);
+    }
   }, [ready, overlays]);
 
   // Tree-canopy overlay — sampled on demand (it's expensive).  Fetches the
@@ -458,6 +546,7 @@ export default function MapView({ onStatus, selected, overlays }){
     const lat = Number(selected.lat), lon = Number(selected.lon);
     if (!(src && src.setData)) return;
     let cancelled = false;
+    const ac = new AbortController();
 
     // Prefer the full contour footprint (padded 8%) so the canopy field
     // covers the whole study area, not just a circle around the station.
@@ -474,7 +563,7 @@ export default function MapView({ onStatus, selected, overlays }){
     }
 
     report({ kind: 'info', text: 'sampling tree canopy…' });
-    fetch(`${CANOPY_URL}?${query}`, { credentials: 'same-origin' })
+    fetch(`${CANOPY_URL}?${query}`, { credentials: 'same-origin', signal: ac.signal })
       .then(r => (r.ok ? r.json() : { type: 'FeatureCollection', features: [] }))
       .then(fc => {
         if (cancelled) return;
@@ -485,7 +574,7 @@ export default function MapView({ onStatus, selected, overlays }){
       })
       .catch(() => {});
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; ac.abort(); };
   }, [ready, selected, canopyOn]);
 
   // Inline absolute fill as well, so the canvas is sized even if the
