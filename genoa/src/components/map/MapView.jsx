@@ -369,9 +369,12 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
         map.addLayer({ id: 'interference-neighbors', type: 'circle', source: 'genoa:interference',
           filter: ['==', ['get', 'role'], 'neighbor'], layout: { visibility: 'none' },
           paint: {
-            'circle-radius': ['case', ['get', 'conflict'],
-              ['interpolate', ['linear'], ['zoom'], 5, 5, 9, 8, 13, 11],
-              ['interpolate', ['linear'], ['zoom'], 5, 1.6, 9, 2.6, 13, 4]],
+            // One zoom-interpolate (MapLibre allows only one per property);
+            // the conflict/cleared sizing lives in each stop's output.
+            'circle-radius': ['interpolate', ['linear'], ['zoom'],
+              5,  ['case', ['get', 'conflict'], 5, 1.6],
+              9,  ['case', ['get', 'conflict'], 8, 2.6],
+              13, ['case', ['get', 'conflict'], 11, 4]],
             'circle-color':        ['case', ['get', 'conflict'], '#ff3b30', '#d8a23a'],
             'circle-opacity':      ['case', ['get', 'conflict'], 0.95, 0.38],
             'circle-stroke-color': '#1a0f02',
