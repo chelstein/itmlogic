@@ -144,6 +144,31 @@ export default function MapView({ onStatus, selected, overlays }){
           } });
       }
 
+      // Water + Brush highlights — styled directly on the self-hosted
+      // basemap's own vector layers (no sampling): the 'water' source-layer
+      // (polygons + river/stream lines) and the 'landcover' scrub/grassland
+      // classes.  Off by default; brighten those features when toggled.
+      if (!map.getLayer('water-hi')){
+        map.addLayer({ id: 'water-hi', type: 'fill', source: 'protomaps', 'source-layer': 'water',
+          filter: ['==', '$type', 'Polygon'], layout: { visibility: 'none' },
+          paint: { 'fill-color': '#15557a', 'fill-opacity': 0.6 } });
+        map.addLayer({ id: 'water-hi-edge', type: 'line', source: 'protomaps', 'source-layer': 'water',
+          filter: ['==', '$type', 'Polygon'], layout: { visibility: 'none' },
+          paint: { 'line-color': '#4fd1ff', 'line-width': 0.8, 'line-opacity': 0.5 } });
+        map.addLayer({ id: 'water-hi-rivers', type: 'line', source: 'protomaps', 'source-layer': 'water',
+          filter: ['in', ['get', 'kind'], ['literal', ['river', 'stream', 'canal']]], layout: { visibility: 'none' },
+          paint: { 'line-color': '#3aa0d8', 'line-opacity': 0.75,
+                   'line-width': ['interpolate', ['linear'], ['zoom'], 6, 0.4, 12, 1.8] } });
+      }
+      if (!map.getLayer('brush-hi')){
+        map.addLayer({ id: 'brush-hi', type: 'fill', source: 'protomaps', 'source-layer': 'landcover',
+          filter: ['in', ['get', 'kind'], ['literal', ['scrub', 'grassland']]], layout: { visibility: 'none' },
+          paint: {
+            'fill-color': ['match', ['get', 'kind'], 'scrub', '#9a7d2e', 'grassland', '#6f7a3a', '#8a7d33'],
+            'fill-opacity': 0.42
+          } });
+      }
+
       // §73.333 contours (GeoJSON from saved exhibits) — amber glow, drawn
       // UNDER the station markers.  Colored by contour_id.
       const contourColor = ['match', ['get', 'contour_id'],
@@ -351,6 +376,8 @@ export default function MapView({ onStatus, selected, overlays }){
     ['towers-pulse', 'towers-core'].forEach(id => vis(id, overlays.towers !== false));
     vis('canopy-heat', overlays.canopy === true);   // opt-in, default off
     vis('terrain-hillshade', overlays.terrain === true);   // opt-in, default off
+    ['water-hi', 'water-hi-edge', 'water-hi-rivers'].forEach(id => vis(id, overlays.water === true));
+    vis('brush-hi', overlays.brush === true);
   }, [ready, overlays]);
 
   // Tree-canopy overlay — sampled on demand (it's expensive).  Fetches the

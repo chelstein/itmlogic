@@ -7,12 +7,12 @@ import TopNav from './TopNav.jsx';
 import MapView from '@components/map/MapView.jsx';
 
 // Overlays planned for the module — wired in as their data lands.
-const COMING = ['Water', 'Brush', 'Fire risk', 'Soil / conductivity'];
+const COMING = ['Fire risk', 'Soil / conductivity'];
 
 export default function MapPage({ authed, onNavigate, onLogout }){
   const [exhibits, setExhibits]     = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true, canopy: false, terrain: false });
+  const [overlays, setOverlays]     = useState({ stations: true, contours: true, towers: true, canopy: false, terrain: false, water: false, brush: false });
   const [status, setStatus]         = useState(null);
   const [err, setErr]               = useState(null);
 
@@ -75,6 +75,14 @@ export default function MapPage({ authed, onNavigate, onLogout }){
         <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
           <input type="checkbox" checked={overlays.terrain} onChange={() => toggle('terrain')} />
           <span className="inline-block w-2 h-2 rounded-full" style={{ background: 'linear-gradient(135deg,#41566a,#02070c)' }} /> Terrain / hillshade
+        </label>
+        <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
+          <input type="checkbox" checked={overlays.water} onChange={() => toggle('water')} />
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#3aa0d8' }} /> Water
+        </label>
+        <label className="flex items-center gap-2 mt-0.5 cursor-pointer text-cream">
+          <input type="checkbox" checked={overlays.brush} onChange={() => toggle('brush')} />
+          <span className="inline-block w-2 h-2 rounded-full" style={{ background: '#9a7d2e' }} /> Brush
         </label>
         {COMING.map(name => (
           <label key={name} className="flex items-center gap-2 mt-0.5 text-textDim/50">
