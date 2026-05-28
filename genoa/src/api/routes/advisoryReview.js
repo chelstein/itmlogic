@@ -11,10 +11,17 @@
 // instructed never to emit a pass/fail or numeric value — the engine's
 // determination stands.  When the agent isn't configured the route returns
 // { available:false } (200) so the UI degrades cleanly.
+//
+// When RFENGINEER_KB_KEY is set, this route also retrieves raw KB chunks
+// keyed on the disposition's service and injects them as _rf_kb_grounding
+// in the agent call.  The agent already queries its own attached KBs
+// internally; the injected chunks are supplemental — verbatim source text
+// the agent can reference for citations without relying on its own lookup.
 
 import express from 'express';
 import { asyncHandler } from '../middleware/errors.js';
 import { askRfEngineer, isRfAgentConfigured } from '../services/rfAgentClient.js';
+import { retrieveFromKb, isKbRetrieveConfigured } from '../services/kbRetrieveClient.js';
 
 const r = express.Router();
 
@@ -30,6 +37,19 @@ const REVIEW_TASK = [
   '- 3 to 5 sentences, conservative professional engineering language.'
 ].join('\n');
 
+// Build a service-appropriate KB query from the disposition object.
+function dispositionQuery(disposition){
+  const svc = String(
+    disposition?.service ||
+    disposition?.station_inputs?.service ||
+    ''
+  ).toUpperCase();
+  if (svc === 'AM'){
+    return '§73.182 AM groundwave interference RSS §73.184 protected contours skywave NIF nighttime';
+  }
+  return '§73.215 FM contour protection §73.207 minimum distance separation spacing LPFM';
+}
+
 r.post('/advisory/review', asyncHandler(async (req, res) => {
   const disposition = req.body?.disposition;
   if (!disposition || typeof disposition !== 'object'){
@@ -38,9 +58,27 @@ r.post('/advisory/review', asyncHandler(async (req, res) => {
   if (!isRfAgentConfigured()){
     return res.json({ available: false, reason: 'rfengineer agent not configured' });
   }
+
+  // Augment grounding with raw KB chunks when configured; fail-soft so
+  // a KB error never blocks the agent call.
+  let groundingWithKb = disposition;
+  if (isKbRetrieveConfigured()){
+    const query = dispositionQuery(disposition);
+    const kbResult = await retrieveFromKb({ query, k: 4 }).catch(() => null);
+    if (kbResult?.available && kbResult.chunks?.length){
+      groundingWithKb = {
+        ...disposition,
+        _rf_kb_grounding: kbResult.chunks.map(c => ({
+          source: c.source,
+          text:   (c.text || '').slice(0, 600)
+        }))
+      };
+    }
+  }
+
   const result = await askRfEngineer({
     task:      REVIEW_TASK,
-    grounding: disposition,
+    grounding: groundingWithKb,
     timeoutMs: 60_000
   });
   res.json(result);

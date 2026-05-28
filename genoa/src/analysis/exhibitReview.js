@@ -2,10 +2,10 @@
 //
 // Runs the assembled exhibit's verdict / conclusion / HAAT / contour
 // surface through the DO inference router's engineering-exhibit-
-// validation policy (grounded in the FCC Part-73 KB when available) and
-// returns INTERNAL-CONSISTENCY findings — e.g. "FILING READINESS: READY
-// while the conclusion is NON-COMPLIANT", or "flat HAAT but varying
-// per-radial distances".
+// validation policy (grounded in the FCC Part-73 KB and the DO RF-
+// engineering KB when available) and returns INTERNAL-CONSISTENCY
+// findings — e.g. "FILING READINESS: READY while the conclusion is
+// NON-COMPLIANT", or "flat HAAT but varying per-radial distances".
 //
 // STRICTLY ADVISORY.  This never changes contour distances, §73.x
 // compliance determinations, readiness gates, or any deterministic
@@ -15,6 +15,7 @@
 
 import * as aiRouter from '../services/aiRouter.js';
 import * as fccKb from '../services/fccKb.js';
+import * as doKb from '../services/doKb.js';
 
 const SYSTEM_PROMPT =
   'You are an FCC broadcast engineering-exhibit consistency auditor.  You are given a ' +
@@ -63,17 +64,33 @@ export function snapshot(exhibit){
   return lines.join('\n');
 }
 
-// Pull a couple of grounding chunks for any CFR sections the exhibit
-// leans on.  Best-effort; ungrounded if the KB isn't authorized.
+// Pull grounding chunks from FCC Part 73 KB and the DO RF-engineering KB
+// in parallel.  Best-effort; ungrounded if neither KB is authorized.
 async function groundingFor(exhibit){
-  if (!fccKb.isEnabled()) return '';
+  const fccEnabled  = fccKb.isEnabled();
+  const doKbEnabled = doKb.isEnabled();
+  if (!fccEnabled && !doKbEnabled) return '';
+
   const svc = String(exhibit?.station_inputs?.service || '').toUpperCase();
-  const q = svc === 'AM'
+  const fccQuery = svc === 'AM'
     ? '§73.182 nighttime interference RSS and §73.184 groundwave protected contours'
     : '§73.215 contour protection and §73.207 minimum distance separation';
-  const res = await fccKb.retrieve(q, { k: 2 });
-  if (!res.available) return '';
-  return 'Grounding CFR excerpts:\n' + res.chunks.map(c => c.text.slice(0, 800)).join('\n---\n');
+  const doQuery = svc === 'AM'
+    ? 'AM broadcast propagation groundwave conductivity terrain interference'
+    : 'FM broadcast contour protection interference distance separation';
+
+  const [fccResult, doResult] = await Promise.all([
+    fccEnabled  ? fccKb.retrieve(fccQuery, { k: 2 }) : Promise.resolve({ available: false, chunks: [] }),
+    doKbEnabled ? doKb.retrieve(doQuery,   { k: 2 }) : Promise.resolve({ available: false, chunks: [] }),
+  ]);
+
+  const parts = [];
+  if (fccResult.available && fccResult.chunks?.length)
+    parts.push('FCC Part 73 excerpts:\n' + fccResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
+  if (doResult.available && doResult.chunks?.length)
+    parts.push('RF engineering reference:\n' + doResult.chunks.map(c => c.text.slice(0, 800)).join('\n---\n'));
+
+  return parts.length ? 'Grounding:\n' + parts.join('\n\n') : '';
 }
 
 export async function reviewExhibit(exhibit){
