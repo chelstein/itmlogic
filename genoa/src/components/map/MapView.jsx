@@ -8,7 +8,7 @@
 // Reports status (loaded / rendered-feature-count / errors) via onStatus
 // so the page HUD can surface what the map is actually doing.
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
@@ -30,9 +30,10 @@ function esc(v){
   ));
 }
 
-export default function MapView({ onStatus }){
+export default function MapView({ onStatus, selected, overlays }){
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
+  const [ready, setReady] = useState(false);   // map 'load' fired
   // Latest callback via ref so status updates never tear down the map.
   const statusRef    = useRef(onStatus);
   statusRef.current  = onStatus;
@@ -72,7 +73,8 @@ export default function MapView({ onStatus }){
         'protected_40dbu', '#b8860b',
         /* default */    '#9a7b2e'];
       if (!map.getSource('genoa:contours')){
-        map.addSource('genoa:contours', { type: 'geojson', data: CONTOURS_URL });
+        // Starts empty; the selected-report effect sets the data.
+        map.addSource('genoa:contours', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'contours-fill', type: 'fill', source: 'genoa:contours',
           paint: { 'fill-color': contourColor, 'fill-opacity': 0.05 } });
         map.addLayer({ id: 'contours-glow', type: 'line', source: 'genoa:contours',
@@ -128,6 +130,7 @@ export default function MapView({ onStatus }){
         }
       }
       report({ kind: 'info', text: `style loaded · ${LAYERS.length} layer(s) added` });
+      setReady(true);
     });
 
     // Once the map settles, report how many features actually rendered —
@@ -143,6 +146,26 @@ export default function MapView({ onStatus }){
 
     return () => { map.remove(); mapRef.current = null; };
   }, []);   // create the map exactly once
+
+  // Load the picked report's contours into the source + fly to it.
+  useEffect(() => {
+    if (!ready || !mapRef.current || !selected) return;
+    const map = mapRef.current;
+    const src = map.getSource('genoa:contours');
+    if (src && src.setData) src.setData(`${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`);
+    if (Number.isFinite(selected.lat) && Number.isFinite(selected.lon)){
+      map.flyTo({ center: [Number(selected.lon), Number(selected.lat)], zoom: 9, speed: 0.8 });
+    }
+  }, [ready, selected]);
+
+  // Overlay visibility toggles.
+  useEffect(() => {
+    if (!ready || !mapRef.current || !overlays) return;
+    const map = mapRef.current;
+    const vis = (id, on) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); };
+    LAYERS.forEach(L => vis(`${L.id}-${L.type}`, overlays.stations !== false));
+    ['contours-fill', 'contours-glow', 'contours-line'].forEach(id => vis(id, overlays.contours !== false));
+  }, [ready, overlays]);
 
   // Inline absolute fill as well, so the canvas is sized even if the
   // utility classes don't resolve a height for any reason.

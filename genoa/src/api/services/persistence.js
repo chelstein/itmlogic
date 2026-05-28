@@ -85,7 +85,7 @@ export async function listExhibits({ limit = 100 } = {}){
   const p = need();
   const r = await p.query(
     `SELECT id, call_sign, facility_id, service, frequency, erp_kw, haat_m,
-            method, filing_score, filing_status, created_at
+            lat, lon, method, filing_score, filing_status, created_at
        FROM genoa_exhibit
       ORDER BY created_at DESC
       LIMIT $1`,
@@ -105,17 +105,22 @@ export async function getExhibit(id){
 // feature already carries [lon,lat] Polygon geometry + properties
 // (contour_id, field_strength_dbu, call).  No recompute — read straight
 // from saved exhibit payloads.
-export async function listExhibitContours({ limit = 300 } = {}){
+export async function listExhibitContours({ limit = 300, exhibitId = null } = {}){
   const p = need();
-  const r = await p.query(
-    `SELECT DISTINCT ON (call_sign) call_sign, payload->'geojson' AS geojson
-       FROM genoa_exhibit
-      WHERE call_sign IS NOT NULL
-        AND payload -> 'geojson' -> 'features' IS NOT NULL
-      ORDER BY call_sign, created_at DESC
-      LIMIT $1`,
-    [Math.min(2000, Math.max(1, limit))]
-  );
+  // One specific saved report (the picker), or the latest per station.
+  const r = exhibitId
+    ? await p.query(
+        `SELECT call_sign, payload->'geojson' AS geojson
+           FROM genoa_exhibit WHERE id = $1`,
+        [exhibitId])
+    : await p.query(
+        `SELECT DISTINCT ON (call_sign) call_sign, payload->'geojson' AS geojson
+           FROM genoa_exhibit
+          WHERE call_sign IS NOT NULL
+            AND payload -> 'geojson' -> 'features' IS NOT NULL
+          ORDER BY call_sign, created_at DESC
+          LIMIT $1`,
+        [Math.min(2000, Math.max(1, limit))]);
   const features = [];
   for (const row of r.rows){
     const fc = row.geojson;
