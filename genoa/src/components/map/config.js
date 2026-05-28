@@ -86,3 +86,11 @@ const RAW_CANOPY = String(import.meta.env.VITE_CANOPY_URL || '/api/map/canopy.ge
 export const CANOPY_URL = (RAW_CANOPY.startsWith('/') && typeof window !== 'undefined')
   ? window.location.origin + RAW_CANOPY
   : RAW_CANOPY;
+
+// Terrain DEM tiles (Terrarium-encoded RGB) for the hillshade overlay,
+// proxied same-origin via /terrain so MapLibre can read DEM pixels without
+// a CORS taint.  {z}/{x}/{y} are filled by MapLibre, not us.
+const RAW_DEM = String(import.meta.env.VITE_TERRAIN_DEM || '/terrain/{z}/{x}/{y}.png');
+export const TERRAIN_DEM_URL = (RAW_DEM.startsWith('/') && typeof window !== 'undefined')
+  ? window.location.origin + RAW_DEM
+  : RAW_DEM;

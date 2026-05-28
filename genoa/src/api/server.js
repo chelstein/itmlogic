@@ -33,6 +33,7 @@ import amColocationOpportunitiesRoutes from './routes/amColocationOpportunities.
 import authRoutes       from './routes/auth.js';
 import tileRoutes       from './routes/tiles.js';
 import basemapRoutes    from './routes/basemap.js';
+import terrainRoutes    from './routes/terrain.js';
 import mapDataRoutes    from './routes/mapData.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
@@ -85,6 +86,10 @@ app.use('/tiles', tileRoutes);
 
 // Self-hosted PMTiles basemap proxy (public; range-forwarding) → Spaces.
 app.use('/basemap', basemapRoutes);
+
+// Terrain-DEM proxy (public) → Terrarium elevation tiles, same-origin so
+// the hillshade layer can read DEM pixels without a CORS taint.
+app.use('/terrain', terrainRoutes);
 
 // Auth (publicly accessible: login / logout / me).  Mounted BEFORE the
 // requireAuth gate so the login endpoint itself isn't gated.  Any

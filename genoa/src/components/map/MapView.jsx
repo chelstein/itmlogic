@@ -12,7 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
-import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL } from './config.js';
+import { MAP_STYLE_URL, INITIAL_VIEW, LAYERS, tileUrl, CONTOURS_URL, TOWERS_URL, CANOPY_URL, TERRAIN_DEM_URL } from './config.js';
 
 // Register the pmtiles:// protocol once so a self-hosted PMTiles basemap
 // (referenced from the style.json, served same-origin via /basemap) reads
@@ -100,6 +100,26 @@ export default function MapView({ onStatus, selected, overlays }){
     });
 
     map.on('load', () => {
+      // Terrain hillshade — Terrarium DEM via the same-origin /terrain
+      // proxy.  Added first so it sits at the bottom of the data stack
+      // (over the basemap, under all data overlays).  Off by default;
+      // toned for the dark navy base so it adds relief without washing
+      // the map out.
+      if (!map.getSource('genoa:dem')){
+        map.addSource('genoa:dem', {
+          type: 'raster-dem', tiles: [TERRAIN_DEM_URL], encoding: 'terrarium', tileSize: 256, maxzoom: 15
+        });
+        map.addLayer({ id: 'terrain-hillshade', type: 'hillshade', source: 'genoa:dem',
+          layout: { visibility: 'none' },
+          paint: {
+            'hillshade-exaggeration':          0.45,
+            'hillshade-shadow-color':          '#02070c',
+            'hillshade-highlight-color':       '#41566a',
+            'hillshade-accent-color':          '#0a1a27',
+            'hillshade-illumination-direction': 315
+          } });
+      }
+
       // Tree-canopy density field — graduated green dots, drawn at the
       // BOTTOM of the data stack (under contours/stations/towers) as
       // environmental context.  Loaded on demand by the canopy effect.
@@ -330,6 +350,7 @@ export default function MapView({ onStatus, selected, overlays }){
     ['contours-fill', 'contours-glow', 'contours-line'].forEach(id => vis(id, overlays.contours !== false));
     ['towers-pulse', 'towers-core'].forEach(id => vis(id, overlays.towers !== false));
     vis('canopy-heat', overlays.canopy === true);   // opt-in, default off
+    vis('terrain-hillshade', overlays.terrain === true);   // opt-in, default off
   }, [ready, overlays]);
 
   // Tree-canopy overlay — sampled on demand (it's expensive).  Fetches the
