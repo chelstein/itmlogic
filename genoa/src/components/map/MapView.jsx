@@ -192,12 +192,16 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
         'city_54dbu',    '#f0b53f',
         'protected_40dbu', '#c08a2a',
         /* default */    '#9a7b2e'];
-      // Per-contour relative weight (service = inner = strongest).  The
-      // outer protected contour stays clearly readable (≥0.7) rather than
-      // fading out, so the station's footprint reads at a glance.
+      // Per-contour relative weight (service = inner = strongest), used only
+      // where there's no zoom term (glow width).  Where a property also
+      // varies with zoom, the zoom-interpolate MUST be top-level and the
+      // per-contour value lives in each stop as a match — MapLibre forbids a
+      // nested 'zoom' subexpression.
       const contourWeight = ['match', ['get', 'contour_id'],
         'service_60dbu', 1.0, 'city_54dbu', 0.85, 'protected_40dbu', 0.7, 0.8];
-      const zoomFactor = ['interpolate', ['linear'], ['zoom'], 5, 0.9, 9, 1.2, 13, 1.9];
+      // [service, city, protected, default] → a contour_id match expression.
+      const byContour = (s, c, p, d) => ['match', ['get', 'contour_id'],
+        'service_60dbu', s, 'city_54dbu', c, 'protected_40dbu', p, d];
       if (!map.getSource('genoa:contours')){
         // Starts empty; the selected-report effect sets the data.
         map.addSource('genoa:contours', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
@@ -207,11 +211,17 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
         map.addLayer({ id: 'contours-glow', type: 'line', source: 'genoa:contours',
           paint: { 'line-color': contourColor, 'line-blur': 4.5,
                    'line-width': ['*', contourWeight, 9],
-                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.32, 11, 0.55]] } });
+                   'line-opacity': ['interpolate', ['linear'], ['zoom'],
+                     5,  byContour(0.34, 0.28, 0.20, 0.26),
+                     11, byContour(0.55, 0.45, 0.34, 0.40)] } });
         map.addLayer({ id: 'contours-line', type: 'line', source: 'genoa:contours',
           paint: { 'line-color': contourColor,
-                   'line-width': ['*', contourWeight, ['*', 2.8, zoomFactor]],
-                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.85, 11, 1.0]] } });
+                   'line-width': ['interpolate', ['linear'], ['zoom'],
+                     5,  byContour(2.5, 2.0, 1.6, 1.9),
+                     13, byContour(5.5, 4.6, 3.8, 4.2)],
+                   'line-opacity': ['interpolate', ['linear'], ['zoom'],
+                     5,  byContour(0.90, 0.78, 0.62, 0.72),
+                     11, byContour(1.0, 0.90, 0.78, 0.85)] } });
 
         // Hover tooltip (contour name + field strength) and click → detail.
         const cHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
