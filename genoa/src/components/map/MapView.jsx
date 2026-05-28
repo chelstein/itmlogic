@@ -192,24 +192,26 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
         'city_54dbu',    '#f0b53f',
         'protected_40dbu', '#c08a2a',
         /* default */    '#9a7b2e'];
-      // Per-contour relative weight (service = inner = strongest).
+      // Per-contour relative weight (service = inner = strongest).  The
+      // outer protected contour stays clearly readable (≥0.7) rather than
+      // fading out, so the station's footprint reads at a glance.
       const contourWeight = ['match', ['get', 'contour_id'],
-        'service_60dbu', 1.0, 'city_54dbu', 0.75, 'protected_40dbu', 0.55, 0.7];
-      const zoomFactor = ['interpolate', ['linear'], ['zoom'], 5, 0.8, 9, 1.1, 13, 1.7];
+        'service_60dbu', 1.0, 'city_54dbu', 0.85, 'protected_40dbu', 0.7, 0.8];
+      const zoomFactor = ['interpolate', ['linear'], ['zoom'], 5, 0.9, 9, 1.2, 13, 1.9];
       if (!map.getSource('genoa:contours')){
         // Starts empty; the selected-report effect sets the data.
         map.addSource('genoa:contours', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
         map.addLayer({ id: 'contours-fill', type: 'fill', source: 'genoa:contours',
           paint: { 'fill-color': contourColor,
-                   'fill-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.03, 11, 0.08] } });
+                   'fill-opacity': ['interpolate', ['linear'], ['zoom'], 5, 0.06, 11, 0.13] } });
         map.addLayer({ id: 'contours-glow', type: 'line', source: 'genoa:contours',
-          paint: { 'line-color': contourColor, 'line-blur': 4,
-                   'line-width': ['*', contourWeight, 6],
-                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.18, 11, 0.4]] } });
+          paint: { 'line-color': contourColor, 'line-blur': 4.5,
+                   'line-width': ['*', contourWeight, 9],
+                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.32, 11, 0.55]] } });
         map.addLayer({ id: 'contours-line', type: 'line', source: 'genoa:contours',
           paint: { 'line-color': contourColor,
-                   'line-width': ['*', contourWeight, ['*', 2.2, zoomFactor]],
-                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.7, 11, 1.0]] } });
+                   'line-width': ['*', contourWeight, ['*', 2.8, zoomFactor]],
+                   'line-opacity': ['*', contourWeight, ['interpolate', ['linear'], ['zoom'], 5, 0.85, 11, 1.0]] } });
 
         // Hover tooltip (contour name + field strength) and click → detail.
         const cHover = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
@@ -240,6 +242,26 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
             properties: p, lngLat: ev.lngLat
           });
         });
+      }
+
+      // Selected-station focus marker — a cobalt highlight ring + call label
+      // at the centre of the contour set, so the station the study belongs to
+      // is unmistakable.  Set per report by the selected-report effect.
+      if (!map.getSource('genoa:focus')){
+        map.addSource('genoa:focus', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+        map.addLayer({ id: 'focus-halo', type: 'circle', source: 'genoa:focus',
+          paint: { 'circle-color': '#4fd1ff', 'circle-opacity': 0.10, 'circle-blur': 0.6,
+                   'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 10, 11, 20] } });
+        map.addLayer({ id: 'focus-ring', type: 'circle', source: 'genoa:focus',
+          paint: { 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#7fe0ff',
+                   'circle-stroke-width': 2.4, 'circle-stroke-opacity': 0.95,
+                   'circle-radius': ['interpolate', ['linear'], ['zoom'], 5, 5, 11, 8] } });
+        map.addLayer({ id: 'focus-label', type: 'symbol', source: 'genoa:focus',
+          layout: {
+            'text-field': ['get', 'call'], 'text-size': 12, 'text-offset': [0, 1.3],
+            'text-anchor': 'top', 'text-font': ['Noto Sans Regular'], 'text-allow-overlap': true
+          },
+          paint: { 'text-color': '#cfeefc', 'text-halo-color': '#001018', 'text-halo-width': 1.4 } });
       }
 
       for (const L of LAYERS){
@@ -461,6 +483,15 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
     const cSrc = map.getSource('genoa:contours');
     const tSrc = map.getSource('genoa:towers');
     const iSrc = map.getSource('genoa:interference');
+    const fSrc = map.getSource('genoa:focus');
+    const focusAt = (lng, lt) => {
+      if (fSrc && fSrc.setData && Number.isFinite(lng) && Number.isFinite(lt)){
+        fSrc.setData({ type: 'FeatureCollection', features: [{
+          type: 'Feature', geometry: { type: 'Point', coordinates: [lng, lt] },
+          properties: { call: selected.call || selected.facility_id || '' }
+        }] });
+      }
+    };
     const url = `${CONTOURS_URL}?exhibit=${encodeURIComponent(selected.id)}`;
     const lat = Number(selected.lat), lon = Number(selected.lon);
     let cancelled = false;
@@ -509,11 +540,15 @@ export default function MapView({ onStatus, selected, overlays, onSelectFeature,
         if (b){
           map.fitBounds(b, { padding: 64, maxZoom: 11, duration: 900 });
           const cLng = (b[0][0] + b[1][0]) / 2, cLat = (b[0][1] + b[1][1]) / 2;
+          // Highlight the station: its own coords when known, else the
+          // contour centroid.
+          focusAt(Number.isFinite(lon) ? lon : cLng, Number.isFinite(lat) ? lat : cLat);
           const spanLatM = (b[1][1] - b[0][1]) * 111_320;
           const spanLonM = (b[1][0] - b[0][0]) * 111_320 * Math.cos(cLat * Math.PI / 180);
           const radius_m = Math.min(200_000, Math.max(40_000, Math.hypot(spanLatM, spanLonM) / 2 * 1.15));
           loadTowers(cLng, cLat, radius_m);
         } else {
+          focusAt(lon, lat);
           flyToStation();
           loadTowers(lon, lat, 75_000);
         }
