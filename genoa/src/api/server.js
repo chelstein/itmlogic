@@ -33,6 +33,7 @@ import amColocationOpportunitiesRoutes from './routes/amColocationOpportunities.
 import authRoutes       from './routes/auth.js';
 import tileRoutes       from './routes/tiles.js';
 import basemapRoutes    from './routes/basemap.js';
+import mapDataRoutes    from './routes/mapData.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
 import { migrate }   from '../db/migrate.js';
@@ -89,6 +90,11 @@ app.use('/basemap', basemapRoutes);
 // requireAuth gate so the login endpoint itself isn't gated.  Any
 // /api path that isn't /api/auth/* falls through to requireAuth.
 app.use('/api', authRoutes);
+
+// Public live-map data (GeoJSON for MapLibre sources) — FCC contour
+// geometry, not sensitive; mounted before the auth gate so the map's
+// same-origin GeoJSON fetch never hits a 401.
+app.use('/api', mapDataRoutes);
 
 // Auth gate for every other /api/* route.  Health (mounted at root,
 // not under /api) and the static UI bundle remain public; the React
