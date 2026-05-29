@@ -168,6 +168,7 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
           <Card title="Self-validating">Every exhibit carries a validation verdict: golden-suite curve checks, live geo.fcc.gov parity, and FORTRAN parity — visible to the reviewer.</Card>
           <Card title="AI consistency audit">An automated reviewer, grounded in the verbatim Part 73 rule text, flags internal contradictions for the engineer of record.</Card>
           <Card title="Engineer-of-record ready">Genoa does the deterministic computation and evidence assembly; a qualified broadcast engineer reviews and certifies. It never certifies on its own.</Card>
+          <Card title="Adversarially tested">Genoa's RF Engineering Agent was subjected to adversarial testing using NVIDIA Garak, an industry-recognized LLM red-teaming framework. The agent consistently maintained domain boundaries, rejected non-engineering prompts, and corrected false technical assertions within its area of expertise.</Card>
         </div>
       </Section>
 
