@@ -49,17 +49,32 @@ export function snapshot(exhibit){
     lines.push(`engineering_conclusion=${exhibit.engineering_conclusion.conclusion}`);
   if (hv.status) lines.push(`haat_status=${hv.status} haat_basis=${hv.basis || '?'}`);
   const s = hv.stats || {};
-  if (s.min_m != null && s.max_m != null)
-    lines.push(`haat_per_radial_range=[${s.min_m}, ${s.max_m}] mean=${s.mean_m} operator=${s.operator_m}`);
-  // Contour distance spread — the flat-HAAT-but-varying-distance tell.
+  if (s.min_m != null && s.max_m != null){
+    // Clarify which HAAT value is actually operative so the AI doesn't
+    // flag a false inconsistency between operator-entered and terrain-derived.
+    const basis = hv.basis || '?';
+    const operativeHaat = basis === 'terrain_derived' ? s.mean_m : s.operator_m;
+    lines.push(`haat_per_radial_range=[${s.min_m}, ${s.max_m}] mean=${s.mean_m} operator_entered=${s.operator_m} haat_operative_for_filing=${operativeHaat} (${basis})`);
+  }
+  // When regulatory_pass is false, name the failing component(s) explicitly so
+  // the AI can distinguish interference-rule failures from HAAT/curve failures.
+  if (exhibit?.regulatory_compliance?.pass === false){
+    const failed = (v.components || []).filter(c => c?.status === 'FAIL').map(c => c.name);
+    if (failed.length) lines.push(`regulatory_fail_reason=${failed.join(',')}`);
+  }
+  // Contour distance spread — computed per contour type so the AI compares
+  // min/max within the same contour, not across service vs protected contours.
   const rt = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];
-  const dvals = [];
+  const perContour = {};
   for (const r of rt){
     const cd = r?.contour_distances_km || {};
-    for (const k of Object.keys(cd)){ const d = Number(cd[k]); if (Number.isFinite(d)) dvals.push(d); }
+    for (const k of Object.keys(cd)){
+      const d = Number(cd[k]);
+      if (Number.isFinite(d)){ (perContour[k] = perContour[k] || []).push(d); }
+    }
   }
-  if (dvals.length){
-    lines.push(`contour_distance_spread_km=[${Math.min(...dvals).toFixed(2)}, ${Math.max(...dvals).toFixed(2)}]`);
+  for (const [k, vals] of Object.entries(perContour)){
+    lines.push(`contour_${k}_spread_km=[${Math.min(...vals).toFixed(2)}, ${Math.max(...vals).toFixed(2)}]`);
   }
   return lines.join('\n');
 }
