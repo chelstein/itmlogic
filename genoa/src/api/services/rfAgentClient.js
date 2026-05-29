@@ -73,8 +73,6 @@ function baseUrl(){
  *                                    section name + intent)
  * @param {object}  [opts.grounding]  deterministic values for the agent to
  *                                    reference (serialized into the prompt)
- * @param {number}  [opts.maxTokens]  default 700
- * @param {number}  [opts.temperature] default 0.2
  * @param {number}  [opts.timeoutMs]  default 30s
  * @returns {Promise<{available:boolean, text?:string,
  *                    citations?:Array, model?:string, error?:string}>}
