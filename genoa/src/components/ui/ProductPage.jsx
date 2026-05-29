@@ -62,8 +62,12 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
         <p className="text-textDim text-lg max-w-2xl mx-auto leading-relaxed">
           Genoa turns a broadcast station's parameters into a complete, filing-ready
           FCC engineering statement — the kind of coverage-and-interference study that
-          normally takes a consulting RF firm weeks — with every number self-checked
-          against the FCC's own reference engine.
+          traditionally requires specialized consulting software, terrain analysis, and
+          engineering review.
+        </p>
+        <p className="text-cream font-semibold text-base max-w-2xl mx-auto mt-4 leading-relaxed">
+          Every engineering exhibit is independently validated against FCC reference
+          calculations before report generation.
         </p>
         <p className="text-cream/90 text-base max-w-2xl mx-auto mt-5 font-medium">
           Less manual work. Faster answers. More confidence before you file.
@@ -164,11 +168,11 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
       {/* Why it's different */}
       <Section eyebrow="Why it's different" title="Built to be trusted, not just generated">
         <div className="grid sm:grid-cols-2 gap-4">
-          <Card title="Deterministic & reproducible">Same inputs always produce the same numbers — SHA-256 hashed with replay tokens, so any exhibit can be independently re-verified.</Card>
+          <Card title="Deterministic First">AI assists with review and consistency checking. Engineering calculations are performed by deterministic FCC-compliant algorithms, ensuring identical inputs always produce identical engineering results.</Card>
           <Card title="Self-validating">Every exhibit carries a validation verdict: golden-suite curve checks, live geo.fcc.gov parity, and FORTRAN parity — visible to the reviewer.</Card>
           <Card title="AI consistency audit">An automated reviewer, grounded in the verbatim Part 73 rule text, flags internal contradictions for the engineer of record.</Card>
           <Card title="Engineer-of-record ready">Genoa does the deterministic computation and evidence assembly; a qualified broadcast engineer reviews and certifies. It never certifies on its own.</Card>
-          <Card title="Adversarially tested">Genoa's RF Engineering Agent was subjected to adversarial testing using NVIDIA Garak, an industry-recognized LLM red-teaming framework. The agent consistently maintained domain boundaries, rejected non-engineering prompts, and corrected false technical assertions within its area of expertise.</Card>
+          <Card title="AI Assurance Testing">Genoa's RF Engineering Agent has undergone adversarial prompt-injection and instruction-override testing using NVIDIA Garak. During testing, the agent maintained RF-engineering scope boundaries, rejected non-engineering requests, resisted prompt-injection attempts, and correctly challenged false technical assertions within its domain.</Card>
         </div>
       </Section>
 
