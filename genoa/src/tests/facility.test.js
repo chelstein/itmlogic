@@ -255,3 +255,116 @@ test('Missing fields stay null (no fabrication)', async () => {
     assert.equal(r.facility.haat_m, null);
   } finally { restore(); }
 });
+
+// ---- normalizeZtrRow AM directional field passthrough ----
+
+const KNUV_ZTR_ROW = {
+  id: 456, source: 'fcc', kind: 'am', callsign: 'KNUV', station_name: 'KNUV',
+  frequency_khz: 1190, facility_id: '12345',
+  latitude: 33.4, longitude: -112.1,
+  power_watts: 10000, haat_m: null,
+  status: 'L', licensee: 'Test Licensee', city: 'Phoenix', state: 'AZ', country_code: 'US'
+};
+
+test('normalizeZtrRow passes through day_power_kw when present', async () => {
+  const row = { ...KNUV_ZTR_ROW, day_power_kw: 2.8 };
+  const restore = mockFetch(() => jsonResp({ rows: [row] }));
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
+    const r = await c.getById('12345');
+    assert.equal(r.facility.day_power_kw, 2.8);
+  } finally { restore(); }
+});
+
+test('normalizeZtrRow passes through pattern_mode when present', async () => {
+  const row = { ...KNUV_ZTR_ROW, pattern_mode: 'DA' };
+  const restore = mockFetch(() => jsonResp({ rows: [row] }));
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
+    const r = await c.getById('12345');
+    assert.equal(r.facility.pattern_mode, 'DA');
+  } finally { restore(); }
+});
+
+test('normalizeZtrRow returns null for day_power_kw when absent', async () => {
+  const restore = mockFetch(() => jsonResp({ rows: [KNUV_ZTR_ROW] }));
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
+    const r = await c.getById('12345');
+    assert.equal(r.facility.day_power_kw, null);
+  } finally { restore(); }
+});
+
+test('normalizeZtrRow passes through pattern_day array when present', async () => {
+  const patternDay = [[0, 1.0], [90, 0.8]];
+  const row = { ...KNUV_ZTR_ROW, pattern_day: patternDay };
+  const restore = mockFetch(() => jsonResp({ rows: [row] }));
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', fmqClient: null });
+    const r = await c.getById('12345');
+    assert.deepEqual(r.facility.pattern_day, patternDay);
+  } finally { restore(); }
+});
+
+// ---- normalizeN8nRow AM directional field passthrough ----
+
+const KNUV_N8N_ROW = {
+  facility_id: '12345', call: 'KNUV', service: 'AM', frequency: 1190,
+  erp_kw: 10, haat_m: null, lat: 33.4, lon: -112.1
+};
+
+test('normalizeN8nRow passes through day_power_kw when present', async () => {
+  const row = { ...KNUV_N8N_ROW, day_power_kw: 2.8 };
+  const restore = mockFetch((url, opts) => {
+    if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [] });
+    if (url.includes('/webhook/station/analyze')) return jsonResp({ rows: [row] });
+    throw new Error('unexpected url ' + url);
+  });
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test', fmqClient: null });
+    const r = await c.searchByQuery('KNUV');
+    assert.equal(r.rows[0].day_power_kw, 2.8);
+  } finally { restore(); }
+});
+
+test('normalizeN8nRow passes through pattern_mode when present', async () => {
+  const row = { ...KNUV_N8N_ROW, pattern_mode: 'DA' };
+  const restore = mockFetch((url) => {
+    if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [] });
+    if (url.includes('/webhook/station/analyze')) return jsonResp({ rows: [row] });
+    throw new Error('unexpected url ' + url);
+  });
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test', fmqClient: null });
+    const r = await c.searchByQuery('KNUV');
+    assert.equal(r.rows[0].pattern_mode, 'DA');
+  } finally { restore(); }
+});
+
+test('normalizeN8nRow returns null for day_power_kw when absent', async () => {
+  const restore = mockFetch((url) => {
+    if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [] });
+    if (url.includes('/webhook/station/analyze')) return jsonResp({ rows: [KNUV_N8N_ROW] });
+    throw new Error('unexpected url ' + url);
+  });
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test', fmqClient: null });
+    const r = await c.searchByQuery('KNUV');
+    assert.equal(r.rows[0].day_power_kw, null);
+  } finally { restore(); }
+});
+
+test('normalizeN8nRow passes through pattern_day array when present', async () => {
+  const patternDay = [[0, 1.0], [90, 0.8]];
+  const row = { ...KNUV_N8N_ROW, pattern_day: patternDay };
+  const restore = mockFetch((url) => {
+    if (url.includes('/api/broadcast/stations')) return jsonResp({ rows: [] });
+    if (url.includes('/webhook/station/analyze')) return jsonResp({ rows: [row] });
+    throw new Error('unexpected url ' + url);
+  });
+  try {
+    const c = makeFacilityClient({ ztrUrl: 'http://ztr.test', n8nBaseUrl: 'http://n8n.test', fmqClient: null });
+    const r = await c.searchByQuery('KNUV');
+    assert.deepEqual(r.rows[0].pattern_day, patternDay);
+  } finally { restore(); }
+});

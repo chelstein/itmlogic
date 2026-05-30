@@ -1019,6 +1019,17 @@ function normalizeZtrRow(row, endpoint){
     country_code:    row.country_code || null,
     licensee:        row.licensee || null,
     status:          row.status   || null,
+    // AM directional / power fields — pass through when present on the ZTR
+    // row; null otherwise.  These are needed for DA-2 stations (e.g. KNUV)
+    // so exhibitService can wire them to inputs without the engineer having
+    // to enter them manually.  Never fabricated — null beats a wrong value.
+    day_power_kw:            num(row.day_power_kw) ?? num(row.power_day_kw) ?? null,
+    night_power_kw:          num(row.night_power_kw) ?? num(row.power_night_kw) ?? null,
+    critical_hours_power_kw: num(row.critical_hours_power_kw) ?? null,
+    pattern_mode:            row.pattern_mode || row.am_pattern_mode || null,
+    pattern_day:             Array.isArray(row.pattern_day)      ? row.pattern_day      : null,
+    pattern_night:           Array.isArray(row.pattern_night)    ? row.pattern_night    : null,
+    pattern_critical:        Array.isArray(row.pattern_critical) ? row.pattern_critical : null,
     facility_lookup_source: {
       upstream:              'zerotrustradio',
       endpoint:              endpoint,
@@ -1078,6 +1089,15 @@ function normalizeN8nRow(row, endpoint){
     country_code:    row.country_code || null,
     licensee:        row.licensee || null,
     status:          row.status || null,
+    // AM directional / power fields — handle both snake_case and camelCase
+    // since N8N workflow field naming conventions vary across operators.
+    day_power_kw:            num(row.day_power_kw ?? row.dayPowerKw) ?? num(row.power_day_kw ?? row.powerDayKw) ?? null,
+    night_power_kw:          num(row.night_power_kw ?? row.nightPowerKw) ?? num(row.power_night_kw ?? row.powerNightKw) ?? null,
+    critical_hours_power_kw: num(row.critical_hours_power_kw ?? row.criticalHoursPowerKw) ?? null,
+    pattern_mode:            row.pattern_mode || row.patternMode || row.am_pattern_mode || row.amPatternMode || null,
+    pattern_day:             Array.isArray(row.pattern_day   ?? row.patternDay)   ? (row.pattern_day   ?? row.patternDay)   : null,
+    pattern_night:           Array.isArray(row.pattern_night ?? row.patternNight) ? (row.pattern_night ?? row.patternNight) : null,
+    pattern_critical:        Array.isArray(row.pattern_critical ?? row.patternCritical) ? (row.pattern_critical ?? row.patternCritical) : null,
     facility_lookup_source: {
       upstream:   'n8n',
       endpoint,

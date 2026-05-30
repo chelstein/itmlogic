@@ -256,6 +256,13 @@ export async function computeExhibit(req){
       fillIfMissing('haat_m',          facility.haat_m);
       fillIfMissing('lat',             facility.lat);
       fillIfMissing('lon',             facility.lon);
+      fillIfMissing('day_power_kw',            facility.day_power_kw);
+      fillIfMissing('night_power_kw',          facility.night_power_kw);
+      fillIfMissing('critical_hours_power_kw', facility.critical_hours_power_kw);
+      fillIfMissing('pattern_mode',            facility.pattern_mode);
+      fillIfMissing('pattern_day',             facility.pattern_day);
+      fillIfMissing('pattern_night',           facility.pattern_night);
+      fillIfMissing('pattern_critical',        facility.pattern_critical);
       facilityResolution = { source, facility };
     }
   }
