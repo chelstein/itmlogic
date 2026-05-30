@@ -99,6 +99,10 @@ export const WARNING_CODES = Object.freeze({
     title: 'Facility lookup unavailable',
     description: 'Read-only facility database (zerotrustradio) was not reachable. Facility metadata is not validated.' },
 
+  CP_LOOKUP_FALLBACK:            { severity: 'warning', phase: 'sidecar',
+    title: 'CP pending-application lookup fell back to licensed record',
+    description: 'A study_mode=\'cp\' request was made but no pending or granted-no-construction application was found in the FCC LMS pending-applications database for this facility ID.  The licensed record was used instead.  If the CP application was recently filed, retry after the FCC\'s LMS indexing delay (typically 24–48 h).  CP parameters (power, pattern) may need to be entered manually.' },
+
   RADIODNS_VALIDATION_UNAVAILABLE: { severity: 'warning', phase: 'sidecar',
     title: 'RadioDNS validation unavailable',
     description: 'RadioDNS resolver did not respond. Hybrid-radio identity is not confirmed.' },

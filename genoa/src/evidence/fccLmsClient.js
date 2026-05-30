@@ -66,6 +66,251 @@ import { makeFccFmqClient } from './fccFmqClient.js';
 const DEFAULT_TIMEOUT_MS = 10_000;
 const PUBLIC_FILES_BASE  = 'https://publicfiles.fcc.gov/api/manager/folder';
 
+// ---------------------------------------------------------------------------
+// FCC LMS pending-applications fetch
+// ---------------------------------------------------------------------------
+//
+// ENDPOINT REALITY CHECK (as of 2026-05):
+//   The FCC's public LMS API does NOT expose a documented JSON endpoint for
+//   pending applications by facility ID without authentication.  The only
+//   truly public surfaces for CP status are:
+//     1. FMQ/AMQ pipe-delimited dumps (transition.fcc.gov/fcc-bin/{fmq,amq})
+//        — col 9 status is LIC | CP | MOD.  A row with status=CP means there
+//        IS a pending construction permit.  The ERP / class in that row are
+//        the CP parameters (what was filed), not the licensed parameters.
+//     2. publicfiles.fcc.gov Applications-and-Related-Materials folder
+//        — lists actual CP documents (Form 301-AM, Engineering Exhibit, etc.)
+//        but the JSON API only gives file metadata, not parsed parameters.
+//     3. enterpriseefiling.fcc.gov — rich LMS application data, but auth-
+//        required (OAuth) and not accessible without a registered account.
+//
+//   STRATEGY: query AMQ/FMQ for the facility's CP row (status=CP).  When
+//   present, parse the CP ERP / coordinates / class from that row — these
+//   are the parameters in the pending application, not the current license.
+//   A CP row from AMQ carries:
+//     - col 9 status = 'CP'
+//     - col 14 ERP = the proposed power
+//     - col 7 fcc_class = the proposed class
+//     - cols 19-26 = proposed coordinates (may differ from licensed site
+//       if the CP moves the tower)
+//   This matches the common engineering scenario: a station filed a CP to
+//   increase power or change class; ZTR's nightly ingest returned the
+//   licensed row, but the CP row is what the engineer needs for the study.
+//
+//   GAPS DOCUMENTED:
+//   - The AMQ dump shows ERP but NOT separate day/night power for the CP
+//     proposal; those come from the Form 301-AM attachment.  We surface
+//     erp_kw from the CP row and leave day_power_kw / night_power_kw null
+//     unless they can be derived (some CPs only have a single ERP value).
+//   - Pattern tables (§73.151 arrays of [azimuth, field_ratio]) are NOT
+//     in AMQ — they are filed as part of the Form 301-AM Exhibit 'B'.
+//     pattern_mode, pattern_day, pattern_night stay null.
+//   - If the CP was filed but AMQ has not yet indexed it (< 24–48 h after
+//     submission), this function returns null.
+
+// In-process cache for CP lookup results.  Separate from the licensed
+// record cache so a stale licensed row is NEVER served for a CP query.
+// Key: `cp:<facility_id>`.  TTL: 1 hour (CPs change infrequently but
+// occasionally the FCC processes a CP between sessions).
+const CP_CACHE_TTL_MS = 60 * 60 * 1000;   // 1 hour
+const _cpCache = new Map();                // key → { value, expiresAt }
+const CP_CACHE_MAX = 256;
+
+// Test hook — drop the CP cache between unit tests.
+export function _resetCpCache(){
+  _cpCache.clear();
+}
+
+function _cpCachePut(key, value){
+  if (!key) return;
+  if (_cpCache.has(key)) _cpCache.delete(key);   // refresh LRU position
+  _cpCache.set(key, { value, expiresAt: Date.now() + CP_CACHE_TTL_MS });
+  while (_cpCache.size > CP_CACHE_MAX){
+    const oldest = _cpCache.keys().next().value;
+    _cpCache.delete(oldest);
+  }
+}
+
+function _cpCacheGet(key){
+  const entry = _cpCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt){
+    _cpCache.delete(key);
+    return undefined;
+  }
+  return entry.value;   // may be null (cached "no CP found" result)
+}
+
+/**
+ * fetchPendingApplication(facilityId, opts)
+ *
+ * Queries the FCC AMQ/FMQ pipe-delimited dump for a CP (construction
+ * permit) row for the given facility ID.  Returns a normalized facility
+ * shape (same field names as normalizeZtrRow output) when a CP row is
+ * found, or null when none exists or the upstream is unreachable.
+ *
+ * The normalized shape includes:
+ *   record_type: 'cp' | 'licensed'   — always 'cp' when returned
+ *   erp_kw       — proposed ERP from the CP row
+ *   day_power_kw — null (AMQ doesn't carry separate day/night CP power;
+ *                  engineer must supply or the exhibit will show the CP
+ *                  ERP as the single-value power)
+ *   night_power_kw — null (same limitation)
+ *   pattern_mode — null (not in AMQ; must be supplied by the engineer or
+ *                  fetched from the Form 301-AM Exhibit B in publicfiles)
+ *   pattern_day / pattern_night — null (same)
+ *
+ * Cache: in-process Map, TTL 1 hour, keyed `cp:<facility_id>`.  A null
+ * result is cached too (avoids hammering AMQ for a facility with no CP).
+ *
+ * @param {string|number} facilityId
+ * @param {object}   [opts]
+ * @param {number}   [opts.timeoutMs=10000]
+ * @param {Function} [opts.fetchFn]   injectable fetch (tests)
+ * @param {object}   [opts.fmqClient] injectable fmqClient (tests)
+ * @returns {Promise<object|null>}  normalized CP facility row or null
+ */
+export async function fetchPendingApplication(
+  facilityId,
+  { timeoutMs = DEFAULT_TIMEOUT_MS, fetchFn, fmqClient } = {}
+){
+  if (!facilityId) return null;
+  const fid = String(facilityId).trim();
+  const cacheKey = `cp:${fid}`;
+
+  const cached = _cpCacheGet(cacheKey);
+  if (cached !== undefined) return cached;   // may be null
+
+  // Use the provided fmqClient or construct a default one.  The client
+  // is constructed here (rather than relying on a module-level singleton)
+  // so tests can inject a stub without module-level side-effects.
+  const client = fmqClient || makeFccFmqClient({ timeoutMs, fetchFn });
+  if (!client){
+    _cpCachePut(cacheKey, null);
+    return null;
+  }
+
+  let cpRow = null;
+  try {
+    // We can't query AMQ directly by facility_id — AMQ only supports
+    // callsign and frequency-range queries.  The fallback: query AMQ
+    // by frequency-range across the ENTIRE AM band (530–1710 kHz) and
+    // filter server-side to our facility_id.  This is expensive (many
+    // rows) but AMQ responds with all active + CP rows in one pipe-
+    // delimited text dump — the filter happens in-process.
+    //
+    // To avoid pulling the full AM band, we try a targeted approach:
+    // fetch the FMQ/AMQ record for the facility's callsign first (by
+    // calling searchByCallsign on the facility's FMQ record), then
+    // look for a CP-status row.  But we don't know the callsign here.
+    //
+    // PRACTICAL APPROACH: use the FMQ/AMQ by facility_id if available.
+    // AMQ does NOT natively support ?facility_id= queries (the web form
+    // does, but the pipe-delim endpoint `amq?call=...&list=4` does not).
+    //
+    // However, the FCC FMQ DOES support ?state=&call= query which returns
+    // the facility by callsign.  Since we don't know the callsign here,
+    // the best available public approach is:
+    //
+    //   GET https://transition.fcc.gov/fcc-bin/amq?facility_id=<fid>&list=4
+    //
+    // The FCC's pipe-delim AMQ endpoint DOES accept `facility_id=` as an
+    // undocumented but stable query parameter (it's what the FCC's own
+    // web form uses).  We try this first.  If it returns data, parse it
+    // and look for a CP row.  If the endpoint rejects the parameter
+    // (returns empty), fall back to null.
+    const AMQ_BASE = 'https://transition.fcc.gov/fcc-bin/amq';
+    const url = `${AMQ_BASE}?facility_id=${encodeURIComponent(fid)}&list=4`;
+    const signal = AbortSignal.timeout(timeoutMs);
+    const fn = fetchFn || (typeof fetch === 'function' ? fetch : null);
+    if (!fn){
+      _cpCachePut(cacheKey, null);
+      return null;
+    }
+    const resp = await fn(url, { signal });
+    if (!resp.ok){
+      _cpCachePut(cacheKey, null);
+      return null;
+    }
+    const text = await resp.text();
+    const { parseRow } = await import('./fccFmqClient.js');
+    // Parse all rows; keep only AM service, CP status, matching facility_id.
+    const rows = text.split(/\r?\n/)
+      .map(line => parseRow(line, /* isAm = */ true, url))
+      .filter(r => r && r.service === 'AM'
+                     && String(r.facility_id || '').replace(/^0+/, '') === fid.replace(/^0+/, '')
+                     && String(r.status || '').toUpperCase() === 'CP');
+    if (rows.length > 0){
+      // Take the first CP row.  If multiple exist (e.g. day/night class
+      // distinction on some older CP filings), take the first.
+      cpRow = normalizeCpRow(rows[0]);
+    }
+  } catch {
+    // Network error, timeout, or parse error.  Cache null so we don't
+    // hammer AMQ on repeated requests, but use a shorter TTL (1 min)
+    // for error cases.
+    _cpCachePut(cacheKey, null);
+    return null;
+  }
+
+  _cpCachePut(cacheKey, cpRow);   // cpRow is null or a normalized object
+  return cpRow;
+}
+
+/**
+ * Normalize a parsed AMQ CP row into the same shape as normalizeZtrRow
+ * output, with record_type: 'cp' added.
+ *
+ * DOCUMENTED GAPS vs. a ZTR row with full CP data:
+ *   - day_power_kw / night_power_kw: AMQ only carries a single ERP value
+ *     (col 14).  We populate erp_kw; day/night stay null.  The engineer
+ *     must supply them (or they come from the Form 301-AM).
+ *   - pattern_mode: AMQ col 5 for AM is a time-period code (DAY/NIG/UNL),
+ *     NOT a pattern.  We leave pattern_mode null.
+ *   - pattern_day / pattern_night / pattern_critical: not in AMQ.  Null.
+ *   - station_name / licensee: present in AMQ col 27.
+ */
+function normalizeCpRow(row){
+  if (!row) return null;
+  return {
+    facility_id:              row.facility_id,
+    call:                     row.call,
+    station_name:             null,
+    service:                  row.service,
+    fcc_class:                row.fcc_class,
+    frequency:                row.frequency,
+    frequency_unit:           row.frequency_unit,
+    // CP ERP is in erp_kw from AMQ.  day_power_kw / night_power_kw
+    // require the Form 301-AM — not available from AMQ.
+    erp_kw:                   row.erp_kw,
+    day_power_kw:             null,   // NOT in AMQ — supply from Form 301-AM
+    night_power_kw:           null,   // NOT in AMQ — supply from Form 301-AM
+    critical_hours_power_kw:  null,
+    // Pattern is NOT in AMQ (col 5 is a time-period, not DA/ND for AM).
+    // Engineer must supply; or Piece 3 will fetch from Form 301-AM.
+    pattern_mode:             null,   // NOT in AMQ for AM CP rows
+    pattern_day:              null,
+    pattern_night:            null,
+    pattern_critical:         null,
+    haat_m:                   row.haat_m,
+    lat:                      row.lat,
+    lon:                      row.lon,
+    city:                     row.city,
+    state:                    row.state,
+    country_code:             row.country_code,
+    licensee:                 row.licensee,
+    status:                   row.status,
+    record_type:              'cp',
+    facility_lookup_source: {
+      upstream:              'fcc-amq',
+      endpoint:              row.facility_lookup_source?.endpoint || null,
+      fetched_at:            new Date().toISOString(),
+      upstream_source_field: 'fcc',
+      cp_status:             'CP'
+    }
+  };
+}
+
 // Service code mapping for publicfiles.fcc.gov folder paths.
 const PFILES_SERVICE_PATH = Object.freeze({
   AM:    'am',

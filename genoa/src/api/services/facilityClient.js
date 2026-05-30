@@ -30,6 +30,7 @@
 const DEFAULT_TIMEOUT_MS = 8_000;
 
 import { makeFccFmqClient } from '../../evidence/fccFmqClient.js';
+import { fetchPendingApplication } from '../../evidence/fccLmsClient.js';
 
 export function makeFacilityClient({
   ztrUrl     = process.env.ZERO_TRUST_RADIO_READONLY_URL || null,
@@ -135,6 +136,59 @@ export function makeFacilityClient({
       const n8n = await callN8nStationAnalyze({ n8nBaseUrl, n8nSecret, timeoutMs, facility_id });
       if (n8n && n8n.rows[0]) return { facility: n8n.rows[0], source: 'n8n' };
       return { facility: null, source: null, error: 'facility not found in any configured source' };
+    },
+
+    /**
+     * getByIdCp(facility_id)
+     *
+     * CP-specific facility lookup.  Checks the in-process CP cache first
+     * (`cp:<facility_id>`, TTL 1 hour), then calls
+     * fetchPendingApplication() to query the FCC AMQ dump for a CP-status
+     * row.  Falls back to the licensed record (via getById) when no CP
+     * is found, emitting a return field `record_type: 'licensed'`.
+     *
+     * Return shape:
+     *   { facility, source, record_type: 'cp' | 'licensed', cp_fallback: bool }
+     *
+     * The caller MUST set inputs.isProposal = true after receiving
+     * record_type 'cp' — this method does not mutate inputs directly.
+     * On CP fallback (record_type 'licensed') the caller should emit a
+     * CP_LOOKUP_FALLBACK warning so the engineer is aware.
+     *
+     * Opt-in only: default getById() is unchanged.  This method is called
+     * exclusively when options.study_mode === 'cp' or inputs.isProposal.
+     */
+    async getByIdCp(facility_id){
+      if (!facility_id) return { facility: null, source: null, record_type: null, error: 'facility_id required' };
+
+      // fetchPendingApplication handles its own in-process cache.
+      let cpFacility = null;
+      try {
+        cpFacility = await fetchPendingApplication(facility_id, { timeoutMs });
+      } catch {
+        cpFacility = null;
+      }
+
+      if (cpFacility){
+        // Enrich the CP row with FCC AM class (same as licensed path).
+        const enriched = await enrichAmFromAmq(cpFacility, fmqClient);
+        return {
+          facility:     enriched,
+          source:       enriched.facility_lookup_source?.upstream || 'fcc-amq',
+          record_type:  'cp',
+          cp_fallback:  false
+        };
+      }
+
+      // No CP found — fall back to licensed record.
+      const licensed = await this.getById(facility_id);
+      return {
+        facility:     licensed.facility ? { ...licensed.facility, record_type: 'licensed' } : null,
+        source:       licensed.source,
+        record_type:  'licensed',
+        cp_fallback:  true,
+        error:        licensed.error || null
+      };
     },
 
     // ---- Outcome-A enrichment endpoints (read-only) ----
