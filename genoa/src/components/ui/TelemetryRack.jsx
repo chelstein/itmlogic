@@ -7,6 +7,41 @@ import EngineProvenance      from './EngineProvenance.jsx';
 import MetricReadout         from './MetricReadout.jsx';
 import RegulatoryContextCard from './RegulatoryContextCard.jsx';
 
+// Small inline badge row showing directional_pattern_applied, pattern_source,
+// and study_mode from the latest computed exhibit.  Placed inside Channel B
+// so pattern provenance is always visible next to the main telemetry.
+function PatternBadges({ exhibit }){
+  const dpa = exhibit?.directional_pattern_applied;
+  const src = exhibit?.pattern_source;
+  const sm  = exhibit?.evidence?.am_operating_profile?.study_mode
+           || exhibit?.evidence?.fm_operating_profile?.study_mode;
+  return (
+    <div className="mt-2 flex flex-wrap gap-1 font-mono text-[10px]">
+      <span className={
+        `inline-flex items-center gap-1 px-1.5 py-0.5 rounded ` +
+        (dpa === true
+          ? 'bg-emerald-700/30 text-emerald-300'
+          : 'bg-white/5 text-textDim')
+      }>
+        <span className={dpa === true ? 'text-emerald-400' : 'text-textDim'}>●</span>
+        directional_pattern_applied = {String(dpa ?? '—')}
+      </span>
+      {src && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-300">
+          <span className="text-amber-400">●</span>
+          pattern_source = {src}
+        </span>
+      )}
+      {sm && (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-cyan-500/10 text-cyan-300">
+          <span className="text-cyan-400">●</span>
+          study_mode = {sm}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function TelemetryRack({ exhibit }) {
   const fr   = exhibit?.filing_readiness || {};
   const polys = exhibit?.polygons || [];
@@ -71,6 +106,7 @@ export default function TelemetryRack({ exhibit }) {
         )}
         <MetricReadout label="Lat / Lon"   value={s.lat != null && s.lon != null ? `${Number(s.lat).toFixed(4)}, ${Number(s.lon).toFixed(4)}` : '—'} />
         <MetricReadout label="Radials"     value={(exhibit?.radial_table || []).length || '—'} />
+        {exhibit && <PatternBadges exhibit={exhibit} />}
       </RackPanel>
 
       <RackPanel eyebrow="Channel C" title="Contour Results" tone="amber">
