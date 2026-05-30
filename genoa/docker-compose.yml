@@ -41,6 +41,11 @@ services:
       SPACES_BUCKET:            ""
       SPACES_ACCESS_KEY_ID:     ""
       SPACES_SECRET_ACCESS_KEY: ""
+      # FCCAM Wang 1985 skywave sidecar — set to http://host:8090 when deployed.
+      # Without it, AM NIF falls back to Berry 1968 (screening-grade).
+      FCCAM_SIDECAR_URL:        ""
+      # FAA OE/AAA determination proxy — set to operator-managed bridge URL.
+      FAA_OE_SIDECAR_URL:       ""
     ports: [ "8080:8080" ]
 
   genoa-worker:

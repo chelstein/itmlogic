@@ -1847,6 +1847,91 @@ export async function computeExhibit(req){
     };
   }
 
+  // ---- 8a-2. AM per-contour population for §73.24(g) blanketing ratio ----
+  // The service-polygon fetch above (8a-1) populates the primary count.
+  // §73.24(g) additionally needs blanket_1000mvm and service_25mvm contour
+  // populations; without them the check returns NOT_MEASURED instead of
+  // PASS/FAIL.  Run a second pass for those two contours when the exhibit
+  // is AM and the population sidecar is available.
+  if (service === 'AM' && sidecars.population){
+    const byContour = {};
+    for (const contourId of ['blanket_1000mvm', 'service_25mvm', 'international_25mvm']){
+      // Skip if we already have a number for this contour id.
+      const alreadyHave = exhibit.population_estimate?.by_contour?.[contourId];
+      if (Number.isFinite(alreadyHave) || Number.isFinite(alreadyHave?.persons)) continue;
+
+      const poly = (exhibit.polygons || []).find(
+        p => p.contour_id === contourId && p.closed && p.ring_latlng?.length >= 4);
+      const feat = (exhibit.geojson?.features || []).find(
+        f => f.properties?.contour_id === contourId);
+      if (!poly || !feat) continue;
+      try {
+        const resp = await sidecars.population.populationForContour({
+          geojson:       feat,
+          contour_label: contourId
+        });
+        if (resp?.available && Number.isFinite(resp.persons)){
+          byContour[contourId] = resp.persons;
+        } else if (resp && !resp.available){
+          byContour[contourId] = {
+            error:  resp.error || 'population sidecar unavailable',
+            source: 'DATA SOURCE ERROR'
+          };
+        }
+      } catch (e){
+        byContour[contourId] = { error: String(e.message), source: 'DATA SOURCE ERROR' };
+      }
+    }
+    if (Object.keys(byContour).length){
+      exhibit.population_estimate = {
+        ...(exhibit.population_estimate || {}),
+        by_contour: { ...(exhibit.population_estimate?.by_contour || {}), ...byContour }
+      };
+    }
+  }
+
+  // ---- 8a-3. AM community boundary auto-fetch for §73.24(j) ----
+  // §73.24(j) needs the legal city boundary polygon to check whether
+  // the 5 mV/m contour encompasses the community.  When the operator
+  // hasn't supplied community_boundary_geojson, attempt to resolve it
+  // automatically via Census TIGER / Nominatim.  Result is stored as
+  // evidence.community_boundary; §73.24(j) reads it from there.
+  if (service === 'AM' && !inputs.community_boundary_geojson
+      && !evidence.community_boundary){
+    try {
+      const { makeCommunityBoundaryClient, parseCommunityState } =
+        await import('../../evidence/communityBoundaryClient.js');
+      const communityRaw = inputs.community_of_license
+                        || inputs.community
+                        || inputs.city_of_license
+                        || null;
+      if (communityRaw){
+        const stateRaw = inputs.state || inputs.state_abbr || null;
+        const { name: communityName, stateAbbr: parsedState } = parseCommunityState(communityRaw);
+        const stateAbbr = (stateRaw || parsedState || '').toUpperCase().trim() || null;
+        const boundaryClient = makeCommunityBoundaryClient();
+        if (boundaryClient){
+          const boundary = await boundaryClient.getByName({
+            community: communityName || communityRaw,
+            state:     stateAbbr
+          });
+          if (boundary.available && boundary.geojson){
+            evidence.community_boundary = boundary.geojson;
+            evidence.community_boundary_meta = {
+              source:    boundary.source,
+              community: boundary.community,
+              state:     boundary.state,
+              geoid:     boundary.geoid  || null,
+              endpoint:  boundary.endpoint || null
+            };
+          } else if (!boundary.available){
+            evidence.community_boundary_error = boundary.error || 'community boundary not found';
+          }
+        }
+      }
+    } catch { /* boundary fetch is fail-soft; §73.24(j) renders NOT_MEASURED */ }
+  }
+
   // ---- 8b. Cross-validate engine output against FCC contour ----
   // The cross-check requires the engine's polygons + station coords,
   // both available now.  If the FCC contour is reachable AND the
