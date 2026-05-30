@@ -83,6 +83,14 @@ services:
       # the URL + bearer token (see chelstein/splat#9) post-deploy.
       - { key: SPLAT_SIDECAR_URL,           scope: RUN_TIME, value: "" }
       - { key: SPLAT_API_TOKEN,             scope: RUN_TIME, type: SECRET, value: "" }
+      # FCCAM (Wang 1985 skywave) — operator deploys src/sidecars/fccam/
+      # (requires Fccam.for from https://www.fcc.gov/media/radio/am-skywave-program)
+      # on a Droplet or App Platform worker; set URL here when live.
+      # When unset, Genoa falls back to Berry 1968 (screening-grade) for AM NIF.
+      - { key: FCCAM_SIDECAR_URL,           scope: RUN_TIME, value: "" }
+      # FAA OE/AAA determination proxy — operator-managed JSON bridge to
+      # oeaaa.faa.gov.  When unset, FAA OE fetch reports DATA SOURCE ERROR.
+      - { key: FAA_OE_SIDECAR_URL,          scope: RUN_TIME, value: "" }
       # Orphan reaper — 2 h window so long NEC optimizer and SPLAT/ITM
       # runs are not killed before they finish.
       - { key: JOB_REAP_STALE_AFTER_MS,    scope: RUN_TIME, value: "1800000" }

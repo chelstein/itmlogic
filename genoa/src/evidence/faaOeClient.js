@@ -152,12 +152,12 @@ export function makeFaaOeClient({
         return {
           available: false, source: null,
           endpoint: `${oeRoot}/searchAction.jsp?action=showCaseFile&studyId=${encodeURIComponent(study_number)}`,
-          error: 'FAA OE/AAA HTML scraping not implemented in this build (set FAA_OE_SIDECAR_URL for clean JSON access)'
+          error: 'DATA SOURCE ERROR — FAA OE/AAA HTML scraping not implemented in this build.  Set FAA_OE_SIDECAR_URL for clean JSON access via an operator-managed proxy.'
         };
       }
       return {
-        available: false, source: null,
-        error: 'No FAA OE lookup source configured.  Set FAA_OE_SIDECAR_URL for an operator-managed proxy, or FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape (not yet implemented).'
+        available: false, source: 'DATA SOURCE ERROR',
+        error: 'DATA SOURCE ERROR — FAA OE endpoint not configured.  Set FAA_OE_SIDECAR_URL (operator-managed JSON proxy for oeaaa.faa.gov) to enable determination fetch.  Study number on file: ' + study_number
       };
     }
   };

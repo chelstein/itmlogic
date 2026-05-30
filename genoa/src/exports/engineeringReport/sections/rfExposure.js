@@ -67,7 +67,7 @@ export function buildRfExposureSection(exhibit){
   const haveDistances = Number.isFinite(Number(ctl.distance_m)) || Number.isFinite(Number(unc.distance_m));
   const passLabel = bc.pass === true  ? 'PASS — boundary clears uncontrolled MPE'
                   : bc.pass === false ? 'FAIL — uncontrolled MPE exceeded at boundary'
-                  : nf.required_for_filing ? 'NEAR-FIELD MODELING REQUIRED — antenna mounting height below the OET-65 simplified-equation validity range'
+                  : nf.required_for_filing ? 'ENGINEERING REVIEW REQUIRED — near-field NEC study needed (antenna RC AGL below OET-65 far-field validity range; far-field equation is not applicable)'
                   : haveDistances ? 'DISTANCES COMPUTED · BOUNDARY CHECK DEFERRED — supply lot/property-line dimensions to complete §1.1307(b) categorical evaluation'
                   : 'NOT EVALUATED';
 
@@ -82,7 +82,9 @@ export function buildRfExposureSection(exhibit){
     ['Uncontrolled compliance distance', unc.distance_m != null ? `${unc.distance_m.toFixed?.(2) ?? unc.distance_m} m` : '—'],
     ['Boundary check distance',   bc.boundary_distance_m != null ? `${bc.boundary_distance_m} m (per filed lot/property line or fence)` : 'DEFERRED — operator must supply lot/property-line dimensions'],
     ['Boundary power density',    bc.power_density_mw_cm2 != null ? `${bc.power_density_mw_cm2.toFixed?.(4) ?? bc.power_density_mw_cm2} mW/cm²` : 'DEFERRED — depends on boundary distance above'],
-    ['Near-field required',       nf.required_for_filing ? `YES — antenna RC AGL ${nf.rcagl_m ?? '—'} m is below the OET-65 simplified-equation lower bound; full NEC near-field modeling required` : 'no'],
+    ['Near-field status',         nf.required_for_filing
+                                    ? `ENGINEERING REVIEW REQUIRED — RC AGL ${nf.rcagl_m ?? '—'} m < near-field boundary ${nf.boundary_m != null ? nf.boundary_m.toFixed(1) + ' m' : '(λ/2π)'}; NEC reactive-region study required (OET-65 §3.B)`
+                                    : 'Not required — antenna RC AGL is beyond the reactive near-field boundary'],
     ['Engine module',             oet.engine_module || 'genoa.regulatory.oet65'],
     ['Bulletin',                  'OET-65 Bulletin (Edition 97-01) Supplement A · 47 CFR §1.1310 Table 1']
   ];
@@ -112,7 +114,7 @@ export function buildRfExposureSection(exhibit){
     'Compliance limits are taken from 47 CFR §1.1310 Table 1; controlled-environment limits apply to occupational personnel with awareness training, and uncontrolled-environment limits apply to the general public.';
 
   const summary = nf.required_for_filing
-    ? 'NEAR-FIELD MODELING REQUIRED.  The antenna RC AGL falls below the validity range of the OET-65 simplified far-field equation; the engineer of record must perform an NEC reactive-region near-field study and attach it as a separate exhibit before filing.'
+    ? 'ENGINEERING REVIEW REQUIRED — far-field equation not applicable.  The antenna radiation center AGL falls inside the OET-65 reactive near-field boundary (λ/2π).  The far-field power-density formula understates actual near-field exposure at this height; the engineer of record must perform an NEC near-field study (OET-65 §3.B) before filing.  If NEC antenna geometry has been modeled, attach the NEC result set as a separate exhibit.  This is a study requirement, not a compliance failure — no boundary MPE exceedance has been determined.'
     : (bc.pass === true
         ? 'The categorical evaluation indicates the controlling boundary distance clears the uncontrolled-environment MPE limit; no further mitigation is identified by this study.'
         : bc.pass === false
