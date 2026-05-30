@@ -167,11 +167,23 @@ export function requiredTowerCompliance({
     });
   }
 
+  // Bug 2 fix: expose split boolean flags so the report section can
+  // display the ACTUAL reason(s) rather than a single combined string.
+  // A 60 ft tower near an airport triggers proximity but NOT height.
+  const height_gt_200ft   = height_triggers;
+  const airport_proximity = proximity_triggers;
+  const notification_reason = [];
+  if (height_gt_200ft)   notification_reason.push('height_gt_200ft');
+  if (airport_proximity) notification_reason.push('airport_proximity');
+
   // Below threshold and not near an airport — no FAA marking / lighting.
   if (!notification_required){
     return Object.freeze({
       applicable:           true,
       notification_required: false,
+      height_gt_200ft,
+      airport_proximity,
+      notification_reason,
       structure_type,
       height_agl_m:         Number(height_agl_m),
       height_agl_ft:        Number(height_agl_ft.toFixed(1)),
@@ -253,6 +265,9 @@ export function requiredTowerCompliance({
   return Object.freeze({
     applicable:           true,
     notification_required: true,
+    height_gt_200ft,
+    airport_proximity,
+    notification_reason,
     structure_type,
     height_agl_m:         Number(height_agl_m),
     height_agl_ft:        Number(height_agl_ft.toFixed(1)),

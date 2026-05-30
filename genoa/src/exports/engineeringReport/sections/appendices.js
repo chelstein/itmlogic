@@ -47,6 +47,11 @@ export function buildAppendixSections(exhibit){
         { key: 'sigma_msm',    label: 'σ used (mS/m)',          width: 0.13, align: 'right' },
         { key: 'ref_field',    label: 'E @ 1 km (mV/m)',        width: 0.14, align: 'right' }
       ];
+      // Bug 3 fix: show the pattern factor column whenever a non-null
+      // pattern_table is attached, not only when the station_inputs.pattern
+      // array is populated.  The prior guard used hasDaPattern (which reads
+      // station_inputs.pattern) but pattern_table and pattern are both
+      // authoritative and may differ in population timing.
       if (hasDaPattern){
         columns.splice(1, 0, { key: 'pat_factor', label: 'Pattern f', width: 0.10, align: 'right' });
       }
@@ -234,8 +239,13 @@ export function buildAppendixSections(exhibit){
         ? `Per-radial conductivity (σ), inverse-distance field at 1 km, and §73.184 groundwave contour distances.  Radial step shown in METHODOLOGY.  ${anySigmaPath
             ? 'σ varies by azimuth where step 6d found M3 boundary crossings (path-length-weighted; stage-3 Millington pending).  Full per-azimuth (σ, cumulative km) tabulation in Appendix A-1.'
             : 'σ is uniform across all azimuths — per-radial M3 segmentation either found no crossings or was unavailable (see Appendix D).'}  ${hasDaPattern
+            // Bug 3 fix: only label the antenna NDA when there is genuinely
+            // no pattern_table; a station with a pattern_table but whose
+            // station_inputs.pattern was parsed to empty would have falsely
+            // shown "Non-directional antenna; pattern factor is 1.0" even
+            // when per-radial factors were applied by the engine.
             ? 'Pattern factor f is the §73.150 relative field; field at azimuth scales as f × E₁ₖₘ.'
-            : 'Non-directional antenna (NDA); pattern factor is 1.0 at every azimuth.'}`
+            : 'Non-directional antenna (NDA); pattern factor is 1.0 at every azimuth — no pattern_table was attached to this exhibit.'}`
         : 'Per-radial HAAT, ERP, and contour distances.  Radial step shown in METHODOLOGY.  ' +
           (pattern ? 'ERP per radial computed from filed pattern table (ERP × (relative field)² per §73.316).'
                    : 'Non-directional antenna; ERP constant across all azimuths.')

@@ -142,7 +142,18 @@ export function buildExecutiveSummarySection(exhibit){
     recs.push(`Site is inside the ${ts} treaty zone — verify co-channel / first-adjacent international stations are protected per the bilateral agreement.`);
   }
   if (recs.length === 0){
-    recs.push('No further engineering work is required for this exhibit.  Engineer of record may review the body and Certification page, sign, and file.');
+    // Bug 4 fix: gate the "no further work" language on BOTH filing
+    // readiness AND zero blockers.  A NIF failure (or any other blocker)
+    // sets filingStatus = 'DO NOT FILE' and populates blockerHints, so
+    // we check explicitly.  Previously the condition was only
+    // `recs.length === 0`, which evaluated to true even when the summary
+    // already reported a NIF fail (because none of the if-blocks above
+    // pushed a rec for the DO NOT FILE path, leaving recs empty).
+    if (filingStatus === 'READY' && blockerHints.length === 0){
+      recs.push('No further engineering work is required for this exhibit.  Engineer of record may review the body and Certification page, sign, and file.');
+    } else {
+      recs.push('Engineering review and remediation are required before this exhibit can be submitted for filing.  See the Engineering Conclusion and the specific findings listed above for the required corrective actions.');
+    }
   }
   // Service-aware appendix list — AM nighttime-allocation + PSRA/PSSA
   // appendices only render for AM exhibits, so listing them in an FM

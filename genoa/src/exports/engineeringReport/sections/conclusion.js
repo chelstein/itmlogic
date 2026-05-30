@@ -137,7 +137,10 @@ export function buildConclusionSection(exhibit){
         `The 47 CFR ${vocab.allocation_rule_cite} ${vocab.service_label} nighttime allocation study indicates ` +
         'the facility does not qualify at its proposed nighttime operating mode/' +
         `${vocab.erp_term.toLowerCase()}.  ` +
-        `${s.n_failing_azimuths ?? '?'}/${s.azimuths_evaluated ?? '?'} evaluated azimuths fail the ${vocab.nighttime_interference_cite || vocab.interference_cite} D/U protection ratio; ` +
+        // Bug 5 fix: the NIF summary field is `n_azimuths` (emitted by
+        // nightOrchestrator.js), not `azimuths_evaluated`.  Using the
+        // wrong key produced "36/?" (undefined coerced by ??) or "36/1".
+        `${s.n_failing_azimuths ?? '?'}/${s.n_azimuths ?? s.azimuths_evaluated ?? '?'} evaluated azimuths fail the ${vocab.nighttime_interference_cite || vocab.interference_cite} D/U protection ratio; ` +
         `worst binding margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}.  ` +
         `Facility redesign (${vocab.waiver_options}) is required prior to filing.`;
     } else {

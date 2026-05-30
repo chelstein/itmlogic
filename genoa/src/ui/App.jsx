@@ -957,6 +957,19 @@ function MainApp({ onLogout, onOpenOptimizer }) {
     })))
   ];
 
+  // Derive MapPreview contours from computed polygons so AM exhibits show
+  // mV/m labels instead of the default FM dBu placeholders.
+  const mapPreviewContours = (() => {
+    const polys = (exhibit?.polygons || []).filter(p => p.mean_radial_km > 0);
+    if (!polys.length) return undefined;  // fall back to MapPreview defaults
+    return polys.map((p, i) => ({
+      name:  p.label,
+      field: p.field_strength ? `${p.field_strength.value} ${p.field_strength.unit}` : '',
+      color: CONTOUR_COLORS[i] || '#9fdcb1',
+      km:    p.mean_radial_km
+    }));
+  })();
+
   const mapCaption = (() => {
     const s = exhibit?.station_inputs;
     if (!s) return 'Compute an exhibit to project contours.';
@@ -1071,7 +1084,10 @@ function MainApp({ onLogout, onOpenOptimizer }) {
             onClear={() => setExhibit(prev => prev ? { ...prev, pe_certification: undefined } : prev)}
           />
           <TelemetryRack exhibit={exhibit} />
-          <MapPreview tx={{ label: exhibit?.station_inputs?.call_sign || 'TX' }} />
+          <MapPreview
+            tx={{ label: exhibit?.station_inputs?.call_sign || exhibit?.station_inputs?.call || 'TX' }}
+            contours={mapPreviewContours}
+          />
         </>
       )}
     />

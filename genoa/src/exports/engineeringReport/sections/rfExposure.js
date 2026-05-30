@@ -37,7 +37,16 @@ export function buildRfExposureSection(exhibit){
   // and from the OET-65 sub-blocks where the engine sometimes stashes
   // the working values.
   const s = exhibit.station_inputs || {};
-  const freqMHz = oet.frequency_mhz ?? c.frequency_mhz ?? s.frequency ?? null;
+  // Bug 1 fix: oet.frequency_mhz is not a top-level field on the
+  // checkOet65 return — the converted MHz value lives in
+  // oet.study_inputs.frequency_mhz.  Falling through to s.frequency
+  // would yield the raw kHz value (e.g. 1500) for AM stations.
+  const freqMHz = oet.study_inputs?.frequency_mhz
+               ?? oet.frequency_mhz
+               ?? c.frequency_mhz
+               ?? (s.frequency_unit === 'kHz'
+                    ? (Number.isFinite(Number(s.frequency)) ? Number(s.frequency) / 1000 : null)
+                    : (s.frequency ?? null));
   const erpKw   = oet.erp_kw       ?? c.erp_kw        ?? s.erp_kw    ?? null;
   // FCC §1.1310 Table 1 values — controlled = 1.0 mW/cm², uncontrolled
   // = 0.2 mW/cm² for the FM band (30 MHz – 300 MHz, occupational vs
@@ -82,7 +91,7 @@ export function buildRfExposureSection(exhibit){
   // pulled live from the exhibit's oet65 block so numbers track the
   // table.  Conservative phrasing; mirrors the opening of an H&D /
   // Cavell-Mertz Section 7 RF exposure exhibit.
-  const fmtMHz = oet.frequency_mhz != null ? `${oet.frequency_mhz} MHz` : 'the filed operating frequency';
+  const fmtMHz = freqMHz != null ? `${freqMHz} MHz` : 'the filed operating frequency';
   const fmtErp = oet.erp_kw != null ? `${oet.erp_kw} kW` : 'the filed ERP';
   const ctlD = ctl.distance_m != null ? `${ctl.distance_m.toFixed?.(2) ?? ctl.distance_m} m` : 'the calculated controlled-environment distance';
   const uncD = unc.distance_m != null ? `${unc.distance_m.toFixed?.(2) ?? unc.distance_m} m` : 'the calculated uncontrolled-environment distance';

@@ -1611,6 +1611,13 @@ export async function computeExhibit(req){
   if (!inputs.pattern_table && evidence.nec_pattern_table){
     inputs.pattern_table = evidence.nec_pattern_table;
   }
+  // Facility-record DA pattern: ZTR/n8n normalization stores the daytime
+  // directional table as `inputs.pattern_day`.  The engine (index.js) reads
+  // only `inputs.pattern_table`, so promote pattern_day → pattern_table when
+  // no operator-supplied or NEC-derived pattern is already present.
+  if (!inputs.pattern_table && inputs.pattern_day){
+    inputs.pattern_table = inputs.pattern_day;
+  }
 
   // ---- 6f. Canonical AM operating profile ----
   // Built once; all AM studies consume from here — never scattered form fields.
@@ -1640,7 +1647,7 @@ export async function computeExhibit(req){
                     : inputs.pattern_table ? 'manual_table'
                     : inputs.pattern_day  ? 'facility_record'
                     : 'none',
-    directional_pattern_applied: !!(inputs.pattern_table || evidence.nec_pattern_table),
+    directional_pattern_applied: !!(inputs.pattern_table || inputs.pattern_day || evidence.nec_pattern_table),
   } : null;
 
   if (amProfile) evidence.am_operating_profile = amProfile;
@@ -1662,6 +1669,7 @@ export async function computeExhibit(req){
                   : 'none',
     directional_pattern_applied: !!(inputs.pattern_table || evidence.nec_pattern_table),
   } : null;
+
 
   if (fmProfile) evidence.fm_operating_profile = fmProfile;
 

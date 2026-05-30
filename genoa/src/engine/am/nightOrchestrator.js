@@ -162,7 +162,14 @@ export async function nighttimeNifStudy(input, ctx){
         freq_khz:      Number(proposed.freq_khz),
         erp_kw:        Number(proposed.erp_kw),
         fcc_class:     proposed.fcc_class,
-        pattern_table: proposed.pattern_mode === 'DA' ? proposed.pattern_table : null
+        // Bug 3 fix: pattern_table's existence is the authoritative signal
+        // for whether to apply the directional pattern.  The prior guard
+        // `proposed.pattern_mode === 'DA'` silently dropped the pattern
+        // when pattern_mode was absent or set to a non-'DA' string, even
+        // when a non-null pattern_table was explicitly provided.
+        pattern_table: (Array.isArray(proposed.pattern_table) && proposed.pattern_table.length > 0)
+          ? proposed.pattern_table
+          : null
       },
       interferers,
       azimuths_deg:  options.azimuths_deg
