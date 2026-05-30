@@ -94,6 +94,13 @@ export function buildFacilityParametersSection(exhibit){
          : (s.pattern_mode === 'DA' ? 'DA (directional, per pattern_table)' : 'NDA (non-directional)')]
     : ['Antenna pattern', s.pattern_mode === 'DA' ? 'Directional (per pattern_table)' : 'Non-directional'];
 
+  // Pattern source row — surfaces where the applied pattern came from
+  // (nec_geometry / manual_table / facility_record / none).
+  const _profile = ev.am_operating_profile || ev.fm_operating_profile || null;
+  const patternSourceRow = _profile?.pattern_source && _profile.pattern_source !== 'none'
+    ? ['Pattern source', _profile.pattern_source]
+    : null;
+
   // License + public-file rows from the fcc_lms enrichment (per
   // compliance-officer F-003 / F-004).  Both surfaces are populated by
   // genoa/src/evidence/fccLmsClient.js and would otherwise stay hidden
@@ -125,6 +132,7 @@ export function buildFacilityParametersSection(exhibit){
       heightOrConductivity,
       ['Coordinates (NAD83 / WGS-84)', coordRow],
       patternRow,
+      patternSourceRow,
       ['Radial resolution',   fmt(s.radial_step_deg || 10, '° step')],
       terrainRow,
       licenseExpRow,

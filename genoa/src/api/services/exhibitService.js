@@ -1612,6 +1612,70 @@ export async function computeExhibit(req){
     inputs.pattern_table = evidence.nec_pattern_table;
   }
 
+  // ---- 6f. Canonical AM operating profile ----
+  // Built once; all AM studies consume from here — never scattered form fields.
+  // amProfile / fmProfile are evidence-only; they do NOT replace inputs.* fields.
+  const service = String(inputs.service || '').toUpperCase();
+  const amProfile = service === 'AM' ? {
+    study_mode:       options.study_mode || 'licensed_current',
+    facility_id:      inputs.facility_id || null,
+    call_sign:        inputs.call,
+    frequency_khz:    Number(inputs.frequency),
+    lat:              Number(inputs.lat),
+    lon:              Number(inputs.lon),
+    // Power — operator-supplied wins over facility data
+    erp_kw:                    Number(inputs.erp_kw) || null,
+    day_power_kw:              Number(inputs.day_power_kw)  || null,
+    night_power_kw:            Number(inputs.night_power_kw) || null,
+    critical_hours_power_kw:   Number(inputs.critical_hours_power_kw) || null,
+    // Pattern
+    pattern_mode:     inputs.pattern_mode || 'ND',
+    pattern_table:    inputs.pattern_table || null,        // daytime (or only pattern if no split)
+    pattern_night:    inputs.pattern_night || null,        // nighttime-specific
+    pattern_critical: inputs.pattern_critical || null,     // critical hours
+    // NEC
+    antenna_geometry: inputs.antenna_geometry || null,
+    // Evidence
+    pattern_source:   evidence.nec_pattern_table ? 'nec_geometry'
+                    : inputs.pattern_table ? 'manual_table'
+                    : inputs.pattern_day  ? 'facility_record'
+                    : 'none',
+    directional_pattern_applied: !!(inputs.pattern_table || evidence.nec_pattern_table),
+  } : null;
+
+  if (amProfile) evidence.am_operating_profile = amProfile;
+
+  const fmProfile = service === 'FM' ? {
+    study_mode:  options.study_mode || 'licensed_current',
+    facility_id: inputs.facility_id || null,
+    call_sign:   inputs.call,
+    frequency_mhz: Number(inputs.frequency),
+    lat: Number(inputs.lat),
+    lon: Number(inputs.lon),
+    erp_kw:      Number(inputs.erp_kw) || null,
+    haat_m:      Number(inputs.haat_m) || null,
+    pattern_mode: inputs.pattern_mode || 'ND',
+    pattern_table: inputs.pattern_table || null,
+    antenna_geometry: inputs.antenna_geometry || null,
+    pattern_source: evidence.nec_pattern_table ? 'nec_geometry'
+                  : inputs.pattern_table ? 'manual_table'
+                  : 'none',
+    directional_pattern_applied: !!(inputs.pattern_table || evidence.nec_pattern_table),
+  } : null;
+
+  if (fmProfile) evidence.fm_operating_profile = fmProfile;
+
+  // ---- 6g. Normalize study_mode to canonical enum ----
+  // 'cp' is the Piece 2 alias; canonical name is 'pending_cp'.
+  const study_mode_canonical = {
+    'cp':               'pending_cp',
+    'pending_cp':       'pending_cp',
+    'manual_scenario':  'manual_scenario',
+    'licensed_current': 'licensed_current',
+  }[options.study_mode] || 'licensed_current';
+
+  inputs._study_mode = study_mode_canonical;
+
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {
     operator:     options.operator     || null,
@@ -2045,6 +2109,13 @@ export async function computeExhibit(req){
     const t0 = Date.now();
     try {
       const { nighttimeNifStudy } = await import('../../engine/am/nightOrchestrator.js');
+      // Route nighttime-specific pattern: pattern_night wins, then general
+      // pattern_table, then NEC-derived pattern.  Daytime studies use
+      // inputs.pattern_table (set by step 6e).
+      const _night_pattern = inputs.pattern_night
+        ?? inputs.pattern_table
+        ?? evidence.nec_pattern_table
+        ?? null;
       const proposed = {
         lat:           Number(inputs.lat),
         lon:           Number(inputs.lon),
@@ -2052,8 +2123,8 @@ export async function computeExhibit(req){
         erp_kw:        Number(inputs.erp_kw),
         fcc_class:     inputs.fcc_class || null,
         facility_id:   inputs.facility_id || null,
-        pattern_mode:  inputs.pattern_mode || (inputs.pattern_table ?? evidence.nec_pattern_table ? 'DA' : 'omni'),
-        pattern_table: inputs.pattern_table ?? evidence.nec_pattern_table ?? null
+        pattern_mode:  inputs.pattern_mode || (_night_pattern ? 'DA' : 'omni'),
+        pattern_table: _night_pattern
       };
       const study = await budget.withDeadline('am_night_nif',
         () => nighttimeNifStudy({ proposed, options: options.am_night_nif_options || {} },
@@ -2283,8 +2354,12 @@ export async function computeExhibit(req){
         call:          inputs.call || null,
         facility_id:   inputs.facility_id || null,
         timezone_code: inputs.timezone_code || undefined,
-        pattern_table: inputs.pattern_table ?? evidence.nec_pattern_table ?? null,
-        pattern_mode:  inputs.pattern_mode  || (inputs.pattern_table ?? evidence.nec_pattern_table ? 'DA' : 'omni')
+        // PSRA/PSSA is a nighttime authorization; use the nighttime pattern.
+        pattern_table: inputs.pattern_night
+                       ?? inputs.pattern_table
+                       ?? evidence.nec_pattern_table
+                       ?? null,
+        pattern_mode:  inputs.pattern_mode  || ((inputs.pattern_night ?? inputs.pattern_table ?? evidence.nec_pattern_table) ? 'DA' : 'omni')
       };
       const study = await budget.withDeadline('am_psra_pssa',
         () => psraPssaExhibit({ proposed, options: options.am_psra_pssa_options || {} },
@@ -2415,6 +2490,12 @@ export async function computeExhibit(req){
   }
   if (evidence.am_night_nif){
     exhibit.evidence.am_night_nif = evidence.am_night_nif;
+  }
+  if (evidence.am_operating_profile){
+    exhibit.evidence.am_operating_profile = evidence.am_operating_profile;
+  }
+  if (evidence.fm_operating_profile){
+    exhibit.evidence.fm_operating_profile = evidence.fm_operating_profile;
   }
   if (evidence.am_physics){
     exhibit.evidence.am_physics = evidence.am_physics;
@@ -2996,6 +3077,11 @@ export async function computeExhibit(req){
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
 
   exhibit.narrative = renderNarrative(exhibit);
+
+  // Surface pattern provenance at the exhibit top level for consumers that
+  // don't want to dig into evidence.am_operating_profile / fm_operating_profile.
+  exhibit.pattern_source             = amProfile?.pattern_source || fmProfile?.pattern_source || 'none';
+  exhibit.directional_pattern_applied = !!(amProfile?.directional_pattern_applied || fmProfile?.directional_pattern_applied);
 
   return exhibit;
 }
