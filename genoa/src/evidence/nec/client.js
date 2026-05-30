@@ -99,6 +99,25 @@ export function makeNecClient({
     async runNearField(model, points, opts = {}){
       return postJson(baseUrl, '/model/near-field',
                        { model, points }, opts.timeoutMs ?? timeoutMs);
+    },
+
+    /**
+     * Coarse phase grid search: given a tower array geometry, a target
+     * bearing, and a desired suppression level, find the phase offset(s)
+     * for non-reference towers that achieve the suppression.
+     *
+     * @param {object} spec — { base_model, target_bearing_deg,
+     *   desired_suppression_db, phase_step_deg?, max_iterations? }
+     * @param {{ timeoutMs?: number }} [opts]
+     */
+    async optimizePattern(spec, opts = {}){
+      // Per-iteration NEC run needs a full BRIDGE_TIMEOUT_MS; the
+      // server multiplies by max_iterations on its side, but we need
+      // the HTTP client timeout to cover the whole grid search too.
+      const maxIter   = Number(spec?.max_iterations ?? 36);
+      const perRunMs  = opts.timeoutMs ?? timeoutMs;
+      const totalMs   = perRunMs * maxIter;
+      return postJson(baseUrl, '/model/optimize-pattern', spec, totalMs);
     }
   };
 }
@@ -174,6 +193,20 @@ export function necPatternToTable(necResponse, { elevation_deg = 0 } = {}){
     out.push([az, Math.max(0, Math.min(1, Math.pow(10, (db - max_dbi) / 20)))]);
   }
   return out.length ? out : null;
+}
+
+/**
+ * Extract a Genoa pattern_table from an optimizePattern() response.
+ *
+ * Returns the pattern table (same shape as necPatternToTable()) when
+ * the optimizer converged, or null when it did not converge or the
+ * response is malformed.  The optimize response carries `pattern` in
+ * the same shape as a run() response, so necPatternToTable() works
+ * verbatim.
+ */
+export function necOptimalPatternTable(optimizeResponse, opts = {}){
+  if (optimizeResponse?.converged !== true) return null;
+  return necPatternToTable(optimizeResponse, opts);
 }
 
 export const NEC_PROVENANCE = Object.freeze({

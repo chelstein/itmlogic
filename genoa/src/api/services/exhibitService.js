@@ -26,6 +26,7 @@ import { W }                    from '../../types/warnings.js';
 import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
 import { makeBudget }              from './computeBudget.js';
 import { necPatternToTable }       from '../../evidence/nec/client.js';
+import { suggestDirectionalMitigation } from '../../engine/regulatory/mitigationAdvisor.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -1555,6 +1556,110 @@ export async function computeExhibit(req){
     user_agent:   options.user_agent   || null,
     validation:   validationContext
   }});
+
+  // ---- 7b. §73.215 mitigation advisor (optional, gated) ----
+  // Only runs when options.mitigation_optimizer === true AND the NEC
+  // sidecar is configured AND the engine detected §73.215 failures AND
+  // antenna_geometry was supplied by the caller.
+  // Operator-supplied pattern_table always wins; the advisor only runs when
+  // the engine hasn't already applied an operator pattern.
+  if (options.mitigation_optimizer === true
+      && sidecars.nec
+      && inputs.antenna_geometry
+      && exhibit?.regulatory?.section_73_215?.violations?.length > 0){
+    const mitigations = [];
+    const failures_73215 = exhibit.regulatory.section_73_215.violations;
+    for (const v of failures_73215){
+      // v.detail is a section_73_215 study; we want the forward leg
+      // (subject as U station toward nearby as D) when it fails.
+      const fwd = v.detail?.forward;
+      if (fwd && fwd.pass === false){
+        // Attach u_station / d_station so mitigationAdvisor can re-run the study.
+        const violation = {
+          ...fwd,
+          u_station: {
+            lat:          Number(inputs.lat),
+            lon:          Number(inputs.lon),
+            erp_kw:       Number(inputs.erp_kw),
+            haat_m:       Number(inputs.haat_m),
+            frequency_mhz: Number(inputs.frequency) / 1000,
+            call:         inputs.call || null,
+            facility_id:  inputs.facility_id || null,
+            fcc_class:    inputs.fcc_class || null
+          },
+          d_station: {
+            lat:          Number(v.detail?.forward?.bearings ? null : null),  // rebuilt below
+            lon:          null
+          },
+          d_protected_field_dbu: v.detail?.subject_protected_field_dbu
+                              ?? v.detail?.nearby_protected_field_dbu
+                              ?? 60
+        };
+        // The D station is the nearby station; pull coordinates from the
+        // nearby station entry if available via the study's nearby fields.
+        // section_73_215 embeds subject/nearby shapes via subjectShape()
+        // but the nearby coordinates come from nearbyStations[i].  The
+        // forward study has u_call/d_call but not lat/lon — skip the
+        // re-run unless the d_station shape is derivable.  We use the
+        // nearby station entry from the exhibit if present.
+        const nearbyStations = inputs.nearby_primaries || [];
+        const nearbyMatch = nearbyStations.find(n =>
+          (fwd.d_call && n.call === fwd.d_call) ||
+          (fwd.d_facility_id && String(n.facility_id) === String(fwd.d_facility_id))
+        );
+        if (nearbyMatch){
+          violation.u_station = {
+            lat:           Number(inputs.lat),
+            lon:           Number(inputs.lon),
+            erp_kw:        Number(inputs.erp_kw),
+            haat_m:        Number(inputs.haat_m),
+            frequency_mhz: Number(inputs.frequency) / 1000,
+            call:          inputs.call || null,
+            facility_id:   inputs.facility_id || null,
+            fcc_class:     inputs.fcc_class || null
+          };
+          violation.d_station = {
+            lat:           Number(nearbyMatch.lat),
+            lon:           Number(nearbyMatch.lon),
+            erp_kw:        Number(nearbyMatch.erp_kw),
+            haat_m:        Number(nearbyMatch.haat_m),
+            frequency_mhz: Number(nearbyMatch.frequency_mhz || nearbyMatch.frequency / 1000),
+            call:          nearbyMatch.call || null,
+            facility_id:   nearbyMatch.facility_id || null,
+            fcc_class:     nearbyMatch.fcc_class || null
+          };
+        }
+        try {
+          const mitResult = await suggestDirectionalMitigation({
+            violation,
+            antenna_geometry: inputs.antenna_geometry,
+            necClient:        sidecars.nec,
+            options:          {}
+          });
+          if (mitResult){
+            mitigations.push({
+              violation_cite:  v.cite,
+              violation_msg:   v.message,
+              nearby_call:     fwd.d_call || null,
+              nearby_facility_id: fwd.d_facility_id || null,
+              ...mitResult
+            });
+          }
+        } catch (e){
+          // Mitigation is advisory; never block the exhibit.
+          mitigations.push({
+            violation_cite: v.cite,
+            nearby_call:    fwd.d_call || null,
+            converged:      false,
+            reason:         String(e?.message || e)
+          });
+        }
+      }
+    }
+    if (mitigations.length > 0){
+      exhibit.mitigation_options = mitigations;
+    }
+  }
 
   // ---- 8a. Population evidence (sourced; never invented) ----
   // Ask the population adapter for an estimate over the SERVICE contour
