@@ -235,6 +235,247 @@ def get_feedpoint_impedance(ctx, warnings):
         return None
 
 
+def optimize_pattern(base_model, target_bearing_deg, desired_suppression_db,
+                     phase_step_deg=10, max_iterations=36):
+    """
+    Coarse grid search over phase offsets of all non-reference towers.
+    Reference tower (first in array or tower with phase_deg == 0) is fixed.
+    All others are swept from 0 to 360 in phase_step_deg increments.
+
+    Returns:
+    {
+      "converged": bool,
+      "optimal_phases_deg": [{"tag": int, "phase_deg": float}, ...],
+      "achieved_suppression_db": float,
+      "bearing_factor": float,   # field factor at target bearing [0..1]
+      "pattern": {...},          # same format as run_model() pattern output
+      "iterations": int
+    }
+
+    Supports 1-4 tower arrays. For a 2-tower array, sweeps the phase of
+    tower 2. For 3+ towers, sweeps tower 2 phase with tower 3+ held at
+    their base_model values (first pass only).
+    """
+    PyNEC, nec_context = import_pynec()
+
+    towers = base_model.get("towers", [])
+    if not towers:
+        return {
+            "converged": False,
+            "optimal_phases_deg": [],
+            "achieved_suppression_db": 0.0,
+            "bearing_factor": 1.0,
+            "pattern": None,
+            "iterations": 0
+        }
+
+    # Build the frequency_mhz from frequency_khz if needed (match buildAmArrayModel)
+    freq_mhz = base_model.get("frequency_mhz")
+    if freq_mhz is None:
+        freq_khz = base_model.get("frequency_khz")
+        if freq_khz is None:
+            return {
+                "converged": False,
+                "optimal_phases_deg": [],
+                "achieved_suppression_db": 0.0,
+                "bearing_factor": 1.0,
+                "pattern": None,
+                "iterations": 0
+            }
+        freq_mhz = float(freq_khz) / 1000.0
+
+    ground = base_model.get("ground") or {
+        "type": "sommerfeld", "conductivity_s_m": 0.005, "dielectric_constant": 13
+    }
+    pattern_spec = base_model.get("pattern") or {
+        "theta_start": 90, "theta_stop": 90, "theta_step": 1,
+        "phi_start": 0, "phi_stop": 359, "phi_step": 1
+    }
+
+    def run_candidate(candidate_towers):
+        """Build and run one NEC model for the given tower drive phases."""
+        ctx = nec_context()
+        warnings_inner = []
+
+        wires = []
+        excitations = []
+        for t in candidate_towers:
+            tag = int(t["tag"])
+            segs = int(t.get("segments", 21))
+            x = float(t.get("x_m", 0))
+            y = float(t.get("y_m", 0))
+            h = float(t.get("height_m", 75))
+            r = float(t.get("radius_m", 0.25))
+            wires.append({
+                "tag": tag, "segments": segs,
+                "x1": x, "y1": y, "z1": 0,
+                "x2": x, "y2": y, "z2": h,
+                "radius_m": r
+            })
+            amp = float(t.get("drive", {}).get("amplitude", 1.0))
+            ph_deg = float(t.get("drive", {}).get("phase_deg", 0))
+            ph_rad = ph_deg * math.pi / 180.0
+            excitations.append({
+                "tag": tag, "segment": 1,
+                "voltage_real": amp * math.cos(ph_rad),
+                "voltage_imag": amp * math.sin(ph_rad)
+            })
+
+        make_geometry(ctx, wires, warnings_inner)
+        configure_ground(ctx, ground, warnings_inner)
+        configure_excitations(ctx, excitations, warnings_inner)
+        ctx.fr_card(0, 1, freq_mhz, 0)
+        return run_pattern(ctx, pattern_spec, warnings_inner)
+
+    def gain_at_bearing(pattern, bearing_deg):
+        """Find gain_dbi at theta=90 (horizon), nearest phi to bearing_deg."""
+        theta_degs = pattern["theta_deg"]
+        phi_degs   = pattern["phi_deg"]
+        gain_dbi   = pattern["gain_dbi"]
+
+        # Find theta index closest to 90
+        best_t = 0
+        best_dt = abs(theta_degs[0] - 90.0)
+        for i, td in enumerate(theta_degs):
+            dt = abs(td - 90.0)
+            if dt < best_dt:
+                best_dt = dt
+                best_t = i
+
+        row = gain_dbi[best_t]
+
+        # Normalise target bearing to [0, 360)
+        target = float(bearing_deg) % 360.0
+
+        # Find phi index with minimum angular distance
+        best_p = 0
+        best_dp = float('inf')
+        for i, pd in enumerate(phi_degs):
+            dp = abs((float(pd) - target + 180.0) % 360.0 - 180.0)
+            if dp < best_dp:
+                best_dp = dp
+                best_p = i
+
+        return float(row[best_p])
+
+    def compute_suppression(pattern):
+        """Suppression = peak_gain_dbi - gain_at_bearing_dbi (at horizon)."""
+        theta_degs = pattern["theta_deg"]
+        phi_degs   = pattern["phi_deg"]
+        gain_dbi   = pattern["gain_dbi"]
+
+        # Find horizon row
+        best_t = 0
+        best_dt = abs(theta_degs[0] - 90.0)
+        for i, td in enumerate(theta_degs):
+            dt = abs(td - 90.0)
+            if dt < best_dt:
+                best_dt = dt
+                best_t = i
+
+        row = gain_dbi[best_t]
+        finite_vals = [v for v in row if math.isfinite(v)]
+        if not finite_vals:
+            return 0.0, 0.0, 0.0
+
+        peak_dbi = max(finite_vals)
+        bearing_dbi = gain_at_bearing(pattern, target_bearing_deg)
+        suppression = peak_dbi - bearing_dbi
+        # bearing_factor in field (linear): 10^((bearing_dbi - peak_dbi)/20)
+        factor = pow(10.0, (bearing_dbi - peak_dbi) / 20.0)
+        return suppression, factor, bearing_dbi
+
+    # Phase steps to try
+    steps = max(1, int(round(360.0 / phase_step_deg)))
+    phases_to_try = [i * phase_step_deg for i in range(steps)]
+
+    # Best state
+    best_suppression = -float('inf')
+    best_pattern = None
+    best_phases = [{"tag": int(t["tag"]),
+                    "phase_deg": float(t.get("drive", {}).get("phase_deg", 0))}
+                   for t in towers]
+    best_factor = 1.0
+
+    # Reference tower is index 0 (or first tower — kept fixed).
+    # We sweep tower index 1 (tag 2 in a 2-tower array).
+    iterations = 0
+
+    if len(towers) < 2:
+        # Single tower — run once, report suppression (may be 0 if omni)
+        try:
+            pattern = run_candidate(towers)
+            suppression, factor, _ = compute_suppression(pattern)
+            converged = suppression >= desired_suppression_db
+            return {
+                "converged": converged,
+                "optimal_phases_deg": [{"tag": int(towers[0]["tag"]),
+                                        "phase_deg": float(towers[0].get("drive", {}).get("phase_deg", 0))}],
+                "achieved_suppression_db": round(suppression, 4),
+                "bearing_factor": round(factor, 6),
+                "pattern": pattern,
+                "iterations": 1
+            }
+        except SystemExit:
+            raise
+        except Exception:
+            return {
+                "converged": False,
+                "optimal_phases_deg": [],
+                "achieved_suppression_db": 0.0,
+                "bearing_factor": 1.0,
+                "pattern": None,
+                "iterations": 0
+            }
+
+    for ph in phases_to_try:
+        if iterations >= max_iterations:
+            break
+
+        # Build candidate tower list: reference tower unchanged, tower[1] swept,
+        # tower[2+] kept at base model values.
+        candidate = []
+        for idx, t in enumerate(towers):
+            tc = dict(t)
+            drive = dict(t.get("drive") or {})
+            if idx == 1:
+                drive["phase_deg"] = ph
+            tc["drive"] = drive
+            candidate.append(tc)
+
+        try:
+            pattern = run_candidate(candidate)
+        except SystemExit:
+            raise
+        except Exception:
+            iterations += 1
+            continue
+
+        suppression, factor, _ = compute_suppression(pattern)
+        iterations += 1
+
+        if suppression > best_suppression:
+            best_suppression = suppression
+            best_pattern = pattern
+            best_factor = factor
+            best_phases = [{"tag": int(t2["tag"]),
+                            "phase_deg": float(t2.get("drive", {}).get("phase_deg", 0))}
+                           for t2 in candidate]
+
+        if suppression >= desired_suppression_db:
+            break  # converged — stop early
+
+    converged = best_suppression >= desired_suppression_db
+    return {
+        "converged": converged,
+        "optimal_phases_deg": best_phases,
+        "achieved_suppression_db": round(best_suppression, 4),
+        "bearing_factor": round(best_factor, 6),
+        "pattern": best_pattern,
+        "iterations": iterations
+    }
+
+
 def main_run():
     PyNEC, nec_context = import_pynec()
     body = read_input()
@@ -272,9 +513,48 @@ def main_run():
     })
 
 
+def main_optimize():
+    """Entry point for optimize-pattern: reads JSON from stdin, runs grid search, writes result."""
+    body = read_input()
+    if not isinstance(body, dict):
+        fail("INVALID_INPUT", "expected JSON object on stdin")
+
+    base_model = body.get("base_model")
+    if not isinstance(base_model, dict):
+        fail("INVALID_INPUT", "base_model required (object)")
+
+    target_bearing = body.get("target_bearing_deg")
+    if not isinstance(target_bearing, (int, float)):
+        fail("INVALID_INPUT", "target_bearing_deg required (number)")
+
+    desired_suppression = body.get("desired_suppression_db")
+    if not isinstance(desired_suppression, (int, float)) or desired_suppression <= 0:
+        fail("INVALID_INPUT", "desired_suppression_db required (number > 0)")
+
+    phase_step  = float(body.get("phase_step_deg",  10))
+    max_iter    = int(body.get("max_iterations",    36))
+
+    result = optimize_pattern(
+        base_model,
+        float(target_bearing),
+        float(desired_suppression),
+        phase_step_deg=phase_step,
+        max_iterations=max_iter
+    )
+    out({"ok": True, **result})
+
+
 if __name__ == "__main__":
     if "--probe" in sys.argv:
         probe()
+        sys.exit(0)
+    if "--optimize" in sys.argv:
+        try:
+            main_optimize()
+        except SystemExit:
+            raise
+        except Exception as e:
+            fail("NEC_BRIDGE_UNHANDLED", "unhandled optimize error: %s" % e, code=3)
         sys.exit(0)
     try:
         main_run()

@@ -181,6 +181,98 @@ app.post('/model/am-array', asyncHandler(async (req, res) => {
   res.status(result.ok ? 200 : 502).json(result);
 }));
 
+// -------------------- /model/optimize-pattern --------------------
+//
+// Coarse phase grid search: given a tower array geometry, a target
+// bearing, and a desired suppression level (dB), sweep the phase of
+// non-reference towers until the pattern achieves the suppression.
+//
+// Input:
+//   {
+//     "base_model": { frequency_khz, ground, towers: [...] },  // same as /model/am-array
+//     "target_bearing_deg": 270,        // 0–360, required
+//     "desired_suppression_db": 20,     // > 0, required
+//     "phase_step_deg": 10,             // 1–45, optional, default 10
+//     "max_iterations": 36              // 1–72, optional, default 36
+//   }
+app.post('/model/optimize-pattern', asyncHandler(async (req, res) => {
+  const body = req.body || {};
+
+  if (!body.base_model || typeof body.base_model !== 'object')
+    return res.status(400).json({ ok: false, error: 'INVALID_INPUT', detail: 'base_model required (object)' });
+
+  const target_bearing = Number(body.target_bearing_deg);
+  if (!Number.isFinite(target_bearing) || target_bearing < 0 || target_bearing > 360)
+    return res.status(400).json({ ok: false, error: 'INVALID_INPUT', detail: 'target_bearing_deg required (number 0–360)' });
+
+  const desired_suppression = Number(body.desired_suppression_db);
+  if (!Number.isFinite(desired_suppression) || desired_suppression <= 0)
+    return res.status(400).json({ ok: false, error: 'INVALID_INPUT', detail: 'desired_suppression_db required (number > 0)' });
+
+  const phase_step   = body.phase_step_deg   !== undefined ? Number(body.phase_step_deg)   : 10;
+  const max_iter     = body.max_iterations   !== undefined ? Number(body.max_iterations)   : 36;
+
+  if (!Number.isFinite(phase_step) || phase_step < 1 || phase_step > 45)
+    return res.status(400).json({ ok: false, error: 'INVALID_INPUT', detail: 'phase_step_deg must be 1–45' });
+  if (!Number.isInteger(max_iter) || max_iter < 1 || max_iter > 72)
+    return res.status(400).json({ ok: false, error: 'INVALID_INPUT', detail: 'max_iterations must be 1–72 (integer)' });
+
+  const payload = {
+    base_model:            body.base_model,
+    target_bearing_deg:    target_bearing,
+    desired_suppression_db: desired_suppression,
+    phase_step_deg:        phase_step,
+    max_iterations:        max_iter
+  };
+
+  // Each NEC run needs the full BRIDGE_TIMEOUT_MS budget; multiply by
+  // max_iterations so the total deadline covers the whole grid search.
+  const optimizeTimeout = BRIDGE_TIMEOUT_MS * max_iter;
+  const model_hash = sha256(JSON.stringify(canonicalize(payload)));
+  const t0 = Date.now();
+  const r  = await runBridge('--optimize', JSON.stringify(payload), optimizeTimeout);
+  const runtime_seconds = (Date.now() - t0) / 1000;
+
+  if (r.code === 124 || r.timed_out){
+    return res.status(502).json({
+      ok: false, error: 'NEC_BRIDGE_TIMEOUT',
+      detail: `Python bridge exceeded ${optimizeTimeout} ms`,
+      runtime_seconds
+    });
+  }
+  if (r.code !== 0){
+    return res.status(502).json({
+      ok: false, error: 'NEC_BRIDGE_FAILED',
+      detail: (r.stderr || '').trim().slice(0, 600),
+      runtime_seconds
+    });
+  }
+  let parsed;
+  try { parsed = JSON.parse(r.stdout); }
+  catch (e){
+    return res.status(502).json({
+      ok: false, error: 'NEC_BRIDGE_PARSE_FAILED',
+      detail: String(e.message), runtime_seconds
+    });
+  }
+  if (parsed.ok === false){
+    return res.status(502).json({ ...parsed, runtime_seconds });
+  }
+  res.status(200).json({
+    ok: true,
+    runtime_seconds,
+    ...parsed,
+    provenance: {
+      engine:           'necpp/PyNEC',
+      source:           'NEC2++ sidecar',
+      license_boundary: 'external sidecar',
+      sidecar_version:  VERSION,
+      generated_at:     new Date().toISOString(),
+      model_hash
+    }
+  });
+}));
+
 // -------------------- /model/near-field --------------------
 //
 // Convenience: take an existing model + add additional near-field

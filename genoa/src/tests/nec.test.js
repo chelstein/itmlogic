@@ -11,9 +11,11 @@ import assert from 'node:assert/strict';
 import {
   makeNecClient,
   necPatternToTable,
+  necOptimalPatternTable,
   NEC_PROVENANCE
 } from '../evidence/nec/client.js';
 import { studyContourPair } from '../engine/regulatory/_du_pair_study.js';
+import { suggestDirectionalMitigation } from '../engine/regulatory/mitigationAdvisor.js';
 
 function withFetch(fakeFetch, fn){
   const orig = global.fetch;
@@ -324,4 +326,125 @@ test('NEC wiring integration: D/U study with NEC pattern applies directional sup
     assert.ok(study_with_pattern.du_actual_db > study_omni.du_actual_db,
       `D/U with pattern (${study_with_pattern.du_actual_db.toFixed(2)} dB) should exceed omni D/U (${study_omni.du_actual_db.toFixed(2)} dB)`);
   }
+});
+
+/* ---------------- PR #2: necOptimalPatternTable + suggestDirectionalMitigation ---------------- */
+
+test('necOptimalPatternTable: returns null when converged=false', () => {
+  const notConverged = { ...REF_RESPONSE, converged: false };
+  assert.equal(necOptimalPatternTable(notConverged), null);
+});
+
+test('necOptimalPatternTable: returns valid pattern table when converged=true', () => {
+  const converged = { ...REF_RESPONSE, converged: true };
+  const tbl = necOptimalPatternTable(converged);
+  assert.ok(tbl !== null, 'should return a pattern table when converged=true');
+  assert.ok(Array.isArray(tbl), 'pattern table must be an array');
+  assert.ok(tbl.length > 0, 'pattern table must be non-empty');
+  for (const [az, f] of tbl){
+    assert.ok(Number.isFinite(az), `az_deg ${az} is finite`);
+    assert.ok(Number.isFinite(f) && f >= 0 && f <= 1, `field_factor ${f} in [0,1]`);
+  }
+});
+
+test('suggestDirectionalMitigation: returns null when necClient is null', async () => {
+  const result = await suggestDirectionalMitigation({
+    violation:        { du_threshold_db: 20, du_actual_db: 15, bearings: { u_to_d_deg: 180 } },
+    antenna_geometry: { frequency_khz: 107900, towers: [] },
+    necClient:        null
+  });
+  assert.equal(result, null);
+});
+
+test('suggestDirectionalMitigation: returns { converged: false } when optimizer returns converged=false', async () => {
+  const notConvergedResp = {
+    ok:                      true,
+    converged:               false,
+    achieved_suppression_db: 3.5,
+    optimal_phases_deg:      [],
+    bearing_factor:          0.7,
+    pattern:                 REF_PATTERN,
+    iterations:              36
+  };
+  const fakeClient = {
+    async optimizePattern(){ return notConvergedResp; }
+  };
+  const result = await suggestDirectionalMitigation({
+    violation: {
+      du_threshold_db: 20,
+      du_actual_db:    15,
+      bearings:        { u_to_d_deg: 180 }
+    },
+    antenna_geometry: { frequency_khz: 107900, towers: [{ tag: 1, height_m: 75 }] },
+    necClient:        fakeClient
+  });
+  assert.ok(result !== null, 'should return an object (not null) when optimizer returns');
+  assert.equal(result.converged, false);
+  assert.equal(result.reason, 'optimizer_did_not_converge');
+});
+
+test('suggestDirectionalMitigation: converged optimizer produces recheck.pass=true and recheck.directional_pattern_applied=true', async () => {
+  // Build a converged optimizer response using the REF_PATTERN which has a
+  // clear null at phi=180 (gain -6 dBi vs peak +3 dBi → suppression 9 dB).
+  const convergedResp = {
+    ok:                      true,
+    converged:               true,
+    achieved_suppression_db: 9.0,
+    optimal_phases_deg:      [{ tag: 1, phase_deg: 0 }, { tag: 2, phase_deg: 90 }],
+    bearing_factor:          0.355,
+    pattern:                 REF_PATTERN,
+    iterations:              9
+  };
+  const fakeClient = {
+    async optimizePattern(){ return convergedResp; }
+  };
+
+  // U station (subject) is north of D; bearing U→D ≈ 180°.
+  // At phi=180 REF_PATTERN has factor ≈ 0.355 (−9 dBi suppression).
+  // With protected_field_dbu=105, erp_kw=50, haat_m=100 and stations
+  // ~11 km apart: omni D/U ≈ 11.7 dB (fails at threshold 20) but
+  // directional D/U ≈ 20.7 dB (passes).  This is the controlled test case.
+  const U = {
+    lat: 38.0, lon: -97.0,
+    erp_kw: 50.0, haat_m: 100, frequency_mhz: 107.9,
+    call: 'WXXX'
+  };
+  const D = {
+    lat: 37.9, lon: -97.0,
+    erp_kw: 10.0, haat_m: 150, frequency_mhz: 107.9,
+    fcc_class: 'C'
+  };
+  const PROTECTED_FIELD = 105;
+
+  // Run the omni study to get a realistic failing violation object.
+  const omniStudy = studyContourPair(U, D, {
+    relationship:       'co-channel',
+    du_threshold_db:    20,
+    protected_field_dbu: PROTECTED_FIELD,
+    protected_mode:     '50,50',
+    interfering_mode:   '50,10'
+  });
+
+  const violation = {
+    ...omniStudy,
+    u_station: U,
+    d_station: D,
+    d_protected_field_dbu: PROTECTED_FIELD
+  };
+
+  const result = await suggestDirectionalMitigation({
+    violation,
+    antenna_geometry: { frequency_khz: 107900, towers: [{ tag: 1, height_m: 75 }] },
+    necClient:        fakeClient
+  });
+
+  assert.ok(result !== null, 'should return an object');
+  assert.equal(result.converged, true, 'converged should be true');
+  assert.ok(Array.isArray(result.optimal_phases_deg), 'optimal_phases_deg should be an array');
+  assert.ok(Array.isArray(result.pattern_table), 'pattern_table should be an array');
+  assert.ok(result.recheck !== null, 'recheck should be present');
+  assert.equal(result.recheck.directional_pattern_applied, true,
+    'recheck.directional_pattern_applied must be true');
+  // With the null-bearing pattern the D/U should improve enough to pass.
+  assert.equal(result.recheck.pass, true, 'recheck.pass should be true after applying the optimal pattern');
 });
