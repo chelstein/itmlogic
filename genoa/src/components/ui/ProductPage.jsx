@@ -66,8 +66,9 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
           engineering review.
         </p>
         <p className="text-cream font-semibold text-base max-w-2xl mx-auto mt-4 leading-relaxed">
-          Every engineering exhibit is independently validated against FCC reference
-          calculations before report generation.
+          Validated against FCC published propagation curves, FCC FORTRAN reference
+          implementations, geo.fcc.gov engineering outputs, and more than 550 adversarial
+          AI assurance test attempts.
         </p>
         <p className="text-cream/90 text-base max-w-2xl mx-auto mt-5 font-medium">
           Less manual work. Faster answers. More confidence before you file.
@@ -172,7 +173,26 @@ export default function ProductPage({ authed, onNavigate, onLogout }){
           <Card title="Self-validating">Every exhibit carries a validation verdict: golden-suite curve checks, live geo.fcc.gov parity, and FORTRAN parity — visible to the reviewer.</Card>
           <Card title="AI consistency audit">An automated reviewer, grounded in the verbatim Part 73 rule text, flags internal contradictions for the engineer of record.</Card>
           <Card title="Engineer-of-record ready">Genoa does the deterministic computation and evidence assembly; a qualified broadcast engineer reviews and certifies. It never certifies on its own.</Card>
-          <Card title="AI Assurance Testing">Genoa's RF Engineering Agent has undergone adversarial prompt-injection and instruction-override testing using NVIDIA Garak. During testing, the agent maintained RF-engineering scope boundaries, rejected non-engineering requests, resisted prompt-injection attempts, and correctly challenged false technical assertions within its domain.</Card>
+          <Card title="AI Assurance Testing">Genoa's RF Engineering Agent has undergone more than 550 adversarial evaluation attempts using NVIDIA Garak, including prompt-injection, jailbreak, persona-adoption, instruction-override, and encoded-payload attacks. No successful RF-engineering scope escapes were observed during completed Genoa evaluation runs.</Card>
+        </div>
+      </Section>
+
+      {/* Validation metrics */}
+      <Section eyebrow="Validation metrics" title="What every exhibit is checked against">
+        <div className="grid sm:grid-cols-2 gap-3 max-w-2xl">
+          {[
+            'FCC curve parity (F(50,50) / F(50,10))',
+            'FCC FORTRAN reference parity',
+            'geo.fcc.gov engineering output parity',
+            '550+ adversarial AI assurance tests',
+            'Deterministic calculations — same inputs, same results',
+            'SHA-256 hashed with replay tokens for independent re-verification',
+          ].map((item, i) => (
+            <div key={i} className="flex items-start gap-3 text-sm text-textDim">
+              <span className="text-amber shrink-0 font-bold mt-px">✓</span>
+              <span>{item}</span>
+            </div>
+          ))}
         </div>
       </Section>
 
