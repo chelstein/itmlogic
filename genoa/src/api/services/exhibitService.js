@@ -229,23 +229,79 @@ export async function computeExhibit(req){
   let sdrResp            = null;   // { available, source, endpoint, n_records, records }
 
   // ---- 1. Resolve facility_id ----
+  //
+  // CP study mode (options.study_mode === 'cp' or inputs.isProposal === true):
+  //   Route through facilityClient.getByIdCp() which queries FCC AMQ for a
+  //   pending CP row (status=CP) for this facility ID.  If a CP row is found,
+  //   it replaces the licensed record for all fillIfMissing wiring below, and
+  //   inputs.isProposal is forced to true so classifyRegulatoryContext() returns
+  //   facilityStatus='proposed' / studyIntent='modification'.  If no CP is
+  //   found, getByIdCp() falls back to the licensed record and we emit a
+  //   CP_LOOKUP_FALLBACK warning.
+  //
+  //   The CP cache key (`cp:<facility_id>`) is SEPARATE from the licensed
+  //   record cache (keyed on plain facility_id in Postgres), so a cached
+  //   licensed record is NEVER served for a CP request.
+  //
+  // Default path (study_mode absent, isProposal not set):
+  //   Unchanged — uses getById() + Postgres cache as before.
+  const wantCp = options.study_mode === 'cp' || inputs.isProposal === true;
   if (inputs.facility_id){
-    const cached = await getCached(String(inputs.facility_id));
-    let facility = cached?.facility || null;
-    let source   = cached?.source   || null;
-    if (!facility && sidecars.facility){
-      const r = await sidecars.facility.getById(String(inputs.facility_id));
-      if (r.facility){
-        facility = r.facility;
-        source   = r.source;
-        await putCached(facility).catch(() => {});
-      } else if (!r.source){
-        facilityWarnings.push(W.make('FACILITY_LOOKUP_UNAVAILABLE', r.error || 'no facility source reachable'));
+    let facility = null;
+    let source   = null;
+
+    if (wantCp){
+      // CP path — bypass Postgres licensed-record cache entirely.
+      // getByIdCp() has its own in-process CP cache (TTL 1 h).
+      if (sidecars.facility?.getByIdCp){
+        const r = await sidecars.facility.getByIdCp(String(inputs.facility_id));
+        if (r.facility){
+          facility = r.facility;
+          source   = r.source;
+          // Force isProposal and modificationScenario regardless of what
+          // the CP row carries.  A CP for an existing licensed facility IS
+          // a modification request — classifyRegulatoryContext will produce
+          // studyIntent='modification' when modificationScenario=true.
+          inputs.isProposal = true;
+          if (inputs.modificationScenario === undefined || inputs.modificationScenario === null){
+            inputs.modificationScenario = true;
+          }
+          if (r.cp_fallback){
+            // No CP found — using licensed record but caller asked for CP.
+            facilityWarnings.push(W.make('CP_LOOKUP_FALLBACK',
+              `facility_id=${inputs.facility_id}: no CP row found in FCC AMQ; licensed record used`));
+          }
+          // Do NOT putCached() for CP records — the Postgres cache is for
+          // licensed records only.  A CP record in the licensed cache would
+          // pollute subsequent non-CP lookups for the same facility.
+        } else if (!r.source){
+          facilityWarnings.push(W.make('FACILITY_LOOKUP_UNAVAILABLE', r.error || 'no facility source reachable'));
+        }
+      } else {
+        // Facility sidecar not configured or doesn't have getByIdCp.
+        facilityWarnings.push(W.make('FACILITY_LOOKUP_UNAVAILABLE',
+          'No facility data source configured for CP lookup (ZERO_TRUST_RADIO_READONLY_URL / N8N_BASE_URL).'));
       }
-    } else if (!facility && !sidecars.facility){
-      facilityWarnings.push(W.make('FACILITY_LOOKUP_UNAVAILABLE',
-        'No facility data source configured (ZERO_TRUST_RADIO_READONLY_URL / N8N_BASE_URL).'));
+    } else {
+      // Default licensed-record path — unchanged.
+      const cached = await getCached(String(inputs.facility_id));
+      facility = cached?.facility || null;
+      source   = cached?.source   || null;
+      if (!facility && sidecars.facility){
+        const r = await sidecars.facility.getById(String(inputs.facility_id));
+        if (r.facility){
+          facility = r.facility;
+          source   = r.source;
+          await putCached(facility).catch(() => {});
+        } else if (!r.source){
+          facilityWarnings.push(W.make('FACILITY_LOOKUP_UNAVAILABLE', r.error || 'no facility source reachable'));
+        }
+      } else if (!facility && !sidecars.facility){
+        facilityWarnings.push(W.make('FACILITY_LOOKUP_UNAVAILABLE',
+          'No facility data source configured (ZERO_TRUST_RADIO_READONLY_URL / N8N_BASE_URL).'));
+      }
     }
+
     if (facility){
       const fillIfMissing = (k, v) => { if (inputs[k] === undefined || inputs[k] === null || inputs[k] === '') inputs[k] = v; };
       fillIfMissing('call',            facility.call);
