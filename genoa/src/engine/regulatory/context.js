@@ -114,8 +114,28 @@ export function classifyRegulatoryContext(input = {}, evidence = {}, studyResult
   const hasProtectionWarning = warnings.some(w => w && PROTECTION_WARNING_CODES.has(w.code));
   const hasInterferenceStudy = !!studyResult?.interference_study;
 
+  // AM NIF awareness: the pairwise interference study (§73.182/§73.190)
+  // is separate from the aggregate NIF check (n_failing_azimuths > 0).
+  // A station can pass all 250 pairwise checks (hasInterferenceStudy &&
+  // no AM_NIGHTTIME_PROTECTION_VIOLATION) while still failing NIF if the
+  // RSS-aggregated interference exceeds the §73.182(k) threshold.
+  // When NIF fails and the skywave source is the authoritative FCCAM
+  // (Wang 1985), treat as a current-rule conflict.  Berry-1968 screening
+  // failures are advisory-only and do NOT trigger fails_current_rules —
+  // Berry under-estimates field per §73.190(c) and a screening fail may
+  // not survive re-run with FCCAM.  For licensed facilities, an FCCAM
+  // NIF fail is handled as legacy/grandfathering (same as §73.207 conflicts).
+  const nif = studyResult?.evidence?.am_night_nif || studyResult?.am_night_nif || null;
+  const nifFails = nif?.available
+    && ((Number(nif.summary?.n_failing_azimuths) || 0) > 0
+        || (Number.isFinite(Number(nif.summary?.worst_margin_db)) && Number(nif.summary?.worst_margin_db) < 0));
+  const nifIsScreening = nif && /berry/i.test(
+    String(nif.provenance?.upstream_skywave || nif.source || '')
+  );
+  const nifDefinitiveFail = nifFails && !nifIsScreening;
+
   let currentRuleCompliance;
-  if (hasProtectionWarning){
+  if (hasProtectionWarning || nifDefinitiveFail){
     currentRuleCompliance = 'fails_current_rules';
   } else if (hasInterferenceStudy){
     currentRuleCompliance = 'passes_current_rules';
@@ -134,27 +154,38 @@ export function classifyRegulatoryContext(input = {}, evidence = {}, studyResult
     licenseInterpretation = 'licensed_with_legacy_conflicts';
     filingRisk = (studyIntent === 'modification') ? 'high' : 'medium';
     userFacingSummary =
-      'Existing licensed facility.  Current-rule §73.207/§73.215 analysis ' +
-      'reports spacing or contour conflicts, but this does not by itself ' +
-      'mean the facility is unauthorized.  Treat as a legacy/grandfathering/' +
-      'waiver-risk condition.  Any modification should receive licensed ' +
-      'engineering review.';
+      'Existing licensed facility.  Current-rule §73.207/§73.215/§73.182 ' +
+      'analysis reports spacing, contour, or nighttime-allocation conflicts, ' +
+      'but this does not by itself mean the facility is unauthorized.  ' +
+      'Treat as a legacy/grandfathering/waiver-risk condition.  Any ' +
+      'modification should receive licensed engineering review.';
     notes.push('Modeled current-rule conflicts may reflect grandfathered, waived, or otherwise authorized historical operating conditions.');
-    warningsToDowngrade.push('FM_CONTOUR_PROTECTION_VIOLATION', 'FM_MINIMUM_SEPARATION_VIOLATION');
+    warningsToDowngrade.push('FM_CONTOUR_PROTECTION_VIOLATION', 'FM_MINIMUM_SEPARATION_VIOLATION', 'AM_NIGHTTIME_PROTECTION_VIOLATION');
+    if (nifDefinitiveFail){
+      notes.push('§73.182(k) NIF failure confirmed by FCCAM (Wang 1985).  For a licensed station this is a legacy-review condition; the current authorization is not invalidated.  Any modification or new-CP filing must address the NIF shortfall.');
+    }
   } else if (currentRuleCompliance === 'fails_current_rules'){
     licenseInterpretation = 'requires_engineering_review';
     filingRisk = 'high';
     userFacingSummary =
-      'New or proposed filing does not clear current §73.207/§73.215 ' +
+      'The filing does not clear current §73.207/§73.215/§73.182 ' +
       'protections.  Filing cannot be treated as qualified until a ' +
       'compliant configuration, waiver basis, or engineering showing is ' +
       'developed.';
   } else if (currentRuleCompliance === 'passes_current_rules'){
     licenseInterpretation = 'ordinary_compliant';
-    filingRisk = 'low';
-    userFacingSummary =
-      'Current-rule spacing and contour checks did not identify a ' +
-      'filing-blocking FM protection issue.';
+    filingRisk = (nifFails && nifIsScreening) ? 'medium' : 'low';
+    userFacingSummary = (nifFails && nifIsScreening)
+      ? 'Pairwise spacing and contour checks did not identify a ' +
+        'filing-blocking protection issue.  The §73.182(k) NIF study ' +
+        'was run on the Berry 1968 screening engine (advisory-grade); ' +
+        'the screening result is not definitive under §73.190(c).  ' +
+        'Re-run with FCCAM (Wang 1985) for a defensible filing-grade result.'
+      : 'Current-rule spacing and contour checks did not identify a ' +
+        'filing-blocking protection issue.';
+    if (nifFails && nifIsScreening){
+      notes.push('Berry 1968 NIF screening failure is advisory only.  §73.190(c) permits Wang 1985 (FCCAM) as the authoritative source; a Berry screening result may not bind if the FCCAM run passes.');
+    }
   } else {
     licenseInterpretation = 'requires_engineering_review';
     filingRisk = 'medium';

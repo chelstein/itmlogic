@@ -129,23 +129,61 @@ export async function computeHaatMultiSource({
 }){
   const pts = buildSamplePoints({ tx_lat, tx_lon, radials_deg, from_km, to_km, samples });
 
-  // Fire all three sources concurrently; collect what succeeds.
-  const [usgsResult, omResult, otdResult] = await Promise.allSettled([
-    fetchElevationsUsgsEpqs(pts, timeoutMs),
-    fetchElevationsOpenMeteo(pts, timeoutMs),
-    fetchElevationsOpenTopoData(pts, timeoutMs)
-  ]);
+  // Race all three elevation sources: return as soon as the FIRST succeeds.
+  // Previously this used Promise.allSettled which waited for all three —
+  // meaning a slow USGS EPQS (49 serial chunks × 15 s timeout × 3 retries
+  // ≈ 2200 s worst case) blocked even after Open-Meteo had results in ~8 s.
+  // With Promise.any we take the winner and proceed.  Cross-validation
+  // collects secondaries that finish within CROSS_VALIDATE_WINDOW_MS; when
+  // only one source is available cross_validated stays false.
+  const CROSS_VALIDATE_WINDOW_MS = 30_000;
 
-  const results = [
-    { source_id: 'usgs-epqs',           r: usgsResult },
-    { source_id: 'open-meteo',          r: omResult   },
-    { source_id: 'opentopodata-srtm30m', r: otdResult  }
-  ].map(({ source_id, r }) => ({
-    source_id,
-    ok:        r.status === 'fulfilled',
-    elevations: r.status === 'fulfilled' ? r.value : null,
-    error:      r.status === 'rejected'  ? String(r.reason?.message || r.reason) : null
-  }));
+  const t0 = Date.now();
+  const sourceDefs = [
+    { source_id: 'usgs-epqs',            fn: () => fetchElevationsUsgsEpqs(pts, timeoutMs) },
+    { source_id: 'open-meteo',           fn: () => fetchElevationsOpenMeteo(pts, timeoutMs) },
+    { source_id: 'opentopodata-srtm30m', fn: () => fetchElevationsOpenTopoData(pts, timeoutMs) }
+  ];
+
+  // Each promise resolves to a result object (never rejects).
+  const racePromises = sourceDefs.map(({ source_id, fn }) =>
+    fn()
+      .then(elevations => ({ source_id, elevations, ok: true,  error: null }))
+      .catch(err       => ({ source_id, elevations: null, ok: false, error: String(err?.message || err) }))
+  );
+
+  // Find the first success.
+  let primary;
+  try {
+    primary = await Promise.any(racePromises.map(p =>
+      p.then(r => { if (!r.ok) throw new Error(r.error); return r; })
+    ));
+  } catch {
+    const settled = await Promise.allSettled(racePromises);
+    const errors  = settled.map(s => `${s.value?.source_id}: ${s.value?.error || s.reason}`);
+    throw new Error('All elevation sources failed: ' + errors.join('; '));
+  }
+
+  // Gather any secondaries that resolved within the cross-validation window.
+  const windowLeft = Math.max(0, CROSS_VALIDATE_WINDOW_MS - (Date.now() - t0));
+  const windowedResults = await Promise.all(
+    racePromises.map(p =>
+      Promise.race([
+        p,
+        new Promise(resolve =>
+          setTimeout(() => resolve({ source_id: 'window-expired', ok: false, error: 'timeout' }), windowLeft)
+        )
+      ])
+    )
+  );
+
+  const results = sourceDefs.map(({ source_id }) => {
+    if (source_id === primary.source_id) return { source_id, ok: true, elevations: primary.elevations, error: null };
+    const secondary = windowedResults.find(r => r.source_id === source_id);
+    return secondary && secondary.source_id !== 'window-expired'
+      ? { source_id, ok: secondary.ok, elevations: secondary.elevations, error: secondary.error }
+      : { source_id, ok: false, elevations: null, error: 'did not resolve within cross-validate window' };
+  });
 
   const succeeded = results.filter(x => x.ok && x.elevations);
 
@@ -156,22 +194,20 @@ export async function computeHaatMultiSource({
     );
   }
 
-  // Use the first successful source as primary.
-  const primary = succeeded[0];
   const haat_per_radial = computeHaatPerRadial({
-    elevations: primary.elevations,
+    elevations: primaryResult.elevations,
     radials_deg, samples, tx_amsl_m
   });
 
-  // Cross-validate if we have ≥ 2 sources.
+  // Cross-validate if we have ≥ 2 sources that resolved within the window.
   let cross_validated = false;
   let agreement_m     = null;
   const sourcesMeta   = results.map(x => {
     const meta = ELEVATION_SOURCES.find(s => s.id === x.source_id);
     return {
       source_id: x.source_id,
-      name:      meta.name,
-      dataset:   meta.dataset,
+      name:      meta?.name,
+      dataset:   meta?.dataset,
       ok:        x.ok,
       error:     x.error || null
     };
@@ -184,8 +220,8 @@ export async function computeHaatMultiSource({
   }
 
   return {
-    provider:         primary.source_id,
-    dem_source:       ELEVATION_SOURCES.find(s => s.id === primary.source_id).dataset,
+    provider:         primaryResult.source_id,
+    dem_source:       ELEVATION_SOURCES.find(s => s.id === primaryResult.source_id)?.dataset,
     regulation:       '47 CFR §73.313(d) arc-averaged HAAT',
     arc:              { from_km, to_km, samples, method: 'equal-spacing, Karney WGS-84 geodesic' },
     tx:               { lat: tx_lat, lon: tx_lon, amsl_m: tx_amsl_m },

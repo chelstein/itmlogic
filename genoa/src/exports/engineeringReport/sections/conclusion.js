@@ -130,19 +130,29 @@ export function buildConclusionSection(exhibit){
   // Take the verdict's narrative_fragments[] as the spine and decorate
   // with rule-specific context (NIF summary, failed-rule list, etc.).
   let narrative;
+  // Detect existing-licensed-facility context for narrative framing.
+  const _rcEx = exhibit?.regulatory_compliance || exhibit?.regulatoryContext || {};
+  const _isExisting = _rcEx.facility_status === 'licensed'
+                   || _rcEx.facilityStatus   === 'licensed'
+                   || _rcEx.study_intent     === 'existing_facility_review'
+                   || _rcEx.studyIntent      === 'existing_facility_review';
+  const _operatingLabel = _isExisting ? 'licensed nighttime operating mode' : 'proposed nighttime operating mode';
+
   if (v.status === Verdict.NOT_FILING_READY){
     if (nifFailing && !nifSourceIsScreening){
       const s = nif.summary || {};
       narrative =
         `The 47 CFR ${vocab.allocation_rule_cite} ${vocab.service_label} nighttime allocation study indicates ` +
-        'the facility does not qualify at its proposed nighttime operating mode/' +
+        `the facility does not qualify at its ${_operatingLabel}/` +
         `${vocab.erp_term.toLowerCase()}.  ` +
         // Bug 5 fix: the NIF summary field is `n_azimuths` (emitted by
         // nightOrchestrator.js), not `azimuths_evaluated`.  Using the
         // wrong key produced "36/?" (undefined coerced by ??) or "36/1".
         `${s.n_failing_azimuths ?? '?'}/${s.n_azimuths ?? s.azimuths_evaluated ?? '?'} evaluated azimuths fail the ${vocab.nighttime_interference_cite || vocab.interference_cite} D/U protection ratio; ` +
         `worst binding margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}.  ` +
-        `Facility redesign (${vocab.waiver_options}) is required prior to filing.`;
+        (_isExisting
+          ? `This is an existing licensed facility; the NIF shortfall may reflect legacy/grandfathered conditions.  Any modification or new-CP filing must address the §73.182(k) NIF standard (${vocab.waiver_options}).`
+          : `Facility redesign (${vocab.waiver_options}) is required prior to filing.`);
     } else {
       narrative = sentenceJoin(v.narrative_fragments);
     }
@@ -153,7 +163,8 @@ export function buildConclusionSection(exhibit){
       'screening engine (Berry 1968 analytical) and reports ' + (s.n_failing_azimuths ?? '?') + ' failing azimuth(s) ' +
       `(worst margin ${Number.isFinite(Number(s.worst_margin_db)) ? Number(s.worst_margin_db).toFixed(2) + ' dB' : 'n/a'}).  ` +
       `Re-run with FCCAM (Wang 1985) before filing to obtain a defensible ${vocab.skywave_cite || '§73.190(c)'} result; ` +
-      `a Berry-only failure is advisory and may not bind under ${vocab.nighttime_interference_cite || vocab.interference_cite}/${vocab.skywave_cite || '§73.190(c)'}.`;
+      `a Berry-only failure is advisory and may not bind under ${vocab.nighttime_interference_cite || vocab.interference_cite}/${vocab.skywave_cite || '§73.190(c)'}.` +
+      (_isExisting ? '  For this existing licensed station, a Berry screening failure is a review condition, not a prohibition on operation.' : '');
   } else if (v.status === Verdict.NON_COMPLIANT && isr && isr.filing_qualifies === false){
     // Reuse the failed-rules synthesis from the prior implementation so
     // the conclusion can't claim §73.207 failed when only §73.215 did.
