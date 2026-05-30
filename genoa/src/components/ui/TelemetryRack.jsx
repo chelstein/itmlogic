@@ -59,6 +59,15 @@ export default function TelemetryRack({ exhibit }) {
                 : regCtx?.filingRisk === 'low'    ? 'cyan'
                 : 'default';
 
+  // Single source of truth for blocker/warning counts: merge exhibit.blockers
+  // (engine warnings-level) with exhibit.annotations blockers (NIF/advisory
+  // system).  FilingHeroBanner in App.jsx uses the same formula so the gauge
+  // and the banner always agree.
+  const annBlockers = (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'blocker');
+  const annWarnings = (exhibit?.annotations || []).filter(a => (a?.severity || a?.level) === 'warning');
+  const allBlockers = [...(exhibit?.blockers || []), ...annBlockers];
+  const allWarnings = [...(exhibit?.warnings || []).filter(w => w.severity !== 'blocker'), ...annWarnings];
+
   return (
     <div className="space-y-4">
 
@@ -66,8 +75,8 @@ export default function TelemetryRack({ exhibit }) {
         <FilingReadinessGauge
           score={fr.score ?? 0}
           mode={fr.status || 'demo'}
-          blockersCount={(exhibit?.blockers || []).length}
-          warningsCount={(exhibit?.warnings || []).filter(w => w.severity !== 'blocker').length}
+          blockersCount={allBlockers.length}
+          warningsCount={allWarnings.length}
         />
         {fr.recommendations && fr.recommendations.length > 0 && (
           <ul className="mt-3 space-y-1">
@@ -139,8 +148,8 @@ export default function TelemetryRack({ exhibit }) {
 
       <RackPanel eyebrow="Console / 02" title="Warnings" tone="danger">
         <WarningConsole
-          blockers={exhibit?.blockers || []}
-          warnings={exhibit?.warnings || []}
+          blockers={allBlockers}
+          warnings={allWarnings}
           recommendations={fr.recommendations || []}
           warningsToDowngrade={regCtx?.warningsToDowngrade || []}
           regulatoryContext={regCtx}
