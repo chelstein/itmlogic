@@ -13,6 +13,7 @@ import {
   necPatternToTable,
   NEC_PROVENANCE
 } from '../evidence/nec/client.js';
+import { studyContourPair } from '../engine/regulatory/_du_pair_study.js';
 
 function withFetch(fakeFetch, fn){
   const orig = global.fetch;
@@ -226,4 +227,101 @@ test('NEC_PROVENANCE names NEC2++ + GPL boundary + regulation cites', () => {
   assert.ok(NEC_PROVENANCE.regulation_basis.some(r => /73\.62/.test(r)));
   assert.ok(NEC_PROVENANCE.regulation_basis.some(r => /73\.150/.test(r)));
   assert.ok(NEC_PROVENANCE.regulation_basis.some(r => /1\.1310/.test(r)));
+});
+
+/* ---------------- NEC pattern → FM D/U wiring integration ---------------- */
+//
+// This block tests the full wiring introduced by PR #1:
+//   necPatternToTable() → pattern_table on the U station → studyContourPair()
+// It proves that a non-omnidirectional NEC pattern actually suppresses the
+// undesired-signal field in the D/U study (directional_pattern_applied=true,
+// u_pattern_factor < 1.0, erp_effective_kw < erp_kw on the null bearing).
+
+// REF_PATTERN horizon row at theta=90:  phi=[0,90,180,270], gain=[3,0,-6,0] dBi
+// max_dbi = 3 → factors: phi=0→1.0, phi=90→0.708, phi=180→0.355, phi=270→0.708.
+// At ~270° (bearing toward a station roughly west of U) the factor is ≈ 0.708 (−3 dB)
+// compared to the omnidirectional peak.  At ~180° it is 0.355 (−9 dB) — a clear null.
+
+test('NEC wiring integration: necPatternToTable returns non-null table for REF_RESPONSE', () => {
+  const tbl = necPatternToTable(REF_RESPONSE, { elevation_deg: 0 });
+  assert.ok(tbl !== null, 'should extract horizon pattern table from NEC response');
+  assert.ok(Array.isArray(tbl), 'pattern_table must be an array');
+  assert.ok(tbl.length > 0, 'pattern_table must be non-empty');
+  // All entries must be [az_deg, field_factor] pairs with factor in (0,1].
+  for (const [az, f] of tbl){
+    assert.ok(Number.isFinite(az), `az_deg ${az} is finite`);
+    assert.ok(Number.isFinite(f) && f >= 0 && f <= 1, `field_factor ${f} in [0,1]`);
+  }
+});
+
+test('NEC wiring integration: D/U study with NEC pattern applies directional suppression', () => {
+  // Extract pattern from the reference NEC response.
+  const pattern_table = necPatternToTable(REF_RESPONSE, { elevation_deg: 0 });
+  assert.ok(pattern_table !== null, 'precondition: pattern_table non-null');
+
+  // U station: AM-band parameters, positioned roughly due south of D (bearing ~180°
+  // from U toward D) — which aligns with the −6 dBi null in REF_PATTERN's phi=180 slot.
+  const U = {
+    lat: 35.0,          // U is north of D
+    lon: -97.0,
+    erp_kw: 5.0,
+    haat_m: 100,
+    frequency_mhz: 107.9,
+    call: 'WXXX',
+    pattern_table          // NEC-derived directional pattern wired in
+  };
+
+  // D station: further south, such that U→D bearing is roughly 180°.
+  const D = {
+    lat: 34.0,
+    lon: -97.0,
+    erp_kw: 10.0,
+    haat_m: 150,
+    frequency_mhz: 107.9,   // co-channel
+    fcc_class: 'C'
+  };
+
+  const study_with_pattern = studyContourPair(U, D, {
+    relationship:       'co-channel',
+    du_threshold_db:    20,
+    protected_field_dbu: 40,
+    protected_mode:     '50,50',
+    interfering_mode:   '50,10'
+  });
+
+  // Verify directional suppression was applied.
+  assert.equal(study_with_pattern.directional_pattern_applied, true,
+    'directional_pattern_applied should be true when pattern_table is wired in');
+  assert.ok(study_with_pattern.u_pattern_factor < 1.0,
+    `u_pattern_factor (${study_with_pattern.u_pattern_factor}) should be < 1.0 on a null bearing`);
+  assert.ok(study_with_pattern.u_erp_effective_kw < U.erp_kw,
+    `u_erp_effective_kw (${study_with_pattern.u_erp_effective_kw}) should be < erp_kw (${U.erp_kw}) when pattern suppresses`);
+
+  // Compare with the omni baseline (no pattern_table).
+  const U_omni = { ...U, pattern_table: null };
+  const study_omni = studyContourPair(U_omni, D, {
+    relationship:       'co-channel',
+    du_threshold_db:    20,
+    protected_field_dbu: 40,
+    protected_mode:     '50,50',
+    interfering_mode:   '50,10'
+  });
+
+  assert.equal(study_omni.directional_pattern_applied, false,
+    'omni baseline: directional_pattern_applied should be false');
+  assert.equal(study_omni.u_pattern_factor, 1.0,
+    'omni baseline: u_pattern_factor should be 1.0');
+
+  // Before (omni) vs after (directional): effective ERP is lower with pattern.
+  assert.ok(study_with_pattern.u_erp_effective_kw < study_omni.u_erp_effective_kw,
+    `directional ERP (${study_with_pattern.u_erp_effective_kw} kW) should be less than omni ERP (${study_omni.u_erp_effective_kw} kW)`);
+
+  // D/U should be better (higher) with directional pattern because U radiates less
+  // toward D along the null bearing.
+  if (!study_with_pattern.skipped && !study_omni.skipped
+      && Number.isFinite(study_with_pattern.du_actual_db)
+      && Number.isFinite(study_omni.du_actual_db)){
+    assert.ok(study_with_pattern.du_actual_db > study_omni.du_actual_db,
+      `D/U with pattern (${study_with_pattern.du_actual_db.toFixed(2)} dB) should exceed omni D/U (${study_omni.du_actual_db.toFixed(2)} dB)`);
+  }
 });

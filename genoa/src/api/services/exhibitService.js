@@ -25,6 +25,7 @@ import { needsRemediation, runRemediationSweep, bindingBearings, bindingConstrai
 import { W }                    from '../../types/warnings.js';
 import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/terrain/elevationClient.js';
 import { makeBudget }              from './computeBudget.js';
+import { necPatternToTable }       from '../../evidence/nec/client.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -826,6 +827,12 @@ export async function computeExhibit(req){
         { minMs: 5_000 });
       if (necResp?.ok){
         evidence.nec_model = necResp;
+        // Extract the horizon radiation pattern and store it so
+        // downstream FM and AM study paths can apply it.
+        // necPatternToTable() returns [[az_deg, field_factor], ...]
+        // normalized to peak=1, or null when no pattern is present.
+        const nec_pattern_table = necPatternToTable(necResp, { elevation_deg: 0 });
+        if (nec_pattern_table) evidence.nec_pattern_table = nec_pattern_table;
         // license-boundary disclosure is informational; always emitted
         // when NEC evidence is present so reviewers see the boundary.
         warnings.push(W.make('NEC_LICENSE_BOUNDARY_EXTERNAL'));
@@ -1529,6 +1536,18 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 6e. NEC pattern → inputs.pattern_table (FM D/U wiring) ----
+  // The NEC sidecar pattern (when present) is stored on evidence at
+  // step 3b-2.  The engine's compute() reads inputs.pattern_table to
+  // build the subject's directional pattern for FM §73.215 and FX
+  // §74.1204 D/U studies (studyContourPair() checks U.pattern_table).
+  // Copy the NEC pattern to inputs.pattern_table here so compute()
+  // sees it as the subject's pattern — but only when the operator
+  // didn't already supply an explicit pattern_table (operator data wins).
+  if (!inputs.pattern_table && evidence.nec_pattern_table){
+    inputs.pattern_table = evidence.nec_pattern_table;
+  }
+
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {
     operator:     options.operator     || null,
@@ -1865,8 +1884,8 @@ export async function computeExhibit(req){
         erp_kw:        Number(inputs.erp_kw),
         fcc_class:     inputs.fcc_class || null,
         facility_id:   inputs.facility_id || null,
-        pattern_mode:  inputs.pattern_mode || (inputs.pattern_table ? 'DA' : 'omni'),
-        pattern_table: inputs.pattern_table || null
+        pattern_mode:  inputs.pattern_mode || (inputs.pattern_table ?? evidence.nec_pattern_table ? 'DA' : 'omni'),
+        pattern_table: inputs.pattern_table ?? evidence.nec_pattern_table ?? null
       };
       const study = await budget.withDeadline('am_night_nif',
         () => nighttimeNifStudy({ proposed, options: options.am_night_nif_options || {} },
@@ -2096,8 +2115,8 @@ export async function computeExhibit(req){
         call:          inputs.call || null,
         facility_id:   inputs.facility_id || null,
         timezone_code: inputs.timezone_code || undefined,
-        pattern_table: inputs.pattern_table || null,
-        pattern_mode:  inputs.pattern_mode  || (inputs.pattern_table ? 'DA' : 'omni')
+        pattern_table: inputs.pattern_table ?? evidence.nec_pattern_table ?? null,
+        pattern_mode:  inputs.pattern_mode  || (inputs.pattern_table ?? evidence.nec_pattern_table ? 'DA' : 'omni')
       };
       const study = await budget.withDeadline('am_psra_pssa',
         () => psraPssaExhibit({ proposed, options: options.am_psra_pssa_options || {} },
