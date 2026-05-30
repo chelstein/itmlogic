@@ -102,7 +102,19 @@ export function buildTowerStudySection(exhibit){
   if (cmpl?.applicable){
     divider('§17.21 / §17.23 + FAA AC 70/7460-1L — rules-derived recommendation');
     rows.push(
-      ['Notification required (§17.7)', cmpl.notification_required ? 'YES — structure > 200 ft AGL or near airport' : 'No (under threshold)'],
+      // Bug 2 fix: surface the actual trigger reason(s) rather than a
+      // generic combined string.  A short tower near an airport must not
+      // say "> 200 ft AGL" when only airport proximity applies.
+      ['Notification required (§17.7)', cmpl.notification_required
+        ? (() => {
+            const reasons = [];
+            const citeHeight  = (cmpl.cites || []).find(ci => ci.rule && /17\.7\(a\)/.test(ci.rule));
+            const citeAirport = (cmpl.cites || []).find(ci => ci.rule && /17\.7\(c\)/.test(ci.rule));
+            if (citeHeight?.triggered)   reasons.push('structure > 200 ft AGL');
+            if (citeAirport?.triggered)  reasons.push('within airport notification proximity');
+            return `YES — ${reasons.length ? reasons.join(' and ') : 'see §17.7'}`;
+          })()
+        : 'No (under threshold)'],
       ['Structure type',                cmpl.structure_type      || 'TOWER'],
       ['Height AGL',                    `${fmtMeters(cmpl.height_agl_m)} (${cmpl.height_agl_ft || '—'} ft)`],
       ['Required marking',              cmpl.marking?.required  ? styleLabel(cmpl.marking.style)  : 'Not required'],
