@@ -42,6 +42,134 @@ const RADIAL_STEPS = [
   { v: 1,     label: '1° (full exhibit)' }
 ];
 
+// NEC tower geometry form — a compact table of per-tower fields.
+// Rendered by FacilityRack when antennaSource === 'nec_geometry'.
+function NecTowerForm({ necGeometry, onNecGeometryChange, necRunning, necResult, necError, onRunNec, necOnline }){
+  const TOWER_COLS = [
+    { key: 'tag',            label: 'Tag' },
+    { key: 'x_m',            label: 'X (m)' },
+    { key: 'y_m',            label: 'Y (m)' },
+    { key: 'height_m',       label: 'H (m)' },
+    { key: 'radius_m',       label: 'R (m)' },
+    { key: 'segments',       label: 'Segs' },
+    { key: 'drive_amplitude',label: 'Amp' },
+    { key: 'drive_phase_deg',label: 'Phase°' }
+  ];
+
+  function setField(k, v){
+    onNecGeometryChange(prev => ({ ...prev, [k]: v }));
+  }
+  function setTower(idx, field, value){
+    onNecGeometryChange(prev => ({
+      ...prev,
+      towers: prev.towers.map((t, i) => i === idx ? { ...t, [field]: value } : t)
+    }));
+  }
+  function addTower(){
+    onNecGeometryChange(prev => ({
+      ...prev,
+      towers: [
+        ...prev.towers,
+        { tag: String(prev.towers.length + 1), x_m: '0', y_m: '0',
+          height_m: '75', radius_m: '0.25', segments: '21',
+          drive_amplitude: '1.0', drive_phase_deg: '0' }
+      ]
+    }));
+  }
+  function removeTower(idx){
+    onNecGeometryChange(prev => ({
+      ...prev,
+      towers: prev.towers.filter((_, i) => i !== idx)
+    }));
+  }
+
+  return (
+    <div className="mt-3 space-y-2 font-mono text-[11px]">
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <label className="rack-label">Freq (kHz)</label>
+          <input className="rack-input" value={necGeometry.frequency_khz}
+            onChange={e => setField('frequency_khz', e.target.value)}
+            placeholder="e.g. 1190" />
+        </div>
+        <div>
+          <label className="rack-label">Ground σ (S/m)</label>
+          <input className="rack-input" value={necGeometry.ground_conductivity}
+            onChange={e => setField('ground_conductivity', e.target.value)}
+            placeholder="0.005" />
+        </div>
+        <div>
+          <label className="rack-label">Ground εᵣ</label>
+          <input className="rack-input" value={necGeometry.ground_dielectric}
+            onChange={e => setField('ground_dielectric', e.target.value)}
+            placeholder="13" />
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded border border-rule">
+        <table className="telemetry w-full text-[10px]">
+          <thead>
+            <tr>
+              {TOWER_COLS.map(c => <th key={c.key}>{c.label}</th>)}
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {necGeometry.towers.map((t, idx) => (
+              <tr key={idx}>
+                {TOWER_COLS.map(c => (
+                  <td key={c.key} className="p-0">
+                    <input
+                      className="w-full bg-transparent border-0 px-1 py-0.5 font-mono text-[10px] text-cream focus:outline-none focus:bg-white/5"
+                      value={t[c.key]}
+                      onChange={e => setTower(idx, c.key, e.target.value)}
+                    />
+                  </td>
+                ))}
+                <td className="p-0 text-center">
+                  <button
+                    type="button"
+                    onClick={() => removeTower(idx)}
+                    disabled={necGeometry.towers.length <= 1}
+                    className="px-1 text-textDim hover:text-red-400 disabled:opacity-30"
+                    title="Remove tower"
+                  >×</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center gap-2 flex-wrap">
+        <button type="button" onClick={addTower}
+          className="px-2 py-0.5 border border-rule rounded text-textDim hover:bg-white/5 text-[10px]">
+          + Add tower
+        </button>
+        <button type="button" onClick={onRunNec}
+          disabled={necRunning || !necOnline}
+          className="px-3 py-1 border border-cyan-500/50 rounded text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-40 text-[11px] font-mono"
+          title={!necOnline ? 'NEC sidecar offline (NEC_SIDECAR_URL not set)' : 'Run NEC pattern preview'}>
+          {necRunning ? 'Running…' : 'Run NEC →'}
+        </button>
+        {!necOnline && (
+          <span className="text-textDim text-[10px]">(NEC offline)</span>
+        )}
+      </div>
+
+      {necError && (
+        <div className="text-amber-400 text-[10px] mt-1">NEC error: {necError}</div>
+      )}
+      {necResult && (
+        <div className="text-emerald-300 text-[10px] mt-1">
+          NEC OK · {(necResult.pattern_table || []).length} samples →
+          wired into pattern_table (pattern_mode set to DA)
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FacilityRack({
   inputs = {},
   onChange,
@@ -59,7 +187,19 @@ export default function FacilityRack({
   onStationQueryChange,
   onStationPick,
   computing = false,
-  busy = false
+  busy = false,
+  // Workbench: study mode, antenna source, NEC geometry
+  studyMode           = 'licensed_current',
+  onStudyModeChange,
+  antennaSource       = 'manual_table',
+  onAntennaSourceChange,
+  necGeometry         = { frequency_khz: '', ground_conductivity: '0.005', ground_dielectric: '13', towers: [] },
+  onNecGeometryChange,
+  necRunning          = false,
+  necResult           = null,
+  necError            = '',
+  onRunNec,
+  necOnline           = false
 }) {
   // 3rd arg is an optional provenance tag — only the fcc_class field
   // uses it today so the source chip can flip from "AMQ" to "manual"
@@ -160,6 +300,17 @@ export default function FacilityRack({
         <div className="mt-2 font-mono text-[11px] text-textDim">{facilitySource}</div>
       )}
 
+      {/* Workbench: study mode — licensed_current is default and a no-op */}
+      <div className="mt-3">
+        <label className="rack-label">Study mode</label>
+        <select className="rack-input" value={studyMode}
+          onChange={e => onStudyModeChange && onStudyModeChange(e.target.value)}>
+          <option value="licensed_current">Licensed Current</option>
+          <option value="pending_cp">Pending CP</option>
+          <option value="manual_scenario">Manual Scenario</option>
+        </select>
+      </div>
+
       <div className="grid grid-cols-3 gap-2 mt-3">
         <div>
           <label className="rack-label">Frequency</label>
@@ -216,13 +367,6 @@ export default function FacilityRack({
 
       <div className="grid grid-cols-2 gap-2 mt-3">
         <div>
-          <label className="rack-label">Pattern</label>
-          <select className="rack-input" value={inputs.pattern_mode || 'ND'} onChange={e => set('pattern_mode', e.target.value)}>
-            <option value="ND">Non-directional</option>
-            <option value="DA">Directional (paste table)</option>
-          </select>
-        </div>
-        <div>
           <label className="rack-label">Radial step</label>
           <select className="rack-input" value={inputs.radial_step_deg || 10} onChange={e => set('radial_step_deg', Number(e.target.value))}>
             {RADIAL_STEPS.map(s => <option key={s.v} value={s.v}>{s.label}</option>)}
@@ -230,17 +374,52 @@ export default function FacilityRack({
         </div>
       </div>
 
-      {inputs.pattern_mode === 'DA' && (
-        <div className="mt-3">
-          <label className="rack-label">Pattern table (azimuth, relative field)</label>
-          <textarea
-            className="rack-input"
-            rows={4}
-            value={inputs.pattern_table || ''}
-            onChange={e => set('pattern_table', e.target.value)}
-            placeholder={'0,1.00\n90,0.85\n180,0.40\n270,0.85'}
-          />
-        </div>
+      {/* Workbench: antenna source — manual_table preserves existing behavior */}
+      <div className="mt-3">
+        <label className="rack-label">Antenna source</label>
+        <select className="rack-input" value={antennaSource}
+          onChange={e => onAntennaSourceChange && onAntennaSourceChange(e.target.value)}>
+          <option value="manual_table">Manual table</option>
+          <option value="nec_geometry" disabled={!necOnline}>
+            NEC geometry{!necOnline ? ' (NEC offline)' : ''}
+          </option>
+        </select>
+      </div>
+
+      {antennaSource === 'manual_table' && (
+        <>
+          <div className="mt-3">
+            <label className="rack-label">Pattern</label>
+            <select className="rack-input" value={inputs.pattern_mode || 'ND'} onChange={e => set('pattern_mode', e.target.value)}>
+              <option value="ND">Non-directional</option>
+              <option value="DA">Directional (paste table)</option>
+            </select>
+          </div>
+          {inputs.pattern_mode === 'DA' && (
+            <div className="mt-3">
+              <label className="rack-label">Pattern table (azimuth, relative field)</label>
+              <textarea
+                className="rack-input"
+                rows={4}
+                value={inputs.pattern_table || ''}
+                onChange={e => set('pattern_table', e.target.value)}
+                placeholder={'0,1.00\n90,0.85\n180,0.40\n270,0.85'}
+              />
+            </div>
+          )}
+        </>
+      )}
+
+      {antennaSource === 'nec_geometry' && (
+        <NecTowerForm
+          necGeometry={necGeometry}
+          onNecGeometryChange={onNecGeometryChange}
+          necRunning={necRunning}
+          necResult={necResult}
+          necError={necError}
+          onRunNec={onRunNec}
+          necOnline={necOnline}
+        />
       )}
 
       <div className="rack-eyebrow mt-4 mb-1">Demo presets</div>

@@ -243,6 +243,43 @@ function MainApp({ onLogout, onOpenOptimizer }) {
   // PE certification dialog state.  Stamps land on `exhibit.pe_certification`.
   const [peDialogOpen, setPeDialogOpen] = useState(false);
 
+  // Workbench: NEC sidecar online flag — probed from /readyz on mount.
+  // Drives the disabled state of the "nec_geometry" antenna source option.
+  const [necOnline, setNecOnline] = useState(false);
+  useEffect(() => {
+    fetch('/readyz', { credentials: 'same-origin' })
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        const nec = j?.sidecars?.nec;
+        setNecOnline(!!(nec?.configured && nec?.healthy));
+      })
+      .catch(() => {});
+  }, []);
+
+  // Workbench: study mode — controls which licensing scenario the
+  // exhibit engine runs against.  licensed_current (default) is a no-op
+  // so existing behavior is 100% preserved.
+  const [studyMode, setStudyMode] = useState('licensed_current');
+
+  // Workbench: antenna source — controls whether the pattern is taken
+  // from a manually-entered table or from a NEC2++ antenna geometry run.
+  // manual_table (default) preserves all existing behavior.
+  const [antennaSource, setAntennaSource] = useState('manual_table');
+
+  // NEC geometry form state — tower array parameters for the NEC sidecar.
+  const [necGeometry, setNecGeometry] = useState({
+    frequency_khz:       '',
+    ground_conductivity: '0.005',
+    ground_dielectric:   '13',
+    towers: [
+      { tag: '1', x_m: '0', y_m: '0', height_m: '75', radius_m: '0.25',
+        segments: '21', drive_amplitude: '1.0', drive_phase_deg: '0' }
+    ]
+  });
+  const [necRunning, setNecRunning]   = useState(false);
+  const [necResult,  setNecResult]    = useState(null);
+  const [necError,   setNecError]     = useState('');
+
   // 3rd arg (src) tags the provenance of the change — only fcc_class
   // currently uses it so the source chip in FacilityRack flips from
   // "AMQ" to "manual" when the engineer types over the auto-populated
@@ -411,11 +448,37 @@ function MainApp({ onLogout, onOpenOptimizer }) {
           ground_sigma_mS_m: num(i.ground_sigma_mS_m),
           radial_step_deg:   num(i.radial_step_deg) || 10,
           // Pass DA pattern only when the user toggled it on.
-          pattern_table: i.pattern_mode === 'DA' ? i.pattern_table : null
+          pattern_table: i.pattern_mode === 'DA' ? i.pattern_table : null,
+          // NEC antenna geometry — only wired when operator selected nec_geometry source.
+          antenna_geometry: antennaSource === 'nec_geometry' && necGeometry.towers.length > 0
+            ? {
+                frequency_khz: Number(necGeometry.frequency_khz) || num(i.frequency) || null,
+                ground: {
+                  type: 'sommerfeld',
+                  conductivity_s_m:   Number(necGeometry.ground_conductivity),
+                  dielectric_constant: Number(necGeometry.ground_dielectric)
+                },
+                towers: necGeometry.towers.map(t => ({
+                  tag:      Number(t.tag),
+                  x_m:      Number(t.x_m),
+                  y_m:      Number(t.y_m),
+                  height_m: Number(t.height_m),
+                  radius_m: Number(t.radius_m),
+                  segments: Number(t.segments),
+                  drive: {
+                    amplitude:  Number(t.drive_amplitude),
+                    phase_deg:  Number(t.drive_phase_deg)
+                  }
+                }))
+              }
+            : undefined
         },
         options: {
           use_terrain: !!i.use_terrain,
-          use_itm:     !!i.use_itm
+          use_itm:     !!i.use_itm,
+          use_nec:     antennaSource === 'nec_geometry',
+          // study_mode: omit when licensed_current so existing behavior is preserved.
+          study_mode: studyMode !== 'licensed_current' ? studyMode : undefined
         }
       };
       // Belt-and-suspenders: strip any DOM/React refs that could have
@@ -567,6 +630,59 @@ function MainApp({ onLogout, onOpenOptimizer }) {
     setExhibit(null);
     setFacilitySource('');
     setStatusMsg('Reset.');
+  }
+
+  /* ---------------- NEC PATTERN PREVIEW ---------------- */
+
+  async function runNec(){
+    if (necRunning) return;
+    setNecRunning(true);
+    setNecError('');
+    setNecResult(null);
+    try {
+      const geo = {
+        frequency_khz: Number(necGeometry.frequency_khz) || num(inputs.frequency) || null,
+        ground: {
+          type: 'sommerfeld',
+          conductivity_s_m:    Number(necGeometry.ground_conductivity),
+          dielectric_constant: Number(necGeometry.ground_dielectric)
+        },
+        towers: necGeometry.towers.map(t => ({
+          tag:      Number(t.tag),
+          x_m:      Number(t.x_m),
+          y_m:      Number(t.y_m),
+          height_m: Number(t.height_m),
+          radius_m: Number(t.radius_m),
+          segments: Number(t.segments),
+          drive: {
+            amplitude: Number(t.drive_amplitude),
+            phase_deg: Number(t.drive_phase_deg)
+          }
+        }))
+      };
+      const r = await fetch('/api/nec/pattern', {
+        method:  'POST',
+        headers: { 'content-type': 'application/json' },
+        credentials: 'same-origin',
+        body:    JSON.stringify({ antenna_geometry: geo })
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!j.ok){
+        setNecError(j.error || `NEC run failed (HTTP ${r.status})`);
+        return;
+      }
+      setNecResult(j);
+      // Wire the returned pattern_table into inputs so compute() picks it up.
+      setInputs(s => ({
+        ...s,
+        pattern_mode:  'DA',
+        pattern_table: j.pattern_table
+      }));
+    } catch (e){
+      setNecError(`NEC request failed: ${e.message}`);
+    } finally {
+      setNecRunning(false);
+    }
   }
 
   /* ---------------- SAVE / EXPORT ---------------- */
@@ -893,6 +1009,18 @@ function MainApp({ onLogout, onOpenOptimizer }) {
           onStationPick={loadStationRow}
           computing={computing}
           busy={busy}
+          // Workbench: study mode + antenna source + NEC geometry form
+          studyMode={studyMode}
+          onStudyModeChange={setStudyMode}
+          antennaSource={antennaSource}
+          onAntennaSourceChange={setAntennaSource}
+          necGeometry={necGeometry}
+          onNecGeometryChange={setNecGeometry}
+          necRunning={necRunning}
+          necResult={necResult}
+          necError={necError}
+          onRunNec={() => runNec()}
+          necOnline={necOnline}
         />
         <ServiceHealthPanel />
       </>)}
