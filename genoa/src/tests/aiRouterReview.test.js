@@ -82,7 +82,7 @@ test('snapshot surfaces the consistency-relevant fields', () => {
   assert.match(snap, /Interference rules = FAIL/);
   assert.match(snap, /engineering_conclusion=NON-COMPLIANT/);
   assert.match(snap, /haat_status=FALLBACK_ONLY/);
-  assert.match(snap, /contour_distance_spread_km=\[37\.10, 41\.90\]/);
+  assert.match(snap, /contour_s60_spread_km=\[37\.10, 41\.90\]/);
 });
 
 test('reviewExhibit is a no-op (null) without MODEL_ACCESS_KEY', async () => {
