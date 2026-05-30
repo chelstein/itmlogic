@@ -83,6 +83,9 @@ services:
       # the URL + bearer token (see chelstein/splat#9) post-deploy.
       - { key: SPLAT_SIDECAR_URL,           scope: RUN_TIME, value: "" }
       - { key: SPLAT_API_TOKEN,             scope: RUN_TIME, type: SECRET, value: "" }
+      # Orphan reaper — 2 h window so long NEC optimizer and SPLAT/ITM
+      # runs are not killed before they finish.
+      - { key: JOB_REAP_STALE_AFTER_MS,    scope: RUN_TIME, value: "1800000" }
 
   # ---- NEC2++ / PyNEC antenna-modeling sidecar (GPL-isolated) ----
   #
@@ -203,7 +206,8 @@ workers:
       - { key: DATABASE_URL, scope: RUN_TIME, value: "${db.DATABASE_URL}" }
       - { key: PG_SSL,       scope: RUN_TIME, value: "true" }
       - { key: PG_SSL_REJECT_UNAUTHORIZED, scope: RUN_TIME, value: "false" }
-      - { key: WORKER_POLL_MS, scope: RUN_TIME, value: "5000" }
+      - { key: WORKER_POLL_MS,             scope: RUN_TIME, value: "5000" }
+      - { key: JOB_REAP_STALE_AFTER_MS,   scope: RUN_TIME, value: "1800000" }
 
 # Notes on what's NOT in this spec:
 #

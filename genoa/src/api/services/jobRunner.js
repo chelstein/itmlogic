@@ -40,7 +40,7 @@ const PROGRESS = Object.freeze({
 // jobs that are merely slow.  A 30 s tick is enough resolution for both:
 // it bumps updated_at well inside the reaper window and lets the UI
 // show an elapsed-time counter that advances visibly.
-const HEARTBEAT_INTERVAL_MS = 30_000;
+const HEARTBEAT_INTERVAL_MS = 15_000;
 
 // Run an async step while emitting periodic setProgress() heartbeats
 // against the job row.  The heartbeat re-uses the same phase message
