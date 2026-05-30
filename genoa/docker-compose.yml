@@ -52,7 +52,8 @@ services:
     environment:
       DATABASE_URL: postgres://genoa:genoa@genoa-postgres:5432/genoa
       PG_SSL:       "false"
-      WORKER_POLL_MS: "5000"
+      WORKER_POLL_MS:           "5000"
+      JOB_REAP_STALE_AFTER_MS: "7200000"
 
   genoa-terrain-sidecar:
     build:
