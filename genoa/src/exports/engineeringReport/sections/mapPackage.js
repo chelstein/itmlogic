@@ -14,14 +14,16 @@ import { coerceMapBuffer } from '../../../sidecars/mapClient.js';
 
 export function buildMapPackageSection(exhibit, options = {}){
   const buf = coerceMapBuffer(options.contour_map_png);
+  const isAM = (exhibit?.station_inputs?.service || '').toUpperCase() === 'AM';
+  const contourCite = isAM ? '§73.184' : '§73.333';
   if (!buf){
     return {
       id:      'map-package',
       type:    'paragraphs',
       heading: 'Contour Map',
       paragraphs: [
-        'No contour map render is attached to this exhibit (the Genoa map sidecar was not configured at PDF render time, or the render timed out).  The §73.333 contour distances are reported in the Contour Results exhibit; coordinate provenance and radial table appear in the Radials appendix; this section would normally include the printable contour map composed by the Genoa map sidecar.',
-        'To attach the map, configure MAP_SIDECAR_URL on the deploy and re-run the PDF export.  The map sidecar renders a Leaflet-composed PNG with the §73.333 service / interfering contour polygons, transmitter site marker, NAD83 coordinates, scale bar, north arrow, and station banner — the standard H&D-style contour-map deliverable for an FCC filing.'
+        `No contour map render is attached to this exhibit (the Genoa map sidecar was not configured at PDF render time, or the render timed out).  The ${contourCite} contour distances are reported in the Contour Results exhibit; coordinate provenance and radial table appear in the Radials appendix; this section would normally include the printable contour map composed by the Genoa map sidecar.`,
+        `To attach the map, configure MAP_SIDECAR_URL on the deploy and re-run the PDF export.  The map sidecar renders a Leaflet-composed PNG with the ${contourCite} service / interfering contour polygons, transmitter site marker, NAD83 coordinates, scale bar, north arrow, and station banner — the standard H&D-style contour-map deliverable for an FCC filing.`
       ]
     };
   }
@@ -29,7 +31,7 @@ export function buildMapPackageSection(exhibit, options = {}){
     id:      'map-package',
     type:    'image',
     heading: 'Contour Map',
-    caption: 'Service / interfering contours per 47 CFR §73.333.  Transmitter site shown as filled circle; NAD83 datum; scale bar and north arrow at lower-right.  Composed by Genoa map sidecar (Chromium-rendered Leaflet, OSM/CARTO base, sidecar SHA see Build Attestation).',
+    caption: `Service / interfering contours per 47 CFR ${contourCite}.  Transmitter site shown as filled circle; NAD83 datum; scale bar and north arrow at lower-right.  Composed by Genoa map sidecar (Chromium-rendered Leaflet, OSM/CARTO base, sidecar SHA see Build Attestation).`,
     image_buffer: buf,
     image_format: 'png'
   };
