@@ -116,8 +116,10 @@ function methodologyParagraph({ summary, interferers, nif }){
 }
 
 function isBerryEngine(nif){
-  const engine = nif?.engine || nif?.source || 'fccam';
-  return engine === 'berry-1968-screening' || (typeof engine === 'string' && engine.startsWith('berry'));
+  if (nif?.filing_grade === false) return true;
+  const engine = nif?.source || nif?.engine || 'fccam';
+  return engine === 'berry-1968' || engine === 'berry-1968-screening'
+      || (typeof engine === 'string' && engine.startsWith('berry'));
 }
 
 // Engine-aware methodology + closing prose.  Reads the engine
@@ -127,8 +129,7 @@ function isBerryEngine(nif){
 // explicit "SCREENING-grade — re-run with FCCAM Wang before filing"
 // disclaimer the reviewer needs to see.
 function describeEngine(nif){
-  const engine = nif?.engine || nif?.source || 'fccam';
-  if (engine === 'berry-1968-screening' || engine?.startsWith?.('berry')){
+  if (isBerryEngine(nif)){
     return 'the Berry analytical model (47 CFR §73.190(c)) — SCREENING-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing';
   }
   return 'FCCAM (Wang 1985 model, 47 CFR §73.190(c)) — filing-grade';
@@ -168,8 +169,7 @@ function failureRollupParagraph({ summary, contour }){
 }
 
 function closingParagraph({ nif }){
-  const engine = nif?.engine || nif?.source || 'fccam';
-  const isBerry = engine === 'berry-1968-screening' || engine?.startsWith?.('berry');
+  const isBerry = isBerryEngine(nif);
   const engineLabel = isBerry
     ? 'Berry analytical model (47 CFR §73.190(c), SCREENING-grade)'
     : (nif.provenance?.upstream_skywave || 'FCCAM (Fccam.for / Wang 1985)');

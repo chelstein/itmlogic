@@ -259,7 +259,33 @@ export const WARNING_CODES = Object.freeze({
 
   SIGMA_CLAMP: { severity: 'warning', phase: 'engine',
     title: 'AM σ rounded or clamped to FCC M3 grid (47 CFR §73.184)',
-    description: 'The §73.184 groundwave grid is keyed on integer σ ∈ {1..8} mS/m (Figure M3).  The typed conductivity was rounded to the nearest grid value, or clamped to the 1 / 8 mS/m boundary for out-of-range soils (wet/marine commonly ≥10 mS/m).  Distances reflect the boundary curve, not the typed σ.  See exhibit.evidence.ground_constants for the input vs. used values.' }
+    description: 'The §73.184 groundwave grid is keyed on integer σ ∈ {1..8} mS/m (Figure M3).  The typed conductivity was rounded to the nearest grid value, or clamped to the 1 / 8 mS/m boundary for out-of-range soils (wet/marine commonly ≥10 mS/m).  Distances reflect the boundary curve, not the typed σ.  See exhibit.evidence.ground_constants for the input vs. used values.' },
+
+  // ─── AM nighttime NIF (§73.182) warning codes ────────────────────────────
+
+  FCCAM_UNAVAILABLE_BERRY_FALLBACK: { severity: 'warning', phase: 'sidecar',
+    title: 'FCCAM sidecar unavailable — Berry 1968 screening used for NIF study',
+    description: 'The FCCAM sidecar (FCCAM_SIDECAR_URL) was configured but unreachable at compute time.  The §73.182 NIF study ran on the Berry 1968 analytical screening engine instead.  Berry results are SCREENING-GRADE per §73.190(c) — the exhibit cannot be filed on this NIF study alone.  Re-run with the FCCAM Wang 1985 sidecar online before filing.' },
+
+  AM_NIGHT_NIF_MARGINAL: { severity: 'info', phase: 'engine',
+    title: 'AM §73.182 NIF study: marginal margin miss (advisory, FCCAM filing-grade)',
+    description: 'The §73.182 nighttime NIF study (FCCAM Wang 1985) found azimuths with a failing margin within the engineering advisory band (≤ 0.5 dB over ≤ 10% of azimuths).  FCC practice does not treat a sub-decibel margin as a filing blocker at this scale.  Engineer of record should review the binding-azimuth detail in Appendix F-1.' },
+
+  AM_NIGHT_NIF_MARGINAL_SCREENING: { severity: 'info', phase: 'engine',
+    title: 'AM §73.182 NIF study: marginal margin miss (advisory, Berry screening-grade)',
+    description: 'The §73.182 nighttime NIF study (Berry 1968 screening) found azimuths with a failing margin within the advisory band (≤ 0.5 dB over ≤ 10% of azimuths).  Berry 1968 under-estimates field strength in most regimes — this may resolve when re-run with FCCAM Wang 1985.  Not a filing blocker at this scale; FCCAM confirmation strengthens the case.' },
+
+  AM_NIGHT_NIF_REVIEW: { severity: 'warning', phase: 'engine',
+    title: 'AM §73.182 NIF study: failing margins require engineering review (FCCAM filing-grade)',
+    description: 'The §73.182 nighttime NIF study (FCCAM Wang 1985) found meaningful failing margins (> 0.5 dB; ≤ 2.0 dB over ≤ 25% of azimuths).  Engineer of record should review the binding-azimuth detail in Appendix F-1 and decide whether a minor pattern tweak or §73.99 reduced-power authority is warranted before filing.' },
+
+  AM_NIGHT_NIF_FAIL_SCREENING: { severity: 'warning', phase: 'engine',
+    title: 'AM §73.182 NIF study: significant failures detected (Berry screening-grade)',
+    description: 'The §73.182 nighttime NIF study (Berry 1968 screening) found significant failing margins.  Berry 1968 is screening-grade per §73.190(c) — re-run with FCCAM (Wang 1985) before filing.  If FCCAM also fails, a full §73.182(k) RSS analysis by the engineer of record is required.' },
+
+  AM_NIGHT_NIF_FAIL: { severity: 'blocker', phase: 'engine',
+    title: 'AM §73.182 NIF study: significant failure (FCCAM filing-grade) — engineering review required',
+    description: 'The §73.182 nighttime NIF study (FCCAM Wang 1985) found significant failing margins (> 2.0 dB or > 25% of azimuths).  This is filing-grade evidence of a protection violation under §73.182.  A full §73.182(k) RSS analysis and/or facility modification (pattern, power, class) by the engineer of record is required before filing.' }
 });
 
 export class W {
