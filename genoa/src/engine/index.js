@@ -460,7 +460,8 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     identity:     evidence.identity     || { available: false, sources: [], confirmations: [] },
     itm_coverage: evidence.itm_coverage || null,
     uncertainty:  evidence.uncertainty  || null,
-    ground_constants: groundConstants
+    ground_constants: groundConstants,
+    community_boundary: evidence.community_boundary || null
   };
   if (!evidenceBlock.measurements.available){
     warnings.push(W.make('SDR_MEASUREMENTS_MISSING'));
