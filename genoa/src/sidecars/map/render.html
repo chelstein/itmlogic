@@ -148,11 +148,11 @@
 <div id="wrap">
   <div id="title-band">
     <span class="lhs" id="title-station">Station</span>
-    <span class="rhs" id="title-meta">FCC §73.333 contour study</span>
+    <span class="rhs" id="title-meta">FCC contour study</span>
   </div>
   <div id="figure-callout">
     <b id="figure-num">FIGURE 1</b><br>
-    <span id="figure-label">CONTOUR MAP — 47 CFR §73.333</span>
+    <span id="figure-label">CONTOUR MAP</span>
   </div>
   <div id="map"></div>
   <div id="north" aria-label="north arrow">
@@ -170,7 +170,7 @@
     <div class="scale" id="scale-readout"></div>
   </div>
   <div id="provenance">
-    <span id="prov-lhs">NAD83 datum · 47 CFR §73.333 F(50,50)</span>
+    <span id="prov-lhs">NAD83 datum · FCC contour</span>
     <span id="prov-rhs">Genoa FCC Propagation Studio</span>
   </div>
 </div>
@@ -204,13 +204,17 @@
     const community = s.community || s.city || '';
     const meta = `${(s.service || '—').toUpperCase()} · ${s.frequency ?? '—'} ${s.frequency_unit || 'MHz'} · ERP ${s.erp_kw ?? '—'} kW · HAAT ${s.haat_m_input ?? '—'} m`;
 
+    const isAM = (s.service || '').toUpperCase() === 'AM';
+    const contourCite = isAM ? '47 CFR §73.184' : '47 CFR §73.333 F(50,50)';
+    const contourLabel = isAM ? 'CONTOUR MAP — 47 CFR §73.184' : 'CONTOUR MAP — 47 CFR §73.333';
+
     document.getElementById('title-station').textContent =
       community ? `${callTag} — ${community.toUpperCase()}` : callTag;
     document.getElementById('title-meta').textContent = meta;
     document.getElementById('prov-lhs').textContent =
-      `NAD83  ${Number.isFinite(lat) ? lat.toFixed(6) : '—'}, ${Number.isFinite(lon) ? lon.toFixed(6) : '—'}  ·  47 CFR §73.333 F(50,50)`;
-    if (opts.figure_num)   document.getElementById('figure-num').textContent   = String(opts.figure_num);
-    if (opts.figure_label) document.getElementById('figure-label').textContent = String(opts.figure_label);
+      `NAD83  ${Number.isFinite(lat) ? lat.toFixed(6) : '—'}, ${Number.isFinite(lon) ? lon.toFixed(6) : '—'}  ·  ${contourCite}`;
+    document.getElementById('figure-label').textContent = opts.figure_label ? String(opts.figure_label) : contourLabel;
+    if (opts.figure_num) document.getElementById('figure-num').textContent = String(opts.figure_num);
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon)){
       renderCoordsMissingFallback();
