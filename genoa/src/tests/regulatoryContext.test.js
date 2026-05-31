@@ -77,7 +77,7 @@ test('C: proposed facility with §73.215 failure → new_filing, high risk', () 
   assert.equal(r.currentRuleCompliance,  'fails_current_rules');
   assert.equal(r.licenseInterpretation,  'requires_engineering_review');
   assert.equal(r.filingRisk,             'high');
-  assert.match(r.userFacingSummary, /New or proposed filing/);
+  assert.match(r.userFacingSummary, /does not clear current/);
 });
 
 // --- D. Clean licensed facility ---

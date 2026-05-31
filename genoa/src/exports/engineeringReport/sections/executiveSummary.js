@@ -95,8 +95,20 @@ export function buildExecutiveSummarySection(exhibit){
   // be misread as a regulatory finding.  Qualify it to make the
   // tier-3 status explicit when fallback_tier > 1.
   const tier3Fallback = (exhibit?.validation?.fcc_curve_parity?.fallback_tier ?? 1) > 1;
+  // For existing licensed stations, avoid "proposed mode" — the facility
+  // already has a license; its operating parameters are authorized values,
+  // not a proposal.  Read facility status from the regulatory compliance
+  // block attached by classifyRegulatoryContext().
+  const _rc = exhibit?.regulatory_compliance || exhibit?.regulatoryContext || {};
+  const isExistingFacility = _rc.facility_status === 'licensed'
+                          || _rc.facilityStatus   === 'licensed'
+                          || _rc.study_intent     === 'existing_facility_review'
+                          || _rc.studyIntent      === 'existing_facility_review';
+  const _modePhrase = isExistingFacility
+    ? 'under the licensed operating parameters'
+    : 'under the proposed operating parameters';
   // Translate the legacy single status into a plain-English phrase.
-  const niceVerdict = conclusion === 'COMPLIANT'      ? 'is compliant with the FCC rules under the proposed mode'
+  const niceVerdict = conclusion === 'COMPLIANT'      ? `is compliant with the FCC rules ${_modePhrase}`
                    :  conclusion === 'NON-COMPLIANT'  ? 'does NOT comply with one or more FCC rules — see Engineering Conclusion for the specific blocker(s)'
                    :  conclusion === 'PARTIAL'        ? 'meets some but not all of the regulatory checks — see Engineering Conclusion for details'
                    :  legacyStatus === 'VERIFIED' && tier3Fallback
@@ -110,12 +122,20 @@ export function buildExecutiveSummarySection(exhibit){
   if (exhibit?.am_blanket_compliance?.overall_pass === false)       blockerHints.push('§73.24(g) blanket-population fail');
   if (exhibit?.am_da_pattern_compliance?.overall_pass === false)    blockerHints.push('§73.150 DA-pattern shape fail');
   if (exhibit?.am_city_coverage_compliance?.overall_pass === false) blockerHints.push('§73.24(j) community-coverage fail');
-  if (exhibit?.evidence?.am_night_nif?.summary?.n_failing_azimuths > 0) blockerHints.push('§73.182 nighttime NIF fail');
+  if (exhibit?.evidence?.am_night_nif?.summary?.n_failing_azimuths > 0){
+    const _nifIsScreening = /berry/i.test(
+      String(exhibit?.evidence?.am_night_nif?.provenance?.upstream_skywave
+          || exhibit?.evidence?.am_night_nif?.source || ''));
+    blockerHints.push(_nifIsScreening
+      ? '§73.182 NIF screening advisory (Berry 1968 — re-run with FCCAM for filing-grade result)'
+      : '§73.182 nighttime NIF fail (FCCAM-confirmed)');
+  }
   const blockerText = blockerHints.length
     ? `  Specific findings flagged in this run: ${blockerHints.join('; ')}.`
     : '';
   const concText = conclusion ? `  The Engineering Conclusion reports the regulatory disposition as ${conclusion}.` : '';
-  const para3 = `Overall the proposed exhibit ${niceVerdict}.${concText}${blockerText}  This Executive Summary is INFORMATIONAL — the actual filing decision rests with the qualified broadcast engineer of record reviewing the technical body.`;
+  const _subjectLabel = isExistingFacility ? 'the subject facility' : 'the proposed facility';
+  const para3 = `Overall, ${_subjectLabel} ${niceVerdict}.${concText}${blockerText}  This Executive Summary is INFORMATIONAL — the actual filing decision rests with the qualified broadcast engineer of record reviewing the technical body.`;
   // Surface filingStatus from conclusion / blockers so recommendations
   // section below still works without categories.
   const filingStatus = conclusion === 'COMPLIANT' && blockerHints.length === 0 ? 'READY'
@@ -135,7 +155,7 @@ export function buildExecutiveSummarySection(exhibit){
     const pct = Number.isFinite(exhibit.am_city_coverage_compliance.coverage_pct)
       ? (exhibit.am_city_coverage_compliance.coverage_pct * 100).toFixed(1) + '%'
       : '—';
-    recs.push(`§73.24(j) principal-community coverage is ${pct} of the city-of-license boundary — a substantial-compliance waiver showing or facility redesign is required before filing.`);
+    recs.push(`§73.24(j) principal-community coverage is ${pct} of the city-of-license boundary — ${isExistingFacility ? 'a substantial-compliance waiver showing or engineering review is required before any modification filing' : 'a substantial-compliance waiver showing or facility redesign is required before filing'}.`);
   }
   if (exhibit?.international_border?.inside_treaty_zone){
     const ts = exhibit.international_border.treaties?.map((t) => t.treaty).join(' + ');

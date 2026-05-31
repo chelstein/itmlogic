@@ -68,7 +68,7 @@ export function checkAm73_24g({ exhibit } = {}){
   // Finding 1 — the blanket contour itself must be computable.
   result.findings.push({
     rule:      'blanket_contour_present',
-    citation:  `${RULE_CITE} — 1000 mV/m blanket contour must be defined for the proposed facility`,
+    citation:  `${RULE_CITE} — 1000 mV/m blanket contour must be defined for the subject facility`,
     observed:  blanketKm != null
                 ? `1000 mV/m blanket contour mean radius ${blanketKm.toFixed(2)} km`
                 : '1000 mV/m blanket contour not present in computed contour set',
@@ -106,14 +106,26 @@ export function checkAm73_24g({ exhibit } = {}){
     });
   }
 
-  // Overall: every decisive finding must pass.
+  // Overall: the ratio check is the required sub-test.  The contour-
+  // presence check passes if the blanket contour is defined (decisive
+  // and can be true).  But overall_pass must be null — NOT_MEASURED —
+  // whenever the ratio check did not run (population data absent),
+  // regardless of how many other decisive findings passed.  Previously
+  // this returned true when only blanket_contour_present passed; that
+  // misrepresented a NOT_MEASURED check as a PASS.
+  const ratioFinding = result.findings.find(f => f.rule === 'blanket_population_ratio');
+  const ratioMeasured = ratioFinding && ratioFinding.pass !== null;
   const decisive = result.findings.filter((f) => f.pass !== null);
-  result.overall_pass = decisive.length > 0 && decisive.every((f) => f.pass === true);
-  result.summary = result.overall_pass
-    ? '§73.24(g) blanket-interference check passes (or all decisive sub-checks pass).'
-    : decisive.some((f) => f.pass === false)
+  if (!ratioMeasured){
+    result.overall_pass = null;
+  } else {
+    result.overall_pass = decisive.length > 0 && decisive.every((f) => f.pass === true);
+  }
+  result.summary = result.overall_pass === true
+    ? '§73.24(g) blanket-interference check passes.'
+    : result.overall_pass === false
       ? '§73.24(g) blanket-interference check FAILED — see findings.'
-      : '§73.24(g) blanket-interference check incomplete — population data not attached for both contours.';
+      : '§73.24(g) blanket-interference check NOT MEASURED — population data required for both blanket_1000mvm and service_25mvm contours.';
 
   return result;
 }
