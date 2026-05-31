@@ -1,0 +1,22 @@
+[Unit]
+Description=Genoa FCCGW Advisory Sidecar (FCC/OET R86-1 Ground Wave)
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=genoa
+WorkingDirectory=/opt/fccgw-api
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+Environment=PORT=8096
+Environment=FCCGW_OCTAVE_PATH=/opt/fccgw/GroundWaveFCC
+# Add FCCGW_API_TOKEN in /etc/systemd/system/fccgw-api.service.d/override.conf
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fccgw-api
+
+[Install]
+WantedBy=multi-user.target
