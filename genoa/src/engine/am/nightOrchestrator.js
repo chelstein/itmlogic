@@ -263,7 +263,7 @@ export async function nighttimeNifStudy(input, ctx){
         berryContour = { available: false, error: `berry engine error: ${e?.message || e}` };
       }
       if (berryContour.available){
-        return buildResult({ contour: berryContour, interferers, normalized, max_interferers, primariesResp, isBerry: true, fccamFallbackUsed: true });
+        return await buildResult({ contour: berryContour, interferers, normalized, max_interferers, primariesResp, isBerry: true, fccamFallbackUsed: true, voacapClient, proposed });
       }
     }
     return { available: false, error: contour.error || 'NIF contour solver returned available:false',
@@ -272,7 +272,7 @@ export async function nighttimeNifStudy(input, ctx){
 
   // 4. Determine actual engine identity and build result.
   const isBerry = /berry/i.test(String(contour.source || contour.engine || ''));
-  return buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed: false });
+  return await buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed: false, voacapClient, proposed });
 }
 
 /**
@@ -280,7 +280,7 @@ export async function nighttimeNifStudy(input, ctx){
  * Centralises source/filing_grade/provenance stamping so the Berry
  * runtime-fallback path produces the same shape as the happy path.
  */
-function buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed }){
+async function buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed, voacapClient, proposed }){
   const radii   = contour.per_azimuth.filter((p) => p.ok).map((p) => p.distance_km);
   const failing = contour.per_azimuth.filter((p) => p.binding && !p.binding.pass);
   const margins = contour.per_azimuth
