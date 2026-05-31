@@ -132,15 +132,17 @@ export const sidecars = Object.freeze({
   // degrades explicitly rather than substituting a different engine.
   // See genoa/src/sidecars/fccam/ for the sidecar code + deploy doc
   // and src/evidence/fccamClient.js for the contract.
-  // FCCAM is the primary AM skywave engine.  When FCCAM_SIDECAR_URL
-  // is unset the registry falls through to the Berry analytical
-  // implementation (47 CFR §73.190(c) explicitly permits it),
-  // labeled as SCREENING-grade so reviewers can tell at a glance
-  // which engine produced the §73.182 NIF numbers.  Operator can
-  // disable the Berry fallback entirely with
-  // GENOA_BERRY_SKYWAVE_FALLBACK=false (then AM-night degrades to
-  // the existing "FCCAM not configured" diagnostic instead).
-  fccam:       makeFccamClient() || makeBerrySkywaveClient(),
+  // FCCAM is the primary AM skywave engine (filing-grade, Wang 1985).
+  // null when FCCAM_SIDECAR_URL is unset.  exhibitService.js step 8d
+  // uses sidecars.fccam first and falls back to sidecars.berry at
+  // runtime so a FCCAM_UNAVAILABLE_BERRY_FALLBACK warning can be
+  // surfaced when FCCAM was configured but unreachable.
+  fccam:       makeFccamClient(),
+  // Berry 1968 analytical skywave — SCREENING-grade fallback.
+  // 47 CFR §73.190(c) explicitly permits it in lieu of Figure 2.
+  // Always present (pure-JS, no sidecar).  Disable entirely with
+  // GENOA_BERRY_SKYWAVE_FALLBACK=false.
+  berry:       makeBerrySkywaveClient(),
 
   // FCC Sunrise/Sunset Authority (SRSSTIME) sidecar.  Opt-in via
   // FCC_SUN_SIDECAR_URL on the deploy (+ FCC_SUN_API_TOKEN for

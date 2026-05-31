@@ -144,6 +144,82 @@ export function makeFccamClient({
     },
 
     /**
+     * Full NIF study — offloads the entire §73.182 nighttime allocation
+     * study to the FCCAM sidecar when the sidecar implements POST /nif.
+     * Returns { available: false, error: 'endpoint_not_supported' } when
+     * the sidecar returns 404 (older deployments without /nif).  The
+     * orchestrator falls back to per-point runBatch() bisection in that
+     * case.
+     *
+     * Request body:
+     *   { frequency_khz, subject: { call, facility_id, lat, lon,
+     *     power_kw, rms_mv_m_1km, pattern_table, mode },
+     *     interferers: [{ call, facility_id, class, frequency_khz,
+     *     lat, lon, relationship, distance_km, power_kw,
+     *     rms_mv_m_1km, pattern_table }],
+     *     azimuths_deg, percent_time, method: 'FCCAM_WANG_1985' }
+     *
+     * Response (sidecar):
+     *   { available, engine: 'FCCAM_WANG_1985', filing_grade: true,
+     *     summary: { azimuths_evaluated, n_failing_azimuths,
+     *       worst_margin_db, worst_azimuth_deg, binding_interferer },
+     *     azimuths: [{ azimuth_deg, nif_radius_km, margin_db,
+     *       binding_call, pass }],
+     *     provenance: { method, program, basis, percent_time,
+     *       fetched_at, sidecar_url } }
+     */
+    async runNifStudy({
+      frequency_khz, subject, interferers = [], azimuths_deg,
+      percent_time = 50
+    } = {}, opts = {}){
+      if (!Number.isFinite(Number(frequency_khz))){
+        return { available: false, error: 'frequency_khz required' };
+      }
+      if (!subject?.lat || !subject?.lon){
+        return { available: false, error: 'subject.lat and subject.lon required' };
+      }
+      const body = {
+        frequency_khz: Number(frequency_khz),
+        subject,
+        interferers,
+        azimuths_deg:  azimuths_deg || defaultAzimuths(),
+        percent_time:  Number(percent_time) || 50,
+        method:        'FCCAM_WANG_1985'
+      };
+      try {
+        const r = await fetchWithTimeout(fetchFn, joinUrl(baseUrl, '/nif'), {
+          method:  'POST',
+          headers: { 'content-type': 'application/json', ...authHeaders(apiToken) },
+          body:    JSON.stringify(body)
+        }, opts.timeoutMs ?? (timeoutMs * 6));
+        if (r.status === 404){
+          return { available: false, error: 'endpoint_not_supported',
+                   endpoint: joinUrl(baseUrl, '/nif') };
+        }
+        if (!r.ok){
+          return { available: false, error: `HTTP ${r.status}`,
+                   endpoint: joinUrl(baseUrl, '/nif') };
+        }
+        const j = await r.json();
+        return {
+          available:    j.available !== false,
+          source:       'fccam-wang-1985',
+          engine:       j.engine || 'FCCAM_WANG_1985',
+          filing_grade: true,
+          endpoint:     joinUrl(baseUrl, '/nif'),
+          fetched_at:   new Date().toISOString(),
+          summary:      j.summary || null,
+          azimuths:     j.azimuths || [],
+          provenance:   j.provenance || null,
+          error:        j.available === false ? (j.error || 'sidecar returned available:false') : undefined
+        };
+      } catch (e){
+        return { available: false, error: String(e?.message || e),
+                 endpoint: joinUrl(baseUrl, '/nif') };
+      }
+    },
+
+    /**
      * Batch — fan a list of skywave computes out in one round-trip.
      * Used by §73.182 nighttime allocation orchestrator: one request
      * per (proposed-station × interferer-station × azimuth) tuple.
@@ -275,6 +351,12 @@ async function postRun(fetchFn, baseUrl, apiToken, body, timeoutMs){
     return { available: false, error: String(e?.message || e),
              endpoint: joinUrl(baseUrl, '/run') };
   }
+}
+
+function defaultAzimuths(){
+  const out = [];
+  for (let a = 0; a < 360; a += 10) out.push(a);
+  return out;
 }
 
 function authHeaders(apiToken){

@@ -76,12 +76,19 @@ export function normalizePrimary(row){
  */
 export async function nighttimeNifStudy(input, ctx){
   const { proposed = null, options = {} } = input || {};
-  const { fccamClient = null, facilityClient = null, budget = null } = ctx || {};
+  const { fccamClient = null, berryClient = null, facilityClient = null, budget = null } = ctx || {};
 
-  if (!fccamClient){
+  // Select the active skywave client.  FCCAM (Wang 1985) is filing-grade;
+  // Berry 1968 is screening-grade.  We prefer FCCAM and fall back to Berry
+  // so exhibitService can emit FCCAM_UNAVAILABLE_BERRY_FALLBACK when FCCAM
+  // was configured but unreachable.
+  const activeClient = fccamClient || berryClient || null;
+  const usingFccam   = !!fccamClient;
+
+  if (!activeClient){
     return {
       available: false,
-      error:     'FCCAM sidecar not configured (FCCAM_SIDECAR_URL unset)',
+      error:     'No AM skywave engine configured (set FCCAM_SIDECAR_URL or enable Berry fallback)',
       regulation: '47 CFR §73.182 / §73.190(c)'
     };
   }
@@ -110,9 +117,10 @@ export async function nighttimeNifStudy(input, ctx){
       radius_km,
       exclude_facility_id: proposed.facility_id || null
     };
+    const clientForLms = facilityClient;
     primariesResp = budget?.withDeadline
-      ? await budget.withDeadline('am_night_primaries', () => facilityClient.getNearbyPrimaries(pullArgs), { minMs: 5_000 })
-      : await facilityClient.getNearbyPrimaries(pullArgs);
+      ? await budget.withDeadline('am_night_primaries', () => clientForLms.getNearbyPrimaries(pullArgs), { minMs: 5_000 })
+      : await clientForLms.getNearbyPrimaries(pullArgs);
   } catch (e){
     return { available: false, error: `nearby-primaries fetch failed: ${e?.message || e}` };
   }
@@ -153,36 +161,62 @@ export async function nighttimeNifStudy(input, ctx){
     .sort((a, b) => estField(b) - estField(a))
     .slice(0, max_interferers);
 
-  // 3. Solve.
-  const contour = await solveNifContour(
-    {
-      proposed:      {
-        lat:           Number(proposed.lat),
-        lon:           Number(proposed.lon),
-        freq_khz:      Number(proposed.freq_khz),
-        erp_kw:        Number(proposed.erp_kw),
-        fcc_class:     proposed.fcc_class,
-        // Bug 3 fix: pattern_table's existence is the authoritative signal
-        // for whether to apply the directional pattern.  The prior guard
-        // `proposed.pattern_mode === 'DA'` silently dropped the pattern
-        // when pattern_mode was absent or set to a non-'DA' string, even
-        // when a non-null pattern_table was explicitly provided.
-        pattern_table: (Array.isArray(proposed.pattern_table) && proposed.pattern_table.length > 0)
-          ? proposed.pattern_table
-          : null
-      },
-      interferers,
-      azimuths_deg:  options.azimuths_deg
-    },
-    { fccamClient, duDbOverride: options.duDbOverride }
-  );
+  // 3. Solve.  Use the active skywave client (FCCAM if configured,
+  // Berry fallback otherwise).  A try/catch here catches sidecar
+  // transport errors (ECONNREFUSED, ETIMEDOUT, etc.) so they surface as
+  // available:false instead of propagating to the caller.
+  // pattern_table's presence (not pattern_mode) is the authoritative
+  // signal for directional-pattern application — see nifContour.js.
+  const proposedForSolver = {
+    lat:           Number(proposed.lat),
+    lon:           Number(proposed.lon),
+    freq_khz:      Number(proposed.freq_khz),
+    erp_kw:        Number(proposed.erp_kw),
+    fcc_class:     proposed.fcc_class,
+    pattern_table: (Array.isArray(proposed.pattern_table) && proposed.pattern_table.length > 0)
+      ? proposed.pattern_table
+      : null
+  };
+  const solverArgs  = { proposed: proposedForSolver, interferers, azimuths_deg: options.azimuths_deg };
+  const solverOpts  = { duDbOverride: options.duDbOverride };
+
+  let contour;
+  try {
+    contour = await solveNifContour(solverArgs, { fccamClient: activeClient, ...solverOpts });
+  } catch (e) {
+    contour = { available: false, error: `skywave engine error: ${e?.message || e}` };
+  }
 
   if (!contour.available){
+    // If FCCAM was active and failed (transport error or returned available:false),
+    // try Berry as a runtime fallback so exhibitService can surface
+    // FCCAM_UNAVAILABLE_BERRY_FALLBACK.
+    if (usingFccam && berryClient){
+      let berryContour;
+      try {
+        berryContour = await solveNifContour(solverArgs, { fccamClient: berryClient, ...solverOpts });
+      } catch (e) {
+        berryContour = { available: false, error: `berry engine error: ${e?.message || e}` };
+      }
+      if (berryContour.available){
+        return buildResult({ contour: berryContour, interferers, normalized, max_interferers, primariesResp, isBerry: true, fccamFallbackUsed: true });
+      }
+    }
     return { available: false, error: contour.error || 'NIF contour solver returned available:false',
              raw: contour };
   }
 
-  // 4. Summary statistics for the appendix.
+  // 4. Determine actual engine identity and build result.
+  const isBerry = /berry/i.test(String(contour.source || contour.engine || ''));
+  return buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed: false });
+}
+
+/**
+ * Build the final nighttimeNifStudy result from a solved contour.
+ * Centralises source/filing_grade/provenance stamping so the Berry
+ * runtime-fallback path produces the same shape as the happy path.
+ */
+function buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed }){
   const radii   = contour.per_azimuth.filter((p) => p.ok).map((p) => p.distance_km);
   const failing = contour.per_azimuth.filter((p) => p.binding && !p.binding.pass);
   const margins = contour.per_azimuth
@@ -202,15 +236,23 @@ export async function nighttimeNifStudy(input, ctx){
     interferer_cap:       max_interferers
   };
 
+  // Canonical source identifiers — context.js and the conclusion
+  // section detect Berry via /berry/i on source/provenance.
+  const source        = isBerry ? 'berry-1968'       : 'fccam-wang-1985';
+  const skywave_engine = isBerry ? 'BERRY_1968'       : 'FCCAM_WANG_1985';
+  const filing_grade   = !isBerry;
+  const upstream_sw    = isBerry
+    ? 'Berry 1968 analytical (screening-grade per §73.190(c))'
+    : 'FCCAM (Fccam.for / Wang 1985)';
+
   return {
     available:   true,
-    // Pass through the actual engine identity solveNifContour
-    // sniffed from the skywave client's /version (FCCAM Wang or
-    // Berry-1968-screening); narrative + appendix preface key off
-    // this to render screening-vs-filing-grade prose.
-    source:      contour.source || contour.engine || 'fccam',
-    engine:      contour.engine || contour.source || 'fccam',
+    source,
+    engine:      contour.engine || source,
     engine_warning: contour.engine_warning || null,
+    filing_grade,
+    skywave_engine,
+    fccam_fallback_used: fccamFallbackUsed,
     fetched_at:  new Date().toISOString(),
     proposed:    contour.proposed,
     interferers,
@@ -219,20 +261,11 @@ export async function nighttimeNifStudy(input, ctx){
     polygon:     contour.polygon,
     du_db_by_relation: contour.du_db_by_relation,
     summary,
-    // FUTURE: VOACAP HF propagation advisory hook.  When a VOACAP
-    // sidecar comes online (operator-hosted ITS HF-PROPLOSS / IONCAP
-    // family — public domain), the orchestrator will populate this
-    // slot with a per-azimuth ionospheric advisory band (sporadic-E,
-    // F2-MUF excursions) ALONGSIDE the §73.190(c) Wang result.  The
-    // FCC engineering charts remain the authoritative §73.182 input;
-    // VOACAP output is advisory only and never changes NIF radii.
-    // Reserved here so consumers can rely on the field shape today
-    // without a downstream schema migration when wiring lands.
     advisory_voacap: null,
     regulation:  '47 CFR §73.182 / §73.183 / §73.190(c)',
     provenance:  {
       module:           'src/engine/am/nightOrchestrator.js',
-      upstream_skywave: 'FCCAM (Fccam.for / Wang 1985)',
+      upstream_skywave: upstream_sw,
       upstream_lms:     primariesResp.source || 'fcc-amq',
       license_basis:    '17 USC §105 (FCC engine + endpoint, US Government public domain)'
     }

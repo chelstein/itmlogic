@@ -2193,16 +2193,20 @@ export async function computeExhibit(req){
   // ---- 8d. AM nighttime allocation (§73.182 NIF contour) ----
   //
   // For AM exhibits, run the §73.182 nighttime allocation study via
-  // the FCCAM sidecar + the nearby-primaries we already pulled in
-  // step 6b.  Attaches evidence.am_night_nif with the per-azimuth
+  // the FCCAM sidecar (filing-grade / Wang 1985) or Berry screening
+  // fallback.  Attaches evidence.am_night_nif with the per-azimuth
   // contour, interferer table, and §73.182(k)/(s) summary stats.
   //
-  // Fail-soft: if FCCAM isn't configured (FCCAM_SIDECAR_URL unset)
-  // or the proposed station's class isn't supplied, attaches an
-  // explanatory available:false record rather than skipping
-  // silently — the appendix surfaces the diagnostic verbatim.
+  // Engine priority:
+  //   1. FCCAM sidecar (FCCAM_SIDECAR_URL set) — filing_grade: true
+  //   2. Berry 1968 analytical fallback        — filing_grade: false
+  //      When FCCAM was configured but unreachable, adds
+  //      FCCAM_UNAVAILABLE_BERRY_FALLBACK warning.
+  //
+  // Fail-soft: if neither engine succeeds, attaches an explanatory
+  // available:false record — the appendix surfaces it verbatim.
   if (String(inputs.service || '').toUpperCase() === 'AM'
-      && sidecars.fccam
+      && (sidecars.fccam || sidecars.berry)
       && options.am_night_nif !== false){
     const t0 = Date.now();
     try {
@@ -2226,12 +2230,25 @@ export async function computeExhibit(req){
       };
       const study = await budget.withDeadline('am_night_nif',
         () => nighttimeNifStudy({ proposed, options: options.am_night_nif_options || {} },
-                                { fccamClient: sidecars.fccam, facilityClient: sidecars.facility }),
+                                { fccamClient: sidecars.fccam, berryClient: sidecars.berry,
+                                  facilityClient: sidecars.facility }),
         { minMs: 30_000 });
       evidence.am_night_nif = {
         ...(study || { available: false, error: 'compute budget exhausted' }),
         elapsed_ms: Date.now() - t0
       };
+
+      // When FCCAM was configured but the orchestrator fell back to Berry
+      // (FCCAM sidecar unreachable at the time of compute), surface a
+      // warning so the engineer of record knows the result is screening-
+      // grade, not the filing-grade FCCAM Wang 1985 result that was
+      // expected.
+      if (study?.fccam_fallback_used && sidecars.fccam){
+        warnings.push(W.make('FCCAM_UNAVAILABLE_BERRY_FALLBACK',
+          'FCCAM sidecar (FCCAM_SIDECAR_URL) was configured but unreachable at compute time.  ' +
+          'The §73.182 NIF study ran on the Berry 1968 screening engine instead.  ' +
+          'Berry results are SCREENING-GRADE per §73.190(c) — re-run with FCCAM Wang 1985 before filing.'));
+      }
 
       // Surface §73.182 NIF failure as a top-level annotation so the
       // engineering-conclusion logic (which walks exhibit.annotations
@@ -2260,7 +2277,8 @@ export async function computeExhibit(req){
         const _isFailing = _nFail > 0
           || (_hasWorstFinite && Number(_sum.worst_margin_db) < 0);
         if (_isFailing){
-          const _isScreening = /berry/i.test(String(_nif.provenance?.upstream_skywave || _nif.source || ''));
+          const _isScreening = _nif.filing_grade === false
+                            || /berry/i.test(String(_nif.source || _nif.provenance?.upstream_skywave || ''));
           // Tolerance-band classification.
           let _band;
           if (_worstAbs <= 0.5 && _fracFail <= 0.10) _band = 'ADVISORY';
