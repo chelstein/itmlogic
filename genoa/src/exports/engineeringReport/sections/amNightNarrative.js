@@ -64,7 +64,15 @@ export function buildAmNightNarrative(exhibit){
     paragraphs.push(failureRollupParagraph({ summary, contour }));
   }
 
-  // 5. Closing — replay-determinism reassurance.
+  // 5. VOACAP advisory — rendered when the VOACAP sidecar ran and
+  //    returned paths.  Always labeled advisory/filing_effect:none so
+  //    it cannot be mistaken for the FCCAM Wang §73.190(c) NIF result.
+  const voacap = nif.advisory_voacap;
+  if (voacap && Array.isArray(voacap.paths) && voacap.paths.length > 0){
+    paragraphs.push(voacapAdvisoryParagraph({ voacap }));
+  }
+
+  // 6. Closing — replay-determinism reassurance.
   paragraphs.push(closingParagraph({ nif }));
 
   return { ok: true, paragraphs };
@@ -166,6 +174,20 @@ function failureRollupParagraph({ summary, contour }){
   }
   parts.push(`See Appendix F-1 for the per-azimuth NIF radius and Appendix F-2 for the interferer pool that fed the RSS.`);
   return parts.join('  ');
+}
+
+function voacapAdvisoryParagraph({ voacap }){
+  const month = voacap.month ? `(Month ${voacap.month})` : '';
+  const pathSummary = voacap.paths.slice(0, 3).map(p => {
+    if (!p.available) return `${p.call || '?'}: unavailable`;
+    const rel = p.reliability_pct != null ? `${p.reliability_pct}%` : 'n/a';
+    return `${p.call || '?'}: reliability ${rel}`;
+  }).join('; ');
+  return `ADVISORY IONOSPHERIC CONTEXT (filing_effect: none) — VOACAP HF propagation ${month}: ${pathSummary}${voacap.paths.length > 3 ? ` …(+${voacap.paths.length - 3} paths)` : ''}.  ` +
+    'This VOACAP advisory characterises the ionospheric environment at the time of compute.  ' +
+    'Frequencies are clamped to 2 MHz as a proxy for MF skywave ionospheric state; ' +
+    'VOACAP reliability at 2 MHz is not a substitute for the §73.190(c) FCCAM Wang 1985 co-channel skywave field-strength calculation.  ' +
+    'ADVISORY ONLY — does not modify NIF radii, §73.182 allocation, or §73.190 skywave results.';
 }
 
 function closingParagraph({ nif }){

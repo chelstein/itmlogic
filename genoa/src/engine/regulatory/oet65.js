@@ -717,6 +717,7 @@ export function checkOet65({
     study_inputs,
     near_field:     {
       boundary_m:              nf_m == null ? null : Number(nf_m.toFixed(2)),
+      rcagl_m:                 Number.isFinite(tower_height_m) ? tower_height_m : null,
       required_for_filing:     near_field_required,
       analysis:                near_field_analysis,
       am_screening:            am_near_field_screening

@@ -236,6 +236,18 @@ export const WARNING_CODES = Object.freeze({
     title: 'SDR predicted-vs-measured residual exceeds 10 dB',
     description: 'The RMS residual between Genoa\'s predicted field strength (FCC §73.333 / §73.184 curves) and the calibrated SDR-measured field exceeds 10 dB across the captured locations.  This typically indicates terrain shadowing or multipath that the simplified §73.333 model does not capture (use options.use_itm = true for terrain-aware coverage), or a calibration error in the receiver chain.  See evidence.measurements.residuals for the per-row table.' },
 
+  AM_73_24G_FAIL: { severity: 'blocker', phase: 'engine',
+    title: 'AM §73.24(g) blanket-interference population ratio exceeds 1%',
+    description: 'The population within the 1000 mV/m blanket-interference contour exceeds 1.0% of the population within the 25 mV/m service contour (47 CFR §73.24(g)).  The licensee must submit a blanketing-interference remediation plan (§73.318(b)) and commit to receiver-treatment funds before filing.  This is a pre-construction showing requirement.' },
+
+  AM_73_24J_FAIL: { severity: 'blocker', phase: 'engine',
+    title: 'AM §73.24(j) community coverage — 5 mV/m contour does not encompass city of license',
+    description: 'The proposed station\'s 5 mV/m groundwave service contour does not encompass the entire community of license (47 CFR §73.24(j)).  The facility as proposed cannot serve its community of license with the required daytime service level and does not qualify for a construction permit on these parameters.' },
+
+  AM_INTERNATIONAL_TREATY_ZONE: { severity: 'warning', phase: 'engine',
+    title: 'AM transmitter site inside US/MX or US/CA bilateral treaty zone',
+    description: 'The proposed transmitter coordinates fall within a US/Mexico or US/Canada bilateral AM treaty zone.  Stations in these zones must protect co-channel and adjacent-channel foreign stations per the applicable bilateral agreement (NARBA or US/Canada agreement) and the FCC\'s implementing rules (47 CFR §73.187 / §73.188).  Genoa does not compute bilateral treaty skywave protection studies; the engineer of record must perform that study separately before filing with the FCC.' },
+
   AM_DA_PATTERN_COMPLIANCE_FAIL: { severity: 'blocker', phase: 'engine',
     title: 'AM DA pattern §73.150 compliance failure',
     description: 'The directional antenna pattern filed with this exhibit fails one or more §73.150 pattern-shape compliance checks (smoothness, max-to-min ratio, or RMS minimum field).  The FCC field-intensity analysis (§73.62 / §73.150) uses the authorized pattern; a failing pattern means the filed pattern does not conform to §73.150 construction standards.  The engineer of record must correct the DA pattern before filing.' },
@@ -271,7 +283,7 @@ export const WARNING_CODES = Object.freeze({
 
   // ─── AM nighttime NIF (§73.182) warning codes ────────────────────────────
 
-  FCCAM_UNAVAILABLE_BERRY_FALLBACK: { severity: 'warning', phase: 'sidecar',
+  FCCAM_UNAVAILABLE_BERRY_FALLBACK: { severity: 'blocker', phase: 'sidecar',
     title: 'FCCAM sidecar unavailable — Berry 1968 screening used for NIF study',
     description: 'The FCCAM sidecar (FCCAM_SIDECAR_URL) was configured but unreachable at compute time.  The §73.182 NIF study ran on the Berry 1968 analytical screening engine instead.  Berry results are SCREENING-GRADE per §73.190(c) — the exhibit cannot be filed on this NIF study alone.  Re-run with the FCCAM Wang 1985 sidecar online before filing.' },
 
