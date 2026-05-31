@@ -42,7 +42,7 @@ const ROWS = [
   ['geoRfEvidence', 'Geo-RF Evidence',                 'sidecar'],
   ['sun',           'AM Sunrise/Sunset (§73.99)',      'sidecar'],
   ['fortranFcc',    'FCC FORTRAN parity',              'sidecar'],
-  ['fccam',         'FCC AM groundwave dataset',       'sidecar'],
+  ['fccam',         'FCC AM skywave (Wang §73.190(c))', 'sidecar'],
   ['facility',      'Facility (ZTR)',                  'upstream'],
   ['asr',           'ASR (FCC opendata)',              'upstream'],
   ['airports',      'FAA airports proximity',          'upstream'],

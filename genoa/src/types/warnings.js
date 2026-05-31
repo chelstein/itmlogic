@@ -198,7 +198,7 @@ export const WARNING_CODES = Object.freeze({
 
   AM_GROUND_SIGMA_UNRESOLVED: { severity: 'blocker', phase: 'sidecar',
     title: 'AM ground conductivity could not be resolved from any source',
-    description: 'Genoa refuses to compute AM groundwave / NEC results with a synthetic σ default.  The resolution chain (operator-supplied → ZTR /api/m3/conductivity proxy, which serves the vendored FCC §73.190 M3 polygon dataset) returned no usable value at the subject lat/lon.  Supply inputs.ground_sigma_mS_m explicitly (FCC §73.190 M3 zone value for the tower site) and recompute.  evidence.ground_conductivity.tier_attempts records each upstream failure for diagnosis.' },
+    description: 'Genoa refuses to compute AM groundwave / NEC results with a synthetic σ default.  The resolution chain exhausted all three tiers: (1) operator-supplied inputs.ground_sigma_mS_m, (2) ZTR /api/m3/conductivity proxy, (3) local AM_m3.geojson point-in-polygon (AM_M3_GEOJSON_PATH).  No usable σ value was found at the subject lat/lon.  Supply inputs.ground_sigma_mS_m explicitly (FCC §73.190 M3 zone value for the tower site) and recompute, or verify the M3 GeoJSON is accessible at AM_M3_GEOJSON_PATH.  evidence.ground_conductivity.tier_attempts records each upstream failure for diagnosis.' },
 
   LMS_DATA_UNAVAILABLE: { severity: 'warning', phase: 'evidence',
     title: 'FCC LMS / public-file data unavailable',

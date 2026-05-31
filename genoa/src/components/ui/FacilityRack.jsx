@@ -360,7 +360,7 @@ export default function FacilityRack({
         {String(inputs.service || '').toUpperCase() === 'AM' && (
         <div>
           <label className="rack-label">AM σ (mS/m)</label>
-          <input className="rack-input" value={inputs.ground_sigma_mS_m ?? ''} onChange={e => set('ground_sigma_mS_m', e.target.value)} placeholder="e.g. 8" />
+          <input className="rack-input" value={inputs.ground_sigma_mS_m ?? ''} onChange={e => set('ground_sigma_mS_m', e.target.value)} placeholder="from M3 map" />
         </div>
         )}
       </div>
