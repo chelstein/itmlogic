@@ -158,12 +158,14 @@ def _parse_case_html(html: str, *, asn: str, endpoint: str) -> dict:
     if not hazard_summary and determination == "DOH":
         hazard_summary = raw_determ  # surface the raw determination text for DOH
 
-    # Validity check — if we couldn't extract a determination or study number,
-    # the page is either a login redirect or an unknown structure.
-    if not determination and not study_number:
+    # Validity check — if we couldn't extract a determination the page is
+    # either a login redirect, a "no results" page, or an HTML structure
+    # change.  study_number falls back to the caller's ASN so it is never
+    # a reliable signal; determination is the authoritative gate.
+    if not determination:
         return {
             "available": False,
-            "error": "Could not parse FAA OE/AAA case file — page structure unrecognized",
+            "error": "Could not parse FAA OE/AAA case file — determination not found (page structure unrecognized or login redirect)",
             "endpoint": endpoint,
             "html_snippet": html[:500],
         }

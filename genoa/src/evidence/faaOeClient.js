@@ -79,6 +79,7 @@ const DEFAULT_OE_ROOT     = 'https://oeaaa.faa.gov/oeaaa/external';
 export function makeFaaOeClient({
   oeRoot          = process.env.FAA_OE_ROOT_URL    || DEFAULT_OE_ROOT,
   oeSidecarUrl    = process.env.FAA_OE_SIDECAR_URL || null,
+  oeSidecarToken  = process.env.FAA_OE_API_TOKEN   || null,
   htmlFallback    = process.env.FAA_OE_HTML_FALLBACK === '1',
   oeDisable       = process.env.FAA_OE_DISABLE === '1',
   timeoutMs       = DEFAULT_TIMEOUT_MS,
@@ -140,7 +141,8 @@ export function makeFaaOeClient({
       if (oeSidecarUrl){
         try {
           const u = joinUrl(oeSidecarUrl, `/api/v1/oe/${encodeURIComponent(study_number)}`);
-          const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs) });
+          const headers = oeSidecarToken ? { Authorization: `Bearer ${oeSidecarToken}` } : {};
+          const r = await fetchFn(u, { signal: AbortSignal.timeout(timeoutMs), headers });
           if (r.ok){
             const j = await r.json();
             return normalizeFaaOeRecord(j, 'faa-oe-sidecar', u);
