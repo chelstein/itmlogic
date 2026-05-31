@@ -1301,6 +1301,11 @@ export async function computeExhibit(req){
   // a missing variant can be added in one line.  Same pattern as
   // measurements_probe for SDR captures.
   if (!evidence.identity?.available && (identityFromSidecar || identityFromZtr)){
+    // G-010: emit SIDECAR_UNAVAILABLE so the readiness score degrades (-6 pts)
+    // and degraded_mode surfaces the identity gap.  Without this the exhibit
+    // looks fully-provisioned even when call sign / facility ID are unconfirmed.
+    warnings.push(W.make('SIDECAR_UNAVAILABLE',
+      'Identity sidecar and ZTR RadioDNS fallback both failed; facility identity unverified — call sign and facility ID are not independently confirmed.'));
     evidence.identity_probe = {
       available:                  false,
       sidecar:                    identityFromSidecar

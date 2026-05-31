@@ -237,3 +237,68 @@ test('PSRA_PSSA_ORCHESTRATOR_PROVENANCE names §73.99 + §73.182(k) + §73.190(c
   assert.match(PSRA_PSSA_ORCHESTRATOR_PROVENANCE.regulation, /73\.190\(c\)/);
   assert.match(PSRA_PSSA_ORCHESTRATOR_PROVENANCE.license_basis, /17 USC §105/);
 });
+
+/* ---------- G-013 PINNED NUMERIC FIXTURE ---------- */
+//
+// Purpose: prevent silent regression in the §73.99(b)(1) power-reduction
+// formula by asserting exact p_reduced_w and scale_factor values from known
+// geometry.  This is not testing the skywave model (which is mocked); it
+// pins the formula P = P_daytime · (E_max / E_actual)² · 1000.
+//
+// Geometry:
+//   proposed: WTST Class B 5 kW, 700 kHz, (40.0, -75.0)
+//   protected: WBLK Class B at (41.0, -75.0), distance ≈ 111.19 km
+//
+// With the default RSS share of 0.25, the orchestrator sets:
+//   e_max_allowed = e_actual × 0.25
+//
+// The power formula therefore simplifies to:
+//   P_reduced = P_daytime × 0.25² × 1000 = 5 × 0.0625 × 1000 = 312.5 W
+//
+// This result is INDEPENDENT of the absolute skywave field value
+// (the ratio e_max/e_actual = 0.25 regardless of what FCCAM returns),
+// so it pins formula correctness without coupling to the skywave model.
+// Both PSSA (50%) and PSRA (10%) pools yield the same result because
+// e_max = e_actual × rss_share in both cases.
+test('G-013 PINNED: default RSS share (0.25) → p_reduced_w = 312.5 W, scale_factor = 0.0625', async () => {
+  const r = await psraPssaExhibit({
+    proposed: PROPOSED
+  }, {
+    fccamClient:    makeFakeFccam(),
+    facilityClient: makeFakeFacility([{
+      call: 'WBLK', facility_id: 9001, fcc_class: 'B',
+      lat: 41, lon: -75, frequency_khz: 700, erp_kw: 10,
+      channel_relationship: 'cochannel', distance_km: 110
+    }]),
+    sunClient: makeFakeSun()
+  });
+
+  assert.equal(r.available, true, 'exhibit available');
+  assert.equal(r.power.ok,  true, 'power ok');
+
+  // PSSA (50% skywave) pool
+  assert.equal(r.power.pssa.p_reduced_w,         312.5,  'PSSA p_reduced_w');
+  assert.equal(r.power.pssa.binding.scale_factor, 0.0625, 'PSSA scale_factor = (0.25)^2');
+  assert.equal(r.power.pssa.ceiling_applied,      false,  'PSSA ceiling not applied (312.5 < 500 W)');
+  assert.equal(r.power.pssa.binding.call,         'WBLK', 'PSSA binding pair is WBLK');
+
+  // PSRA (10% skywave) pool — identical result: e_max = e_actual × 0.25 in both pools
+  assert.equal(r.power.psra.p_reduced_w,         312.5,  'PSRA p_reduced_w');
+  assert.equal(r.power.psra.binding.scale_factor, 0.0625, 'PSRA scale_factor = (0.25)^2');
+  assert.equal(r.power.psra.ceiling_applied,      false,  'PSRA ceiling not applied');
+  assert.equal(r.power.psra.binding.call,         'WBLK', 'PSRA binding pair is WBLK');
+
+  // The pair itself carries the raw field values for further verification
+  const pair = r.protected_pairs[0];
+  assert.ok(Number.isFinite(pair.pssa.e_actual_uv_m),    'PSSA e_actual is finite');
+  assert.ok(Number.isFinite(pair.psra.e_actual_uv_m),    'PSRA e_actual is finite');
+  // e_max must equal e_actual × 0.25 (to 6 sig-fig) — this pins the RSS-share wiring
+  assert.ok(
+    Math.abs(pair.pssa.e_max_allowed_uv_m / pair.pssa.e_actual_uv_m - 0.25) < 1e-9,
+    'PSSA e_max_allowed = e_actual × 0.25 (default RSS share)'
+  );
+  assert.ok(
+    Math.abs(pair.psra.e_max_allowed_uv_m / pair.psra.e_actual_uv_m - 0.25) < 1e-9,
+    'PSRA e_max_allowed = e_actual × 0.25 (default RSS share)'
+  );
+});

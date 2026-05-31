@@ -246,7 +246,7 @@ export const WARNING_CODES = Object.freeze({
 
   AM_INTERNATIONAL_TREATY_ZONE: { severity: 'warning', phase: 'engine',
     title: 'AM transmitter site inside US/MX or US/CA bilateral treaty zone',
-    description: 'The proposed transmitter coordinates fall within a US/Mexico or US/Canada bilateral AM treaty zone.  Stations in these zones must protect co-channel and adjacent-channel foreign stations per the applicable bilateral agreement (NARBA or US/Canada agreement) and the FCC\'s implementing rules (47 CFR §73.187 / §73.188).  Genoa does not compute bilateral treaty skywave protection studies; the engineer of record must perform that study separately before filing with the FCC.' },
+    description: 'The proposed transmitter coordinates fall within a US/Mexico or US/Canada bilateral AM treaty zone.  Stations in these zones must protect co-channel and adjacent-channel foreign stations per the applicable bilateral agreement (NARBA or US/Canada agreement) under 47 CFR §73.187 / §73.188.  A separate bilateral interference study is required before this application can be filed; the engineer of record must perform it and attach the exhibit to the FCC submission.  This engine does not produce bilateral treaty studies.' },
 
   AM_DA_PATTERN_COMPLIANCE_FAIL: { severity: 'blocker', phase: 'engine',
     title: 'AM DA pattern §73.150 compliance failure',
@@ -276,6 +276,10 @@ export const WARNING_CODES = Object.freeze({
   MISSING_NEARBY_STATIONS: { severity: 'warning', phase: 'evidence',
     title: 'Nearby-stations list missing',
     description: 'No list of nearby primary stations was attached to the exhibit, so the §74.1204 D/U interference study could not run.  Provide evidence.nearby_primaries to complete the translator analysis.' },
+
+  BUILD_UNVERSIONED: { severity: 'warning', phase: 'sidecar',
+    title: 'Build SHA is "uncommitted" — replay-token build identity unreliable',
+    description: 'The engine resolved to SHA "uncommitted" because no Docker .build_sha, GIT_COMMIT_SHA env-var, or .git/HEAD was found at startup.  The build_attestation.sha field is non-unique; two exhibits with different code may share the same "uncommitted" SHA.  Deploy via Docker or set GIT_COMMIT_SHA to fix.' },
 
   SIGMA_CLAMP: { severity: 'warning', phase: 'engine',
     title: 'AM σ rounded or clamped to FCC M3 grid (47 CFR §73.184)',

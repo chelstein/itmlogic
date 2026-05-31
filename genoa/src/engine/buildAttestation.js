@@ -178,13 +178,44 @@ export function verifyAttestation(attestation){
   if (a.length !== b.length || !crypto.timingSafeEqual(a, b)){
     return { ok: false, reason: 'HMAC mismatch (different signing key, tampered fingerprint, or wrong build)' };
   }
+  // G-016: verify the composed curve-dataset fingerprint when present.
+  // curve_dataset_fingerprint_sha256 = sha256(base_fingerprint + '|' + curve_json)
+  // stamped by engine/index.js after the curve dataset is loaded at runtime.
+  // Old attestations without this field pass unchanged (additive check).
+  if (attestation.curve_dataset_fingerprint_sha256
+      && Array.isArray(attestation.curve_dataset_fingerprint_inputs)){
+    const recomputedCurve = crypto
+      .createHash('sha256')
+      .update(attestation.curve_dataset_fingerprint_inputs.join('|sep|'), 'utf8')
+      .digest('hex');
+    // The engine stores inputs as ['base=<hash>', 'curve_dataset=<json>'] and
+    // joins them with '|' when hashing (see engine/index.js _composedFp).
+    // Recompute using the exact separator the engine used.
+    const inputsRaw = attestation.curve_dataset_fingerprint_inputs;
+    const baseHash  = inputsRaw.find(s => s.startsWith('base='))?.slice(5) || '';
+    const curvePart = inputsRaw.find(s => s.startsWith('curve_dataset='))?.slice(14) || '';
+    const recomputedCurveFp = crypto
+      .createHash('sha256')
+      .update(baseHash + '|' + curvePart, 'utf8')
+      .digest('hex');
+    if (recomputedCurveFp !== attestation.curve_dataset_fingerprint_sha256){
+      return {
+        ok:    false,
+        reason: 'curve_dataset_fingerprint_sha256 mismatch (curve dataset differs from build; claimed '
+               + attestation.curve_dataset_fingerprint_sha256.slice(0, 12) + '…, recomputed '
+               + recomputedCurveFp.slice(0, 12) + '…)'
+      };
+    }
+  }
+
   return {
     ok:                  true,
     sha:                 attestation.sha,
     release_tag:         attestation.release_tag,
     build_time:          attestation.build_time,
     fingerprint_sha256:  attestation.fingerprint_sha256,
-    signing_key_id:      attestation.signing_key_id
+    signing_key_id:      attestation.signing_key_id,
+    curve_dataset_fingerprint_sha256: attestation.curve_dataset_fingerprint_sha256 || null
   };
 }
 
