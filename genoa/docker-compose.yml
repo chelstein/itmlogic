@@ -47,6 +47,12 @@ services:
       FCCAM_SIDECAR_URL:        http://genoa-fccam-sidecar:8090
       # FAA OE/AAA determination proxy — set to operator-managed bridge URL.
       FAA_OE_SIDECAR_URL:       ""
+      # FCCGW (FCC/OET R86-1 Ground Wave) advisory sidecar.
+      # Runs natively on the host at port 8096 — NOT a Docker service.
+      # Set to http://host.docker.internal:8096 (Docker Desktop) or
+      # http://<host-ip>:8096 (Linux) when the sidecar is running.
+      # See genoa/src/sidecars/fccgw/fccgw-api.service for the systemd unit.
+      FCCGW_SIDECAR_URL:        ""
     ports: [ "8080:8080" ]
 
   genoa-worker:

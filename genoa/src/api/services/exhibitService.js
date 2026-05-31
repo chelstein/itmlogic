@@ -2509,6 +2509,174 @@ export async function computeExhibit(req){
     }
   }
 
+  // ---- 8e-2. FCCGW/OET R86-1 AM physics validation ----
+  //
+  // Runs the FCC/OET R86-1 Ground Wave model as a second independent
+  // physics cross-check alongside the somnec2d result.  Computes
+  // contour distances for the standard FCC AM contour levels and
+  // compares them against the FCC §73.184 curve result.
+  // advisory:true, filing_effect:'none' — never changes filing values.
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && options.am_physics_fccgw !== false){
+    const t0 = Date.now();
+    if (!sidecars.fccgw){
+      evidence.am_physics_fccgw = {
+        status:        'not_configured',
+        advisory:      true,
+        filing_effect: 'none',
+        engine:        'fccgw-oet-r86-1',
+        label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+        method:        'FCC/OET R86-1 ground-wave model (GroundWaveFCC Octave engine)',
+        notes: [
+          'Independent physics evidence only.',
+          'Does not modify FCC §73.184 curve-derived contour distances.',
+          'FCCGW_SIDECAR_URL unset — sidecar not invoked.'
+        ],
+        elapsed_ms: Date.now() - t0
+      };
+    } else {
+      try {
+        // Derive inputs from station parameters.
+        const freq_khz    = Number(inputs.frequency);
+        const freq_hz     = Number.isFinite(freq_khz) && freq_khz > 0 ? freq_khz * 1000 : null;
+
+        if (!freq_hz){
+          evidence.am_physics_fccgw = {
+            status:        'not_run',
+            advisory:      true,
+            filing_effect: 'none',
+            engine:        'fccgw-oet-r86-1',
+            label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+            warning:       'frequency missing — FCCGW requires a positive AM-band frequency',
+            elapsed_ms:    Date.now() - t0
+          };
+        } else {
+          // Resolve ground constants (same defaults as somnec2d block).
+          const { DEFAULT_EPR, DEFAULT_GROUND_SIGMA_MS_M, sigmaMsmToSm } =
+            await import('../../evidence/amPhysicsClient.js');
+
+          let sigma_ms_m   = Number(inputs.ground_sigma_mS_m);
+          let sigma_source = 'input';
+          if (!Number.isFinite(sigma_ms_m) || sigma_ms_m <= 0){
+            sigma_ms_m   = DEFAULT_GROUND_SIGMA_MS_M;
+            sigma_source = 'default';
+          }
+          const sigma_s_per_m = sigmaMsmToSm(sigma_ms_m);
+
+          let epsilon    = Number(inputs.ground_epr);
+          let epr_source = 'input';
+          if (!Number.isFinite(epsilon) || epsilon < 1){
+            epsilon    = DEFAULT_EPR;
+            epr_source = 'default';
+          }
+
+          // E1km: 100 * sqrt(ERP_kW) per FCC §73.184 / §73.189 reference.
+          const erp_kw = Number(inputs.erp_kw || inputs.power_kw || inputs.power);
+          const e1km_mvm = Number.isFinite(erp_kw) && erp_kw > 0
+            ? 100 * Math.sqrt(erp_kw)
+            : null;
+
+          if (!e1km_mvm){
+            evidence.am_physics_fccgw = {
+              status:        'not_run',
+              advisory:      true,
+              filing_effect: 'none',
+              engine:        'fccgw-oet-r86-1',
+              label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+              warning:       'ERP/power missing — FCCGW requires a positive ERP to compute E1km',
+              elapsed_ms:    Date.now() - t0
+            };
+          } else {
+            // Standard FCC AM contour levels (mV/m).
+            const CONTOUR_LEVELS = [5, 2, 0.5, 0.025];
+
+            // Run contour for each target level.
+            const contourResults = await budget.withDeadline('am_physics_fccgw', async () => {
+              const results = [];
+              for (const target_field_mvm of CONTOUR_LEVELS){
+                const r = await sidecars.fccgw.runContour({
+                  freq_hz,
+                  sigma_s_per_m,
+                  epsilon,
+                  e1km_mvm,
+                  target_field_mvm
+                });
+                results.push({ target_field_mvm, ...r });
+              }
+              return results;
+            }, { minMs: 30_000 });
+
+            // Compare FCCGW physics results against FCC §73.184 curve distances
+            // already present in exhibit.contour_distances (if available).
+            const fccCurveDistances = exhibit.contour_distances || exhibit.radial_table || null;
+
+            const comparisons = (contourResults || []).map(r => {
+              const fccgw_km = r.contour_distance_km;
+              // Attempt to look up the FCC §73.184 curve distance for this contour level.
+              // The curve distance may live in contour_distances keyed by field string.
+              const fieldKey = String(r.target_field_mvm);
+              const fcc_curve_km = fccCurveDistances
+                ? (fccCurveDistances[fieldKey] || fccCurveDistances[r.target_field_mvm] || null)
+                : null;
+
+              const variance_pct = (fcc_curve_km != null && fccgw_km != null && fcc_curve_km > 0)
+                ? Math.round(Math.abs(fccgw_km - fcc_curve_km) / fcc_curve_km * 1000) / 10
+                : null;
+
+              return {
+                field_mvm:       r.target_field_mvm,
+                fcc_curve_km:    fcc_curve_km  != null ? Math.round(fcc_curve_km  * 100) / 100 : null,
+                fccgw_physics_km: fccgw_km     != null ? Math.round(fccgw_km      * 100) / 100 : null,
+                variance_pct,
+                bracketed_by:    r.bracketed_by || null,
+                available:       r.available !== false
+              };
+            });
+
+            evidence.am_physics_fccgw = {
+              status:        contourResults ? 'run' : 'failed',
+              advisory:      true,
+              filing_effect: 'none',
+              engine:        'fccgw-oet-r86-1',
+              label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+              method:        'FCC/OET R86-1 ground-wave model (GroundWaveFCC Octave engine)',
+              sidecar_configured: true,
+              inputs: {
+                freq_hz,
+                freq_khz,
+                sigma_s_per_m,
+                sigma_ms_m,
+                sigma_source,
+                epsilon,
+                epr_source,
+                e1km_mvm,
+                erp_kw: erp_kw || null
+              },
+              contour_comparisons: comparisons,
+              notes: [
+                'Independent physics evidence only.',
+                'Does not modify FCC §73.184 curve-derived contour distances.',
+                'Contour distances are FCC/OET R86-1 advisory cross-check only.'
+              ],
+              elapsed_ms: Date.now() - t0,
+              fetched_at: new Date().toISOString()
+            };
+          }
+        }
+      } catch (e){
+        evidence.am_physics_fccgw = {
+          status:        'failed',
+          advisory:      true,
+          filing_effect: 'none',
+          engine:        'fccgw-oet-r86-1',
+          label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+          warning:       `am_physics_fccgw compute failed: ${e?.message || e}`,
+          elapsed_ms:    Date.now() - t0
+        };
+      }
+    }
+  }
+
   // ---- 8f. AM §73.99(b)(1)/(2) PSRA/PSSA reduced-power exhibit ----
   //
   // Runs the closed-form reduced-power formula for the proposed AM
@@ -2682,6 +2850,9 @@ export async function computeExhibit(req){
   }
   if (evidence.am_physics){
     exhibit.evidence.am_physics = evidence.am_physics;
+  }
+  if (evidence.am_physics_fccgw){
+    exhibit.evidence.am_physics_fccgw = evidence.am_physics_fccgw;
   }
   if (evidence.am_psra_pssa){
     exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;

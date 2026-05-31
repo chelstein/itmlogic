@@ -96,6 +96,13 @@ services:
       # FAA OE/AAA determination proxy — operator-managed JSON bridge to
       # oeaaa.faa.gov.  When unset, FAA OE fetch reports DATA SOURCE ERROR.
       - { key: FAA_OE_SIDECAR_URL,          scope: RUN_TIME, value: "" }
+      # FCCGW (FCC/OET R86-1 Ground Wave) advisory sidecar.
+      # Runs natively on the host (not a DO App Platform component) because it
+      # requires Octave + GroundWaveFCC.  Set FCCGW_SIDECAR_URL to the droplet
+      # or bare-metal host URL where genoa-fccgw-api.service is running (port 8096).
+      # Advisory only — filing_effect:'none'; never modifies §73.184 contour math.
+      - { key: FCCGW_SIDECAR_URL,           scope: RUN_TIME, value: "" }
+      - { key: FCCGW_API_TOKEN,             scope: RUN_TIME, type: SECRET, value: "" }
       # Orphan reaper — 2 h window so long NEC optimizer and SPLAT/ITM
       # runs are not killed before they finish.
       - { key: JOB_REAP_STALE_AFTER_MS,    scope: RUN_TIME, value: "1800000" }

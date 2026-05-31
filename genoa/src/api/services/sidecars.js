@@ -42,6 +42,7 @@ import { makeFccSunClient }      from '../../evidence/fccSunClient.js';
 import { makeAmPhysicsClient }   from '../../evidence/amPhysicsClient.js';
 import { makeGeoRfEvidenceClient } from '../../evidence/geoRfEvidenceClient.js';
 import { makeVoacapClient }       from '../../evidence/voacapClient.js';
+import { makeFccgwClient }       from '../../evidence/fccgwClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -183,7 +184,19 @@ export const sidecars = Object.freeze({
   // filing_effect:'none', never modifies §73.182 NIF radii or §73.190
   // skywave results.  Opt-in via VOACAP_SIDECAR_URL on the deploy.
   // When unset, nightOrchestrator sets advisory_voacap:null silently.
-  voacap:        makeVoacapClient()
+  voacap:        makeVoacapClient(),
+
+  // FCCGW (FCC/OET R86-1 Ground Wave) advisory sidecar.
+  // Runs the GroundWaveFCC Octave engine as a second independent physics
+  // cross-check alongside the somnec2d result.  Computes groundwave field
+  // strengths and contour distances for the standard FCC AM contour levels
+  // and compares them against the FCC §73.184 curve result.
+  // ADVISORY ONLY — filing_effect:'none'; never modifies §73.184 contour
+  // distances, §73.183 allocation results, or any filing-controlling rule
+  // math.  Opt-in via FCCGW_SIDECAR_URL on the deploy; when unset, the AM
+  // exhibit attaches evidence.am_physics_fccgw = { status:'not_configured' }
+  // and the study still ships.
+  fccgw:         makeFccgwClient()
 });
 
 // SIDECAR_REGISTRY — additive metadata describing each sidecar's role,
@@ -343,6 +356,14 @@ export const SIDECAR_REGISTRY = Object.freeze([
     filing_effect: 'none',
     required_for: ['AM'],
     current_url: process.env.VOACAP_SIDECAR_URL || null
+  },
+  {
+    name: 'fccgw',
+    url_env_var: 'FCCGW_SIDECAR_URL',
+    role: 'advisory_physics',
+    filing_effect: 'none',
+    required_for: ['AM'],
+    current_url: process.env.FCCGW_SIDECAR_URL || null
   }
 ]);
 
