@@ -78,9 +78,10 @@ export function makeVoacapClient({
     ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {})
   };
 
-  async function fetchWithTimeout(input, init = {}){
+  async function fetchWithTimeout(input, init = {}, overrideMs){
+    const ms = overrideMs ?? timeoutMs;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    const timer = setTimeout(() => ctrl.abort(), ms);
     try {
       const res = await fetch(input, { ...init, signal: ctrl.signal });
       return res;
@@ -95,16 +96,18 @@ export function makeVoacapClient({
 
     /**
      * Probe sidecar health.
-     * @returns {{ reachable: boolean, binary_present?: boolean, error?: string }}
+     * Returns true only when the sidecar is reachable AND reports ok:true.
+     * Uses a 3 s timeout so /readyz is never stalled by a slow sidecar.
+     * @returns {Promise<boolean>}
      */
     async health(){
       try {
-        const res = await fetchWithTimeout(`${url}/healthz`, { method: 'GET' });
-        if (!res.ok) return { reachable: false, error: `HTTP ${res.status}` };
+        const res = await fetchWithTimeout(`${url}/healthz`, { method: 'GET' }, 3_000);
+        if (!res.ok) return false;
         const body = await res.json();
-        return { reachable: true, ...body };
-      } catch (e){
-        return { reachable: false, error: e.message };
+        return body.ok === true;
+      } catch {
+        return false;
       }
     },
 

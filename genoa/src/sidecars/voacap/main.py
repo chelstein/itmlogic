@@ -205,12 +205,33 @@ def _parse_output(text: str, freqs: List[float]) -> List[dict]:
             if 1.5 <= candidate <= 32.0:
                 freq_sections.append((candidate, i))
 
+    hour_label_re = re.compile(r'^\s*HOUR\b', re.IGNORECASE)
+
+    def is_hour_labels(nums: list) -> bool:
+        """Return True when nums is the sequential 1..24 hour-label row."""
+        if len(nums) < 24:
+            return False
+        return nums[:24] == list(range(1, 25))
+
     def extract_24(start_line: int) -> Optional[List[int]]:
-        """Look ahead from start_line for 24 integer values ≤ 100."""
+        """Look ahead from start_line for 24 reliability values.
+
+        Skips any line that contains the 'HOUR' keyword or that is the
+        sequential 1..24 hour-label row — both appear before the actual
+        reliability integers in Method 14 output and would otherwise be
+        mistakenly captured as reliability data.
+        """
         values: List[int] = []
         for j in range(start_line, min(start_line + 30, len(lines))):
-            nums = [int(x) for x in re.findall(r'\b(\d{1,3})\b', lines[j])
+            line = lines[j]
+            # Skip HOUR header lines explicitly.
+            if hour_label_re.search(line):
+                continue
+            nums = [int(x) for x in re.findall(r'\b(\d{1,3})\b', line)
                     if int(x) <= 100]
+            # Skip the sequential 1..24 hour-label row.
+            if is_hour_labels(nums):
+                continue
             values.extend(nums)
             if len(values) >= 24:
                 return values[:24]
