@@ -714,6 +714,42 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
+  // §73.24(g)/(j) and international border — run BEFORE warnings are frozen
+  // so failures raise blockers that score in filing_readiness.  Previously
+  // these ran after readiness() was computed, making them invisible to the
+  // badge and score (G-001, G-002, G-007 audit fixes).
+  if (service === 'AM'){
+    exhibit.am_blanket_compliance = checkAm73_24g({ exhibit });
+    if (exhibit.am_blanket_compliance?.overall_pass === false){
+      warnings.push(W.make('AM_73_24G_FAIL',
+        `Blanket population ratio ${
+          (() => {
+            const f = (exhibit.am_blanket_compliance.findings || []).find(x => x.rule === 'blanket_population_ratio');
+            return f?.observed || 'see am_blanket_compliance.findings';
+          })()
+        } — §73.318(b) remediation plan required before filing.`));
+    }
+
+    exhibit.am_city_coverage_compliance = checkAm73_24j({ exhibit });
+    if (exhibit.am_city_coverage_compliance?.overall_pass === false){
+      const jDetail = (exhibit.am_city_coverage_compliance.findings || [])
+        .filter(f => f.pass === false)
+        .map(f => f.observed || f.rule)
+        .join('; ');
+      warnings.push(W.make('AM_73_24J_FAIL',
+        `5 mV/m contour does not encompass community of license: ${jDetail || 'see am_city_coverage_compliance.findings'}`));
+    }
+
+    if (Number.isFinite(lat) && Number.isFinite(lon)){
+      exhibit.international_border = detectInternationalBorder({ lat, lon });
+      if (exhibit.international_border?.inside_treaty_zone === true){
+        const treaties = (exhibit.international_border.treaties || []).join(', ') || 'US/MX or US/CA bilateral agreement';
+        warnings.push(W.make('AM_INTERNATIONAL_TREATY_ZONE',
+          `Site at (${lat.toFixed(4)}, ${lon.toFixed(4)}) is inside treaty zone: ${treaties}.  Bilateral protection study required before filing.`));
+      }
+    }
+  }
+
   exhibit.warnings     = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
   // "Degraded mode" = an external dependency (sidecar/upstream) was
@@ -727,23 +763,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_reasons = _degraded.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
-
-  // §73.24(g) blanket-interference compliance (AM).  Reads the
-  // 1000 mV/m and 25 mV/m contours from the radial table plus any
-  // attached per-contour population data.  Runs unconditionally for
-  // AM so the verdict always reports a status (PASS / FAIL / null when
-  // population data unavailable).
-  if (service === 'AM'){
-    exhibit.am_blanket_compliance = checkAm73_24g({ exhibit });
-    exhibit.am_city_coverage_compliance = checkAm73_24j({ exhibit });
-    // International border auto-detect — surfaces US/MX and US/CA
-    // AM treaty obligations when the site is inside either bilateral
-    // zone.  Cf. Mullaney KELP 1989: site 0 km from US/Mexico border,
-    // had to protect XEJPV per the US/Mexico AM Agreement.
-    if (Number.isFinite(lat) && Number.isFinite(lon)){
-      exhibit.international_border = detectInternationalBorder({ lat, lon });
-    }
-  }
 
   exhibit.interference_study = buildInterferenceStudy({
     subject: {

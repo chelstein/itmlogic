@@ -71,6 +71,8 @@ export function buildAmNightNifGeoJson(exhibit){
         kind:                  'nif_contour',
         regulation:            nif.regulation || '47 CFR §73.182',
         source:                nif.source     || 'fccam',
+        filing_grade:          nif.filing_grade ?? false,
+        screening_only:        !(nif.filing_grade ?? false),
         n_azimuths:            nif.summary?.n_azimuths           ?? null,
         n_failing_azimuths:    nif.summary?.n_failing_azimuths   ?? null,
         n_no_service_azimuths: nif.summary?.n_no_service_azimuths ?? null,
@@ -157,9 +159,11 @@ export function buildAmNightNifGeoJson(exhibit){
       bbox:     bboxOf(features),
       features,
       properties: {
-        regulation: '47 CFR §73.182 (AM nighttime allocation) + §73.190(c) (Wang skywave)',
-        source:     nif.source     || 'fccam',
-        generated_at: nif.fetched_at || new Date().toISOString(),
+        regulation:    '47 CFR §73.182 (AM nighttime allocation) + §73.190(c) (Wang skywave)',
+        source:        nif.source        || 'fccam',
+        filing_grade:  nif.filing_grade  ?? false,
+        screening_only: !(nif.filing_grade ?? false),
+        generated_at:  nif.fetched_at    || new Date().toISOString(),
         license_basis: '17 USC §105 (FCC engine output, US Government public domain)'
       }
     }

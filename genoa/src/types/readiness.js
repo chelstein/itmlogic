@@ -108,22 +108,32 @@ export function readiness({ warnings = [], exhibit = {} }){
     }
   }
 
-  if (status !== 'filing_candidate' && status !== 'licensed_legacy_review'){
-    if (blockers.find(b => b.code === 'CURVE_VALIDATION_MISSING'))
-      recommendations.push('Run the reference validation suite against the active curve dataset.');
-    if (blockers.find(b => b.code === 'AM_DA_PATTERN_COMPLIANCE_FAIL'))
-      recommendations.push('Correct the directional antenna pattern to satisfy §73.150 smoothness, max-to-min ratio, and RMS minimum-field requirements before filing.');
-    if (blockers.find(b => b.code === 'CONTOUR_MONOTONICITY_VIOLATION'))
-      recommendations.push('Contour distance ordering is inconsistent; re-run compute and inspect the radial table for the flagged radials.');
-    if (w_codes.find(w => w.code === 'CONSTANT_HAAT_ASSUMED'))
-      recommendations.push('Enable the terrain sidecar to compute per-radial §73.313 arc-averaged HAAT.');
-    if (w_codes.find(w => w.code === 'POPULATION_PLACEHOLDER'))
-      recommendations.push('Replace the uniform-density population estimate with a Census/ACS dispatch.');
-    if (w_codes.find(w => w.code === 'SDR_MEASUREMENTS_MISSING' || w.code === 'SDR_MEASUREMENTS_NOT_CALIBRATED'))
-      recommendations.push('Attach calibrated SigMF SDR captures to populate the measurement appendix.');
-  } else {
-    recommendations.push('Engineering review required prior to FCC filing. Genoa does not certify; the licensed engineer does.');
-  }
+  // Blocker-specific recommendations — always shown regardless of status.
+  if (blockers.find(b => b.code === 'CURVE_VALIDATION_MISSING'))
+    recommendations.push('Run the reference validation suite against the active curve dataset.');
+  if (blockers.find(b => b.code === 'AM_DA_PATTERN_COMPLIANCE_FAIL'))
+    recommendations.push('Correct the directional antenna pattern to satisfy §73.150 smoothness, max-to-min ratio, and RMS minimum-field requirements before filing.');
+  if (blockers.find(b => b.code === 'CONTOUR_MONOTONICITY_VIOLATION'))
+    recommendations.push('Contour distance ordering is inconsistent; re-run compute and inspect the radial table for the flagged radials.');
+  if (blockers.find(b => b.code === 'AM_73_24G_FAIL'))
+    recommendations.push('Submit a §73.318(b) blanketing-interference remediation plan and commit to receiver-treatment funding before filing (47 CFR §73.24(g)).');
+  if (blockers.find(b => b.code === 'AM_73_24J_FAIL'))
+    recommendations.push('Increase power, reduce frequency, or modify the site to bring the 5 mV/m groundwave contour around the entire community of license before filing (47 CFR §73.24(j)).');
+  if (blockers.find(b => b.code === 'FCCAM_UNAVAILABLE_BERRY_FALLBACK'))
+    recommendations.push('Restore the FCCAM Wang 1985 sidecar (FCCAM_SIDECAR_URL) and re-run: Berry 1968 screening is not filing-grade for §73.182 nighttime protection (§73.190(c)).');
+
+  // Warning-level specific recommendations — always shown regardless of status.
+  if (w_codes.find(w => w.code === 'CONSTANT_HAAT_ASSUMED'))
+    recommendations.push('Enable the terrain sidecar to compute per-radial §73.313 arc-averaged HAAT.');
+  if (w_codes.find(w => w.code === 'POPULATION_PLACEHOLDER'))
+    recommendations.push('Replace the uniform-density population estimate with a Census/ACS dispatch.');
+  if (w_codes.find(w => w.code === 'SDR_MEASUREMENTS_MISSING' || w.code === 'SDR_MEASUREMENTS_NOT_CALIBRATED'))
+    recommendations.push('Attach calibrated SigMF SDR captures to populate the measurement appendix.');
+  if (w_codes.find(w => w.code === 'AM_INTERNATIONAL_TREATY_ZONE'))
+    recommendations.push('Perform bilateral treaty skywave protection study (NARBA / US-Canada agreement) before filing — Genoa does not compute this study automatically.');
+
+  // Generic sign-off — always appended.
+  recommendations.push('Engineering review required prior to FCC filing. Genoa does not certify; the licensed engineer does.');
 
   return {
     score,
