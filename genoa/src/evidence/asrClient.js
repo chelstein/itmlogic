@@ -158,9 +158,21 @@ export function makeAsrClient({
         });
         if (out?.available) return out;
       }
-      // Tier 3: FCC ULS HTML scrape (operator-opted-in).
+      // Tier 3: FCC ULS ASR HTML scrape (operator-opted-in via ASR_HTML_FALLBACK=1).
       if (htmlFallback){
-        return { available: false, source: null, error: 'FCC ULS HTML scraping not implemented in this build (set ASR_SOCRATA_URL or ASR_SIDECAR_URL for clean JSON access)' };
+        const endpoint = `https://wireless2.fcc.gov/UlsApp/AsrSearch/asrRegistration.jsp?registration_cd=${encodeURIComponent(asr_number)}`;
+        try {
+          const r = await fetchFn(endpoint, { signal: AbortSignal.timeout(timeoutMs) });
+          if (!r.ok){
+            return { available: false, source: 'fcc-uls-html', endpoint,
+                     error: `FCC ASR HTML returned HTTP ${r.status}` };
+          }
+          const html = await r.text();
+          return normalizeAsrHtml(html, asr_number, endpoint);
+        } catch (e){
+          return { available: false, source: 'fcc-uls-html', endpoint,
+                   error: `FCC ASR HTML fetch failed: ${e.message}` };
+        }
       }
       return {
         available: false, source: null,
@@ -529,6 +541,86 @@ function escapeSoql(s){
 
 /* -------------------- internal helpers -------------------- */
 
+/**
+ * Parse FCC ULS ASR registration HTML from wireless2.fcc.gov into a
+ * normalized record.  The page uses label/value table rows; we also
+ * accept the plain-text variant some ULS paths return.
+ */
+function normalizeAsrHtml(html, asr_number, endpoint){
+  if (!html || typeof html !== 'string'){
+    return { available: false, source: 'fcc-uls-html', endpoint, error: 'empty HTML response' };
+  }
+
+  const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ').trim();
+
+  // Build a label→value map from two-column table rows.
+  const labelMap = {};
+  // Pattern: <td ...>Label:</td> <td ...>Value</td>
+  const rowRe = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+  let rm;
+  while ((rm = rowRe.exec(html)) !== null){
+    const cells = [];
+    const cellRe = /<td[^>]*>([\s\S]*?)<\/td>/gi;
+    let cm;
+    while ((cm = cellRe.exec(rm[1])) !== null){
+      cells.push(stripTags(cm[1]));
+    }
+    if (cells.length >= 2){
+      const label = cells[0].replace(/:$/, '').toLowerCase().trim();
+      const value = cells[1].trim();
+      if (label && value) labelMap[label] = value;
+    }
+  }
+
+  // Check for "no record" page.
+  if (Object.keys(labelMap).length === 0 || /no.*record|not.*found/i.test(html)){
+    return { available: false, source: 'fcc-uls-html', endpoint,
+             error: `ASR number ${asr_number} not found in FCC ULS HTML` };
+  }
+
+  // Parse coordinates from "DD-MM-SS.SSS" or decimal formats.
+  const parseCoord = (raw, negLabel) => {
+    if (!raw) return null;
+    const dms = raw.match(/(\d+)-(\d+)-(\d+(?:\.\d+)?)(?:\s*([NSEW]))?/i);
+    if (dms){
+      const val = Number(dms[1]) + Number(dms[2])/60 + Number(dms[3])/3600;
+      const neg = negLabel && (!dms[4] || /[SW]/i.test(dms[4]));
+      return Number((neg ? -val : val).toFixed(6));
+    }
+    const dec = raw.match(/(-?\d+\.\d+)/);
+    return dec ? Number(dec[1]) : null;
+  };
+
+  // Heights come in feet from FCC ULS; convert to metres.
+  const ftToM = (raw) => {
+    const n = Number(String(raw || '').replace(/[^\d.]/g, ''));
+    return Number.isFinite(n) && n > 0 ? Number((n * 0.3048).toFixed(2)) : null;
+  };
+
+  const lat_raw = labelMap['latitude']  || labelMap['lat'];
+  const lon_raw = labelMap['longitude'] || labelMap['long'] || labelMap['lon'];
+
+  return {
+    available:             true,
+    source:                'fcc-uls-html',
+    endpoint,
+    fetched_at:            new Date().toISOString(),
+    asr_number:            labelMap['registration number'] || labelMap['asr number'] || asr_number,
+    latitude_deg:          parseCoord(lat_raw, false),
+    longitude_deg:         parseCoord(lon_raw, true),   // longitude is West → negative
+    overall_height_m:      ftToM(labelMap['overall height above ground (ft)'] || labelMap['height above ground']),
+    overall_height_amsl_m: ftToM(labelMap['overall height above msl (ft)']    || labelMap['height above msl']),
+    ground_elevation_m:    ftToM(labelMap['ground elevation (ft)']             || labelMap['ground elevation']),
+    lighting_requirement:  labelMap['lighting']          || labelMap['lighting requirement']  || null,
+    painting_requirement:  labelMap['painting']          || labelMap['painting requirement']  || null,
+    owner:                 labelMap['owner']             || labelMap['registrant']             || null,
+    status:                (labelMap['status']           || labelMap['application status']     || null),
+    faa_study_number:      labelMap['faa study number']  || labelMap['faa asn']               || null,
+  };
+}
+
 function normalizeAsrRecord(j, source, endpoint){
   if (!j || typeof j !== 'object') return { available: false, source: null, error: 'ASR response not an object' };
   return {
@@ -591,7 +683,7 @@ export const ASR_PROVENANCE = Object.freeze({
     'ZTR rich-station _tower / asr_number',
     'opendata.fcc.gov Socrata (ASR_SOCRATA_URL, default)',
     'ASR_SIDECAR_URL operator sidecar',
-    'FCC ULS HTML (opt-in)'
+    'FCC ULS ASR HTML scrape (ASR_HTML_FALLBACK=1, opt-in)'
   ],
   cross_check_tolerances: {
     coordinates: '1 arcsec (~30 m)',
