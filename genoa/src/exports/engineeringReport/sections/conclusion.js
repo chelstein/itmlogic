@@ -271,6 +271,31 @@ export function buildConclusionSection(exhibit){
       'No blocker- or warning-level findings were raised by the engine.';
   }
 
+  // Append FCCGW physics variance advisory when any contour level deviates
+  // more than 10% from the FCC §73.184 curve distance.  Advisory only —
+  // filing_effect:'none'; does not affect verdict or contour distances.
+  const FCCGW_VARIANCE_WARN_PCT = 10;
+  const fccgwComp = exhibit.evidence?.am_physics_fccgw?.contour_comparisons;
+  if (svc === 'AM' && Array.isArray(fccgwComp)){
+    const highVar = fccgwComp.filter(c =>
+      c.available !== false &&
+      Number.isFinite(c.variance_pct) &&
+      c.variance_pct > FCCGW_VARIANCE_WARN_PCT
+    );
+    if (highVar.length > 0){
+      const items = highVar.map(c =>
+        `${c.field_mvm} mV/m (FCC curve: ${c.fcc_curve_km} km, OET R86-1: ${c.fccgw_physics_km} km, Δ=${c.variance_pct}%)`
+      ).join('; ');
+      narrative +=
+        `  [ADVISORY — Independent Physics Validation] The FCC/OET R86-1 ground-wave model predicts ` +
+        `contour distances that differ from the FCC §73.184 curve values by more than ` +
+        `${FCCGW_VARIANCE_WARN_PCT}% for the following contour level(s): ${items}.  ` +
+        `This is advisory only and does not modify filing-controlling contour distances.  ` +
+        `Variance may reflect site-specific ground conductivity; cross-check σ measurements ` +
+        `or consider a radial-segmented conductivity study.`;
+    }
+  }
+
   // Audit-friendly rewordings.
   narrative = rewordForReport(narrative);
 
