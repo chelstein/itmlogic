@@ -1,90 +1,108 @@
-// FCC §73.190 Figure M3 ground conductivity map — local GeoJSON lookup.
+// FCC §73.190 Figure M3 ground conductivity map — GeoTIFF raster lookup.
 //
-// Loads AM_m3.geojson once at first call from AM_M3_GEOJSON_PATH
-// (default: /opt/genoa/live-data/m3/AM_m3.geojson).  Provides a
-// local fallback when the ZTR M3 proxy is unavailable.
+// Opens AM_m3.tif once (lazy, on first call) via the geotiff package,
+// which makes efficient range reads so the full raster is never loaded
+// into memory.  Provides a local fallback when the ZTR M3 proxy is
+// unavailable.
 //
-// Point-in-polygon via ray-casting; the M3 map has ~150 polygons so
-// a single lookup is sub-millisecond.
+// DATA SOURCE (search order):
+//   1. AM_M3_TIF_PATH env var
+//   2. /opt/genoa/live-data/m3/AM_m3.tif   (production)
+//   3. /opt/genoa/live-data/m3/m3.tif
+//   4. <repo>/data/m3/AM_m3.tif            (local dev)
 //
-// REGULATORY BASIS: 47 CFR §73.190 Figure M3 (FCC ground conductivity
-// map for the contiguous United States).  Values are on the integer
-// mS/m grid {1, 2, 4, 8, 15, 30} historically; the FCC §73.184
-// groundwave table is tabulated for 1–8 mS/m.
+// Pixel values are treated as mS/m.  Set AM_M3_TIF_SCALE=1000 if the
+// raster stores S/m (all values ≤ 0.1) instead.
+//
+// REGULATORY BASIS: 47 CFR §73.190 Figure M3.
 
-import fs from 'fs';
+import { existsSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
-const DEFAULT_M3_PATH = '/opt/genoa/live-data/m3/AM_m3.geojson';
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
-let _geojson   = null;
-let _loadError = null;
-let _loaded    = false;
+const TIF_SEARCH_PATHS = [
+  process.env.AM_M3_TIF_PATH,
+  '/opt/genoa/live-data/m3/AM_m3.tif',
+  '/opt/genoa/live-data/m3/m3.tif',
+  resolve(__dirname, '..', '..', '..', '..', 'data', 'm3', 'AM_m3.tif'),
+  resolve(__dirname, '..', '..', '..', '..', 'data', 'm3', 'm3.tif'),
+].filter(Boolean);
 
-function _load(){
-  if (_loaded) return;
-  _loaded = true;
-  const p = process.env.AM_M3_GEOJSON_PATH || DEFAULT_M3_PATH;
-  try {
-    const raw = fs.readFileSync(p, 'utf8');
-    _geojson = JSON.parse(raw);
-  } catch (e){
-    _loadError = `AM_m3.geojson load failed (${p}): ${e.message}`;
-  }
+const SIGMA_SCALE = Number(process.env.AM_M3_TIF_SCALE || 1) || 1;
+
+let _state = {
+  status:     'pending',  // 'pending' | 'loaded' | 'error'
+  sourcePath: null,
+  loadError:  null,
+  image:      null,
+  originLon:  null,
+  originLat:  null,
+  resLon:     null,
+  resLat:     null,
+  width:      null,
+  height:     null
+};
+let _loadPromise = null;
+
+async function _ensureLoaded(){
+  if (_state.status !== 'pending') return;
+  if (_loadPromise) return _loadPromise;
+  _loadPromise = _doLoad();
+  return _loadPromise;
 }
 
-// Ray-casting point-in-polygon for a single coordinate ring.
-function _pointInRing(lon, lat, ring){
-  let inside = false;
-  const n = ring.length;
-  for (let i = 0, j = n - 1; i < n; j = i++){
-    const xi = ring[i][0], yi = ring[i][1];
-    const xj = ring[j][0], yj = ring[j][1];
-    if (((yi > lat) !== (yj > lat)) &&
-        (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi)){
-      inside = !inside;
-    }
-  }
-  return inside;
-}
+async function _doLoad(){
+  const { fromFile } = await import('geotiff');
 
-// Test [lon, lat] against a GeoJSON Polygon or MultiPolygon geometry.
-function _pointInGeometry(lon, lat, geom){
-  if (!geom) return false;
-  if (geom.type === 'Polygon'){
-    if (!_pointInRing(lon, lat, geom.coordinates[0])) return false;
-    for (let h = 1; h < geom.coordinates.length; h++){
-      if (_pointInRing(lon, lat, geom.coordinates[h])) return false; // hole
-    }
-    return true;
-  }
-  if (geom.type === 'MultiPolygon'){
-    for (const poly of geom.coordinates){
-      if (!_pointInRing(lon, lat, poly[0])) continue;
-      let inHole = false;
-      for (let h = 1; h < poly.length; h++){
-        if (_pointInRing(lon, lat, poly[h])){ inHole = true; break; }
-      }
-      if (!inHole) return true;
-    }
-    return false;
-  }
-  return false;
-}
+  let sourcePath = null;
+  let image = null;
 
-// Property key variants seen across FCC M3 GeoJSON vintages.
-const SIGMA_KEYS = [
-  'conductivity_mS_m', 'conductivity_msm', 'conductivity_mS_per_m',
-  'conductivity', 'sigma_mS_m', 'sigma',
-  'COND', 'CONDUCTIVITY', 'VALUE', 'value'
-];
-
-function _getSigma(props){
-  if (!props) return null;
-  for (const k of SIGMA_KEYS){
-    const v = Number(props[k]);
-    if (Number.isFinite(v) && v > 0) return v;
+  for (const p of TIF_SEARCH_PATHS){
+    if (!existsSync(p)) continue;
+    try {
+      const tiff = await fromFile(p);
+      image = await tiff.getImage();
+      sourcePath = p;
+      break;
+    } catch { /* try next */ }
   }
-  return null;
+
+  if (!image){
+    _state = {
+      ..._state,
+      status: 'error',
+      loadError: `AM_m3.tif not found; searched: ${TIF_SEARCH_PATHS.join(', ')}`
+    };
+    return;
+  }
+
+  const origin = image.getOrigin();
+  const res    = image.getResolution();
+
+  if (!origin || !res || !Number.isFinite(origin[0]) || !Number.isFinite(res[0])){
+    _state = {
+      ..._state,
+      status: 'error',
+      sourcePath,
+      loadError: `${sourcePath}: no georeferencing (getOrigin/getResolution failed)`
+    };
+    return;
+  }
+
+  _state = {
+    status:     'loaded',
+    sourcePath,
+    loadError:  null,
+    image,
+    originLon:  origin[0],
+    originLat:  origin[1],
+    resLon:     res[0],
+    resLat:     res[1],
+    width:      image.getWidth(),
+    height:     image.getHeight()
+  };
 }
 
 /**
@@ -92,63 +110,76 @@ function _getSigma(props){
  *
  * @param {number} lat  Decimal degrees latitude (positive = North)
  * @param {number} lon  Decimal degrees longitude (negative = West)
- * @returns {{
+ * @returns {Promise<{
  *   available:    boolean,
  *   sigma_mS_m?:  number,
- *   zone_id?:     string,
  *   zone_label?:  string,
  *   source:       string,
  *   regulation?:  string,
  *   error?:       string
- * }}
+ * }>}
  */
-export function lookupM3Conductivity(lat, lon){
-  _load();
-  if (_loadError){
-    return { available: false, source: 'fcc-m3-geojson-local', error: _loadError };
+export async function lookupM3Conductivity(lat, lon){
+  await _ensureLoaded();
+
+  if (_state.status !== 'loaded'){
+    return { available: false, source: 'fcc-m3-tif-local', error: _state.loadError || 'GeoTIFF not loaded' };
   }
-  if (!_geojson?.features){
-    return { available: false, source: 'fcc-m3-geojson-local', error: 'GeoJSON not loaded or has no features' };
-  }
+
   const fLat = Number(lat);
   const fLon = Number(lon);
   if (!Number.isFinite(fLat) || !Number.isFinite(fLon)){
-    return { available: false, source: 'fcc-m3-geojson-local', error: 'lat and lon must be finite numbers' };
+    return { available: false, source: 'fcc-m3-tif-local', error: 'lat and lon must be finite numbers' };
   }
-  for (const feat of _geojson.features){
-    if (!_pointInGeometry(fLon, fLat, feat.geometry)) continue;
-    const sigma = _getSigma(feat.properties);
-    if (sigma === null) continue;
-    const props      = feat.properties || {};
-    const zone_id    = String(props.zone ?? props.ZONE ?? props.id ?? feat.id ?? '');
-    const zone_label = String(props.label ?? props.LABEL ?? props.name ?? props.NAME ?? (sigma + ' mS/m'));
-    return {
-      available:  true,
-      sigma_mS_m: sigma,
-      zone_id,
-      zone_label,
-      source:     'fcc-m3-geojson-local',
-      regulation: '47 CFR §73.190 Figure M3'
-    };
+
+  const { image, originLon, originLat, resLon, resLat, width, height } = _state;
+  const px = Math.floor((fLon - originLon) / resLon);
+  const py = Math.floor((fLat - originLat) / resLat);
+
+  if (px < 0 || px >= width || py < 0 || py >= height){
+    return { available: false, source: 'fcc-m3-tif-local', error: 'point outside raster coverage' };
   }
+
+  let rawValue;
+  try {
+    const data = await image.readRasters({ window: [px, py, px + 1, py + 1] });
+    rawValue = data[0][0];
+  } catch (e){
+    return { available: false, source: 'fcc-m3-tif-local', error: `raster read failed: ${e.message}` };
+  }
+
+  if (rawValue == null || !Number.isFinite(rawValue) || rawValue <= 0){
+    return { available: false, source: 'fcc-m3-tif-local', error: 'no-data pixel at this location' };
+  }
+
+  const sigma = rawValue * SIGMA_SCALE;
   return {
-    available: false,
-    source:    'fcc-m3-geojson-local',
-    error:     'point not within any M3 polygon (outside CONUS coverage or GeoJSON gap)'
+    available:  true,
+    sigma_mS_m: sigma,
+    zone_label: `${sigma} mS/m (FCC M3)`,
+    source:     'fcc-m3-tif-local',
+    regulation: '47 CFR §73.190 Figure M3'
   };
 }
 
 /**
- * Status of the locally loaded M3 GeoJSON file — for health checks.
+ * Status of the locally loaded M3 GeoTIFF — for health checks.
  */
 export function m3LoadStatus(){
-  _load();
-  const p = process.env.AM_M3_GEOJSON_PATH || DEFAULT_M3_PATH;
-  if (_loadError) return { loaded: false, path: p, error: _loadError };
-  if (!_geojson)  return { loaded: false, path: p, error: 'not loaded' };
+  if (_state.status === 'pending'){
+    // trigger load but don't await — status will update asynchronously
+    _ensureLoaded().catch(() => {});
+    return { loaded: false, status: 'pending', searched: TIF_SEARCH_PATHS };
+  }
+  if (_state.status === 'error'){
+    return { loaded: false, status: 'error', error: _state.loadError, searched: TIF_SEARCH_PATHS };
+  }
   return {
-    loaded:        true,
-    path:          p,
-    feature_count: _geojson.features?.length ?? 0
+    loaded:     true,
+    status:     'loaded',
+    path:       _state.sourcePath,
+    width:      _state.width,
+    height:     _state.height,
+    sigma_scale: SIGMA_SCALE
   };
 }

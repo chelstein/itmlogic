@@ -1478,13 +1478,13 @@ export async function computeExhibit(req){
         tierAttempts.ztr = { available: false, error: 'sidecar not configured' };
       }
 
-      // Tier 2 — local AM_m3.geojson (fallback when ZTR unavailable).
-      // Reads the FCC §73.190 Figure M3 polygon file loaded at startup
-      // from AM_M3_GEOJSON_PATH (default: /opt/genoa/live-data/m3/).
+      // Tier 2 — local AM_m3.tif raster (fallback when ZTR unavailable).
+      // Reads the FCC §73.190 Figure M3 GeoTIFF at AM_M3_TIF_PATH
+      // (default: /opt/genoa/live-data/m3/AM_m3.tif).
       // Provides site-σ without ZTR; never used when ZTR succeeded.
       if (!resolved){
         try {
-          const m3r = lookupM3Conductivity(inputs.lat, inputs.lon);
+          const m3r = await lookupM3Conductivity(inputs.lat, inputs.lon);
           tierAttempts.local_m3 = m3r;
           if (m3r?.available){
             resolved = { ...m3r, fetched_at: new Date().toISOString() };
