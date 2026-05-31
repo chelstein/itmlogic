@@ -2854,6 +2854,18 @@ export async function computeExhibit(req){
   if (evidence.am_physics_fccgw){
     exhibit.evidence.am_physics_fccgw = evidence.am_physics_fccgw;
   }
+  if (evidence.community_boundary){
+    exhibit.evidence.community_boundary = evidence.community_boundary;
+  }
+  if (evidence.community_boundary_lookup){
+    exhibit.evidence.community_boundary_lookup = evidence.community_boundary_lookup;
+  }
+  if (evidence.community_boundary_meta){
+    exhibit.evidence.community_boundary_meta = evidence.community_boundary_meta;
+  }
+  if (evidence.community_boundary_error){
+    exhibit.evidence.community_boundary_error = evidence.community_boundary_error;
+  }
   if (evidence.am_psra_pssa){
     exhibit.evidence.am_psra_pssa = evidence.am_psra_pssa;
   }
