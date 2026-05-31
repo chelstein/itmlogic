@@ -80,6 +80,19 @@ export function buildConclusionSection(exhibit){
     });
   }
 
+  // AM §73.24(j) principal-community 5 mV/m coverage — filing-controlling.
+  // overall_pass:null means prerequisites were missing (not measured); only
+  // push a component when the check actually ran and returned a definitive fail.
+  const cov73_24j = (svc === 'AM') ? (exhibit.am_city_coverage_compliance || null) : null;
+  if (cov73_24j && cov73_24j.overall_pass === false){
+    components.push({
+      name:   '§73.24(j) principal-community 5 mV/m coverage',
+      cite:   '47 CFR §73.24(j)',
+      status: FindingStatus.FILING_BLOCKER,
+      detail: { coverage_pct: cov73_24j.coverage_pct, summary: cov73_24j.summary }
+    });
+  }
+
   // Primary-rule interference study (§73.207 + alt-rule §73.215).
   if (isr && isr.filing_qualifies === false){
     components.push({
@@ -139,7 +152,20 @@ export function buildConclusionSection(exhibit){
   const _operatingLabel = _isExisting ? 'licensed nighttime operating mode' : 'proposed nighttime operating mode';
 
   if (v.status === Verdict.NOT_FILING_READY){
-    if (nifFailing && !nifSourceIsScreening){
+    if (cov73_24j && cov73_24j.overall_pass === false && !nifFailing){
+      const pct = Number.isFinite(cov73_24j.coverage_pct)
+        ? (cov73_24j.coverage_pct * 100).toFixed(1)
+        : '?';
+      narrative =
+        `The 47 CFR §73.24(j) principal-community coverage check indicates the 5 mV/m ` +
+        `daytime groundwave contour encompasses only ${pct}% of the city-of-license boundary.  ` +
+        `The rule requires the 5 mV/m contour to encompass the entire principal community.  ` +
+        (_isExisting
+          ? `This is an existing licensed facility; the coverage shortfall may reflect legacy site conditions or a historic waiver.  ` +
+            `Any modification or new-CP filing that affects the daytime contour must address the §73.24(j) standard.`
+          : `Facility redesign (transmitter site relocation, increased TPO, or DA re-patterning) ` +
+            `is required prior to filing.`);
+    } else if (nifFailing && !nifSourceIsScreening){
       const s = nif.summary || {};
       narrative =
         `The 47 CFR ${vocab.allocation_rule_cite} ${vocab.service_label} nighttime allocation study indicates ` +
