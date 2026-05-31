@@ -65,7 +65,7 @@ export function buildRfExposureSection(exhibit){
       ? `SCREENING GRADE — OET-65 Supplement A §4 single-tower near-field analysis completed; exclusion radius ${amScr.binding_distance_m} m (binding: ${amScr.binding}); filing_effect: none`
       : amScrGrade === 'ENGINEERING_REVIEW_REQUIRED'
         ? `ENGINEERING REVIEW REQUIRED — ${(amScr?.review_triggers || []).join('; ') || 'near-field conditions require NEC or measured RF survey'}`
-        : `ENGINEERING REVIEW REQUIRED — RC AGL < near-field boundary ${nf.boundary_m != null ? nf.boundary_m.toFixed(1) + ' m' : '(λ/2π)'}; NEC reactive-region study required (OET-65 §3.B)`;
+        : `ENGINEERING REVIEW REQUIRED — RC AGL ${nf.rcagl_m != null ? nf.rcagl_m.toFixed(1) + ' m' : '(AGL unknown)'} < near-field boundary ${nf.boundary_m != null ? nf.boundary_m.toFixed(1) + ' m' : '(λ/2π)'}; NEC reactive-region study required (OET-65 §3.B)`;
 
   const haveDistances = Number.isFinite(Number(ctl.distance_m)) || Number.isFinite(Number(unc.distance_m));
   const passLabel = bc.pass === true  ? 'PASS — boundary clears uncontrolled MPE'

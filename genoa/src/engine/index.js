@@ -186,6 +186,53 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       break;
   }
 
+  // Monotonicity check: within each radial the computed contour distances
+  // MUST be ordered inversely with field-strength threshold.  A weaker
+  // threshold (smaller mV/m / smaller dBu) must reach FARTHER than a
+  // stronger one.  Violations are physically impossible under FCC
+  // propagation curves and indicate a data-corruption or interpolation bug.
+  if (Array.isArray(radial_table) && radial_table.length > 0 && Array.isArray(contours) && contours.length >= 2){
+    // Build ordered pairs: sort contours by descending threshold so
+    // contours[0] is the strongest (shortest range) and contours[n-1] is
+    // the weakest (longest range).
+    const ordered = contours
+      .map(c => ({
+        id:        c.id,
+        threshold: Number.isFinite(c.field_mvm) ? c.field_mvm
+                 : Number.isFinite(c.field_dBu) ? Math.pow(10, c.field_dBu / 20) * 1e-3
+                 : null
+      }))
+      .filter(c => c.threshold != null)
+      .sort((a, b) => b.threshold - a.threshold);   // strongest first
+    if (ordered.length >= 2){
+      const violations = [];
+      for (const r of radial_table){
+        const cd = r?.contour_distances_km || {};
+        for (let i = 0; i < ordered.length - 1; i++){
+          const dStrong = Number(cd[ordered[i].id]);
+          const dWeak   = Number(cd[ordered[i + 1].id]);
+          if (!Number.isFinite(dStrong) || !Number.isFinite(dWeak)) continue;
+          if (dStrong > dWeak + 0.01){   // 10 m tolerance for rounding
+            violations.push({
+              az:       r.azimuth_deg,
+              stronger: ordered[i].id,
+              weaker:   ordered[i + 1].id,
+              d_stronger_km: dStrong,
+              d_weaker_km:   dWeak
+            });
+          }
+        }
+      }
+      if (violations.length > 0){
+        const sample = violations.slice(0, 3)
+          .map(v => `az=${v.az}° ${v.stronger}=${v.d_stronger_km}km > ${v.weaker}=${v.d_weaker_km}km`)
+          .join('; ');
+        warnings.push(W.make('CONTOUR_MONOTONICITY_VIOLATION',
+          `${violations.length} radial(s) have non-monotone contour distances.  Sample: ${sample}.  This is a data-integrity error; re-run compute.`));
+      }
+    }
+  }
+
   let regulatory_compliance = null;
   if (service === 'LPFM'){
     regulatory_compliance = await checkLpfmCompliance({
@@ -324,6 +371,19 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       warnings.push(W.make('OET65_BOUNDARY_VIOLATION',
         `Power density ${oet65.compliance.boundary_check.power_density_mw_cm2} mW/cm² at site boundary (slant ${oet65.compliance.boundary_check.slant_distance_m} m) exceeds §1.1310 uncontrolled MPE ${oet65.compliance.boundary_check.mpe_uncontrolled_mw_cm2} mW/cm².  Public access must be restricted out to ${oet65.compliance.uncontrolled.distance_m} m or pattern downtilt / ground-reflection assumptions revisited.`));
     }
+    // LPFM categorical exclusion note.  §1.1307(b)(1) Table 1 categorically
+    // excludes FM broadcast stations operating at or below 0.1 kW ERP from
+    // routine MPE evaluation.  LPFM LP100 is capped at 0.1 kW; LP10 is
+    // 0.01 kW.  We still compute OET-65 for belt-and-suspenders engineering,
+    // but the exhibit notes the exclusion so reviewers are not surprised.
+    if (service === 'LPFM' && erp_kW <= 0.1){
+      oet65.categorical_exclusion = {
+        applies:    true,
+        basis:      '47 CFR §1.1307(b)(1) Table 1 — FM broadcast facilities operating at or below 0.1 kW ERP are categorically excluded from routine RF-exposure evaluation',
+        erp_kw:     erp_kW,
+        note:       'OET-65 compliance distances are computed below as engineering due diligence; the §1.1307(b)(1) categorical exclusion does not require this exhibit to be filed with the RF-exposure application.'
+      };
+    }
   } else {
     oet65 = {
       cite:    '47 CFR §1.1310',
@@ -440,7 +500,11 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     informational_only: true,
     disclaimer:        'INFORMATIONAL ONLY.  FCC broadcast filings (§73.207, §73.215, §74.1204, §73.187, §73.811) do not require population data; compliance is determined by distance and field-strength tests.  Where a Census/ACS dispatch is supplied, the persons figure is the licensee\'s best estimate of audience reach within the protected contour and is not a regulatory determination.'
   };
-  warnings.push(W.make('POPULATION_PLACEHOLDER'));
+  warnings.push(W.make('POPULATION_PLACEHOLDER',
+    service === 'AM'
+      ? '§73.24(g) blanket-interference ratio check (blanket_1000mvm / service_25mvm population) cannot run without per-contour Census/ACS population data.  am_blanket_compliance.overall_pass will be null until the population sidecar is configured per-contour.'
+      : null
+  ));
 
   const validation = options.validation || { runs: [], reference_cases_present: false };
   const passing = (validation.runs || []).some(r =>
@@ -631,6 +695,25 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.validation   = validation;
   exhibit.uncertainty  = evidenceBlock.uncertainty;
   exhibit.population_estimate = population_estimate;
+
+  // §73.150 AM DA pattern-shape compliance — run BEFORE warnings are
+  // frozen so a failing pattern raises AM_DA_PATTERN_COMPLIANCE_FAIL and
+  // the score is reflected in filing_readiness.
+  if (service === 'AM' && Array.isArray(pattern) && pattern.length >= 2){
+    exhibit.am_da_pattern_compliance = checkAmDaPatternCompliance({
+      pattern_table:            pattern,
+      authorized_pattern_table: inputs.authorized_pattern_table || null
+    });
+    if (exhibit.am_da_pattern_compliance?.overall_pass === false){
+      const failDetails = (exhibit.am_da_pattern_compliance.findings || [])
+        .filter(f => f.pass === false)
+        .map(f => `${f.rule}: ${f.observed || '—'}`)
+        .join('; ');
+      warnings.push(W.make('AM_DA_PATTERN_COMPLIANCE_FAIL',
+        `DA pattern fails §73.150: ${failDetails || 'see am_da_pattern_compliance.findings'}`));
+    }
+  }
+
   exhibit.warnings     = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
   // "Degraded mode" = an external dependency (sidecar/upstream) was
@@ -644,17 +727,6 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.degraded_reasons = _degraded.map(w => w.code);
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
   exhibit.regulatory_compliance = regulatory_compliance;
-
-  // §73.150 AM DA pattern-shape compliance — smoothness, max:min,
-  // RMS minimum.  Runs only when an AM exhibit has a DA pattern
-  // attached; surfaces as a separate evidence block (does NOT modify
-  // the contour math; the engine already used the filed pattern).
-  if (service === 'AM' && Array.isArray(pattern) && pattern.length >= 2){
-    exhibit.am_da_pattern_compliance = checkAmDaPatternCompliance({
-      pattern_table:            pattern,
-      authorized_pattern_table: inputs.authorized_pattern_table || null
-    });
-  }
 
   // §73.24(g) blanket-interference compliance (AM).  Reads the
   // 1000 mV/m and 25 mV/m contours from the radial table plus any

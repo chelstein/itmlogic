@@ -39,10 +39,6 @@ export const WARNING_CODES = Object.freeze({
     title: 'Population estimate is a placeholder',
     description: 'Population is computed against a uniform density placeholder. A Census/ACS dispatch is required for filing.' },
 
-  AM_ENGINE_NOT_IMPLEMENTED:     { severity: 'blocker', phase: 'engine',
-    title: 'AM engine not implemented',
-    description: 'AM groundwave §73.184 sigma-aware curve grid is not yet ingested; engine refused to interpolate.' },
-
   INTERPOLATION_UNDOCUMENTED:    { severity: 'blocker', phase: 'engine',
     title: 'Interpolation undocumented',
     description: 'The interpolation method used to read the FCC curve is not recorded. Filing-grade exhibits require documented interpolation.' },
@@ -239,6 +235,14 @@ export const WARNING_CODES = Object.freeze({
   SDR_RESIDUAL_LARGE: { severity: 'warning', phase: 'evidence',
     title: 'SDR predicted-vs-measured residual exceeds 10 dB',
     description: 'The RMS residual between Genoa\'s predicted field strength (FCC §73.333 / §73.184 curves) and the calibrated SDR-measured field exceeds 10 dB across the captured locations.  This typically indicates terrain shadowing or multipath that the simplified §73.333 model does not capture (use options.use_itm = true for terrain-aware coverage), or a calibration error in the receiver chain.  See evidence.measurements.residuals for the per-row table.' },
+
+  AM_DA_PATTERN_COMPLIANCE_FAIL: { severity: 'blocker', phase: 'engine',
+    title: 'AM DA pattern §73.150 compliance failure',
+    description: 'The directional antenna pattern filed with this exhibit fails one or more §73.150 pattern-shape compliance checks (smoothness, max-to-min ratio, or RMS minimum field).  The FCC field-intensity analysis (§73.62 / §73.150) uses the authorized pattern; a failing pattern means the filed pattern does not conform to §73.150 construction standards.  The engineer of record must correct the DA pattern before filing.' },
+
+  CONTOUR_MONOTONICITY_VIOLATION: { severity: 'blocker', phase: 'engine',
+    title: 'Contour distance monotonicity violation',
+    description: 'For one or more radials, a weaker-threshold contour has a shorter computed distance than a stronger-threshold contour.  This is physically impossible under FCC curve propagation and indicates a data-corruption event, an interpolation error, or a contour-ID assignment bug.  Filing readiness is blocked; re-run compute and inspect the radial table for the flagged radials.' },
 
   AM_NIGHTTIME_PROTECTION_VIOLATION: { severity: 'warning', phase: 'engine',
     title: 'AM nighttime skywave — simplified §73.190 study flagged a violation (47 CFR §73.182(k) / §73.190)',
