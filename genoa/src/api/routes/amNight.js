@@ -38,7 +38,7 @@ r.post('/am-night/nif', asyncHandler(async (req, res) => {
   }
   const result = await nighttimeNifStudy(
     { proposed, options },
-    { fccamClient: sidecars.fccam, facilityClient: sidecars.facility }
+    { fccamClient: sidecars.fccam, facilityClient: sidecars.facility, voacapClient: sidecars.voacap }
   );
   // available:false is a legitimate response (sidecar down, primaries
   // empty, validation rejection) — return 200 so the UI can render

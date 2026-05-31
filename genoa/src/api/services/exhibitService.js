@@ -2250,7 +2250,7 @@ export async function computeExhibit(req){
       const study = await budget.withDeadline('am_night_nif',
         () => nighttimeNifStudy({ proposed, options: options.am_night_nif_options || {} },
                                 { fccamClient: sidecars.fccam, berryClient: sidecars.berry,
-                                  facilityClient: sidecars.facility }),
+                                  facilityClient: sidecars.facility, voacapClient: sidecars.voacap }),
         { minMs: 30_000 });
       evidence.am_night_nif = {
         ...(study || { available: false, error: 'compute budget exhausted' }),
