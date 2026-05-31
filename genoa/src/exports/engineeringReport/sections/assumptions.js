@@ -57,11 +57,17 @@ export function buildAssumptionsSection(exhibit){
   const groundLine = isAm
     ? (function(){
         const gcr = exhibit?.evidence?.ground_conductivity_per_radial;
+        const gc  = exhibit?.evidence?.ground_constants;
         const head = `Ground conductivity: ${s.ground_sigma_mS_m ?? '—'} mS/m (per §73.190 Figure M3 reference grid).`;
+        // G-011: disclose σ rounding when the engine clamped or rounded the
+        // typed value to the nearest FCC M3 integer grid point.
+        const sigmaRound = (gc && Number.isFinite(gc.sigma_rounding) && Math.abs(gc.sigma_rounding) > 0)
+          ? `  NOTE: typed σ ${gc.sigma_input} mS/m was ${gc.sigma_clamp ? gc.sigma_clamp + '-clamped' : 'rounded'} to ${gc.sigma_used} mS/m (Δ = ${gc.sigma_rounding > 0 ? '+' : ''}${gc.sigma_rounding} mS/m) — distances reflect the ${gc.sigma_used} mS/m boundary curve.`
+          : '';
         const seg  = gcr?.available
           ? `  Per-radial M3 segmentation applied on ${gcr.radials_segmented ?? '—'} of ${gcr.radials_total ?? '—'} azimuths (${gcr.method || 'path-length weighted, stage-2'}; Millington integration pending stage-3).`
           : `  Per-radial M3 segmentation NOT applied (${gcr?.reason || 'no boundary crossings within the §73.184 range, or geodata sidecar unavailable'}); engine ran with uniform σ across all azimuths.`;
-        return head + seg + '  No terrain elevation model is required for §73.184 groundwave — HAAT and §73.313 do not apply to AM.';
+        return head + sigmaRound + seg + '  No terrain elevation model is required for §73.184 groundwave — HAAT and §73.313 do not apply to AM.';
       })()
     : `Ground conductivity: not applicable for FM/TV (space-wave service).  ${t.available
         ? `Per-radial HAAT computed from ${t.dem?.source || 'DEM'} ${t.dem?.dataset || ''} via ${t.method || 'fcc-hd-radials'}, sampled along ${(t.profiles || []).length || 8} radials.`

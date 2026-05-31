@@ -750,6 +750,13 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
   }
 
+  // G-008: detect uncommitted build SHA before warnings are frozen so the
+  // readiness score and degraded_mode reflect the missing provenance.
+  if (ENGINE_SIGNATURE.hash === 'uncommitted'){
+    warnings.push(W.make('BUILD_UNVERSIONED',
+      'Build SHA resolved to "uncommitted" — deploy via Docker (bake .build_sha) or set GIT_COMMIT_SHA env-var.  Replay tokens from this build cannot be uniquely tied to a source commit.'));
+  }
+
   exhibit.warnings     = W.dedupe(warnings);
   exhibit.blockers         = exhibit.warnings.filter(w => w.severity === 'blocker');
   // "Degraded mode" = an external dependency (sidecar/upstream) was

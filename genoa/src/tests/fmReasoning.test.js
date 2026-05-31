@@ -383,3 +383,46 @@ test('buildFmReasoning: station with no evaluated rules → null rule + helpful 
   assert.equal(p.pass, null);
   assert.match(p.binding_constraint, /no restricted relationship/);
 });
+
+// G-014: proves §73.207 + §73.215 double-fail → filing blocked, no alternate route claimed.
+// This test drives through buildFmReasoning (the PDF/API narrative layer) to verify the
+// engineering conclusion correctly reports a blocked filing when no rule clears the station.
+test('G-014: §73.207 + §73.215 both fail — n_blocking=1, alternate_route_available=false, filing_qualifies=false', () => {
+  const study = makeInterferenceStudy({
+    stations: [{
+      call: 'KBOTH', facility_id: '99', fcc_class: 'B',
+      frequency_mhz: 100.7, channel_relationship: 'co-channel',
+      distance_km: 50,
+      rules: {
+        section_73_207: {
+          cite: '47 CFR §73.207(b) Table A',
+          required_separation_km: 241, actual_separation_km: 50,
+          margin_km: -191, pass: false, skipped: false
+        },
+        section_73_215: {
+          cite: '47 CFR §73.215',
+          du_required_db: 20,
+          du_actual_db_forward: 5, du_actual_db_reverse: 8,
+          polygon_pass: false, pass: false
+        }
+      },
+      pass_overall: false, qualified_via: [], failed_rules: ['§73.207(b)', '§73.215']
+    }]
+  });
+
+  const r = buildFmReasoning(study);
+  // The station blocks filing — no alternate route because §73.215 also failed.
+  assert.equal(r.n_blocking, 1, 'one blocking station');
+  assert.equal(study.filing_qualifies, false, 'study filing_qualifies=false');
+
+  const p = r.pairs[0];
+  assert.equal(p.pass, false, 'pair pass=false');
+  assert.equal(p.alternate_route_available, false, 'no alternate when §73.215 also fails');
+  // Narrative must NOT claim an alternate route is available.
+  assert.doesNotMatch(p.narrative, /alternate route/i,
+    'narrative must not claim alternate route when §73.215 also fails');
+  // Narrative must confirm both rules failed (the binding constraint cites §73.207,
+  // but the no-alternate text should acknowledge §73.215 was evaluated).
+  assert.match(p.narrative, /No alternate qualifying rule/,
+    'narrative must say no alternate qualifying rule exists');
+});

@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import { buildAppendixSections }       from '../exports/engineeringReport/sections/appendices.js';
 import { buildFacilityParametersSection } from '../exports/engineeringReport/sections/facilityParameters.js';
 import { buildMethodologySection }     from '../exports/engineeringReport/sections/methodology.js';
+import { buildAssumptionsSection }     from '../exports/engineeringReport/sections/assumptions.js';
 
 // Minimal KRDM-shaped exhibit fixture.  Mirrors the actual engine
 // output: method_versions.curve_dataset (object), engine_signature
@@ -226,4 +227,130 @@ test('Methodology: AM lists curve dataset by name, suppresses DEM rows, mentions
   // DEM rows must NOT be present on an AM methodology page.
   assert.equal(get('Terrain source'), undefined);
   assert.equal(get('DEM dataset'),    undefined);
+});
+
+/* ────────────── G-011: σ rounding disclosure in Assumptions ────────────── */
+
+// G-011: when the engine clamped or rounded the typed σ to the nearest FCC M3
+// integer grid point, buildAssumptionsSection must disclose the rounding in the
+// groundLine paragraph — the PE reviewer needs to know which boundary curve
+// was actually used.
+test('G-011: Assumptions discloses σ rounding when sigma_rounding != 0', () => {
+  const x = makeAmExhibit();
+  // Inject ground_constants with a non-zero rounding (typed 2.7 → used 3 mS/m)
+  x.evidence = {
+    ...x.evidence,
+    ground_constants: {
+      sigma_input:    2.7,
+      sigma_used:     3,
+      sigma_rounding: 0.3,
+      sigma_clamp:    null
+    }
+  };
+  const sec = buildAssumptionsSection(x);
+  const groundParagraph = sec.paragraphs.find(p =>
+    typeof p === 'string' && p.includes('Ground conductivity')
+  );
+  assert.ok(groundParagraph, 'should produce a ground conductivity paragraph');
+  assert.match(groundParagraph, /NOTE.*σ.*2\.7.*rounded.*3/i,
+    'must disclose σ rounding: input 2.7 rounded to 3');
+  assert.match(groundParagraph, /mS\/m/,
+    'units must be stated');
+});
+
+test('G-011: Assumptions discloses clamp direction when sigma_clamp is set', () => {
+  const x = makeAmExhibit();
+  // Inject ground_constants with a clamped σ (typed 9 mS/m, clamped to 8 mS/m max)
+  x.evidence = {
+    ...x.evidence,
+    ground_constants: {
+      sigma_input:    9,
+      sigma_used:     8,
+      sigma_rounding: -1,
+      sigma_clamp:    'max'
+    }
+  };
+  const sec = buildAssumptionsSection(x);
+  const groundParagraph = sec.paragraphs.find(p =>
+    typeof p === 'string' && p.includes('Ground conductivity')
+  );
+  assert.ok(groundParagraph, 'should produce a ground conductivity paragraph');
+  assert.match(groundParagraph, /max-clamped/i, 'must say "max-clamped"');
+  assert.match(groundParagraph, /9.*8|8.*9/i, 'must mention both sigma values');
+});
+
+test('G-011: Assumptions does NOT insert σ rounding note when sigma_rounding = 0', () => {
+  const x = makeAmExhibit();
+  x.evidence = {
+    ...x.evidence,
+    ground_constants: {
+      sigma_input:    8,
+      sigma_used:     8,
+      sigma_rounding: 0,
+      sigma_clamp:    null
+    }
+  };
+  const sec = buildAssumptionsSection(x);
+  const groundParagraph = sec.paragraphs.find(p =>
+    typeof p === 'string' && p.includes('Ground conductivity')
+  );
+  assert.ok(groundParagraph, 'should produce a ground conductivity paragraph');
+  assert.doesNotMatch(groundParagraph, /NOTE.*σ/i,
+    'must not insert a rounding note when sigma_rounding is 0');
+});
+
+/* ────────────── G-017: Full AM report structural snapshot ────────────── */
+
+// G-017: render every section builder on a full AM exhibit and assert the
+// section model is structurally complete — correct IDs, non-empty content,
+// no FM vocabulary leaking into AM output.  This is a structural snapshot:
+// it pins the shape and critical fields rather than byte-for-byte text, so
+// it catches regressions without being brittle to minor wording changes.
+test('G-017: full AM exhibit produces structurally complete report sections', () => {
+  const x = makeAmExhibit();
+  x.evidence = {
+    ...x.evidence,
+    ground_constants: { sigma_input: 8, sigma_used: 8, sigma_rounding: 0, sigma_clamp: null }
+  };
+
+  // Assumptions
+  const assumptions = buildAssumptionsSection(x);
+  assert.equal(assumptions.id,   'assumptions', 'assumptions id');
+  assert.equal(assumptions.type, 'paragraphs',  'assumptions type');
+  assert.ok(Array.isArray(assumptions.paragraphs) && assumptions.paragraphs.length >= 7,
+    'assumptions must have at least 7 paragraphs');
+  const joined = assumptions.paragraphs.join(' ');
+  // AM-specific vocabulary must appear
+  assert.match(joined, /73\.184|groundwave/i, 'assumptions must cite §73.184 / groundwave');
+  assert.match(joined, /conductivity/i,       'assumptions must mention conductivity');
+  // HAAT must only appear in the "does not apply" disclaimer, not as a prescribed value.
+  // Check it is not used as an affirmative FM-style assumption line.
+  assert.doesNotMatch(joined, /HAAT:\s*\d/,   'AM assumptions must not prescribe a HAAT value');
+  assert.doesNotMatch(joined, /§73\.316/,     'AM assumptions must not cite FM §73.316');
+
+  // Facility Parameters
+  const fp = buildFacilityParametersSection(x);
+  assert.equal(fp.id,   'parameters', 'facility-parameters id');
+  assert.ok(Array.isArray(fp.rows) && fp.rows.length >= 5, 'must have at least 5 rows');
+  const fpLabels = fp.rows.map(r => r[0]);
+  assert.ok(fpLabels.includes('Ground conductivity (σ)'), 'must have σ row');
+  assert.ok(!fpLabels.includes('HAAT'), 'must not have HAAT row');
+
+  // Methodology
+  const m = buildMethodologySection(x);
+  assert.equal(m.id, 'methodology', 'methodology id');
+  assert.ok(Array.isArray(m.rows) && m.rows.length >= 4, 'must have at least 4 rows');
+
+  // Appendices B/C/D/E
+  const appendices = buildAppendixSections(x);
+  const appIds = appendices.map(a => a.id);
+  for (const required of ['appendix-b', 'appendix-c', 'appendix-d', 'appendix-e']){
+    assert.ok(appIds.includes(required), `must include ${required}`);
+  }
+  const ab = appendices.find(a => a.id === 'appendix-b');
+  assert.ok(ab.table.rows.length === 2, 'appendix-b must have 2 station rows for KRDM');
+  // Verify no FM column labels leaked into AM appendix B
+  const abLabels = ab.table.columns.map(c => c.label);
+  assert.ok(!abLabels.includes('§73.207'), 'appendix-b must not show §73.207 for AM');
+  assert.ok(!abLabels.includes('§73.215'), 'appendix-b must not show §73.215 for AM');
 });

@@ -171,6 +171,56 @@ test('buildInterferenceStudy: AM service uses §73.182(k) + §73.190 rule list (
   assert.deepEqual(r.rules_evaluated, ['§73.182(k)', '§73.190 (Wang skywave)']);
 });
 
+// G-014 regression fixture — proves both §73.207 AND §73.215 failing on the
+// same station produces pass_overall=false, qualified_via=[], filing_qualifies=false.
+// Prior test at "every rule fails" only asserted aggregate counts; this test
+// pins the per-station fields that feed the engineering conclusion and PDF verdict.
+test('G-014: both §73.207 and §73.215 fail → station pass_overall=false, qualified_via=[], filing_qualifies=false', () => {
+  const rc = {
+    cite: '47 CFR §73.215', pass: false,
+    studies: [{
+      nearby_call: 'KBAD', nearby_facility_id: 'n99', nearby_class: 'B',
+      nearby_frequency_mhz: 100.7, relationship: 'co-channel',
+      du_threshold_db: 20,
+      actual_separation_km: 50,
+      forward: { du_actual_db: 5 },
+      reverse: { du_actual_db: 8 },
+      polygon_overlap: {
+        subject_interfering_overlaps_nearby_protected: true,
+        nearby_interfering_overlaps_subject_protected: true,
+        subject_interfering_overlap_area_km2: 999,
+        nearby_interfering_overlap_area_km2: 999
+      },
+      pair_pass_du: false, pair_pass: false
+    }],
+    section_73_207: {
+      pass: false,
+      studies: [{
+        nearby_call: 'KBAD', nearby_facility_id: 'n99', nearby_class: 'B',
+        relationship: 'co-channel',
+        required_separation_km: 241, actual_separation_km: 50, margin_km: -191,
+        pair_pass: false
+      }]
+    }
+  };
+  const r = buildInterferenceStudy({ subject: SUBJECT_FM, regulatory_compliance: rc, service: 'FM' });
+
+  // aggregate counts
+  assert.equal(r.n_fail,           1,     'one station fails');
+  assert.equal(r.n_pass,           0,     'zero stations pass');
+  assert.equal(r.filing_qualifies, false, 'filing does not qualify');
+
+  // station-row fields — these were not previously asserted (G-014 gap)
+  const st = r.stations[0];
+  assert.equal(st.pass_overall,   false, 'station-row pass_overall is false');
+  assert.deepEqual(st.qualified_via, [],  'no rule qualified the station');
+  assert.ok(st.failed_rules.includes('§73.207(b)'), '§73.207(b) in failed_rules');
+  assert.ok(st.failed_rules.includes('§73.215'),    '§73.215 in failed_rules');
+
+  // blocking_rule names the station so the PDF narrative can call it out
+  assert.match(r.blocking_rule, /KBAD/, 'blocking_rule names the failing station');
+});
+
 test('buildInterferenceStudy: provenance documents methodology + qualification rule', () => {
   const r = buildInterferenceStudy({
     subject: SUBJECT_FM,

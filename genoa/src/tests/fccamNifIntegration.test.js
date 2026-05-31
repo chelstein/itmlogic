@@ -146,7 +146,9 @@ test('scenario 2b: W.make(FCCAM_UNAVAILABLE_BERRY_FALLBACK) does not throw', () 
     'FCCAM_UNAVAILABLE_BERRY_FALLBACK must be a registered warning code'
   );
   const w = W.make('FCCAM_UNAVAILABLE_BERRY_FALLBACK', 'sidecar unreachable');
-  assert.equal(w.severity, 'warning');
+  // Severity was upgraded to 'blocker' because Berry 1968 is screening-grade
+  // (§73.190(c)) and cannot serve as filing-grade NIF evidence.
+  assert.equal(w.severity, 'blocker');
   assert.equal(w.phase,    'sidecar');
 });
 
