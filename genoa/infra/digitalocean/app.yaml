@@ -196,6 +196,28 @@ services:
       - { key: VOACAP_ITSHFBC,        scope: RUN_TIME, value: "/opt/voacap/itshfbc" }
       - { key: VOACAP_API_TOKEN,      scope: RUN_TIME, type: SECRET, value: "" }
 
+  # ---- FCCAM sidecar (FCC §73.190(c) skywave; always-on internal service) ----
+  #
+  # Wraps the FCC's public-domain Fccam.for (Wang 1985 model).  Provides
+  # filing-grade 50% skywave field strength for §73.182 AM nighttime
+  # allocation.  BUILD REQUIRES: Fccam.for must be placed into
+  # src/sidecars/fccam/ before `docker build`.  Obtain from:
+  # https://www.fcc.gov/media/radio/am-skywave-program
+  # When not deployed, the API falls back to the Berry approximation
+  # (screening-grade; see src/evidence/berrySkywaveClient.js).
+  - name: genoa-fccam
+    dockerfile_path: src/sidecars/fccam/Dockerfile
+    source_dir: src/sidecars/fccam
+    internal_ports:
+      - 8090
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 10
+      period_seconds: 30
+    envs:
+      - { key: PORT,             scope: RUN_TIME, value: "8090" }
+      - { key: FCCAM_API_TOKEN,  scope: RUN_TIME, type: SECRET, value: "" }
+
   # ---- Identity sidecar (always-on internal service) ----
   #
   # Thin adapter that resolves station identity by calling upstream

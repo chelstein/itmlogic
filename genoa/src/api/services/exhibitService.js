@@ -28,7 +28,8 @@ import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/
 import { makeBudget }              from './computeBudget.js';
 import { necPatternToTable }       from '../../evidence/nec/client.js';
 import { suggestDirectionalMitigation } from '../../engine/regulatory/mitigationAdvisor.js';
-import { lookupM3Conductivity }    from '../../engine/am/m3.js';
+import { lookupM3Conductivity, lookupM3ZoneFallback } from '../../engine/am/m3.js';
+import { makeCommunityBoundaryClient } from '../../evidence/communityBoundaryClient.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -1495,13 +1496,27 @@ export async function computeExhibit(req){
         }
       }
 
+      // Tier 3 — FCC M3 zone-based screening estimate.
+      // Used only when both ZTR and the local GeoTIFF are unavailable.
+      // Returns a geographic-zone approximation from the FCC Figure M3
+      // representative values; accuracy ~±50% vs. the raster.  The
+      // result is labeled filing_grade:'screening' so the exhibit PDF
+      // surfaces the caveat.  Deploy AM_m3.tif or configure ZTR for
+      // filing-grade σ.
+      if (!resolved){
+        const zr = lookupM3ZoneFallback(inputs.lat, inputs.lon);
+        tierAttempts.m3_zone = zr;
+        if (zr?.available){
+          resolved = { ...zr, fetched_at: new Date().toISOString() };
+          warnings.push(W.make('AM_GROUND_SIGMA_ZONE_ESTIMATE'));
+        }
+      }
+
       if (resolved){
         inputs.ground_sigma_mS_m = resolved.sigma_mS_m;
         evidence.ground_conductivity = { ...resolved, tier_attempts: tierAttempts };
       } else {
-        // Real-data policy: NO synthetic σ fallback.  Emit a blocker so
-        // the AM compute halts cleanly and the reviewer is told exactly
-        // which upstream(s) failed.  AM groundwave + NEC will not run.
+        // All three tiers exhausted and the operator did not supply σ.
         warnings.push(W.make('AM_GROUND_SIGMA_UNRESOLVED'));
         evidence.ground_conductivity = {
           available:     false,
@@ -1703,6 +1718,39 @@ export async function computeExhibit(req){
   }[options.study_mode] || 'licensed_current';
 
   inputs._study_mode = study_mode_canonical;
+
+  // ---- 6h. Community boundary auto-lookup (AM §73.24(j)) ----
+  // When the caller does not supply community_boundary_geojson and the
+  // exhibit is AM, attempt to fetch the incorporated-place boundary from
+  // the Census TIGERweb REST service using the transmitter lat/lon as a
+  // proxy for the city-of-license location.  The result is stored in
+  // evidence.community_boundary where section_73_24j.js will find it.
+  //
+  // Failure is non-blocking: the §73.24(j) check degrades to
+  // overall_pass:null with the attach-GeoJSON instruction, exactly as
+  // it did before this lookup was added.
+  if (String(inputs.service || '').toUpperCase() === 'AM'
+      && !inputs.community_boundary_geojson
+      && !evidence.community_boundary
+      && Number.isFinite(Number(inputs.lat))
+      && Number.isFinite(Number(inputs.lon))){
+    try {
+      const cbClient = makeCommunityBoundaryClient();
+      if (cbClient){
+        const cbr = await cbClient.lookupByPoint(inputs.lat, inputs.lon);
+        evidence.community_boundary_lookup = cbr;
+        if (cbr?.available && cbr.geojson){
+          evidence.community_boundary = cbr.geojson;
+        }
+      }
+    } catch (e){
+      evidence.community_boundary_lookup = {
+        available: false,
+        source:    'census-tigerweb-places',
+        error:     String(e?.message || e)
+      };
+    }
+  }
 
   // ---- 7. Compute ----
   const exhibit = await compute({ inputs, evidence, options: {

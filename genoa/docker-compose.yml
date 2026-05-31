@@ -98,5 +98,17 @@ services:
       PORT: "8086"
     ports: [ "8086:8086" ]
 
+  # FCCAM sidecar — wraps FCC's Fccam.for (Wang 1985 / §73.190(c)).
+  # BUILD REQUIRES: place Fccam.for from https://www.fcc.gov/media/radio/am-skywave-program
+  # into src/sidecars/fccam/ before running docker-compose build.
+  # Comment this service out if Fccam.for has not been obtained.
+  genoa-fccam-sidecar:
+    build:
+      context: src/sidecars/fccam
+      dockerfile: Dockerfile
+    environment:
+      PORT: "8090"
+    ports: [ "8090:8090" ]
+
 volumes:
   genoa-pg:
