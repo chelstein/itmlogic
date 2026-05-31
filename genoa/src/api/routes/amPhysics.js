@@ -27,6 +27,7 @@ import {
   sigmaMsmToSm,
   khzToMhz
 } from '../../evidence/amPhysicsClient.js';
+import { lookupM3Conductivity, m3LoadStatus } from '../../engine/am/m3.js';
 import { asyncHandler } from '../middleware/errors.js';
 
 const r = express.Router();
@@ -132,6 +133,37 @@ r.post('/am/physics/somnec', express.json({ limit: '64kb' }), asyncHandler(async
       'Does not modify FCC §73.184 curve-derived contour distances.'
     ]
   });
+}));
+
+// ---- M3 ground conductivity endpoints ----
+//
+// GET /api/am/physics/m3/conductivity?lat=&lon=
+//   Point-in-polygon lookup against the locally loaded AM_m3.geojson.
+//   Returns the FCC §73.190 Figure M3 conductivity for the site.
+//   Used by the exhibit orchestrator as tier-3 fallback when ZTR
+//   M3 proxy is unavailable.  Also callable directly for inspection.
+//
+// GET /api/am/physics/m3/status
+//   GeoJSON load status — feature count, file path, any load error.
+
+r.get('/am/physics/m3/conductivity', asyncHandler(async (req, res) => {
+  const lat = Number(req.query.lat);
+  const lon = Number(req.query.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)){
+    return res.status(400).json({
+      available: false,
+      error: 'lat and lon query params required (decimal degrees)'
+    });
+  }
+  const result = lookupM3Conductivity(lat, lon);
+  res.json({
+    ...result,
+    fetched_at: new Date().toISOString()
+  });
+}));
+
+r.get('/am/physics/m3/status', asyncHandler(async (req, res) => {
+  res.json(m3LoadStatus());
 }));
 
 export default r;
