@@ -73,6 +73,20 @@ export function makeVoacapClient({
   if (!baseUrl) return null;
 
   const url    = baseUrl.replace(/\/$/, '');
+
+  // IANA-reserved .test TLD never resolves — use it as a well-known
+  // stub-URL pattern so tests can exercise the client shape without
+  // making real network calls.
+  if (/\.test(:\d+)?$/.test(url)){
+    const stubEnvelope = () => ({ ...advisoryEnvelope({ available: false }), stub: true, status: 'not_run' });
+    return {
+      stub:    true,
+      baseUrl: url,
+      version: VOACAP_CLIENT_VERSION,
+      async health(){ return { stub: true, reachable: false }; },
+      async runPath(){ return stubEnvelope(); }
+    };
+  }
   const headers = {
     'Content-Type': 'application/json',
     ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {})

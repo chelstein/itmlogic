@@ -111,8 +111,10 @@ export function readiness({ warnings = [], exhibit = {} }){
   if (status !== 'filing_candidate' && status !== 'licensed_legacy_review'){
     if (blockers.find(b => b.code === 'CURVE_VALIDATION_MISSING'))
       recommendations.push('Run the reference validation suite against the active curve dataset.');
-    if (blockers.find(b => b.code === 'AM_ENGINE_NOT_IMPLEMENTED'))
-      recommendations.push('Engage a qualified broadcast engineer for AM filings until the §73.184 sigma-aware curve grid is ingested.');
+    if (blockers.find(b => b.code === 'AM_DA_PATTERN_COMPLIANCE_FAIL'))
+      recommendations.push('Correct the directional antenna pattern to satisfy §73.150 smoothness, max-to-min ratio, and RMS minimum-field requirements before filing.');
+    if (blockers.find(b => b.code === 'CONTOUR_MONOTONICITY_VIOLATION'))
+      recommendations.push('Contour distance ordering is inconsistent; re-run compute and inspect the radial table for the flagged radials.');
     if (w_codes.find(w => w.code === 'CONSTANT_HAAT_ASSUMED'))
       recommendations.push('Enable the terrain sidecar to compute per-radial §73.313 arc-averaged HAAT.');
     if (w_codes.find(w => w.code === 'POPULATION_PLACEHOLDER'))

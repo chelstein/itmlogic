@@ -166,8 +166,8 @@ export function makeFaaOeClient({
         }
       }
       return {
-        available: false, source: null,
-        error: 'No FAA OE lookup source configured.  Set FAA_OE_SIDECAR_URL for an operator-managed proxy, or FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape.'
+        available: false, source: 'DATA SOURCE ERROR',
+        error: `DATA SOURCE ERROR — no FAA OE lookup source is configured for study ${study_number}.  Set FAA_OE_SIDECAR_URL for an operator-managed proxy (recommended), or FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape (fragile, not for production).`
       };
     }
   };

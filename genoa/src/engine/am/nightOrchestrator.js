@@ -270,7 +270,29 @@ export async function nighttimeNifStudy(input, ctx){
              raw: contour };
   }
 
-  // 4. Determine actual engine identity and build result.
+  // 4. Degenerate contour guard.  Distinguish between a valid "no service"
+  // result (ok=true, saturated='no_service' at every azimuth — the proposed
+  // station genuinely can't protect itself) and a bisection failure (ok=false
+  // at every azimuth — the solver errored out at every point).  The former
+  // is a valid strong-interference finding; the latter is a data-quality
+  // failure that must not be propagated as a usable NIF result.
+  const azimuths = contour.per_azimuth || [];
+  const okAzimuths   = azimuths.filter(p => p?.ok === true);
+  const failAzimuths = azimuths.filter(p => p?.ok === false);
+  if (azimuths.length > 0 && okAzimuths.length === 0 && failAzimuths.length > 0){
+    const errSample = failAzimuths.slice(0, 2).map(p => `az=${p.azimuth_deg}: ${p.error}`).join('; ');
+    return { available: false, error: `NIF contour degenerate: all ${azimuths.length} azimuths failed (ok=false); bisection failed across the entire azimuth set.  Sample errors: ${errSample}.  Check FCCAM sidecar and interferer normalization.` };
+  }
+  // All-identical check: when a meaningful number of azimuths succeed and
+  // every finite distance is the same, the bisection likely didn't converge.
+  const validRadii = azimuths.map(p => p?.distance_km).filter(d => Number.isFinite(d) && d > 0);
+  const totalAzimuths = azimuths.length;
+  const uniqueRadii = new Set(validRadii.map(d => d.toFixed(3)));
+  if (uniqueRadii.size === 1 && validRadii.length >= 6 && totalAzimuths >= 6){
+    return { available: false, error: `NIF contour degenerate: all ${validRadii.length} radii are identical (${validRadii[0]} km) — bisection appears to have not converged.  Check FCCAM sidecar response shape.` };
+  }
+
+  // 5. Determine actual engine identity and build result.
   const isBerry = /berry/i.test(String(contour.source || contour.engine || ''));
   return await buildResult({ contour, interferers, normalized, max_interferers, primariesResp, isBerry, fccamFallbackUsed: false, voacapClient, proposed });
 }
