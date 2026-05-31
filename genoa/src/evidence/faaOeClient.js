@@ -149,17 +149,25 @@ export function makeFaaOeClient({
           }
         } catch { /* fall through */ }
       }
-      // Tier 2: HTML scrape (opt-in).
+      // Tier 2: oeaaa.faa.gov HTML scrape (opt-in via FAA_OE_HTML_FALLBACK=1).
       if (htmlFallback){
-        return {
-          available: false, source: null,
-          endpoint: `${oeRoot}/searchAction.jsp?action=showCaseFile&studyId=${encodeURIComponent(study_number)}`,
-          error: 'DATA SOURCE ERROR — FAA OE/AAA HTML scraping not implemented in this build.  Set FAA_OE_SIDECAR_URL for clean JSON access via an operator-managed proxy.'
-        };
+        const endpoint = `${oeRoot}/searchAction.jsp?action=showCaseFile&studyId=${encodeURIComponent(study_number)}`;
+        try {
+          const r = await fetchFn(endpoint, { signal: AbortSignal.timeout(timeoutMs) });
+          if (!r.ok){
+            return { available: false, source: 'faa-oe-html', endpoint,
+                     error: `FAA OE/AAA HTML returned HTTP ${r.status}` };
+          }
+          const html = await r.text();
+          return normalizeFaaOeHtml(html, endpoint);
+        } catch (e){
+          return { available: false, source: 'faa-oe-html', endpoint,
+                   error: `FAA OE/AAA HTML fetch failed: ${e.message}` };
+        }
       }
       return {
-        available: false, source: 'DATA SOURCE ERROR',
-        error: 'DATA SOURCE ERROR — FAA OE endpoint not configured.  Set FAA_OE_SIDECAR_URL (operator-managed JSON proxy for oeaaa.faa.gov) to enable determination fetch.  Study number on file: ' + study_number
+        available: false, source: null,
+        error: 'No FAA OE lookup source configured.  Set FAA_OE_SIDECAR_URL for an operator-managed proxy, or FAA_OE_HTML_FALLBACK=1 to opt into the HTML scrape.'
       };
     }
   };
@@ -277,6 +285,142 @@ export function checkFaaAgainstAsr({ faa, asr, application = null } = {}){
 
 /* -------------------- internal helpers -------------------- */
 
+/**
+ * Parse FAA OE/AAA case-file HTML from oeaaa.faa.gov into a normalized record.
+ * The page uses a two-column table layout with "dataLabel" / "dataValue" cells.
+ * Falls back to regex against the raw text for key fields.
+ */
+function normalizeFaaOeHtml(html, endpoint){
+  if (!html || typeof html !== 'string'){
+    return { available: false, source: 'faa-oe-html', endpoint, error: 'empty HTML response' };
+  }
+
+  // Helper: extract text between HTML tags.
+  const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').trim();
+
+  // Build a label→value map from the dataLabel/dataValue table pairs.
+  const labelMap = {};
+  const pairRe = /<td[^>]*class=["']dataLabel["'][^>]*>([\s\S]*?)<\/td>\s*<td[^>]*class=["']dataValue["'][^>]*>([\s\S]*?)<\/td>/gi;
+  let m;
+  while ((m = pairRe.exec(html)) !== null){
+    const label = stripTags(m[1]).replace(/:$/, '').toLowerCase().trim();
+    const value = stripTags(m[2]);
+    if (label && value) labelMap[label] = value;
+  }
+
+  // Also scan for bold label patterns outside the table.
+  const boldRe = /<(?:b|strong)[^>]*>([\s\S]*?)<\/(?:b|strong)>\s*:?\s*([\w ,./()-]+)/gi;
+  while ((m = boldRe.exec(html)) !== null){
+    const label = stripTags(m[1]).replace(/:$/, '').toLowerCase().trim();
+    const value = m[2].trim();
+    if (label && value && !labelMap[label]) labelMap[label] = value;
+  }
+
+  // Study number — appears in the heading or as "study number" / "case number".
+  const snRaw = labelMap['study number'] || labelMap['aeronautical study number']
+             || labelMap['case number']  || labelMap['asn'];
+  // Also try the page title / heading.
+  const titleMatch = html.match(/(\d{4}-[A-Z]{3}-\d{4,6}-(?:OE|NRA))/i);
+  const study_number = snRaw || (titleMatch && titleMatch[1]) || null;
+
+  if (!study_number && Object.keys(labelMap).length === 0){
+    // Likely a "no results" page or error page.
+    const noResult = /no.*results|not found|no.*record|no.*case/i.test(html);
+    return { available: false, source: 'faa-oe-html', endpoint,
+             error: noResult ? 'FAA OE/AAA: study number not found' : 'FAA OE/AAA HTML: could not parse case file' };
+  }
+
+  // Determination.
+  const detRaw = labelMap['study status'] || labelMap['determination'] || labelMap['case outcome'] || '';
+  let determination = null;
+  if (/no\s+hazard/i.test(detRaw))          determination = 'DNH';
+  else if (/hazard/i.test(detRaw))          determination = 'DOH';
+  else if (/conditional/i.test(detRaw))     determination = 'CONDITIONAL';
+  else if (/withdrawn/i.test(detRaw))       determination = 'WITHDRAWN';
+  else if (/pending/i.test(detRaw))         determination = 'PENDING';
+  else if (detRaw)                          determination = detRaw.toUpperCase().slice(0, 40);
+
+  // Dates.
+  const dateRe = /(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/;
+  const parseDateField = (key) => {
+    const raw = labelMap[key] || '';
+    const dm = raw.match(dateRe);
+    if (!dm) return null;
+    const d = new Date(dm[1]);
+    return Number.isFinite(d.getTime()) ? d.toISOString().slice(0, 10) : null;
+  };
+  const determination_date = parseDateField('determination date') || parseDateField('issue date') || parseDateField('date');
+  const expiration_date    = parseDateField('expiration date')    || parseDateField('expires')    || null;
+
+  // Structure type.
+  const structure_type = (labelMap['structure type'] || labelMap['structure'] || labelMap['type'] || null);
+
+  // Coordinates.
+  const parseCoord = (raw) => {
+    if (!raw) return null;
+    // Handles "40-45-30.00N" or "40° 45' 30\" N" or decimal "40.7583 N"
+    const dms = raw.match(/(\d+)[°\-\s]+(\d+)['\-\s]+(\d+(?:\.\d+)?)["\s]*([NSEW])/i);
+    if (dms){
+      const sign = /[SW]/i.test(dms[4]) ? -1 : 1;
+      return sign * (Number(dms[1]) + Number(dms[2])/60 + Number(dms[3])/3600);
+    }
+    const dec = raw.match(/(-?\d+\.\d+)\s*([NSEW])?/i);
+    if (dec){
+      const sign = dec[2] && /[SW]/i.test(dec[2]) ? -1 : 1;
+      return sign * Number(dec[1]);
+    }
+    return null;
+  };
+  const latitude_deg  = parseCoord(labelMap['latitude']  || labelMap['lat'] || '');
+  const longitude_deg = parseCoord(labelMap['longitude'] || labelMap['lon'] || labelMap['long'] || '');
+
+  // Heights — typically in feet; convert to metres.
+  const ftToM = (raw) => {
+    if (!raw) return null;
+    const n = Number(String(raw).replace(/[^\d.]/g, ''));
+    return Number.isFinite(n) && n > 0 ? Number((n * 0.3048).toFixed(2)) : null;
+  };
+  const height_agl_m  = ftToM(labelMap['height above ground'] || labelMap['height agl'] || labelMap['agl height']);
+  const height_amsl_m = ftToM(labelMap['height above msl']    || labelMap['height amsl'] || labelMap['amsl height']);
+
+  // Conditions — gather any lighting/marking rows or the "Conditions" section.
+  const conditions = [];
+  for (const [k, v] of Object.entries(labelMap)){
+    if (/condition|light|mark|painting|restriction/i.test(k) && v){
+      conditions.push(`${k}: ${v}`);
+    }
+  }
+  // Also pull any <li> items in a "Conditions" section.
+  const condSection = html.match(/Conditions[\s\S]{0,200}<ul>([\s\S]*?)<\/ul>/i);
+  if (condSection){
+    const liRe = /<li[^>]*>([\s\S]*?)<\/li>/gi;
+    let li;
+    while ((li = liRe.exec(condSection[1])) !== null){
+      const c = stripTags(li[1]).trim();
+      if (c && !conditions.includes(c)) conditions.push(c);
+    }
+  }
+
+  return {
+    available:          true,
+    source:             'faa-oe-html',
+    endpoint,
+    fetched_at:         new Date().toISOString(),
+    study_number:       study_number || null,
+    determination,
+    determination_date,
+    expiration_date,
+    structure_type:     structure_type ? structure_type.toUpperCase() : null,
+    latitude_deg,
+    longitude_deg,
+    height_agl_m,
+    height_amsl_m,
+    conditions,
+    hazard_summary:     labelMap['hazard summary'] || labelMap['summary'] || null,
+  };
+}
+
 function normalizeFaaOeRecord(j, source, endpoint){
   if (!j || typeof j !== 'object') return { available: false, source: null, error: 'FAA OE response not an object' };
   // Per the FAA bridge sidecar's documented response shape; tolerant
@@ -321,7 +465,7 @@ export const FAA_OE_PROVENANCE = Object.freeze({
   upstream:      'https://oeaaa.faa.gov/oeaaa/external/',
   fallback_chain: [
     'FAA_OE_SIDECAR_URL operator-managed proxy (recommended)',
-    'oeaaa.faa.gov HTML scrape (FAA_OE_HTML_FALLBACK=1, opt-in, not yet implemented)'
+    'oeaaa.faa.gov HTML scrape (FAA_OE_HTML_FALLBACK=1, opt-in)'
   ],
   cross_check_tolerances: {
     coordinates: '1 arcsec (~30 m)',

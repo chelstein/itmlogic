@@ -83,11 +83,16 @@ services:
       # the URL + bearer token (see chelstein/splat#9) post-deploy.
       - { key: SPLAT_SIDECAR_URL,           scope: RUN_TIME, value: "" }
       - { key: SPLAT_API_TOKEN,             scope: RUN_TIME, type: SECRET, value: "" }
+      # VOACAP advisory sidecar — ionospheric context for AM nighttime
+      # skywave studies.  advisory_only; filing_effect: none.
+      - { key: VOACAP_SIDECAR_URL,          scope: RUN_TIME, value: "http://genoa-voacap:8086" }
+      - { key: VOACAP_API_TOKEN,            scope: RUN_TIME, type: SECRET, value: "" }
       # FCCAM (Wang 1985 skywave) — operator deploys src/sidecars/fccam/
       # (requires Fccam.for from https://www.fcc.gov/media/radio/am-skywave-program)
       # on a Droplet or App Platform worker; set URL here when live.
       # When unset, Genoa falls back to Berry 1968 (screening-grade) for AM NIF.
-      - { key: FCCAM_SIDECAR_URL,           scope: RUN_TIME, value: "" }
+      - { key: FCCAM_SIDECAR_URL,           scope: RUN_TIME, value: "http://genoa-fccam:8090" }
+      - { key: FCCAM_API_TOKEN,             scope: RUN_TIME, type: SECRET, value: "" }
       # FAA OE/AAA determination proxy — operator-managed JSON bridge to
       # oeaaa.faa.gov.  When unset, FAA OE fetch reports DATA SOURCE ERROR.
       - { key: FAA_OE_SIDECAR_URL,          scope: RUN_TIME, value: "" }
@@ -159,6 +164,59 @@ services:
     envs:
       - { key: SIDECAR_PORT,    scope: RUN_TIME, value: "8081" }
       - { key: TERRAIN_BACKEND, scope: RUN_TIME, value: "multi" }   # USGS + Open-Meteo + OpenTopoData
+
+  # ---- VOACAP advisory sidecar (always-on internal service) ----
+  #
+  # Wraps jawatson/voacapl (MIT License; NTIA/ITS VOACAP is public domain
+  # per 17 USC §105).  Provides per-path ionospheric reliability advisory
+  # for AM nighttime skywave analysis.  OUTPUT IS ADVISORY ONLY —
+  # filing_effect:'none'; never modifies §73.182 NIF or §73.190 math.
+  # Build: `docker build -t genoa-voacap src/sidecars/voacap/` on the
+  # operator droplet; image downloads voacapl from GitHub during build.
+  - name: genoa-voacap
+    dockerfile_path: src/sidecars/voacap/Dockerfile
+    source_dir: src/sidecars/voacap
+    github:
+      repo: chelstein/itmlogic
+      branch: master
+      deploy_on_push: true
+    instance_size_slug: apps-s-1vcpu-1gb
+    instance_count: 1
+    internal_ports:
+      - 8086
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 60        # voacapl build from source on cold start
+      period_seconds: 30
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 3
+    envs:
+      - { key: PORT,                  scope: RUN_TIME, value: "8086" }
+      - { key: VOACAP_ITSHFBC,        scope: RUN_TIME, value: "/opt/voacap/itshfbc" }
+      - { key: VOACAP_API_TOKEN,      scope: RUN_TIME, type: SECRET, value: "" }
+
+  # ---- FCCAM sidecar (FCC §73.190(c) skywave; always-on internal service) ----
+  #
+  # Wraps the FCC's public-domain Fccam.for (Wang 1985 model).  Provides
+  # filing-grade 50% skywave field strength for §73.182 AM nighttime
+  # allocation.  BUILD REQUIRES: Fccam.for must be placed into
+  # src/sidecars/fccam/ before `docker build`.  Obtain from:
+  # https://www.fcc.gov/media/radio/am-skywave-program
+  # When not deployed, the API falls back to the Berry approximation
+  # (screening-grade; see src/evidence/berrySkywaveClient.js).
+  - name: genoa-fccam
+    dockerfile_path: src/sidecars/fccam/Dockerfile
+    source_dir: src/sidecars/fccam
+    internal_ports:
+      - 8090
+    health_check:
+      http_path: /healthz
+      initial_delay_seconds: 10
+      period_seconds: 30
+    envs:
+      - { key: PORT,             scope: RUN_TIME, value: "8090" }
+      - { key: FCCAM_API_TOKEN,  scope: RUN_TIME, type: SECRET, value: "" }
 
   # ---- Identity sidecar (always-on internal service) ----
   #

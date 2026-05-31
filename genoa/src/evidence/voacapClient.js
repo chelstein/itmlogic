@@ -1,135 +1,192 @@
-// VOACAP advisory sidecar client — STUB.
+// Genoa VOACAP advisory sidecar client.
 //
-// VOACAP (Voice of America Coverage Analysis Program) is the
-// long-standing NTIA/ITS HF propagation prediction tool.  Its outputs
-// are useful as an *advisory* second opinion for AM skywave / HF link
-// budget context, but never as the basis for any FCC filing math.
+// Talks to the VOACAP sidecar — a FastAPI wrapper around the NTIA/ITS
+// VOACAP (Voice of America Coverage Analysis Program) HF propagation
+// prediction tool via the jawatson/voacapl Linux port.  The sidecar
+// runs at VOACAP_SIDECAR_URL; when unset, makeVoacapClient() returns
+// null and the orchestrator skips advisory_voacap silently.
 //
 // REGULATORY POSTURE
-//   Filing-controlling AM skywave math remains §73.190 / §73.182(k) /
-//   Berry-style closed form (see evidence/berrySkywaveClient.js and
-//   engine/am/skywave.js).  Anything this client returns is ADVISORY
-//   ONLY and surfaces via the same advisory envelope contract used by
-//   evidence/amPhysicsClient.js — i.e. blocks carry
-//     { advisory: true, filing_effect: 'none' }
-//   and are validated by validatePhysicsEvidence() in
-//   types/physicsEvidence.schema.js before they are attached to the
-//   exhibit.
+//   ALL responses carry advisory:true, filing_effect:'none'.
+//   VOACAP output provides ionospheric context for AM nighttime skywave
+//   studies; it NEVER substitutes for FCC §73.190(c) / §73.182 math.
 //
-// LIFECYCLE
-//   This module ships as a *stub* — no live HTTP, no FORTRAN call.
-//   makeVoacapClient() returns null when VOACAP_SIDECAR_URL is unset
-//   so the orchestrator can fail-soft exactly like SOMNEC2D and NEC.
-//   When the URL is set, the returned client exposes a stable
-//   { health(), runPath() } interface that follows the advisory
-//   envelope contract; the live wire-up will be done in a later
-//   change once a vendored VOACAP sidecar container is published.
+// SERVICE CONTRACT (see genoa/src/sidecars/voacap/main.py)
+//
+//   GET  /healthz
+//     → 200 { ok, binary_present, itshfbc_present, started_at }
+//
+//   GET  /version
+//     → { engine: 'voacap', binary_sha256, itshfbc_path, advisory:true,
+//         filing_effect:'none', license_basis, regulation }
+//
+//   POST /run/path
+//     body: {
+//       tx_lat, tx_lon,       // transmitter coords (decimal degrees)
+//       rx_lat, rx_lon,       // receiver coords
+//       freq_mhz: number[],   // HF frequencies; clamped ≥2 MHz in sidecar
+//       month:    1..12,
+//       ssn?:     0..300,     // smoothed sunspot number (default 50)
+//       power_kw?: number,    // transmitter power in kW (default 1.0)
+//       required_snr_db?: number  // default 48.0
+//     }
+//     → 200 {
+//         advisory: true, filing_effect: 'none',
+//         engine: 'voacap', available: true,
+//         month, ssn, power_kw, distance_km, inp_sha256,
+//         results: [{
+//           freq_mhz, freq_mhz_used,
+//           hourly_reliability: number[24] | null,
+//           mean_reliability:   number | null,
+//           note?: string
+//         }],
+//         note?: string
+//       }
+//
+// USE
+//   Genoa-side wiring in src/api/services/sidecars.js:
+//     voacap: makeVoacapClient(),
+//   Consumed by nightOrchestrator.js to attach advisory_voacap to
+//   the §73.182 NIF result.
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
-// Symbolic version tag — bumped when the wire contract changes.
-export const VOACAP_CLIENT_STUB_VERSION = '0.0.1-stub';
+export const VOACAP_CLIENT_VERSION = '1.0.0';
 
 /**
- * Construct a VOACAP advisory client.
+ * Construct a live VOACAP advisory client.
+ *
+ * Returns null when VOACAP_SIDECAR_URL is unset so the orchestrator
+ * can fail-soft exactly like NEC and amPhysics.
  *
  * @param {object}  [opts]
  * @param {string}  [opts.baseUrl=process.env.VOACAP_SIDECAR_URL]
+ * @param {string}  [opts.apiToken=process.env.VOACAP_API_TOKEN]
  * @param {number}  [opts.timeoutMs=60000]
- * @returns {{
- *   baseUrl: string,
- *   stub: true,
- *   version: string,
- *   health: () => Promise<{reachable:boolean, stub:true}>,
- *   runPath: (path:object) => Promise<{
- *     available: false,
- *     status: 'not_run',
- *     advisory: true,
- *     filing_effect: 'none',
- *     engine: 'voacap',
- *     stub: true,
- *     reason: string
- *   }>
- * } | null}
+ * @returns {{ baseUrl, version, health, runPath } | null}
  */
 export function makeVoacapClient({
   baseUrl   = process.env.VOACAP_SIDECAR_URL || null,
+  apiToken  = process.env.VOACAP_API_TOKEN   || null,
   timeoutMs = DEFAULT_TIMEOUT_MS
 } = {}){
   if (!baseUrl) return null;
-  // intentionally unused while STUB — kept on the closure so the live
-  // implementation can pick it up without changing the call site.
-  void timeoutMs;
+
+  const url    = baseUrl.replace(/\/$/, '');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(apiToken ? { Authorization: `Bearer ${apiToken}` } : {})
+  };
+
+  async function fetchWithTimeout(input, init = {}, overrideMs){
+    const ms = overrideMs ?? timeoutMs;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms);
+    try {
+      const res = await fetch(input, { ...init, signal: ctrl.signal });
+      return res;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   return {
     baseUrl,
-    stub:    true,
-    version: VOACAP_CLIENT_STUB_VERSION,
+    version: VOACAP_CLIENT_VERSION,
 
     /**
-     * Stub health probe.  Reports reachable:false with stub:true so
-     * the orchestrator knows the client is wired but the live HTTP
-     * path has not yet been implemented.  Does NOT make a network
-     * call.
+     * Probe sidecar health.
+     * Returns true only when the sidecar is reachable AND reports ok:true.
+     * Uses a 3 s timeout so /readyz is never stalled by a slow sidecar.
+     * @returns {Promise<boolean>}
      */
     async health(){
-      return { reachable: false, stub: true, version: VOACAP_CLIENT_STUB_VERSION };
+      try {
+        const res = await fetchWithTimeout(`${url}/healthz`, { method: 'GET' }, 3_000);
+        if (!res.ok) return false;
+        const body = await res.json();
+        return body.ok === true;
+      } catch {
+        return false;
+      }
     },
 
     /**
-     * Stub `/run/path` entry point.  Live wire-up will POST a
-     * VOACAP path-method request (TX/RX coordinates, frequencies,
-     * months, SSN, antennas) and return propagation predictions.
-     * For now this returns an advisory envelope marked not_run with
-     * stub:true so callers can attach it as advisory evidence
-     * without failing the study.
+     * Run a VOACAP path advisory.
      *
-     * @param {object} path — placeholder spec; ignored by the stub.
-     * @returns advisory envelope (see makeVoacapClient JSDoc)
+     * @param {object} path
+     * @param {number} path.tx_lat
+     * @param {number} path.tx_lon
+     * @param {number} path.rx_lat
+     * @param {number} path.rx_lon
+     * @param {number[]} path.freq_mhz   HF reference frequencies in MHz; values
+     *                                   below 2 MHz are clamped in the sidecar
+     * @param {number}  path.month       1–12
+     * @param {number}  [path.ssn]       smoothed sunspot number (default 50)
+     * @param {number}  [path.power_kw]  (default 1.0)
+     * @param {number}  [path.required_snr_db]  (default 48.0)
+     * @returns {Promise<{advisory:true, filing_effect:'none', available:boolean, ...}>}
      */
     async runPath(path = {}){
-      return advisoryEnvelope({
-        available:  false,
-        status:     'not_run',
-        reason:     'voacapClient is a stub; live HTTP path not yet implemented',
-        request:    safePath(path)
-      });
+      try {
+        const res = await fetchWithTimeout(`${url}/run/path`, {
+          method:  'POST',
+          headers,
+          body:    JSON.stringify(path),
+        });
+        if (!res.ok){
+          const detail = await res.text().catch(() => '');
+          return advisoryEnvelope({
+            available: false,
+            status:    'sidecar_error',
+            reason:    `VOACAP sidecar returned HTTP ${res.status}: ${detail.slice(0, 200)}`
+          });
+        }
+        const body = await res.json();
+        // Always enforce the advisory contract regardless of what the
+        // sidecar returns — belt-and-suspenders so a misconfigured
+        // sidecar cannot accidentally inject filing-controlling data.
+        return {
+          ...body,
+          advisory:      true,
+          filing_effect: 'none',
+          engine:        'voacap',
+        };
+      } catch (e){
+        return advisoryEnvelope({
+          available: false,
+          status:    'sidecar_unreachable',
+          reason:    e.message
+        });
+      }
     }
   };
 }
 
 /**
- * Build the advisory envelope every VOACAP response (live or stub)
- * must conform to.  Centralized so the live implementation cannot
- * accidentally drop the `advisory: true` / `filing_effect: 'none'`
- * invariants — those are the boundary that keeps VOACAP out of
- * filing math.
+ * Build the advisory envelope every VOACAP response must conform to.
+ * Centralised so callers cannot accidentally drop advisory:true or
+ * filing_effect:'none' — those are the contract that keeps VOACAP
+ * out of filing math.
  */
 export function advisoryEnvelope(extra = {}){
   return {
     advisory:      true,
     filing_effect: 'none',
     engine:        'voacap',
-    stub:          true,
-    ...extra
+    available:     false,
+    ...extra,
   };
 }
 
-function safePath(p){
-  if (!p || typeof p !== 'object') return null;
-  // Strip non-serializable / oversized fields defensively.
-  try { return JSON.parse(JSON.stringify(p)); }
-  catch { return null; }
-}
-
 export const VOACAP_PROVENANCE = Object.freeze({
-  module:         'src/evidence/voacapClient.js',
-  upstream:       'VOACAP (NTIA/ITS HF propagation prediction)',
-  status:         'STUB — no live HTTP, no FORTRAN call',
-  posture:        'ADVISORY — never substitutes for FCC §73.190 / §73.182(k) skywave math',
-  envelope:       'advisory:true + filing_effect:none on every response (live or stub)',
+  module:      'src/evidence/voacapClient.js',
+  upstream:    'VOACAP (NTIA/ITS HF propagation prediction, jawatson/voacapl Linux port)',
+  posture:     'ADVISORY — never substitutes for FCC §73.190(c) / §73.182 skywave math',
+  envelope:    'advisory:true + filing_effect:none on every response',
   not_modeled: [
-    'Filing-controlling AM skywave field strength — remains §73.190 / Berry-style closed form',
+    'Filing-controlling AM skywave field strength — remains §73.190(c) / Berry-style closed form',
     'Filing-controlling RSS share — remains §73.182(k)',
-    'Any FCC allocation / contour math'
-  ]
+    'Any FCC allocation / contour math',
+  ],
 });

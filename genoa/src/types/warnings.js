@@ -196,9 +196,13 @@ export const WARNING_CODES = Object.freeze({
     title: 'NEC evidence sourced from GPL-isolated external sidecar',
     description: 'NEC2++ is GPL v2.  This evidence was produced by an isolated sidecar process that Genoa talks to over HTTP only — Genoa\'s own codebase does not link or embed any GPL\'d code.  evidence.nec_model.provenance.license_boundary is stamped "external sidecar" so reviewers can verify the boundary is preserved.' },
 
+  AM_GROUND_SIGMA_ZONE_ESTIMATE: { severity: 'warning', phase: 'sidecar',
+    title: 'AM ground conductivity resolved from FCC M3 zone table (screening-grade)',
+    description: 'Neither the ZTR /api/m3/conductivity proxy nor the local AM_m3.tif GeoTIFF was available.  Genoa fell back to a geographic zone estimate from the FCC §73.190 Figure M3 representative values (±50% accuracy vs. the raster).  The AM groundwave and NIF results in this exhibit are SCREENING-GRADE — acceptable for preliminary site studies but not for FCC filing.  Deploy AM_m3.tif to /opt/genoa/live-data/m3/ or configure the ZTR sidecar (FACILITY_SIDECAR_URL) to obtain filing-grade σ.  evidence.ground_conductivity.filing_grade is set to "screening".  evidence.ground_conductivity.tier_attempts records each upstream attempt.' },
+
   AM_GROUND_SIGMA_UNRESOLVED: { severity: 'blocker', phase: 'sidecar',
     title: 'AM ground conductivity could not be resolved from any source',
-    description: 'Genoa refuses to compute AM groundwave / NEC results with a synthetic σ default.  The resolution chain exhausted all three tiers: (1) operator-supplied inputs.ground_sigma_mS_m, (2) ZTR /api/m3/conductivity proxy, (3) local AM_m3.geojson point-in-polygon (AM_M3_GEOJSON_PATH).  No usable σ value was found at the subject lat/lon.  Supply inputs.ground_sigma_mS_m explicitly (FCC §73.190 M3 zone value for the tower site) and recompute, or verify the M3 GeoJSON is accessible at AM_M3_GEOJSON_PATH.  evidence.ground_conductivity.tier_attempts records each upstream failure for diagnosis.' },
+    description: 'Genoa could not resolve ground conductivity from any tier: (1) operator-supplied inputs.ground_sigma_mS_m, (2) ZTR /api/m3/conductivity proxy, (3) local AM_m3.tif GeoTIFF, (4) FCC M3 zone table.  The site is likely outside CONUS/Alaska/Hawaii or all lookups failed.  Supply inputs.ground_sigma_mS_m explicitly (FCC §73.190 M3 zone value for the tower site) and recompute.  evidence.ground_conductivity.tier_attempts records each upstream failure for diagnosis.' },
 
   LMS_DATA_UNAVAILABLE: { severity: 'warning', phase: 'evidence',
     title: 'FCC LMS / public-file data unavailable',

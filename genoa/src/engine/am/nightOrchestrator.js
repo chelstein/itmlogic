@@ -72,11 +72,75 @@ export function normalizePrimary(row){
 }
 
 /**
+ * Run VOACAP advisory for the proposed station's ionospheric context.
+ *
+ * Picks up to 3 of the strongest interferers and runs VOACAP for each
+ * TX→RX path at 2.0 MHz (lowest valid VOACAP frequency — serves as a
+ * proxy for MF skywave ionospheric state, since AM band 535–1705 kHz
+ * is below VOACAP's 2 MHz minimum).  Results are ADVISORY ONLY and
+ * never modify NIF radii, §73.182 allocation, or contour math.
+ *
+ * Returns null when voacapClient is null (sidecar not configured).
+ */
+async function _voacapAdvisory(voacapClient, proposed, interferers){
+  if (!voacapClient) return null;
+
+  // Month from UTC now; for a real study the operator may supply it —
+  // the night-orchestrator input doesn't yet carry a month field so we
+  // use current calendar month as a reasonable default.
+  const month = new Date().getUTCMonth() + 1;
+
+  // Run VOACAP for the 3 strongest interferers (already sorted by
+  // estimated field at proposed site) or self-path if none.
+  const targets = interferers.slice(0, 3);
+  if (targets.length === 0){
+    targets.push({
+      call: proposed.station_id || 'self',
+      lat:  proposed.lat + 0.5,    // small displacement to avoid 0-km path
+      lon:  proposed.lon
+    });
+  }
+
+  const paths = await Promise.allSettled(
+    targets.map((itf) => voacapClient.runPath({
+      tx_lat:          proposed.lat,
+      tx_lon:          proposed.lon,
+      rx_lat:          Number(itf.lat),
+      rx_lon:          Number(itf.lon),
+      freq_mhz:        [2.0],
+      month,
+      ssn:             50,     // medium solar activity as neutral default
+      power_kw:        Number(proposed.erp_kw),
+      required_snr_db: 48.0,
+    }))
+  );
+
+  const results = paths.map((p, i) => {
+    const target = targets[i];
+    if (p.status === 'rejected'){
+      return { call: target.call || null, available: false, error: p.reason?.message };
+    }
+    return { call: target.call || null, ...p.value };
+  });
+
+  return {
+    advisory:      true,
+    filing_effect: 'none',
+    engine:        'voacap',
+    month,
+    paths: results,
+    note: 'Ionospheric advisory context only. Frequencies clamped to 2 MHz; '
+        + 'reliability at 2 MHz is a proxy for MF skywave ionospheric state. '
+        + 'Does not modify NIF radii, §73.182 allocation, or §73.190 skywave results.',
+  };
+}
+
+/**
  * Run the §73.182 nighttime NIF study for a proposed AM station.
  */
 export async function nighttimeNifStudy(input, ctx){
   const { proposed = null, options = {} } = input || {};
-  const { fccamClient = null, berryClient = null, facilityClient = null, budget = null } = ctx || {};
+  const { fccamClient = null, berryClient = null, facilityClient = null, budget = null, voacapClient = null } = ctx || {};
 
   // Select the active skywave client.  FCCAM (Wang 1985) is filing-grade;
   // Berry 1968 is screening-grade.  We prefer FCCAM and fall back to Berry
@@ -261,7 +325,7 @@ function buildResult({ contour, interferers, normalized, max_interferers, primar
     polygon:     contour.polygon,
     du_db_by_relation: contour.du_db_by_relation,
     summary,
-    advisory_voacap: null,
+    advisory_voacap: await _voacapAdvisory(voacapClient, proposed, interferers),
     regulation:  '47 CFR §73.182 / §73.183 / §73.190(c)',
     provenance:  {
       module:           'src/engine/am/nightOrchestrator.js',

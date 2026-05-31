@@ -41,6 +41,7 @@ import { makeBerrySkywaveClient } from '../../evidence/berrySkywaveClient.js';
 import { makeFccSunClient }      from '../../evidence/fccSunClient.js';
 import { makeAmPhysicsClient }   from '../../evidence/amPhysicsClient.js';
 import { makeGeoRfEvidenceClient } from '../../evidence/geoRfEvidenceClient.js';
+import { makeVoacapClient }       from '../../evidence/voacapClient.js';
 
 // Population evidence priority:
 //   1. POPULATION_EVIDENCE_URL — operator-managed sidecar (any source).
@@ -174,7 +175,15 @@ export const sidecars = Object.freeze({
   // GEO_RF_EVIDENCE_SIDECAR_URL on the deploy; when unset the exhibit
   // attaches evidence.geo_rf_evidence = { status:'not_configured' } and
   // ships unchanged.
-  geoRfEvidence: makeGeoRfEvidenceClient()
+  geoRfEvidence: makeGeoRfEvidenceClient(),
+
+  // VOACAP (Voice of America Coverage Analysis Program) advisory sidecar.
+  // Provides per-azimuth ionospheric advisory context for AM nighttime
+  // skywave studies (sporadic-E, F2-MUF excursions).  ADVISORY ONLY —
+  // filing_effect:'none', never modifies §73.182 NIF radii or §73.190
+  // skywave results.  Opt-in via VOACAP_SIDECAR_URL on the deploy.
+  // When unset, nightOrchestrator sets advisory_voacap:null silently.
+  voacap:        makeVoacapClient()
 });
 
 // SIDECAR_REGISTRY — additive metadata describing each sidecar's role,
@@ -326,6 +335,14 @@ export const SIDECAR_REGISTRY = Object.freeze([
     filing_effect: 'none',
     required_for: ['FM','LPFM','FX','TV'],
     current_url: process.env.ZTR_BASE_URL || null
+  },
+  {
+    name: 'voacap',
+    url_env_var: 'VOACAP_SIDECAR_URL',
+    role: 'advisory_physics',
+    filing_effect: 'none',
+    required_for: ['AM'],
+    current_url: process.env.VOACAP_SIDECAR_URL || null
   }
 ]);
 
