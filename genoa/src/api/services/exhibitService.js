@@ -13,6 +13,7 @@
 // real, sourced evidence is present.
 
 import { compute }              from '../../engine/index.js';
+import { checkAm73_24g }       from '../../engine/regulatory/section_73_24g.js';
 import { runValidationSuite }   from '../../engine/validation/runner.js';
 import { renderNarrative }      from '../../narrative/generator.js';
 import { sidecars }             from './sidecars.js';
@@ -1887,6 +1888,10 @@ export async function computeExhibit(req){
         ...(exhibit.population_estimate || {}),
         by_contour: { ...(exhibit.population_estimate?.by_contour || {}), ...byContour }
       };
+      // Re-run §73.24(g) now that by_contour is populated.  The engine ran
+      // checkAm73_24g() before this fetch completed, so the earlier result
+      // has overall_pass=null.  Overwrite it with the real verdict.
+      exhibit.am_blanket_compliance = checkAm73_24g({ exhibit });
     }
   }
 

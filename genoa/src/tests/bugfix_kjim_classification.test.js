@@ -19,14 +19,16 @@ import { buildConclusionSection }   from '../exports/engineeringReport/sections/
 //
 // BEFORE: overall_pass=true when blanket contour present but ratio NOT run.
 // AFTER:  overall_pass=null (NOT_MEASURED) when ratio check did not run.
+//
+// Note: radial_table rows use the real engine format — each row is a radial
+// bearing with a contour_distances_km sub-object, not a flat contour_id row.
 
 test('§73.24(g): overall_pass=null when population ratio not measured', () => {
   const exhibit = {
     station_inputs: { service: 'AM' },
+    // blanket_1000mvm contour IS present; population not fetched yet
     radial_table: [
-      // blanket_1000mvm contour IS present
-      { contour_id: 'blanket_1000mvm', distance_km: 0.15 },
-      { contour_id: 'service_25mvm',   distance_km: 70   }
+      { contour_distances_km: { blanket_1000mvm: 0.15, service_25mvm: 70 } }
     ],
     population_estimate: {
       by_contour: {}  // no population data for either contour
@@ -44,8 +46,7 @@ test('§73.24(g): overall_pass=true when BOTH contours have population and ratio
   const exhibit = {
     station_inputs: { service: 'AM' },
     radial_table: [
-      { contour_id: 'blanket_1000mvm', distance_km: 0.15 },
-      { contour_id: 'service_25mvm',   distance_km: 70   }
+      { contour_distances_km: { blanket_1000mvm: 0.15, service_25mvm: 70 } }
     ],
     population_estimate: {
       by_contour: {
@@ -63,8 +64,7 @@ test('§73.24(g): overall_pass=false when ratio exceeds 1%', () => {
   const exhibit = {
     station_inputs: { service: 'AM' },
     radial_table: [
-      { contour_id: 'blanket_1000mvm', distance_km: 0.15 },
-      { contour_id: 'service_25mvm',   distance_km: 70   }
+      { contour_distances_km: { blanket_1000mvm: 0.15, service_25mvm: 70 } }
     ],
     population_estimate: {
       by_contour: {
@@ -233,6 +233,9 @@ test('executiveSummary: still uses "proposed" for non-licensed proposals', () =>
 });
 
 // ─── 4. Engineering conclusion NIF framing for licensed facility ──────────────
+//
+// buildConclusionSection returns { narrative: string, ... } not { paragraphs: [] }.
+// Tests read section.narrative directly.
 
 test('conclusion: Berry NIF screening for licensed station uses advisory framing', () => {
   const exhibit = {
@@ -247,8 +250,8 @@ test('conclusion: Berry NIF screening for licensed station uses advisory framing
   };
   const section = buildConclusionSection(exhibit);
   assert.ok(section, 'should build without throwing');
-  const text = (section.paragraphs || []).join('\n');
-  // Should NOT say "NON-COMPLIANT, facility redesign required"
+  const text = section.narrative || '';
+  // Should NOT say "facility redesign required" (that's for proposed filings)
   assert.ok(!text.includes('facility redesign') || text.includes('advisory') || text.includes('review'),
     'Berry NIF fail for licensed station should be framed as advisory, not as redesign-required');
   // Should mention Berry/screening
@@ -268,7 +271,7 @@ test('conclusion: Berry NIF for existing facility adds review note, not prohibit
     }
   };
   const section = buildConclusionSection(exhibit);
-  const text = (section.paragraphs || []).join('\n');
+  const text = section.narrative || '';
   assert.ok(/existing licensed station|licensed station|existing/i.test(text),
     'should mention this is an existing licensed station for Berry NIF context');
 });
