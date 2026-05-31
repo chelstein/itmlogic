@@ -5,7 +5,9 @@
 //   generateDistanceGrid(n)
 //   computeContour({ freq_hz, sigma_s_per_m, epsilon, e1km_mvm, target_field_mvm })
 
-import { runFccgw } from './engine.js';
+'use strict';
+
+const { runFccgw } = require('./engine.js');
 
 /**
  * Find the distance at which the field equals targetField using log-log
@@ -22,7 +24,7 @@ import { runFccgw } from './engine.js';
  * @param {number}   targetField  Target field in mV/m (must be > 0)
  * @returns {number | null}  Interpolated distance in km, or null if not bracketed
  */
-export function findContourDistance(distances, fields, targetField){
+function findContourDistance(distances, fields, targetField){
   if (!Array.isArray(distances) || !Array.isArray(fields)){
     throw new TypeError('distances and fields must be arrays');
   }
@@ -37,8 +39,8 @@ export function findContourDistance(distances, fields, targetField){
 
   // Fields typically decrease with distance.  The target must be between
   // the smallest and largest field values in the array.
-  const maxField = Math.max(...fields);
-  const minField = Math.min(...fields);
+  const maxField = Math.max.apply(null, fields);
+  const minField = Math.min.apply(null, fields);
 
   if (targetField > maxField || targetField < minField){
     return null;  // target is out of range
@@ -46,7 +48,6 @@ export function findContourDistance(distances, fields, targetField){
 
   // Find adjacent bracket (i, i+1) where fields[i] >= target > fields[i+1]
   // (for a monotonically decreasing field profile).
-  // We search for the pair that brackets the target regardless of order.
   for (let i = 0; i < n - 1; i++){
     const f0 = fields[i];
     const f1 = fields[i + 1];
@@ -61,10 +62,6 @@ export function findContourDistance(distances, fields, targetField){
     if (!inBracket) continue;
 
     // Log-log interpolation: log(E) = m * log(d) + b
-    //   log(f0) = m * log(d0) + b
-    //   log(f1) = m * log(d1) + b
-    //   m = (log(f1) - log(f0)) / (log(d1) - log(d0))
-    //   solve for d: log(d) = (log(E) - b) / m = log(d0) + (log(E) - log(f0)) / m
     const logD0 = Math.log(d0);
     const logD1 = Math.log(d1);
     const logF0 = Math.log(f0);
@@ -75,16 +72,14 @@ export function findContourDistance(distances, fields, targetField){
     const dLogF = logF1 - logF0;
 
     if (Math.abs(dLogF) < 1e-15){
-      // Flat segment — field is constant, return midpoint distance.
       return Math.exp((logD0 + logD1) / 2);
     }
 
-    // m = dLogF / dLogD  →  logD = logD0 + (logE - logF0) * dLogD / dLogF
     const logD = logD0 + (logE - logF0) * dLogD / dLogF;
     return Math.exp(logD);
   }
 
-  return null;  // no bracket found (shouldn't happen if range check passed)
+  return null;
 }
 
 /**
@@ -93,7 +88,8 @@ export function findContourDistance(distances, fields, targetField){
  * @param {number} [n=200]  Number of grid points
  * @returns {number[]}      Array of distances in km
  */
-export function generateDistanceGrid(n = 200){
+function generateDistanceGrid(n){
+  if (n === undefined) n = 200;
   const logMin = Math.log10(0.5);
   const logMax = Math.log10(2000);
   const grid = [];
@@ -107,52 +103,29 @@ export function generateDistanceGrid(n = 200){
 /**
  * Compute the distance at which the FCC/OET R86-1 groundwave field equals
  * target_field_mvm, using a 200-point log-spaced distance grid.
- *
- * @param {object} params
- * @param {number}   params.freq_hz           Carrier frequency in Hz
- * @param {number}   params.sigma_s_per_m     Conductivity in S/m
- * @param {number}   params.epsilon           Relative dielectric constant
- * @param {number}   params.e1km_mvm          Reference field at 1 km in mV/m
- * @param {number}   params.target_field_mvm  Target contour field in mV/m
- * @param {number}   [params.n_grid=200]      Number of distance grid points
- * @returns {Promise<{
- *   contour_distance_km: number | null,
- *   field_mvm_at_contour: number | null,
- *   bracketed_by: { d_lo_km, e_lo_mvm, d_hi_km, e_hi_mvm } | null,
- *   n_grid_points: number,
- *   advisory: true,
- *   filing_effect: 'none'
- * }>}
  */
-export async function computeContour({
-  freq_hz,
-  sigma_s_per_m,
-  epsilon,
-  e1km_mvm,
-  target_field_mvm,
-  n_grid = 200
-}){
+async function computeContour(params){
+  const { freq_hz, sigma_s_per_m, epsilon, e1km_mvm, target_field_mvm } = params;
+  const n_grid = params.n_grid || 200;
   const distances_km = generateDistanceGrid(n_grid);
 
-  const { fields_mvm } = await runFccgw({
+  const result = await runFccgw({
     freq_hz,
     sigma_s_per_m,
     epsilon,
     e1km_mvm,
     distances_km
   });
+  const fields_mvm = result.fields_mvm;
 
   const contour_distance_km = findContourDistance(distances_km, fields_mvm, target_field_mvm);
 
-  // Find the bracketing pair for provenance.
   let bracketed_by = null;
   let field_mvm_at_contour = null;
 
   if (contour_distance_km !== null){
-    // Evaluate the field at the interpolated distance to report back.
-    field_mvm_at_contour = target_field_mvm;  // by definition of interpolation
+    field_mvm_at_contour = target_field_mvm;
 
-    // Find the actual bracket in the grid.
     for (let i = 0; i < distances_km.length - 1; i++){
       const f0 = fields_mvm[i];
       const f1 = fields_mvm[i + 1];
@@ -161,12 +134,7 @@ export async function computeContour({
       const inBracket = (f0 >= target_field_mvm && target_field_mvm >= f1)
                      || (f1 >= target_field_mvm && target_field_mvm >= f0);
       if (inBracket){
-        bracketed_by = {
-          d_lo_km:  d0,
-          e_lo_mvm: f0,
-          d_hi_km:  d1,
-          e_hi_mvm: f1
-        };
+        bracketed_by = { d_lo_km: d0, e_lo_mvm: f0, d_hi_km: d1, e_hi_mvm: f1 };
         break;
       }
     }
@@ -181,3 +149,5 @@ export async function computeContour({
     filing_effect: 'none'
   };
 }
+
+module.exports = { findContourDistance, generateDistanceGrid, computeContour };
