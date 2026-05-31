@@ -300,11 +300,25 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       site_boundary_m:   Number.isFinite(Number(inputs.site_boundary_m))
                           ? Number(inputs.site_boundary_m) : null,
       site_height_m:     Number.isFinite(Number(inputs.site_height_m))
-                          ? Number(inputs.site_height_m)   : null
+                          ? Number(inputs.site_height_m)   : null,
+      // AM near-field screening inputs (forwarded to amNearFieldScreening):
+      tpo_kw:           Number.isFinite(Number(inputs.tpo_kw)) ? Number(inputs.tpo_kw) : null,
+      e1km_mvm:         Number.isFinite(Number(inputs.e1km_mvm)) ? Number(inputs.e1km_mvm) : null,
+      tower_height_m:   Number.isFinite(Number(inputs.tower_height_m)) ? Number(inputs.tower_height_m) : null,
+      duty_factor:      Number.isFinite(Number(inputs.duty_factor)) ? Number(inputs.duty_factor) : 1.0,
+      n_towers:         Number.isFinite(Number(inputs.n_towers)) ? Math.round(Number(inputs.n_towers)) : 1,
+      is_directional:   !!inputs.is_directional,
+      ground_system:    inputs.ground_system || 'standard_buried'
     });
     if (oet65.near_field?.required_for_filing){
+      const amScr = oet65.near_field?.am_screening;
+      const amScrMsg = amScr?.filing_grade === 'SCREENING'
+        ? `AM near-field screening (OET-65 Supplement A §4) completed: exclusion radius ${amScr.binding_distance_m} m (${amScr.binding}).  filing_effect: none.`
+        : amScr?.filing_grade === 'ENGINEERING_REVIEW_REQUIRED'
+          ? `AM near-field screening ENGINEERING_REVIEW_REQUIRED: ${(amScr?.review_triggers || []).join('; ')}.  NEC or measured RF survey required.`
+          : 'NEC reactive-region study required (OET-65 §3.B) for filing-grade compliance.';
       warnings.push(W.make('OET65_NEAR_FIELD_REQUIRED',
-        `Far-field compliance distance ${oet65.compliance.uncontrolled.distance_m} m at ${freq_mhz_for_oet65.toFixed(3)} MHz is inside the near-field boundary λ/(2π) = ${oet65.near_field.boundary_m} m.  OET-65 §3.B near-field analysis required for filing-grade compliance.`));
+        `Far-field compliance distance ${oet65.compliance.uncontrolled.distance_m} m at ${freq_mhz_for_oet65.toFixed(3)} MHz is inside the near-field boundary λ/(2π) = ${oet65.near_field.boundary_m} m.  ${amScrMsg}`));
     }
     if (oet65.compliance?.boundary_check?.pass === false){
       warnings.push(W.make('OET65_BOUNDARY_VIOLATION',
