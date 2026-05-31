@@ -2,7 +2,6 @@
   "name": "genoa-fccgw-sidecar",
   "version": "1.0.0",
   "description": "FCC/OET R86-1 ground wave sidecar — wraps GroundWaveFCC Octave engine",
-  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

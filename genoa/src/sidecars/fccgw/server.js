@@ -13,21 +13,20 @@
 // Port: 8096 (env PORT)
 // Auth: optional bearer token (env FCCGW_API_TOKEN)
 
-import express from 'express';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-import { generateDistanceGrid, computeContour } from './contour.js';
-import { runFccgw, FCCGW_OCTAVE_PATH } from './engine.js';
+'use strict';
 
-const execFileAsync = promisify(execFile);
+const express = require('express');
+const { execFile } = require('child_process');
+const { generateDistanceGrid, computeContour } = require('./contour.js');
+const { runFccgw, FCCGW_OCTAVE_PATH } = require('./engine.js');
 
 const PORT       = Number(process.env.PORT)           || 8096;
 const API_TOKEN  = (process.env.FCCGW_API_TOKEN || '').trim() || null;
 const STARTED_AT = new Date().toISOString();
 
 // ---- AM frequency band limits in Hz ----
-const FREQ_HZ_MIN = 530_000;   // 530 kHz
-const FREQ_HZ_MAX = 1_710_000; // 1710 kHz
+const FREQ_HZ_MIN = 530000;    // 530 kHz
+const FREQ_HZ_MAX = 1710000;   // 1710 kHz
 
 // ---- Auth middleware ----
 function authMiddleware(req, res, next){
@@ -47,7 +46,7 @@ function authMiddleware(req, res, next){
 // ---- Request logger ----
 function requestLogger(req, res, next){
   const t0 = Date.now();
-  res.on('finish', () => {
+  res.on('finish', function(){
     process.stdout.write(JSON.stringify({
       ts:          new Date().toISOString(),
       method:      req.method,
@@ -60,13 +59,14 @@ function requestLogger(req, res, next){
 }
 
 // ---- Validation helpers ----
-
-/**
- * Validate an AM ground-wave request body.
- * Returns null on success, or { error, code } on failure.
- */
-function validateAmRequest(body, requireTarget = false){
-  const { freq_hz, sigma_s_per_m, epsilon, e1km_mvm, target_field_mvm, distances_km } = body || {};
+function validateAmRequest(body, requireTarget){
+  const b = body || {};
+  const freq_hz       = b.freq_hz;
+  const sigma_s_per_m = b.sigma_s_per_m;
+  const epsilon       = b.epsilon;
+  const e1km_mvm      = b.e1km_mvm;
+  const target_field_mvm = b.target_field_mvm;
+  const distances_km  = b.distances_km;
 
   if (freq_hz === undefined || freq_hz === null){
     return { error: 'freq_hz is required', code: 'MISSING_FIELD' };
@@ -77,7 +77,7 @@ function validateAmRequest(body, requireTarget = false){
   const fFreq = Number(freq_hz);
   if (fFreq < FREQ_HZ_MIN || fFreq > FREQ_HZ_MAX){
     return {
-      error: `freq_hz must be between ${FREQ_HZ_MIN} and ${FREQ_HZ_MAX} Hz (530–1710 kHz AM band)`,
+      error: 'freq_hz must be between ' + FREQ_HZ_MIN + ' and ' + FREQ_HZ_MAX + ' Hz (530-1710 kHz AM band)',
       code: 'OUT_OF_RANGE'
     };
   }
@@ -123,7 +123,8 @@ function validateAmRequest(body, requireTarget = false){
     if (distances_km.length === 0){
       return { error: 'distances_km must be non-empty', code: 'INVALID_FIELD' };
     }
-    for (const d of distances_km){
+    for (let i = 0; i < distances_km.length; i++){
+      const d = distances_km[i];
       if (!Number.isFinite(Number(d)) || Number(d) <= 0){
         return { error: 'All distances_km values must be positive finite numbers', code: 'INVALID_FIELD' };
       }
@@ -139,23 +140,15 @@ app.use(express.json({ limit: '1mb' }));
 app.use(requestLogger);
 
 // ---- GET /healthz ---- (no auth — monitoring probes must not require a token)
-app.get('/healthz', async (req, res) => {
-  let octave_available = false;
-  try {
-    const { stdout } = await execFileAsync('octave', ['--version'], {
-      timeout: 5000,
-      maxBuffer: 64 * 1024
+app.get('/healthz', function(req, res){
+  const child = execFile('octave', ['--version'], { timeout: 5000, maxBuffer: 64 * 1024 }, function(err, stdout){
+    const octave_available = !err && (stdout.includes('GNU Octave') || stdout.includes('octave'));
+    res.status(octave_available ? 200 : 503).json({
+      ok:               octave_available,
+      octave_available: octave_available,
+      fccgw_path:       FCCGW_OCTAVE_PATH,
+      started_at:       STARTED_AT
     });
-    octave_available = stdout.includes('GNU Octave') || stdout.includes('octave');
-  } catch {
-    octave_available = false;
-  }
-
-  res.status(octave_available ? 200 : 503).json({
-    ok:               octave_available,
-    octave_available,
-    fccgw_path:       FCCGW_OCTAVE_PATH,
-    started_at:       STARTED_AT
   });
 });
 
@@ -163,7 +156,7 @@ app.get('/healthz', async (req, res) => {
 app.use(authMiddleware);
 
 // ---- GET /version ----
-app.get('/version', (req, res) => {
+app.get('/version', function(req, res){
   res.json({
     engine:        'fccgw-oet-r86-1',
     model:         'FCC/OET R86-1 Ground Wave',
@@ -177,112 +170,83 @@ app.get('/version', (req, res) => {
 });
 
 // ---- POST /am/fccgw/field ----
-// Compute field strength at each distance.
-app.post('/am/fccgw/field', async (req, res) => {
+app.post('/am/fccgw/field', function(req, res){
   const err = validateAmRequest(req.body, false);
   if (err){
-    return res.status(400).json({ ok: false, ...err });
+    return res.status(400).json(Object.assign({ ok: false }, err));
   }
 
-  const {
-    freq_hz,
-    sigma_s_per_m,
-    epsilon,
-    e1km_mvm,
-    distances_km: reqDistances
-  } = req.body;
-
-  const distances_km = reqDistances
-    ? reqDistances.map(Number)
+  const b = req.body;
+  const freq_hz       = Number(b.freq_hz);
+  const sigma_s_per_m = Number(b.sigma_s_per_m);
+  const epsilon       = Number(b.epsilon);
+  const e1km_mvm      = Number(b.e1km_mvm);
+  const distances_km  = b.distances_km
+    ? b.distances_km.map(Number)
     : generateDistanceGrid(200);
 
-  try {
-    const result = await runFccgw({
-      freq_hz:       Number(freq_hz),
-      sigma_s_per_m: Number(sigma_s_per_m),
-      epsilon:       Number(epsilon),
-      e1km_mvm:      Number(e1km_mvm),
-      distances_km
+  runFccgw({ freq_hz, sigma_s_per_m, epsilon, e1km_mvm, distances_km })
+    .then(function(result){
+      return res.json({
+        ok:            true,
+        advisory:      true,
+        filing_effect: 'none',
+        label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+        engine:        result.engine,
+        inputs: { freq_hz, sigma_s_per_m, epsilon, e1km_mvm },
+        distances_km:  result.distances_km,
+        fields_mvm:    result.fields_mvm
+      });
+    })
+    .catch(function(e){
+      return res.status(500).json({
+        ok:    false,
+        error: e.message || 'Engine error',
+        code:  'ENGINE_ERROR'
+      });
     });
-
-    return res.json({
-      ok:            true,
-      advisory:      true,
-      filing_effect: 'none',
-      label:         'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
-      engine:        result.engine,
-      inputs: {
-        freq_hz:       Number(freq_hz),
-        sigma_s_per_m: Number(sigma_s_per_m),
-        epsilon:       Number(epsilon),
-        e1km_mvm:      Number(e1km_mvm)
-      },
-      distances_km:  result.distances_km,
-      fields_mvm:    result.fields_mvm
-    });
-  } catch (e){
-    return res.status(500).json({
-      ok:    false,
-      error: e.message || 'Engine error',
-      code:  'ENGINE_ERROR'
-    });
-  }
 });
 
 // ---- POST /am/fccgw/contour ----
-// Find the contour distance for a target field strength.
-app.post('/am/fccgw/contour', async (req, res) => {
+app.post('/am/fccgw/contour', function(req, res){
   const err = validateAmRequest(req.body, true);
   if (err){
-    return res.status(400).json({ ok: false, ...err });
+    return res.status(400).json(Object.assign({ ok: false }, err));
   }
 
-  const {
-    freq_hz,
-    sigma_s_per_m,
-    epsilon,
-    e1km_mvm,
-    target_field_mvm
-  } = req.body;
+  const b = req.body;
+  const freq_hz         = Number(b.freq_hz);
+  const sigma_s_per_m   = Number(b.sigma_s_per_m);
+  const epsilon         = Number(b.epsilon);
+  const e1km_mvm        = Number(b.e1km_mvm);
+  const target_field_mvm = Number(b.target_field_mvm);
 
-  try {
-    const result = await computeContour({
-      freq_hz:         Number(freq_hz),
-      sigma_s_per_m:   Number(sigma_s_per_m),
-      epsilon:         Number(epsilon),
-      e1km_mvm:        Number(e1km_mvm),
-      target_field_mvm: Number(target_field_mvm)
+  computeContour({ freq_hz, sigma_s_per_m, epsilon, e1km_mvm, target_field_mvm })
+    .then(function(result){
+      return res.json({
+        ok:                   true,
+        advisory:             true,
+        filing_effect:        'none',
+        label:                'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
+        engine:               'fccgw-oet-r86-1',
+        inputs: { freq_hz, sigma_s_per_m, epsilon, e1km_mvm, target_field_mvm },
+        contour_distance_km:  result.contour_distance_km,
+        field_mvm_at_contour: result.field_mvm_at_contour,
+        bracketed_by:         result.bracketed_by,
+        n_grid_points:        result.n_grid_points
+      });
+    })
+    .catch(function(e){
+      return res.status(500).json({
+        ok:    false,
+        error: e.message || 'Engine error',
+        code:  'ENGINE_ERROR'
+      });
     });
-
-    return res.json({
-      ok:                   true,
-      advisory:             true,
-      filing_effect:        'none',
-      label:                'Independent Physics Validation — FCC/OET R86-1 Ground Wave',
-      engine:               'fccgw-oet-r86-1',
-      inputs: {
-        freq_hz:          Number(freq_hz),
-        sigma_s_per_m:    Number(sigma_s_per_m),
-        epsilon:          Number(epsilon),
-        e1km_mvm:         Number(e1km_mvm),
-        target_field_mvm: Number(target_field_mvm)
-      },
-      contour_distance_km:  result.contour_distance_km,
-      field_mvm_at_contour: result.field_mvm_at_contour,
-      bracketed_by:         result.bracketed_by,
-      n_grid_points:        result.n_grid_points
-    });
-  } catch (e){
-    return res.status(500).json({
-      ok:    false,
-      error: e.message || 'Engine error',
-      code:  'ENGINE_ERROR'
-    });
-  }
 });
 
 // ---- Start server ----
-app.listen(PORT, () => {
+app.listen(PORT, function(){
   process.stdout.write(JSON.stringify({
     ts:         STARTED_AT,
     event:      'started',
@@ -292,4 +256,4 @@ app.listen(PORT, () => {
   }) + '\n');
 });
 
-export default app;
+module.exports = app;
