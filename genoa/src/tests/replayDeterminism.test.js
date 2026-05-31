@@ -203,3 +203,71 @@ test('G-016: verifyAttestation passes when curve_dataset fields are absent (back
   assert.doesNotMatch(r.reason, /curve_dataset/,
     'absence of curve_dataset fields must not trigger curve mismatch error');
 });
+
+// G-016 SIGNED PATH — exercises the full production verifyAttestation() code
+// path including HMAC verification, not merely the fingerprint formula.
+//
+// The prior tests in this file proved the fingerprint computation formula is
+// correct but bypassed verifyAttestation() because BUILD_SIGNING_SECRET was
+// unset in the test environment.  This test sets a known test secret so
+// buildAttestation() produces a real HMAC signature that verifyAttestation()
+// will check, then tampers only curve_dataset_fingerprint_sha256 and confirms:
+//   (a) the tampered attestation is rejected
+//   (b) the rejection reason names the curve fingerprint — not HMAC or unsigned
+//   (c) this proves the HMAC path was exercised and PASSED before the curve
+//       guard ran (if HMAC had failed the reason would say 'HMAC mismatch')
+test('G-016 SIGNED: verifyAttestation exercises full production path with signing secret', () => {
+  const origSecret = process.env.BUILD_SIGNING_SECRET;
+  try {
+    process.env.BUILD_SIGNING_SECRET = 'genoa-test-signing-secret-g016-2026';
+
+    // buildAttestation() now produces a real HMAC-SHA256 signature.
+    const base = buildAttestation();
+    assert.ok(
+      typeof base.signature === 'string' && /^[0-9a-f]{64}$/.test(base.signature),
+      'attestation must carry a hex HMAC signature when BUILD_SIGNING_SECRET is set'
+    );
+
+    // Attach curve_dataset fields — mirroring what engine/index.js stamps at runtime.
+    const curvePart = JSON.stringify({ curve_dataset: { meta_sha256: 'cafebabe01234567' }, service: 'FM' });
+    const baseHash  = base.fingerprint_sha256;
+    const curveFp   = crypto.createHash('sha256').update(baseHash + '|' + curvePart, 'utf8').digest('hex');
+    const att = {
+      ...base,
+      curve_dataset_fingerprint_sha256:  curveFp,
+      curve_dataset_fingerprint_inputs:  [ 'base=' + baseHash, 'curve_dataset=' + curvePart ]
+    };
+
+    // 1. Positive: full signed verification must succeed.
+    const r1 = verifyAttestation(att);
+    assert.equal(r1.ok, true,
+      'signed attestation with correct curve fingerprint must verify ok=true');
+    assert.equal(r1.curve_dataset_fingerprint_sha256, curveFp,
+      'verifyAttestation must echo back the verified curve fingerprint');
+
+    // 2. Negative: tamper ONLY curve_dataset_fingerprint_sha256 — the HMAC
+    //    (which covers the base fingerprint, not the curve extension) stays valid.
+    const tamperedCurve = JSON.stringify({ curve_dataset: { meta_sha256: 'TAMPERED-0000' }, service: 'FM' });
+    const tamperedFp    = crypto.createHash('sha256')
+      .update(baseHash + '|' + tamperedCurve, 'utf8').digest('hex');
+    const attTampered = { ...att, curve_dataset_fingerprint_sha256: tamperedFp };
+
+    const r2 = verifyAttestation(attTampered);
+    assert.equal(r2.ok, false,
+      'tampered curve fingerprint must be rejected even when base HMAC is valid');
+    assert.match(r2.reason, /curve_dataset_fingerprint_sha256 mismatch/,
+      'rejection reason must specifically identify the curve dataset fingerprint as the mismatch');
+
+    // 3. The rejection must NOT come from HMAC or unsigned — proves the HMAC path
+    //    was exercised and passed before the curve guard ran.
+    assert.doesNotMatch(r2.reason, /HMAC|unsigned|SECRET/i,
+      'reason must not be from HMAC or unsigned path — HMAC was exercised and passed');
+
+  } finally {
+    if (origSecret === undefined){
+      delete process.env.BUILD_SIGNING_SECRET;
+    } else {
+      process.env.BUILD_SIGNING_SECRET = origSecret;
+    }
+  }
+});
