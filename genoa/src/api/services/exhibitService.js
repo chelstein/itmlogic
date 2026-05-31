@@ -28,6 +28,7 @@ import { computeHaatMultiSource, fetchElevationsFallback } from '../../evidence/
 import { makeBudget }              from './computeBudget.js';
 import { necPatternToTable }       from '../../evidence/nec/client.js';
 import { suggestDirectionalMitigation } from '../../engine/regulatory/mitigationAdvisor.js';
+import { lookupM3Conductivity }    from '../../engine/am/m3.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -1433,7 +1434,9 @@ export async function computeExhibit(req){
   //   1. operator-supplied inputs.ground_sigma_mS_m  (highest priority)
   //   2. ZTR /api/m3/conductivity proxy (vendored FCC §73.190 M3
   //      polygons in chelstein/zerotrustradio data/m3/)
-  //   3. chain exhausted → AM_GROUND_SIGMA_UNRESOLVED blocker
+  //   3. local AM_m3.geojson point-in-polygon (AM_M3_GEOJSON_PATH;
+  //      fallback when ZTR unavailable; same FCC dataset)
+  //   4. chain exhausted → AM_GROUND_SIGMA_UNRESOLVED blocker
   //      (no synthetic fallback — refuse to compute).
   //
   // FCC, NOAA, and ITU-R BR do NOT publish a live JSON σ-at-lat/lon
@@ -1476,6 +1479,22 @@ export async function computeExhibit(req){
         tierAttempts.ztr = { available: false, error: 'sidecar not configured' };
       }
 
+      // Tier 2 — local AM_m3.geojson (fallback when ZTR unavailable).
+      // Reads the FCC §73.190 Figure M3 polygon file loaded at startup
+      // from AM_M3_GEOJSON_PATH (default: /opt/genoa/live-data/m3/).
+      // Provides site-σ without ZTR; never used when ZTR succeeded.
+      if (!resolved){
+        try {
+          const m3r = lookupM3Conductivity(inputs.lat, inputs.lon);
+          tierAttempts.local_m3 = m3r;
+          if (m3r?.available){
+            resolved = { ...m3r, fetched_at: new Date().toISOString() };
+          }
+        } catch (e){
+          tierAttempts.local_m3 = { available: false, error: String(e?.message || e) };
+        }
+      }
+
       if (resolved){
         inputs.ground_sigma_mS_m = resolved.sigma_mS_m;
         evidence.ground_conductivity = { ...resolved, tier_attempts: tierAttempts };
@@ -1487,7 +1506,7 @@ export async function computeExhibit(req){
         evidence.ground_conductivity = {
           available:     false,
           source:        null,
-          reason:        'ZTR /api/m3/conductivity unavailable and operator did not supply ground_sigma_mS_m; refusing to synthesize',
+          reason:        'ZTR M3 proxy and local AM_m3.geojson both unavailable; operator did not supply ground_sigma_mS_m; refusing to synthesize',
           tier_attempts: tierAttempts
         };
       }

@@ -133,6 +133,38 @@ export function makeAmPhysicsClient({
     baseUrl,
     hasToken: !!apiToken,
 
+    /**
+     * Query the FCC M3 ground conductivity at a lat/lon point via
+     * the am-physics sidecar's /m3/conductivity endpoint.  When the
+     * sidecar has AM_M3_GEOJSON_PATH configured, this returns the
+     * local polygon lookup result without hitting ZTR.
+     *
+     * @param {object} params
+     * @param {number} params.lat  Decimal degrees latitude
+     * @param {number} params.lon  Decimal degrees longitude (negative = West)
+     * @returns {Promise<{available:boolean, sigma_mS_m?:number, zone_id?:string,
+     *                    zone_label?:string, source:string, error?:string}>}
+     */
+    async getM3Conductivity({ lat, lon } = {}){
+      const fLat = Number(lat);
+      const fLon = Number(lon);
+      if (!Number.isFinite(fLat) || !Number.isFinite(fLon)){
+        return { available: false, source: null, error: 'lat and lon required' };
+      }
+      const url = joinUrl(baseUrl, `/m3/conductivity?lat=${fLat}&lon=${fLon}`);
+      try {
+        const r = await fetchWithTimeout(fetchFn, url,
+          { headers: auth(apiToken) }, 5_000);
+        if (!r.ok){
+          return { available: false, source: null, error: `HTTP ${r.status}`, endpoint: url };
+        }
+        const j = await r.json();
+        return { ...j, endpoint: url };
+      } catch (e){
+        return { available: false, source: null, error: String(e?.message || e), endpoint: url };
+      }
+    },
+
     async health(){
       try {
         const r = await fetchWithTimeout(fetchFn,
