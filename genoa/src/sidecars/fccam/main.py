@@ -120,7 +120,7 @@ def _normalize_inputs(r: RunRequest) -> dict:
     input_sha256 must be equal.
     """
     return {
-        "engine":        "fccam",
+        "engine":        FCCAM_VERSION_LABEL,
         "erp_kw":        round(r.erp_kw, 3),
         "freq_khz":      int(r.freq_khz),
         "distance_km":   round(r.distance_km, 2),
@@ -278,7 +278,7 @@ def healthz():
 @app.get("/version", dependencies=[Depends(require_token)])
 def version():
     return {
-        "engine": "fccam",
+        "engine": FCCAM_VERSION_LABEL,
         "version": FCCAM_VERSION_LABEL,
         "binary_present": FCCAM_BIN.exists(),
         "source_sha256": SOURCE_SHA,   # Fccam.for sha256
@@ -307,7 +307,7 @@ def run(req: RunRequest):
     result = _invoke_fccam(norm)
     return {
         **result,
-        "engine": "fccam",
+        "engine": FCCAM_VERSION_LABEL,
         "input_sha256": input_sha,
         "inputs": norm,
         "engine_version": FCCAM_VERSION_LABEL,
@@ -324,7 +324,7 @@ def run_batch(batch: RunBatchRequest):
         single = _invoke_fccam(norm)
         out.append({
             **single,
-            "engine": "fccam",
+            "engine": FCCAM_VERSION_LABEL,
             "input_sha256": input_sha,
             "inputs": norm,
         })
