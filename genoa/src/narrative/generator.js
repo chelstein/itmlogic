@@ -28,25 +28,34 @@ export function renderNarrative(exhibit){
   const v   = exhibit.validation || {};
 
   const sections = {
-    summary:             section_summary(exhibit),
-    station_inputs:      section_inputs(s),
-    fcc_method:          section_method(m, ip),
-    contour_results:     section_contour_results(exhibit),
-    radial_table:        section_radial_summary(rt, exhibit.contour_definitions || []),
-    methodology:         section_methodology(exhibit),
-    provenance:          section_provenance(exhibit),
-    terrain_evidence:    section_terrain(ev),
-    measurement_evidence:section_measurement(ev),
-    validation_evidence: section_validation(v),
-    population:          section_population(pop),
-    warnings:            section_warnings(exhibit.warnings || [], fr),
-    certification:       section_certification(fr)
+    summary:                  section_summary(exhibit),
+    station_inputs:           section_inputs(s),
+    fcc_method:               section_method(m, ip),
+    contour_results:          section_contour_results(exhibit),
+    radial_table:             section_radial_summary(rt, exhibit.contour_definitions || []),
+    methodology:              section_methodology(exhibit),
+    provenance:               section_provenance(exhibit),
+    terrain_evidence:         section_terrain(ev),
+    measurement_evidence:     section_measurement(ev),
+    county_overlay_evidence:  section_county_overlay(ev),
+    conductivity_evidence:    section_conductivity(ev, s),
+    am_physics_fccgw_evidence:section_am_physics_fccgw(ev),
+    am_physics_evidence:      section_am_physics(ev),
+    oet65_evidence:           section_oet65(exhibit),
+    identity_evidence:        section_identity(ev),
+    validation_evidence:      section_validation(v),
+    population:               section_population(pop),
+    warnings:                 section_warnings(exhibit.warnings || [], fr),
+    certification:            section_certification(fr)
   };
 
   const rawText = [
     sections.summary, sections.station_inputs, sections.fcc_method,
     sections.contour_results, sections.radial_table, sections.methodology,
     sections.provenance, sections.terrain_evidence, sections.measurement_evidence,
+    sections.county_overlay_evidence, sections.conductivity_evidence,
+    sections.am_physics_fccgw_evidence, sections.am_physics_evidence,
+    sections.oet65_evidence, sections.identity_evidence,
     sections.validation_evidence, sections.population, sections.warnings,
     sections.certification
   ].join('\n\n');
@@ -379,6 +388,201 @@ function section_certification(fr){
     `Date:                     ___________________________`,
     `Signature:                ___________________________`
   ].join('\n');
+}
+
+function section_county_overlay(ev){
+  const co = ev?.county_overlay;
+  if (!co){
+    return hr('County Boundary Overlay') + '\nNot computed (contour geometry unavailable or AM station without polygon contour).';
+  }
+  const lines = [hr('County Boundary Overlay')];
+  const n = Array.isArray(co.counties_intersected) ? co.counties_intersected.length : '—';
+  lines.push(`Counties intersected:  ${n}`);
+  if (co.contour_area_sq_km != null) lines.push(`Contour area:          ${fmt(co.contour_area_sq_km, 1)} km²`);
+
+  const fully = Array.isArray(co.counties_fully_contained) ? co.counties_fully_contained : [];
+  const partial = Array.isArray(co.counties_partially_intersected) ? co.counties_partially_intersected : [];
+  if (fully.length)   lines.push(`Fully contained:       ${fully.length}  (${fully.slice(0,5).join(', ')}${fully.length > 5 ? ', …' : ''})`);
+  if (partial.length) lines.push(`Partially intersected: ${partial.length}  (${partial.slice(0,5).join(', ')}${partial.length > 5 ? ', …' : ''})`);
+
+  if (co.warning_code) lines.push(`Warning:               ${co.warning_code}${co.warning_detail ? ' — ' + co.warning_detail : ''}`);
+
+  // List gap counties that were checked via centroid fallback.
+  const missing = Array.isArray(co.missing_county_hits) ? co.missing_county_hits : [];
+  if (missing.length){
+    lines.push('');
+    lines.push('FCC endpoint-miss counties (centroid method):');
+    for (const m of missing) lines.push(`  · ${m.county || m.key || m}`);
+  }
+
+  lines.push('');
+  lines.push('Advisory: County boundary data is FCC-derived evidence, not an authoritative service area filing.');
+  return lines.join('\n');
+}
+
+function section_conductivity(ev, s){
+  const gc  = ev?.ground_conductivity;
+  const gcr = ev?.ground_conductivity_per_radial;
+  const isAm = String(s?.service || '').toUpperCase() === 'AM';
+
+  if (!isAm){
+    return hr('Ground Conductivity (M3)') + '\nNot applicable (FM/TV service — §73.183 M3 conductivity lookup is AM-only).';
+  }
+  if (!gc){
+    return hr('Ground Conductivity (M3)') + '\nNo conductivity evidence attached.';
+  }
+
+  const lines = [hr('Ground Conductivity (M3)')];
+  lines.push(`Available:     ${gc.available ? 'yes' : 'no'}`);
+  if (gc.available){
+    lines.push(`Source:        ${gc.source || '—'}`);
+    lines.push(`σ (mS/m):      ${gc.sigma_mS_m != null ? fmt(gc.sigma_mS_m, 3) : '—'}`);
+    if (gc.filing_grade) lines.push(`Filing grade:  ${gc.filing_grade}`);
+  } else {
+    lines.push(`Reason:        ${gc.reason || '—'}`);
+  }
+
+  if (gcr){
+    lines.push('');
+    if (gcr.available){
+      const method = gcr.method || gcr.source || '—';
+      const nRadials = Array.isArray(gcr.radials) ? gcr.radials.length : (gcr.n_radials ?? '—');
+      lines.push(`Per-radial M3: ${nRadials} radials  ·  method: ${method}`);
+      if (gcr.filing_grade) lines.push(`Filing grade:  ${gcr.filing_grade}`);
+    } else {
+      lines.push(`Per-radial M3: not available — ${gcr.reason || gcr.error || '—'}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Source: FCC §73.190 Figure M3 (ground conductivity chart) · advisory evidence.');
+  return lines.join('\n');
+}
+
+function section_am_physics_fccgw(ev){
+  const p = ev?.am_physics_fccgw;
+  if (!p){
+    return hr('AM Physics — FCC/OET R86-1 Ground Wave') + '\nNot computed (FM/TV station or sidecar not configured).';
+  }
+  const lines = [hr('AM Physics — FCC/OET R86-1 Ground Wave')];
+  lines.push(`Status:        ${p.status || '—'}`);
+  lines.push(`Engine:        ${p.engine || '—'}`);
+  lines.push(`Filing effect: ${p.filing_effect || 'none'} — advisory evidence only`);
+  if (p.warning)  lines.push(`Warning:       ${p.warning}`);
+
+  const comps = Array.isArray(p.contour_comparisons) ? p.contour_comparisons : [];
+  if (comps.length){
+    lines.push('');
+    lines.push('FCC curve vs. FCCGW physics comparison:');
+    lines.push(`  ${'Level (mV/m)'.padEnd(14)} ${'FCC curve km'.padEnd(14)} ${'FCCGW km'.padEnd(10)} Variance`);
+    for (const c of comps){
+      const fcc = c.fcc_curve_km != null ? fmt(c.fcc_curve_km, 2) : '—';
+      const gw  = c.fccgw_physics_km != null ? fmt(c.fccgw_physics_km, 2) : '—';
+      const v   = c.variance_pct != null ? `${fmt(c.variance_pct, 1)}%` : '—';
+      lines.push(`  ${String(c.field_mvm).padEnd(14)} ${fcc.padEnd(14)} ${gw.padEnd(10)} ${v}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Advisory: FCCGW physics cross-check does not modify §73.184 curve-derived contour distances.');
+  return lines.join('\n');
+}
+
+function section_am_physics(ev){
+  const p = ev?.am_physics;
+  if (!p){
+    return hr('AM Physics — SOMNEC2D Ground-Field Solver') + '\nNot computed (FM/TV station or sidecar not configured).';
+  }
+  const lines = [hr('AM Physics — SOMNEC2D Ground-Field Solver')];
+  lines.push(`Status:        ${p.status || '—'}`);
+  lines.push(`Engine:        ${p.engine || '—'}`);
+  lines.push(`Filing effect: ${p.filing_effect || 'none'} — advisory evidence only`);
+  if (p.warning) lines.push(`Warning:       ${p.warning}`);
+
+  if (p.inputs){
+    const inp = p.inputs;
+    if (inp.frequency_mhz != null) lines.push(`Frequency:     ${fmt(inp.frequency_mhz, 4)} MHz`);
+    if (inp.sigma_ms_m != null)    lines.push(`σ (mS/m):      ${fmt(inp.sigma_ms_m, 3)}  (source: ${inp.sigma_source || '—'})`);
+    if (inp.epr != null)           lines.push(`εᵣ:            ${fmt(inp.epr, 1)}  (source: ${inp.epr_source || '—'})`);
+  }
+
+  if (p.outputs){
+    lines.push('');
+    lines.push('Solver outputs:');
+    for (const [k, val] of Object.entries(p.outputs)){
+      lines.push(`  ${k.padEnd(24)} ${val}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Advisory: SOMNEC2D is an independent NEC-family ground-field solver. Does not modify §73.184 curve-derived contour distances.');
+  return lines.join('\n');
+}
+
+function section_oet65(x){
+  const o = x?.oet65;
+  if (!o){
+    return hr('RF Exposure (OET-65 / §1.1310)') + '\nNot computed — OET-65 analysis not attached to this exhibit.';
+  }
+  const lines = [hr('RF Exposure (OET-65 / §1.1310)')];
+  lines.push(`Result:              ${o.pass ? 'PASS' : 'REVIEW REQUIRED'}`);
+  lines.push(`Cite:                ${o.cite || '47 CFR §1.1310'}`);
+  lines.push(`Bulletin:            ${o.oet65_revision || '—'}`);
+  lines.push(`Method:              ${o.method || '—'}`);
+
+  const unc = o.compliance?.uncontrolled;
+  const ctl = o.compliance?.controlled;
+  if (unc) lines.push(`Uncontrolled dist.:  ${unc.distance_m != null ? fmt(unc.distance_m, 1) + ' m' : '—'}${unc.compliant != null ? '  (' + (unc.compliant ? 'compliant' : 'non-compliant') + ')' : ''}`);
+  if (ctl) lines.push(`Controlled dist.:    ${ctl.distance_m != null ? fmt(ctl.distance_m, 1) + ' m' : '—'}${ctl.compliant != null ? '  (' + (ctl.compliant ? 'compliant' : 'non-compliant') + ')' : ''}`);
+
+  const nf = o.near_field;
+  if (nf){
+    lines.push(`Near-field required: ${nf.required_for_filing ? 'yes' : 'no'}`);
+    if (nf.boundary_m != null) lines.push(`Near-field boundary: ${fmt(nf.boundary_m, 1)} m`);
+    if (nf.am_screening?.filing_grade){
+      lines.push(`AM screening grade:  ${nf.am_screening.filing_grade}`);
+    }
+  }
+
+  if (o.notes?.length){
+    lines.push('');
+    for (const n of o.notes) lines.push(`Note: ${n}`);
+  }
+
+  lines.push('');
+  lines.push('Advisory: OET-65 distances are deterministic rule outputs — review with a qualified engineer before filing.');
+  return lines.join('\n');
+}
+
+function section_identity(ev){
+  const id = ev?.identity;
+  if (!id){
+    return hr('Station Identity Evidence (EAS / RadioDNS / RDS)') + '\nNo identity evidence attached — identity sidecar not configured or did not respond.';
+  }
+  const lines = [hr('Station Identity Evidence (EAS / RadioDNS / RDS)')];
+  lines.push(`Available:     ${id.available ? 'yes' : 'no'}`);
+
+  if (id.tiers_used?.length) lines.push(`Tiers used:    ${id.tiers_used.join(', ')}`);
+  if (id.sources?.length)    lines.push(`Sources:       ${id.sources.join(', ')}`);
+
+  const confirmations = Array.isArray(id.confirmations) ? id.confirmations : [];
+  if (confirmations.length){
+    lines.push('');
+    lines.push('Confirmations:');
+    for (const c of confirmations){
+      const status = (c.status || '—').toUpperCase();
+      const detail = c.value || c.fqdn || c.call || c.detail || '';
+      lines.push(`  [${status}] ${(c.kind || '—').padEnd(18)} ${detail}`);
+    }
+  } else if (id.available){
+    lines.push('Confirmations: (none returned)');
+  }
+
+  if (!id.available && id.reason) lines.push(`Reason:        ${id.reason}`);
+
+  lines.push('');
+  lines.push('Advisory: Identity evidence (EAS, RadioDNS, RDS) is supplemental. FCC call sign authority rests with the FCC license record.');
+  return lines.join('\n');
 }
 
 function fmt(v, d = 2){
