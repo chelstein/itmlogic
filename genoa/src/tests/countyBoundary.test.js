@@ -15,6 +15,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
@@ -22,7 +23,9 @@ import crypto from 'node:crypto';
 import {
   parseCountyName,
   loadCountyBoundaries,
+  fetchCountyBoundaries,
   getCountyDataset,
+  isUrl,
   _resetCache,
   MISSING_COUNTY_CENTROIDS,
   KNOWN_MISSING_COUNTIES
@@ -353,6 +356,72 @@ test('KAZM sample: station at Prescott AZ centroid is within Yavapai', async () 
   const keys = result.counties_intersected.map(c => c.key);
   assert.ok(keys.includes('YAVAPAI, AZ'),
     `KAZM local area must be in Yavapai; intersected: ${keys.join(', ')}`);
+});
+
+// ── URL endpoint support ──────────────────────────────────────────────────────
+
+test('isUrl: detects http and https, rejects file paths', () => {
+  assert.equal(isUrl('http://example.com/data.geojson'), true);
+  assert.equal(isUrl('https://example.com/data.geojson'), true);
+  assert.equal(isUrl('/opt/genoa/data.geojson'), false);
+  assert.equal(isUrl('C:\\data\\file.geojson'), false);
+  assert.equal(isUrl(null), false);
+});
+
+// Spin up a temporary HTTP server serving the fixture content, then verify
+// that fetchCountyBoundaries and computeCountyOverlay can load via URL.
+test('fetchCountyBoundaries: loads dataset from local HTTP server', async () => {
+  _resetCache();
+  const content = fs.readFileSync(FIXTURE_PATH, 'utf8');
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(content);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  try {
+    const ds = await fetchCountyBoundaries(`http://127.0.0.1:${port}/us_counties_fcc.geojson`);
+    assert.equal(ds.ok, true, 'dataset must load ok from HTTP');
+    assert.ok(ds.dataset_sha256, 'must have sha256');
+    assert.ok(ds.unique_county_count > 0, 'must have counties');
+    assert.ok(ds.path.startsWith('http://'), 'path must reflect URL source');
+  } finally {
+    server.close();
+  }
+});
+
+test('fetchCountyBoundaries: HTTP 404 → available:false COUNTY_BOUNDARY_DATASET_MISSING', async () => {
+  _resetCache();
+  const server = http.createServer((req, res) => { res.writeHead(404); res.end('Not Found'); });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  try {
+    const ds = await fetchCountyBoundaries(`http://127.0.0.1:${port}/missing.geojson`);
+    assert.equal(ds.ok, false);
+    assert.equal(ds.warning_code, 'COUNTY_BOUNDARY_DATASET_MISSING');
+  } finally {
+    server.close();
+  }
+});
+
+test('computeCountyOverlay: loads from HTTP URL path option', async () => {
+  _resetCache();
+  const content = fs.readFileSync(FIXTURE_PATH, 'utf8');
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(content);
+  });
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  try {
+    const result = await computeCountyOverlay(YAVAPAI_CENTER_POLYGON,
+      { path: `http://127.0.0.1:${port}/us_counties_fcc.geojson` });
+    assert.equal(result.available, true, 'overlay must be available via HTTP path');
+    const keys = result.counties_intersected.map(c => c.key);
+    assert.ok(keys.includes('YAVAPAI, AZ'), `YAVAPAI must intersect via HTTP-loaded dataset`);
+  } finally {
+    server.close();
+  }
 });
 
 // ── Missing-county centroid manifest ─────────────────────────────────────────
