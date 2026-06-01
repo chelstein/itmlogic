@@ -3,6 +3,13 @@
 // Loads the FCC-derived county boundary GeoJSON (us_counties_fcc.geojson)
 // once at first use and caches it for the process lifetime.
 //
+// Source: FCC_COUNTY_GEOJSON_PATH environment variable.
+//   File path:  '/opt/genoa-cartography/data/reference/us_counties_fcc.geojson'
+//   HTTP/HTTPS: 'http://159.223.153.153:8765/us_counties_fcc.geojson'
+//
+// getCountyDataset(pathOrUrl) is async and handles both.
+// loadCountyBoundaries(filePath) is sync (file path only — for tests / CLI).
+//
 // Dataset format (from FCC contourplot.kml conversion):
 //   - 7,094 raw features for ~3,207 unique county-equivalents
 //   - Boundary features: { Name: "YAVAPAI, AZ", altitudeMode: "clampToGround",
@@ -11,7 +18,7 @@
 //       description: "Latitude: 34.57 Longitude: -112.47" }, geometry type Point
 //
 // Loader steps:
-//   1. Read file and compute SHA-256.
+//   1. Read file (or fetch URL) and compute SHA-256.
 //   2. Parse FeatureCollection features.
 //   3. Group by properties.Name.
 //   4. For each group, identify boundary features vs. centroid features.
@@ -91,8 +98,16 @@ export const MISSING_COUNTY_CENTROIDS = new Map([
 // FCC_ENDPOINT_MISSES count — used in dataset metadata.
 export const FCC_ENDPOINT_MISSES = 18;
 
-// Module-level singleton — set once on first successful load.
-let _cached = null;
+// Module-level singleton.
+// _cached   — resolved dataset (or error result) after first successful load.
+// _loading  — Promise in flight, prevents duplicate fetches under concurrency.
+let _cached  = null;
+let _loading = null;
+
+// Returns true when the path/URL string should be fetched over HTTP(S).
+export function isUrl(s){
+  return typeof s === 'string' && /^https?:\/\//i.test(s);
+}
 
 // ── Name parsing ──────────────────────────────────────────────────────────────
 
@@ -164,29 +179,17 @@ function isLabelFeature(feat){
   return /Latitude/i.test(desc) && /Longitude/i.test(desc);
 }
 
-// ── Loader ────────────────────────────────────────────────────────────────────
+// ── Shared raw-to-dataset processing ─────────────────────────────────────────
+//
+// Called by both the sync file loader and the async URL loader.
+// raw    — GeoJSON string (already read/fetched).
+// source — file path or URL, stored on the result for provenance.
 
-export function loadCountyBoundaries(path){
-  path = path || DEFAULT_COUNTY_PATH;
-
-  // ── 1. Read file ──────────────────────────────────────────────────────────
-  let raw;
-  try {
-    raw = fs.readFileSync(path, 'utf8');
-  } catch (e){
-    return {
-      ok: false,
-      error: 'DATASET_MISSING',
-      detail: `File not found at ${path}: ${e.message}`,
-      warning_code: 'COUNTY_BOUNDARY_DATASET_MISSING',
-      path
-    };
-  }
-
-  // ── 2. SHA-256 ────────────────────────────────────────────────────────────
+function _processRaw(raw, source){
+  // SHA-256
   const dataset_sha256 = crypto.createHash('sha256').update(raw, 'utf8').digest('hex');
 
-  // ── 3. Parse JSON ─────────────────────────────────────────────────────────
+  // Parse JSON
   let fc;
   try {
     fc = JSON.parse(raw);
@@ -196,7 +199,7 @@ export function loadCountyBoundaries(path){
       error: 'PARSE_FAILED',
       detail: `JSON parse error: ${e.message}`,
       warning_code: 'COUNTY_BOUNDARY_LOAD_FAILED',
-      path,
+      path: source,
       dataset_sha256
     };
   }
@@ -313,7 +316,7 @@ export function loadCountyBoundaries(path){
 
   return {
     ok:                   true,
-    path,
+    path:                 source,
     dataset_sha256,
     raw_feature_count,
     valid_source_kml_files: 3207,
@@ -325,22 +328,93 @@ export function loadCountyBoundaries(path){
     parse_warnings:       parseWarnings,
     geometry_errors:      geometryErrors,
     counties,
-    // Fast lookup: key → county record
-    _byKey: new Map(counties.map(c => [c.key, c])),
-    // Fast bbox lookup arrays for prefiltering
+    _byKey:         new Map(counties.map(c => [c.key, c])),
     _validCounties: valid_counties
   };
 }
 
-// ── Lazy singleton ────────────────────────────────────────────────────────────
+// ── File loader (sync) ────────────────────────────────────────────────────────
 
-export function getCountyDataset(path){
-  if (_cached) return _cached;
-  _cached = loadCountyBoundaries(path);
-  return _cached;
+export function loadCountyBoundaries(filePath){
+  filePath = filePath || DEFAULT_COUNTY_PATH;
+  let raw;
+  try {
+    raw = fs.readFileSync(filePath, 'utf8');
+  } catch (e){
+    return {
+      ok: false,
+      error: 'DATASET_MISSING',
+      detail: `File not found at ${filePath}: ${e.message}`,
+      warning_code: 'COUNTY_BOUNDARY_DATASET_MISSING',
+      path: filePath
+    };
+  }
+  return _processRaw(raw, filePath);
+}
+
+// ── URL loader (async) ────────────────────────────────────────────────────────
+
+// 30 s covers a cold-start on the data server; keeps exhibit requests from hanging
+// indefinitely when the endpoint stalls after accepting the connection.
+const FETCH_TIMEOUT_MS = 30_000;
+
+export async function fetchCountyBoundaries(url){
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+  let raw;
+  try {
+    const res = await fetch(url, { signal: ac.signal });
+    if (!res.ok){
+      return {
+        ok: false,
+        error: 'DATASET_MISSING',
+        detail: `HTTP ${res.status} fetching county dataset from ${url}`,
+        warning_code: 'COUNTY_BOUNDARY_DATASET_MISSING',
+        path: url
+      };
+    }
+    raw = await res.text();
+  } catch (e){
+    const timedOut = e.name === 'AbortError';
+    return {
+      ok: false,
+      error: 'DATASET_MISSING',
+      detail: timedOut
+        ? `Timeout fetching county dataset from ${url} (>${FETCH_TIMEOUT_MS} ms)`
+        : `Network error fetching county dataset from ${url}: ${e.message}`,
+      warning_code: 'COUNTY_BOUNDARY_DATASET_MISSING',
+      path: url
+    };
+  } finally {
+    clearTimeout(timer);
+  }
+  return _processRaw(raw, url);
+}
+
+// ── Lazy singleton (async, URL- and file-aware) ───────────────────────────────
+//
+// Returns a Promise that resolves to the dataset.  A single in-flight fetch
+// is reused for concurrent callers; the result is cached for the process
+// lifetime.  Set FCC_COUNTY_GEOJSON_PATH to a file path or an http(s) URL.
+
+export async function getCountyDataset(pathOrUrl){
+  if (_cached)  return _cached;
+  if (_loading) return _loading;
+
+  const source = pathOrUrl || DEFAULT_COUNTY_PATH;
+  _loading = (isUrl(source)
+    ? fetchCountyBoundaries(source)
+    : Promise.resolve(loadCountyBoundaries(source))
+  ).then(ds => {
+    _cached  = ds;
+    _loading = null;
+    return ds;
+  });
+  return _loading;
 }
 
 // For tests: reset the cache so each test gets a fresh load.
 export function _resetCache(){
-  _cached = null;
+  _cached  = null;
+  _loading = null;
 }

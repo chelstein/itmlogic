@@ -80,8 +80,8 @@ export async function computeCountyOverlay(contourGeom, opts = {}){
     };
   }
 
-  // Load dataset.
-  const ds = opts._dataset || getCountyDataset(opts.path);
+  // Load dataset (getCountyDataset is async; supports file path and http(s) URL).
+  const ds = opts._dataset || await getCountyDataset(opts.path);
 
   if (!ds.ok){
     warnings.push({
