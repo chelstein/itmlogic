@@ -23,7 +23,9 @@ import {
   parseCountyName,
   loadCountyBoundaries,
   getCountyDataset,
-  _resetCache
+  _resetCache,
+  MISSING_COUNTY_CENTROIDS,
+  KNOWN_MISSING_COUNTIES
 } from '../evidence/countyBoundaryLoader.js';
 import { computeCountyOverlay } from '../evidence/countyIntersectionClient.js';
 import { buildCountyOverlaySection } from '../exports/engineeringReport/sections/countyOverlay.js';
@@ -353,6 +355,43 @@ test('KAZM sample: station at Prescott AZ centroid is within Yavapai', async () 
     `KAZM local area must be in Yavapai; intersected: ${keys.join(', ')}`);
 });
 
+// ── Missing-county centroid manifest ─────────────────────────────────────────
+
+test('MISSING_COUNTY_CENTROIDS has exactly 18 entries matching KNOWN_MISSING_COUNTIES', () => {
+  assert.equal(MISSING_COUNTY_CENTROIDS.size, 18, 'must have 18 centroid entries');
+  for (const key of KNOWN_MISSING_COUNTIES){
+    assert.ok(MISSING_COUNTY_CENTROIDS.has(key),
+      `MISSING_COUNTY_CENTROIDS must include key "${key}" from KNOWN_MISSING_COUNTIES`);
+  }
+});
+
+test('MISSING_COUNTY_CENTROIDS: all centroids are [lon, lat] with valid ranges', () => {
+  for (const [key, lonlat] of MISSING_COUNTY_CENTROIDS){
+    assert.ok(Array.isArray(lonlat) && lonlat.length === 2,
+      `${key}: centroid must be [lon, lat]`);
+    const [lon, lat] = lonlat;
+    assert.ok(lon >= -180 && lon <= 180, `${key}: lon ${lon} out of range`);
+    assert.ok(lat >= -90  && lat <= 90,  `${key}: lat ${lat} out of range`);
+  }
+});
+
+test('computeCountyOverlay: contour enclosing BALTIMORE CITY centroid fires COUNTY_MISSING_INTERSECTION', async () => {
+  _resetCache();
+  // Polygon that encloses the BALTIMORE CITY, MD centroid (-76.61, 39.29)
+  const BALT_POLYGON = {
+    type: 'Polygon',
+    coordinates: [[
+      [-76.70, 39.20], [-76.50, 39.20], [-76.50, 39.40],
+      [-76.70, 39.40], [-76.70, 39.20]
+    ]]
+  };
+  const result = await computeCountyOverlay(BALT_POLYGON, { path: FIXTURE_PATH });
+  assert.ok(Array.isArray(result.warnings), 'must have warnings array');
+  const warn = result.warnings.find(w => w.code === 'COUNTY_MISSING_INTERSECTION');
+  assert.ok(warn, 'COUNTY_MISSING_INTERSECTION must fire when contour covers a gap-county centroid');
+  assert.match(warn.detail, /BALTIMORE CITY, MD/);
+});
+
 // ── Production-pinned facts (from real dataset on 159.223.153.153) ────────────
 //
 // Run against /opt/genoa-cartography/data/reference/us_counties_fcc.geojson
@@ -471,4 +510,37 @@ test('PRODUCTION-PINNED: KAZM 2-degree region intersects 6 AZ counties', { skip:
   const expected = ['COCONINO, AZ', 'GILA, AZ', 'LA PAZ, AZ', 'MARICOPA, AZ', 'MOHAVE, AZ', 'YAVAPAI, AZ'].sort();
   assert.deepEqual(keys, expected,
     `KAZM 2° region must intersect exactly ${expected.length} counties; got: ${keys.join(', ')}`);
+});
+
+// Prescott/KAZM small polygon smoke test — proves the full Turf intersection
+// chain on real production boundaries.  The polygon (~25 × 22 km around
+// Prescott AZ, 34.54°N 112.47°W) is solidly inside Yavapai County; Maricopa's
+// northernmost boundary is at ~34.05°N, well south of this polygon's
+// lower edge (34.45°N).  A bbox-only or broken implementation would either
+// miss YAVAPAI or spuriously include MARICOPA.
+test('PRODUCTION-PINNED: Prescott polygon intersects YAVAPAI, not MARICOPA — real Turf chain verified', { skip: !REAL_DATASET_PRESENT ? 'real dataset not mounted' : false }, async () => {
+  _resetCache();
+  const PRESCOTT_POLYGON = {
+    type: 'Polygon',
+    coordinates: [[
+      [-112.60, 34.45], [-112.35, 34.45], [-112.35, 34.65],
+      [-112.60, 34.65], [-112.60, 34.45]
+    ]]
+  };
+  const result = await computeCountyOverlay(PRESCOTT_POLYGON, { path: REAL_DATASET });
+  assert.equal(result.available, true);
+  assert.equal(result.dataset_sha256, REAL_DATASET_SHA256,
+    'dataset_sha256 must match known production hash — file integrity confirmed');
+  const keys = result.counties_intersected.map(c => c.key);
+  assert.ok(keys.includes('YAVAPAI, AZ'),
+    `YAVAPAI must intersect Prescott polygon; got: ${keys.join(', ')}`);
+  assert.ok(!keys.includes('MARICOPA, AZ'),
+    `MARICOPA must NOT intersect small Prescott polygon (its boundary ends at ~34.05°N); got: ${keys.join(', ')}`);
+  const yavapai = result.counties_intersected.find(c => c.key === 'YAVAPAI, AZ');
+  assert.ok(yavapai.intersection_area_sq_km > 0,
+    'intersection_area_sq_km must be positive');
+  assert.ok(yavapai.percent_of_county_covered > 0 && yavapai.percent_of_county_covered <= 100,
+    `percent_of_county_covered must be in (0, 100]; got ${yavapai.percent_of_county_covered}`);
+  assert.ok(yavapai.percent_of_contour_in_county > 0 && yavapai.percent_of_contour_in_county <= 100,
+    `percent_of_contour_in_county must be in (0, 100]; got ${yavapai.percent_of_contour_in_county}`);
 });

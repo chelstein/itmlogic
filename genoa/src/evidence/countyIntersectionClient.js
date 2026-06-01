@@ -34,7 +34,7 @@ import * as turf from '@turf/turf';
 import {
   getCountyDataset,
   loadCountyBoundaries,
-  KNOWN_MISSING_COUNTIES
+  MISSING_COUNTY_CENTROIDS
 } from './countyBoundaryLoader.js';
 
 // ── Bounding box helpers ──────────────────────────────────────────────────────
@@ -187,16 +187,17 @@ export async function computeCountyOverlay(contourGeom, opts = {}){
     .map(c => c.key);
 
   // Check for missing-county intersection.
+  // The 18 FCC endpoint-miss counties are absent from the loaded GeoJSON
+  // entirely (no geometry record to iterate).  Drive this check from the
+  // MISSING_COUNTY_CENTROIDS manifest instead.
   const missing_hits = [];
-  for (const county of (ds.counties || [])){
-    if (!county.geometry_valid && county.centroid){
-      const pt = turf.point([county.centroid.lon, county.centroid.lat]);
-      try {
-        if (KNOWN_MISSING_COUNTIES.has(county.key) && turf.booleanPointInPolygon(pt, contourFeature)){
-          missing_hits.push(county.key);
-        }
-      } catch { /* centroid check is best-effort */ }
-    }
+  for (const [key, lonlat] of MISSING_COUNTY_CENTROIDS){
+    try {
+      const pt = turf.point(lonlat);
+      if (turf.booleanPointInPolygon(pt, contourFeature)){
+        missing_hits.push(key);
+      }
+    } catch { /* centroid check is best-effort */ }
   }
   if (missing_hits.length > 0){
     warnings.push({

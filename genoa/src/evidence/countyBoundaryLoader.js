@@ -36,9 +36,56 @@ export const DEFAULT_COUNTY_PATH =
 // Known missing FCC KML endpoint counties (18 documented misses).
 // Keyed as "<COUNTY_NAME>, <STATE>" — normalized uppercase.
 // Update this list as the dataset is refreshed.
+// Derived from FCC KML endpoint-miss manifest (18 counties as of 2026-06-01).
+// 16 Puerto Rico municipalities + Baltimore City, MD + St. Louis City, MO.
 export const KNOWN_MISSING_COUNTIES = new Set([
-  // Placeholder list — replace with the real 18 when the dataset manifest ships.
-  // Keeping the set non-empty so the gate logic is exercised even with partial fixture.
+  'RIO GRANDE, PR',
+  'MANATI, PR',
+  'ANASCO, PR',
+  'PENUELAS, PR',
+  'CATANO, PR',
+  'COMERIO, PR',
+  'SAN GERMAN, PR',
+  'CANOVANAS, PR',
+  'JUANA DIAZ, PR',
+  'LAS MARIAS, PR',
+  'GUANICA, PR',
+  'LOIZA, PR',
+  'MAYAGUEZ, PR',
+  'SAN SEBASTIAN, PR',
+  'RINCON, PR',
+  'BAYAMON, PR',
+  'BALTIMORE CITY, MD',
+  'ST. LOUIS CITY, MO',
+]);
+
+// Known approximate centroids for the 18 FCC endpoint-miss counties.
+// Used by countyIntersectionClient.js to fire COUNTY_MISSING_INTERSECTION
+// when a contour encloses one of these gap counties.  These counties are
+// absent from the loaded GeoJSON (the FCC endpoint never returned their KML),
+// so there are no geometry records in the dataset to iterate — the centroid
+// manifest is the only way to detect an overlap.
+//
+// Coordinates are [lon, lat] in decimal degrees (WGS-84), accurate to ~1 km.
+export const MISSING_COUNTY_CENTROIDS = new Map([
+  ['RIO GRANDE, PR',   [-65.83, 18.38]],
+  ['MANATI, PR',       [-66.48, 18.43]],
+  ['ANASCO, PR',       [-67.14, 18.29]],
+  ['PENUELAS, PR',     [-66.73, 17.99]],
+  ['CATANO, PR',       [-66.11, 18.44]],
+  ['COMERIO, PR',      [-66.23, 18.22]],
+  ['SAN GERMAN, PR',   [-67.04, 18.08]],
+  ['CANOVANAS, PR',    [-65.90, 18.38]],
+  ['JUANA DIAZ, PR',   [-66.51, 18.05]],
+  ['LAS MARIAS, PR',   [-66.99, 18.25]],
+  ['GUANICA, PR',      [-66.91, 17.97]],
+  ['LOIZA, PR',        [-65.88, 18.43]],
+  ['MAYAGUEZ, PR',     [-67.14, 18.20]],
+  ['SAN SEBASTIAN, PR',[-66.99, 18.34]],
+  ['RINCON, PR',       [-67.25, 18.34]],
+  ['BAYAMON, PR',      [-66.16, 18.40]],
+  ['BALTIMORE CITY, MD',[-76.61, 39.29]],
+  ['ST. LOUIS CITY, MO',[-90.20, 38.63]],
 ]);
 
 // FCC_ENDPOINT_MISSES count — used in dataset metadata.
