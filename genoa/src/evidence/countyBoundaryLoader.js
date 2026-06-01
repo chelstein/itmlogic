@@ -36,9 +36,27 @@ export const DEFAULT_COUNTY_PATH =
 // Known missing FCC KML endpoint counties (18 documented misses).
 // Keyed as "<COUNTY_NAME>, <STATE>" — normalized uppercase.
 // Update this list as the dataset is refreshed.
+// Derived from FCC KML endpoint-miss manifest (18 counties as of 2026-06-01).
+// 16 Puerto Rico municipalities + Baltimore City, MD + St. Louis City, MO.
 export const KNOWN_MISSING_COUNTIES = new Set([
-  // Placeholder list — replace with the real 18 when the dataset manifest ships.
-  // Keeping the set non-empty so the gate logic is exercised even with partial fixture.
+  'RIO GRANDE, PR',
+  'MANATI, PR',
+  'ANASCO, PR',
+  'PENUELAS, PR',
+  'CATANO, PR',
+  'COMERIO, PR',
+  'SAN GERMAN, PR',
+  'CANOVANAS, PR',
+  'JUANA DIAZ, PR',
+  'LAS MARIAS, PR',
+  'GUANICA, PR',
+  'LOIZA, PR',
+  'MAYAGUEZ, PR',
+  'SAN SEBASTIAN, PR',
+  'RINCON, PR',
+  'BAYAMON, PR',
+  'BALTIMORE CITY, MD',
+  'ST. LOUIS CITY, MO',
 ]);
 
 // FCC_ENDPOINT_MISSES count — used in dataset metadata.
