@@ -354,10 +354,16 @@ export function loadCountyBoundaries(filePath){
 
 // ── URL loader (async) ────────────────────────────────────────────────────────
 
+// 30 s covers a cold-start on the data server; keeps exhibit requests from hanging
+// indefinitely when the endpoint stalls after accepting the connection.
+const FETCH_TIMEOUT_MS = 30_000;
+
 export async function fetchCountyBoundaries(url){
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
   let raw;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: ac.signal });
     if (!res.ok){
       return {
         ok: false,
@@ -369,13 +375,18 @@ export async function fetchCountyBoundaries(url){
     }
     raw = await res.text();
   } catch (e){
+    const timedOut = e.name === 'AbortError';
     return {
       ok: false,
       error: 'DATASET_MISSING',
-      detail: `Network error fetching county dataset from ${url}: ${e.message}`,
+      detail: timedOut
+        ? `Timeout fetching county dataset from ${url} (>${FETCH_TIMEOUT_MS} ms)`
+        : `Network error fetching county dataset from ${url}: ${e.message}`,
       warning_code: 'COUNTY_BOUNDARY_DATASET_MISSING',
       path: url
     };
+  } finally {
+    clearTimeout(timer);
   }
   return _processRaw(raw, url);
 }

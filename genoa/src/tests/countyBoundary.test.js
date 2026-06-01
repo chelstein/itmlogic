@@ -424,6 +424,23 @@ test('computeCountyOverlay: loads from HTTP URL path option', async () => {
   }
 });
 
+test('fetchCountyBoundaries: connection reset → ok:false COUNTY_BOUNDARY_DATASET_MISSING', async () => {
+  _resetCache();
+  // Destroy every socket immediately to simulate a network error (covers the
+  // catch branch that also fires on AbortController timeout).
+  const server = http.createServer((_req, _res) => {});
+  server.on('connection', sock => sock.destroy());
+  await new Promise(r => server.listen(0, '127.0.0.1', r));
+  const { port } = server.address();
+  try {
+    const ds = await fetchCountyBoundaries(`http://127.0.0.1:${port}/reset.geojson`);
+    assert.equal(ds.ok, false);
+    assert.equal(ds.warning_code, 'COUNTY_BOUNDARY_DATASET_MISSING');
+  } finally {
+    server.close();
+  }
+});
+
 // ── Missing-county centroid manifest ─────────────────────────────────────────
 
 test('MISSING_COUNTY_CENTROIDS has exactly 18 entries matching KNOWN_MISSING_COUNTIES', () => {
