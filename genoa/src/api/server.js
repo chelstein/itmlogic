@@ -37,6 +37,7 @@ import terrainRoutes    from './routes/terrain.js';
 import mapDataRoutes    from './routes/mapData.js';
 import advisoryReviewRoutes from './routes/advisoryReview.js';
 import necPatternRoutes     from './routes/necPattern.js';
+import atlasRoutes          from './routes/atlas.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
 import { migrate }   from '../db/migrate.js';
@@ -133,6 +134,7 @@ app.use('/api', measurementsRoutes); // drive-test ingestion (POST /api/measurem
 app.use('/api', amSiteOptimizerRoutes); // AM regional relocation optimizer (POST /api/am/site-optimizer — SCREENING ONLY)
 app.use('/api', amColocationOpportunitiesRoutes); // AM co-location opportunity engine (POST /api/am/colocation-opportunities — SCREENING ONLY)
 app.use('/api', necPatternRoutes);               // NEC pattern preview (POST /api/nec/pattern — NEC2++ sidecar)
+app.use('/api', atlasRoutes);                    // Graph Atlas debug (GET /api/atlas/{search,explain,affected,stats})
 app.use('/api', exhibitRoutes);
 
 // SPA fallback — any GET request that isn't /api/*, /healthz, /readyz,
