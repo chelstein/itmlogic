@@ -2,6 +2,7 @@ import express from 'express';
 import { dbHealthy, dbProbe, poolReady } from '../../db/pool.js';
 import { sidecarStatus } from '../services/sidecars.js';
 import { probeAllSources } from '../services/sourcesHealth.js';
+import { graphAtlasStats } from '../../evidence/graphAtlasLoader.js';
 
 const r = express.Router();
 
@@ -50,7 +51,8 @@ r.get('/readyz', async (_req, res) => {
     ok,
     db_configured: poolReady(),
     db_healthy:    db,
-    sidecars:      sc
+    sidecars:      sc,
+    graph_atlas:   graphAtlasStats()
   });
 });
 
