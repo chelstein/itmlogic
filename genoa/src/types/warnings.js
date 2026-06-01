@@ -309,7 +309,37 @@ export const WARNING_CODES = Object.freeze({
 
   AM_NIGHT_NIF_FAIL: { severity: 'blocker', phase: 'engine',
     title: 'AM §73.182 NIF study: significant failure (FCCAM filing-grade) — engineering review required',
-    description: 'The §73.182 nighttime NIF study (FCCAM Wang 1985) found significant failing margins (> 2.0 dB or > 25% of azimuths).  This is filing-grade evidence of a protection violation under §73.182.  A full §73.182(k) RSS analysis and/or facility modification (pattern, power, class) by the engineer of record is required before filing.' }
+    description: 'The §73.182 nighttime NIF study (FCCAM Wang 1985) found significant failing margins (> 2.0 dB or > 25% of azimuths).  This is filing-grade evidence of a protection violation under §73.182.  A full §73.182(k) RSS analysis and/or facility modification (pattern, power, class) by the engineer of record is required before filing.' },
+
+  // ─── County boundary / FCC county overlay warnings ──────────────────────
+
+  COUNTY_BOUNDARY_DATASET_MISSING: { severity: 'blocker', phase: 'evidence',
+    title: 'FCC county boundary dataset not found at configured path',
+    description: 'The FCC-derived county boundary GeoJSON (us_counties_fcc.geojson) was not found at the configured FCC_COUNTY_GEOJSON_PATH.  County overlay analysis cannot run.  For filing-grade output, this dataset is required.  Do not silently fall back to the live FCC CGI — set FCC_COUNTY_GEOJSON_PATH to the merged dataset.' },
+
+  COUNTY_BOUNDARY_LOAD_FAILED: { severity: 'blocker', phase: 'evidence',
+    title: 'FCC county boundary dataset failed to load',
+    description: 'The FCC county boundary GeoJSON was found but could not be parsed or failed integrity checks.  County overlay analysis is blocked.  Check the file for corruption and verify the dataset_sha256 matches the expected value.' },
+
+  COUNTY_BOUNDARY_FEATURE_PARSE_WARNING: { severity: 'warning', phase: 'evidence',
+    title: 'FCC county boundary: some features could not be parsed',
+    description: 'One or more county features in us_counties_fcc.geojson could not be parsed (missing Name, malformed geometry, or ambiguous county name format).  The dataset is partially valid; analysis continues with the valid features.' },
+
+  COUNTY_INTERSECTION_FAILED: { severity: 'warning', phase: 'evidence',
+    title: 'County intersection computation failed for one or more counties',
+    description: 'The contour-vs-county polygon intersection threw an error for one or more counties.  Those counties are excluded from the coverage table.  Re-run or inspect the exhibit.evidence.county_overlay.errors array.' },
+
+  COUNTY_GEOMETRY_INVALID: { severity: 'warning', phase: 'evidence',
+    title: 'One or more county boundary geometries are invalid (self-intersecting or unclosed)',
+    description: 'The FCC KML boundary for one or more counties was unclosed or self-intersecting and could not be reliably polygonized.  Those counties are marked geometry_valid=false and excluded from filing-grade intersection analysis.' },
+
+  COUNTY_OVERLAY_PARTIAL_DATASET: { severity: 'warning', phase: 'evidence',
+    title: 'FCC county boundary dataset is partial (18 FCC endpoint misses documented)',
+    description: 'The us_counties_fcc.geojson dataset covers 3,207 of approximately 3,225 FCC county-equivalents; 18 FCC KML endpoints did not return valid boundaries.  The dataset is marked partial_but_valid=true.  Studies are not failed on account of the 18 missing counties unless the contour area directly intersects a known-missing county.' },
+
+  COUNTY_MISSING_INTERSECTION: { severity: 'blocker', phase: 'evidence',
+    title: 'Contour intersects a county known to be missing from the FCC KML dataset',
+    description: 'The study area overlaps a county that was one of the 18 FCC endpoint misses in the county boundary dataset.  No county boundary polygon is available for that county; the intersection analysis for it is not possible.  The engineer of record must independently verify county coverage before filing.' }
 });
 
 export class W {

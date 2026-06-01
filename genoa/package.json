@@ -2,7 +2,7 @@
   "name": "genoa",
   "version": "2.0.0",
   "private": true,
-  "description": "Genoa \u2014 FCC Propagation Studio. Deterministic AM / FM / LPFM / FM-translator contour engine with three-layer UX (Official FCC method, Scientific evidence, AI narrative).",
+  "description": "Genoa — FCC Propagation Studio. Deterministic AM / FM / LPFM / FM-translator contour engine with three-layer UX (Official FCC method, Scientific evidence, AI narrative).",
   "type": "module",
   "main": "src/api/server.js",
   "engines": {
@@ -44,6 +44,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1030.0",
     "@pdfme/common": "^6.1.1",
     "@pdfme/generator": "^6.1.1",
+    "@turf/turf": "^7.3.5",
     "express": "^4.21.1",
     "geographiclib-geodesic": "^2.2.0",
     "geotiff": "^2.1.3",

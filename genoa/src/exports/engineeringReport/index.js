@@ -42,6 +42,7 @@ import {
 import { buildVisualSummarySection }               from './sections/visualSummary.js';
 import { buildAdvisoryReviewSection }              from './sections/advisoryReview.js';
 import { buildRemediationSection }                from './sections/remediation.js';
+import { buildCountyOverlaySection }              from './sections/countyOverlay.js';
 
 export function buildEngineeringReport(exhibit, options){
   const opt = options || {};
@@ -127,6 +128,10 @@ export function buildEngineeringReport(exhibit, options){
   // engineering conclusion so a reviewer sees the §73 contour analysis
   // followed by the §1.1310 exposure check, then the disposition.
   push(buildRfExposureSection(exhibit, opt));
+  // County Boundary / FCC County Overlay Analysis — sits after RF Exposure
+  // so engineering-compliance sections are complete before the geographic
+  // coverage context.  Skipped when county_overlay evidence is absent.
+  push(buildCountyOverlaySection(exhibit, opt));
   // Tower Study (47 CFR §17.4 + FAA OE/AAA + §17.21/§17.23) — the H&D-
   // style structural exhibit consolidating ASR registration, FAA
   // 7460-2 determination, and rules-derived marking/lighting
