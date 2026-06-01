@@ -30,6 +30,7 @@ import { necPatternToTable }       from '../../evidence/nec/client.js';
 import { suggestDirectionalMitigation } from '../../engine/regulatory/mitigationAdvisor.js';
 import { lookupM3Conductivity, lookupM3ZoneFallback } from '../../engine/am/m3.js';
 import { makeCommunityBoundaryClient } from '../../evidence/communityBoundaryClient.js';
+import { computeCountyOverlay } from '../../evidence/countyIntersectionClient.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -1754,6 +1755,35 @@ export async function computeExhibit(req){
         source:    'census-tigerweb-places',
         error:     String(e?.message || e)
       };
+    }
+  }
+
+  // ---- 6b. County overlay (FCC county boundary spatial intersection) ----
+  // Runs whenever a contour polygon is available in evidence.  Uses the
+  // FCC-derived county boundary dataset (us_counties_fcc.geojson).
+  // Does NOT block compute — failures are recorded in evidence.county_overlay
+  // with appropriate warning codes so the exhibit can proceed.
+  {
+    // Prefer operator-supplied contour polygon; fall back to community boundary.
+    const contourGeom = evidence.primary_contour_polygon
+      || evidence.community_boundary
+      || null;
+    try {
+      const overlayResult = await computeCountyOverlay(contourGeom);
+      evidence.county_overlay = overlayResult;
+      // Promote dataset-level warnings into the main warning array.
+      if (Array.isArray(overlayResult?.warnings)){
+        for (const w of overlayResult.warnings){
+          if (w.code) warnings.push(W.make(w.code, w.detail || undefined));
+        }
+      }
+    } catch (e){
+      evidence.county_overlay = {
+        available: false,
+        error:     'exception',
+        detail:    String(e?.message || e)
+      };
+      warnings.push(W.make('COUNTY_INTERSECTION_FAILED', String(e?.message || e)));
     }
   }
 

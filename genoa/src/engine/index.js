@@ -539,7 +539,8 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     itm_coverage: evidence.itm_coverage || null,
     uncertainty:  evidence.uncertainty  || null,
     ground_constants: groundConstants,
-    community_boundary: evidence.community_boundary || null
+    community_boundary: evidence.community_boundary || null,
+    county_overlay:     evidence.county_overlay     || null
   };
   if (!evidenceBlock.measurements.available){
     warnings.push(W.make('SDR_MEASUREMENTS_MISSING'));
