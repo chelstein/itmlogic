@@ -29,6 +29,7 @@ import ExhibitDiffPanel from '@components/ui/ExhibitDiffPanel.jsx';
 import ShortSpacingShowingPanel from '@components/ui/ShortSpacingShowingPanel.jsx';
 import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
 import FieldLineagePanel  from '@components/ui/FieldLineagePanel.jsx';
+import TrustDashboard     from '@components/ui/TrustDashboard.jsx';
 import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx';
 
 // Routes — a minimal client-side dispatch.  The default Contour
@@ -39,6 +40,7 @@ const ROUTE_OPTIMIZER = '/am-relocation';
 const ROUTE_PRODUCT   = '/product';
 const ROUTE_MAP       = '/map';
 const ROUTE_LINEAGE   = '/debug/lineage';
+const ROUTE_TRUST     = '/debug/trust';
 
 function navigateTo(path){
   if (typeof window === 'undefined') return;
@@ -213,6 +215,9 @@ function AuthedRouter({ onLogout }){
   }
   if (path === ROUTE_LINEAGE){
     return <LineageDebugPage onNavigate={navigateTo} onLogout={onLogout} />;
+  }
+  if (path === ROUTE_TRUST){
+    return <TrustDashboard onNavigate={navigateTo} onLogout={onLogout} />;
   }
   return (
     <MainApp

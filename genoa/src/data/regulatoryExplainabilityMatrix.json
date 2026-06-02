@@ -1,0 +1,228 @@
+{
+  "schema": "genoa.regulatory_explainability.v1",
+  "generated_at": "2026-06-02T00:00:00Z",
+  "rules": [
+    {
+      "rule": "47 CFR §73.207",
+      "title": "Minimum Distance Separation",
+      "service": ["FM"],
+      "inputs": [
+        "station_inputs.lat",
+        "station_inputs.lon",
+        "station_inputs.frequency",
+        "station_inputs.erp_kw",
+        "station_inputs.haat_m_input",
+        "station_inputs.fcc_class"
+      ],
+      "calculation": "Compute 60 dBu service contour distance; compare against §73.207 Table 1 minimum spacing for co-channel and adjacent-channel stations within search radius",
+      "pass_condition": "All co-channel and adjacent-channel stations meet minimum distance separation per Table 1",
+      "fail_condition": "Any co-channel or adjacent-channel station violates minimum distance separation",
+      "evidence_source": "regulatory_compliance.section_73_207",
+      "confidence_basis": "Deterministic — same inputs always produce same output",
+      "output_locations": [
+        "regulatory_compliance.section_73_207.pass",
+        "regulatory_compliance.section_73_207.violations[]",
+        "reasoning conclusions[section-73-207-spacing]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.215",
+      "title": "FM Short-Spacing / Contour Protection (Waiver Basis)",
+      "service": ["FM"],
+      "inputs": [
+        "station_inputs.lat",
+        "station_inputs.lon",
+        "station_inputs.frequency",
+        "station_inputs.erp_kw",
+        "station_inputs.haat_m_input",
+        "station_inputs.fcc_class",
+        "regulatory_compliance.section_73_207"
+      ],
+      "calculation": "When §73.207 spacing fails, evaluate whether a §73.215 short-spacing showing can be made: confirm the station fails §73.207 minimum separation but has executed an interference protection agreement or demonstrates contour non-overlap under §73.215 criteria",
+      "pass_condition": "§73.215 waiver criteria are met: contour protection ratios do not overlap any protected station's contour OR an interference protection agreement is in place",
+      "fail_condition": "Contour overlap with a protected station exists and no §73.215 waiver basis applies",
+      "evidence_source": "regulatory_compliance",
+      "confidence_basis": "Deterministic — same contour engine inputs produce same output",
+      "output_locations": [
+        "regulatory_compliance.pass",
+        "regulatory_compliance.violations[]",
+        "lineage fields[compliance-rule-path] = §73.215",
+        "lineage fields[compliance-pass] = PASS-via-73.215 | FAIL",
+        "reasoning conclusions[section-73-215-compliance]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.313",
+      "title": "HAAT Computation (Height Above Average Terrain)",
+      "service": ["FM"],
+      "inputs": [
+        "station_inputs.haat_m_input",
+        "station_inputs.lat",
+        "station_inputs.lon",
+        "evidence.terrain_haat_per_radial"
+      ],
+      "calculation": "Arc-average method over 8 radials (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°) at 3–16 km from the transmitter site using ITM terrain model. Mean of 8 per-radial HAAT values is the terrain-derived advisory HAAT. Filing HAAT is operator-supplied or FCC-accepted value.",
+      "pass_condition": "Filing HAAT is consistent with terrain-derived advisory HAAT (within 20%); all 8 radials computed",
+      "fail_condition": "Filing HAAT diverges from terrain-derived advisory HAAT by >20% (HAAT_DISCREPANCY warning, not blocker)",
+      "evidence_source": "evidence.terrain_haat_per_radial",
+      "confidence_basis": "HIGH when ITM terrain sidecar runs successfully; MEDIUM when operator-supplied",
+      "output_locations": [
+        "lineage fields[haat-m]",
+        "lineage fields[haat-terrain-advisory-m]",
+        "readiness warnings[HAAT_DISCREPANCY]",
+        "reasoning conclusions[haat-filing-value]",
+        "reasoning conclusions[haat-terrain-advisory]",
+        "reasoning conclusions[haat-conflict]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.211",
+      "title": "FM Class ERP Limits",
+      "service": ["FM"],
+      "inputs": [
+        "station_inputs.erp_kw",
+        "station_inputs.fcc_class"
+      ],
+      "calculation": "Look up the maximum authorized ERP for the station's FCC class from the §73.211 class ERP table: A=6 kW, B1=25 kW, B=50 kW, C0/C1/C=100 kW, C2=50 kW, C3=25 kW. Compare station_inputs.erp_kw against the class maximum.",
+      "pass_condition": "station_inputs.erp_kw <= class maximum ERP",
+      "fail_condition": "station_inputs.erp_kw > class maximum ERP",
+      "evidence_source": "station_inputs.erp_kw, station_inputs.fcc_class",
+      "confidence_basis": "HIGH — deterministic table lookup",
+      "output_locations": [
+        "reasoning conclusions[erp-class-limit]"
+      ],
+      "class_erp_limits_kw": {
+        "A": 6, "B1": 25, "B": 50, "C3": 25, "C2": 50, "C1": 100, "C0": 100, "C": 100
+      }
+    },
+    {
+      "rule": "47 CFR §73.316",
+      "title": "FM Antenna Location and Directional Antenna Requirements",
+      "service": ["FM"],
+      "inputs": [
+        "station_inputs.lat",
+        "station_inputs.lon",
+        "station_inputs.pattern"
+      ],
+      "calculation": "Validate transmitter coordinates are within US territory (NAD83). When station_inputs.pattern is present, classify antenna as DA (directional) vs ND (non-directional). DA pattern table must be provided for Form 301-FM Section III.",
+      "pass_condition": "Coordinates within US service territory; DA pattern table present when station_inputs.pattern is non-empty",
+      "fail_condition": "Coordinates outside US territory; or DA station missing pattern table",
+      "evidence_source": "station_inputs.lat, station_inputs.lon, station_inputs.pattern",
+      "confidence_basis": "HIGH for coordinate range check; MEDIUM for pattern classification",
+      "output_locations": [
+        "reasoning conclusions[coordinate-validation]",
+        "lineage fields[antenna-pattern]",
+        "lineage fields[antenna-pattern-table]",
+        "lineage fields[coordinates-nad83]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.685 / FAA 14 CFR §77 / Part 17",
+      "title": "Tower Height, Obstruction Marking, and ASR Registration",
+      "service": ["FM", "AM", "FX", "LPFM"],
+      "inputs": [
+        "station_inputs.overall_height_m",
+        "evidence.asr.overall_height_m",
+        "evidence.asr.asr_number",
+        "evidence.faa_oe.determination"
+      ],
+      "calculation": "Determine tower overall height AGL from ASR (preferred) or operator input. Structures >60.96 m (200 ft) AGL require FAA Notice of Proposed Construction (Form 7460-1) and may require ASR registration. ASR record provides authoritative height, painting, and lighting requirements.",
+      "pass_condition": "Tower height > 0 and <= 60.96 m (no FAA notice required); or >60.96 m with valid FAA/ASR records present",
+      "fail_condition": "Tower height is 0 or negative (physically impossible); height >60.96 m with no ASR/FAA evidence",
+      "evidence_source": "evidence.asr, evidence.faa_oe",
+      "confidence_basis": "HIGH when ASR record present; MEDIUM when operator-supplied only",
+      "output_locations": [
+        "reasoning conclusions[tower-height]",
+        "lineage fields[tower-overall-height-agl-m]",
+        "lineage fields[asr-number]",
+        "lineage fields[faa-determination]",
+        "lineage fields[tower-painting]",
+        "lineage fields[tower-lighting]"
+      ]
+    },
+    {
+      "rule": "OET Bulletin 65",
+      "title": "RF Exposure Evaluation (Maximum Permissible Exposure)",
+      "service": ["FM", "AM", "LPFM"],
+      "inputs": [
+        "station_inputs.erp_kw",
+        "station_inputs.haat_m_input",
+        "station_inputs.overall_height_m",
+        "oet65"
+      ],
+      "calculation": "Compute controlled and uncontrolled MPE boundaries using OET-65 methodology. For FM: compute the horizontal distance at which power density drops below 1 mW/cm² (controlled) and 0.2 mW/cm² (uncontrolled). Compare against transmitter site boundaries.",
+      "pass_condition": "MPE boundaries fall within transmitter site fence line; no public access within uncontrolled zone",
+      "fail_condition": "MPE boundary extends beyond transmitter site boundary; near-field evaluation required",
+      "evidence_source": "oet65",
+      "confidence_basis": "HIGH when oet65 block present; advisory gap when absent",
+      "output_locations": [
+        "readiness advisories[OET65_MISSING]",
+        "lineage fields[oet-65-boundary-pass]",
+        "lineage fields[oet-65-controlled-distance-m]",
+        "lineage fields[oet-65-uncontrolled-distance-m]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.183",
+      "title": "AM Groundwave Field Strength",
+      "service": ["AM"],
+      "inputs": [
+        "station_inputs.power_day_kw",
+        "station_inputs.m3_conductivity_zone",
+        "station_inputs.rms_field_mv_m",
+        "station_inputs.lat",
+        "station_inputs.lon"
+      ],
+      "calculation": "Compute daytime groundwave field strength using FCC M3 propagation curves (conductivity-based). Determine the distance at which the 0.5 mV/m daytime service contour is reached, and check against §73.183 groundwave protection requirements for co-channel and adjacent-channel AM stations.",
+      "pass_condition": "Groundwave 0.5 mV/m service contour does not encroach upon another station's 0.5 mV/m protected contour",
+      "fail_condition": "Groundwave service contour overlaps a co-channel or adjacent-channel protected contour",
+      "evidence_source": "evidence.am_physics, evidence.am_physics_fccgw",
+      "confidence_basis": "HIGH when SOMNEC2D/FCCGW physics run; MEDIUM when M3 curve-only",
+      "output_locations": [
+        "lineage fields[service-contour-distance-mean-km] (AM)",
+        "readiness advisories[AM_PHYSICS_MISSING]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.182",
+      "title": "AM Nighttime Skywave Protection (NIF Contour)",
+      "service": ["AM"],
+      "inputs": [
+        "station_inputs.power_night_kw",
+        "station_inputs.fcc_class",
+        "station_inputs.lat",
+        "station_inputs.lon",
+        "evidence.am_night_nif"
+      ],
+      "calculation": "Compute nighttime interference-free (NIF) contour using FCC skywave propagation model. Determine which Class A and B stations require protection from the subject station's skywave. Evaluate whether the subject station's 0.5 mV/m nighttime skywave contour (50% time/10% locations) encroaches on a protected station's 0.5 mV/m contour.",
+      "pass_condition": "Subject station's nighttime skywave does not degrade any protected station's 0.5 mV/m NIF contour",
+      "fail_condition": "Nighttime skywave interferes with one or more protected AM stations",
+      "evidence_source": "evidence.am_night_nif",
+      "confidence_basis": "HIGH when NIF contour engine runs with verified skywave model",
+      "output_locations": [
+        "evidence.am_night_nif",
+        "readiness advisories[AM_PHYSICS_MISSING]"
+      ]
+    },
+    {
+      "rule": "47 CFR §73.184 / §73.1560",
+      "title": "AM Antenna Input Power and Class Power Limits",
+      "service": ["AM"],
+      "inputs": [
+        "station_inputs.power_day_kw",
+        "station_inputs.power_night_kw",
+        "station_inputs.fcc_class",
+        "station_inputs.tower_count"
+      ],
+      "calculation": "Validate that day/night antenna input power does not exceed class maximums per §73.184 table. For directional arrays, verify that the licensed RMS field is consistent with the antenna design and that the transmitter power delivered to the antenna system meets §73.1560 operating power tolerance (±10% for AM).",
+      "pass_condition": "Day and night power within class maximums; transmitter operating power within ±10% of licensed value",
+      "fail_condition": "Power exceeds class maximum; or operating power out of ±10% tolerance",
+      "evidence_source": "station_inputs.power_day_kw, station_inputs.power_night_kw",
+      "confidence_basis": "HIGH — deterministic table lookup for class power; MEDIUM for operating tolerance",
+      "output_locations": [
+        "lineage fields (AM form 301-AM power fields)",
+        "readiness advisories[AM_PHYSICS_MISSING]"
+      ]
+    }
+  ]
+}

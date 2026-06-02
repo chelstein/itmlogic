@@ -2,6 +2,7 @@
 // Distinct from computeReadinessScore (engine computation quality).
 
 import { buildLineageReport } from '../../exports/lmsFiling/lineage.js';
+import { detectFieldConflicts } from './conflicts.js';
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
@@ -26,11 +27,27 @@ export function buildReadinessReport(exhibit, applicant = {}) {
 
   for (const f of fields) {
     if (f.blocking === true) {
+      const src = f.source ?? 'genoa-auto';
+      let code, category;
+      if (src === 'genoa-auto') {
+        code = 'FIELD_AUTO_MISSING';
+        category = 'auto_evidence';
+      } else if (src === 'manual-engineer') {
+        code = 'FIELD_ENGINEER_REQUIRED';
+        category = 'engineer_input';
+      } else if (src === 'manual-applicant') {
+        code = 'FIELD_APPLICANT_REQUIRED';
+        category = 'applicant_input';
+      } else {
+        code = 'FIELD_AUTO_MISSING';
+        category = 'auto_evidence';
+      }
       blockers.push({
-        code: 'FIELD_MISSING',
+        code,
         message: `${f.lms_label} is required but not filled`,
         field: f.id,
         remedy: f.expected_source || 'Provide value via workbench',
+        category,
       });
     }
 
@@ -123,6 +140,20 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     });
   }
 
+  // ── CONFLICT WARNINGS ───────────────────────────────────────────────────────
+
+  const fieldConflicts = detectFieldConflicts(exhibit);
+  for (const c of fieldConflicts) {
+    // HAAT discrepancy is already covered by the HAAT_DISCREPANCY warning above
+    if (c.field === 'haat-m') continue;
+    warnings.push({
+      code: 'FIELD_CONFLICT',
+      field: c.field,
+      message: c.conflict_reason,
+      detail: c.winning_reason,
+    });
+  }
+
   // ── ADVISORIES ──────────────────────────────────────────────────────────────
 
   if (!exhibit.evidence?.sdr_captures) {
@@ -187,8 +218,29 @@ export function buildReadinessReport(exhibit, applicant = {}) {
   // ── SCORE + DETERMINATION ───────────────────────────────────────────────────
 
   let score = 100;
-  score -= blockers.length * 20;
-  score -= warnings.length * 8;
+
+  for (const b of blockers) {
+    if (b.code === 'COMPLIANCE_FAILURE' || b.code === 'FIELD_INVALID') {
+      score -= 25;
+    } else if (b.code === 'FIELD_AUTO_MISSING') {
+      score -= 15;
+    } else if (b.code === 'FIELD_ENGINEER_REQUIRED') {
+      score -= 5;
+    } else if (b.code === 'FIELD_APPLICANT_REQUIRED') {
+      score -= 10;
+    } else {
+      score -= 25;
+    }
+  }
+
+  for (const w of warnings) {
+    if (w.code === 'ENGINE_BLOCKER') {
+      score -= 15;
+    } else {
+      score -= 8;
+    }
+  }
+
   score = clamp(score, 0, 100);
 
   let determination;
