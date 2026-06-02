@@ -149,3 +149,116 @@ A score ≥70 indicates a well-formed exhibit with full provenance, passing comp
 4. **DA pattern suppression** — §73.316 requires the horizontal pattern to meet suppression ratio requirements. The engine captures pattern data but does not compute or verify the suppression ratio.
 
 5. **Replay token in engineer flows** — The `/api/exhibits/engineer-review` and `/api/exhibits/audit-score` endpoints call `enrichTowerEvidence()` but no replay token is stamped on the resulting provenance. Audit packages built via these endpoints will always score 0/5 on replay_token provenance.
+
+---
+
+## Trust Sprint #2 — Adversarial Review Findings
+
+### What Was Built
+
+**`buildAdversarialReview(exhibit)`** — pure function that stress-tests an exhibit from 5 adversarial perspectives: FCC Audio Division reviewer, FCC attorney, consulting engineer, opposing engineer, and internal QA. Produces 15-category structured challenge report. No FCC math.
+
+**`generateReviewerQuestions(exhibit)`** — convenience wrapper returning just the adversarial question list.
+
+**`POST /api/exhibits/adversarial-review`** — wraps the engine behind the standard auth-gated exhibit API.
+
+**`/debug/trust` Adversarial Review section** — expandable challenge points showing reviewer questions, why-it-matters, current evidence, gap, and recommended fix.
+
+**`adversarialReview.test.js`** — 62 tests, all passing.
+
+---
+
+### Adversarial Findings by Golden Station
+
+#### WJPZ-FM — Overall Risk: HIGH
+
+| Challenge | Category | Severity | Reviewer Question |
+|-----------|----------|----------|-------------------|
+| Filed HAAT 37m vs terrain 241m (>20% divergence) | haat_support | CRITICAL | "Filed HAAT and terrain HAAT diverge >20%. Which is authoritative?" |
+| 2 active §73.215 violations (WDWN, WIII) | filing_readiness | CRITICAL | "What remediation is proposed for these compliance failures?" |
+| No OET-65 RF exposure evaluation | environmental_rf | HIGH | "Has an OET Bulletin 65 evaluation been conducted for 6 kW ERP?" |
+| Coordinate source not cross-referenced | coordinate_source | MEDIUM | "Were these coordinates confirmed against the LMS or FMQ record?" |
+
+**Likely FCC reviewer objections:** The HAAT discrepancy will trigger a technical deficiency letter. The §73.215 violations block the grant entirely. The missing OET-65 is a standard deficiency.
+
+**Likely opposing-engineer objections:** "Filed HAAT is 6.5× lower than terrain-computed value — the proposed coverage footprint is understated, and the spacing analysis at 37m HAAT may allow interference that would not exist at the actual terrain HAAT of ~241m."
+
+**Filing risk:** NOT READY. Do not file until WDWN and WIII violations are resolved.
+
+---
+
+#### KAZM-AM — Overall Risk: MEDIUM
+
+| Challenge | Category | Severity | Reviewer Question |
+|-----------|----------|----------|-------------------|
+| No §73.182 nighttime skywave analysis | am_reasoning | HIGH | "What NIF contour analysis was performed? What are the nighttime interference results?" |
+| No OET-65 RF exposure evaluation | environmental_rf | MEDIUM | "Has an OET Bulletin 65 evaluation been conducted?" |
+| Coordinate source not fully documented | coordinate_source | MEDIUM | "Are these coordinates confirmed against the LMS record?" |
+
+**Likely FCC reviewer objections:** AM applications without explicit §73.182/§73.183 analysis will receive a deficiency letter. The FCC requires nighttime skywave interference analysis for all AM CP applications.
+
+**Likely opposing-engineer objections:** "No AM-specific reasoning conclusions are present in the engineering report. The exhibit does not address nighttime skywave interference potential."
+
+**Known engine gap:** AM reasoning is a documented limitation. This is not a data bug — the adversarial review correctly flags it as a filing gap the engineer must manually address until AM reasoning automation is implemented.
+
+**Filing risk:** REVIEW. AM-specific analysis must be manually documented before submission.
+
+---
+
+#### KNUV-FM — Overall Risk: MEDIUM
+
+| Challenge | Category | Severity | Reviewer Question |
+|-----------|----------|----------|-------------------|
+| Only 4 of 8 standard HAAT radials present | haat_support | MEDIUM | "Is the HAAT computation complete? Only 4/8 standard radials are recorded." |
+| No OET-65 RF exposure evaluation | environmental_rf | HIGH | "With 100 kW ERP, has an OET Bulletin 65 evaluation been conducted?" |
+
+**Likely FCC reviewer objections:** 100 kW ERP without an OET-65 evaluation will trigger a deficiency letter. This is the most common deficiency on Class C FM CP applications.
+
+**Likely opposing-engineer objections:** "With only 4 HAAT radials, the arc-average computation may be biased. All 8 standard radials should be computed before accepting the HAAT value."
+
+**Filing risk:** LOW. Compliance passes. OET-65 and HAAT radial completion are the primary action items.
+
+---
+
+#### WVIK-FM — Overall Risk: LOW–MEDIUM
+
+| Challenge | Category | Severity | Reviewer Question |
+|-----------|----------|----------|-------------------|
+| §73.215 showing lacks documentation | spacing_support | MEDIUM | "Has an IPA been executed with the short-spaced station? Where is the §73.215 showing documentation?" |
+| Only 4 of 8 standard HAAT radials | haat_support | MEDIUM | "Is the HAAT computation complete?" |
+| No OET-65 RF exposure evaluation | environmental_rf | MEDIUM | "Has OET Bulletin 65 been applied?" |
+
+**Likely FCC reviewer objections:** A §73.215 short-spacing showing without explicit documentation of the IPA or contour analysis methodology will be flagged.
+
+**Likely opposing-engineer objections:** "The §73.215 showing basis is undocumented. If no IPA exists, this showing cannot be sustained against a petition to deny."
+
+**Filing risk:** LOW-MEDIUM. Compliance passes via §73.215. The showing needs documentation before the FCC will grant the CP.
+
+---
+
+### Adversarial Challenge Categories (15 Total)
+
+| Category | Description |
+|----------|-------------|
+| `coordinate_source` | Source and verification of transmitter coordinates |
+| `haat_support` | Terrain evidence supporting the filed HAAT value |
+| `contour_support` | Service contour computation and documentation |
+| `spacing_support` | §73.207 and §73.215 spacing analysis completeness |
+| `community_coverage` | Community of license disclosure |
+| `tower_registration` | ASR registration and FAA notification |
+| `environmental_rf` | OET Bulletin 65 RF exposure evaluation |
+| `directional_status` | DA pattern table for directional antennas |
+| `am_reasoning` | AM-specific §73.182/§73.183/§73.184 analysis |
+| `confidence_basis` | Field confidence and source system provenance |
+| `missing_lineage` | Blocking fields with no values |
+| `conflicting_values` | Data conflicts across sources |
+| `unsupported_pass` | Compliance PASS without supporting sub-records |
+| `unsupported_fail` | Compliance FAIL without rule citations |
+| `filing_readiness` | Overall filing gate — active compliance failures |
+
+### Remaining Adversarial Gaps
+
+1. **§73.216 FM translator interference analysis** — FX stations with short-spacing to primary stations are not adversarially reviewed.
+2. **International coordination** — Stations within 320 km of the Canadian or Mexican border are not flagged for NAFTA coordination requirements.
+3. **Competing application conflicts** — No detection of pending CP applications that might conflict with the proposed facility.
+4. **Environmental review (NEPA)** — No check for towers in antenna farms, wilderness areas, or areas requiring environmental assessment.

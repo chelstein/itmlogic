@@ -94,11 +94,111 @@ function ConclusionRow({ c }){
   );
 }
 
+// ── Adversarial Review UI ──────────────────────────────────────────────────────
+
+const RISK_COLOR = { HIGH: '#e55', MEDIUM: '#f90', LOW: '#d6a36a', MINIMAL: '#43a85a', UNKNOWN: '#666' };
+const SEV_COLOR  = { CRITICAL: '#e55', HIGH: '#f66', MEDIUM: '#f90', LOW: '#d6a36a' };
+
+function ChallengePoint({ cp, index }){
+  const [open, setOpen] = React.useState(false);
+  const sc = SEV_COLOR[cp.severity] || '#888';
+  return (
+    <div style={{ marginBottom: 6, border: `1px solid ${sc}22`, borderRadius: 4, background: '#0f0f0f' }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{ display: 'flex', gap: 10, padding: '7px 10px', cursor: 'pointer', alignItems: 'flex-start' }}
+      >
+        <Badge color={sc} label={cp.severity} />
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 11, color: '#ccc', marginBottom: 2 }}>{cp.reviewer_question}</div>
+          <div style={{ fontSize: 9, color: '#555', ...MONO }}>{cp.category}{cp.rule ? ` · ${cp.rule}` : ''}</div>
+        </div>
+        <span style={{ color: '#555', fontSize: 10 }}>{open ? '▲' : '▼'}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '0 10px 10px', fontSize: 10, ...MONO, borderTop: `1px solid ${sc}18` }}>
+          <div style={{ marginBottom: 6, color: '#aaa', lineHeight: 1.6 }}>
+            <strong style={{ color: '#888' }}>Why it matters:</strong> {cp.why_it_matters}
+          </div>
+          {cp.current_evidence && (
+            <div style={{ marginBottom: 4 }}>
+              <strong style={{ color: '#666' }}>Current evidence:</strong>{' '}
+              <span style={{ color: '#888' }}>{cp.current_evidence}</span>
+            </div>
+          )}
+          <div style={{ marginBottom: 4 }}>
+            <strong style={{ color: '#666' }}>Gap:</strong>{' '}
+            <span style={{ color: '#d6a36a' }}>{cp.gap}</span>
+          </div>
+          <div>
+            <strong style={{ color: '#43a85a' }}>Recommended fix:</strong>{' '}
+            <span style={{ color: '#ccc' }}>{cp.recommended_fix}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdversarialReviewSection({ review }){
+  if (!review) return null;
+  const riskColor = RISK_COLOR[review.overall_risk] || '#888';
+  const cps       = review.challenge_points || [];
+  const critCount = cps.filter(cp => cp.severity === 'CRITICAL').length;
+  const highCount = cps.filter(cp => cp.severity === 'HIGH').length;
+  const actions   = review.recommended_engineer_actions || [];
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      {/* header bar */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12, padding: '8px 12px', background: '#0f0f0f', borderRadius: 4, border: '1px solid #1a1a1a' }}>
+        <span style={{ fontSize: 11, color: '#888', ...MONO, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+          Adversarial Review
+        </span>
+        <Badge color={riskColor} label={`${review.overall_risk} RISK`} />
+        {critCount > 0 && <Badge color="#e55" label={`${critCount} CRITICAL`} />}
+        {highCount > 0 && <Badge color="#f66" label={`${highCount} HIGH`} />}
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#555', ...MONO }}>{cps.length} challenge points</span>
+      </div>
+
+      {/* reviewer questions */}
+      {review.questions_reviewer_may_ask?.length > 0 && (
+        <Section title={`Reviewer Questions (${review.questions_reviewer_may_ask.length})`}>
+          {review.questions_reviewer_may_ask.map((q, i) => (
+            <div key={i} style={{ fontSize: 11, color: '#a0c8f0', marginBottom: 5, paddingLeft: 8, borderLeft: '2px solid #1a3a5a', lineHeight: 1.5 }}>
+              {i + 1}. {q}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {/* challenge points (expandable) */}
+      {cps.length > 0 && (
+        <Section title={`Challenge Points (${cps.length})`}>
+          {cps.map((cp, i) => <ChallengePoint key={i} cp={cp} index={i} />)}
+        </Section>
+      )}
+
+      {/* recommended actions */}
+      {actions.length > 0 && (
+        <Section title={`Recommended Engineer Actions (${actions.length})`}>
+          {actions.map((a, i) => (
+            <div key={i} style={{ fontSize: 11, color: '#43a85a', marginBottom: 5, paddingLeft: 8, borderLeft: '2px solid #1a3a1a', lineHeight: 1.5 }}>
+              {i + 1}. {a}
+            </div>
+          ))}
+        </Section>
+      )}
+    </div>
+  );
+}
+
 export default function TrustDashboard({ onNavigate }){
   const [raw,          setRaw]          = useState('');
   const [exhibit,      setExhibit]      = useState(null);
   const [auditPackage, setAuditPackage] = useState(null);
   const [auditScore,   setAuditScore]   = useState(null);
+  const [adversarial,  setAdversarial]  = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [result, setResult]   = useState(null);
@@ -119,6 +219,7 @@ export default function TrustDashboard({ onNavigate }){
     setLoading(true);
     setAuditPackage(null);
     setAuditScore(null);
+    setAdversarial(null);
     try {
       // Step 1: POST /api/exhibits/audit-package → auditPackage
       const pkgRes = await fetch('/api/exhibits/audit-package', {
@@ -141,6 +242,19 @@ export default function TrustDashboard({ onNavigate }){
       if (!scoreRes.ok) throw new Error(`audit-score: ${scoreRes.status}`);
       const score = await scoreRes.json();
       setAuditScore(score);
+
+      // Step 3: POST /api/exhibits/adversarial-review → adversarial
+      const advRes = await fetch('/api/exhibits/adversarial-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ exhibit })
+      });
+      if (advRes.ok) {
+        const adv = await advRes.json();
+        setAdversarial(adv.adversarial_review || null);
+      }
+
       // Build engineer review text client-side from readiness sections
       const readiness = pkg.readiness || {};
       const det = readiness.determination || '—';
@@ -393,6 +507,9 @@ export default function TrustDashboard({ onNavigate }){
               ))}
             </Section>
           )}
+
+          {/* ── Adversarial Review ─────────────────────────────────────── */}
+          {adversarial && <AdversarialReviewSection review={adversarial} />}
 
         </div>
       )}
