@@ -28,6 +28,7 @@ import ComparableFacilitiesPanel from '@components/ui/ComparableFacilitiesPanel.
 import ExhibitDiffPanel from '@components/ui/ExhibitDiffPanel.jsx';
 import ShortSpacingShowingPanel from '@components/ui/ShortSpacingShowingPanel.jsx';
 import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
+import FieldLineagePanel  from '@components/ui/FieldLineagePanel.jsx';
 import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx';
 
 // Routes — a minimal client-side dispatch.  The default Contour
@@ -37,6 +38,7 @@ import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx'
 const ROUTE_OPTIMIZER = '/am-relocation';
 const ROUTE_PRODUCT   = '/product';
 const ROUTE_MAP       = '/map';
+const ROUTE_LINEAGE   = '/debug/lineage';
 
 function navigateTo(path){
   if (typeof window === 'undefined') return;
@@ -208,6 +210,9 @@ function AuthedRouter({ onLogout }){
         onLogout={onLogout}
       />
     );
+  }
+  if (path === ROUTE_LINEAGE){
+    return <LineageDebugPage onNavigate={navigateTo} onLogout={onLogout} />;
   }
   return (
     <MainApp
@@ -2054,4 +2059,83 @@ function num(s){
 }
 function escapeHtml(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ── /debug/lineage — standalone field-lineage audit page ─────────────────────
+//
+// Lets an engineer paste a raw exhibit JSON into a textarea and immediately
+// see the full per-field lineage table (value · status · source · path ·
+// confidence · blocking · validation).  Accessible at /debug/lineage.
+// Auth-gated via requireAuth (same session cookie as the main workbench).
+
+function LineageDebugPage({ onNavigate }){
+  const [raw, setRaw]     = useState('');
+  const [exhibit, setExhibit] = useState(null);
+  const [parseErr, setParseErr] = useState('');
+
+  function handleApply(){
+    try {
+      const parsed = JSON.parse(raw.trim());
+      // Accept both bare exhibit and { exhibit: {...} } shapes.
+      setExhibit(parsed?.station_inputs ? parsed : parsed?.exhibit || parsed);
+      setParseErr('');
+    } catch (e){
+      setParseErr(`JSON parse error: ${e.message}`);
+    }
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#0d0d0d', fontFamily: 'monospace', color: '#ccc' }}>
+      {/* header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', background: '#0a0a0a', borderBottom: '1px solid #1e1e1e' }}>
+        <button
+          onClick={() => onNavigate && onNavigate('/')}
+          style={{ background: 'none', border: '1px solid #333', color: '#888', borderRadius: 3, padding: '3px 10px', cursor: 'pointer', fontSize: 11, fontFamily: 'monospace' }}
+        >← Workbench</button>
+        <span style={{ fontSize: 12, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#888' }}>
+          Field Lineage Audit · /debug/lineage
+        </span>
+      </div>
+
+      {/* paste zone */}
+      <div style={{ padding: '12px 16px', borderBottom: '1px solid #1a1a1a' }}>
+        <div style={{ fontSize: 10, color: '#666', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Paste exhibit JSON (or <code style={{ color: '#888' }}>{"{ exhibit: {...} }"}</code>)
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <textarea
+            rows={4}
+            value={raw}
+            onChange={e => setRaw(e.target.value)}
+            placeholder='{"station_inputs":{"call":"WJPZ","service":"FM",...}}'
+            style={{
+              flex: 1,
+              background: '#111',
+              border: '1px solid #2a2a2a',
+              color: '#ccc',
+              borderRadius: 3,
+              padding: '6px 10px',
+              fontSize: 11,
+              fontFamily: 'monospace',
+              resize: 'vertical'
+            }}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <button
+              onClick={handleApply}
+              style={{ background: '#1a1a1a', border: '1px solid #444', color: '#ccc', borderRadius: 3, padding: '6px 16px', cursor: 'pointer', fontSize: 11, fontFamily: 'monospace' }}
+            >Apply</button>
+            <button
+              onClick={() => { setRaw(''); setExhibit(null); setParseErr(''); }}
+              style={{ background: 'none', border: '1px solid #2a2a2a', color: '#666', borderRadius: 3, padding: '6px 16px', cursor: 'pointer', fontSize: 11, fontFamily: 'monospace' }}
+            >Clear</button>
+          </div>
+        </div>
+        {parseErr && <div style={{ marginTop: 6, color: '#e55', fontSize: 11 }}>{parseErr}</div>}
+      </div>
+
+      {/* lineage table */}
+      <FieldLineagePanel exhibit={exhibit} />
+    </div>
+  );
 }
