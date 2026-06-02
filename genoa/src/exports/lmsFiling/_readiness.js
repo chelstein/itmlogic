@@ -30,7 +30,14 @@ export const FieldStatus = Object.freeze({
   SUGGESTED:        'SUGGESTED',
   NEEDS_INPUT:      'NEEDS_INPUT',
   EVIDENCE_MISSING: 'EVIDENCE_MISSING',
-  NOT_APPLICABLE:   'NOT_APPLICABLE'
+  NOT_APPLICABLE:   'NOT_APPLICABLE',
+  // INVALID: Genoa resolved a value but it fails a safety check
+  // (e.g. 0 for a physical dimension, null marked as filled).
+  // Always a filing gap for required fields.
+  INVALID:          'INVALID',
+  // CONFLICT: Two authoritative sources disagree; engineer must resolve.
+  // Always a filing gap for required fields.
+  CONFLICT:         'CONFLICT'
 });
 
 // Map between legacy lowercase ('filled', 'suggested', 'gap',
@@ -41,7 +48,9 @@ const LEGACY_TO_ENUM = {
   suggested: FieldStatus.SUGGESTED,
   gap:       FieldStatus.NEEDS_INPUT,
   unknown:   FieldStatus.EVIDENCE_MISSING,
-  na:        FieldStatus.NOT_APPLICABLE
+  na:        FieldStatus.NOT_APPLICABLE,
+  invalid:   FieldStatus.INVALID,
+  conflict:  FieldStatus.CONFLICT
 };
 
 export function normalizeStatus(s){

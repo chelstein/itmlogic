@@ -114,13 +114,26 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     cite: '47 CFR §73.3539',
     mapping: 'station_inputs.community',
     derive: (exhibit) => firstNonEmptyPath(exhibit, [
+      // Operator-supplied (highest priority).
       'station_inputs.community',
       'station_inputs.community_of_license',
       'station_inputs.licensing_community',
       'station_inputs.city',
+      // FCC LMS record (top-level and nested).
+      'evidence.fcc_lms.city',
+      'evidence.fcc_lms.community',
+      'evidence.fcc_lms.community_of_license',
       'evidence.fcc_lms.license.community',
       'evidence.fcc_lms.license.community_of_license',
       'evidence.fcc_lms.license.city',
+      // FCC FMQ / ZTR facility record stored under facility_metadata.raw.
+      // exhibitService.js builds facility_metadata = { ..., raw: f } where
+      // f is the facilityResolution.facility object.  FCC FMQ stores city
+      // at the top level of that record (fccFmqClient.js line ~318).
+      'facility_metadata.raw.city',
+      'facility_metadata.raw.community',
+      'facility_metadata.raw.community_of_license',
+      // Flat facility_metadata keys (legacy / ZTR-shaped responses).
       'facility_metadata.community',
       'facility_metadata.community_of_license',
       'facility_metadata.city'
@@ -221,16 +234,46 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     lms_label: 'HAAT (m) — average across 8 cardinal radials, §73.313',
     section: 'III', subsection: '3B',
     type: 'number', unit: 'm',
+    physical_dimension: true,
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §73.313',
-    mapping: 'station_inputs.haat_m_input'
+    mapping: 'station_inputs.haat_m_input',
+    notes: 'This is the FILING HAAT — the FCC-accepted or operator-supplied value used for contour computation. See haat-terrain-advisory-m for the terrain-derived advisory HAAT from per-radial profiles.'
+  },
+  {
+    id: 'haat-terrain-advisory-m',
+    lms_label: 'Terrain-derived advisory HAAT (mean, §73.313 ITM per-radial) — NOT the filing HAAT',
+    section: 'III', subsection: '3B',
+    type: 'number', unit: 'm',
+    source: 'genoa-auto',
+    required: false,
+    advisory: true,
+    cite: '47 CFR §73.313 (informational)',
+    derive: (exhibit) => {
+      // Compute mean from per-radial terrain profiles (haat_computed_m is the
+      // field populated by the ITM terrain sidecar; haat_m is the flat fallback).
+      const perRadial = exhibit?.evidence?.terrain_haat_per_radial;
+      if (Array.isArray(perRadial) && perRadial.length > 0){
+        const vals = perRadial
+          .map(r => Number(r?.haat_computed_m ?? r?.haat_m))
+          .filter(Number.isFinite);
+        if (vals.length > 0){
+          return Number((vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1));
+        }
+      }
+      // Single-value fallback from terrain evidence block.
+      const th = exhibit?.evidence?.terrain?.haat_m;
+      return Number.isFinite(Number(th)) ? Number(th) : null;
+    },
+    notes: 'ADVISORY ONLY — terrain-derived mean HAAT from ITM per-radial profiles. Does NOT replace the filing HAAT (haat-m). A discrepancy >20 m between this and the filed HAAT warrants verification of antenna AMSL and site-elevation inputs before filing.'
   },
   {
     id: 'rcamsl-m',
     lms_label: 'Radiation center AMSL (m)',
     section: 'III', subsection: '3B',
     type: 'number', unit: 'm',
+    physical_dimension: true,
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §73.313',
@@ -241,6 +284,7 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     lms_label: 'Radiation center AGL (m)',
     section: 'III', subsection: '3B',
     type: 'number', unit: 'm',
+    physical_dimension: true,
     source: 'manual-engineer',
     required: true,
     cite: '47 CFR §17',
@@ -322,12 +366,27 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     derive: (exhibit) => {
       const rc = exhibit?.regulatory_compliance;
       if (!rc) return null;
-      const p207 = rc.section_73_207?.pass === true;
-      const p215 = rc.cite && /73\.215/.test(rc.cite) && rc.pass === true;
-      if (p207 && p215) return '§73.207-and-§73.215';
-      if (p215) return '§73.215';
-      if (p207) return '§73.207';
-      return null;
+
+      // Determine which analyses were run.
+      // For FM: checkSection73215 always runs first and its result IS
+      // regulatory_compliance.  section_73_207 is then attached as a
+      // sub-key.  The old code checked rc.cite — but regulatory_compliance
+      // does NOT carry a .cite field for FM; that caused permanent null.
+      const has215 = rc.pass !== undefined;          // §73.215 ran iff pass is present
+      const has207 = rc.section_73_207 != null;      // always attached for FM
+      const p207   = rc.section_73_207?.pass === true;
+
+      if (!has215 && !has207) return null;
+
+      if (has215 && has207){
+        // Both ran.  Filing basis depends on which test the station clears.
+        //   §73.207 passes cleanly → file under §73.207 (simpler).
+        //   §73.207 fails → must rely on §73.215 (pass or fail).
+        if (p207) return '§73.207';
+        return '§73.215';
+      }
+      if (has215) return '§73.215';
+      return '§73.207';
     }
   },
   {
@@ -342,8 +401,14 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     derive: (exhibit) => {
       const rc = exhibit?.regulatory_compliance;
       if (!rc) return null;
-      if (rc.pass === true)  return 'PASS';
-      if (rc.section_73_207?.pass === false && rc.pass === true) return 'PASS-via-73.215';
+      // rc.pass === true means §73.215 passed.  If §73.207 also failed,
+      // the station cleared via §73.215 only (PASS-via-73.215).
+      // The prior code had a dead branch: it returned 'PASS' first,
+      // then checked the same condition again — second branch never ran.
+      if (rc.pass === true){
+        if (rc.section_73_207?.pass === false) return 'PASS-via-73.215';
+        return 'PASS';
+      }
       return 'FAIL';
     }
   },
@@ -495,6 +560,7 @@ export const FORM_301_FM_FIELDS = Object.freeze([
     lms_label: 'Overall tower height AGL (m)',
     section: 'III', subsection: '3E',
     type: 'number', unit: 'm',
+    physical_dimension: true,
     source: 'genoa-auto',
     required: true,
     cite: '47 CFR §17',

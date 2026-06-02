@@ -47,6 +47,38 @@ function dotPath(obj, path){
   return path.split('.').reduce((o, k) => (o == null ? o : o[k]), obj);
 }
 
+// Validate a resolved field value before committing status='filled'.
+// Returns an error string if the value should NOT be marked FILLED,
+// or null if the value is acceptable.
+//
+// Rules (from the filing-field lineage spec):
+//   1. null / undefined is never FILLED.
+//   2. Blank string is never FILLED.
+//   3. For physical-dimension fields (physical_dimension: true) the value
+//      must be a finite number GREATER THAN zero.  A tower of 0 m AGL,
+//      an HAAT of 0 m, or a radiation-center height of 0 m is physically
+//      impossible for a licensed broadcast facility.  Mark INVALID so the
+//      engineer is forced to supply the correct value before filing.
+//   4. NaN / non-finite number is never FILLED.
+export function validateFilingField({ def, value }){
+  if (value === null || value === undefined){
+    return 'null value cannot be marked FILLED — source data missing';
+  }
+  if (typeof value === 'string' && !value.trim()){
+    return 'blank string cannot be marked FILLED — source data missing';
+  }
+  if (def.type === 'number' || typeof value === 'number'){
+    const n = Number(value);
+    if (!Number.isFinite(n)){
+      return `non-finite number (${value}) cannot be marked FILLED`;
+    }
+    if (def.physical_dimension && n <= 0){
+      return `${def.lms_label}: value ${n} is invalid for a physical dimension — zero or negative height is not a real antenna installation; verify source data`;
+    }
+  }
+  return null;  // valid
+}
+
 // Normalize service string for routing.  AM/FM are unambiguous; FX
 // covers FM translator filings (FCC service code 'FX').  'FB' (FM
 // booster) also routes to Form 349.  'LPFM' and 'LP' both route to
@@ -147,8 +179,16 @@ function mapFields(exhibit, fields, applicant){
           value = dotPath(exhibit, def.mapping);
         }
         if (value !== undefined && value !== null && !(typeof value === 'string' && !value.trim())){
-          status = 'filled';
-          provenance = resolveProvenance(exhibit, def);
+          // Validate before marking filled — reject 0 on physical dimensions,
+          // non-finite numbers, etc.
+          const vErr = validateFilingField({ def, value });
+          if (vErr){
+            status = 'invalid';
+            provenance = { source: 'genoa-engine', note: vErr };
+          } else {
+            status = 'filled';
+            provenance = resolveProvenance(exhibit, def);
+          }
         } else {
           status = 'unknown';
         }

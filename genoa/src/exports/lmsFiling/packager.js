@@ -29,7 +29,12 @@ const STATUS_BADGE = {
   filled:    { color: '#43a85a', label: 'FILLED' },
   suggested: { color: '#5a9ec4', label: 'SUGGESTED — confirm' },
   gap:       { color: '#c4745a', label: 'NEEDS INPUT' },
-  unknown:   { color: '#d6a36a', label: 'EVIDENCE MISSING' }
+  unknown:   { color: '#d6a36a', label: 'EVIDENCE MISSING' },
+  // INVALID: Genoa found a value but it fails a safety check (e.g. 0
+  // for a physical dimension).  Engineer must supply a valid value.
+  invalid:   { color: '#b03030', label: 'INVALID — fix required' },
+  // CONFLICT: Two authoritative sources disagree.  Engineer must resolve.
+  conflict:  { color: '#8b2fc9', label: 'CONFLICT — resolve' }
 };
 
 // One-line "FCC FMQ · cached 2026-05-08T18:14Z" string for the cheatsheet.
@@ -231,7 +236,7 @@ function plainTextOutput(mapped, advisory_notes = []){
       out.push(`-- ${f.subsection || f.section} ${'-'.repeat(76 - (f.subsection || '').length)}`);
       lastSub = f.subsection;
     }
-    const tag = (STATUS_BADGE[f.status] || STATUS_BADGE.gap).label.padEnd(20);
+    const tag = (STATUS_BADGE[f.status] || STATUS_BADGE.gap).label.padEnd(26);
     const req = f.required ? '[REQ]' : '     ';
     out.push(`${tag} ${req} ${f.lms_label}`);
     out.push(`                           ${fmtValue(f.value, f.type)}`);
@@ -294,11 +299,19 @@ function htmlOutput(mapped){
     const badge = STATUS_BADGE[f.status] || STATUS_BADGE.gap;
     const provText = fmtProvenance(f.provenance);
     let valueCell;
-    if (f.status === 'filled' || f.status === 'suggested'){
+    if (f.status === 'filled'){
       valueCell = `<code>${escapeHtml(fmtValue(f.value, f.type))}</code>`;
-      if (f.status === 'suggested'){
-        valueCell += ' <small style="color:#5a9ec4;font-style:italic">(suggested — confirm before filing)</small>';
-      }
+    } else if (f.status === 'suggested'){
+      valueCell = `<code>${escapeHtml(fmtValue(f.value, f.type))}</code>`;
+      valueCell += ' <small style="color:#5a9ec4;font-style:italic">(suggested — confirm before filing)</small>';
+    } else if (f.status === 'invalid'){
+      // Show the bad value alongside the reason so the engineer knows what to fix.
+      const badVal = f.value !== null && f.value !== undefined ? escapeHtml(fmtValue(f.value, f.type)) : '—';
+      const reason = f.provenance?.note || 'value failed safety check';
+      valueCell = `<code style="color:#b03030">${badVal}</code> <small style="color:#b03030;font-style:italic">${escapeHtml(reason)}</small>`;
+    } else if (f.status === 'conflict'){
+      const conflictDetail = f.provenance?.note || 'source data conflict — resolve before filing';
+      valueCell = `<i style="color:#8b2fc9">${escapeHtml(conflictDetail)}</i>`;
     } else {
       valueCell = `<i style="color:#999">${f.status === 'gap' ? 'manual entry required' : 'evidence missing'}</i>`;
     }

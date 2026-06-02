@@ -436,3 +436,247 @@ test('cheatsheet plain-text retitles correctly for FM translator (Form 349)', ()
   assert.match(pkg.plain_text, /SUBMISSION PORTAL/);
   assert.match(pkg.plain_text, /PRE-FLIGHT CHECKLIST/);
 });
+
+// ── 11. WJPZ-FM filing-field lineage regression suite ────────────
+//
+// Fixture: WJPZ-FM at 107.9 MHz, Class A, Syracuse NY.
+//   • Community stored only in facility_metadata.raw.city (FCC FMQ shape).
+//   • Tower height AGL is erroneously 0 in the source data.
+//   • regulatory_compliance shows §73.215 failures against WDWN/WIII.
+//   • Filed HAAT 37 m differs significantly from terrain-derived 241.8 m.
+//
+// Each test asserts a specific failure mode that occurred on the
+// WJPZ-FM run and MUST NEVER recur.
+
+const WJPZ_FM = {
+  station_inputs: {
+    call:          'WJPZ',
+    facility_id:   '73610',
+    service:       'FM',
+    fcc_class:     'A',
+    frequency:     107.9,
+    erp_kw:        6.0,
+    haat_m_input:  37,
+    lat:           43.0481,
+    lon:          -76.1474
+    // community intentionally NOT set here — must come from facility_metadata.raw.city
+  },
+  facility_metadata: {
+    cached:                 true,
+    facility_lookup_source: 'FCC FMQ',
+    raw: {
+      call:    'WJPZ',
+      city:    'SYRACUSE',   // FCC FMQ shape stores community as `city` in raw record
+      state:   'NY',
+      haat_m:  37,
+      erp_kw:  6.0
+    }
+  },
+  // station_inputs.overall_height_m = 0 simulates the observed bug.
+  // tower_compliance and evidence.asr are both absent, so
+  // firstNonEmptyPath resolves station_inputs.overall_height_m = 0.
+  // The validator MUST reject 0 and mark the field INVALID.
+  regulatory_compliance: {
+    pass:     false,   // §73.215 FAILS against WDWN and WIII
+    violations: [
+      { cite: '47 CFR §73.215', message: 'Contour overlap with WDWN (66249) at 3.2 km' },
+      { cite: '47 CFR §73.215', message: 'Contour overlap with WIII (12312) at 4.7 km' }
+    ],
+    section_73_207: {
+      pass:       false,
+      violations: [
+        { cite: '47 CFR §73.207', message: 'Co-channel separation: WDWN fails by 12 km' }
+      ]
+    }
+  },
+  evidence: {
+    terrain_haat_per_radial: [
+      { azimuth_deg: 0,   haat_computed_m: 220.3 },
+      { azimuth_deg: 45,  haat_computed_m: 241.5 },
+      { azimuth_deg: 90,  haat_computed_m: 260.1 },
+      { azimuth_deg: 135, haat_computed_m: 255.8 },
+      { azimuth_deg: 180, haat_computed_m: 230.4 },
+      { azimuth_deg: 225, haat_computed_m: 248.2 },
+      { azimuth_deg: 270, haat_computed_m: 241.6 },
+      { azimuth_deg: 315, haat_computed_m: 236.7 }
+    ]
+  }
+};
+
+// 11a. Community of license must NOT be EVIDENCE_MISSING when
+//      the value is present in facility_metadata.raw.city.
+test('WJPZ: community-of-license is FILLED from facility_metadata.raw.city', () => {
+  const pkg = buildFilingPackage(WJPZ_FM);
+  const j   = JSON.parse(pkg.json);
+  const col = j.fields.find(f => f.id === 'community-of-license');
+  assert.ok(col, 'community-of-license field must exist');
+  assert.equal(col.status, 'filled',
+    `community-of-license must be filled (got '${col.status}' value='${col.value}')`);
+  assert.ok(col.value && /SYRACUSE/i.test(String(col.value)),
+    `community-of-license value must contain SYRACUSE (got '${col.value}')`);
+});
+
+// 11b. Tower height AGL = 0 must be INVALID, not FILLED.
+//      A zero tower height is physically impossible for a licensed
+//      broadcast facility and must never be auto-certified.
+test('WJPZ: tower-overall-height-agl-m = 0 is INVALID, not FILLED', () => {
+  const exhibit = {
+    ...WJPZ_FM,
+    station_inputs: { ...WJPZ_FM.station_inputs, overall_height_m: 0 }
+  };
+  const pkg = buildFilingPackage(exhibit);
+  const j   = JSON.parse(pkg.json);
+  const f   = j.fields.find(x => x.id === 'tower-overall-height-agl-m');
+  assert.ok(f, 'tower-overall-height-agl-m must exist');
+  assert.notEqual(f.status, 'filled',
+    'tower height 0 must NOT be FILLED — zero is not a valid AGL height');
+  assert.equal(f.status, 'invalid',
+    `expected INVALID, got '${f.status}'`);
+  // The invalid reason must surface in provenance.
+  assert.ok(f.provenance?.note && f.provenance.note.length > 10,
+    'provenance.note must explain why the value is INVALID');
+});
+
+// Complementary: a positive tower height IS FILLED.
+test('WJPZ: tower-overall-height-agl-m > 0 is FILLED', () => {
+  const exhibit = {
+    ...WJPZ_FM,
+    station_inputs: { ...WJPZ_FM.station_inputs, overall_height_m: 42.5 }
+  };
+  const pkg = buildFilingPackage(exhibit);
+  const j   = JSON.parse(pkg.json);
+  const f   = j.fields.find(x => x.id === 'tower-overall-height-agl-m');
+  assert.equal(f.status, 'filled');
+  assert.equal(f.value, 42.5);
+});
+
+// 11c. Compliance basis must be derivable (not EVIDENCE_MISSING)
+//      when regulatory_compliance carries violations.
+test('WJPZ: compliance-rule-path is FILLED even when §73.215 fails', () => {
+  const pkg = buildFilingPackage(WJPZ_FM);
+  const j   = JSON.parse(pkg.json);
+  const crp = j.fields.find(f => f.id === 'compliance-rule-path');
+  assert.ok(crp, 'compliance-rule-path must exist');
+  assert.equal(crp.status, 'filled',
+    `compliance-rule-path must be filled when rc is present (got '${crp.status}')`);
+  assert.equal(crp.value, '§73.215',
+    `expected §73.215 (station fails §73.207, attempts §73.215); got '${crp.value}'`);
+});
+
+test('WJPZ: compliance-pass is FAIL when both §73.207 and §73.215 fail', () => {
+  const pkg = buildFilingPackage(WJPZ_FM);
+  const j   = JSON.parse(pkg.json);
+  const cp  = j.fields.find(f => f.id === 'compliance-pass');
+  assert.equal(cp.status, 'filled');
+  assert.equal(cp.value, 'FAIL');
+});
+
+test('compliance-pass is PASS-via-73.215 when §73.207 fails but §73.215 passes', () => {
+  const exhibit = {
+    ...WJPZ_FM,
+    regulatory_compliance: {
+      pass:     true,   // §73.215 passes
+      violations: [],
+      section_73_207: { pass: false, violations: [{ cite: '47 CFR §73.207', message: 'co-channel fail' }] }
+    }
+  };
+  const pkg = buildFilingPackage(exhibit);
+  const j   = JSON.parse(pkg.json);
+  const cp  = j.fields.find(f => f.id === 'compliance-pass');
+  assert.equal(cp.value, 'PASS-via-73.215');
+  // Rule path should be §73.215 when filing on that basis.
+  const crp = j.fields.find(f => f.id === 'compliance-rule-path');
+  assert.equal(crp.value, '§73.215');
+});
+
+test('compliance-pass is PASS when both §73.207 and §73.215 pass', () => {
+  const exhibit = {
+    ...WJPZ_FM,
+    regulatory_compliance: {
+      pass: true,
+      violations: [],
+      section_73_207: { pass: true, violations: [] }
+    }
+  };
+  const j = JSON.parse(buildFilingPackage(exhibit).json);
+  const cp  = j.fields.find(f => f.id === 'compliance-pass');
+  assert.equal(cp.value, 'PASS');
+  // When §73.207 passes cleanly, use §73.207 as basis.
+  const crp = j.fields.find(f => f.id === 'compliance-rule-path');
+  assert.equal(crp.value, '§73.207');
+});
+
+// 11d. HAAT conflict — advisory terrain HAAT (241.8 m mean) vs
+//      filed HAAT (37 m) must both appear, filed HAAT stays FILLED.
+test('WJPZ: filed haat-m is FILLED with operator value', () => {
+  const pkg = buildFilingPackage(WJPZ_FM);
+  const j   = JSON.parse(pkg.json);
+  const h   = j.fields.find(f => f.id === 'haat-m');
+  assert.equal(h.status, 'filled');
+  assert.equal(h.value, 37, 'filed HAAT must be the operator-supplied value');
+});
+
+test('WJPZ: terrain advisory HAAT is computed from per-radial profiles', () => {
+  const pkg = buildFilingPackage(WJPZ_FM);
+  const j   = JSON.parse(pkg.json);
+  const adv = j.fields.find(f => f.id === 'haat-terrain-advisory-m');
+  assert.ok(adv, 'haat-terrain-advisory-m field must exist');
+  // Mean of [220.3,241.5,260.1,255.8,230.4,248.2,241.6,236.7] ≈ 241.8
+  assert.ok(Number.isFinite(Number(adv.value)),
+    'advisory HAAT must be a finite number');
+  assert.ok(Number(adv.value) > 200,
+    `advisory HAAT should be ~241.8 (got ${adv.value})`);
+});
+
+test('WJPZ: advisory HAAT field is not required and does not block filing on that alone', () => {
+  const pkg = buildFilingPackage(WJPZ_FM);
+  const j   = JSON.parse(pkg.json);
+  const adv = j.fields.find(f => f.id === 'haat-terrain-advisory-m');
+  assert.equal(adv.required, false,
+    'advisory HAAT must not be required — it must not gate filing');
+});
+
+// 11e. No required field with null/0/blank can be FILLED.
+//      Inject pathological values and verify they never slip through.
+test('no required FM field with value null can be FILLED', () => {
+  // Run the mapper on a minimal exhibit — many fields will be null/unknown;
+  // assert none of those nulls have status=filled.
+  const pkg = buildFilingPackage({
+    station_inputs: { call: 'WFOO', service: 'FM', frequency: 100.1, erp_kw: 1, lat: 40, lon: -75 },
+    evidence: {}
+  });
+  const j = JSON.parse(pkg.json);
+  for (const f of j.fields){
+    if (f.value === null || f.value === undefined){
+      assert.notEqual(f.status, 'filled',
+        `field ${f.id} has null value but status='filled' — null cannot be FILLED`);
+    }
+  }
+});
+
+test('validateFilingField rejects zero for physical dimension', async () => {
+  const { validateFilingField } = await import('../exports/lmsFiling/mapping.js');
+  const err = validateFilingField({
+    def: { id: 'tower-overall-height-agl-m', type: 'number', physical_dimension: true, lms_label: 'Overall tower height AGL (m)' },
+    value: 0
+  });
+  assert.ok(err && err.length > 0, 'zero physical dimension must produce an error string');
+});
+
+test('validateFilingField accepts positive physical dimension', async () => {
+  const { validateFilingField } = await import('../exports/lmsFiling/mapping.js');
+  const err = validateFilingField({
+    def: { id: 'tower-overall-height-agl-m', type: 'number', physical_dimension: true, lms_label: 'Overall tower height AGL (m)' },
+    value: 48.8
+  });
+  assert.equal(err, null, 'positive height must not produce an error');
+});
+
+test('validateFilingField rejects null value', async () => {
+  const { validateFilingField } = await import('../exports/lmsFiling/mapping.js');
+  const err = validateFilingField({
+    def: { id: 'haat-m', type: 'number', physical_dimension: true, lms_label: 'HAAT' },
+    value: null
+  });
+  assert.ok(err && err.length > 0, 'null must produce an error string');
+});
