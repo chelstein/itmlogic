@@ -41,6 +41,7 @@ import atlasRoutes          from './routes/atlas.js';
 import lineageRoutes        from './routes/lineage.js';
 import auditPackageRoutes   from './routes/auditPackage.js';
 import trustRoutes          from './routes/trustRoutes.js';
+import adversarialReviewRoutes from './routes/adversarialReview.js';
 import { errorHandler } from './middleware/errors.js';
 import { requireAuth }  from './middleware/auth.js';
 import { migrate }   from '../db/migrate.js';
@@ -141,6 +142,7 @@ app.use('/api', atlasRoutes);                    // Graph Atlas debug (GET /api/
 app.use('/api', lineageRoutes);                  // Filing field lineage (POST /api/exhibits/lineage)
 app.use('/api', auditPackageRoutes);             // Audit package (POST /api/exhibits/audit-package)
 app.use('/api', trustRoutes);                    // Trust routes (POST /api/exhibits/engineer-review, /audit-score)
+app.use('/api', adversarialReviewRoutes);        // Adversarial review (POST /api/exhibits/adversarial-review)
 app.use('/api', exhibitRoutes);
 
 // SPA fallback — any GET request that isn't /api/*, /healthz, /readyz,
