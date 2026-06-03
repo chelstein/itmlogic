@@ -138,13 +138,13 @@ test('WJPZ readiness evidence includes filed HAAT and terrain advisory HAAT', ()
     `advisory HAAT should be ~241.8 (got ${advisory.value})`);
 });
 
-test('WJPZ readiness advisories include SDR and OET-65 (never blocking)', () => {
+test('WJPZ readiness: SDR advisory present, OET-65 escalated to warning at 6 kW ERP', () => {
   const r = buildReadinessReport(WJPZ_FM);
   const sdr  = r.advisories.find(a => a.code === 'SDR_MISSING');
-  const oet  = r.advisories.find(a => a.code === 'OET65_MISSING');
-  assert.ok(sdr,  'SDR_MISSING advisory must be present');
-  assert.ok(oet,  'OET65_MISSING advisory must be present');
-  // Advisory-only — the determination is NOT_READY purely due to compliance, not advisory gaps.
+  const oet  = r.warnings.find(w => w.code === 'OET65_REQUIRED');
+  assert.ok(sdr, 'SDR_MISSING advisory must be present');
+  assert.ok(oet, 'OET65_REQUIRED warning must be present for 6 kW ERP (never a blocker)');
+  // OET-65 is a warning, not a blocker — determination is NOT_READY only due to compliance.
   assert.equal(r.determination, 'NOT_READY');
 });
 
