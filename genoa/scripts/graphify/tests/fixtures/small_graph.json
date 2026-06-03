@@ -19,7 +19,12 @@
     { "id": "island1",         "label": "island1",         "file": "src/workers/batch.js" },
     { "id": "island2",         "label": "island2",         "file": "src/workers/queue.js" },
     { "id": "island3",         "label": "island3",         "file": "src/workers/runner.js" },
-    { "id": "floater",         "label": "floater",         "file": "src/utils/floater.js" }
+    { "id": "floater",         "label": "floater",         "file": "src/utils/floater.js" },
+    { "id": "json::id",        "label": "id",              "file": null },
+    { "id": "json::version",   "label": "version",         "file": null },
+    { "id": "json::method",    "label": "method",          "file": null },
+    { "id": "engine.A_factor", "label": "A_factor",        "file": "src/engine/core.js" },
+    { "id": "engine.klim",     "label": "klim",            "file": "src/engine/core.js" }
   ],
   "edges": [
     { "source": "server",         "target": "routes",         "label": "uses",    "type": "normal" },
@@ -51,6 +56,11 @@
     { "source": "evidenceLoader", "target": "dbClient",       "label": "loads",   "type": "normal" },
     { "source": "server",         "target": "evidenceLoader", "label": "warms",   "type": "normal" },
     { "source": "middleware",     "target": "routes",         "label": "next",    "type": "normal" },
-    { "source": "godNode",        "target": "island1",        "label": "dispatch-inferred", "type": "inferred" }
+    { "source": "godNode",        "target": "island1",        "label": "dispatch-inferred", "type": "inferred" },
+    { "source": "engineCore",     "target": "json::id",       "label": "contains",          "type": "contains" },
+    { "source": "engineCore",     "target": "json::version",  "label": "contains",          "type": "contains" },
+    { "source": "engineCore",     "target": "json::method",   "label": "contains",          "type": "contains" },
+    { "source": "engineCore",     "target": "engine.A_factor","label": "contains",          "type": "contains" },
+    { "source": "engineCore",     "target": "engine.klim",    "label": "contains",          "type": "contains" }
   ]
 }

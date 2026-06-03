@@ -20,9 +20,14 @@ export function buildSnapshot(nodes, edges) {
     timestamp: new Date().toISOString(),
     nodes: m.nodeCount,
     edges: m.edgeCount,
-    communities: m.communityCount,
+    structural_edges: m.structuralEdgeCount,
+    containment_edges: m.containmentEdgeCount,
+    semantic_edges: m.semanticEdgeCount,
     inferred_edges: m.inferredEdgeCount,
+    structural_ratio: m.structuralRatio,
+    communities: m.communityCount,
     weak_nodes: m.weakNodeCount,
+    weak_json_field_nodes: m.weakJsonFieldNodeCount,
     top_god_nodes: topGodNodes,
     community_cohesion: m.communityCount_top5_cohesion,
   };
@@ -32,7 +37,11 @@ export function buildSnapshot(nodes, edges) {
  * Compute delta between two snapshots (numeric fields only).
  */
 export function computeDelta(prev, curr) {
-  const numericFields = ['nodes', 'edges', 'communities', 'inferred_edges', 'weak_nodes'];
+  const numericFields = [
+    'nodes', 'edges',
+    'structural_edges', 'containment_edges', 'semantic_edges', 'inferred_edges',
+    'communities', 'weak_nodes', 'weak_json_field_nodes',
+  ];
   const delta = {};
   for (const f of numericFields) {
     delta[f] = curr[f] - (prev[f] ?? 0);
@@ -75,9 +84,14 @@ export function runDrift({ nodes, edges }, outDir) {
     `|--------|-------|`,
     `| Nodes | ${current.nodes} |`,
     `| Edges | ${current.edges} |`,
-    `| Communities | ${current.communities} |`,
+    `| Structural edges | ${current.structural_edges} |`,
+    `| Containment edges | ${current.containment_edges} |`,
+    `| Semantic edges | ${current.semantic_edges} |`,
     `| Inferred edges | ${current.inferred_edges} |`,
+    `| Structural ratio | ${(current.structural_ratio * 100).toFixed(1)}% |`,
+    `| Communities | ${current.communities} |`,
     `| Weak nodes | ${current.weak_nodes} |`,
+    `| Weak JSON field nodes | ${current.weak_json_field_nodes} |`,
     '',
   ];
 
@@ -91,7 +105,11 @@ export function runDrift({ nodes, edges }, outDir) {
     lines.push('');
     lines.push('| Metric | Previous | Current | Delta |');
     lines.push('|--------|----------|---------|-------|');
-    const numericFields = ['nodes', 'edges', 'communities', 'inferred_edges', 'weak_nodes'];
+    const numericFields = [
+      'nodes', 'edges',
+      'structural_edges', 'containment_edges', 'semantic_edges', 'inferred_edges',
+      'communities', 'weak_nodes', 'weak_json_field_nodes',
+    ];
     for (const f of numericFields) {
       const d = delta[f];
       const sign = d > 0 ? '+' : '';
