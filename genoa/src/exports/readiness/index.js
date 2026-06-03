@@ -180,15 +180,17 @@ export function buildReadinessReport(exhibit, applicant = {}) {
   // DA pattern warnings (collected above alongside blockers, appended here).
   warnings.push(...deferredDaWarnings);
 
-  // OET-65 — escalate to WARNING at ERP thresholds where evaluation is effectively
-  // mandatory: FCC routinely issues deficiency letters when it is missing above 5 kW.
+  // OET-65 — §1.1307(b)(3)(i) Table 1 categorical exclusion for FM band (30-300 MHz):
+  // threshold = 3.83×R² watts, where R = minimum accessible distance in meters.
+  // At R≈36 m (fenced tower), threshold ≈ 5 kW.  5 kW is used here as a conservative
+  // station-level gate; FCC routinely issues deficiency letters above this level.
   if (!exhibit.oet65) {
     const erpKw = exhibit.station_inputs?.erp_kw ?? exhibit.station_inputs?.power_day_kw ?? null;
     if (erpKw != null && erpKw >= 5) {
       warnings.push({
         code: 'OET65_REQUIRED',
         message: `OET Bulletin 65 RF exposure evaluation required for ${erpKw} kW ERP — FCC will issue a deficiency letter without it`,
-        rule: 'OET Bulletin 65 / 47 CFR §1.1310',
+        rule: 'OET Bulletin 65 / 47 CFR §§1.1307(b)(3)(i), 1.1310',
       });
     } else {
       advisories.push({
