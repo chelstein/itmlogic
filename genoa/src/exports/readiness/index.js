@@ -130,6 +130,7 @@ export function buildReadinessReport(exhibit, applicant = {}) {
         code: 'HAAT_DISCREPANCY',
         message: `Filed HAAT ${filedHaat}m differs from terrain-derived advisory HAAT ${advisoryHaat.toFixed(1)}m (${pct.toFixed(1)}% divergence)`,
         field: 'haat-m',
+        authority: 'genoa-heuristic',
       });
     }
   }
@@ -160,6 +161,8 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     warnings.push({
       code: 'ENGINE_BLOCKER',
       message: b.message ?? b,
+      source: b.source ?? 'engine',
+      authority: 'genoa-internal',
     });
   }
 
@@ -174,6 +177,7 @@ export function buildReadinessReport(exhibit, applicant = {}) {
       field: c.field,
       message: c.conflict_reason,
       detail: c.winning_reason,
+      authority: 'genoa-heuristic',
     });
   }
 
@@ -206,6 +210,7 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     advisories.push({
       code: 'SDR_MISSING',
       message: 'No SDR drive-test captures attached',
+      authority: 'genoa-internal',
     });
   }
 
@@ -213,6 +218,7 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     advisories.push({
       code: 'AM_PHYSICS_MISSING',
       message: 'SOMNEC2D AM physics advisory analysis not run',
+      authority: 'genoa-internal',
     });
   }
 
