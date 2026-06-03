@@ -30,6 +30,7 @@ describe('weakNodes', () => {
       'test-only',
       'external-schema',
       'exported-unused',
+      'json-field',
       'possible-missing-edge',
     ]);
   });
@@ -120,6 +121,24 @@ describe('weakNodes', () => {
     assert.equal(classifyWeakNode(node, degrees), 'exported-unused');
   });
 
+  it('classifyWeakNode: json-field for src/ node with label matching JSON scalar key', () => {
+    const node = { id: 'engine.A_factor', label: 'A_factor', file: 'src/engine/core.js' };
+    const degrees = { in: 0, out: 0 };
+    assert.equal(classifyWeakNode(node, degrees), 'json-field');
+  });
+
+  it('classifyWeakNode: json-field for src/ node whose id matches JSON scalar key (no label)', () => {
+    const node = { id: 'engine.klim', label: 'klim', file: 'src/engine/core.js' };
+    const degrees = { in: 0, out: 0 };
+    assert.equal(classifyWeakNode(node, degrees), 'json-field');
+  });
+
+  it('classifyWeakNode: json-field for A_factor ITM scalar in src/ (no :: prefix)', () => {
+    const node = { id: 'someModule.A_factor', label: 'A_factor', file: 'src/engine/propagation.js' };
+    const degrees = { in: 0, out: 0 };
+    assert.equal(classifyWeakNode(node, degrees), 'json-field');
+  });
+
   it('classifyWeakNode: possible-missing-edge for src/ file with no special category', () => {
     const node = { id: 'possibleMissing', file: 'src/api/utils/helper.js' };
     const degrees = { in: 0, out: 0 };
@@ -135,12 +154,14 @@ describe('weakNodes', () => {
     const categories = new Set(weakNodes.map(w => classifyWeakNode(w.node, w.degrees)));
 
     // We expect docs-only (README), config-env (config.json), test-only (auth.test.js),
-    // external-schema (extern::Schema), exported-unused (exportedUnused), possible-missing-edge (possibleMissing)
+    // external-schema (extern::Schema), exported-unused (exportedUnused),
+    // json-field (json::id, json::version, json::method), possible-missing-edge (possibleMissing)
     assert.ok(categories.has('docs-only'), 'should have docs-only');
     assert.ok(categories.has('config-env'), 'should have config-env');
     assert.ok(categories.has('test-only'), 'should have test-only');
     assert.ok(categories.has('external-schema'), 'should have external-schema');
     assert.ok(categories.has('exported-unused'), 'should have exported-unused');
+    assert.ok(categories.has('json-field'), 'should have json-field');
     assert.ok(categories.has('possible-missing-edge'), 'should have possible-missing-edge');
   });
 });

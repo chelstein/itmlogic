@@ -1,5 +1,5 @@
 // Feature 3: Weak Node Classification
-import { buildDegreeMap } from './metrics.js';
+import { buildDegreeMap, JSON_SCALAR_NAMES, classifyEdge } from './metrics.js';
 import { writeReport } from './report.js';
 
 export const CATEGORIES = [
@@ -8,6 +8,7 @@ export const CATEGORIES = [
   'test-only',
   'external-schema',
   'exported-unused',
+  'json-field',
   'possible-missing-edge',
 ];
 
@@ -60,6 +61,12 @@ export function classifyWeakNode(node, degrees) {
   // exported-unused: in_degree === 0 AND out_degree > 0
   if (inDeg === 0 && outDeg > 0) {
     return 'exported-unused';
+  }
+
+  // json-field: label/id matches a known JSON scalar key name (metadata, not a real code node)
+  const nameToCheck = (node.label || id || '').trim();
+  if (JSON_SCALAR_NAMES.has(nameToCheck)) {
+    return 'json-field';
   }
 
   return 'possible-missing-edge';
