@@ -3,6 +3,7 @@
 
 import { buildLineageReport } from '../../exports/lmsFiling/lineage.js';
 import { detectFieldConflicts } from './conflicts.js';
+import { checkDaPatternReadiness } from './daPatternCheck.js';
 
 function clamp(n, lo, hi) {
   return Math.max(lo, Math.min(hi, n));
@@ -103,6 +104,12 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     });
   }
 
+  // DA pattern — §73.316 filing gate for directional-antenna FM stations.
+  const daChecks = checkDaPatternReadiness(exhibit);
+  blockers.push(...daChecks.blockers);
+  // DA warnings are interleaved after the main warnings section to preserve ordering.
+  const deferredDaWarnings = daChecks.warnings;
+
   // ── WARNINGS ────────────────────────────────────────────────────────────────
 
   const haatField = fields.find(f => f.id === 'haat-m');
@@ -169,6 +176,9 @@ export function buildReadinessReport(exhibit, applicant = {}) {
       detail: c.winning_reason,
     });
   }
+
+  // DA pattern warnings (collected above alongside blockers, appended here).
+  warnings.push(...deferredDaWarnings);
 
   // OET-65 — escalate to WARNING at ERP thresholds where evaluation is effectively
   // mandatory: FCC routinely issues deficiency letters when it is missing above 5 kW.
@@ -251,6 +261,10 @@ export function buildReadinessReport(exhibit, applicant = {}) {
       score -= 25;
     } else if (b.code === 'ASR_UNREGISTERED') {
       score -= 20;
+    } else if (b.code === 'DA_PATTERN_MISSING') {
+      score -= 20;
+    } else if (b.code === 'DA_PATTERN_INVALID') {
+      score -= 25;
     } else if (b.code === 'FIELD_AUTO_MISSING') {
       score -= 15;
     } else if (b.code === 'FIELD_ENGINEER_REQUIRED') {
