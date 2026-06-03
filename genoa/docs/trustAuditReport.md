@@ -142,13 +142,47 @@ A score ≥70 indicates a well-formed exhibit with full provenance, passing comp
 
 1. **AM reasoning conclusions** — §73.182, §73.183, §73.184 are evidence-only. An AM engineer gets `coordinate-validation` only. Blocked by no-new-FCC-rules constraint.
 
-2. **OET-65 RF exposure** — No MPE field, no conclusion, no advisory even. Any station with ERP > 5 kW and antenna height < 50 m should trigger an OET-65 advisory at minimum.
-
-3. **Part 17 ASR blocking** — Towers >60.96 m with no ASR number are advisory-only. Industry standard is to treat this as a filing blocker (FCC LMS rejects filings with unregistered towers).
-
 4. **DA pattern suppression** — §73.316 requires the horizontal pattern to meet suppression ratio requirements. The engine captures pattern data but does not compute or verify the suppression ratio.
 
-5. **Replay token in engineer flows** — The `/api/exhibits/engineer-review` and `/api/exhibits/audit-score` endpoints call `enrichTowerEvidence()` but no replay token is stamped on the resulting provenance. Audit packages built via these endpoints will always score 0/5 on replay_token provenance.
+---
+
+## Trust Sprint #3 — Three Gap Fixes
+
+**Sprint:** Trust Sprint #3
+**Date:** 2026-06-03
+**Scope:** Closed Gaps #2, #3, and #5 from the Sprint #1 remaining-gaps list. No FCC math changes.
+
+### Fix 1 — OET-65 Escalation to Warning (Gap #2, FIXED)
+
+**Gap:** Missing OET-65 RF exposure evaluation was advisory-only for all stations. FCC routinely issues deficiency letters for stations with ERP ≥ 5 kW that file without an OET-65 evaluation.
+
+**Fix:** `buildReadinessReport()` now checks `erp_kw` (FM/LPFM/FX) and `power_day_kw` (AM fallback). When OET-65 is absent and ERP ≥ 5 kW: `OET65_REQUIRED` warning (not advisory, not blocker) with rule citation `OET Bulletin 65 / 47 CFR §1.1310`. When ERP < 5 kW: `OET65_MISSING` advisory unchanged.
+
+**Effect on stations:**
+- WJPZ (6 kW), KNUV (100 kW), WVIK (50 kW), KFOO (95 kW), WFGH (5.8 kW), KBIG (48 kW), KMMM (99.9 kW), WAAA (80 kW), WBIG (24.5 kW), WKLX (5.5 kW), WMRY (50 kW AM day): `OET65_REQUIRED` warning
+- WPFK (0.1 kW LPFM), W123CD (0.25 kW FX), KAZM (1.0 kW AM day): `OET65_MISSING` advisory (unchanged)
+
+**Test updated:** `wjpzGoldenAudit.test.js` — "SDR and OET-65 (never blocking)" updated to check `OET65_REQUIRED` in `warnings` rather than `OET65_MISSING` in `advisories`.
+
+---
+
+### Fix 2 — ASR Registration Blocker (Gap #3, FIXED)
+
+**Gap:** Towers >60.96 m (200 ft) with no ASR registration number were advisory-only. FCC LMS rejects applications with unregistered towers above 200 ft.
+
+**Fix:** `buildReadinessReport()` now checks `station_inputs.overall_height_m` OR `evidence.asr.overall_height_m` against 60.96 m, and `station_inputs.asr_number` OR `evidence.asr.asr_number` for registration. If height > 60.96 m AND no ASR number found: `ASR_UNREGISTERED` blocker with rule `47 CFR Part 17 / §17.7`, remedy text, and -20 penalty (less than COMPLIANCE_FAILURE at -25).
+
+**Effect on golden fixtures:** KNUV (95 m, no ASR) and WVIK (65 m, no ASR) now correctly gate as NOT_READY. KBIG (110 m, ASR present) and WAAA (88 m, ASR present) unaffected.
+
+---
+
+### Fix 3 — Replay Token Stamped in Engineer Flows (Gap #5, FIXED)
+
+**Gap:** `POST /api/exhibits/engineer-review`, `POST /api/exhibits/audit-score`, and `POST /api/exhibits/audit-package` called `enrichTowerEvidence()` but never stamped a replay token. Exhibits submitted to these endpoints always scored 0/5 on `replay_token` provenance.
+
+**Fix:** After `enrichTowerEvidence()`, each endpoint calls `buildReplayToken(exhibit, { inputs, evidence })` and stamps `exhibit.replay_token` when not already present. The `stampReplayToken()` helper is shared across both trust routes; `auditPackage.js` uses the same inline pattern.
+
+**Verification:** `trustSprint3.test.js` — 20 tests covering boundary conditions for all three fixes. Full suite: 1910 tests, 1909 pass, 1 pre-existing `serviceWordingLeak` failure (unrelated, predates Sprint #3).
 
 ---
 

@@ -18,6 +18,16 @@ import { buildFilingPackage }        from '../../exports/lmsFiling/packager.js';
 import { buildEngineeringReasoning } from '../../exports/readiness/reasoning.js';
 import { detectFieldConflicts }      from '../../exports/readiness/conflicts.js';
 import { scoreAuditPackage }         from '../../exports/readiness/qualityScore.js';
+import { buildReplayToken }          from '../../engine/buildAttestation.js';
+
+function stampReplayToken(exhibit) {
+  if (exhibit.replay_token) return;
+  const { token } = buildReplayToken(exhibit, {
+    inputs:   exhibit.station_inputs,
+    evidence: exhibit.evidence,
+  });
+  exhibit.replay_token = token;
+}
 
 const r = express.Router();
 
@@ -33,6 +43,7 @@ r.post('/exhibits/engineer-review', asyncHandler(async (req, res) => {
   }
 
   await enrichTowerEvidence(exhibit, console);
+  stampReplayToken(exhibit);
 
   const readiness = buildReadinessReport(exhibit, applicant);
   const review    = buildEngineerReviewSummary(readiness, station);
@@ -51,6 +62,7 @@ r.post('/exhibits/audit-score', asyncHandler(async (req, res) => {
   }
 
   await enrichTowerEvidence(exhibit, console);
+  stampReplayToken(exhibit);
 
   const pkg        = buildFilingPackage(exhibit, applicant);
   const lineage    = buildLineageReport(exhibit, applicant);
@@ -60,7 +72,7 @@ r.post('/exhibits/audit-score', asyncHandler(async (req, res) => {
 
   const provenance = {
     build_sha:        exhibit?.build_attestation?.sha || exhibit?.engine_signature?.hash || null,
-    replay_token:     exhibit?.replay_token || null,
+    replay_token:     exhibit.replay_token || null,
     engine_signature: exhibit?.engine_signature?.hash || null,
     generated_at:     new Date().toISOString(),
   };

@@ -87,6 +87,22 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     }
   }
 
+  // ASR registration — FCC LMS rejects applications with towers >60.96 m (200 ft)
+  // that have no registered ASR number.  Promote from advisory to blocker.
+  const overallHeightM = exhibit.station_inputs?.overall_height_m
+    ?? exhibit.evidence?.asr?.overall_height_m ?? null;
+  const asrNumber = exhibit.station_inputs?.asr_number
+    ?? exhibit.evidence?.asr?.asr_number ?? null;
+  if (overallHeightM != null && overallHeightM > 60.96 && !asrNumber) {
+    blockers.push({
+      code: 'ASR_UNREGISTERED',
+      message: `Tower height ${overallHeightM} m exceeds 60.96 m (200 ft) but no ASR registration number is on file`,
+      rule: '47 CFR Part 17 / §17.7',
+      field: 'asr-registration',
+      remedy: 'Register tower with FCC ASR database before filing — LMS will reject without a valid ASR number',
+    });
+  }
+
   // ── WARNINGS ────────────────────────────────────────────────────────────────
 
   const haatField = fields.find(f => f.id === 'haat-m');
@@ -154,19 +170,30 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     });
   }
 
+  // OET-65 — escalate to WARNING at ERP thresholds where evaluation is effectively
+  // mandatory: FCC routinely issues deficiency letters when it is missing above 5 kW.
+  if (!exhibit.oet65) {
+    const erpKw = exhibit.station_inputs?.erp_kw ?? exhibit.station_inputs?.power_day_kw ?? null;
+    if (erpKw != null && erpKw >= 5) {
+      warnings.push({
+        code: 'OET65_REQUIRED',
+        message: `OET Bulletin 65 RF exposure evaluation required for ${erpKw} kW ERP — FCC will issue a deficiency letter without it`,
+        rule: 'OET Bulletin 65 / 47 CFR §1.1310',
+      });
+    } else {
+      advisories.push({
+        code: 'OET65_MISSING',
+        message: 'OET Bulletin 65 RF exposure analysis not run',
+      });
+    }
+  }
+
   // ── ADVISORIES ──────────────────────────────────────────────────────────────
 
   if (!exhibit.evidence?.sdr_captures) {
     advisories.push({
       code: 'SDR_MISSING',
       message: 'No SDR drive-test captures attached',
-    });
-  }
-
-  if (!exhibit.oet65) {
-    advisories.push({
-      code: 'OET65_MISSING',
-      message: 'OET Bulletin 65 RF exposure analysis not run',
     });
   }
 
@@ -222,6 +249,8 @@ export function buildReadinessReport(exhibit, applicant = {}) {
   for (const b of blockers) {
     if (b.code === 'COMPLIANCE_FAILURE' || b.code === 'FIELD_INVALID') {
       score -= 25;
+    } else if (b.code === 'ASR_UNREGISTERED') {
+      score -= 20;
     } else if (b.code === 'FIELD_AUTO_MISSING') {
       score -= 15;
     } else if (b.code === 'FIELD_ENGINEER_REQUIRED') {

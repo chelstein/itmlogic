@@ -27,6 +27,7 @@ import { buildLineageReport }       from '../../exports/lmsFiling/lineage.js';
 import { buildReadinessReport }     from '../../exports/readiness/index.js';
 import { buildEngineeringReasoning } from '../../exports/readiness/reasoning.js';
 import { detectFieldConflicts }     from '../../exports/readiness/conflicts.js';
+import { buildReplayToken }         from '../../engine/buildAttestation.js';
 
 const r = express.Router();
 
@@ -37,6 +38,13 @@ r.post('/exhibits/audit-package', asyncHandler(async (req, res) => {
     return res.status(400).json({ error: 'BAD_REQUEST', detail: 'exhibit is required' });
   }
   await enrichTowerEvidence(exhibit, console);
+  if (!exhibit.replay_token) {
+    const { token } = buildReplayToken(exhibit, {
+      inputs:   exhibit.station_inputs,
+      evidence: exhibit.evidence,
+    });
+    exhibit.replay_token = token;
+  }
 
   const pkg = buildFilingPackage(exhibit, applicant);
 
@@ -50,7 +58,7 @@ r.post('/exhibits/audit-package', asyncHandler(async (req, res) => {
 
   const provenance = {
     build_sha:        exhibit?.build_attestation?.sha || exhibit?.engine_signature?.hash || null,
-    replay_token:     exhibit?.replay_token || null,
+    replay_token:     exhibit.replay_token || null,
     engine_signature: exhibit?.engine_signature?.hash || null,
     generated_at:     new Date().toISOString()
   };
