@@ -142,7 +142,58 @@ A score ≥70 indicates a well-formed exhibit with full provenance, passing comp
 
 1. **AM reasoning conclusions** — §73.182, §73.183, §73.184 are evidence-only. An AM engineer gets `coordinate-validation` only. Blocked by no-new-FCC-rules constraint.
 
-4. **DA pattern suppression** — §73.316 requires the horizontal pattern to meet suppression ratio requirements. The engine captures pattern data but does not compute or verify the suppression ratio.
+---
+
+## Trust Sprint #4 — DA Pattern Suppression Verification
+
+**Sprint:** Trust Sprint #4
+**Date:** 2026-06-03
+**Scope:** §73.316 filing gate for FM directional antenna (DA) stations. No new FCC math — existing §73.316 is already on Form 301-FM Section III. This sprint adds the trust enforcement that was previously missing.
+
+### What Was Built
+
+**`genoa/src/exports/readiness/daPatternCheck.js`** — pure function `checkDaPatternReadiness(exhibit)` returning `{ blockers, warnings }` for all DA pattern trust checks. Wired into `buildReadinessReport()` in `readiness/index.js`.
+
+Six new readiness codes:
+
+| Code | Type | Penalty | Trigger |
+|------|------|---------|---------|
+| `DA_PATTERN_MISSING` | BLOCKER | -20 | `pattern_mode=DA` but no pattern table anywhere |
+| `DA_PATTERN_INVALID` | BLOCKER | -25 | Non-numeric entries, azimuth ≥360°, or relative_field out of range |
+| `DA_PATTERN_UNCONFIRMED` | WARNING | -8 | Pattern data present but `pattern_mode` not declared |
+| `DA_PATTERN_INCOMPLETE` | WARNING | -8 | Fewer than 8 standard radials (FCC standard: 0°–315° in 45° steps) |
+| `DA_PATTERN_UNNORMALIZED` | WARNING | -8 | Maximum `relative_field` < 0.95 |
+| `DA_SUPPRESSION_UNVERIFIED` | WARNING | -8 | FM DA with no `evidence.suppression_db` or `evidence.pattern_suppression` |
+
+**Scope guard:** All DA checks are FM-band only (FM, LPFM, FX). AM uses §73.150 instead of §73.316 — no AM DA checks fire.
+
+**Pattern source priority:** `evidence.nec_pattern_table` → `station_inputs.pattern` → `evidence.da_pattern` → `evidence.pattern_data`
+
+**Pattern format:** Accepts both array format `[azimuth_deg, relative_field]` and object format `{ azimuth, relative_field }` or `{ azimuth_deg, relative_field }`.
+
+### Station Impact
+
+| Station | New Codes Fired |
+|---------|----------------|
+| WKLX-FM (golden) | `DA_PATTERN_UNCONFIRMED` (no `pattern_mode`), `DA_PATTERN_INCOMPLETE` (4/8 radials), `DA_SUPPRESSION_UNVERIFIED` |
+| All other 13 golden stations | No DA checks (omni or AM) |
+
+WKLX determination remains REVIEW (DA warnings are not blockers). All golden fixture invariant tests still pass.
+
+### Tests
+
+**`trustSprint4.test.js`** — 30 tests, all passing:
+- Blocker fire/no-fire conditions for `DA_PATTERN_MISSING` (5 tests)
+- Blocker conditions for `DA_PATTERN_INVALID` (5 tests)
+- `DA_PATTERN_UNCONFIRMED` + WKLX golden fixture regression (3 tests)
+- `DA_PATTERN_INCOMPLETE` boundary (3 tests)
+- `DA_PATTERN_UNNORMALIZED` boundary (3 tests)
+- `DA_SUPPRESSION_UNVERIFIED` + evidence clear (4 tests)
+- AM / omni / NDA service guards (3 tests)
+- Array-format and `azimuth_deg` key compatibility (2 tests)
+- Cross-cutting score/integer invariants (2 tests)
+
+Full suite: 1940 tests, 1 pre-existing `serviceWordingLeak` failure (unrelated, predates Sprint #4).
 
 ---
 
