@@ -219,6 +219,16 @@ test('DA_PATTERN_UNNORMALIZED does NOT fire at exactly 0.95 boundary', () => {
   assert.ok(!r.warnings.find(w => w.code === 'DA_PATTERN_UNNORMALIZED'));
 });
 
+test('DA_PATTERN_UNNORMALIZED fires: max relative_field > 1.0 (over-normalized / units error)', () => {
+  // relative_field of 1.2 is over-normalized — §73.316 requires max = 1.000
+  const overNorm = GOOD_PATTERN.map((e, i) => ({ ...e, relative_field: i === 0 ? 1.2 : e.relative_field * 0.8 }));
+  const ex = fmDaExhibit({ station_inputs: { pattern: overNorm } });
+  const r  = buildReadinessReport(ex);
+  const w  = r.warnings.find(w => w.code === 'DA_PATTERN_UNNORMALIZED');
+  assert.ok(w, 'DA_PATTERN_UNNORMALIZED must fire when max relative_field > 1.0');
+  assert.match(w.message, /1\.\d{3}/, 'message must include the actual max value');
+});
+
 // ── DA_SUPPRESSION_UNVERIFIED (WARNING) ───────────────────────────────────────
 
 test('DA_SUPPRESSION_UNVERIFIED fires: FM DA with no suppression evidence', () => {

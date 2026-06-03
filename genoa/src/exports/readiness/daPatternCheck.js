@@ -103,7 +103,9 @@ export function checkDaPatternReadiness(exhibit) {
       hasInvalid = true;
       break;
     }
-    // relative_field > 2.0 is almost certainly a data error (pattern should be ≤1.0 normalized)
+    // relative_field > 2.0 is a hard data error (clearly wrong magnitude).
+    // Values 1.0–2.0 are structurally parseable but over-normalized; they pass
+    // here and are caught by the DA_PATTERN_UNNORMALIZED check below.
     if (e.relative_field < 0 || e.relative_field > 2.0) {
       hasInvalid = true;
       break;
@@ -134,12 +136,17 @@ export function checkDaPatternReadiness(exhibit) {
   }
 
   // ── Check 5: pattern not normalized to 1.0 at maximum ─────────────────────
+  // §73.316 requires the maximum to be exactly 1.000.  Warn in both directions:
+  // under-normalized (max < 0.95, allowing ±5% for measurement uncertainty) and
+  // over-normalized (max > 1.0, which is always wrong and typically a units error).
 
   const maxField = normalized.length > 0 ? Math.max(...normalized.map(e => e.relative_field)) : null;
-  if (maxField != null && maxField < 0.95) {
+  if (maxField != null && (maxField < 0.95 || maxField > 1.0)) {
     warnings.push({
       code:    'DA_PATTERN_UNNORMALIZED',
-      message: `Pattern maximum relative_field is ${maxField.toFixed(3)} — FCC standard requires normalization to 1.000 at the maximum radiation azimuth`,
+      message: maxField > 1.0
+        ? `Pattern maximum relative_field is ${maxField.toFixed(3)} — §73.316 requires normalization to exactly 1.000; values > 1.0 indicate a units or scaling error`
+        : `Pattern maximum relative_field is ${maxField.toFixed(3)} — §73.316 requires normalization to 1.000 at the maximum radiation azimuth`,
       rule:    '47 CFR §73.316',
       field:   'antenna-pattern-table',
     });
