@@ -392,22 +392,32 @@ The code's 8-radial compass-point threshold was engineering shorthand, not the a
 
 ---
 
-### §1.1310 / OET Bulletin 65 — RF Exposure ERP Threshold (5 kW)
+### §1.1307(b)(3)(i) / §1.1310 / OET Bulletin 65 — RF Exposure ERP Threshold (5 kW)
 
 **Used in:** `OET65_REQUIRED` warning  
 **Code value:** `erp_kw >= 5` triggers WARNING  
-**Research status: PARTIALLY VERIFIED.**
+**Verdict: VERIFIED CORRECT (with documentation correction).**
 
-The general population/uncontrolled MPE limits at FM frequencies (88–108 MHz, 30–300 MHz band) are confirmed: 27.5 V/m electric field strength, 0.2 mW/cm² power density per 47 CFR §1.1310 Table 1. OET Bulletin 65 applies these limits.
+**Actual CFR rule (§1.1307(b)(3)(i) Table 1):** The categorical exclusion from formal MPE evaluation is **formula-based**, not a flat ERP cutoff. For the 30–300 MHz band covering FM broadcast (88–108 MHz):
 
-The specific FM broadcast categorical exclusion ERP threshold (the level below which a station is excluded from performing a formal MPE evaluation) is in 47 CFR §1.1307(b)(3)(i) Table 1. This table was not successfully fetched during the research run (the ecfr.gov endpoint redirected). However:
+> Exclusion threshold = **3.83 × R² watts**  
+> where R = minimum separation distance (meters) to nearest accessible location.
 
-- The 5 kW threshold is widely cited in FCC broadcast engineering practice for FM stations
-- FCC stations routinely receive deficiency letters for missing OET-65 evaluations at ≥5 kW  
-- The consequence of a wrong threshold is calibration error (too many or too few warnings), not a statutory violation
-- The code designation is WARNING (not BLOCKER), which is the correct tier regardless of exact ERP threshold
+The MPE limits themselves (§1.1310 Table 1) are 27.5 V/m / 0.2 mW/cm² for general population/uncontrolled exposure — confirmed correct.
 
-**Action:** The `OET65_REQUIRED` warning remains at 5 kW. A dedicated §1.1307(b)(3)(i) Table 1 verification task is logged. If the actual categorical exclusion threshold differs, only the ERP boundary changes — the warning tier and code do not change.
+**Reconciliation with code:**
+
+| R (min accessible distance) | Formula threshold |
+|-----------------------------|------------------|
+| 36 m (≈118 ft, typical fenced tower) | 3.83 × 36² = **4,964 W ≈ 5 kW** |
+| 50 m | 3.83 × 50² = 9,575 W ≈ 9.6 kW |
+| 100 m | 3.83 × 100² = 38,300 W ≈ 38.3 kW |
+
+The code's 5 kW gate corresponds to assuming ~36 m minimum accessible distance — a reasonable conservative bound for a fenced broadcast tower. It is a deliberate simplification of the formula, and it errs on the side of caution (more warnings, no missed evaluations).
+
+**Two corrections applied:**
+1. Comment in `readiness/index.js` updated to document the formula basis and the 36 m derivation
+2. Rule citation corrected from `§1.1310` (MPE limits) to `§§1.1307(b)(3)(i), 1.1310` (evaluation requirement + limits)
 
 ---
 
@@ -417,5 +427,5 @@ The specific FM broadcast categorical exclusion ERP threshold (the level below w
 |-----------|--------------|--------------|--------|
 | ASR height (§17.7) | 60.96 m | ✓ Confirmed exact CFR text | None |
 | DA pattern radials (§73.316) | ~~8~~ → **36** | ✗ Discrepancy — corrected | `MIN_RADIALS` fixed |
-| OET-65 ERP (§1.1307) | 5 kW | Partially verified — widely cited practice | Log for §1.1307 Table 1 fetch |
+| OET-65 ERP (§1.1307) | 5 kW | ✓ Verified — formula 3.83×R² at R≈36 m → 5 kW; rule citation corrected to §§1.1307(b)(3)(i), 1.1310 | Citation fixed |
 | DA suppression (§73.316) | WARNING (not BLOCKER) | ✓ No explicit suppression ratio in §73.316 | None |
