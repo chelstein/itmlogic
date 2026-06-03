@@ -9,7 +9,7 @@
 // NOT a new FCC rule — §73.316 is already on Form 301-FM Section III.
 // This adds the readiness enforcement that was previously missing.
 
-const MIN_RADIALS = 8; // standard compass radials: 0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°
+const MIN_RADIALS = 36; // §73.316: at least 36 evenly spaced radials at intervals of not greater than 10° (0° through 350°)
 
 // Normalize a pattern entry to { azimuth_deg, relative_field } regardless of format.
 // Accepts: [azimuth_deg, relative_field] array OR { azimuth_deg|azimuth|az, relative_field|field|value|rf }
@@ -127,7 +127,7 @@ export function checkDaPatternReadiness(exhibit) {
   if (normalized.length < MIN_RADIALS) {
     warnings.push({
       code:    'DA_PATTERN_INCOMPLETE',
-      message: `Horizontal pattern has ${normalized.length} azimuth point(s); FCC standard requires at least ${MIN_RADIALS} radials (0°, 45°, 90°, 135°, 180°, 225°, 270°, 315°)`,
+      message: `Horizontal pattern has ${normalized.length} azimuth point(s); §73.316 requires at least ${MIN_RADIALS} radials tabulated at 10° intervals (0° through 350°)`,
       rule:    '47 CFR §73.316',
       field:   'antenna-pattern-table',
     });

@@ -4,7 +4,7 @@
 //   DA_PATTERN_MISSING     BLOCKER — pattern_mode=DA but no pattern table anywhere
 //   DA_PATTERN_INVALID     BLOCKER — pattern entries are non-numeric / out-of-range
 //   DA_PATTERN_UNCONFIRMED WARNING — pattern data present but pattern_mode not declared
-//   DA_PATTERN_INCOMPLETE  WARNING — fewer than 8 standard radials
+//   DA_PATTERN_INCOMPLETE  WARNING — fewer than 36 standard radials (§73.316)
 //   DA_PATTERN_UNNORMALIZED WARNING — max relative_field < 0.95
 //   DA_SUPPRESSION_UNVERIFIED WARNING — FM DA with no suppression calc in evidence
 
@@ -15,17 +15,11 @@ import { checkDaPatternReadiness } from '../exports/readiness/daPatternCheck.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-// 8-point standard-radial pattern, normalized.
-const GOOD_PATTERN = [
-  { azimuth: 0,   relative_field: 1.0 },
-  { azimuth: 45,  relative_field: 0.85 },
-  { azimuth: 90,  relative_field: 0.9 },
-  { azimuth: 135, relative_field: 0.8 },
-  { azimuth: 180, relative_field: 0.95 },
-  { azimuth: 225, relative_field: 0.75 },
-  { azimuth: 270, relative_field: 0.88 },
-  { azimuth: 315, relative_field: 0.92 },
-];
+// 36-radial pattern (10° intervals per §73.316), normalized to 1.0 at 0°.
+const GOOD_PATTERN = Array.from({ length: 36 }, (_, i) => ({
+  azimuth: i * 10,
+  relative_field: i === 0 ? 1.0 : Math.min(1.0, Math.max(0.1, 0.75 + 0.2 * Math.cos(i * Math.PI / 18))),
+}));
 
 // 4-point pattern (WKLX-style) — incomplete but parseable.
 const SPARSE_PATTERN = [
@@ -177,25 +171,25 @@ test('WKLX golden fixture: DA_PATTERN_UNCONFIRMED fires (no pattern_mode in fixt
 
 // ── DA_PATTERN_INCOMPLETE (WARNING) ───────────────────────────────────────────
 
-test('DA_PATTERN_INCOMPLETE fires: fewer than 8 standard radials', () => {
+test('DA_PATTERN_INCOMPLETE fires: fewer than 36 standard radials (§73.316)', () => {
   const ex = fmDaExhibit({ station_inputs: { pattern: SPARSE_PATTERN } });
   const r  = buildReadinessReport(ex);
   const w  = r.warnings.find(w => w.code === 'DA_PATTERN_INCOMPLETE');
   assert.ok(w, 'DA_PATTERN_INCOMPLETE must fire for 4-radial pattern');
   assert.match(w.message, /4/, 'warning must state the actual radial count');
-  assert.match(w.message, /8/, 'warning must state the required radial count');
+  assert.match(w.message, /36/, 'warning must state the §73.316 required radial count');
 });
 
-test('DA_PATTERN_INCOMPLETE does NOT fire for 8-radial pattern', () => {
+test('DA_PATTERN_INCOMPLETE does NOT fire for 36-radial pattern (§73.316 minimum)', () => {
   const ex = fmDaExhibit({ station_inputs: { pattern: GOOD_PATTERN } });
   const r  = buildReadinessReport(ex);
   assert.ok(!r.warnings.find(w => w.code === 'DA_PATTERN_INCOMPLETE'));
 });
 
-test('DA_PATTERN_INCOMPLETE does NOT fire for pattern with > 8 radials', () => {
-  // 36-radial pattern (10° increments)
-  const dense = Array.from({ length: 36 }, (_, i) => ({ azimuth: i * 10, relative_field: Math.random() * 0.5 + 0.5 }));
-  dense[0].relative_field = 1.0; // normalize
+test('DA_PATTERN_INCOMPLETE does NOT fire for pattern with > 36 radials', () => {
+  // 72-radial pattern (5° increments — denser than required)
+  const dense = Array.from({ length: 72 }, (_, i) => ({ azimuth: i * 5, relative_field: 0.5 + 0.5 * Math.cos(i * Math.PI / 36) }));
+  dense[0].relative_field = 1.0;
   const ex = fmDaExhibit({ station_inputs: { pattern: dense } });
   const r  = buildReadinessReport(ex);
   assert.ok(!r.warnings.find(w => w.code === 'DA_PATTERN_INCOMPLETE'));
