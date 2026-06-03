@@ -37,7 +37,8 @@
     "agents:regulatory": "../agents/scripts/regulatory-regression-test.sh",
     "agents:golden": "../agents/scripts/golden-output-compare.sh",
     "agents:queue": "../agents/scripts/queue-manager.sh",
-    "agents:spawn-worker": "../agents/scripts/spawn-worker.sh"
+    "agents:spawn-worker": "../agents/scripts/spawn-worker.sh",
+    "graphify": "node scripts/graphify/graphify.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1030.0",
