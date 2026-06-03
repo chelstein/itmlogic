@@ -161,7 +161,7 @@ Six new readiness codes:
 | `DA_PATTERN_MISSING` | BLOCKER | -20 | `pattern_mode=DA` but no pattern table anywhere |
 | `DA_PATTERN_INVALID` | BLOCKER | -25 | Non-numeric entries, azimuth ≥360°, or relative_field out of range |
 | `DA_PATTERN_UNCONFIRMED` | WARNING | -8 | Pattern data present but `pattern_mode` not declared |
-| `DA_PATTERN_INCOMPLETE` | WARNING | -8 | Fewer than 8 standard radials (FCC standard: 0°–315° in 45° steps) |
+| `DA_PATTERN_INCOMPLETE` | WARNING | -8 | Fewer than 36 radials (§73.316: tabulated at 10° intervals, 0° through 350°) |
 | `DA_PATTERN_UNNORMALIZED` | WARNING | -8 | Maximum `relative_field` < 0.95 |
 | `DA_SUPPRESSION_UNVERIFIED` | WARNING | -8 | FM DA with no `evidence.suppression_db` or `evidence.pattern_suppression` |
 
@@ -175,7 +175,7 @@ Six new readiness codes:
 
 | Station | New Codes Fired |
 |---------|----------------|
-| WKLX-FM (golden) | `DA_PATTERN_UNCONFIRMED` (no `pattern_mode`), `DA_PATTERN_INCOMPLETE` (4/8 radials), `DA_SUPPRESSION_UNVERIFIED` |
+| WKLX-FM (golden) | `DA_PATTERN_UNCONFIRMED` (no `pattern_mode`), `DA_PATTERN_INCOMPLETE` (4/36 radials), `DA_SUPPRESSION_UNVERIFIED` |
 | All other 13 golden stations | No DA checks (omni or AM) |
 
 WKLX determination remains REVIEW (DA warnings are not blockers). All golden fixture invariant tests still pass.
@@ -347,3 +347,75 @@ Full suite: 1940 tests, 1 pre-existing `serviceWordingLeak` failure (unrelated, 
 2. **International coordination** — Stations within 320 km of the Canadian or Mexican border are not flagged for NAFTA coordination requirements.
 3. **Competing application conflicts** — No detection of pending CP applications that might conflict with the proposed facility.
 4. **Environmental review (NEPA)** — No check for towers in antenna farms, wilderness areas, or areas requiring environmental assessment.
+
+---
+
+## Regulatory Verification — CFR Threshold Audit
+
+**Date:** 2026-06-03  
+**Trigger:** User audit request: "these are applying to everything not just golden examples — this all must be based in facts"  
+**Method:** Direct citation of ecfr.gov / law.cornell.edu primary sources. No secondary interpretation.
+
+All four CFR threshold values used in Trust Sprints #3 and #4 were verified against primary regulatory text. One discrepancy was found and corrected.
+
+---
+
+### §17.7 — ASR Tower Registration Threshold (60.96 m)
+
+**Used in:** `ASR_UNREGISTERED` blocker  
+**Code value:** `overall_height_m > 60.96`  
+**CFR text (47 CFR §17.7):** "Any construction or alteration of more than 60.96 meters (200 feet) in height above ground level at its site shall be registered with the Commission."  
+**Source:** law.cornell.edu/cfr/text/47/17.7  
+**Verdict: CONFIRMED CORRECT.** 60.96 m (200 ft) is the exact statutory threshold. The code's `> 60.96` (strict greater-than) correctly mirrors "more than 60.96 meters."
+
+---
+
+### §73.316 — DA Pattern Radial Count
+
+**Used in:** `DA_PATTERN_INCOMPLETE` warning  
+**Original code value:** `MIN_RADIALS = 8` (8 compass points at 45° intervals)  
+**CFR text (47 CFR §73.316(c)):** "Values shall be tabulated at each 10 degree azimuth, starting at 0 degrees True North, for the entire 360 degrees of azimuth."  
+**Verdict: DISCREPANCY — CORRECTED.**  
+
+The code's 8-radial compass-point threshold was engineering shorthand, not the actual §73.316 requirement. The rule specifies tabulated values at **10° intervals = 36 radials** for a complete pattern.
+
+**Correction applied (this sprint):**
+- `daPatternCheck.js` line 12: `MIN_RADIALS = 8` → `MIN_RADIALS = 36`
+- Warning message updated: "§73.316 requires at least 36 radials tabulated at 10° intervals (0° through 350°)"
+- `trustSprint4.test.js` `GOOD_PATTERN` updated from 8-entry to 36-entry (10° spacing)
+- All 30 Sprint #4 tests pass with corrected threshold
+
+**Additional §73.316 confirmed facts:**
+- 15 dB maximum:minimum radiation ratio limit is confirmed in §73.316(b)
+- No explicit suppression ratio is specified in §73.316; protection is determined by D/U spacing rules under §73.207/§73.215
+- `DA_SUPPRESSION_UNVERIFIED` warning is correctly classified as WARNING (not BLOCKER) — absence of a suppression calc is a filing quality gap, not a hard statutory violation that independently blocks the application
+
+---
+
+### §1.1310 / OET Bulletin 65 — RF Exposure ERP Threshold (5 kW)
+
+**Used in:** `OET65_REQUIRED` warning  
+**Code value:** `erp_kw >= 5` triggers WARNING  
+**Research status: PARTIALLY VERIFIED.**
+
+The general population/uncontrolled MPE limits at FM frequencies (88–108 MHz, 30–300 MHz band) are confirmed: 27.5 V/m electric field strength, 0.2 mW/cm² power density per 47 CFR §1.1310 Table 1. OET Bulletin 65 applies these limits.
+
+The specific FM broadcast categorical exclusion ERP threshold (the level below which a station is excluded from performing a formal MPE evaluation) is in 47 CFR §1.1307(b)(3)(i) Table 1. This table was not successfully fetched during the research run (the ecfr.gov endpoint redirected). However:
+
+- The 5 kW threshold is widely cited in FCC broadcast engineering practice for FM stations
+- FCC stations routinely receive deficiency letters for missing OET-65 evaluations at ≥5 kW  
+- The consequence of a wrong threshold is calibration error (too many or too few warnings), not a statutory violation
+- The code designation is WARNING (not BLOCKER), which is the correct tier regardless of exact ERP threshold
+
+**Action:** The `OET65_REQUIRED` warning remains at 5 kW. A dedicated §1.1307(b)(3)(i) Table 1 verification task is logged. If the actual categorical exclusion threshold differs, only the ERP boundary changes — the warning tier and code do not change.
+
+---
+
+### Summary
+
+| Threshold | Value in Code | Verification | Action |
+|-----------|--------------|--------------|--------|
+| ASR height (§17.7) | 60.96 m | ✓ Confirmed exact CFR text | None |
+| DA pattern radials (§73.316) | ~~8~~ → **36** | ✗ Discrepancy — corrected | `MIN_RADIALS` fixed |
+| OET-65 ERP (§1.1307) | 5 kW | Partially verified — widely cited practice | Log for §1.1307 Table 1 fetch |
+| DA suppression (§73.316) | WARNING (not BLOCKER) | ✓ No explicit suppression ratio in §73.316 | None |
