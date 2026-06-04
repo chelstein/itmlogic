@@ -9,3 +9,12 @@ node_modules/
 
 # Vite build output (generated; do not commit)
 src/ui/dist/
+
+# Graphify generated artifacts
+graphify-out/
+
+# Local virtualenv
+.venv/
+
+# Local Claude instructions
+CLAUDE.md
