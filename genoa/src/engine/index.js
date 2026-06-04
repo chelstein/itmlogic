@@ -250,7 +250,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   if (service === 'LPFM'){
     regulatory_compliance = await checkLpfmCompliance({
       erp_kw:        erp_kW,
-      haat_m,
+      haat_m:        operativeHaat.haat_m,   // operative (terrain-derived when available)
       frequency_mhz: freq,
       fcc_class:     inputs.fcc_class || 'LP100'
     });
