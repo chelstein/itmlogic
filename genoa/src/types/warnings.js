@@ -87,9 +87,21 @@ export const WARNING_CODES = Object.freeze({
     title: 'Upstream terrain-HAAT response rejected',
     description: 'A terrain sidecar returned per-radial HAAT values that failed plausibility checks (outside physical bounds or inconsistent with operator HAAT). Bundle rejected; pipeline fell through to the resolver-backed multi-source DEM path.' },
 
-  TX_AMSL_UNRESOLVED:            { severity: 'warning', phase: 'engine',
-    title: 'Antenna AMSL unresolved',
-    description: 'Could not resolve antenna AMSL: neither inputs.overall_height_amsl_m supplied nor ground-elevation probe at the transmitter site succeeded.  Per-radial HAAT column reflects (haat_m − terrain_avg_at_radial), not true HAAT.' },
+  TX_AMSL_UNRESOLVED:            { severity: 'blocker', phase: 'engine',
+    title: 'Antenna AMSL unresolved — per-radial HAAT unreliable',
+    description: 'Could not resolve antenna AMSL: neither inputs.overall_height_amsl_m supplied nor ground-elevation probe at the transmitter site succeeded.  Per-radial HAAT cannot be computed without a real AMSL basis; terrain pipeline skipped.  Supply overall_height_amsl_m (the "radiation center AMSL" field on FCC Form 301) to resolve.' },
+
+  FREQUENCY_OUT_OF_BAND:         { severity: 'blocker', phase: 'input',
+    title: 'Frequency outside US broadcast band',
+    description: 'The submitted frequency is outside the US broadcast band for the specified service (AM: 530–1710 kHz; FM/LPFM/FX: 88.0–108.0 MHz).  This almost always indicates a unit-conversion error — e.g. an FM frequency entered in kHz instead of MHz.  FCC §73.333/§73.184 curves do not apply outside these ranges; no contour distances can be computed.  Correct the frequency before resubmitting.' },
+
+  ERP_VARIANCE_FROM_LICENSE:     { severity: 'warning', phase: 'evidence',
+    title: 'Proposed ERP differs from FCC-licensed ERP',
+    description: 'The operator-entered ERP deviates from the FCC-licensed ERP by more than 5 %.  This may indicate an intentional modification (CP, STA, or power increase application) or a data-entry error.  If this is a modification exhibit, the variance is expected and this warning is informational.  If this is a license-verification exhibit, correct the ERP to match the FCC record before filing.' },
+
+  FCC_CLASS_DEFAULTED:           { severity: 'info', phase: 'engine',
+    title: 'FCC class not supplied — Class A default applied',
+    description: 'No FCC class was provided; §73.215 contour protection used the Class A protected-field default (60 dBu).  Class A is the most protective option; using it is conservative and will not produce false-pass results, but may flag interference pairs that a lower-class station (C, C0, C1, C2, B, B1) would be permitted to fail under the actual applicable threshold (54 dBu).  Supply inputs.fcc_class for a class-specific study.' },
 
   SIDECAR_UNAVAILABLE:           { severity: 'warning', phase: 'sidecar',
     title: 'Optional sidecar unavailable',
