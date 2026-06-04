@@ -46,6 +46,7 @@ export function renderNarrative(exhibit){
     validation_evidence:      section_validation(v),
     population:               section_population(pop),
     warnings:                 section_warnings(exhibit.warnings || [], fr),
+    source_attestation:       section_source_attestation(exhibit),
     certification:            section_certification(fr)
   };
 
@@ -57,7 +58,7 @@ export function renderNarrative(exhibit){
     sections.am_physics_fccgw_evidence, sections.am_physics_evidence,
     sections.oet65_evidence, sections.identity_evidence,
     sections.validation_evidence, sections.population, sections.warnings,
-    sections.certification
+    sections.source_attestation, sections.certification
   ].join('\n\n');
 
   // Guard against unsupported engineering claims.  Even though the
@@ -582,6 +583,63 @@ function section_identity(ev){
 
   lines.push('');
   lines.push('Advisory: Identity evidence (EAS, RadioDNS, RDS) is supplemental. FCC call sign authority rests with the FCC license record.');
+  return lines.join('\n');
+}
+
+function section_source_attestation(exhibit){
+  const sa = exhibit.source_attestation;
+  if (!sa) return '';
+
+  const hr2 = '─'.repeat(62);
+  const lines = [`${hr2}`, 'APPENDIX P — Data Source Provenance', hr2];
+
+  const pct = sa.overall_confidence != null
+    ? `${(sa.overall_confidence * 100).toFixed(0)}%`
+    : '—';
+  lines.push(`Overall source confidence: ${pct}`);
+  lines.push('');
+
+  // Per-field table
+  const COL = [22, 14, 14, 16, 12];
+  const hdr = ['Field', 'Authority', 'Status', 'Confidence', 'Conflict'];
+  lines.push(hdr.map((h, i) => h.padEnd(COL[i])).join(''));
+  lines.push(COL.map(c => '─'.repeat(c - 1)).join(' '));
+
+  const scores = Array.isArray(sa.field_scores)
+    ? sa.field_scores
+    : Object.values(sa.fields || {});
+
+  for (const s of scores){
+    const row = [
+      String(s.field || '').padEnd(COL[0]),
+      String(s.source_authority || '').padEnd(COL[1]),
+      String(s.verification_status || '').padEnd(COL[2]),
+      String(s.confidence != null ? (s.confidence * 100).toFixed(0) + '%' : '—').padEnd(COL[3]),
+      String(s.conflict_detail ? 'YES' : '').padEnd(COL[4])
+    ];
+    lines.push(row.join(''));
+  }
+
+  // Conflicts
+  if (sa.conflicts?.length){
+    lines.push('');
+    lines.push('Conflicts:');
+    for (const c of sa.conflicts){
+      lines.push(`  [${(c.severity || 'conflict').toUpperCase()}] ${c.field}: ${c.description}`);
+    }
+  }
+
+  // Evidence hashes
+  if (sa.source_hashes && Object.keys(sa.source_hashes).length){
+    lines.push('');
+    lines.push('Evidence SHA-256 fingerprints:');
+    for (const [src, hash] of Object.entries(sa.source_hashes)){
+      lines.push(`  ${src.padEnd(14)} ${hash}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Advisory: Source authority scores are engineering provenance metadata, not regulatory findings.');
   return lines.join('\n');
 }
 
