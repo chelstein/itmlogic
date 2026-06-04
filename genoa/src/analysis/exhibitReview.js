@@ -43,14 +43,7 @@ const SYSTEM_PROMPT =
   'source_attestation_conflicts names fields where two independent sources disagree beyond tolerance. ' +
   'Low source confidence is a DATA QUALITY issue, not a contour math issue — do NOT flag it as ' +
   'an internal engineering contradiction unless the confidence problem would directly invalidate ' +
-  'a specific regulatory conclusion shown in the exhibit.\n\n' +
-  'SOURCE FRESHNESS AND EVIDENCE LOCK: source_stale lists sources older than their staleness ' +
-  'threshold.  evidence_lock_status indicates whether the evidence lock is valid, invalid, ' +
-  'missing, or not_verified.  source_record_changed lists sources whose evidence hash changed ' +
-  'after locking.  Treat stale, changed, or unlocked authoritative source records as filing ' +
-  'risk.  Do NOT recommend READY when a critical source (FCC LMS, ASR) is stale, changed, or ' +
-  'lacks a valid evidence lock.  evidence_lock_status=not_verified means the lock was created ' +
-  'this session and has not yet been re-verified — this is normal for fresh exhibits.';
+  'a specific regulatory conclusion shown in the exhibit.';
 
 // Build a compact, deterministic snapshot of the consistency-relevant
 // surface.  Kept small (the router bills per token) and stable (so the
@@ -125,27 +118,6 @@ export function snapshot(exhibit){
       .map(s => s.field)
       .join(',');
     if (operatorOnly) lines.push(`source_operator_only_fields=${operatorOnly}`);
-
-    // Source freshness context.
-    const sfMap = sa.source_freshness ?? {};
-    const staleSources = Object.entries(sfMap)
-      .filter(([, r]) => r.freshness_status === 'stale')
-      .map(([k]) => k)
-      .join(',');
-    if (staleSources) lines.push(`source_stale=${staleSources}`);
-
-    // Evidence lock status.
-    const lv = sa._lock_verification ?? null;
-    const el = sa.evidence_lock      ?? null;
-    if (el){
-      const lockStatus = lv ? (lv.valid ? 'valid' : 'invalid') : 'not_verified';
-      lines.push(`evidence_lock_status=${lockStatus}`);
-      if (lv && !lv.valid && lv.mismatches?.length){
-        lines.push(`source_record_changed=${lv.mismatches.map(m => m.source).join(',')}`);
-      }
-    } else {
-      lines.push('evidence_lock_status=missing');
-    }
   }
 
   // Contour distance spread — computed per contour type so the AI compares

@@ -384,41 +384,7 @@ export const WARNING_CODES = Object.freeze({
 
   SOURCE_AUTHORITY_UNKNOWN: { severity: 'info', phase: 'evidence',
     title: 'Source authority could not be determined for one or more fields',
-    description: 'One or more engineering values have unknown source authority (trust score 0.0).  This typically means the field was not populated by any recognized source — not operator input, not an FCC record, not a terrain DEM.  Investigate the missing provenance and supply the value from an authoritative source.' },
-
-  // ─── Source freshness + evidence lock framework (PR #331) ────────────────
-
-  SOURCE_STALE: { severity: 'warning', phase: 'evidence',
-    title: 'Authoritative source record is stale',
-    description: 'An evidence source record is older than the staleness threshold for its authority type (FCC LMS/ASR >30 days, FAA OE/AAA >90 days).  Stale records are still usable but require engineering review before filing.  Re-fetch the source record to restore current status.' },
-
-  SOURCE_AGING: { severity: 'info', phase: 'evidence',
-    title: 'Authoritative source record is aging',
-    description: 'An evidence source record has passed the aging-notice threshold (FCC LMS/ASR >14 days, FAA >30 days) but has not yet reached the stale threshold.  No filing action required, but re-fetching the record ahead of filing is prudent.' },
-
-  SOURCE_TIMESTAMP_MISSING: { severity: 'warning', phase: 'evidence',
-    title: 'Source record has no retrieval or modification timestamp',
-    description: 'An authoritative evidence record does not carry a retrieved_at or source_last_modified timestamp.  Without a timestamp, Genoa cannot assess freshness.  Ensure the source fetch pipeline stamps every record with at least a retrieved_at timestamp.' },
-
-  SOURCE_REFRESH_REQUIRED: { severity: 'blocker', phase: 'evidence',
-    title: 'Critical source record must be refreshed before filing',
-    description: 'A source record that is authoritative for a filing-critical field (frequency, coordinates, RCAMSL, tower height, FCC class) is both stale and flagged refresh_required.  Filing is blocked until the record is re-fetched and the freshness threshold is cleared.' },
-
-  SOURCE_RECORD_CHANGED: { severity: 'blocker', phase: 'evidence',
-    title: 'Source record has changed since exhibit was generated',
-    description: 'A source evidence record that was locked at exhibit generation time has a different content hash now.  The exhibit engineering values may no longer agree with the current authoritative record.  Re-compute the exhibit from the updated source record before filing.' },
-
-  SOURCE_EVIDENCE_LOCK_MISSING: { severity: 'blocker', phase: 'evidence',
-    title: 'Evidence lock entry missing for a critical source',
-    description: 'A critical source (FCC LMS, FCC ASR) is present in evidence but has no corresponding entry in the evidence lock, or the evidence lock itself is absent.  Filing-grade exhibits require a complete evidence lock so auditors can verify that source records have not changed since the study was computed.' },
-
-  SOURCE_EVIDENCE_LOCK_INVALID: { severity: 'blocker', phase: 'evidence',
-    title: 'Evidence lock hash mismatch — source record changed after locking',
-    description: 'The SHA-256 fingerprint of one or more evidence records does not match the value stored in the evidence lock.  This means a source record was modified or replaced after the exhibit was computed.  The exhibit must be recomputed from the current source records.' },
-
-  SOURCE_EVIDENCE_LOCK_STALE: { severity: 'warning', phase: 'evidence',
-    title: 'Evidence lock is older than the source freshness window',
-    description: 'The evidence lock was generated more than the staleness threshold ago.  The lock hashes may still be valid, but the underlying source records should be re-fetched and the exhibit recomputed to produce a lock stamped with current data.' }
+    description: 'One or more engineering values have unknown source authority (trust score 0.0).  This typically means the field was not populated by any recognized source — not operator input, not an FCC record, not a terrain DEM.  Investigate the missing provenance and supply the value from an authoritative source.' }
 });
 
 export class W {

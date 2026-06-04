@@ -278,60 +278,7 @@ export function buildReadinessReport(exhibit, applicant = {}) {
           source:  'source_attestation'
         });
       }
-      if (w.code === 'SOURCE_STALE'){
-        warnings.push({
-          code:    'SOURCE_STALE',
-          message: w.detail || 'Source record is stale',
-          source:  w.source ?? 'source_attestation'
-        });
-      }
-      if (w.code === 'SOURCE_AGING'){
-        advisories.push({
-          code:    'SOURCE_AGING',
-          message: w.detail || 'Source record is aging',
-          source:  w.source ?? 'source_attestation'
-        });
-      }
     }
-
-    // Freshness/lock blockers — these prevent READY.
-    const BLOCKING_FRESHNESS_CODES = new Set([
-      'SOURCE_REFRESH_REQUIRED', 'SOURCE_RECORD_CHANGED',
-      'SOURCE_EVIDENCE_LOCK_INVALID', 'SOURCE_EVIDENCE_LOCK_MISSING'
-    ]);
-    for (const b of (sa.blockers ?? [])){
-      if (BLOCKING_FRESHNESS_CODES.has(b.code)){
-        blockers.push({
-          code:    b.code,
-          message: b.detail || b.message || b.code,
-          source:  b.source ?? 'source_attestation'
-        });
-      }
-    }
-
-    // Summarise freshness and lock status for the readiness report.
-    const freshnessMap   = sa.source_freshness ?? {};
-    const stale_sources  = Object.entries(freshnessMap)
-      .filter(([, r]) => r.freshness_status === 'stale' || r.freshness_status === 'aging')
-      .map(([k]) => k);
-
-    const evidenceLock   = sa.evidence_lock ?? null;
-    const lockVerification = sa._lock_verification ?? null;
-    const invalid_locks  = lockVerification?.mismatches?.map(m => m.source) ?? [];
-    const evidenceLockStatus = !evidenceLock
-      ? 'missing'
-      : lockVerification
-        ? (lockVerification.valid ? 'valid' : 'invalid')
-        : 'not_verified';
-
-    // Attach summary fields to the report object (done after return statement
-    // via augmentation in the return value below).
-    sa._readiness_summary = {
-      source_freshness_status: stale_sources.length > 0 ? 'stale' : 'current',
-      evidence_lock_status:    evidenceLockStatus,
-      stale_sources,
-      invalid_locks
-    };
   }
 
   // ── EVIDENCE ────────────────────────────────────────────────────────────────
@@ -437,10 +384,6 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     determination = 'READY';
   }
 
-  // Pull freshness summary from the attestation (populated above if sa exists).
-  const sa  = exhibit.source_attestation ?? null;
-  const frs = sa?._readiness_summary ?? null;
-
   return {
     determination,
     readiness_score: score,
@@ -448,11 +391,5 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     warnings,
     advisories,
     evidence,
-    ...(frs ? {
-      source_freshness_status: frs.source_freshness_status,
-      evidence_lock_status:    frs.evidence_lock_status,
-      stale_sources:           frs.stale_sources,
-      invalid_locks:           frs.invalid_locks
-    } : {})
   };
 }

@@ -590,8 +590,8 @@ function section_source_attestation(exhibit){
   const sa = exhibit.source_attestation;
   if (!sa) return '';
 
-  const hr2 = '─'.repeat(76);
-  const lines = [hr2, 'APPENDIX P — Data Source Provenance & Freshness', hr2];
+  const hr2 = '─'.repeat(62);
+  const lines = [`${hr2}`, 'APPENDIX P — Data Source Provenance', hr2];
 
   const pct = sa.overall_confidence != null
     ? `${(sa.overall_confidence * 100).toFixed(0)}%`
@@ -599,50 +599,28 @@ function section_source_attestation(exhibit){
   lines.push(`Overall source confidence: ${pct}`);
   lines.push('');
 
-  // ── Per-field table ───────────────────────────────────────────────────────
-  const COL = [14, 14, 13, 11, 12, 12, 9];
-  const hdr = ['Field', 'Authority', 'Status', 'Conf%', 'Retrieved', 'Freshness', 'Hash'];
+  // Per-field table
+  const COL = [22, 14, 14, 16, 12];
+  const hdr = ['Field', 'Authority', 'Status', 'Confidence', 'Conflict'];
   lines.push(hdr.map((h, i) => h.padEnd(COL[i])).join(''));
   lines.push(COL.map(c => '─'.repeat(c - 1)).join(' '));
 
-  const scores  = Array.isArray(sa.field_scores)
+  const scores = Array.isArray(sa.field_scores)
     ? sa.field_scores
     : Object.values(sa.fields || {});
-  const sfMap   = sa.source_freshness ?? {};
-  const hashes  = sa.source_hashes   ?? {};
-
-  // Map authority → freshness record (use first match).
-  const authorityToFreshness = {};
-  for (const [k, r] of Object.entries(sfMap)){
-    const auth = r.source_authority;
-    if (auth && !authorityToFreshness[auth]) authorityToFreshness[auth] = r;
-  }
 
   for (const s of scores){
-    const fr  = authorityToFreshness[s.source_authority] ?? null;
-    const hashKey = s.source_authority === 'fcc_asr' ? 'fcc_asr'
-                  : s.source_authority === 'fcc_lms' ? 'fcc_lms'
-                  : s.source_authority === 'usgs_dem'? 'usgs_dem'
-                  : null;
-    const hasHash = hashKey && hashes[hashKey] ? 'yes' : '—';
-    const retrieved = fr?.retrieved_at
-      ? new Date(fr.retrieved_at).toISOString().slice(0, 10)
-      : '—';
-    const freshness = fr?.freshness_status ?? '—';
-
     const row = [
       String(s.field || '').padEnd(COL[0]),
       String(s.source_authority || '').padEnd(COL[1]),
       String(s.verification_status || '').padEnd(COL[2]),
-      String(s.confidence != null ? (s.confidence * 100).toFixed(0) : '—').padEnd(COL[3]),
-      retrieved.padEnd(COL[4]),
-      freshness.padEnd(COL[5]),
-      hasHash.padEnd(COL[6])
+      String(s.confidence != null ? (s.confidence * 100).toFixed(0) + '%' : '—').padEnd(COL[3]),
+      String(s.conflict_detail ? 'YES' : '').padEnd(COL[4])
     ];
     lines.push(row.join(''));
   }
 
-  // ── Conflicts ─────────────────────────────────────────────────────────────
+  // Conflicts
   if (sa.conflicts?.length){
     lines.push('');
     lines.push('Conflicts:');
@@ -651,57 +629,17 @@ function section_source_attestation(exhibit){
     }
   }
 
-  // ── Source freshness detail ───────────────────────────────────────────────
-  if (Object.keys(sfMap).length){
-    lines.push('');
-    lines.push('Source Freshness:');
-    for (const [src, r] of Object.entries(sfMap)){
-      const age   = r.staleness_days != null ? `${r.staleness_days.toFixed(0)} days` : 'unknown age';
-      const modTs = r.source_last_modified
-        ? new Date(r.source_last_modified).toISOString().slice(0, 10)
-        : '—';
-      lines.push(`  ${src.padEnd(16)} status=${r.freshness_status.padEnd(19)} age=${age.padEnd(12)} last_modified=${modTs}`);
-    }
-  }
-
-  // ── Evidence hashes ───────────────────────────────────────────────────────
-  if (Object.keys(hashes).length){
+  // Evidence hashes
+  if (sa.source_hashes && Object.keys(sa.source_hashes).length){
     lines.push('');
     lines.push('Evidence SHA-256 fingerprints:');
-    for (const [src, hash] of Object.entries(hashes)){
+    for (const [src, hash] of Object.entries(sa.source_hashes)){
       lines.push(`  ${src.padEnd(14)} ${hash}`);
     }
   }
 
-  // ── Evidence lock summary ─────────────────────────────────────────────────
-  const el = sa.evidence_lock;
-  if (el){
-    lines.push('');
-    lines.push('Evidence Lock Summary:');
-    lines.push(`  Lock version:   ${el.lock_version ?? '—'}`);
-    lines.push(`  Generated at:   ${el.generated_at ?? '—'}`);
-    lines.push(`  Aggregate hash: ${el.aggregate_hash ?? '—'}`);
-
-    const lv = sa._lock_verification ?? null;
-    if (lv){
-      lines.push(`  Verification:   ${lv.valid ? 'VALID' : 'INVALID'}`);
-      if (lv.mismatches?.length){
-        for (const m of lv.mismatches){
-          lines.push(`    MISMATCH ${m.source}: locked=${m.locked.slice(0, 12)}… current=${m.current.slice(0, 12)}…`);
-        }
-      }
-    } else {
-      lines.push('  Verification:   not_verified (lock generated this session)');
-    }
-
-    const lockSources = Object.keys(el.sources || {});
-    if (lockSources.length){
-      lines.push(`  Locked sources: ${lockSources.join(', ')}`);
-    }
-  }
-
   lines.push('');
-  lines.push('Advisory: Source authority scores and freshness are engineering provenance metadata, not regulatory findings.');
+  lines.push('Advisory: Source authority scores are engineering provenance metadata, not regulatory findings.');
   return lines.join('\n');
 }
 
