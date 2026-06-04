@@ -450,7 +450,79 @@ export const WARNING_CODES = Object.freeze({
 
   SOURCE_EVIDENCE_LOCK_STALE: { severity: 'warning', phase: 'evidence',
     title: 'Evidence lock is older than the source freshness window',
-    description: 'The evidence lock was generated more than the staleness threshold ago.  The lock hashes may still be valid, but the underlying source records should be re-fetched and the exhibit recomputed to produce a lock stamped with current data.' }
+    description: 'The evidence lock was generated more than the staleness threshold ago.  The lock hashes may still be valid, but the underlying source records should be re-fetched and the exhibit recomputed to produce a lock stamped with current data.' },
+
+  // ─── Readiness gate codes (used in readiness/index.js blockers/warnings) ──
+
+  FIELD_INVALID: { severity: 'blocker', phase: 'input',
+    title: 'Required input field is missing or invalid',
+    description: 'A required engineering input field is absent, null, or outside its valid range.  The exhibit cannot proceed to computation until all required fields are supplied with valid values.' },
+
+  COMPLIANCE_FAILURE: { severity: 'blocker', phase: 'engine',
+    title: 'Regulatory compliance check failed',
+    description: 'One or more FCC regulatory compliance checks (contour protection, separation, power limits) produced a failing result.  The filing is blocked; the engineer of record must resolve the compliance failure before submitting.' },
+
+  ASR_UNREGISTERED: { severity: 'blocker', phase: 'evidence',
+    title: 'Tower above ASR threshold but not registered (47 CFR §17.7)',
+    description: 'The antenna support structure exceeds the 47 CFR §17.7 registration threshold but no Antenna Structure Registration (ASR) number is attached to the exhibit.  FCC LMS will reject Form 301 / 302 submissions for structures above this threshold without a valid ASR number.' },
+
+  ENGINEER_CONFIRMATION_NEEDED: { severity: 'warning', phase: 'export',
+    title: 'Exhibit requires engineer-of-record confirmation before filing',
+    description: 'One or more exhibit parameters require explicit certification by a licensed professional engineer before the filing can be submitted to the FCC.  Review the exhibit findings and sign off.' },
+
+  TERRAIN_EVIDENCE_MISSING: { severity: 'warning', phase: 'evidence',
+    title: 'Terrain evidence not attached — HAAT is operator-entered',
+    description: 'No terrain DEM evidence was attached to this exhibit.  Per-radial HAAT is set to the operator-entered value rather than a terrain-computed value.  FCC §73.313 requires arc-averaged terrain HAAT for filing-grade FM exhibits; attach terrain evidence to compute a defensible HAAT.' },
+
+  ENGINE_BLOCKER: { severity: 'blocker', phase: 'engine',
+    title: 'Engine-level blocker surfaced from exhibit',
+    description: 'The propagation engine produced one or more blocker-severity issues that prevent this exhibit from reaching a READY determination.  See exhibit.blockers for the specific engine-level failure details.' },
+
+  FIELD_CONFLICT: { severity: 'warning', phase: 'evidence',
+    title: 'Conflicting values for one or more engineering fields',
+    description: 'Two inputs or evidence sources provide different values for the same engineering field and the conflict was not automatically resolved.  The engineer of record must identify the authoritative value and reconcile the conflict before filing.' },
+
+  OET65_REQUIRED: { severity: 'warning', phase: 'engine',
+    title: 'OET-65 RF exposure evaluation required (47 CFR §1.1310)',
+    description: 'This station\'s ERP and frequency combination meets or exceeds the §1.1310 threshold requiring a formal RF exposure (MPE) evaluation per OET Bulletin 65.  The evaluation has not been performed or has not been attached to this exhibit.  A signed OET-65 compliance study is required for filing.' },
+
+  OET65_MISSING: { severity: 'info', phase: 'engine',
+    title: 'OET-65 RF exposure evaluation not attached',
+    description: 'No OET-65 RF exposure study is attached to this exhibit.  If the station\'s ERP and frequency place it above the §1.1310 evaluation threshold, an OET-65 study is required; otherwise this is advisory only.' },
+
+  SDR_MISSING: { severity: 'info', phase: 'evidence',
+    title: 'No SDR field-measurement captures attached',
+    description: 'No SigMF SDR measurement captures are attached to this exhibit.  Field measurements provide empirical evidence of actual radiated field strength and are valuable for engineering review, though they are not required for FCC filing.' },
+
+  AM_PHYSICS_MISSING: { severity: 'info', phase: 'evidence',
+    title: 'AM SOMNEC2D physics advisory not run',
+    description: 'The SOMNEC2D AM ground-wave physics advisory analysis was not run for this exhibit.  SOMNEC2D provides a numerical electromagnetic check on the antenna system\'s effective ground resistance and efficiency, which is particularly valuable for AM DA filings.' },
+
+  // ─── Directional antenna pattern checks (daPatternCheck.js) ─────────────
+
+  DA_PATTERN_MISSING: { severity: 'blocker', phase: 'input',
+    title: 'Directional antenna pattern required but not provided',
+    description: 'The exhibit uses a directional antenna but no horizontal radiation pattern was supplied.  A horizontal radiation pattern (Table of Relative Field Values per §73.316) is required for Form 301-FM filings with directional antennas.  Provide the pattern before continuing.' },
+
+  DA_PATTERN_UNCONFIRMED: { severity: 'warning', phase: 'input',
+    title: 'Directional antenna pattern present but not confirmed',
+    description: 'A horizontal radiation pattern is attached but it has not been confirmed by the engineer of record.  Pattern verification is required before filing a directional antenna exhibit.' },
+
+  DA_PATTERN_INVALID: { severity: 'blocker', phase: 'input',
+    title: 'Directional antenna pattern fails §73.316 validity checks',
+    description: 'The supplied horizontal radiation pattern fails one or more §73.316 validity checks (e.g., normalization, radial count, suppression ratio).  Correct the pattern before filing.' },
+
+  DA_PATTERN_INCOMPLETE: { severity: 'warning', phase: 'input',
+    title: 'Directional antenna pattern is missing radials',
+    description: 'The horizontal radiation pattern does not include all required radials (typically every 10° per §73.316).  Missing radials will be interpolated, which may reduce pattern accuracy.  Provide a complete 36-radial pattern for filing-grade exhibits.' },
+
+  DA_PATTERN_UNNORMALIZED: { severity: 'warning', phase: 'input',
+    title: 'Directional antenna pattern is not normalized to unity maximum',
+    description: 'The maximum relative field value in the pattern is not 1.000.  §73.316 requires the pattern to be normalized so the maximum relative field equals 1.000.  The pattern has been auto-normalized for computation; verify the normalization is correct before filing.' },
+
+  DA_SUPPRESSION_UNVERIFIED: { severity: 'warning', phase: 'input',
+    title: 'DA suppression ratio not independently verified',
+    description: 'The directional antenna suppression ratio has not been cross-checked against a measured or FCC-approved value.  The suppression ratio affects contour distances in the protected directions; an unverified ratio is a filing risk for short-spaced directional applications.' }
 });
 
 export class W {

@@ -438,7 +438,6 @@ export function buildReadinessReport(exhibit, applicant = {}) {
   }
 
   // Pull freshness summary from the attestation (populated above if sa exists).
-  const sa  = exhibit.source_attestation ?? null;
   const frs = sa?._readiness_summary ?? null;
 
   return {
