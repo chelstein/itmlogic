@@ -36,7 +36,14 @@ const SYSTEM_PROMPT =
   'entered tower height AGL instead of HAAT.  The operative HAAT is terrain-derived and ' +
   'is the correct value for RF calculations.  Do NOT treat the difference between ' +
   'operator-entered and terrain-derived HAAT as a contradiction when this flag is set — ' +
-  'it is a known and labeled input issue, not an internal inconsistency.';
+  'it is a known and labeled input issue, not an internal inconsistency.\n\n' +
+  'SOURCE AUTHORITY CONTEXT: source_attestation_confidence reflects the provenance quality of ' +
+  'engineering inputs (FCC LMS=1.00, USGS DEM=0.95, engine-derived=0.90, operator-only=0.50, ' +
+  'AI-inferred=0.10).  source_operator_only_fields lists values with no authoritative cross-check. ' +
+  'source_attestation_conflicts names fields where two independent sources disagree beyond tolerance. ' +
+  'Low source confidence is a DATA QUALITY issue, not a contour math issue — do NOT flag it as ' +
+  'an internal engineering contradiction unless the confidence problem would directly invalidate ' +
+  'a specific regulatory conclusion shown in the exhibit.';
 
 // Build a compact, deterministic snapshot of the consistency-relevant
 // surface.  Kept small (the router bills per token) and stable (so the
@@ -96,6 +103,23 @@ export function snapshot(exhibit){
     if (failed.length) lines.push(`regulatory_fail_reason=${failed.join(',')}`);
     lines.push('note=regulatory_pass=false and haat_validation_status=REVIEW are independent checks; interference geometry alone can cause regulatory_pass=false');
   }
+  // Source attestation — lets the AI know when operator input is the sole
+  // authority for critical values, or when cross-source conflicts exist.
+  const sa = exhibit?.source_attestation;
+  if (sa){
+    if (sa.overall_confidence != null)
+      lines.push(`source_attestation_confidence=${(sa.overall_confidence * 100).toFixed(0)}%`);
+    if (sa.conflicts?.length){
+      const conflictFields = sa.conflicts.map(c => c.field).join(',');
+      lines.push(`source_attestation_conflicts=${conflictFields}`);
+    }
+    const operatorOnly = (sa.field_scores || Object.values(sa.fields || {}))
+      .filter(s => s.verification_status === 'operator_only')
+      .map(s => s.field)
+      .join(',');
+    if (operatorOnly) lines.push(`source_operator_only_fields=${operatorOnly}`);
+  }
+
   // Contour distance spread — computed per contour type so the AI compares
   // min/max within the same contour, not across service vs protected contours.
   const rt = Array.isArray(exhibit?.radial_table) ? exhibit.radial_table : [];

@@ -355,7 +355,36 @@ export const WARNING_CODES = Object.freeze({
 
   COUNTY_MISSING_INTERSECTION: { severity: 'blocker', phase: 'evidence',
     title: 'Contour intersects a county known to be missing from the FCC KML dataset',
-    description: 'The study area overlaps a county that was one of the 18 FCC endpoint misses in the county boundary dataset.  No county boundary polygon is available for that county; the intersection analysis for it is not possible.  The engineer of record must independently verify county coverage before filing.' }
+    description: 'The study area overlaps a county that was one of the 18 FCC endpoint misses in the county boundary dataset.  No county boundary polygon is available for that county; the intersection analysis for it is not possible.  The engineer of record must independently verify county coverage before filing.' },
+
+  // ─── Source attestation framework (PR #330) ─────────────────────────────
+  // These codes live in source_attestation.blockers / source_attestation.warnings,
+  // NOT in exhibit.blockers / exhibit.warnings.  That keeps offline test exhibits
+  // that lack FCC LMS data from receiving false source-authority blockers.
+
+  SOURCE_UNVERIFIED: { severity: 'blocker', phase: 'evidence',
+    title: 'Source confidence below filing-grade threshold (70%)',
+    description: 'The overall source confidence across all engineering values is below 70%, the minimum required for a filing-grade exhibit.  Too many values rely solely on operator input without cross-check against an authoritative record (FCC LMS, ASR, terrain DEM).  Obtain FCC LMS license data, terrain DEM evidence, and ASR data to raise confidence before filing.' },
+
+  SOURCE_CONFLICT: { severity: 'warning', phase: 'evidence',
+    title: 'Cross-source authority conflict detected',
+    description: 'Two independent authoritative sources disagree on an engineering value beyond its tolerance threshold (coordinates >10 m, tower height >3 m, ERP >5%, RCAMSL >20 m, frequency mismatch, FCC class mismatch, HAAT >50%).  The engineer of record must reconcile the conflict and certify the operative value before filing.' },
+
+  SOURCE_OPERATOR_ONLY: { severity: 'warning', phase: 'evidence',
+    title: 'Engineering value rests on operator input only (no cross-check)',
+    description: 'This engineering value has not been cross-checked against any authoritative record (FCC LMS, ASR, terrain DEM, FAA OE/AAA).  Operator-entered values have a trust score of 0.50; two independent authoritative sources raise confidence above 0.90.  Obtain corroborating evidence to strengthen the filing.' },
+
+  SOURCE_HASH_MISSING: { severity: 'info', phase: 'evidence',
+    title: 'Evidence source hash not available',
+    description: 'One or more evidence source records could not be fingerprinted because they were absent from the exhibit at attestation time.  The filed PDF will not carry a SHA-256 provenance hash for those sources.  Re-run with live FCC LMS and ASR evidence attached to generate a complete hash chain.' },
+
+  SOURCE_CONFIDENCE_LOW: { severity: 'warning', phase: 'evidence',
+    title: 'Source confidence below 85% — engineering review recommended',
+    description: 'The overall source confidence is between 70% and 85%.  The exhibit clears the minimum filing threshold but has not reached the 85% "well-corroborated" band.  Engineering review is required to confirm operator-entered values before filing.' },
+
+  SOURCE_AUTHORITY_UNKNOWN: { severity: 'info', phase: 'evidence',
+    title: 'Source authority could not be determined for one or more fields',
+    description: 'One or more engineering values have unknown source authority (trust score 0.0).  This typically means the field was not populated by any recognized source — not operator input, not an FCC record, not a terrain DEM.  Investigate the missing provenance and supply the value from an authoritative source.' }
 });
 
 export class W {

@@ -245,6 +245,42 @@ export function buildReadinessReport(exhibit, applicant = {}) {
     });
   }
 
+  // ── SOURCE ATTESTATION ──────────────────────────────────────────────────────
+  // Source confidence affects the readiness report but does NOT push into
+  // exhibit.blockers/warnings (see buildSourceAttestation.js).  We surface
+  // the attestation blockers here so the filing gate sees them.
+
+  const sa = exhibit.source_attestation ?? null;
+  if (sa){
+    const overallConf = sa.overall_confidence ?? null;
+    if (overallConf != null && overallConf < 0.70){
+      blockers.push({
+        code:     'SOURCE_UNVERIFIED',
+        message:  `Overall source confidence ${(overallConf * 100).toFixed(0)}% is below the 70% filing-grade threshold — too many engineering values lack authoritative cross-check`,
+        source:   'source_attestation',
+        confidence: overallConf
+      });
+    } else if (overallConf != null && overallConf < 0.85){
+      warnings.push({
+        code:     'SOURCE_CONFIDENCE_LOW',
+        message:  `Overall source confidence ${(overallConf * 100).toFixed(0)}% is below 85% — engineering review required`,
+        source:   'source_attestation',
+        confidence: overallConf
+      });
+    }
+
+    for (const w of (sa.warnings ?? [])){
+      if (w.code === 'SOURCE_CONFLICT'){
+        warnings.push({
+          code:    'SOURCE_CONFLICT',
+          message: w.message || 'Cross-source authority conflict detected',
+          field:   w.field ?? null,
+          source:  'source_attestation'
+        });
+      }
+    }
+  }
+
   // ── EVIDENCE ────────────────────────────────────────────────────────────────
 
   // Separate evidence items for HAAT, interference, and overall status

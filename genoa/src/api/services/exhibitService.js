@@ -31,6 +31,7 @@ import { suggestDirectionalMitigation } from '../../engine/regulatory/mitigation
 import { lookupM3Conductivity, lookupM3ZoneFallback } from '../../engine/am/m3.js';
 import { makeCommunityBoundaryClient } from '../../evidence/communityBoundaryClient.js';
 import { computeCountyOverlay } from '../../evidence/countyIntersectionClient.js';
+import { buildSourceAttestation }      from '../../engine/provenance/buildSourceAttestation.js';
 
 let _validationCache = null;
 let _validationCachedAt = 0;
@@ -1814,6 +1815,14 @@ export async function computeExhibit(req){
         }
       : { source: 'not_resolved', value_m: null, ground_elev_m: null, haat_m_input: null, elevation_source: null };
   }
+
+  // ---- 7a-ii. Source attestation ----
+  // Builds the source_attestation exhibit block: per-field authority,
+  // cross-check status, conflicts, overall confidence, and evidence hashes.
+  // Attestation blockers/warnings are stored in source_attestation only —
+  // NOT pushed to exhibit.blockers/warnings — so offline test exhibits
+  // that lack FCC LMS data do not receive false source-authority blockers.
+  exhibit.source_attestation = buildSourceAttestation(exhibit, evidence);
 
   // ---- 7b. §73.215 mitigation advisor (optional, gated) ----
   // Only runs when options.mitigation_optimizer === true AND the NEC
