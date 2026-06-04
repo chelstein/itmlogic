@@ -11,10 +11,13 @@
 // NOT in exhibit.blockers/warnings, so offline test exhibits that
 // lack FCC LMS data do not get false blockers.
 
-import { SOURCE_AUTHORITY }              from './sourceAuthority.js';
-import { scoreSource, scoreExhibitSources } from './sourceConfidence.js';
-import { detectProvenanceConflicts }     from './provenanceConflicts.js';
-import { hashEvidence }                  from './hashEvidence.js';
+import { SOURCE_AUTHORITY }                        from './sourceAuthority.js';
+import { scoreSource, scoreExhibitSources }        from './sourceConfidence.js';
+import { detectProvenanceConflicts }               from './provenanceConflicts.js';
+import { hashEvidence }                            from './hashEvidence.js';
+import { assessExhibitSourceFreshness,
+         collectFreshnessIssues }                  from './sourceFreshness.js';
+import { buildEvidenceLock }                       from './evidenceLock.js';
 
 // Map a lineage/evidence combination to a single fieldLineage descriptor
 // that scoreSource() can consume.
@@ -97,7 +100,7 @@ function applyConflicts(fieldMap, conflicts){
   }
 }
 
-export function buildSourceAttestation(exhibit, evidence){
+export function buildSourceAttestation(exhibit, evidence, options = {}){
   const ev = evidence || exhibit.evidence || {};
 
   // 1. Classify per-field provenance
@@ -129,14 +132,51 @@ export function buildSourceAttestation(exhibit, evidence){
   // 6. Hash the evidence sources
   const source_hashes = hashEvidence(ev);
 
+  // 7. Assess source freshness — pass resolved evidence via a shim so
+  //    assessExhibitSourceFreshness can read it regardless of whether it
+  //    lives on exhibit.evidence or was supplied as a separate argument.
+  const exhibitWithEvidence = ev === exhibit.evidence
+    ? exhibit
+    : { ...exhibit, evidence: ev };
+  const source_freshness = assessExhibitSourceFreshness(exhibitWithEvidence, options);
+  const { warnings: freshnessWarnings, blockers: freshnessBlockers } =
+    collectFreshnessIssues(source_freshness);
+
+  // 8. Build evidence lock (uses source_hashes computed above)
+  //    Pass partial attestation so buildEvidenceLock can read hashes.
+  const partialExhibit = { ...exhibit, source_attestation: { source_hashes } };
+  const evidence_lock  = buildEvidenceLock(partialExhibit);
+
+  // Merge freshness issues into attestation blockers/warnings (deduped by code+source).
+  const mergedBlockers = [...source_blockers];
+  const mergedWarnings = [...source_warnings];
+
+  for (const b of freshnessBlockers){
+    if (!mergedBlockers.some(x => x.code === b.code && x.source === b.source)){
+      mergedBlockers.push(b);
+    }
+  }
+  for (const w of freshnessWarnings){
+    if (!mergedWarnings.some(x => x.code === w.code && x.source === w.source)){
+      mergedWarnings.push(w);
+    }
+  }
+
   return {
     overall_confidence,
     fields: scoredFields,
     field_scores,
     conflicts,
     source_hashes,
-    blockers: source_blockers,
-    warnings: source_warnings,
+    source_freshness,
+    evidence_lock,
+    blockers: mergedBlockers,
+    warnings: mergedWarnings,
     generated_at: new Date().toISOString()
   };
+}
+
+// options forwarded from exhibitService (e.g. { now: Date })
+export function buildSourceAttestationWithOptions(exhibit, evidence, options = {}){
+  return buildSourceAttestation(exhibit, evidence, options);
 }
