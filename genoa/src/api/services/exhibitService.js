@@ -135,12 +135,15 @@ async function resolveTxAmslM({ inputs, evidence, warnings, logger = console }){
   } catch (err){
     logger.warn?.('[resolveTxAmslM] elevation probe failed:', err?.message || err);
   }
-  // Last resort — keep the legacy behavior so we don't break the
-  // pipeline, but make the confusion visible.
+  // Cannot resolve AMSL — emit a blocker and return null so the terrain
+  // pipeline skips per-radial HAAT rather than computing HAAT as
+  // (haat_m − terrain_avg), which produces negative values for sites
+  // where the surrounding terrain elevation exceeds the operator's HAAT
+  // input (the KZLZ class of bug).
   warnings?.push?.(W.make('TX_AMSL_UNRESOLVED',
-    `Antenna AMSL could not be resolved: neither inputs.overall_height_amsl_m supplied nor ground elevation at (${lat.toFixed(4)}, ${lon.toFixed(4)}) reachable.  Falling back to haat_m=${haat} as tx_amsl_m, which means the per-radial HAAT column in Appendix A reports (haat_m − terrain_avg_at_radial), not true HAAT.  Supply overall_height_amsl_m to fix.`));
-  evidence.tx_amsl_resolved = { value_m: haat, source: 'legacy_fallback', haat_m_input: haat };
-  return haat;
+    `Antenna AMSL could not be resolved: neither inputs.overall_height_amsl_m supplied nor ground elevation at (${lat.toFixed(4)}, ${lon.toFixed(4)}) reachable.  Per-radial HAAT terrain pipeline skipped.  Supply overall_height_amsl_m (Form 301 "radiation center AMSL") to resolve.`));
+  evidence.tx_amsl_resolved = { value_m: null, source: 'unresolved', haat_m_input: haat };
+  return null;
 }
 
 function service73215Threshold(klass){
@@ -1794,6 +1797,23 @@ export async function computeExhibit(req){
     user_agent:   options.user_agent   || null,
     validation:   validationContext
   }});
+
+  // ---- 7a. RCAMSL lineage — stamp from pre-compute terrain resolution ----
+  // evidence.tx_amsl_resolved is populated by resolveTxAmslM() before
+  // compute() runs.  Attach it to the exhibit as rcamsl_lineage so the
+  // engineering report and filing checklist can audit the AMSL basis.
+  {
+    const txR = evidence.tx_amsl_resolved;
+    exhibit.rcamsl_lineage = txR
+      ? {
+          source:           txR.source,
+          value_m:          txR.value_m ?? null,
+          ground_elev_m:    txR.tx_ground_amsl_m ?? null,
+          haat_m_input:     txR.haat_m_input ?? null,
+          elevation_source: txR.elevation_source ?? null
+        }
+      : { source: 'not_resolved', value_m: null, ground_elev_m: null, haat_m_input: null, elevation_source: null };
+  }
 
   // ---- 7b. §73.215 mitigation advisor (optional, gated) ----
   // Only runs when options.mitigation_optimizer === true AND the NEC

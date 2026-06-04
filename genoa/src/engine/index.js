@@ -97,6 +97,81 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     warnings.push(W.make('FACILITY_COORDINATES_MISSING'));
   }
 
+  // ── Frequency band validation ────────────────────────────────────────────────
+  // Blocker — out-of-band frequency almost always means a unit-conversion
+  // error (e.g. FM frequency entered as kHz).  FCC curves don't apply
+  // outside these bands; contour distances would be meaningless.
+  {
+    let freqInBand = true;
+    let freqDetail = null;
+    if (service === 'AM') {
+      if (!Number.isFinite(freq) || freq < 530 || freq > 1710) {
+        freqInBand = false;
+        freqDetail = `AM frequency ${freq} kHz is outside the US AM broadcast band (530–1710 kHz); verify units (AM uses kHz)`;
+      }
+    } else if (service === 'FM' || service === 'LPFM' || service === 'FX') {
+      if (!Number.isFinite(freq) || freq < 88.0 || freq > 108.0) {
+        freqInBand = false;
+        freqDetail = `FM frequency ${freq} MHz is outside the US FM broadcast band (88.0–108.0 MHz); verify units (FM uses MHz, not kHz)`;
+      }
+    }
+    if (!freqInBand) {
+      warnings.push(W.make('FREQUENCY_OUT_OF_BAND', freqDetail));
+    }
+  }
+
+  // ── ERP lineage ──────────────────────────────────────────────────────────────
+  // Cross-check proposed ERP against FCC-licensed ERP when the LMS
+  // record was fetched.  >5 % variance = ERP_VARIANCE_FROM_LICENSE warning.
+  const _licensedErpKw = evidence?.fcc_lms?.license?.erp_kw ?? null;
+  const _erpVariancePct = (Number.isFinite(_licensedErpKw) && Number.isFinite(erp_kW) && _licensedErpKw > 0)
+    ? Math.abs((erp_kW - _licensedErpKw) / _licensedErpKw) * 100
+    : null;
+  if (_erpVariancePct != null && _erpVariancePct > 5) {
+    warnings.push(W.make('ERP_VARIANCE_FROM_LICENSE',
+      `Proposed ERP ${erp_kW} kW differs from FCC-licensed ERP ${_licensedErpKw} kW by ${_erpVariancePct.toFixed(1)}%.  If this is a modification exhibit, the variance is expected.  If this is a license-verification exhibit, correct the ERP before filing.`));
+  }
+  const erp_lineage = {
+    licensed_erp_kw: _licensedErpKw,
+    proposed_erp_kw: erp_kW,
+    variance_pct:    _erpVariancePct != null ? +_erpVariancePct.toFixed(1) : null,
+    source:          Number.isFinite(_licensedErpKw) ? 'fcc_lms_license' : 'not_available'
+  };
+
+  // ── Class lineage ────────────────────────────────────────────────────────────
+  // Document how FCC class was resolved; flag when a §73.215 default fires.
+  const _rawClass = inputs.fcc_class || null;
+  const _licensedClass = evidence?.fcc_lms?.license?.fcc_class ?? null;
+  const _fmLike = service === 'FM' || service === 'LPFM' || service === 'FX';
+  const _classDefaulted = !_rawClass && _fmLike;
+  if (_classDefaulted) {
+    warnings.push(W.make('FCC_CLASS_DEFAULTED',
+      `inputs.fcc_class not supplied for ${service} station; §73.215 contour protection uses Class A threshold (60 dBu).  Supply fcc_class for a class-specific study.`));
+  }
+  const class_lineage = {
+    raw:                          _rawClass,
+    resolved:                     _rawClass || (_fmLike ? null : null),
+    engineering_assumption_source: _rawClass ? 'operator_supplied'
+      : _licensedClass          ? 'fcc_licensed_record'
+      : (_fmLike ? 'default_class_a' : 'not_applicable'),
+    licensed_class:               _licensedClass,
+    assumption_applied:           _classDefaulted
+      ? 'Class A (60 dBu protected field) used as conservative default per §73.215'
+      : null
+  };
+
+  // ── Frequency lineage ────────────────────────────────────────────────────────
+  const _freqUnit = service === 'AM' ? 'kHz' : 'MHz';
+  const frequency_lineage = {
+    value:      freq,
+    unit:       _freqUnit,
+    band_check: service === 'AM'
+      ? { min: 530, max: 1710, pass: Number.isFinite(freq) && freq >= 530 && freq <= 1710 }
+      : _fmLike
+        ? { min: 88.0, max: 108.0, pass: Number.isFinite(freq) && freq >= 88.0 && freq <= 108.0 }
+        : { pass: null }
+  };
+
   const { method, regs } = methodFor(service);
 
   const radials_deg = radialList(step);
@@ -250,7 +325,7 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   if (service === 'LPFM'){
     regulatory_compliance = await checkLpfmCompliance({
       erp_kw:        erp_kW,
-      haat_m,
+      haat_m:        operativeHaat.haat_m,   // operative (terrain-derived when available)
       frequency_mhz: freq,
       fcc_class:     inputs.fcc_class || 'LP100'
     });
@@ -840,6 +915,15 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   });
 
   exhibit.oet65 = oet65;
+
+  // ── Lineage outputs (PR #329) ─────────────────────────────────────────────
+  // Each lineage block documents how a key input value was resolved so
+  // the engineering exhibit is fully auditable.  rcamsl_lineage is
+  // back-filled by exhibitService.js after the terrain pipeline runs.
+  exhibit.frequency_lineage = frequency_lineage;
+  exhibit.erp_lineage       = erp_lineage;
+  exhibit.class_lineage     = class_lineage;
+
   exhibit.engineering_confidence = analyzeTerrainConfidence(exhibit);
   exhibit.residual_interpretation = interpretResiduals(exhibit);
   exhibit.exports      = {
