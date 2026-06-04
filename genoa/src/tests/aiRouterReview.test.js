@@ -81,7 +81,7 @@ test('snapshot surfaces the consistency-relevant fields', () => {
   assert.match(snap, /filing_readiness=READY/);
   assert.match(snap, /Interference rules = FAIL/);
   assert.match(snap, /engineering_conclusion=NON-COMPLIANT/);
-  assert.match(snap, /haat_status=FALLBACK_ONLY/);
+  assert.match(snap, /haat_validation_status=FALLBACK_ONLY/);
   assert.match(snap, /contour_s60_spread_km=\[37\.10, 41\.90\]/);
 });
 

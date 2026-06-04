@@ -44,10 +44,17 @@ export const Severity = Object.freeze({
   BLOCKER:  'BLOCKER'
 });
 
-const HARD_FLOOR_M       = -200;
-const SOFT_FLOOR_M       = -50;
-const HARD_CEILING_M     = 4000;
-const MEAN_DELTA_LIMIT_M = 300;
+const HARD_FLOOR_M        = -200;
+const SOFT_FLOOR_M        = -50;
+const HARD_CEILING_M      = 4000;
+const MEAN_DELTA_LIMIT_M  = 300;
+// Relative discrepancy threshold: if |mean − operator| / mean > 50 %,
+// the operator value is likely wrong (e.g. AGL height entered as HAAT).
+const MEAN_RELATIVE_LIMIT = 0.50;
+// AGL-as-HAAT heuristic: operator < 100 m while terrain mean > 150 m
+// is the characteristic signature of a tower-height-AGL input mistake.
+const AGL_SUSPECT_OPERATOR_MAX_M = 100;
+const AGL_SUSPECT_MEAN_MIN_M     = 150;
 
 // Statuses that mean "do not trust the per-radial HAAT column" —
 // Appendix A consumes this list to decide whether to display values
@@ -57,7 +64,9 @@ export const HAAT_DISPLAY_SUPPRESSED = Object.freeze(new Set([
 ]));
 
 // Statuses that block filing readiness from reaching anything above
-// REVIEW (req #2).
+// REVIEW (req #2).  REVIEW itself does NOT gate readiness — it indicates
+// the terrain computation is valid but the operator entry is suspect;
+// the engineer of record must confirm before filing.
 export const HAAT_GATES_READINESS = Object.freeze(new Set([
   'INVALID', 'FALLBACK_ONLY', 'NOT_RUN'
 ]));
@@ -252,6 +261,7 @@ export function validateHaat(exhibit){
   }
 
   // ── Mean-vs-operator delta check ─────────────────────────────
+  let aglSuspected = false;
   if (Number.isFinite(operatorHaat) && Number.isFinite(mean)){
     const delta = mean - operatorHaat;
     if (Math.abs(delta) > MEAN_DELTA_LIMIT_M){
@@ -259,6 +269,33 @@ export function validateHaat(exhibit){
         code:     'HAAT_MEAN_INCONSISTENT',
         severity: Severity.BLOCKER,
         detail:   `Mean per-radial HAAT (${mean.toFixed(1)} m) differs from operator-supplied HAAT (${operatorHaat.toFixed(1)} m) by ${delta.toFixed(1)} m — well beyond the ±${MEAN_DELTA_LIMIT_M} m tolerance.`
+      });
+    }
+
+    // ── Relative delta check ─────────────────────────────────────
+    // Catches AGL-vs-HAAT confusion that slips under the 300 m
+    // absolute gate (e.g. WJPZ: operator=37 m, mean=241.8 m →
+    // absolute delta=204.8 m < 300, but relative=84.7 % >> 50 %).
+    if (operatorHaat > 0){
+      const relativeDelta = Math.abs(delta) / Math.max(Math.abs(mean), 1);
+      if (relativeDelta > MEAN_RELATIVE_LIMIT){
+        issues.push({
+          code:     'HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH',
+          severity: Severity.WARNING,
+          detail:   `Mean per-radial HAAT (${mean.toFixed(1)} m) differs from operator-supplied HAAT (${operatorHaat.toFixed(1)} m) by ${(relativeDelta * 100).toFixed(1)}% — exceeds the ${(MEAN_RELATIVE_LIMIT * 100).toFixed(0)}% relative threshold. The terrain-derived mean (${mean.toFixed(1)} m) is used as operative HAAT for RF calculations; the operator-entered value is preserved for display only.`
+        });
+      }
+    }
+
+    // ── AGL-as-HAAT detection ────────────────────────────────────
+    // Operator HAAT suspiciously low while terrain mean is high:
+    // characteristic signature of tower height AGL entered as HAAT.
+    if (operatorHaat < AGL_SUSPECT_OPERATOR_MAX_M && mean > AGL_SUSPECT_MEAN_MIN_M){
+      aglSuspected = true;
+      issues.push({
+        code:     'LIKELY_AGL_ENTERED_AS_HAAT',
+        severity: Severity.WARNING,
+        detail:   `Operator-entered HAAT (${operatorHaat} m) is suspiciously low relative to terrain-derived HAAT (${mean.toFixed(1)} m). This may indicate tower height AGL was entered instead of HAAT. Per §73.313, HAAT is measured relative to average terrain elevation within 3–16 km, not tower height above ground.`
       });
     }
   }
@@ -274,20 +311,37 @@ export function validateHaat(exhibit){
   }
 
   let status = 'PASS';
-  if (issues.some(i => i.severity === Severity.BLOCKER)) status = 'INVALID';
-  else if (issues.some(i => i.severity === Severity.WARNING)) status = 'SUSPECT';
+  if (issues.some(i => i.severity === Severity.BLOCKER)) {
+    status = 'INVALID';
+  } else if (issues.some(i =>
+    i.code === 'HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH' ||
+    i.code === 'LIKELY_AGL_ENTERED_AS_HAAT'
+  )) {
+    // Terrain computation is valid but operator input is suspect —
+    // REVIEW: engineer must confirm before filing, but per-radial
+    // column is still displayed and readiness is not gated.
+    status = 'REVIEW';
+  } else if (issues.some(i => i.severity === Severity.WARNING)) {
+    status = 'SUSPECT';
+  }
+
+  const relDelta = (Number.isFinite(operatorHaat) && operatorHaat > 0 && Number.isFinite(mean))
+    ? round3(Math.abs(mean - operatorHaat) / Math.max(Math.abs(mean), 1))
+    : null;
 
   return {
     status,
     basis,
     issues,
+    agl_suspected: aglSuspected,
     stats: {
       n_radials: n, n_finite: n, n_negative: nNeg, n_implausible: nImpl,
       mean_m: round1(mean), min_m: round1(min), max_m: round1(max),
       operator_m: Number.isFinite(operatorHaat) ? operatorHaat : null,
       delta_mean_vs_operator_m: Number.isFinite(operatorHaat)
         ? round1(mean - operatorHaat)
-        : null
+        : null,
+      relative_delta: relDelta
     },
     tx_amsl_resolved: haatResolved,
     display_suppressed: status === 'INVALID',
@@ -305,6 +359,7 @@ function emptyStats(operatorHaat){
 }
 
 function round1(n){ return Number.isFinite(n) ? Math.round(n * 10) / 10 : null; }
+function round3(n){ return Number.isFinite(n) ? Math.round(n * 1000) / 1000 : null; }
 
 // Consistency guard (req #3).  Run at end of computeExhibit.
 // Detects the "PDF says X but engineering output says Y" failure

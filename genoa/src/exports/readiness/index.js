@@ -149,6 +149,29 @@ export function buildReadinessReport(exhibit, applicant = {}) {
   }
 
   const service = exhibit.station_inputs?.service ?? '';
+
+  // HAAT validation warnings — separate from interference compliance.
+  // REVIEW status means terrain is valid but operator input is suspect.
+  const haatValidation = exhibit.haat_validation ?? null;
+  const haatStatus     = haatValidation?.status ?? null;
+  if (haatStatus === 'REVIEW') {
+    const haatIssues = (haatValidation?.issues ?? []).map(i => i.code).join(', ');
+    warnings.push({
+      code: 'HAAT_OPERATOR_SUSPECT',
+      message: `HAAT validation status: REVIEW — terrain-derived HAAT was used for RF calculations but operator-entered value is suspect (${haatIssues || 'see haat_validation.issues'}). Engineer of record must confirm HAAT before filing.`,
+      authority: 'genoa-heuristic',
+    });
+  }
+  if (haatValidation?.agl_suspected === true) {
+    const opM  = haatValidation.stats?.operator_m ?? exhibit.station_inputs?.haat_m_input ?? '?';
+    const terM = haatValidation.stats?.mean_m ?? '?';
+    warnings.push({
+      code: 'HAAT_LIKELY_AGL',
+      message: `Operator-entered HAAT (${opM} m) appears to be tower height AGL, not §73.313 HAAT (terrain mean: ${terM} m). Terrain-derived HAAT was used for RF calculations.`,
+      authority: 'genoa-heuristic',
+    });
+  }
+
   if (service === 'FM' && (!exhibit.evidence?.terrain_haat_per_radial || radials.length === 0)) {
     warnings.push({
       code: 'TERRAIN_EVIDENCE_MISSING',
@@ -224,12 +247,34 @@ export function buildReadinessReport(exhibit, applicant = {}) {
 
   // ── EVIDENCE ────────────────────────────────────────────────────────────────
 
+  // Separate evidence items for HAAT, interference, and overall status
+  // so the readiness report does not imply they must agree.
   evidence.push({
     type: 'compliance',
-    label: 'Regulatory compliance',
+    label: 'Interference compliance (§73.215)',
     value: compliance.pass ?? null,
     source: 'regulatory_compliance',
   });
+  if (haatStatus) {
+    evidence.push({
+      type:   'haat_validation',
+      label:  'HAAT validation status',
+      value:  haatStatus,
+      source: 'haat_validation.status',
+      note:   haatStatus === 'REVIEW'
+        ? 'Terrain-derived HAAT used for RF calculations; operator-entered value is suspect'
+        : null,
+    });
+  }
+  if (exhibit.haat_lineage?.operative_m != null) {
+    evidence.push({
+      type:   'haat_operative',
+      label:  'Operative HAAT (used in RF calculations)',
+      value:  exhibit.haat_lineage.operative_m,
+      basis:  exhibit.haat_lineage.operative_basis,
+      source: exhibit.haat_lineage.operative_source,
+    });
+  }
 
   if (filedHaat != null) {
     evidence.push({

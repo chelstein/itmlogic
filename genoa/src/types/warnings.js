@@ -67,6 +67,10 @@ export const WARNING_CODES = Object.freeze({
     title: 'Per-radial HAAT in fallback-only mode',
     description: 'Per-radial HAAT bundle present but no terrain basis attached. Column suppressed in Appendix A; operator HAAT is used for contour interpolation.' },
 
+  OPERATIVE_HAAT_OPERATOR_ONLY:  { severity: 'warning', phase: 'engine',
+    title: 'Operative HAAT is operator-entered (no terrain evidence)',
+    description: 'No terrain evidence or FCC license data is available; the operator-entered HAAT is used as the operative value for RF calculations. Obtain terrain analysis (§73.313 arc-averaged per-radial HAAT) for a defensible filing.' },
+
   HAAT_CONTRADICTION:            { severity: 'blocker', phase: 'engine',
     title: 'HAAT validation contradiction detected',
     description: 'Consistency guard found a divergence between haat_validation.status and the per-radial HAAT actually present in the exhibit. Release blocked to prevent misleading Appendix A output.' },
