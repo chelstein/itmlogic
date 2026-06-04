@@ -202,3 +202,43 @@ test('class_lineage present on exhibit', async () => {
   assert.ok(exhibit.class_lineage != null, 'class_lineage must always be on exhibit');
   assert.equal(exhibit.class_lineage.raw, FM_CLASS_A.fcc_class);
 });
+
+// ─── 6. Warning registry completeness ────────────────────────────────────────
+// Every code emitted via W.make() in the haat validation pipeline must be in
+// the registry — this guards against the production crash where
+// HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH was emitted but unregistered.
+
+import { Severity, validateHaat } from '../engine/haat/validate.js';
+
+test('All codes emitted by validateHaat issues are registered in WARNING_CODES', () => {
+  // Build a minimal exhibit that triggers all three mismatch paths:
+  // 1. HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH (relative delta > 50%)
+  // 2. LIKELY_AGL_ENTERED_AS_HAAT (operator very low, terrain high)
+  const haatMismatchExhibit = {
+    station_inputs:  { service: 'FM', haat_m: 30 },
+    haat_validation: null,
+    blockers:        [],
+    warnings:        [],
+    haat_lineage:    { operator_entered_m: 30, terrain_mean_m: 250 },
+    radial_table:    Array.from({ length: 36 }, (_, i) => ({
+      azimuth_deg: i * 10,
+      haat_m:      250 + Math.sin(i) * 5   // plausible per-radial values
+    }))
+  };
+
+  const haatReport = validateHaat(haatMismatchExhibit);
+  const issueCodes = (haatReport.issues || []).map(i => i.code);
+
+  // Every code the validator emits must exist in WARNING_CODES so W.make won't throw.
+  for (const code of issueCodes){
+    if (!WARNING_CODES[code]){
+      assert.fail(`validateHaat emitted code "${code}" that is NOT in WARNING_CODES — will crash W.make in exhibitService`);
+    }
+  }
+
+  // Specifically confirm the two codes that were missing are now registered.
+  assert.ok(WARNING_CODES['HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH'] != null,
+    'HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH must be in WARNING_CODES (PR #332 fix)');
+  assert.ok(WARNING_CODES['LIKELY_AGL_ENTERED_AS_HAAT'] != null,
+    'LIKELY_AGL_ENTERED_AS_HAAT must be in WARNING_CODES');
+});

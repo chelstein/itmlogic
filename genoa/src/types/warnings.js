@@ -79,6 +79,38 @@ export const WARNING_CODES = Object.freeze({
     title: 'Per-radial HAAT outliers',
     description: 'One or more per-radial HAAT values are physically possible but uncommon (below -50 m). Engineer of record should confirm the antenna is intentionally below surrounding terrain.' },
 
+  HAAT_OPERATOR_TERRAIN_RELATIVE_MISMATCH: { severity: 'warning', phase: 'engine',
+    title: 'Operator-entered HAAT differs materially from terrain-derived HAAT (relative delta)',
+    description: 'The operator-entered HAAT differs from the terrain-derived mean HAAT by more than the relative threshold (typically 50%).  This often indicates AGL tower height was entered instead of §73.313 arc-averaged HAAT.  Terrain-derived HAAT remains authoritative for RF calculations unless the engineer of record manually overrides it after review.' },
+
+  LIKELY_AGL_ENTERED_AS_HAAT:    { severity: 'warning', phase: 'engine',
+    title: 'Operator-entered HAAT is suspiciously low — possible AGL/HAAT confusion',
+    description: 'The operator-entered HAAT is much lower than the terrain-derived mean HAAT, which is the characteristic signature of tower height AGL being entered as HAAT.  Per §73.313, HAAT is measured relative to average terrain elevation within 3–16 km of the transmitter site, not tower height above ground.  The terrain-derived HAAT is used for RF calculations; the operator-entered value is preserved for display only.' },
+
+  HAAT_INVALID:                  { severity: 'blocker', phase: 'engine',
+    title: 'Per-radial HAAT validation: impossible values — terrain compute failed',
+    description: 'HAAT validation reports impossible per-radial values (outside physical bounds).  This typically means antenna AMSL was not resolved or the terrain DEM probe failed.  Supply inputs.overall_height_amsl_m or wait for the terrain DEM probe to succeed before recomputing.' },
+
+  HAAT_SUSPECT:                  { severity: 'warning', phase: 'engine',
+    title: 'Per-radial HAAT validation: outliers detected — engineering review required',
+    description: 'HAAT validation reports one or more per-radial outliers.  The values are within physical bounds but warrant engineer review to confirm they reflect real terrain effects (deep valleys or elevated sites) rather than a computation artefact.' },
+
+  HAAT_NOT_TERRAIN_DERIVED:      { severity: 'warning', phase: 'engine',
+    title: 'Per-radial HAAT was not computed from a terrain DEM',
+    description: 'The terrain sidecar was unavailable or not configured, so per-radial HAAT was not derived from a digital elevation model.  FCC §73.313 requires arc-averaged terrain HAAT for filing-grade exhibits; operator-entered HAAT is used as a placeholder.  Enable the terrain sidecar to compute defensible per-radial HAAT.' },
+
+  HAAT_DISCREPANCY:              { severity: 'warning', phase: 'engine',
+    title: 'Filed HAAT differs from terrain-derived advisory HAAT',
+    description: 'The HAAT filed with this exhibit differs from the terrain-derived advisory mean HAAT by more than 20%.  This may indicate an input error or a legitimate site-specific terrain feature.  The engineer of record should confirm which value is correct before filing.' },
+
+  HAAT_OPERATOR_SUSPECT:         { severity: 'warning', phase: 'engine',
+    title: 'HAAT validation: operator-entered HAAT is suspect',
+    description: 'The HAAT validation engine flagged the operator-entered HAAT as suspect relative to the terrain-derived value.  The terrain-derived HAAT was used for RF calculations.  Engineer of record must confirm the operative HAAT before filing.' },
+
+  HAAT_LIKELY_AGL:               { severity: 'warning', phase: 'engine',
+    title: 'Operator-entered HAAT appears to be tower height AGL',
+    description: 'The operator-entered HAAT appears to be tower height above ground level (AGL) rather than the §73.313 arc-averaged HAAT relative to average terrain within 3–16 km.  The terrain-derived HAAT was used for RF calculations; the operator-entered value is displayed with a warning.  Verify and correct the HAAT input before filing.' },
+
   TERRAIN_LIMITED:               { severity: 'warning', phase: 'engine',
     title: 'Exhibit in terrain-limited mode',
     description: 'Per-radial terrain analysis suppressed (DEM unavailable or no resolved AMSL). Contour distances still computed under FCC §73.333 curves using operator HAAT, but the per-radial HAAT column, terrain severity scoring, and engineering-confidence terrain inputs are unavailable.' },
