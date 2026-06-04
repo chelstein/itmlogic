@@ -6,6 +6,7 @@ source .venv/bin/activate
 
 graphify update .
 python scripts/enrich-graph-edges.py
+python scripts/graphify-god-node-risk.py
 
 rsync -av graphify-out/ /opt/genoa-cartography/data/reference/
 cp graphify-out/graph.json /opt/genoa-cartography/data/reference/genoa_graph.json
