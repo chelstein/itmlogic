@@ -427,7 +427,7 @@ function section_conductivity(ev, s){
   const isAm = String(s?.service || '').toUpperCase() === 'AM';
 
   if (!isAm){
-    return hr('Ground Conductivity (M3)') + '\nNot applicable (FM/TV service — §73.183 M3 conductivity lookup is AM-only).';
+    return hr('Ground Conductivity (M3)') + '\nNot applicable (FM/TV service — ground conductivity lookup is AM-only).';
   }
   if (!gc){
     return hr('Ground Conductivity (M3)') + '\nNo conductivity evidence attached.';
