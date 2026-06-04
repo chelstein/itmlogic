@@ -10,6 +10,7 @@ import { contourFeature, featureCollection } from './geometry/geojson.js';
 import { parsePatternTable } from './pattern/parse.js';
 import { patternFactor } from './pattern/factor.js';
 import { flatHaatPerRadial } from './haat/flat.js';
+import { resolveOperativeHaat } from './haat/resolveOperativeHaat.js';
 import { fmRadialTable, FM_DEFAULT_CONTOURS, FM_INTERP, FM_INTERP_FCC, FM_CONTOUR_METHODS, FM_ENGINE_DEFAULT } from './fm/contour.js';
 import { fmInputGuards } from './fm/rules.js';
 import { lpfmRadialTable, LPFM_DEFAULT_CONTOURS, LPFM_METHOD, lpfmInputGuards } from './lpfm/contour.js';
@@ -116,6 +117,18 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     if (evidence.terrain_haat_requested){
       warnings.push(W.make('TERRAIN_NOT_APPLIED', 'Per-radial terrain HAAT was requested but the terrain sidecar did not return data.'));
       warnings.push(W.make('SIDECAR_UNAVAILABLE', 'terrain sidecar unavailable; falling back to flat HAAT.'));
+    }
+  }
+
+  // Resolve the operative HAAT — the single authoritative value for RF
+  // engineering calculations.  Uses terrain-derived mean when available;
+  // falls back to operator input only when no terrain evidence exists.
+  // Raw operator haat_m is still used for input guards (type B) and
+  // display, but operative HAAT is used for all type-C RF calcs below.
+  const operativeHaat = resolveOperativeHaat({ inputs, evidence });
+  if (operativeHaat.warnings.length > 0) {
+    for (const w of operativeHaat.warnings) {
+      warnings.push(W.make(w.code, w.message));
     }
   }
 
@@ -249,7 +262,10 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     const primaries = Array.isArray(evidence.nearby_primaries) ? evidence.nearby_primaries : [];
     regulatory_compliance = checkTranslatorInterference({
       translator: {
-        erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+        erp_kw: erp_kW,
+        haat_m: operativeHaat.haat_m,   // operative (terrain-derived when available)
+        haat_basis: operativeHaat.basis,
+        frequency_mhz: freq, lat, lon,
         call: inputs.call || null, facility_id
       },
       primaries
@@ -269,7 +285,11 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     });
     regulatory_compliance = checkSection73215({
       subject: {
-        erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+        erp_kw: erp_kW,
+        haat_m: operativeHaat.haat_m,   // operative (terrain-derived when available)
+        haat_basis: operativeHaat.basis,
+        haat_source: operativeHaat.source,
+        frequency_mhz: freq, lat, lon,
         fcc_class: inputs.fcc_class || null,
         call: inputs.call || null, facility_id
       },
@@ -296,7 +316,9 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
     }
     const ch6Stations = Array.isArray(evidence.tv_ch6_stations) ? evidence.tv_ch6_stations : [];
     const sec73_525 = checkSection73525({
-      subject: { erp_kw: erp_kW, haat_m, frequency_mhz: freq, lat, lon,
+      subject: { erp_kw: erp_kW, haat_m: operativeHaat.haat_m,
+                 haat_basis: operativeHaat.basis,
+                 frequency_mhz: freq, lat, lon,
                  fcc_class: inputs.fcc_class || null,
                  call: inputs.call || null, facility_id },
       tvCh6Stations: ch6Stations
@@ -650,9 +672,11 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
         target_dBu:   c.field_dBu ?? null,
         target_mvm:   c.field_mvm ?? null
       })),
-      erp_kw:         erp_kW,
-      haat_m:         haat_m ?? null,
-      haat_source:    haatPerRadial[0]?.haat_source || 'unknown',
+      erp_kw:               erp_kW,
+      haat_m_operator:      Number.isFinite(haat_m) ? haat_m : null,
+      haat_m_operative:     Number.isFinite(operativeHaat.haat_m) ? operativeHaat.haat_m : null,
+      haat_operative_basis: operativeHaat.basis,
+      haat_source:          haatPerRadial[0]?.haat_source || 'unknown',
       pattern_factor_applied: !!pattern,
       curve_engine:   service === 'AM' ? 'fcc-canonical' : fmEngine,
       interpolation:  service === 'AM'
@@ -695,6 +719,33 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   exhibit.validation   = validation;
   exhibit.uncertainty  = evidenceBlock.uncertainty;
   exhibit.population_estimate = population_estimate;
+
+  // HAAT lineage: full audit trail from operator entry through to
+  // the operative value used in RF calculations.  validation_status
+  // and validation_warnings are back-filled by the orchestrator
+  // (exhibitService.js) after validateHaat() runs.
+  {
+    const _rtVals = Array.isArray(radial_table)
+      ? radial_table.map(r => Number(r?.haat_computed_m)).filter(Number.isFinite)
+      : [];
+    // When all values equal the flat operator HAAT, terrain wasn't applied.
+    const _terrainVaried = _rtVals.length > 0 && new Set(_rtVals.map(v => v.toFixed(2))).size > 1;
+    exhibit.haat_lineage = {
+      operator_entered_m:  Number.isFinite(haat_m) ? haat_m : null,
+      terrain_mean_m:      operativeHaat.basis === 'terrain_derived'
+                             ? operativeHaat.haat_m : null,
+      terrain_min_m:       _terrainVaried ? Math.round(Math.min(..._rtVals) * 10) / 10 : null,
+      terrain_max_m:       _terrainVaried ? Math.round(Math.max(..._rtVals) * 10) / 10 : null,
+      fcc_authorized_m:    operativeHaat.basis === 'fcc_authorized' ? operativeHaat.haat_m : null,
+      operative_m:         Number.isFinite(operativeHaat.haat_m) ? operativeHaat.haat_m : null,
+      operative_basis:     operativeHaat.basis,
+      operative_source:    operativeHaat.source,
+      operative_confidence: operativeHaat.confidence,
+      // Back-filled by exhibitService after validateHaat():
+      validation_status:   null,
+      validation_warnings: []
+    };
+  }
 
   // §73.150 AM DA pattern-shape compliance — run BEFORE warnings are
   // frozen so a failing pattern raises AM_DA_PATTERN_COMPLIANCE_FAIL and
@@ -779,7 +830,8 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
       frequency_mhz:  service === 'AM' ? null : Number(freq),
       frequency_khz:  service === 'AM' ? Number(freq) : null,
       erp_kw:         erp_kW,
-      haat_m,
+      haat_m:         operativeHaat.haat_m,
+      haat_basis:     operativeHaat.basis,
       lat, lon
     },
     regulatory_compliance,

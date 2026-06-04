@@ -25,7 +25,18 @@ const SYSTEM_PROMPT =
   'values shown.  Do NOT restate the exhibit, do NOT speculate, do NOT comment on filing ' +
   'merits.  When grounding CFR text is provided, use it to check citations.  Respond as a ' +
   'JSON array of {"issue":"<one sentence>","severity":"WARNING|INFO"}; empty array [] if ' +
-  'internally consistent.';
+  'internally consistent.\n\n' +
+  'IMPORTANT: Do NOT flag regulatory_pass=false and haat_status=REVIEW (or PASS) as ' +
+  'contradictory.  These are independent checks.  An station can have a valid or ' +
+  'reviewable HAAT calculation and STILL fail §73.215 contour protection due to ' +
+  'interference geometry — they measure different things.  Only flag the combination if ' +
+  'the regulatory failure is explicitly attributed to a HAAT error (e.g. haat_status=INVALID ' +
+  'while regulatory_pass=true claiming a HAAT-dependent compliance).\n\n' +
+  'IMPORTANT: If haat_input_suspected_type=tower_agl_entered_as_haat, the operator likely ' +
+  'entered tower height AGL instead of HAAT.  The operative HAAT is terrain-derived and ' +
+  'is the correct value for RF calculations.  Do NOT treat the difference between ' +
+  'operator-entered and terrain-derived HAAT as a contradiction when this flag is set — ' +
+  'it is a known and labeled input issue, not an internal inconsistency.';
 
 // Build a compact, deterministic snapshot of the consistency-relevant
 // surface.  Kept small (the router bills per token) and stable (so the
@@ -47,20 +58,43 @@ export function snapshot(exhibit){
     lines.push(`regulatory_pass=${exhibit.regulatory_compliance.pass}`);
   if (exhibit?.engineering_conclusion?.conclusion)
     lines.push(`engineering_conclusion=${exhibit.engineering_conclusion.conclusion}`);
-  if (hv.status) lines.push(`haat_status=${hv.status} haat_basis=${hv.basis || '?'}`);
+  if (hv.status) lines.push(`haat_validation_status=${hv.status} haat_basis=${hv.basis || '?'}`);
+
+  // Full HAAT lineage context — enables the AI to distinguish operator
+  // input issues from genuine engineering contradictions.
   const s = hv.stats || {};
+  const lineage = exhibit?.haat_lineage || {};
+  const operatorEnteredM  = s.operator_m ?? lineage.operator_entered_m ?? null;
+  const operativeM        = lineage.operative_m ?? (hv.basis === 'terrain_derived' ? s.mean_m : s.operator_m);
+  const operativeBasis    = lineage.operative_basis ?? hv.basis ?? null;
+  const operativeSource   = lineage.operative_source ?? null;
+  const aglSuspected      = hv.agl_suspected === true;
+  const suspectedInputType = aglSuspected ? 'tower_agl_entered_as_haat' : 'haat_as_entered';
+  const haatValidationWarnings = (hv.issues || [])
+    .filter(i => i.severity === 'WARNING')
+    .map(i => i.code)
+    .join(',') || 'none';
+
+  if (operatorEnteredM != null) lines.push(`haat_operator_entered_m=${operatorEnteredM}`);
+  if (operativeM != null)       lines.push(`haat_operative_for_filing_m=${operativeM}`);
+  if (operativeBasis)           lines.push(`haat_operative_basis=${operativeBasis}`);
+  if (operativeSource)          lines.push(`haat_operative_source=${operativeSource}`);
+  lines.push(`haat_input_suspected_type=${suspectedInputType}`);
+  lines.push(`haat_validation_warnings=${haatValidationWarnings}`);
+
   if (s.min_m != null && s.max_m != null){
-    // Clarify which HAAT value is actually operative so the AI doesn't
-    // flag a false inconsistency between operator-entered and terrain-derived.
-    const basis = hv.basis || '?';
-    const operativeHaat = basis === 'terrain_derived' ? s.mean_m : s.operator_m;
-    lines.push(`haat_per_radial_range=[${s.min_m}, ${s.max_m}] mean=${s.mean_m} operator_entered=${s.operator_m} haat_operative_for_filing=${operativeHaat} (${basis})`);
+    lines.push(`haat_per_radial_range=[${s.min_m}, ${s.max_m}] mean=${s.mean_m}`);
+    if (s.relative_delta != null){
+      lines.push(`haat_operator_vs_terrain_relative_delta=${(s.relative_delta * 100).toFixed(1)}%`);
+    }
   }
+
   // When regulatory_pass is false, name the failing component(s) explicitly so
   // the AI can distinguish interference-rule failures from HAAT/curve failures.
   if (exhibit?.regulatory_compliance?.pass === false){
     const failed = (v.components || []).filter(c => c?.status === 'FAIL').map(c => c.name);
     if (failed.length) lines.push(`regulatory_fail_reason=${failed.join(',')}`);
+    lines.push('note=regulatory_pass=false and haat_validation_status=REVIEW are independent checks; interference geometry alone can cause regulatory_pass=false');
   }
   // Contour distance spread — computed per contour type so the AI compares
   // min/max within the same contour, not across service vs protected contours.
