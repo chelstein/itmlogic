@@ -532,7 +532,12 @@ async function scoreCandidate(pt, ctx, warnings){
   }
 
   // Normalize to 0..100 even when only a subset of goals is enabled.
-  const score = weightSum > 0 ? round2(total * (100 / weightSum)) : 0;
+  const normFactor = weightSum > 0 ? 100 / weightSum : 1;
+  const score = weightSum > 0 ? round2(total * normFactor) : 0;
+  // Normalize breakdown values so they sum to score (aids explainability).
+  for (const k of Object.keys(score_breakdown)){
+    score_breakdown[k] = round2(score_breakdown[k] * normFactor);
+  }
 
   // --- compliance & label flags ---
   const flags = [];

@@ -12,10 +12,11 @@ const LEVEL_PALETTE = {
 };
 
 const LAYER_LABELS = {
-  fcc_groundwave_engine:      'FCC groundwave engine',
-  blanket_population_proxy:   'Blanket population proxy',
+  fcc_groundwave_engine:          'FCC groundwave engine',
+  blanket_population_proxy:       'Blanket population proxy',
   international_border_detection: 'International border detection',
-  col_polygon_provided:       'COL polygon (user-supplied)',
+  col_polygon_provided:           'COL polygon (user-supplied)',
+  infrastructure_inventory:       'Infrastructure inventory (co-location)',
 };
 
 function fmtNum(v, d = 1){
