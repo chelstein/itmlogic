@@ -491,6 +491,7 @@ async function scoreCandidate(pt, ctx, warnings){
   //    rough community) inside the 5-mV/m circle.
   let coverage_pct = null;
   let coverage_computed_from = 'none';
+  let principal_community_5mvm_km = null;
   try {
     const r5 = fccAmDistanceKm({
       frequency_khz,
@@ -499,6 +500,7 @@ async function scoreCandidate(pt, ctx, warnings){
       erp_kw: tpo_kw
     });
     const r5km = r5.distance_km;
+    principal_community_5mvm_km = round2(r5km);
     if (community_of_license_polygon){
       coverage_pct = polygonCoverageFraction({
         polygon: community_of_license_polygon,
@@ -669,6 +671,7 @@ async function scoreCandidate(pt, ctx, warnings){
     bearing_deg: pt.bearing_deg ?? null,
     score,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
+    principal_community_5mvm_km,
     nif_status,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),

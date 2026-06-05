@@ -461,3 +461,21 @@ test('every candidate carries ground_sigma_quality from the engine', async () =>
       `ground_sigma_quality must be a known label; rank ${c.rank} got: ${c.ground_sigma_quality}`);
   }
 });
+
+test('every candidate carries principal_community_5mvm_km (§73.24(j) 5 mV/m contour radius)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.principal_community_5mvm_km != null && Number.isFinite(c.principal_community_5mvm_km),
+      `principal_community_5mvm_km must be a finite number; rank ${c.rank} got: ${c.principal_community_5mvm_km}`);
+    assert.ok(c.principal_community_5mvm_km > 0,
+      `principal_community_5mvm_km must be positive; rank ${c.rank} got: ${c.principal_community_5mvm_km}`);
+    // 5 mV/m radius must be shorter than 0.5 mV/m radius (higher field = shorter range)
+    if (c.daytime_reach_km != null){
+      assert.ok(c.principal_community_5mvm_km <= c.daytime_reach_km,
+        `5 mV/m radius must be ≤ 0.5 mV/m reach (rank ${c.rank}): ${c.principal_community_5mvm_km} vs ${c.daytime_reach_km}`);
+    }
+  }
+});
