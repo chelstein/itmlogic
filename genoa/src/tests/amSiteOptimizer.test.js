@@ -277,6 +277,39 @@ test('disc-disc analytical coverage helper produces sane values', () => {
   assert.ok(c > 0 && c < 1, `partial overlap should be in (0,1), got ${c}`);
 });
 
+test('M3 zone lookup: every candidate carries ground_sigma_source and filing_grade', () => {
+  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(typeof c.ground_sigma_source === 'string' && c.ground_sigma_source.length > 0,
+      `candidate must have ground_sigma_source string (got ${JSON.stringify(c.ground_sigma_source)})`);
+    assert.ok(typeof c.ground_sigma_filing_grade === 'string' && c.ground_sigma_filing_grade.length > 0,
+      `candidate must have ground_sigma_filing_grade string (got ${JSON.stringify(c.ground_sigma_filing_grade)})`);
+  }
+  // Baseline must carry the same fields.
+  assert.ok(out.current_site_baseline.ground_sigma_source,     'baseline must have ground_sigma_source');
+  assert.ok(out.current_site_baseline.ground_sigma_filing_grade, 'baseline must have ground_sigma_filing_grade');
+});
+
+test('M3 zone lookup: conductivity varies across geographically distinct points', () => {
+  const { lookupM3ZoneFallback } = __test__;
+  // Desert SW (AZ/NM) — should be σ=2.
+  const sw = lookupM3ZoneFallback(34.86, -111.82);
+  assert.equal(sw.available, true, 'Desert SW point should be available');
+  assert.equal(sw.sigma_mS_m, 2, `Desert SW σ should be 2 mS/m, got ${sw.sigma_mS_m}`);
+  // Great Plains (KS) — should be σ=15.
+  const gp = lookupM3ZoneFallback(38.5, -98.5);
+  assert.equal(gp.available, true, 'Great Plains point should be available');
+  assert.equal(gp.sigma_mS_m, 15, `Great Plains σ should be 15 mS/m, got ${gp.sigma_mS_m}`);
+  // Florida — should be σ=10.
+  const fl = lookupM3ZoneFallback(27.5, -82.0);
+  assert.equal(fl.available, true, 'Florida point should be available');
+  assert.equal(fl.sigma_mS_m, 10, `Florida σ should be 10 mS/m, got ${fl.sigma_mS_m}`);
+  // All three should differ.
+  assert.ok(sw.sigma_mS_m !== gp.sigma_mS_m || gp.sigma_mS_m !== fl.sigma_mS_m,
+    'σ should vary across geographically distinct zones');
+});
+
 test('community-of-license polygon path is exercised when supplied', () => {
   // Small square polygon around the KAZM site, in [lon, lat] order.
   const poly = {
