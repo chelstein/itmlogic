@@ -58,10 +58,11 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
           </div>
         )}
       </div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Score"            value={fmtNum(baseline.score)}                tone="amber" />
-        <Stat label="COL coverage"     value={fmtPct(baseline.col_coverage_pct)}     tone="cyan"  />
-        <Stat label="Blanket pop"      value={fmtBlanketPct(baseline.blanket_population_pct)} tone="red" />
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <Stat label="Score"        value={fmtNum(baseline.score)}                        tone="amber" />
+        <Stat label="COL coverage" value={fmtPct(baseline.col_coverage_pct)}             tone="cyan"  />
+        <Stat label="Daytime reach" value={fmtNum(baseline.daytime_reach_km)} unit="km"  tone="cyan"  />
+        <Stat label="Blanket pop"  value={fmtBlanketPct(baseline.blanket_population_pct)} tone="red"  />
         <div className="flex flex-col">
           <Stat label="Ground σ" value={fmtNum(baseline.ground_sigma_mS_m, 0)} unit="mS/m" tone="green" />
           {baseline.ground_sigma_source && (
