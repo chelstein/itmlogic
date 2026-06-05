@@ -180,7 +180,10 @@ export default function OptimizerInputsPanel({
             suffix="km"
             disabled={gridSpacingDisabled}
             hint={gridSpacingDisabled ? 'n/a in infrastructure-only mode'
-              : estGridPoints != null ? `~${estGridPoints.toLocaleString()} grid pts`
+              : estGridPoints != null
+                ? `~${estGridPoints.toLocaleString()} grid pts · est ${(estGridPoints * 0.0025 < 60
+                    ? `${(estGridPoints * 0.0025).toFixed(1)}s`
+                    : `${Math.ceil(estGridPoints * 0.0025 / 60)} min`)}`
               : 'Finer = more candidates.'}
           />
         </div>
