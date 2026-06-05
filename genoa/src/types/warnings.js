@@ -522,7 +522,17 @@ export const WARNING_CODES = Object.freeze({
 
   DA_SUPPRESSION_UNVERIFIED: { severity: 'warning', phase: 'input',
     title: 'DA suppression ratio not independently verified',
-    description: 'The directional antenna suppression ratio has not been cross-checked against a measured or FCC-approved value.  The suppression ratio affects contour distances in the protected directions; an unverified ratio is a filing risk for short-spaced directional applications.' }
+    description: 'The directional antenna suppression ratio has not been cross-checked against a measured or FCC-approved value.  The suppression ratio affects contour distances in the protected directions; an unverified ratio is a filing risk for short-spaced directional applications.' },
+
+  // ─── AM site optimizer / relocation screening ────────────────────────────
+
+  SCORE_CLUSTERED: { severity: 'warning', phase: 'engine',
+    title: 'Score clustering detected — optimizer may not differentiate sites',
+    description: 'More than 10 candidates share the same composite score.  This typically means the active goal mix does not have enough variation to distinguish candidate sites from each other (e.g., only one goal enabled, or all candidates are at the same ground conductivity).  Enable additional goals or narrow the search radius.' },
+
+  REACH_PLACEHOLDER: { severity: 'warning', phase: 'engine',
+    title: 'Identical daytime reach values across many candidates — propagation may be flat',
+    description: 'More than 10 candidates share the same daytime reach estimate.  This is expected when the screening engine has no per-site ground conductivity raster and uses the same regional σ bin for all points.  The reach values are not differentiating candidates by propagation geometry; per-site DEM conductivity integration is required for filing-grade reach estimates.' }
 });
 
 export class W {

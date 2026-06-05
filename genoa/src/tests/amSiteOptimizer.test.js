@@ -113,9 +113,102 @@ test('tiny radius (< grid spacing) returns at least the current-site point', () 
   );
   assert.ok(me, 'current-site row must be among the returned candidates');
   assert.ok(me.status_labels.includes('SCREENING ONLY'));
-  // The "grid_spacing > radius" warning should have fired.
-  assert.ok(out.warnings.some((w) => /grid_spacing_km/.test(w)),
+  // The "grid_spacing > radius" warning should have fired (string or object).
+  assert.ok(out.warnings.some((w) => /grid_spacing_km/.test(typeof w === 'string' ? w : w.message || '')),
     'warning about grid_spacing > radius should fire');
+});
+
+test('score_stats are present and sensible', () => {
+  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.ok(out.score_stats, 'score_stats must be present');
+  assert.ok(Number.isFinite(out.score_stats.mean),   'score_stats.mean must be finite');
+  assert.ok(Number.isFinite(out.score_stats.std_dev),'score_stats.std_dev must be finite');
+  assert.ok(Number.isFinite(out.score_stats.min),    'score_stats.min must be finite');
+  assert.ok(Number.isFinite(out.score_stats.max),    'score_stats.max must be finite');
+  assert.ok(out.score_stats.min <= out.score_stats.max, 'min <= max');
+  assert.ok(out.score_stats.mean >= out.score_stats.min && out.score_stats.mean <= out.score_stats.max,
+    'mean in [min, max]');
+});
+
+test('optimization_confidence is present with valid level', () => {
+  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.ok(out.optimization_confidence, 'optimization_confidence must be present');
+  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
+    `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
+  assert.ok(Array.isArray(out.optimization_confidence.contributing_layers),
+    'contributing_layers must be an array');
+  assert.ok(Array.isArray(out.optimization_confidence.notes),
+    'notes must be an array');
+});
+
+test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', () => {
+  const poly = {
+    type: 'Polygon',
+    coordinates: [[
+      [-111.85, 34.83], [-111.78, 34.83], [-111.78, 34.90],
+      [-111.85, 34.90], [-111.85, 34.83]
+    ]]
+  };
+  const out = runSiteOptimizer({
+    ...KAZM,
+    community_of_license_polygon: poly,
+    optimization_goals: {
+      maximize_col_coverage:        true,
+      maximize_population:          true,
+      minimize_blanket_population:  true,
+      minimize_int_treaty_zone:     true,
+      prefer_high_conductivity:     false,
+      avoid_wildfire_risk:          false
+    }
+  });
+  assert.equal(out.optimization_confidence.level, 'HIGH');
+  assert.ok(out.optimization_confidence.contributing_layers.includes('col_polygon_provided'));
+});
+
+test('optimization_confidence is LOW when no goals enabled', () => {
+  const out = runSiteOptimizer({
+    ...KAZM,
+    optimization_goals: {
+      maximize_col_coverage: false, maximize_population: false,
+      minimize_blanket_population: false, minimize_int_treaty_zone: false,
+      prefer_high_conductivity: false, avoid_wildfire_risk: false
+    }
+  });
+  assert.equal(out.optimization_confidence.level, 'LOW');
+});
+
+test('SCORE_CLUSTERED warning fires when many candidates share the same score', () => {
+  // Use 0 goals so every candidate scores 0.0 — guaranteed clustering.
+  const out = runSiteOptimizer({
+    ...KAZM,
+    search_radius_km:  50,
+    grid_spacing_km:   10,
+    candidate_limit:   200,
+    optimization_goals: {
+      maximize_col_coverage: false, maximize_population: false,
+      minimize_blanket_population: false, minimize_int_treaty_zone: false,
+      prefer_high_conductivity: false, avoid_wildfire_risk: false
+    }
+  });
+  const clustered = out.warnings.some(w =>
+    (typeof w === 'object' ? w.code : w) === 'SCORE_CLUSTERED'
+  );
+  assert.ok(clustered, 'SCORE_CLUSTERED warning must fire when >10 candidates share the same score');
+});
+
+test('REACH_PLACEHOLDER warning fires when many candidates share identical reach', () => {
+  // Large grid, same sigma region for all candidates → identical reach.
+  const out = runSiteOptimizer({
+    ...KAZM,
+    search_radius_km: 30,
+    grid_spacing_km:  5,
+    candidate_limit:  200,
+    optimization_goals: { ...KAZM.optimization_goals, maximize_population: true }
+  });
+  const reachPlaceholder = out.warnings.some(w =>
+    (typeof w === 'object' ? w.code : w) === 'REACH_PLACEHOLDER'
+  );
+  assert.ok(reachPlaceholder, 'REACH_PLACEHOLDER warning must fire when >10 candidates share identical daytime_reach_km');
 });
 
 test('placeholder goal (avoid_wildfire_risk) surfaces in candidate limitations', () => {

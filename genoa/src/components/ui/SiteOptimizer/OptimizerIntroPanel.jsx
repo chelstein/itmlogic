@@ -17,8 +17,8 @@ export default function OptimizerIntroPanel(){
       <div className="font-mono text-[11px] text-textDim leading-relaxed">
         SCREENING-ONLY workflow.  Every candidate here is a desk-study seed —
         not a filing.  Promote a candidate to the main Contour Studio to
-        compute its §73.183 / §73.184 / §73.182 exhibits, run §73.215
-        short-spacing showings, and pull SDR/measurement evidence.
+        compute its §73.183 / §73.184 / §73.182 exhibits, run the nighttime
+        NIF interference study, and pull SDR/measurement evidence.
       </div>
     </RackPanel>
   );
