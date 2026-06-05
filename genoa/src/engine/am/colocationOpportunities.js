@@ -32,6 +32,7 @@
 import { runSiteOptimizer, __test__ as SO } from './siteOptimizer.js';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
+import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
 import {
   loadManualInfrastructureSites,
   filterInfrastructureSites
@@ -432,6 +433,24 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
   if (site.kind === 'FM_SITE' || site.kind === 'TV_SITE'){
     regulatory_notes.push(`${site.kind} host – evaluate RF safety (47 CFR §1.1310 / OET-65) and IM products.`);
   }
+  // MPE screening: compute the §1.1310 near-field boundary and far-field
+  // compliance distance for the AM station.  For AM (< 30 MHz) the
+  // near-field zone extends λ/(2π) from the antenna and a near-field study
+  // is always required regardless of the far-field result.
+  try {
+    const freq_mhz = ctx.frequency_khz / 1000;
+    const nfBound = nearFieldBoundary_m(freq_mhz);
+    const mpe = complianceDistance_m({ erp_kw: ctx.tpo_kw, frequency_mhz: freq_mhz, exposure_class: 'uncontrolled' });
+    const nfStr = Number.isFinite(nfBound) ? `near-field boundary λ/(2π) ≈ ${Math.round(nfBound)} m` : null;
+    const ffStr = (mpe && Number.isFinite(mpe.distance_m)) ? `far-field compliance distance ≈ ${Math.ceil(mpe.distance_m)} m` : null;
+    if (nfStr || ffStr){
+      const parts = [nfStr, ffStr].filter(Boolean);
+      regulatory_notes.push(
+        `RF safety (§1.1310 / OET-65): ${parts.join('; ')} at ${ctx.tpo_kw} kW / ${ctx.frequency_khz} kHz.` +
+        ` AM < 30 MHz: near-field analysis (OET-65 §3.B) required out to the λ/(2π) boundary.`
+      );
+    }
+  } catch (_){ /* skip if OET-65 lookup fails */ }
 
   const decorated = {
     ...scored,
