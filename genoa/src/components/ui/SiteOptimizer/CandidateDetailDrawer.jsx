@@ -368,14 +368,41 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         )}
 
-        {/* Next actions */}
+        {/* Next actions — context-sensitive per status_category */}
         <div>
-          <div className="rack-eyebrow mb-1">Next actions</div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="rack-eyebrow">Next actions</div>
+            <button
+              onClick={() => {
+                const txt = `${candidate.lat.toFixed(6)}, ${candidate.lon.toFixed(6)}`;
+                if (navigator.clipboard) navigator.clipboard.writeText(txt).catch(() => {});
+              }}
+              className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
+              title="Copy coordinates to clipboard"
+            >
+              Copy coords
+            </button>
+          </div>
           <ul className="font-mono text-[11px] text-text list-disc list-inside space-y-0.5">
-            <li>Promote to Contour Studio with these coordinates.</li>
-            <li>Run §73.182 NIF protection with engineered DA pattern.</li>
-            <li>Verify parcel ownership + zoning before site survey.</li>
-            <li>Pull SDR residual evidence once parcel is selected.</li>
+            {candidate.status_category !== 'NON_COMPLIANT' && onPromoteToStudio && (
+              <li>Use <span className="text-green">Promote →</span> above to load these coordinates into the Contour Studio.</li>
+            )}
+            {(candidate.status_category === 'RECOVERABLE_WITH_DA' || candidate.status_category === 'REVIEW_REQUIRED') && (
+              <li>Design a directional antenna (§73.150) to improve the 5 mV/m principal-community contour.</li>
+            )}
+            {candidate.status_category === 'RECOVERABLE_WITH_REDUCED_POWER' && (
+              <li>Reduce TPO to shrink the 1000 mV/m blanket contour below the §73.24(g) 1% limit.</li>
+            )}
+            {candidate.status_category === 'RECOVERABLE_WITH_COL_CHANGE' && (
+              <li>Consider a community-of-license change filing (§73.3573) — current CoL is too far from this site.</li>
+            )}
+            {candidate.status_category === 'TREATY_REVIEW' && (
+              <li>Engage FCC International Bureau for treaty consultation before any engineering commitment.</li>
+            )}
+            <li>Run §73.182 skywave NIF protection contour with engineered DA pattern.</li>
+            <li>Verify parcel ownership + zoning; obtain lease option before site survey.</li>
+            <li>Commission structural / TIA-222 loading study if reusing an existing tower.</li>
+            <li>Pull SDR residual evidence once parcel is shortlisted.</li>
           </ul>
         </div>
       </section>
