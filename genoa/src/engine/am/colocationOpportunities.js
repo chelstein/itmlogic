@@ -30,6 +30,7 @@
 //   manualInfrastructureClient).  All scoring is deterministic.
 
 import { runSiteOptimizer, __test__ as SO } from './siteOptimizer.js';
+import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import {
   loadManualInfrastructureSites,
   filterInfrastructureSites
@@ -116,7 +117,6 @@ export async function runColocationOpportunities(body = {}){
   // sub-score normalises correctly via scoreCandidate.
   let reach_scale_km = 200;
   try {
-    const { fccAmDistanceKm } = await import('../curves/fcc/index.mjs');
     const rMax = fccAmDistanceKm({
       frequency_khz,
       target_mvm: 0.5,       // matches DAYTIME_REACH_TARGET_MVM in siteOptimizer
