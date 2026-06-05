@@ -31,6 +31,7 @@
 
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
+import { lookupM3ZoneFallback } from './m3.js';
 
 // ---------- thresholds & weights ----------
 
@@ -215,7 +216,7 @@ export function runSiteOptimizer(body = {}){
     level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
     contributing_layers: confidenceLayers,
     notes: [
-      ...(goals.prefer_high_conductivity ? ['Ground conductivity uses a regional heuristic bin, not a real raster'] : []),
+      ...(goals.prefer_high_conductivity ? ['Ground conductivity uses FCC M3 zone table (15 zones, ±50% vs. raster); deploy AM_m3.tif for filing-grade σ'] : []),
       ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
       ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : [])
     ]
@@ -374,12 +375,13 @@ function scoreCandidate(pt, ctx, warnings){
   // --- raw sub-metrics (computed independent of weighting) ---
 
   // 1. Groundwave "daytime reach" — distance to DAYTIME_REACH_TARGET_MVM.
-  //    Uses a generic ground conductivity (M3 σ for the western US is
-  //    typically 4 mS/m; we assume 4 mS/m as a screening default until
-  //    we have a real ground-conductivity raster wired into the grid).
-  //    Both the candidate and the current site use the same sigma so
-  //    relative comparisons are still valid.
-  const sigma_msm = screeningGroundSigmaMsm(pt);
+  //    Uses FCC M3 zone-table conductivity (15 geographic zones, ±50%
+  //    accuracy vs. the GeoTIFF raster).  Each candidate gets its own
+  //    σ so propagation estimates vary meaningfully across the grid.
+  const _m3 = lookupM3ZoneFallback(pt.lat, pt.lon);
+  const sigma_msm = _m3.available ? _m3.sigma_mS_m : 4;
+  const ground_sigma_source       = _m3.available ? _m3.zone_label   : 'default (4 mS/m screening)';
+  const ground_sigma_filing_grade = _m3.available ? (_m3.filing_grade || 'screening') : 'screening';
   let daytime_reach_km = null;
   try {
     const r = fccAmDistanceKm({
@@ -562,7 +564,9 @@ function scoreCandidate(pt, ctx, warnings){
     nif_status,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
-    ground_sigma_mS_m:       sigma_msm,
+    ground_sigma_mS_m:         sigma_msm,
+    ground_sigma_source,
+    ground_sigma_filing_grade,
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),
@@ -619,7 +623,9 @@ function baselineSummary(b){
     col_coverage_pct:       b.col_coverage_pct,
     daytime_reach_km:       b.daytime_reach_km,
     blanket_population_pct: b.blanket_population_pct,
-    ground_sigma_mS_m:      b.ground_sigma_mS_m,
+    ground_sigma_mS_m:         b.ground_sigma_mS_m,
+    ground_sigma_source:       b.ground_sigma_source,
+    ground_sigma_filing_grade: b.ground_sigma_filing_grade,
     nif_status:             b.nif_status,
     treaty_zone:            b.treaty_zone,
     status_labels:          b.status_labels
@@ -660,31 +666,6 @@ function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct
   if (treaty_zone) bits.push(`inside ${treaty_zone} treaty zone — verify cross-border §73.187 obligations`);
   bits.push(`${distance_from_current_km.toFixed(0)} km from current site`);
   return bits.join('; ') + '.';
-}
-
-// ---------- screening-grade ground sigma helper ----------
-
-// Without a real ground-conductivity raster we use a coarse latitude
-// band heuristic that matches the FCC M3 map's gross structure: the
-// US Southwest / interior is ~4 mS/m, the Gulf coast and Florida are
-// ~8-15 mS/m, the northern Plains and Great Lakes ~6 mS/m, the
-// Pacific Northwest ~4 mS/m, and ocean ~30 mS/m.  This is purely a
-// screening surrogate — every candidate carries a "σ assumed from
-// regional bin" note via the engineer-review label.
-function screeningGroundSigmaMsm(pt){
-  const lat = pt.lat, lon = pt.lon;
-  // Florida + Gulf coast band (high sigma, moist soils).
-  if (lat >= 25 && lat <= 31 && lon >= -98 && lon <= -80) return 8;
-  // Great Lakes + northeast.
-  if (lat >= 41 && lat <= 47 && lon >= -90 && lon <= -70) return 6;
-  // Pacific Northwest coast.
-  if (lat >= 42 && lat <= 49 && lon <= -120)              return 4;
-  // Southwest interior (KAZM / Sedona is in this band).
-  if (lat >= 30 && lat <= 42 && lon >= -120 && lon <= -100) return 4;
-  // Northern Plains / Upper Midwest.
-  if (lat >= 41 && lat <= 49 && lon >= -105 && lon <= -90) return 6;
-  // Default — generic "average soil" M3 default.
-  return 4;
 }
 
 // ---------- geometric helpers ----------
@@ -800,6 +781,6 @@ export const __test__ = {
   greatCircleKm,
   discCoverageFraction,
   polygonCoverageFraction,
-  screeningGroundSigmaMsm,
+  lookupM3ZoneFallback,
   KNOWN_GOALS
 };
