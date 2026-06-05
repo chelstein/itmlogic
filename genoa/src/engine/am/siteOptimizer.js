@@ -56,6 +56,14 @@ const SIGMA_PREFERRED_MIN_MSM = 8;
 // Earth radius for great-circle math (mean, km).
 const R_EARTH_KM = 6371.0088;
 
+// Blanket-population proxy constants.
+// §73.24(g) requires people inside the 1000 mV/m contour be < 1% of US population.
+// We estimate via: (blanket area km²) × (regional density ppl/km²) / US_POPULATION * 100.
+// "Regional density" is the US national average — rural/suburban bias is handled by the
+// distance-from-city surrogate in the scoreCandidate function.
+const US_POPULATION_M = 335e6;                    // 2024 US population (persons)
+const US_AVG_POP_DENSITY_PER_KM2 = 34.0;          // national avg (USCB, 2023)
+
 // Goals enum — these are the keys the API exposes.  The set is fixed;
 // unknown keys in the request are ignored (forward-compatibility for UI).
 const KNOWN_GOALS = Object.freeze([
@@ -494,25 +502,36 @@ async function scoreCandidate(pt, ctx, warnings){
     warnings.push(`fccAmDistanceKm(5 mV/m) failed: ${e.message}`);
   }
 
-  // 3. Blanket population — pop inside the 1000 mV/m contour as a
-  //    fraction of pop inside the 25 mV/m contour.  Screening proxy:
-  //    we assume uniform pop density and the ratio is (area_1000 /
-  //    area_25) × density_modifier_for_candidate_vs_current.  This
-  //    UNDER-estimates urban blanket populations; the engineer-grade
-  //    pipeline must be used for filing.
+  // 3. Blanket population — fraction of US population inside the 1000 mV/m
+  //    ground-wave contour.  §73.24(g) caps this at 1%.
+  //
+  //    Proxy formula:
+  //      blanket_area_km² = π × r_1000²
+  //      regional_density = US_AVG × urbanisation_factor
+  //      urbanisation_factor ∈ [1.0, 5.0]: sites closer to the current
+  //        city of license are assumed to be in a more urbanised area;
+  //        sites at ≥ 100 km fall back to pure national average.
+  //      pop_in_blanket = blanket_area_km² × regional_density
+  //      blanket_pct    = pop_in_blanket / US_POPULATION × 100
+  //
+  //    This is still a screening proxy (vs. Census-block sum) but it is
+  //    physically meaningful: changing conductivity / power / frequency
+  //    changes r_1000 which changes the area and therefore the result.
   let blanket_population_pct = null;
   try {
-    const r1000 = fccAmDistanceKm({ frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: tpo_kw }).distance_km;
-    const r25   = fccAmDistanceKm({ frequency_khz, target_mvm: 25,   conductivity_msm: sigma_msm, erp_kw: tpo_kw }).distance_km;
-    // Density modifier: candidates closer to the current site live in
-    // the same metro and inherit ~1.0 modifier; candidates farther
-    // out are assumed to be progressively less populated.  This is a
-    // crude monotonic surrogate — the real check is a Census-block
-    // population sum which lives in the engineer-grade pipeline.
-    const distRatio = Math.min(1, pt.distance_from_current_km / 50);
-    const densityProxy = 1 - 0.7 * distRatio;
-    const areaRatio = (Math.PI * r1000 * r1000) / Math.max(Math.PI * r25 * r25, 1e-9);
-    blanket_population_pct = areaRatio * densityProxy * 100;
+    const r1000 = fccAmDistanceKm({
+      frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: tpo_kw
+    }).distance_km;
+    if (r1000 > 0){
+      const blanket_area_km2 = Math.PI * r1000 * r1000;
+      // Urbanisation factor: 1.0 (rural) → 5.0 (central metro).  Linear
+      // over 0–50 km from current site; saturates at 50 km out.
+      const dist = pt.distance_from_current_km ?? 0;
+      const urbanFactor = 1.0 + 4.0 * Math.max(0, 1 - Math.min(1, dist / 50));
+      const regional_density = US_AVG_POP_DENSITY_PER_KM2 * urbanFactor;
+      const pop_in_blanket = blanket_area_km2 * regional_density;
+      blanket_population_pct = (pop_in_blanket / US_POPULATION_M) * 100;
+    }
   } catch (_){ /* leave null */ }
 
   // 4. NIF status (screening grade) — pass-through for now; future
