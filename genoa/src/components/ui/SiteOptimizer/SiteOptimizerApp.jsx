@@ -10,6 +10,7 @@ import CandidateDetailDrawer from './CandidateDetailDrawer.jsx';
 import BaselinePanel from './BaselinePanel.jsx';
 import FuturePlaceholders from './FuturePlaceholders.jsx';
 import ColocationDoctrineBlock from './ColocationDoctrineBlock.jsx';
+import OptimizationConfidencePanel from './OptimizationConfidencePanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -117,8 +118,11 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
     return result.candidates.find(c => c.rank === selectedRank) || null;
   }, [selectedRank, result]);
 
-  const baseline = result?.current_site_baseline || null;
-  const candidates = result?.candidates || [];
+  const baseline    = result?.current_site_baseline || null;
+  const candidates  = result?.candidates || [];
+  const auditWarnings = (result?.warnings || []).filter(w =>
+    ['SCORE_CLUSTERED', 'REACH_PLACEHOLDER'].includes(typeof w === 'object' ? w.code : null)
+  );
 
   // Infrastructure-source sites drive the InfrastructureLegend layer
   // inside OptimizerMap.  GRID-source candidates remain on the regular
@@ -177,6 +181,21 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               searchMode={inputs.search_mode}
               infrastructureSites={infrastructureSites}
             />
+            {auditWarnings.length > 0 && (
+              <div className="space-y-1 mt-1">
+                {auditWarnings.map((w, i) => {
+                  const msg = typeof w === 'object' ? w.message : w;
+                  return (
+                    <div key={i} className="border border-amber/40 bg-amber/5 rounded-sm px-3 py-2 font-mono text-[10px] text-amberDim leading-snug">
+                      <span className="text-amber font-semibold mr-1.5 uppercase tracking-rack">
+                        {typeof w === 'object' ? w.code : 'WARN'}
+                      </span>
+                      {msg}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
             <CandidateTable
               candidates={candidates}
               selectedRank={selectedRank}
@@ -188,6 +207,10 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
         )}
         right={(
           <>
+            <OptimizationConfidencePanel
+              confidence={result?.optimization_confidence}
+              scoreStats={result?.score_stats}
+            />
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
             ) : (
