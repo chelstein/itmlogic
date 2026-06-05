@@ -394,3 +394,13 @@ test('score_breakdown values sum to approximately the candidate score', async ()
       `breakdown sum ${sumPts.toFixed(2)} should ≈ score ${c.score} (rank ${c.rank})`);
   }
 });
+
+
+test('scoring_time_ms is a non-negative number in the response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(typeof out.scoring_time_ms === 'number' && out.scoring_time_ms >= 0,
+    `scoring_time_ms must be a non-negative number, got: ${out.scoring_time_ms}`);
+});

@@ -215,6 +215,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               scoreStats={result?.score_stats}
               conductivityMode={result?.conductivity_mode}
               nInfrastructureSites={result?.n_infrastructure_sites}
+              scoringTimeMs={result?.scoring_time_ms}
             />
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
@@ -269,6 +270,7 @@ const DEMO_RESULT = {
   n_candidates_returned:  4,
   conductivity_mode: 'zone-table',
   n_infrastructure_sites: 0,
+  scoring_time_ms: 587,
   candidate_count_by_status: {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
@@ -382,6 +384,7 @@ const DEMO_COLOCATION_RESULT = {
   ...DEMO_RESULT,
   conductivity_mode: 'zone-table',
   n_infrastructure_sites: 4,
+  scoring_time_ms: 824,
   n_candidates_evaluated: 312,
   n_candidates_returned:  6,
   candidate_count_by_status: {

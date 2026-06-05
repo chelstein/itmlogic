@@ -25,7 +25,7 @@ function fmtNum(v, d = 1){
   return Number(v).toFixed(d);
 }
 
-export default function OptimizationConfidencePanel({ confidence, scoreStats, conductivityMode, nInfrastructureSites }){
+export default function OptimizationConfidencePanel({ confidence, scoreStats, conductivityMode, nInfrastructureSites, scoringTimeMs }){
   if (!confidence && !scoreStats) return null;
 
   const level = confidence?.level;
@@ -79,6 +79,15 @@ export default function OptimizationConfidencePanel({ confidence, scoreStats, co
               <div><span className="text-textDim">Min</span>   <span className="text-cream ml-1">{fmtNum(scoreStats.min)}</span></div>
               <div><span className="text-textDim">Max</span>   <span className="text-cream ml-1">{fmtNum(scoreStats.max)}</span></div>
             </div>
+          </div>
+        )}
+
+        {/* Timing strip */}
+        {scoringTimeMs != null && (
+          <div className="font-mono text-[9px] text-textDim">
+            Scored in {scoringTimeMs < 1000
+              ? `${scoringTimeMs} ms`
+              : `${(scoringTimeMs / 1000).toFixed(1)} s`}
           </div>
         )}
 

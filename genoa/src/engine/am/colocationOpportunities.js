@@ -112,7 +112,8 @@ export async function runColocationOpportunities(body = {}){
       optimization_confidence: so.optimization_confidence || null,
       conductivity_mode: so.conductivity_mode || null,
       candidate_count_by_status: so.candidate_count_by_status || null,
-      n_infrastructure_sites: 0
+      n_infrastructure_sites: 0,
+      scoring_time_ms: so.scoring_time_ms ?? null
     });
   }
 
@@ -134,6 +135,8 @@ export async function runColocationOpportunities(body = {}){
     callsign, frequency_khz, tpo_kw, pattern_mode, fcc_class,
     community_of_license_polygon, goals, current_site, reach_scale_km
   };
+
+  const scoringStart = Date.now();
 
   // ---- 3a. gather GRID candidates if applicable ----
   let gridScored = [];
@@ -231,6 +234,8 @@ export async function runColocationOpportunities(body = {}){
     candidate_count_by_status[s] = (candidate_count_by_status[s] || 0) + 1;
   }
 
+  const scoring_time_ms = Date.now() - scoringStart;
+
   return composeResponse({
     method: `${search_mode} (infrastructure source: ${infrastructure_source})`,
     candidates: returned,
@@ -246,7 +251,8 @@ export async function runColocationOpportunities(body = {}){
     optimization_confidence,
     conductivity_mode: m3LoadStatus().loaded ? 'raster' : 'zone-table',
     candidate_count_by_status,
-    n_infrastructure_sites: infraSites.length
+    n_infrastructure_sites: infraSites.length,
+    scoring_time_ms
   });
 }
 
@@ -541,7 +547,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             baseline, inputs_echo, warnings, so_limitations,
                             score_stats, optimization_confidence,
                             conductivity_mode, n_infrastructure_sites,
-                            candidate_count_by_status }){
+                            candidate_count_by_status, scoring_time_ms }){
   return {
     available: true,
     method,
@@ -554,6 +560,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     score_stats,
     optimization_confidence,
     conductivity_mode: conductivity_mode || null,
+    scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,
     limitations_global: [

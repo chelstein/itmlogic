@@ -137,6 +137,8 @@ export async function runSiteOptimizer(body = {}){
   // same rubric (the "baseline").
   ensureCurrentSiteIncluded(gridPoints, current_site);
 
+  const scoringStart = Date.now();
+
   // ---- 3. score every candidate ----
   // Compute reach_scale_km once: the maximum daytime reach this station
   // can achieve (at σ=15 mS/m, the best M3-zone conductivity) is used
@@ -273,11 +275,14 @@ export async function runSiteOptimizer(body = {}){
     candidate_count_by_status[s] = (candidate_count_by_status[s] || 0) + 1;
   }
 
+  const scoring_time_ms = Date.now() - scoringStart;
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
     n_candidates_evaluated: scored.length,
     n_candidates_returned:  returned.length,
+    scoring_time_ms,
     candidate_count_by_status,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,

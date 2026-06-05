@@ -196,3 +196,69 @@ test('Status RECOVERABLE_WITH_REDUCED_POWER when blanket pop fails but COL OK', 
   __test__.assignStatusCategory(c, 80, { current_site: KAZM });
   assert.equal(c.status_category, 'RECOVERABLE_WITH_REDUCED_POWER');
 });
+
+// ---------- Test 11 — HYBRID candidates carry rank_percentile ----------
+test('HYBRID candidates all have rank_percentile in [0,100]; rank 1 has the highest', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    search_mode: 'HYBRID',
+    grid_spacing_km: 25,
+    search_radius_km: 40,
+    candidate_limit: 50
+  }));
+  assert.equal(out.available, true);
+  assert.ok(out.candidates.length > 1, 'need at least 2 candidates to check order');
+  for (const c of out.candidates){
+    assert.ok(Number.isFinite(c.rank_percentile),
+      `rank_percentile must be finite for rank ${c.rank}`);
+    assert.ok(c.rank_percentile >= 0 && c.rank_percentile <= 100,
+      `rank_percentile must be in [0,100] (rank ${c.rank}, got ${c.rank_percentile})`);
+  }
+  const sorted = [...out.candidates].sort((a, b) => a.rank - b.rank);
+  assert.ok(
+    sorted[0].rank_percentile >= sorted[sorted.length - 1].rank_percentile,
+    `rank 1 must have rank_percentile >= last (got ${sorted[0].rank_percentile} vs ${sorted[sorted.length - 1].rank_percentile})`
+  );
+});
+
+// ---------- Test 12 — scoring_time_ms present in all modes ----------
+test('scoring_time_ms is a non-negative number in INFRASTRUCTURE response', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  assert.equal(out.available, true);
+  assert.ok(typeof out.scoring_time_ms === 'number' && out.scoring_time_ms >= 0,
+    `scoring_time_ms must be a non-negative number, got: ${out.scoring_time_ms}`);
+});
+
+test('scoring_time_ms is a non-negative number in HYBRID response', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    search_mode: 'HYBRID',
+    grid_spacing_km: 25,
+    search_radius_km: 40
+  }));
+  assert.equal(out.available, true);
+  assert.ok(typeof out.scoring_time_ms === 'number' && out.scoring_time_ms >= 0,
+    `scoring_time_ms must be a non-negative number, got: ${out.scoring_time_ms}`);
+});
+
+// ---------- Test 13 — RECOVERABLE_WITH_COL_CHANGE for distant COL fail ----------
+test('Status RECOVERABLE_WITH_COL_CHANGE when COL fails and site is far from current', () => {
+  // Site is > NEARBY_COMMUNITY_RADIUS_KM (25 km) away — COL polygon can be changed.
+  const c = {
+    lat: 34.0, lon: -112.5,                   // ~90 km south of KAZM
+    distance_from_current_km: 90,
+    score: 70,                                 // above RECOVERY_SCORE_FLOOR (55)
+    col_coverage_pct: 0.35,                    // fails §73.24(j) 0.80 floor
+    blanket_population_pct: 0.10,
+    daytime_reach_km: 60,
+    ground_sigma_mS_m: 6,
+    treaty_zone: null,
+    source: 'GRID',
+    colocation_analysis: null
+  };
+  __test__.assignStatusCategory(c, /*scoreCutoff=*/80, { current_site: KAZM });
+  assert.equal(c.status_category, 'RECOVERABLE_WITH_COL_CHANGE',
+    `expected RECOVERABLE_WITH_COL_CHANGE; got ${c.status_category}`);
+  assert.ok(
+    c.explanation && /community.of.license/i.test(c.explanation.recovery_reasoning || ''),
+    `expected recovery_reasoning to mention community of license; got: ${c.explanation?.recovery_reasoning}`
+  );
+});
