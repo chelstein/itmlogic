@@ -29,7 +29,7 @@
 //   No IO except for the manual JSON inventory load (delegated to
 //   manualInfrastructureClient).  All scoring is deterministic.
 
-import { runSiteOptimizer, buildTopSummary, __test__ as SO } from './siteOptimizer.js';
+import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, __test__ as SO } from './siteOptimizer.js';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
@@ -90,6 +90,19 @@ export async function runColocationOpportunities(body = {}){
     });
   }
 
+  // ---- 1c. FCC class power limit advisory (mirrors siteOptimizer §73.21 check) ----
+  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.001,max:0.25}, D:{min:0.001,max:50} };
+  const classLimits = FCC_CLASS_POWER_KW[fcc_class];
+  if (classLimits){
+    if (tpo_kw > classLimits.max){
+      warnings.push({ code: 'TPO_EXCEEDS_CLASS_MAX',
+        message: `tpo_kw ${tpo_kw} kW exceeds §73.21 daytime maximum for Class ${fcc_class} (${classLimits.max} kW).` });
+    } else if (fcc_class === 'A' && tpo_kw < classLimits.min){
+      warnings.push({ code: 'TPO_BELOW_CLASS_MIN',
+        message: `tpo_kw ${tpo_kw} kW is below §73.21 minimum for Class A stations (${classLimits.min} kW).` });
+    }
+  }
+
   // ---- 2. choose path ----
   if (search_mode === 'GRID'){
     // Pure GRID: delegate to the site optimizer for an apples-to-apples
@@ -120,6 +133,7 @@ export async function runColocationOpportunities(body = {}){
       score_stats: so.score_stats || null,
       optimization_confidence: so.optimization_confidence || null,
       conductivity_mode: so.conductivity_mode || null,
+      frequency_channel_class: so.frequency_channel_class || null,
       candidate_count_by_status: so.candidate_count_by_status || null,
       n_infrastructure_sites: 0,
       scoring_time_ms: so.scoring_time_ms ?? null,
@@ -270,6 +284,7 @@ export async function runColocationOpportunities(body = {}){
     score_stats,
     optimization_confidence,
     conductivity_mode: m3LoadStatus().loaded ? 'raster' : 'zone-table',
+    frequency_channel_class: frequencyChannelClass(frequency_khz),
     candidate_count_by_status,
     n_infrastructure_sites: infraSites.length,
     scoring_time_ms,
@@ -591,7 +606,8 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             baseline, inputs_echo, warnings, so_limitations,
                             score_stats, score_histogram, top_candidates_summary,
                             optimization_confidence,
-                            conductivity_mode, n_infrastructure_sites,
+                            conductivity_mode, frequency_channel_class,
+                            n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   return {
     available: true,
@@ -607,6 +623,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     score_histogram: score_histogram ?? null,
     optimization_confidence,
     conductivity_mode: conductivity_mode || null,
+    frequency_channel_class: frequency_channel_class || null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,
