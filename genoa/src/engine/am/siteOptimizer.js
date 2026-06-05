@@ -160,6 +160,67 @@ export function runSiteOptimizer(body = {}){
   // Re-rank after labeling and assign rank index.
   scored.forEach((c, i) => { c.rank = i + 1; });
 
+  // ---- 5. Score variance stats + clustering audit ----
+  const scoreValues = scored.map(c => c.score);
+  const scoreMean   = scoreValues.reduce((a, b) => a + b, 0) / Math.max(scoreValues.length, 1);
+  const scoreVar    = scoreValues.reduce((a, v) => a + (v - scoreMean) ** 2, 0) / Math.max(scoreValues.length, 1);
+  const score_stats = {
+    mean:    round2(scoreMean),
+    std_dev: round2(Math.sqrt(scoreVar)),
+    min:     round2(Math.min(...scoreValues)),
+    max:     round2(Math.max(...scoreValues))
+  };
+
+  const scoreBuckets = {};
+  for (const c of scored){
+    const k = c.score.toFixed(1);
+    scoreBuckets[k] = (scoreBuckets[k] || 0) + 1;
+  }
+  for (const [val, n] of Object.entries(scoreBuckets)){
+    if (n > 10){
+      warnings.push({ code: 'SCORE_CLUSTERED', message: `${n} candidates share score ${val} — weight mix may not differentiate sites; consider enabling additional goals or narrowing the search radius` });
+    }
+  }
+
+  // ---- 6. Daytime-reach clustering audit ----
+  const reachBuckets = {};
+  for (const c of scored){
+    if (c.daytime_reach_km != null){
+      const k = c.daytime_reach_km.toFixed(1);
+      reachBuckets[k] = (reachBuckets[k] || 0) + 1;
+    }
+  }
+  for (const [val, n] of Object.entries(reachBuckets)){
+    if (n > 10){
+      warnings.push({ code: 'REACH_PLACEHOLDER', message: `${n} candidates share identical daytime_reach_km=${val} km — propagation result appears flat (same σ and TPO across candidates); per-site conductivity raster not yet wired` });
+    }
+  }
+
+  // ---- 7. Optimization confidence ----
+  const confidenceLayers = [];
+  if (goals.maximize_col_coverage || goals.maximize_population || goals.minimize_blanket_population){
+    confidenceLayers.push('fcc_groundwave_engine');
+  }
+  if (goals.minimize_blanket_population){
+    confidenceLayers.push('blanket_population_proxy');
+  }
+  if (goals.minimize_int_treaty_zone){
+    confidenceLayers.push('international_border_detection');
+  }
+  if (community_of_license_polygon){
+    confidenceLayers.push('col_polygon_provided');
+  }
+  const nLayers = confidenceLayers.length;
+  const optimization_confidence = {
+    level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
+    contributing_layers: confidenceLayers,
+    notes: [
+      ...(goals.prefer_high_conductivity ? ['Ground conductivity uses a regional heuristic bin, not a real raster'] : []),
+      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+      ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : [])
+    ]
+  };
+
   // Baseline = the score row for the current site (search by coord match).
   const baseline = scored.find((c) => coordsEqual(c, current_site)) || null;
 
@@ -172,6 +233,8 @@ export function runSiteOptimizer(body = {}){
     n_candidates_returned:  returned.length,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
+    score_stats,
+    optimization_confidence,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,

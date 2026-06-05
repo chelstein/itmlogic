@@ -17,6 +17,17 @@ function fmtNum(v, digits = 1){
   if (v == null || !Number.isFinite(Number(v))) return '—';
   return Number(v).toFixed(digits);
 }
+// blanket_population_pct is stored as a percent value (e.g. 2.14 = 2.14%),
+// NOT as a 0..1 fraction — do NOT multiply by 100.
+function fmtBlanketPct(v, digits = 2){
+  if (v == null || !Number.isFinite(Number(v))) return '—';
+  return `${Number(v).toFixed(digits)}%`;
+}
+function fmtCoord(lat, lon){
+  const latDir = lat >= 0 ? 'N' : 'S';
+  const lonDir = lon >= 0 ? 'E' : 'W';
+  return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`;
+}
 
 function MiniContourPreview({ daytimeReachKm }){
   const r  = Number(daytimeReachKm) || 0;
@@ -80,7 +91,7 @@ function RiskChip({ risk }){
   );
 }
 
-function ColocationAnalysisSection({ analysis }){
+function ColocationAnalysisSection({ analysis, infra }){
   if (!analysis) return null;
   const dist = analysis.distance_to_host_m;
   return (
@@ -93,19 +104,27 @@ function ColocationAnalysisSection({ analysis }){
         </div>
         <div>
           <span className="text-textDim">Host kind</span>{' '}
-          <span className="text-cream">{(analysis.host_kind || '—').toString().replace(/_/g, ' ')}</span>
+          <span className="text-cream">{(analysis.host_kind || 'UNKNOWN').toString().replace(/_/g, ' ')}</span>
         </div>
         <div>
-          <span className="text-textDim">Host owner</span>{' '}
-          <span className="text-cream">{analysis.host_owner || '—'}</span>
+          <span className="text-textDim">Owner</span>{' '}
+          <span className="text-cream">{analysis.host_owner || infra?.owner || 'UNKNOWN'}</span>
         </div>
         <div>
-          <span className="text-textDim">Host height</span>{' '}
-          <span className="text-cream">{analysis.host_height_m != null ? `${analysis.host_height_m} m` : '—'}</span>
+          <span className="text-textDim">Tower height</span>{' '}
+          <span className="text-cream">{analysis.host_height_m != null ? `${analysis.host_height_m} m` : (infra?.height_m != null ? `${infra.height_m} m` : 'UNKNOWN')}</span>
+        </div>
+        <div>
+          <span className="text-textDim">Structure type</span>{' '}
+          <span className="text-cream">{(infra?.structure_type || 'UNKNOWN').toString().replace(/_/g, ' ')}</span>
+        </div>
+        <div>
+          <span className="text-textDim">ASR number</span>{' '}
+          <span className="text-cream">{infra?.asr_number || 'UNKNOWN'}</span>
         </div>
         <div className="col-span-2">
           <span className="text-textDim">Tower loading advisory</span><br/>
-          <span className="text-cream">{analysis.tower_loading_advisory || '—'}</span>
+          <span className="text-cream">{analysis.tower_loading_advisory || 'UNKNOWN'}</span>
         </div>
         <div>
           <span className="text-textDim">Same-band interference</span>{' '}
@@ -153,7 +172,7 @@ export default function CandidateDetailDrawer({ candidate, onClose }){
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="font-display text-cream text-[18px]">Rank #{candidate.rank}</span>
             <span className="font-mono text-[11px] text-textDim">
-              {fmtNum(candidate.lat, 4)}, {fmtNum(candidate.lon, 4)}
+              {fmtCoord(candidate.lat, candidate.lon)}
             </span>
           </div>
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -198,16 +217,17 @@ export default function CandidateDetailDrawer({ candidate, onClose }){
             <div><span className="text-textDim">Distance from current</span> <span className="text-cream">{fmtNum(candidate.distance_from_current_km)} km</span></div>
             <div><span className="text-textDim">Daytime reach</span>          <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
-            <div><span className="text-textDim">Blanket population</span>     <span className="text-cream">{fmtPct(candidate.blanket_population_pct)}</span></div>
+            <div><span className="text-textDim">Blanket pop</span>             <span className="text-cream">{fmtBlanketPct(candidate.blanket_population_pct)}</span></div>
             <div><span className="text-textDim">Ground σ</span>                <span className="text-cream">{fmtNum(candidate.ground_sigma_mS_m, 0)} mS/m</span></div>
             <div><span className="text-textDim">NIF status</span>              <span className="text-cream">{candidate.nif_status || '—'}</span></div>
             <div><span className="text-textDim">Fuel / wildfire</span>         <span className="text-cream">{candidate.fuel_risk || '—'}</span></div>
             <div><span className="text-textDim">Treaty zone</span>             <span className="text-cream">{candidate.treaty_zone ?? '—'}</span></div>
+            <div><span className="text-textDim">Parcel / zoning</span>         <span className="text-cream">UNKNOWN — verify before site survey</span></div>
           </div>
         </div>
 
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
-        {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} />}
+        {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}
 
         {/* Schematic contour preview */}
         <div>
