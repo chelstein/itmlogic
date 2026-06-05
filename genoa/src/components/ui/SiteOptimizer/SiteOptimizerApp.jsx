@@ -11,6 +11,7 @@ import BaselinePanel from './BaselinePanel.jsx';
 import FuturePlaceholders from './FuturePlaceholders.jsx';
 import ColocationDoctrineBlock from './ColocationDoctrineBlock.jsx';
 import OptimizationConfidencePanel from './OptimizationConfidencePanel.jsx';
+import LimitationsGlobalPanel from './LimitationsGlobalPanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -203,6 +204,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               evaluated={result?.n_candidates_evaluated}
               returned={result?.n_candidates_returned}
             />
+            <LimitationsGlobalPanel limitations={result?.limitations_global} />
           </>
         )}
         right={(

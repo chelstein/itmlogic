@@ -16,17 +16,15 @@ import { primaryStatus, rankColor } from './statusUtil.js';
 //     present, otherwise falls back to legacy free-text labels.
 
 const COLUMNS = [
-  { key: 'rank',                       label: '#',                  align: 'right' },
-  { key: 'score',                      label: 'Score',              align: 'right' },
-  { key: '_source',                    label: 'Source',             align: 'left',  unsortable: true },
-  { key: '_host',                      label: 'Host',               align: 'left',  unsortable: true },
-  { key: 'distance_from_current_km',   label: 'Dist',               align: 'right' },
-  { key: 'col_coverage_pct',           label: 'COL %',              align: 'right' },
-  { key: 'nif_status',                 label: 'NIF',                align: 'left'  },
-  { key: 'daytime_reach_km',           label: 'Day reach',          align: 'right' },
-  { key: 'fuel_risk',                  label: 'Fuel risk',          align: 'left'  },
-  { key: '_status',                    label: 'Status',             align: 'left',  unsortable: true },
-  { key: 'notes',                      label: 'Notes',              align: 'left',  unsortable: true }
+  { key: 'rank',                       label: '#',         align: 'right' },
+  { key: 'score',                      label: 'Score',     align: 'right' },
+  { key: '_source',                    label: 'Source',    align: 'left',  unsortable: true },
+  { key: '_host',                      label: 'Host',      align: 'left',  unsortable: true },
+  { key: 'distance_from_current_km',   label: 'Dist',      align: 'right' },
+  { key: 'col_coverage_pct',           label: 'COL %',     align: 'right' },
+  { key: 'blanket_population_pct',     label: 'Blkt pop',  align: 'right' },
+  { key: 'daytime_reach_km',           label: 'Reach',     align: 'right' },
+  { key: '_status',                    label: 'Status',    align: 'left',  unsortable: true }
 ];
 
 function cellValue(c, key){
@@ -37,12 +35,12 @@ function cellValue(c, key){
 
 function fmt(key, v){
   if (v == null) return '—';
-  if (key === 'rank')   return String(v);
-  if (key === 'score')  return Number(v).toFixed(1);
+  if (key === 'rank')                 return String(v);
+  if (key === 'score')                return Number(v).toFixed(1);
   if (key === 'distance_from_current_km') return `${Number(v).toFixed(1)} km`;
-  if (key === 'col_coverage_pct')         return `${(Number(v) * 100).toFixed(0)}%`;
-  if (key === 'daytime_reach_km')         return `${Number(v).toFixed(1)} km`;
-  if (key === 'notes') return String(v);
+  if (key === 'col_coverage_pct')     return `${(Number(v) * 100).toFixed(0)}%`;
+  if (key === 'blanket_population_pct') return `${Number(v).toFixed(2)}%`;
+  if (key === 'daytime_reach_km')     return `${Number(v).toFixed(1)} km`;
   return String(v);
 }
 
@@ -178,16 +176,18 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     <td className="px-2 py-1.5"><HostCell candidate={c} /></td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('distance_from_current_km', c.distance_from_current_km)}</td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('col_coverage_pct', c.col_coverage_pct)}</td>
-                    <td className="px-2 py-1.5 text-textDim">{c.nif_status || '—'}</td>
+                    <td
+                      className="px-2 py-1.5 text-right"
+                      style={{ color: c.blanket_population_pct > 1 ? '#ff5a5a' : c.blanket_population_pct > 0.5 ? '#ffb347' : '#63d471' }}
+                      title={c.blanket_population_pct != null ? `${c.blanket_population_pct.toFixed(3)}% (§73.24(g) limit: 1%)` : ''}
+                    >
+                      {fmt('blanket_population_pct', c.blanket_population_pct)}
+                    </td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('daytime_reach_km', c.daytime_reach_km)}</td>
-                    <td className="px-2 py-1.5 text-textDim">{c.fuel_risk || '—'}</td>
                     <td className="px-2 py-1.5">
                       {statusCode
                         ? <StatusChip status={statusCode} dense />
                         : <StatusChip label={statusLegacy} dense />}
-                    </td>
-                    <td className="px-2 py-1.5 text-textDim truncate max-w-[260px]" title={c.notes || ''}>
-                      {c.notes || ''}
                     </td>
                   </tr>
                 );
