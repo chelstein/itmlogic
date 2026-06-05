@@ -214,17 +214,24 @@ export default function OptimizerMap({
         fillColor:   color,
         fillOpacity: 0.95
       });
+      const catLabel = (c.status_category || status || '').replace(/_/g, ' ');
+      const catColor = (c.status_category === 'PROMISING') ? '#63d471'
+        : (c.status_category === 'NON_COMPLIANT') ? '#ff5a5a'
+        : (c.status_category && c.status_category.startsWith('RECOVERABLE')) ? '#6fd3ff'
+        : '#ffb347';
+      const blanketPct = c.blanket_population_pct;
+      const blanketStr = blanketPct != null ? `${Number(blanketPct).toFixed(2)}%` : '—';
       const popup = `
         <div style="font-family:ui-monospace,monospace;font-size:11px;line-height:1.4">
           <div style="font-weight:700;color:${color}">Rank #${c.rank} · score ${Number(c.score).toFixed(1)}</div>
-          <div style="color:#a89c84">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
-          <div style="margin-top:4px">
-            <span style="color:#a89c84">Status:</span> ${escapeHtml(status)}
+          <div style="color:#a89c84;margin-bottom:4px">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+          <div style="margin-bottom:4px">
+            <span style="color:${catColor};font-weight:600;text-transform:uppercase;letter-spacing:.06em">${escapeHtml(catLabel)}</span>
           </div>
           <div><span style="color:#a89c84">COL:</span> ${(Number(c.col_coverage_pct) * 100).toFixed(0)}% ·
                <span style="color:#a89c84">Day:</span> ${Number(c.daytime_reach_km).toFixed(1)} km</div>
-          <div><span style="color:#a89c84">NIF:</span> ${escapeHtml(c.nif_status || '—')}</div>
-          <div style="margin-top:4px;color:#efe6d6">${escapeHtml(c.notes || '')}</div>
+          <div><span style="color:#a89c84">Blkt pop:</span> ${escapeHtml(blanketStr)} ·
+               <span style="color:#a89c84">σ:</span> ${c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m` : '—'}</div>
           <div style="margin-top:6px"><i style="color:#6fd3ff">Click row in ledger for full detail.</i></div>
         </div>`;
       marker.bindPopup(popup);
