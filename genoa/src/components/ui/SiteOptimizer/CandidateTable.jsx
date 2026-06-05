@@ -144,6 +144,24 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
             {returned != null ? `${returned} shown` : ''}
             {evaluated != null ? ` · ${evaluated} evaluated` : ''}
           </div>
+          {candidates && candidates.length > 0 && (
+            <button
+              onClick={() => {
+                const blob = new Blob(
+                  [JSON.stringify(candidates, null, 2)],
+                  { type: 'application/json' }
+                );
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url; a.download = 'optimizer-candidates.json'; a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
+              title="Download all displayed candidates as JSON"
+            >
+              ↓ JSON
+            </button>
+          )}
         </div>
       )}
     >

@@ -197,9 +197,13 @@ export async function runColocationOpportunities(body = {}){
   };
 
   // Confidence level mirrors siteOptimizer logic.
+  const rasterLoaded = m3LoadStatus().loaded;
   const confidenceLayers = [];
   if (goals.maximize_col_coverage || goals.maximize_population || goals.minimize_blanket_population){
     confidenceLayers.push('fcc_groundwave_engine');
+  }
+  if (rasterLoaded){
+    confidenceLayers.push('m3_conductivity_raster');
   }
   if (goals.minimize_blanket_population)   confidenceLayers.push('blanket_population_proxy');
   if (goals.minimize_int_treaty_zone)      confidenceLayers.push('international_border_detection');
@@ -210,7 +214,7 @@ export async function runColocationOpportunities(body = {}){
     level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
     contributing_layers: confidenceLayers,
     notes: [
-      ...(goals.prefer_high_conductivity ? ['Ground conductivity uses FCC M3 zone table (15 zones, ±50% vs. raster); deploy AM_m3.tif for filing-grade σ'] : []),
+      ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
       ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
       ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
       ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : [])
