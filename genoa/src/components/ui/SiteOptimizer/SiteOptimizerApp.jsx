@@ -227,6 +227,8 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               <TowerReferencePanel
                 towerReference={result.tower_reference}
                 frequency_khz={inputs.frequency_khz}
+                skywaveRiskLevel={result.skywave_risk_level}
+                protectionClassAdvisory={result.protection_class_advisory}
               />
             )}
             {isColocationMode ? (
@@ -314,6 +316,8 @@ const DEMO_RESULT = {
     ]
   },
   frequency_channel_class: 'clear_channel',
+  skywave_risk_level: 'HIGH',
+  protection_class_advisory: 'Class D secondary station on clear channel 780 kHz (§73.25). The dominant Class A retains protected skywave status; your new site must NOT increase nighttime interference into the dominant\'s protected 0.5 mV/m or 25 µV/m contours (§73.182). A §73.182 NIF study demonstrating no new interference at the candidate site is required for filing.',
   limitations_global: [
     'Screening-grade output only; engineer-grade NIF / §73.182 / DA-N analysis is required for any filing.',
     'Population sub-score uses a population-density proxy (groundwave reach × density model), not a Census-block sum.',

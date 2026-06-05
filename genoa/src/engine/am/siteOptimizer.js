@@ -378,6 +378,13 @@ export async function runSiteOptimizer(body = {}){
   const top5 = returned.slice(0, Math.min(5, returned.length));
   const top_candidates_summary = buildTopSummary(top5, baseline, scored.length);
 
+  // ---- 10. Protection class advisory ----
+  // Human-readable §73.182 skywave and protection class guidance for the operator.
+  const chanClass = frequencyChannelClass(frequency_khz);
+  const { protection_class_advisory, skywave_risk_level } = buildProtectionAdvisory({
+    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
+  });
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -392,7 +399,9 @@ export async function runSiteOptimizer(body = {}){
     score_histogram,
     optimization_confidence,
     conductivity_mode,
-    frequency_channel_class: frequencyChannelClass(frequency_khz),
+    frequency_channel_class: chanClass,
+    skywave_risk_level,
+    protection_class_advisory,
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -939,6 +948,54 @@ function buildGroundRadialAdvisory(sigma_msm){
   return `POOR conductivity (σ=${sigma_msm} mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.`;
 }
 
+// Protection class advisory — §73.182 skywave risk guidance based on the
+// station's FCC class and channel type.  Returns { protection_class_advisory, skywave_risk_level }.
+function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, pattern_mode }){
+  const isDa = /DA/i.test(pattern_mode);
+  if (channel_class === 'local'){
+    return {
+      skywave_risk_level: 'LOW',
+      protection_class_advisory:
+        `Class ${fcc_class} on local channel (${frequency_khz} kHz, §73.27). ` +
+        `Maximum 250 W ERP. Skywave (§73.182) nighttime interference is minimal at this power level. ` +
+        `Focus engineering effort on §73.24(j) principal-community 5 mV/m daytime coverage.`
+    };
+  }
+  if (channel_class === 'clear_channel'){
+    if (fcc_class === 'A'){
+      return {
+        skywave_risk_level: 'HIGH',
+        protection_class_advisory:
+          `Class A dominant station on clear channel ${frequency_khz} kHz (§73.25). ` +
+          `A full §73.182 nighttime skywave NIF contour study is required at the new site — ` +
+          `the dominant Class A must demonstrate its exclusive 0.5 mV/m nighttime skywave coverage ` +
+          `is maintained within its protected territory.  ` +
+          (isDa ? `DA-${pattern_mode.slice(-1)}: nighttime pattern must also be designed per §73.150. ` : '') +
+          `Anticipate 750–2500 mile co-channel protection contours.`
+      };
+    }
+    return {
+      skywave_risk_level: 'HIGH',
+      protection_class_advisory:
+        `Class ${fcc_class} secondary station on clear channel ${frequency_khz} kHz (§73.25). ` +
+        `The dominant Class A retains protected skywave status; your new site must NOT increase ` +
+        `nighttime interference into the dominant's protected 0.5 mV/m or 25 µV/m contours (§73.182). ` +
+        `A §73.182 NIF study demonstrating no new interference at the candidate site is required for filing. ` +
+        (isDa ? `DA pattern (§73.150) required at filing. ` : '')
+    };
+  }
+  // Regional channel.
+  return {
+    skywave_risk_level: 'MODERATE',
+    protection_class_advisory:
+      `Class ${fcc_class} on regional channel ${frequency_khz} kHz (§73.26). ` +
+      `Standard §73.182 nighttime interference screening required to show no increase in ` +
+      `inter-station interference.  ` +
+      (isDa ? `DA pattern (§73.150) required at filing. ` : '') +
+      `Candidate sites close to the US/MX or US/CA border may also require treaty consultation.`
+  };
+}
+
 function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km }){
   const parts = [];
   if (coverage_pct != null) parts.push(`${(coverage_pct * 100).toFixed(0)}% city-coverage`);
@@ -1189,6 +1246,7 @@ export const __test__ = {
   sigmaQuality,
   frequencyChannelClass,
   buildGroundRadialAdvisory,
+  buildProtectionAdvisory,
   FCC_CLASS_POWER_KW,
   LOCAL_CHANNEL_KHZ,
   CLEAR_CHANNEL_KHZ,

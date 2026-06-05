@@ -687,6 +687,45 @@ test('ranking_rationale mentions field_at_col_centroid_mvm for non-current-site 
   }
 });
 
+test('protection_class_advisory and skywave_risk_level are present in the response', async () => {
+  // KAZM is 780 kHz (clear channel) Class D → HIGH risk advisory
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(typeof out.protection_class_advisory === 'string' && out.protection_class_advisory.length > 20,
+    `protection_class_advisory must be a non-empty string; got: ${JSON.stringify(out.protection_class_advisory)}`);
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(out.skywave_risk_level),
+    `skywave_risk_level must be LOW/MODERATE/HIGH; got: ${out.skywave_risk_level}`);
+  // 780 kHz is a clear channel → HIGH
+  assert.equal(out.skywave_risk_level, 'HIGH', '780 kHz (clear channel) should be HIGH skywave risk');
+  assert.ok(/§73\.182/i.test(out.protection_class_advisory), 'advisory must mention §73.182');
+});
+
+test('buildProtectionAdvisory returns LOW risk for local channel Class C', () => {
+  const { buildProtectionAdvisory } = __test__;
+  const res = buildProtectionAdvisory({ fcc_class: 'C', frequency_khz: 1240, channel_class: 'local', pattern_mode: 'NDA' });
+  assert.equal(res.skywave_risk_level, 'LOW', 'local channel should be LOW risk');
+  assert.ok(/250 W/i.test(res.protection_class_advisory) || /local channel/i.test(res.protection_class_advisory),
+    'advisory should mention 250W or local channel');
+});
+
+test('buildProtectionAdvisory returns MODERATE risk for regional channel Class B', () => {
+  const { buildProtectionAdvisory } = __test__;
+  const res = buildProtectionAdvisory({ fcc_class: 'B', frequency_khz: 950, channel_class: 'regional', pattern_mode: 'NDA' });
+  assert.equal(res.skywave_risk_level, 'MODERATE');
+  assert.ok(/§73\.182/i.test(res.protection_class_advisory), 'advisory must mention §73.182');
+});
+
+test('DA pattern_mode causes protection_class_advisory to mention §73.150', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(/§73\.150/i.test(out.protection_class_advisory),
+    `DA pattern_mode should cause advisory to mention §73.150; got: ${out.protection_class_advisory}`);
+});
+
 test('buildGroundRadialAdvisory returns null for GOOD/EXCELLENT σ, advisory for POOR/FAIR', () => {
   const { buildGroundRadialAdvisory } = __test__;
   assert.equal(buildGroundRadialAdvisory(4),    null,  'σ=4 mS/m (GOOD) should return null');

@@ -20,7 +20,7 @@ function Row({ label, value, warn }){
   );
 }
 
-export default function TowerReferencePanel({ towerReference, frequency_khz }){
+export default function TowerReferencePanel({ towerReference, frequency_khz, skywaveRiskLevel, protectionClassAdvisory }){
   if (!towerReference && !frequency_khz) return null;
 
   // Fall back to computing from frequency if engine block isn't present yet.
@@ -74,6 +74,30 @@ export default function TowerReferencePanel({ towerReference, frequency_khz }){
           All candidate sites in this run share these sizing constants.
           Site-specific AGL height determines whether §17.7 applies.
         </div>
+        {(skywaveRiskLevel || protectionClassAdvisory) && (
+          <div className="border-t border-rule mt-2 pt-2 space-y-1.5">
+            {skywaveRiskLevel && (
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono text-[9px] text-textDim shrink-0">§73.182 risk</span>
+                <span
+                  className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                  style={skywaveRiskLevel === 'HIGH'
+                    ? { color: '#ff7a7a', background: 'rgba(255,90,90,0.10)', borderColor: 'rgba(255,90,90,0.45)' }
+                    : skywaveRiskLevel === 'MODERATE'
+                    ? { color: '#ffb347', background: 'rgba(255,179,71,0.10)', borderColor: 'rgba(255,179,71,0.45)' }
+                    : { color: '#63d471', background: 'rgba(99,212,113,0.08)', borderColor: 'rgba(99,212,113,0.35)' }}
+                >
+                  {skywaveRiskLevel}
+                </span>
+              </div>
+            )}
+            {protectionClassAdvisory && (
+              <p className="font-mono text-[9px] text-amberDim leading-snug">
+                {protectionClassAdvisory}
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </RackPanel>
   );
