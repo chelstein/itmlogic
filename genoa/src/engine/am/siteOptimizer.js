@@ -133,6 +133,18 @@ export async function runSiteOptimizer(body = {}){
     community_of_license_polygon, goals, candidate_limit
   } = v.value;
 
+  // ---- 1b. DA mode notice ----
+  // When pattern_mode indicates directional antenna operation, a
+  // §73.182 nighttime skywave analysis and §73.150 DA pattern design
+  // are required at filing.  Surface this early so the operator
+  // plans for it even at the screening stage.
+  if (/DA/i.test(pattern_mode)){
+    warnings.push({
+      code: 'DA_MODE_REQUIRED',
+      message: `pattern_mode=${pattern_mode}: a directional antenna (§73.150) pattern design and §73.182 nighttime skywave NIF analysis are required at filing.  Screening scores here are daytime/NDA proxies — DA gain pattern optimization is NOT performed.`
+    });
+  }
+
   // ---- 2. build candidate grid ----
   const gridPoints = buildGridCandidates({
     center: current_site,

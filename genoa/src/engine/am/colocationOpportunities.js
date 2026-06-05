@@ -82,6 +82,14 @@ export async function runColocationOpportunities(body = {}){
     search_mode, infrastructure_source, infrastructure_filters
   } = v.value;
 
+  // ---- 1b. DA mode notice ----
+  if (/DA/i.test(pattern_mode)){
+    warnings.push({
+      code: 'DA_MODE_REQUIRED',
+      message: `pattern_mode=${pattern_mode}: §73.150 DA pattern design and §73.182 nighttime NIF analysis required at filing. Screening scores are daytime/NDA proxies — DA gain pattern optimization not performed.`
+    });
+  }
+
   // ---- 2. choose path ----
   if (search_mode === 'GRID'){
     // Pure GRID: delegate to the site optimizer for an apples-to-apples

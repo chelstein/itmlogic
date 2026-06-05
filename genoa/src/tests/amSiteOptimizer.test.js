@@ -479,3 +479,15 @@ test('every candidate carries principal_community_5mvm_km (§73.24(j) 5 mV/m con
     }
   }
 });
+
+test('DA pattern_mode emits DA_MODE_REQUIRED warning', async () => {
+  for (const mode of ['DA-D', 'DA-N', 'DA-2']){
+    const out = await runSiteOptimizer({ ...KAZM, pattern_mode: mode, candidate_limit: 1,
+      optimization_goals: { maximize_col_coverage: true }
+    });
+    assert.equal(out.available, true);
+    const daWarn = out.warnings.find(w => w?.code === 'DA_MODE_REQUIRED');
+    assert.ok(daWarn, `DA_MODE_REQUIRED warning must be present for pattern_mode=${mode}; got: ${JSON.stringify(out.warnings)}`);
+    assert.ok(/§73\.150|§73\.182/i.test(daWarn.message), `DA warning should mention §73.150 and §73.182`);
+  }
+});
