@@ -435,3 +435,29 @@ test('tower_reference block has correct physics for operating frequency', async 
   // At 790 kHz, λ/4 ≈ 95 m > 60.96 m → ASR required
   assert.equal(tr.asr_registration_required_at_quarter_wave, true);
 });
+
+test('sigmaQuality returns correct labels at boundary values', () => {
+  const { sigmaQuality } = __test__;
+  assert.equal(sigmaQuality(0.5),  'POOR');
+  assert.equal(sigmaQuality(1),    'POOR');
+  assert.equal(sigmaQuality(2),    'FAIR');
+  assert.equal(sigmaQuality(3),    'FAIR');
+  assert.equal(sigmaQuality(4),    'GOOD');
+  assert.equal(sigmaQuality(7),    'GOOD');
+  assert.equal(sigmaQuality(8),    'EXCELLENT');
+  assert.equal(sigmaQuality(15),   'EXCELLENT');
+  assert.equal(sigmaQuality(null), 'UNKNOWN');
+  assert.equal(sigmaQuality(NaN),  'UNKNOWN');
+});
+
+test('every candidate carries ground_sigma_quality from the engine', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true, prefer_high_conductivity: true }
+  });
+  assert.equal(out.available, true);
+  const VALID = new Set(['EXCELLENT', 'GOOD', 'FAIR', 'POOR', 'UNKNOWN']);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.ground_sigma_quality),
+      `ground_sigma_quality must be a known label; rank ${c.rank} got: ${c.ground_sigma_quality}`);
+  }
+});

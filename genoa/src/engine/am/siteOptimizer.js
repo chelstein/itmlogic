@@ -673,6 +673,7 @@ async function scoreCandidate(pt, ctx, warnings){
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
     ground_sigma_mS_m:         sigma_msm,
+    ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,
     ground_sigma_filing_grade,
     treaty_zone,
@@ -748,6 +749,16 @@ function baselineSummary(b){
 }
 
 // ---------- explanatory text builders ----------
+
+// Qualitative conductivity label based on FCC M3 zone ranges.
+// Guides the engineer on site selection even before the sub-score number.
+function sigmaQuality(sigma_msm){
+  if (sigma_msm == null || !Number.isFinite(sigma_msm)) return 'UNKNOWN';
+  if (sigma_msm >= 8)  return 'EXCELLENT';   // Great Plains / coastal / rich soil
+  if (sigma_msm >= 4)  return 'GOOD';        // typical mid-continental
+  if (sigma_msm >= 2)  return 'FAIR';        // hilly, mixed soil
+  return 'POOR';                             // desert, rocky terrain, urban fill
+}
 
 function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km }){
   const parts = [];
@@ -934,5 +945,6 @@ export const __test__ = {
   discCoverageFraction,
   polygonCoverageFraction,
   lookupM3ZoneFallback,
+  sigmaQuality,
   KNOWN_GOALS
 };

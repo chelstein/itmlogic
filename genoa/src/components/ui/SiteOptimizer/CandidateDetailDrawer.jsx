@@ -280,6 +280,19 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div className="col-span-2">
               <span className="text-textDim">Ground σ</span>{' '}
               <span className="text-cream">{fmtNum(candidate.ground_sigma_mS_m, 0)} mS/m</span>
+              {candidate.ground_sigma_quality && (() => {
+                const q = candidate.ground_sigma_quality;
+                const style = q === 'EXCELLENT' ? { color: '#63d471', background: 'rgba(99,212,113,0.10)', borderColor: 'rgba(99,212,113,0.45)' }
+                            : q === 'GOOD'      ? { color: '#63d471', background: 'rgba(99,212,113,0.08)', borderColor: 'rgba(99,212,113,0.35)' }
+                            : q === 'FAIR'      ? { color: '#ffb347', background: 'rgba(255,179,71,0.10)', borderColor: 'rgba(255,179,71,0.45)' }
+                            : q === 'POOR'      ? { color: '#ff5a5a', background: 'rgba(255,90,90,0.10)',  borderColor: 'rgba(255,90,90,0.45)' }
+                            :                    { color: '#a89c84', background: 'transparent',           borderColor: 'rgba(168,156,132,0.35)' };
+                return (
+                  <span className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1 py-0 text-[8px] ml-1.5 align-middle" style={style}>
+                    {q}
+                  </span>
+                );
+              })()}
               {candidate.ground_sigma_filing_grade && (
                 <span
                   className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1 py-0 text-[8px] ml-1.5 align-middle"

@@ -51,9 +51,10 @@ function fmt(key, v){
 function sigmaColor(v){
   const n = Number(v);
   if (!Number.isFinite(n)) return '#6b6b5e';
-  if (n >= 8)  return '#63d471';
-  if (n >= 5)  return '#ffb347';
-  return '#ff7a7a';
+  if (n >= 8)  return '#63d471';   // EXCELLENT
+  if (n >= 4)  return '#a8d46a';   // GOOD
+  if (n >= 2)  return '#ffb347';   // FAIR
+  return '#ff7a7a';                // POOR
 }
 
 function SourceChip({ source }){
@@ -242,7 +243,7 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     <td
                       className="px-2 py-1.5 text-right font-mono"
                       style={{ color: sigmaColor(c.ground_sigma_mS_m) }}
-                      title={c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m (${c.ground_sigma_source || 'M3 zone'})` : ''}
+                      title={c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m — ${c.ground_sigma_quality || ''} (${c.ground_sigma_source || 'M3 zone'})` : ''}
                     >
                       {fmt('ground_sigma_mS_m', c.ground_sigma_mS_m)}
                     </td>
