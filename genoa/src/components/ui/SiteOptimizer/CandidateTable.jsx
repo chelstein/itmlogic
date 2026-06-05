@@ -24,6 +24,7 @@ const COLUMNS = [
   { key: 'col_coverage_pct',           label: 'COL %',     align: 'right' },
   { key: 'blanket_population_pct',     label: 'Blkt pop',  align: 'right' },
   { key: 'daytime_reach_km',           label: 'Reach',     align: 'right' },
+  { key: 'ground_sigma_mS_m',          label: 'σ mS/m',    align: 'right' },
   { key: '_status',                    label: 'Status',    align: 'left',  unsortable: true }
 ];
 
@@ -41,7 +42,16 @@ function fmt(key, v){
   if (key === 'col_coverage_pct')     return `${(Number(v) * 100).toFixed(0)}%`;
   if (key === 'blanket_population_pct') return `${Number(v).toFixed(2)}%`;
   if (key === 'daytime_reach_km')     return `${Number(v).toFixed(1)} km`;
+  if (key === 'ground_sigma_mS_m')    return Number.isFinite(Number(v)) ? Number(v).toFixed(0) : '—';
   return String(v);
+}
+
+function sigmaColor(v){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '#6b6b5e';
+  if (n >= 8)  return '#63d471';
+  if (n >= 5)  return '#ffb347';
+  return '#ff7a7a';
 }
 
 function SourceChip({ source }){
@@ -184,6 +194,13 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                       {fmt('blanket_population_pct', c.blanket_population_pct)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('daytime_reach_km', c.daytime_reach_km)}</td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono"
+                      style={{ color: sigmaColor(c.ground_sigma_mS_m) }}
+                      title={c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m (${c.ground_sigma_source || 'M3 zone'})` : ''}
+                    >
+                      {fmt('ground_sigma_mS_m', c.ground_sigma_mS_m)}
+                    </td>
                     <td className="px-2 py-1.5">
                       {statusCode
                         ? <StatusChip status={statusCode} dense />

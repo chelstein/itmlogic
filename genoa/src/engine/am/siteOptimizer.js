@@ -185,6 +185,7 @@ export async function runSiteOptimizer(body = {}){
   });
 
   // ---- 5. Score variance stats + clustering audit ----
+  const rasterLoaded = m3LoadStatus().loaded;
   const scoreValues = scored.map(c => c.score);
   const scoreMean   = scoreValues.reduce((a, b) => a + b, 0) / Math.max(scoreValues.length, 1);
   const scoreVar    = scoreValues.reduce((a, v) => a + (v - scoreMean) ** 2, 0) / Math.max(scoreValues.length, 1);
@@ -200,9 +201,12 @@ export async function runSiteOptimizer(body = {}){
     const k = c.score.toFixed(1);
     scoreBuckets[k] = (scoreBuckets[k] || 0) + 1;
   }
+  // Only warn about score clustering when the raster is loaded AND we expect
+  // per-pixel differentiation.  Zone-table mode naturally produces score
+  // clusters when candidates share the same M3 zone — that is expected.
   for (const [val, n] of Object.entries(scoreBuckets)){
-    if (n > 10){
-      warnings.push({ code: 'SCORE_CLUSTERED', message: `${n} candidates share score ${val} — weight mix may not differentiate sites; consider enabling additional goals or narrowing the search radius` });
+    if (n > 10 && rasterLoaded){
+      warnings.push({ code: 'SCORE_CLUSTERED', message: `${n} candidates share score ${val} despite raster σ — weight mix may not differentiate sites; consider enabling additional goals or narrowing the search radius` });
     }
   }
 
@@ -211,7 +215,6 @@ export async function runSiteOptimizer(body = {}){
   // share the same σ → same reach).  Only emit a real warning when the
   // GeoTIFF raster IS loaded — at that point flat clusters would indicate
   // a broken per-pixel lookup.
-  const rasterLoaded = m3LoadStatus().loaded;
   const reachBuckets = {};
   for (const c of scored){
     if (c.daytime_reach_km != null){

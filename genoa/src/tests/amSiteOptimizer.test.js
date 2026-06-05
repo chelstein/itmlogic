@@ -177,8 +177,10 @@ test('optimization_confidence is LOW when no goals enabled', async () => {
   assert.equal(out.optimization_confidence.level, 'LOW');
 });
 
-test('SCORE_CLUSTERED warning fires when many candidates share the same score', async () => {
-  // Use 0 goals so every candidate scores 0.0 — guaranteed clustering.
+test('SCORE_CLUSTERED does NOT fire in zone-table mode (expected when no goals or same-zone candidates)', async () => {
+  // Zone-table mode produces score clusters by design (same σ per zone →
+  // same sub-scores → same composite).  SCORE_CLUSTERED now only fires
+  // when the GeoTIFF raster IS loaded and results are still flat (unusual).
   const out = await runSiteOptimizer({
     ...KAZM,
     search_radius_km:  50,
@@ -193,7 +195,10 @@ test('SCORE_CLUSTERED warning fires when many candidates share the same score', 
   const clustered = out.warnings.some(w =>
     (typeof w === 'object' ? w.code : w) === 'SCORE_CLUSTERED'
   );
-  assert.ok(clustered, 'SCORE_CLUSTERED warning must fire when >10 candidates share the same score');
+  assert.ok(!clustered, 'SCORE_CLUSTERED must NOT fire in zone-table mode (clustering is expected)');
+  // conductivity_mode should be present
+  assert.ok(['raster', 'zone-table'].includes(out.conductivity_mode),
+    `conductivity_mode must be raster or zone-table, got ${out.conductivity_mode}`);
 });
 
 test('zone-table mode does NOT emit REACH_PLACEHOLDER for clusters (expected per-zone behaviour)', async () => {
@@ -367,4 +372,25 @@ test('community-of-license polygon path is exercised when supplied', async () =>
   assert.match(me.explanation.coverage_computed_from, /polygon-overlap/);
   // And the input echo flag is set.
   assert.equal(out.inputs_echo.community_of_license_polygon_provided, true);
+});
+
+test('score_breakdown values sum to approximately the candidate score', async () => {
+  const out = await runSiteOptimizer({
+    ...KAZM,
+    candidate_limit: 20,
+    optimization_goals: {
+      maximize_col_coverage: true, maximize_population: true,
+      minimize_blanket_population: true, prefer_high_conductivity: true,
+      minimize_int_treaty_zone: false, avoid_wildfire_risk: false
+    }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const bd = c.explanation?.score_breakdown;
+    if (!bd) continue;
+    const sumPts = Object.values(bd).reduce((a, v) => a + (Number(v) || 0), 0);
+    // Allow ±0.5 rounding tolerance from round2().
+    assert.ok(Math.abs(sumPts - c.score) <= 0.5,
+      `breakdown sum ${sumPts.toFixed(2)} should ≈ score ${c.score} (rank ${c.rank})`);
+  }
 });
