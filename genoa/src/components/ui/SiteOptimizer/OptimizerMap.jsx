@@ -254,6 +254,8 @@ export default function OptimizerMap({
                <span style="color:#a89c84">Day:</span> ${Number(c.daytime_reach_km).toFixed(1)} km</div>
           <div><span style="color:#a89c84">Blkt pop:</span> ${escapeHtml(blanketStr)} ·
                <span style="color:#a89c84">σ:</span> ${c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m` : '—'}</div>
+          <div><span style="color:#a89c84">Dist:</span> ${c.distance_from_current_km != null ? `${Number(c.distance_from_current_km).toFixed(1)} km` : '—'} ·
+               <span style="color:#a89c84">Brg:</span> ${c.bearing_deg != null ? `${c.bearing_deg}°` : '—'}</div>
           <div style="margin-top:6px"><i style="color:#6fd3ff">Click row in ledger for full detail.</i></div>
         </div>`;
       marker.bindPopup(popup);
