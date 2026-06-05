@@ -88,12 +88,26 @@ function HostCell({ candidate }){
   );
 }
 
+const STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'PROMISING', label: 'Promising' },
+  { value: 'REVIEW_REQUIRED', label: 'Review req.' },
+  { value: 'RECOVERABLE_WITH_DA', label: 'Rec. DA' },
+  { value: 'RECOVERABLE_WITH_REDUCED_POWER', label: 'Rec. power' },
+  { value: 'RECOVERABLE_WITH_COL_CHANGE', label: 'Rec. COL' },
+  { value: 'TREATY_REVIEW', label: 'Treaty' },
+  { value: 'NON_COMPLIANT', label: 'Non-compliant' }
+];
+
 export default function CandidateTable({ candidates, selectedRank, onSelect, evaluated, returned, countByStatus }){
   const [sortKey, setSortKey] = useState('rank');
   const [sortDir, setSortDir] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const rows = useMemo(() => {
-    const arr = [...(candidates || [])];
+    const arr = [...(candidates || [])].filter(c =>
+      !statusFilter || (c.status_category || '') === statusFilter
+    );
     arr.sort((a, b) => {
       const av = cellValue(a, sortKey);
       const bv = cellValue(b, sortKey);
@@ -144,26 +158,40 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
             </div>
           )}
           <div className="font-mono text-[10px] tracking-rack uppercase text-textDim">
-            {returned != null ? `${returned} shown` : ''}
-            {evaluated != null ? ` · ${evaluated} evaluated` : ''}
+            {statusFilter
+              ? `${rows.length} shown (filtered)`
+              : (returned != null ? `${returned} shown` : '')}
+            {!statusFilter && evaluated != null ? ` · ${evaluated} evaluated` : ''}
           </div>
           {candidates && candidates.length > 0 && (
-            <button
-              onClick={() => {
-                const blob = new Blob(
-                  [JSON.stringify(candidates, null, 2)],
-                  { type: 'application/json' }
-                );
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url; a.download = 'optimizer-candidates.json'; a.click();
-                URL.revokeObjectURL(url);
-              }}
-              className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
-              title="Download all displayed candidates as JSON"
-            >
-              ↓ JSON
-            </button>
+            <div className="flex items-center gap-1.5">
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1 py-0.5 bg-panelDeep text-textDim hover:text-cream transition-colors"
+                title="Filter by status category"
+              >
+                {STATUS_FILTERS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const blob = new Blob(
+                    [JSON.stringify(candidates, null, 2)],
+                    { type: 'application/json' }
+                  );
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'optimizer-candidates.json'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
+                title="Download all displayed candidates as JSON"
+              >
+                ↓ JSON
+              </button>
+            </div>
           )}
         </div>
       )}
