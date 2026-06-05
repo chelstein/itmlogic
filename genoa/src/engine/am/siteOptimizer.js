@@ -557,9 +557,11 @@ async function scoreCandidate(pt, ctx, warnings){
   const sub = {
     col_coverage: coverage_pct == null ? null : Math.max(0, Math.min(100, coverage_pct * 100)),
     population:   daytime_reach_km == null ? null
-      // Normalise to the best achievable reach for this station (σ=15 mS/m)
-      // so conductivity differences actually differentiate candidates.
-      : Math.max(0, Math.min(100, (daytime_reach_km / reach_scale_km) * 100)),
+      // Area-based normalisation: population inside the 0.5 mV/m contour
+      // is proportional to πr², so scoring on (r/r_max)² is more physically
+      // meaningful than linear r.  Uses best-achievable reach at σ=15 mS/m
+      // as the ceiling so conductivity differences actually differentiate sites.
+      : Math.max(0, Math.min(100, (daytime_reach_km / reach_scale_km) ** 2 * 100)),
     blanket:      blanket_population_pct == null ? null
       // Lower is better.  0% blanket pop → 100 score; 1% → 50; 2% → 0.
       : Math.max(0, Math.min(100, 100 - 50 * blanket_population_pct)),
