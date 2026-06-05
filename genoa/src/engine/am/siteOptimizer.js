@@ -585,6 +585,28 @@ async function scoreCandidate(pt, ctx, warnings){
     }
   } catch (_){ /* leave null */ }
 
+  // 3b. Minimum-TPO for §73.24(g) compliance — only computed when blanket
+  //     pop fails (blanket_population_pct > 1%).  Binary search on TPO to
+  //     find the highest power where the proxy blanket pop stays ≤ 1%.
+  let minimum_tpo_for_compliance_kw = null;
+  if (blanket_population_pct != null && blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT){
+    try {
+      const dist = pt.distance_from_current_km ?? 0;
+      const urbanFactor = 1.0 + 4.0 * Math.max(0, 1 - Math.min(1, dist / 50));
+      const regional_density = US_AVG_POP_DENSITY_PER_KM2 * urbanFactor;
+      // Target r1000 such that π × r² × density / US_POP × 100 = 1.0
+      const r_target_km = Math.sqrt((US_POPULATION_M * 0.01) / (Math.PI * regional_density));
+      // Binary-search TPO in [0.01, tpo_kw] for r1000 ≤ r_target_km.
+      let lo = 0.01, hi = tpo_kw;
+      for (let iter = 0; iter < 40; iter++){
+        const mid = (lo + hi) / 2;
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: mid }).distance_km;
+        if (r <= r_target_km){ lo = mid; } else { hi = mid; }
+      }
+      minimum_tpo_for_compliance_kw = round2(lo);
+    } catch (_){ /* leave null */ }
+  }
+
   // 4. NIF status (screening grade) — pass-through for now; future
   //    versions will run a partial §73.182 NIF screening here.
   const nif_status = 'SCREENING ONLY';
@@ -705,6 +727,7 @@ async function scoreCandidate(pt, ctx, warnings){
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
     blanket_1000mvm_km,
+    minimum_tpo_for_compliance_kw,
     ground_sigma_mS_m:         sigma_msm,
     ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,

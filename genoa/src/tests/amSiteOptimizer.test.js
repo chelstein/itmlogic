@@ -491,3 +491,32 @@ test('DA pattern_mode emits DA_MODE_REQUIRED warning', async () => {
     assert.ok(/§73\.150|§73\.182/i.test(daWarn.message), `DA warning should mention §73.150 and §73.182`);
   }
 });
+
+test('minimum_tpo_for_compliance_kw computed when blanket_population_pct > 1%', async () => {
+  // High-power, close-in site should have blanket pop > 1% at 50 kW.
+  // Use a very high TPO and narrow grid to force high blanket population.
+  const out = await runSiteOptimizer({
+    ...KAZM,
+    tpo_kw: 50,
+    search_radius_km: 5,
+    grid_spacing_km: 10,
+    candidate_limit: 20,
+    optimization_goals: { minimize_blanket_population: true }
+  });
+  assert.equal(out.available, true);
+  const failing = out.candidates.filter(c => (c.blanket_population_pct ?? 0) > 1.0);
+  if (failing.length > 0){
+    for (const c of failing){
+      assert.ok(c.minimum_tpo_for_compliance_kw != null,
+        `minimum_tpo_for_compliance_kw must be present when blanket pop > 1%; got: ${c.minimum_tpo_for_compliance_kw}`);
+      assert.ok(c.minimum_tpo_for_compliance_kw > 0 && c.minimum_tpo_for_compliance_kw < 50,
+        `min TPO must be in (0, 50) kW; got ${c.minimum_tpo_for_compliance_kw}`);
+    }
+  }
+  // Candidates with blanket pop ≤ 1% should NOT have this field set.
+  const passing = out.candidates.filter(c => (c.blanket_population_pct ?? 0) <= 1.0);
+  for (const c of passing){
+    assert.equal(c.minimum_tpo_for_compliance_kw, null,
+      `minimum_tpo_for_compliance_kw must be null when blanket pop ≤ 1%; rank ${c.rank}`);
+  }
+});

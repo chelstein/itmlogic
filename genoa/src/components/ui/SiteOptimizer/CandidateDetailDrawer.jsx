@@ -277,11 +277,21 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div><span className="text-textDim">5 mV/m radius</span>          <span className="text-cream">{fmtNum(candidate.principal_community_5mvm_km)} km</span></div>
             <div><span className="text-textDim">0.5 mV/m reach</span>         <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
-            <div>
+            <div className="col-span-2">
               <span className="text-textDim">Blanket pop</span>{' '}
-              <span className="text-cream">{fmtBlanketPct(candidate.blanket_population_pct)}</span>
+              <span
+                className="text-cream"
+                style={Number(candidate.blanket_population_pct) > 1 ? { color: '#ff5a5a' } : undefined}
+              >
+                {fmtBlanketPct(candidate.blanket_population_pct)}
+              </span>
               {candidate.blanket_1000mvm_km != null && (
-                <span className="text-textDim text-[9px] ml-1.5">(1000 mV/m r={fmtNum(candidate.blanket_1000mvm_km)} km)</span>
+                <span className="text-textDim text-[9px] ml-1.5">(r={fmtNum(candidate.blanket_1000mvm_km)} km at 1000 mV/m)</span>
+              )}
+              {candidate.minimum_tpo_for_compliance_kw != null && (
+                <div className="font-mono text-[9px] text-amber mt-0.5 leading-tight">
+                  §73.24(g): reduce TPO to ≤ {candidate.minimum_tpo_for_compliance_kw} kW to stay under 1% limit
+                </div>
               )}
             </div>
             <div className="col-span-2">
