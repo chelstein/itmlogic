@@ -38,8 +38,8 @@ const KAZM = {
   }
 };
 
-test('happy path: KAZM-like inputs return ≥ 10 ranked candidates with monotonic ranks', () => {
-  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+test('happy path: KAZM-like inputs return ≥ 10 ranked candidates with monotonic ranks', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.equal(out.available, true);
   assert.ok(out.n_candidates_evaluated >= 10, `expected ≥ 10 candidates, got ${out.n_candidates_evaluated}`);
   assert.ok(out.candidates.length >= 10, `expected ≥ 10 returned, got ${out.candidates.length}`);
@@ -74,8 +74,8 @@ test('happy path: KAZM-like inputs return ≥ 10 ranked candidates with monotoni
   assert.equal(out.current_site_baseline.lon, -111.8206);
 });
 
-test('empty goals → every candidate scores 0 and current site is included as baseline', () => {
-  const out = runSiteOptimizer({
+test('empty goals → every candidate scores 0 and current site is included as baseline', async () => {
+  const out = await runSiteOptimizer({
     ...KAZM,
     optimization_goals: {
       maximize_col_coverage:        false,
@@ -97,8 +97,8 @@ test('empty goals → every candidate scores 0 and current site is included as b
     'current-site baseline score should be 0 when no goals are enabled');
 });
 
-test('tiny radius (< grid spacing) returns at least the current-site point', () => {
-  const out = runSiteOptimizer({
+test('tiny radius (< grid spacing) returns at least the current-site point', async () => {
+  const out = await runSiteOptimizer({
     ...KAZM,
     search_radius_km: 1,   // < grid_spacing_km (10)
     grid_spacing_km:  10
@@ -118,8 +118,8 @@ test('tiny radius (< grid spacing) returns at least the current-site point', () 
     'warning about grid_spacing > radius should fire');
 });
 
-test('score_stats are present and sensible', () => {
-  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+test('score_stats are present and sensible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.ok(out.score_stats, 'score_stats must be present');
   assert.ok(Number.isFinite(out.score_stats.mean),   'score_stats.mean must be finite');
   assert.ok(Number.isFinite(out.score_stats.std_dev),'score_stats.std_dev must be finite');
@@ -130,8 +130,8 @@ test('score_stats are present and sensible', () => {
     'mean in [min, max]');
 });
 
-test('optimization_confidence is present with valid level', () => {
-  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+test('optimization_confidence is present with valid level', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.ok(out.optimization_confidence, 'optimization_confidence must be present');
   assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
     `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
@@ -141,7 +141,7 @@ test('optimization_confidence is present with valid level', () => {
     'notes must be an array');
 });
 
-test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', () => {
+test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', async () => {
   const poly = {
     type: 'Polygon',
     coordinates: [[
@@ -149,7 +149,7 @@ test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', 
       [-111.85, 34.90], [-111.85, 34.83]
     ]]
   };
-  const out = runSiteOptimizer({
+  const out = await runSiteOptimizer({
     ...KAZM,
     community_of_license_polygon: poly,
     optimization_goals: {
@@ -165,8 +165,8 @@ test('optimization_confidence is HIGH when COL polygon + 3 real goals enabled', 
   assert.ok(out.optimization_confidence.contributing_layers.includes('col_polygon_provided'));
 });
 
-test('optimization_confidence is LOW when no goals enabled', () => {
-  const out = runSiteOptimizer({
+test('optimization_confidence is LOW when no goals enabled', async () => {
+  const out = await runSiteOptimizer({
     ...KAZM,
     optimization_goals: {
       maximize_col_coverage: false, maximize_population: false,
@@ -177,9 +177,9 @@ test('optimization_confidence is LOW when no goals enabled', () => {
   assert.equal(out.optimization_confidence.level, 'LOW');
 });
 
-test('SCORE_CLUSTERED warning fires when many candidates share the same score', () => {
+test('SCORE_CLUSTERED warning fires when many candidates share the same score', async () => {
   // Use 0 goals so every candidate scores 0.0 — guaranteed clustering.
-  const out = runSiteOptimizer({
+  const out = await runSiteOptimizer({
     ...KAZM,
     search_radius_km:  50,
     grid_spacing_km:   10,
@@ -196,9 +196,9 @@ test('SCORE_CLUSTERED warning fires when many candidates share the same score', 
   assert.ok(clustered, 'SCORE_CLUSTERED warning must fire when >10 candidates share the same score');
 });
 
-test('REACH_PLACEHOLDER warning fires when many candidates share identical reach', () => {
+test('REACH_PLACEHOLDER warning fires when many candidates share identical reach', async () => {
   // Large grid, same sigma region for all candidates → identical reach.
-  const out = runSiteOptimizer({
+  const out = await runSiteOptimizer({
     ...KAZM,
     search_radius_km: 30,
     grid_spacing_km:  5,
@@ -211,8 +211,8 @@ test('REACH_PLACEHOLDER warning fires when many candidates share identical reach
   assert.ok(reachPlaceholder, 'REACH_PLACEHOLDER warning must fire when >10 candidates share identical daytime_reach_km');
 });
 
-test('placeholder goal (avoid_wildfire_risk) surfaces in candidate limitations', () => {
-  const out = runSiteOptimizer({
+test('placeholder goal (avoid_wildfire_risk) surfaces in candidate limitations', async () => {
+  const out = await runSiteOptimizer({
     ...KAZM,
     optimization_goals: { ...KAZM.optimization_goals, avoid_wildfire_risk: true }
   });
@@ -226,30 +226,30 @@ test('placeholder goal (avoid_wildfire_risk) surfaces in candidate limitations',
   }
 });
 
-test('invalid inputs reject with a 400-style error envelope', () => {
+test('invalid inputs reject with a 400-style error envelope', async () => {
   // Missing callsign.
-  const a = runSiteOptimizer({ ...KAZM, callsign: '' });
+  const a = await runSiteOptimizer({ ...KAZM, callsign: '' });
   assert.equal(a.available, false);
   assert.match(a.error, /callsign/);
 
   // Out-of-range frequency.
-  const b = runSiteOptimizer({ ...KAZM, frequency_khz: 200 });
+  const b = await runSiteOptimizer({ ...KAZM, frequency_khz: 200 });
   assert.equal(b.available, false);
   assert.match(b.error, /frequency_khz/);
 
   // Bad lat.
-  const c = runSiteOptimizer({ ...KAZM, current_site: { lat: 999, lon: 0 } });
+  const c = await runSiteOptimizer({ ...KAZM, current_site: { lat: 999, lon: 0 } });
   assert.equal(c.available, false);
   assert.match(c.error, /current_site\.lat/);
 
   // Grid too large (DoS guard).
-  const d = runSiteOptimizer({ ...KAZM, search_radius_km: 500, grid_spacing_km: 1 });
+  const d = await runSiteOptimizer({ ...KAZM, search_radius_km: 500, grid_spacing_km: 1 });
   assert.equal(d.available, false);
   assert.match(d.error, /candidates/);
 });
 
-test('global limitations carry the SCREENING-ONLY disclaimer', () => {
-  const out = runSiteOptimizer(KAZM);
+test('global limitations carry the SCREENING-ONLY disclaimer', async () => {
+  const out = await runSiteOptimizer(KAZM);
   assert.ok(Array.isArray(out.limitations_global) && out.limitations_global.length > 0);
   assert.ok(out.limitations_global.some((l) => /Screening-grade/i.test(l)),
     'global limitations must mention screening-grade');
@@ -277,8 +277,8 @@ test('disc-disc analytical coverage helper produces sane values', () => {
   assert.ok(c > 0 && c < 1, `partial overlap should be in (0,1), got ${c}`);
 });
 
-test('M3 zone lookup: every candidate carries ground_sigma_source and filing_grade', () => {
-  const out = runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+test('M3 zone lookup: every candidate carries ground_sigma_source and filing_grade', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.equal(out.available, true);
   for (const c of out.candidates){
     assert.ok(typeof c.ground_sigma_source === 'string' && c.ground_sigma_source.length > 0,
@@ -310,7 +310,7 @@ test('M3 zone lookup: conductivity varies across geographically distinct points'
     'σ should vary across geographically distinct zones');
 });
 
-test('community-of-license polygon path is exercised when supplied', () => {
+test('community-of-license polygon path is exercised when supplied', async () => {
   // Small square polygon around the KAZM site, in [lon, lat] order.
   const poly = {
     type: 'Polygon',
@@ -322,7 +322,7 @@ test('community-of-license polygon path is exercised when supplied', () => {
       [-111.85, 34.83]
     ]]
   };
-  const out = runSiteOptimizer({
+  const out = await runSiteOptimizer({
     ...KAZM,
     community_of_license_polygon: poly
   });

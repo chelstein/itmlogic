@@ -31,7 +31,7 @@
 
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
-import { lookupM3ZoneFallback } from './m3.js';
+import { lookupM3Conductivity, lookupM3ZoneFallback } from './m3.js';
 
 // ---------- thresholds & weights ----------
 
@@ -111,7 +111,7 @@ const LABEL_NOT_EVALUATED    = 'NOT-EVALUATED';
  *   method:string
  * }}
  */
-export function runSiteOptimizer(body = {}){
+export async function runSiteOptimizer(body = {}){
   const warnings = [];
 
   // ---- 1. validate & echo inputs ----
@@ -148,7 +148,7 @@ export function runSiteOptimizer(body = {}){
     goals,
     current_site
   };
-  const scored = gridPoints.map((pt) => scoreCandidate(pt, ctx, warnings));
+  const scored = await Promise.all(gridPoints.map((pt) => scoreCandidate(pt, ctx, warnings)));
 
   // ---- 4. rank, label, slice ----
   scored.sort((a, b) => b.score - a.score);
@@ -368,20 +368,24 @@ function ensureCurrentSiteIncluded(points, current){
  * Score one candidate.  Returns an object matching the per-candidate
  * shape documented on the route.
  */
-function scoreCandidate(pt, ctx, warnings){
+async function scoreCandidate(pt, ctx, warnings){
   const { frequency_khz, tpo_kw, current_site, goals,
           community_of_license_polygon } = ctx;
 
   // --- raw sub-metrics (computed independent of weighting) ---
 
   // 1. Groundwave "daytime reach" — distance to DAYTIME_REACH_TARGET_MVM.
-  //    Uses FCC M3 zone-table conductivity (15 geographic zones, ±50%
-  //    accuracy vs. the GeoTIFF raster).  Each candidate gets its own
-  //    σ so propagation estimates vary meaningfully across the grid.
-  const _m3 = lookupM3ZoneFallback(pt.lat, pt.lon);
-  const sigma_msm = _m3.available ? _m3.sigma_mS_m : 4;
-  const ground_sigma_source       = _m3.available ? _m3.zone_label   : 'default (4 mS/m screening)';
-  const ground_sigma_filing_grade = _m3.available ? (_m3.filing_grade || 'screening') : 'screening';
+  //    Try real GeoTIFF raster first (filing-grade); fall through to the
+  //    15-zone M3 table (screening-grade) when AM_m3.tif is unavailable.
+  let _m3 = await lookupM3Conductivity(pt.lat, pt.lon).catch(() => null);
+  if (!_m3?.available) _m3 = lookupM3ZoneFallback(pt.lat, pt.lon);
+  const sigma_msm = _m3?.available ? _m3.sigma_mS_m : 4;
+  const ground_sigma_source = _m3?.available
+    ? (_m3.zone_label || `${sigma_msm} mS/m (FCC M3)`)
+    : 'default (4 mS/m screening)';
+  const ground_sigma_filing_grade = _m3?.available
+    ? (_m3.filing_grade || 'filing')   // GeoTIFF result → filing-grade; zone table sets 'screening'
+    : 'screening';
   let daytime_reach_km = null;
   try {
     const r = fccAmDistanceKm({
