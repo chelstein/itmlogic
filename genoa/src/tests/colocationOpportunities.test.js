@@ -279,3 +279,62 @@ test('Status RECOVERABLE_WITH_COL_CHANGE when COL fails and site is far from cur
     `expected recovery_reasoning to mention community of license; got: ${c.explanation?.recovery_reasoning}`
   );
 });
+
+// ---------- Test 15 — skywave_risk_level and protection_class_advisory ----------
+test('INFRASTRUCTURE mode response includes skywave_risk_level and protection_class_advisory', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    frequency_khz: 780,  // clear channel
+    fcc_class: 'D',
+    search_mode: 'INFRASTRUCTURE'
+  }));
+  assert.equal(out.available, true);
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(out.skywave_risk_level),
+    `skywave_risk_level must be LOW/MODERATE/HIGH; got: ${out.skywave_risk_level}`);
+  assert.equal(out.skywave_risk_level, 'HIGH',
+    '780 kHz is a §73.25 clear channel — should emit HIGH skywave risk');
+  assert.ok(typeof out.protection_class_advisory === 'string' && out.protection_class_advisory.length > 20,
+    `protection_class_advisory must be non-empty string; got: ${JSON.stringify(out.protection_class_advisory)}`);
+  assert.ok(/§73\.182/i.test(out.protection_class_advisory),
+    'advisory must mention §73.182');
+});
+
+// ---------- Test 16 — recommended_actions in response ----------
+test('INFRASTRUCTURE mode response includes recommended_actions array', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    frequency_khz: 780,
+    fcc_class: 'D',
+    search_mode: 'INFRASTRUCTURE'
+  }));
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.recommended_actions),
+    `recommended_actions must be an array; got: ${typeof out.recommended_actions}`);
+  // At minimum a NIF study recommendation should appear for a clear channel station.
+  const niffy = out.recommended_actions.find(a => /NIF|§73\.182|nighttime/i.test(a.action));
+  assert.ok(niffy, 'recommended_actions should include a NIF study item for clear channel 780 kHz');
+  // All entries must have required fields.
+  for (const item of out.recommended_actions){
+    assert.ok(['URGENT', 'HIGH', 'MEDIUM', 'INFORMATIONAL'].includes(item.priority),
+      `item.priority must be valid; got: ${item.priority}`);
+    assert.ok(typeof item.action === 'string' && item.action.length > 5,
+      `item.action must be non-empty; got: ${JSON.stringify(item)}`);
+    assert.ok(typeof item.rationale === 'string' && item.rationale.length > 5,
+      `item.rationale must be non-empty; got: ${JSON.stringify(item)}`);
+  }
+});
+
+// ---------- Test 17 — GRID mode also forwards skywave + recommended_actions ----------
+test('GRID search_mode forwards skywave_risk_level + recommended_actions from siteOptimizer', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    frequency_khz: 780,
+    fcc_class: 'D',
+    search_mode: 'GRID',
+    grid_spacing_km: 25,
+    candidate_limit: 5
+  }));
+  assert.equal(out.available, true);
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(out.skywave_risk_level),
+    `skywave_risk_level forwarded from siteOptimizer; got: ${out.skywave_risk_level}`);
+  assert.equal(out.skywave_risk_level, 'HIGH', '780 kHz clear channel → HIGH');
+  assert.ok(Array.isArray(out.recommended_actions),
+    `recommended_actions must be array in GRID mode; got: ${typeof out.recommended_actions}`);
+});

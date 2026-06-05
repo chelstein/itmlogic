@@ -272,6 +272,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           <ScoreBreakdownChart
             breakdown={e.score_breakdown}
             totalScore={candidate.score}
+            baselineBreakdown={baseline?.score_breakdown ?? null}
+            baselineTotalScore={baseline?.score ?? null}
           />
         </div>
 
