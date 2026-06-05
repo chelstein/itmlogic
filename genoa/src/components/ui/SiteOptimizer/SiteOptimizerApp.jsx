@@ -260,11 +260,30 @@ const DEMO_RESULT = {
   available: true,
   n_candidates_evaluated: 234,
   n_candidates_returned:  4,
+  score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
+  optimization_confidence: {
+    level: 'MEDIUM',
+    contributing_layers: ['fcc_groundwave_engine', 'blanket_population_proxy'],
+    notes: [
+      'Ground conductivity uses FCC M3 zone table (15 zones, ±50% vs. raster); deploy AM_m3.tif for filing-grade σ',
+      'COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'
+    ]
+  },
+  limitations_global: [
+    'Screening-grade output only; engineer-grade NIF / §73.182 / DA-N analysis is required for any filing.',
+    'Population sub-score uses a population-density proxy (groundwave reach × density model), not a Census-block sum.',
+    'Wildfire / fuel-risk scoring is a placeholder until USFS FIA / LANDFIRE integration lands.',
+    'Parcel / zoning availability is not checked — engineer must verify each site is leasable / buildable.',
+    'No skywave (§73.182) interference analysis is performed at this stage.'
+  ],
   current_site_baseline: {
     score: 62.4,
     col_coverage_pct: 0.85,
     blanket_population_pct: 0.6,
-    ground_sigma_mS_m: 8
+    daytime_reach_km: 28.5,
+    ground_sigma_mS_m: 8,
+    ground_sigma_source: 'Desert SW (~2 mS/m, FCC M3 zone estimate)',
+    ground_sigma_filing_grade: 'screening'
   },
   candidates: [
     {
@@ -275,7 +294,7 @@ const DEMO_RESULT = {
       ground_sigma_mS_m: 8, treaty_zone: null, fuel_risk: 'NOT-EVALUATED',
       notes: '97% city-coverage, σ=8 mS/m, 0.4% blanket pop, 6 km from current.',
       explanation: {
-        score_breakdown: { col_coverage: 35, population: 28, blanket: 14, conductivity: 10, wildfire: 0, treaty_zone: 4 },
+        score_breakdown: { col_coverage: 40.2, population: 32.2, blanket: 16.1, conductivity: 11.5, wildfire: 0, treaty_zone: 0 },
         ranking_rationale: 'Highest COL coverage and population in pool; conductivity 8 mS/m is M3-zone max for region.'
       },
       status_labels: ['PROMISING', 'ENGINEER REVIEW REQUIRED'],
@@ -293,7 +312,7 @@ const DEMO_RESULT = {
       ground_sigma_mS_m: 6, treaty_zone: null, fuel_risk: 'LOW',
       notes: '91% city-coverage; ground σ slightly lower; daytime reach acceptable.',
       explanation: {
-        score_breakdown: { col_coverage: 31, population: 24, blanket: 13, conductivity: 8, wildfire: 5, treaty_zone: 3 },
+        score_breakdown: { col_coverage: 35.6, population: 27.6, blanket: 14.9, conductivity: 9.2, wildfire: 0, treaty_zone: 0 },
         ranking_rationale: 'Strong overall — second only on COL coverage; fuel-risk score positive.'
       },
       status_labels: ['PROMISING', 'REVIEW REQUIRED'],
@@ -311,8 +330,8 @@ const DEMO_RESULT = {
       ground_sigma_mS_m: 10, treaty_zone: null, fuel_risk: 'MODERATE',
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {
-        score_breakdown: { col_coverage: 24, population: 18, blanket: 16, conductivity: 12, wildfire: -2, treaty_zone: 4 },
-        ranking_rationale: 'Conductivity wins offset lower coverage; wildfire flag pulled the score down.'
+        score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0 },
+        ranking_rationale: 'Conductivity wins offset lower coverage; lower COL coverage is a flagged limitation.'
       },
       status_labels: ['ENGINEER REVIEW REQUIRED'],
       status_category: 'REVIEW_REQUIRED',
@@ -330,8 +349,8 @@ const DEMO_RESULT = {
       fuel_risk: 'LOW',
       notes: 'Coverage gap on east side of COL; treaty advisory zone.',
       explanation: {
-        score_breakdown: { col_coverage: 18, population: 14, blanket: 6, conductivity: 4, wildfire: 4, treaty_zone: -8 },
-        ranking_rationale: 'NIF fails screening + advisory treaty zone — kept for completeness only.'
+        score_breakdown: { col_coverage: 20.7, population: 16.1, blanket: 6.9, conductivity: 4.6, wildfire: 0, treaty_zone: 0 },
+        ranking_rationale: 'COL coverage gap + §73.24(g) blanket pop overage — kept for completeness only.'
       },
       status_labels: ['NON-COMPLIANT'],
       status_category: 'NON_COMPLIANT',
