@@ -21,6 +21,7 @@ const COLUMNS = [
   { key: '_source',                    label: 'Source',    align: 'left',  unsortable: true },
   { key: '_host',                      label: 'Host',      align: 'left',  unsortable: true },
   { key: 'distance_from_current_km',   label: 'Dist',      align: 'right' },
+  { key: 'bearing_deg',                label: 'Brg',       align: 'right' },
   { key: 'col_coverage_pct',           label: 'COL %',     align: 'right' },
   { key: 'blanket_population_pct',     label: 'Blkt pop',  align: 'right' },
   { key: 'daytime_reach_km',           label: 'Reach',     align: 'right' },
@@ -39,6 +40,7 @@ function fmt(key, v){
   if (key === 'rank')                 return String(v);
   if (key === 'score')                return Number(v).toFixed(1);
   if (key === 'distance_from_current_km') return `${Number(v).toFixed(1)} km`;
+  if (key === 'bearing_deg')             return `${Math.round(Number(v))}°`;
   if (key === 'col_coverage_pct')     return `${(Number(v) * 100).toFixed(0)}%`;
   if (key === 'blanket_population_pct') return `${Number(v).toFixed(2)}%`;
   if (key === 'daytime_reach_km')     return `${Number(v).toFixed(1)} km`;
@@ -224,6 +226,10 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     <td className="px-2 py-1.5"><SourceChip source={c.source} /></td>
                     <td className="px-2 py-1.5"><HostCell candidate={c} /></td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('distance_from_current_km', c.distance_from_current_km)}</td>
+                    <td
+                      className="px-2 py-1.5 text-right text-textDim font-mono"
+                      title={c.bearing_deg != null ? `${c.bearing_deg}° true` : ''}
+                    >{c.bearing_deg != null ? `${c.bearing_deg}°` : '—'}</td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('col_coverage_pct', c.col_coverage_pct)}</td>
                     <td
                       className="px-2 py-1.5 text-right"

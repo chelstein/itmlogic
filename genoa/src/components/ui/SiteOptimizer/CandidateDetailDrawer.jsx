@@ -273,6 +273,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           <div className="rack-eyebrow mb-1">Engineering profile</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
             <div><span className="text-textDim">Distance from current</span> <span className="text-cream">{fmtNum(candidate.distance_from_current_km)} km</span></div>
+            <div><span className="text-textDim">Bearing (true)</span>         <span className="text-cream">{candidate.bearing_deg != null ? `${candidate.bearing_deg}°` : '—'}</span></div>
             <div><span className="text-textDim">Daytime reach</span>          <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
             <div><span className="text-textDim">Blanket pop</span>             <span className="text-cream">{fmtBlanketPct(candidate.blanket_population_pct)}</span></div>

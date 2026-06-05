@@ -393,12 +393,16 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
   // siteOptimizer's per-candidate scorer (which handles all of the
   // FCC-curve math and the 5 mV/m COL coverage check), then layer the
   // co-location advisory block on top.
+  const dist = Number.isFinite(site.distance_from_center_km)
+    ? site.distance_from_center_km
+    : SO.greatCircleKm(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon);
+  const bearing = dist < 0.01 ? 0
+    : Math.round(SO.bearingDeg(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon));
   const pt = {
     lat: site.lat,
     lon: site.lon,
-    distance_from_current_km: Number.isFinite(site.distance_from_center_km)
-      ? site.distance_from_center_km
-      : SO.greatCircleKm(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon)
+    distance_from_current_km: dist,
+    bearing_deg: bearing
   };
   const scored = await SO.scoreCandidate(pt, ctx, warnings);
 
@@ -614,7 +618,7 @@ function echoInputs(o){
 
 function ensureCurrentSiteIncluded(points, current){
   if (!points.some((p) => coordsEqual(p, current))){
-    points.push({ lat: current.lat, lon: current.lon, distance_from_current_km: 0 });
+    points.push({ lat: current.lat, lon: current.lon, distance_from_current_km: 0, bearing_deg: 0 });
   }
 }
 

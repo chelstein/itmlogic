@@ -411,7 +411,8 @@ function buildGridCandidates({ center, radius_km, spacing_km }){
       const lon = center.lon + ix * spacing_km * dLonPerKm;
       const d = greatCircleKm(center.lat, center.lon, lat, lon);
       if (d <= radius_km + 1e-6){
-        points.push({ lat, lon, distance_from_current_km: d });
+        const bearing = d < 0.01 ? 0 : bearingDeg(center.lat, center.lon, lat, lon);
+        points.push({ lat, lon, distance_from_current_km: d, bearing_deg: Math.round(bearing) });
       }
     }
   }
@@ -420,7 +421,7 @@ function buildGridCandidates({ center, radius_km, spacing_km }){
 
 function ensureCurrentSiteIncluded(points, current){
   if (!points.some((p) => coordsEqual(p, current))){
-    points.push({ lat: current.lat, lon: current.lon, distance_from_current_km: 0 });
+    points.push({ lat: current.lat, lon: current.lon, distance_from_current_km: 0, bearing_deg: 0 });
   }
 }
 
@@ -643,6 +644,7 @@ async function scoreCandidate(pt, ctx, warnings){
     lat: round6(pt.lat),
     lon: round6(pt.lon),
     distance_from_current_km: round2(pt.distance_from_current_km),
+    bearing_deg: pt.bearing_deg ?? null,
     score,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
     nif_status,
@@ -789,6 +791,15 @@ function coordsEqual(a, b, tol_deg = 1e-9){
   return Math.abs(a.lat - b.lat) < tol_deg && Math.abs(a.lon - b.lon) < tol_deg;
 }
 
+// Forward (initial) bearing from (lat1,lon1) → (lat2,lon2), degrees 0–360.
+function bearingDeg(lat1, lon1, lat2, lon2){
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
 // Analytical fraction of disc B (radius rB at center cB) covered by
 // disc A (radius rA at center cA).  Used as a no-polygon COL coverage
 // proxy.  Returns a value in [0, 1].
@@ -886,6 +897,7 @@ export const __test__ = {
   scoreCandidate,
   validateInputs,
   greatCircleKm,
+  bearingDeg,
   discCoverageFraction,
   polygonCoverageFraction,
   lookupM3ZoneFallback,

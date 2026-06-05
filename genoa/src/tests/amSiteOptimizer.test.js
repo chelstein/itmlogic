@@ -404,3 +404,17 @@ test('scoring_time_ms is a non-negative number in the response', async () => {
   assert.ok(typeof out.scoring_time_ms === 'number' && out.scoring_time_ms >= 0,
     `scoring_time_ms must be a non-negative number, got: ${out.scoring_time_ms}`);
 });
+
+test('every candidate has bearing_deg in [0, 360); current site gets bearing_deg 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.bearing_deg != null, `bearing_deg must be present (rank ${c.rank})`);
+    assert.ok(c.bearing_deg >= 0 && c.bearing_deg < 360,
+      `bearing_deg must be in [0,360) (rank ${c.rank}, got ${c.bearing_deg})`);
+  }
+  const current = out.candidates.find(c => c.distance_from_current_km === 0);
+  if (current) assert.equal(current.bearing_deg, 0, 'current site bearing must be 0');
+});
