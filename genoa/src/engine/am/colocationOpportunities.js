@@ -178,7 +178,11 @@ export async function runColocationOpportunities(body = {}){
   const cutoff = quantile(pool.map((c) => c.score), PROMISING_TOP_QUANTILE);
   for (const c of pool) assignStatusCategory(c, cutoff, { current_site });
 
-  pool.forEach((c, i) => { c.rank = i + 1; });
+  const nPool = pool.length;
+  pool.forEach((c, i) => {
+    c.rank = i + 1;
+    c.rank_percentile = nPool > 1 ? Math.round(((nPool - i - 1) / (nPool - 1)) * 10000) / 100 : 100;
+  });
 
   // Baseline = score row for the current site, if it's in the pool.
   const baseline = pool.find((c) => coordsEqual(c, current_site));
