@@ -658,6 +658,28 @@ async function scoreCandidate(pt, ctx, warnings){
     } catch (_){ /* leave null */ }
   }
 
+  // 3c. Field strength at the COL centroid — inverts the FCC groundwave curve
+  //     via binary search on target_mvm to find the field at the distance from
+  //     this candidate to the community of license (proxied as the current site).
+  //     §73.24(j) requires the community receive ≥ 5 mV/m daytime.
+  let field_at_col_centroid_mvm = null;
+  const colDist = pt.distance_from_current_km;
+  if (colDist != null && colDist >= 0.5 && sigma_msm != null){
+    try {
+      // Binary search: find X s.t. fccAmDistanceKm(target_mvm=X).distance_km ≈ colDist.
+      // Greater X (stronger field req) → shorter distance.  So:
+      //   dist_at_mid > colDist → X is too low → lo = mid
+      //   dist_at_mid < colDist → X is too high → hi = mid
+      let lo = 0.001, hi = 1e5;
+      for (let i = 0; i < 50; i++){
+        const mid = (lo + hi) / 2;
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: mid, conductivity_msm: sigma_msm, erp_kw: tpo_kw }).distance_km;
+        if (r > colDist) lo = mid; else hi = mid;
+      }
+      field_at_col_centroid_mvm = round2((lo + hi) / 2);
+    } catch (_){ /* leave null */ }
+  }
+
   // 4. NIF status (screening grade) — pass-through for now; future
   //    versions will run a partial §73.182 NIF screening here.
   const nif_status = 'SCREENING ONLY';
@@ -789,6 +811,14 @@ async function scoreCandidate(pt, ctx, warnings){
     ground_sigma_source,
     ground_sigma_filing_grade,
     ground_radial_advisory:  buildGroundRadialAdvisory(sigma_msm),
+    // Per-candidate scoring confidence based on available data layers.
+    // HIGH: filing-grade σ raster AND polygon provided.
+    // MEDIUM: one of the two present.
+    // LOW: both absent (zone-table σ, disc-proxy COL).
+    score_confidence: ground_sigma_filing_grade === 'filing' && community_of_license_polygon ? 'HIGH'
+      : ground_sigma_filing_grade === 'filing' || community_of_license_polygon ? 'MEDIUM'
+      : 'LOW',
+    field_at_col_centroid_mvm,
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),

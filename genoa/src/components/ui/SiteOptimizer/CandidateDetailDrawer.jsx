@@ -207,6 +207,20 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 {candidate.rank_percentile.toFixed(0)}th pct
               </span>
             )}
+            {candidate.score_confidence && (() => {
+              const c = candidate.score_confidence;
+              const col = c === 'HIGH' ? '#63d471' : c === 'MEDIUM' ? '#ffb347' : '#a89c84';
+              const bg  = c === 'HIGH' ? 'rgba(99,212,113,0.10)' : c === 'MEDIUM' ? 'rgba(255,179,71,0.10)' : 'transparent';
+              const bc  = c === 'HIGH' ? 'rgba(99,212,113,0.40)' : c === 'MEDIUM' ? 'rgba(255,179,71,0.40)' : 'rgba(168,156,132,0.35)';
+              return (
+                <span className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                  style={{ color: col, background: bg, borderColor: bc }}
+                  title={`Score confidence: ${c}. ${c === 'HIGH' ? 'Filing-grade σ raster and COL polygon provided.' : c === 'MEDIUM' ? 'One of: σ raster or COL polygon provided.' : 'Zone-table σ and disc-proxy COL — screening grade only.'}`}
+                >
+                  {c} confidence
+                </span>
+              );
+            })()}
             <span className="font-mono text-[11px] text-textDim">
               {fmtCoord(candidate.lat, candidate.lon)}
             </span>
@@ -284,6 +298,24 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             </div>
             <div><span className="text-textDim">5 mV/m radius</span>          <span className="text-cream">{fmtNum(candidate.principal_community_5mvm_km)} km</span></div>
             <div><span className="text-textDim">0.5 mV/m reach</span>         <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
+            <div className="col-span-2">
+              <span className="text-textDim">Field at COL centroid</span>{' '}
+              {candidate.distance_from_current_km < 0.5 ? (
+                <span className="text-cream">co-located</span>
+              ) : candidate.field_at_col_centroid_mvm != null ? (() => {
+                const f = candidate.field_at_col_centroid_mvm;
+                const col = f >= 5 ? '#63d471' : f >= 0.5 ? '#ffb347' : '#ff7a7a';
+                const label = f >= 5 ? '≥§73.24(j) 5 mV/m floor ✓'
+                            : f >= 0.5 ? 'below 5 mV/m — COL risk'
+                            : 'below 0.5 mV/m — inadequate';
+                return (
+                  <span>
+                    <span className="text-cream" style={{ color: col }}>{f.toFixed(2)} mV/m</span>
+                    <span className="text-[9px] ml-1.5" style={{ color: col }}>{label}</span>
+                  </span>
+                );
+              })() : <span className="text-textDim">—</span>}
+            </div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
             <div className="col-span-2">
               <span className="text-textDim">Blanket pop</span>{' '}

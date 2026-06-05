@@ -613,6 +613,52 @@ test('every candidate exposes cardinal_direction as a 16-point compass string', 
   }
 });
 
+test('field_at_col_centroid_mvm is present and physically plausible for non-current-site candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+
+  for (const c of out.candidates){
+    if (c.distance_from_current_km < 0.5){
+      // Co-located — field_at_col_centroid_mvm can be null (too close for curve inversion)
+      continue;
+    }
+    assert.ok(c.field_at_col_centroid_mvm != null,
+      `field_at_col_centroid_mvm must be present for distant candidates; rank ${c.rank}, dist=${c.distance_from_current_km}`);
+    assert.ok(Number.isFinite(c.field_at_col_centroid_mvm) && c.field_at_col_centroid_mvm > 0,
+      `field_at_col_centroid_mvm must be > 0; rank ${c.rank}, got ${c.field_at_col_centroid_mvm}`);
+    // Physical sanity: if the COL is within the 5 mV/m radius, field ≥ 5 mV/m
+    if (c.principal_community_5mvm_km != null && c.distance_from_current_km <= c.principal_community_5mvm_km){
+      assert.ok(c.field_at_col_centroid_mvm >= 4.9,
+        `field at COL should be ≥ 5 mV/m when COL is within r5 (rank ${c.rank}): ` +
+        `dist=${c.distance_from_current_km}, r5=${c.principal_community_5mvm_km}, field=${c.field_at_col_centroid_mvm}`);
+    }
+    // Physical sanity: if COL is beyond 0.5 mV/m reach, field < 0.5 mV/m
+    if (c.daytime_reach_km != null && c.distance_from_current_km > c.daytime_reach_km){
+      assert.ok(c.field_at_col_centroid_mvm < 0.55,
+        `field at COL should be < 0.5 mV/m when COL is beyond daytime reach (rank ${c.rank}): ` +
+        `dist=${c.distance_from_current_km}, reach=${c.daytime_reach_km}, field=${c.field_at_col_centroid_mvm}`);
+    }
+  }
+});
+
+test('score_confidence is HIGH/MEDIUM/LOW per candidate based on available data layers', async () => {
+  // Without polygon and on zone-table σ → all candidates should be LOW confidence.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 8,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const VALID = new Set(['HIGH', 'MEDIUM', 'LOW']);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.score_confidence),
+      `score_confidence must be HIGH/MEDIUM/LOW; rank ${c.rank} got: ${c.score_confidence}`);
+    // No polygon + no raster → LOW
+    assert.equal(c.score_confidence, 'LOW',
+      `score_confidence should be LOW when no polygon and no raster (rank ${c.rank})`);
+  }
+});
+
 test('buildGroundRadialAdvisory returns null for GOOD/EXCELLENT σ, advisory for POOR/FAIR', () => {
   const { buildGroundRadialAdvisory } = __test__;
   assert.equal(buildGroundRadialAdvisory(4),    null,  'σ=4 mS/m (GOOD) should return null');
