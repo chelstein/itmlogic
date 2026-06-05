@@ -30,6 +30,7 @@
 //   manualInfrastructureClient).  All scoring is deterministic.
 
 import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, __test__ as SO } from './siteOptimizer.js';
+const { buildProtectionAdvisory, buildRecommendedActions } = SO;
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
@@ -134,6 +135,9 @@ export async function runColocationOpportunities(body = {}){
       optimization_confidence: so.optimization_confidence || null,
       conductivity_mode: so.conductivity_mode || null,
       frequency_channel_class: so.frequency_channel_class || null,
+      skywave_risk_level: so.skywave_risk_level ?? null,
+      protection_class_advisory: so.protection_class_advisory ?? null,
+      recommended_actions: so.recommended_actions ?? [],
       candidate_count_by_status: so.candidate_count_by_status || null,
       n_infrastructure_sites: 0,
       scoring_time_ms: so.scoring_time_ms ?? null,
@@ -270,11 +274,30 @@ export async function runColocationOpportunities(body = {}){
     score_histogram[idx].count += 1;
   }
 
+  const chanClass = frequencyChannelClass(frequency_khz);
+  const { skywave_risk_level, protection_class_advisory } = buildProtectionAdvisory({
+    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
+  });
+
+  const baselineSumm = baseline ? baselineSummary(baseline) : null;
+  const recommended_actions = buildRecommendedActions({
+    baseline: baselineSumm,
+    returned,
+    scored: pool,
+    candidate_count_by_status,
+    fcc_class,
+    pattern_mode,
+    chanClass,
+    skywave_risk_level,
+    warnings,
+    community_of_license_polygon
+  });
+
   return composeResponse({
     method: `${search_mode} (infrastructure source: ${infrastructure_source})`,
     candidates: returned,
     n_candidates_evaluated: pool.length,
-    baseline: baseline ? baselineSummary(baseline) : null,
+    baseline: baselineSumm,
     inputs_echo: echoInputs({ callsign, frequency_khz, current_site,
       search_radius_km, grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
       goals, candidate_limit, search_mode, infrastructure_source,
@@ -284,12 +307,15 @@ export async function runColocationOpportunities(body = {}){
     score_stats,
     optimization_confidence,
     conductivity_mode: m3LoadStatus().loaded ? 'raster' : 'zone-table',
-    frequency_channel_class: frequencyChannelClass(frequency_khz),
+    frequency_channel_class: chanClass,
+    skywave_risk_level,
+    protection_class_advisory,
+    recommended_actions,
     candidate_count_by_status,
     n_infrastructure_sites: infraSites.length,
     scoring_time_ms,
     score_histogram,
-    top_candidates_summary: buildTopSummary(returned.slice(0, 5), baseline ? baselineSummary(baseline) : null, pool.length)
+    top_candidates_summary: buildTopSummary(returned.slice(0, 5), baselineSumm, pool.length)
   });
 }
 
@@ -607,6 +633,8 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             score_stats, score_histogram, top_candidates_summary,
                             optimization_confidence,
                             conductivity_mode, frequency_channel_class,
+                            skywave_risk_level, protection_class_advisory,
+                            recommended_actions,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   return {
@@ -624,6 +652,9 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     optimization_confidence,
     conductivity_mode: conductivity_mode || null,
     frequency_channel_class: frequency_channel_class || null,
+    skywave_risk_level: skywave_risk_level ?? null,
+    protection_class_advisory: protection_class_advisory ?? null,
+    recommended_actions: recommended_actions ?? [],
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,

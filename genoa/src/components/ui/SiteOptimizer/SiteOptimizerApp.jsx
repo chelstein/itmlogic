@@ -366,6 +366,9 @@ const DEMO_RESULT = {
     ground_sigma_quality: 'EXCELLENT',
     ground_sigma_source: 'Desert SW (~2 mS/m, FCC M3 zone estimate)',
     ground_sigma_filing_grade: 'screening',
+    field_at_col_centroid_mvm: 3.7,
+    estimated_daytime_population_served: 87500,
+    score_confidence: 'LOW',
     score_breakdown: { col_coverage: 28.1, population: 20.4, blanket: 12.5, conductivity: 5.2, wildfire: 0, treaty_zone: 0 }
   },
   candidates: [

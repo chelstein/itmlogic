@@ -34,6 +34,19 @@ function fmtNum(v, digits = 1){
   if (v == null || !Number.isFinite(Number(v))) return '—';
   return Number(v).toFixed(digits);
 }
+function fmtPopulation(n){
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
+  return String(Math.round(n));
+}
+function fieldColor(mvm){
+  if (mvm == null) return '#9b9b9b';
+  if (mvm >= 5)    return '#63d471';
+  if (mvm >= 0.5)  return '#ffb347';
+  return '#ff7a7a';
+}
+const CONFIDENCE_COLOR = { HIGH: '#63d471', MEDIUM: '#ffb347', LOW: '#ff7a7a' };
 
 export default function BaselinePanel({ callsign, baseline, comparedTo }){
   if (!baseline){
@@ -90,6 +103,35 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
             <span className="font-mono text-[13px] text-textDim">
               {baseline.rank_percentile.toFixed(0)}
               <span className="text-[10px] ml-0.5">th pct</span>
+            </span>
+          </div>
+        )}
+        {baseline.field_at_col_centroid_mvm != null && (
+          <div className="flex flex-col">
+            <span className="rack-eyebrow">COL centroid field</span>
+            <span className="font-mono text-[13px]" style={{ color: fieldColor(baseline.field_at_col_centroid_mvm) }}>
+              {fmtNum(baseline.field_at_col_centroid_mvm, 2)}
+              <span className="text-textDim ml-1">mV/m</span>
+            </span>
+          </div>
+        )}
+        {baseline.estimated_daytime_population_served != null && (
+          <div className="flex flex-col">
+            <span className="rack-eyebrow">Est. served</span>
+            <span className="font-mono text-[13px] text-textDim">
+              {fmtPopulation(baseline.estimated_daytime_population_served)}
+              <span className="text-[10px] ml-0.5">@0.5 mV/m</span>
+            </span>
+          </div>
+        )}
+        {baseline.score_confidence && (
+          <div className="flex flex-col">
+            <span className="rack-eyebrow">Score confidence</span>
+            <span
+              className="font-mono text-[11px] uppercase tracking-rack"
+              style={{ color: CONFIDENCE_COLOR[baseline.score_confidence] ?? '#9b9b9b' }}
+            >
+              {baseline.score_confidence}
             </span>
           </div>
         )}
