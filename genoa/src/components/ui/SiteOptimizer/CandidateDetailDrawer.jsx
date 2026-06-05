@@ -179,10 +179,18 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
   );
 }
 
+// Administrative labels that are shown on every candidate — suppress them
+// from the chip row when status_category already carries the key signal.
+const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
+
 export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
+  // When status_category is set, only show non-admin supplemental labels.
+  const supplementalLabels = candidate.status_category
+    ? (candidate.status_labels || []).filter(s => !ADMIN_LABELS.has(s))
+    : (candidate.status_labels || []);
   return (
     <div
       role="dialog"
@@ -202,7 +210,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
             {candidate.status_category && (
               <StatusChip status={candidate.status_category} dense />
             )}
-            {(candidate.status_labels || []).map(s => (
+            {supplementalLabels.map(s => (
               <StatusChip key={s} label={s} dense />
             ))}
           </div>
@@ -231,6 +239,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
           <div className="font-mono text-[12px] text-cream leading-relaxed">
             {e.ranking_rationale || candidate.notes || 'No rationale returned by engine.'}
           </div>
+          {e.recovery_reasoning && (
+            <div className="font-mono text-[11px] text-cyan/80 leading-relaxed mt-1.5">
+              {e.recovery_reasoning}
+            </div>
+          )}
         </div>
 
         {/* Environmental + engineering profile */}
