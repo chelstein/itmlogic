@@ -258,7 +258,8 @@ export async function runSiteOptimizer(body = {}){
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
       goals_enabled: Object.entries(goals).filter(([_, v]) => v).map(([k]) => k),
       community_of_license_polygon_provided: !!community_of_license_polygon,
-      candidate_limit
+      candidate_limit,
+      reach_scale_km: round2(reach_scale_km)
     },
     warnings,
     limitations_global: [

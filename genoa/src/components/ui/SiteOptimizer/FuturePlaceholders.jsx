@@ -8,7 +8,8 @@ import RackPanel from '../RackPanel.jsx';
 
 const ENTRIES = [
   { id: 'sdr',          label: 'SDR residual overlays' },
-  { id: 'conductivity', label: 'Conductivity segmentation overlays' },
+  { id: 'conductivity', label: 'Conductivity raster overlay',
+    partial: true, partialNote: 'M3 zone-table active (screening-grade). Deploy AM_m3.tif for per-pixel (filing-grade) raster.' },
   { id: 'wildfire',     label: 'Wildfire / fuel heatmaps' },
   { id: 'parcel',       label: 'Parcel / zoning layers' },
   { id: 'psra',         label: 'PSRA / PSSA optimization' },
@@ -36,13 +37,20 @@ export default function FuturePlaceholders(){
                 <span className="text-textDim">{open[e.id] ? '▾' : '▸'}</span>
                 <span>{e.label}</span>
               </span>
-              <span className="font-mono text-[9px] uppercase tracking-rack text-amberDim bg-amber/10 border border-amber/30 rounded-sm px-1.5 py-0.5">
-                Not wired
+              <span className={`font-mono text-[9px] uppercase tracking-rack rounded-sm px-1.5 py-0.5 border ${
+                e.partial
+                  ? 'text-cyan/80 bg-cyan/10 border-cyan/30'
+                  : 'text-amberDim bg-amber/10 border-amber/30'
+              }`}>
+                {e.partial ? 'Partial' : 'Not wired'}
               </span>
             </button>
             {open[e.id] && (
               <div className="border-t border-rule px-3 py-2 font-mono text-[10px] text-textDim">
-                Placeholder.  Layer will render here once the back-end pipeline emits a signal payload for <span className="text-cream">{e.label}</span>.
+                {e.partial && e.partialNote
+                  ? <span className="text-cyan/80">{e.partialNote}</span>
+                  : <>Placeholder.  Layer will render here once the back-end pipeline emits a signal payload for <span className="text-cream">{e.label}</span>.</>
+                }
               </div>
             )}
           </li>
