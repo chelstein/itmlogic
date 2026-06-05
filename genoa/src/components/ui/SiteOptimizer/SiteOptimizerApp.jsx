@@ -216,6 +216,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
             <OptimizationConfidencePanel
               confidence={result?.optimization_confidence}
               scoreStats={result?.score_stats}
+              scoreHistogram={result?.score_histogram}
               conductivityMode={result?.conductivity_mode}
               nInfrastructureSites={result?.n_infrastructure_sites}
               scoringTimeMs={result?.scoring_time_ms}
@@ -289,6 +290,18 @@ const DEMO_RESULT = {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
   score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
+  score_histogram: [
+    { bucket: '0–9',   min: 0,  max: 9,  count: 0 },
+    { bucket: '10–19', min: 10, max: 19, count: 0 },
+    { bucket: '20–29', min: 20, max: 29, count: 2 },
+    { bucket: '30–39', min: 30, max: 39, count: 8 },
+    { bucket: '40–49', min: 40, max: 49, count: 14 },
+    { bucket: '50–59', min: 50, max: 59, count: 34 },
+    { bucket: '60–69', min: 60, max: 69, count: 62 },
+    { bucket: '70–79', min: 70, max: 79, count: 58 },
+    { bucket: '80–89', min: 80, max: 89, count: 44 },
+    { bucket: '90–99', min: 90, max: 99, count: 12 }
+  ],
   optimization_confidence: {
     level: 'MEDIUM',
     contributing_layers: ['fcc_groundwave_engine', 'blanket_population_proxy'],

@@ -297,7 +297,21 @@ export async function runSiteOptimizer(body = {}){
 
   const scoring_time_ms = Date.now() - scoringStart;
 
-  // ---- 8. Tower sizing reference ----
+  // ---- 8a. Score histogram ----
+  // 10-bucket histogram over [0, 100], 10 points wide each.
+  // Lets the UI visualize the candidate distribution without scanning all scores.
+  const score_histogram = Array.from({ length: 10 }, (_, i) => ({
+    bucket: `${i * 10}–${i * 10 + 9}`,
+    min: i * 10,
+    max: i * 10 + 9,
+    count: 0
+  }));
+  for (const c of scored){
+    const idx = Math.min(9, Math.floor(c.score / 10));
+    score_histogram[idx].count += 1;
+  }
+
+  // ---- 8b. Tower sizing reference ----
   // Physical antenna height limits both site selection and ASR requirements.
   // Standard AM vertical antennas run λ/4 to λ/2; the FCC §17.7 ASR
   // registration threshold is 200 ft (60.96 m) AGL.
@@ -325,6 +339,7 @@ export async function runSiteOptimizer(body = {}){
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,
+    score_histogram,
     optimization_confidence,
     conductivity_mode,
     tower_reference,

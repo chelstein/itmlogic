@@ -25,7 +25,34 @@ function fmtNum(v, d = 1){
   return Number(v).toFixed(d);
 }
 
-export default function OptimizationConfidencePanel({ confidence, scoreStats, conductivityMode, nInfrastructureSites, scoringTimeMs }){
+function ScoreHistogram({ histogram }){
+  if (!Array.isArray(histogram) || histogram.length === 0) return null;
+  const maxCount = Math.max(1, ...histogram.map(b => b.count));
+  return (
+    <div>
+      <div className="rack-eyebrow mb-1">Score histogram</div>
+      <div className="flex items-end gap-0.5 h-[36px]">
+        {histogram.map((b, i) => {
+          const pct = maxCount > 0 ? (b.count / maxCount) * 100 : 0;
+          const shade = i >= 7 ? '#63d471' : i >= 4 ? '#ffb347' : '#ff7a7a';
+          return (
+            <div key={b.bucket} className="flex flex-col items-center flex-1" title={`${b.bucket}: ${b.count}`}>
+              <div
+                className="w-full rounded-t-sm transition-all"
+                style={{ height: `${Math.max(2, pct * 0.32)}px`, background: shade, opacity: b.count === 0 ? 0.2 : 0.85 }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex justify-between font-mono text-[8px] text-textDim mt-0.5 px-0.5">
+        <span>0</span><span>50</span><span>100</span>
+      </div>
+    </div>
+  );
+}
+
+export default function OptimizationConfidencePanel({ confidence, scoreStats, scoreHistogram, conductivityMode, nInfrastructureSites, scoringTimeMs }){
   if (!confidence && !scoreStats) return null;
 
   const level = confidence?.level;
@@ -81,6 +108,9 @@ export default function OptimizationConfidencePanel({ confidence, scoreStats, co
             </div>
           </div>
         )}
+
+        {/* Score histogram */}
+        {scoreHistogram && <ScoreHistogram histogram={scoreHistogram} />}
 
         {/* Timing strip */}
         {scoringTimeMs != null && (

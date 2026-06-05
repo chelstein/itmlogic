@@ -122,7 +122,8 @@ export async function runColocationOpportunities(body = {}){
       conductivity_mode: so.conductivity_mode || null,
       candidate_count_by_status: so.candidate_count_by_status || null,
       n_infrastructure_sites: 0,
-      scoring_time_ms: so.scoring_time_ms ?? null
+      scoring_time_ms: so.scoring_time_ms ?? null,
+      score_histogram: so.score_histogram ?? null
     });
   }
 
@@ -245,6 +246,15 @@ export async function runColocationOpportunities(body = {}){
 
   const scoring_time_ms = Date.now() - scoringStart;
 
+  // Build score histogram for INFRASTRUCTURE/HYBRID pool.
+  const score_histogram = Array.from({ length: 10 }, (_, i) => ({
+    bucket: `${i * 10}–${i * 10 + 9}`, min: i * 10, max: i * 10 + 9, count: 0
+  }));
+  for (const c of pool){
+    const idx = Math.min(9, Math.floor(c.score / 10));
+    score_histogram[idx].count += 1;
+  }
+
   return composeResponse({
     method: `${search_mode} (infrastructure source: ${infrastructure_source})`,
     candidates: returned,
@@ -261,7 +271,8 @@ export async function runColocationOpportunities(body = {}){
     conductivity_mode: m3LoadStatus().loaded ? 'raster' : 'zone-table',
     candidate_count_by_status,
     n_infrastructure_sites: infraSites.length,
-    scoring_time_ms
+    scoring_time_ms,
+    score_histogram
   });
 }
 
@@ -576,7 +587,7 @@ function collectHardFails(c){
 
 function composeResponse({ method, candidates, n_candidates_evaluated,
                             baseline, inputs_echo, warnings, so_limitations,
-                            score_stats, optimization_confidence,
+                            score_stats, score_histogram, optimization_confidence,
                             conductivity_mode, n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   return {
@@ -589,6 +600,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     current_site_baseline: baseline,
     candidates,
     score_stats,
+    score_histogram: score_histogram ?? null,
     optimization_confidence,
     conductivity_mode: conductivity_mode || null,
     scoring_time_ms: scoring_time_ms ?? null,
