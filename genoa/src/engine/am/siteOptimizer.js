@@ -637,7 +637,10 @@ async function scoreCandidate(pt, ctx, warnings){
     blanket:      blanket_population_pct == null ? null
       // Lower is better.  0% blanket pop → 100 score; 1% → 50; 2% → 0.
       : Math.max(0, Math.min(100, 100 - 50 * blanket_population_pct)),
-    conductivity: Math.max(0, Math.min(100, (sigma_msm / SIGMA_PREFERRED_MIN_MSM) * 100)),
+    // Sqrt scale: groundwave path-loss improvement diminishes with increasing σ.
+    // sigma=1→2 mS/m gains ~40% reach; sigma=7→8 gains ~5%. sqrt(σ/8)×100
+    // captures this better than linear σ/8×100.
+    conductivity: Math.max(0, Math.min(100, Math.sqrt(sigma_msm / SIGMA_PREFERRED_MIN_MSM) * 100)),
     wildfire:     null,   // placeholder
     treaty_zone:  treaty_min_border_km == null ? null
       // Farther from border = better; saturates at the treaty threshold.
