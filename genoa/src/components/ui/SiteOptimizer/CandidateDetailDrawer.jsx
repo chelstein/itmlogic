@@ -202,6 +202,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
           <div className="rack-eyebrow">Candidate detail</div>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             <span className="font-display text-cream text-[18px]">Rank #{candidate.rank}</span>
+            {candidate.rank_percentile != null && (
+              <span className="font-mono text-[10px] text-textDim border border-rule rounded-sm px-1.5 py-0.5">
+                {candidate.rank_percentile.toFixed(0)}th pct
+              </span>
+            )}
             <span className="font-mono text-[11px] text-textDim">
               {fmtCoord(candidate.lat, candidate.lon)}
             </span>

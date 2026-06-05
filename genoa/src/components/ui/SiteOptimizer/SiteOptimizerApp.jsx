@@ -291,7 +291,7 @@ const DEMO_RESULT = {
   },
   candidates: [
     {
-      rank: 1, lat: 34.91, lon: -111.79,
+      rank: 1, rank_percentile: 99.6, lat: 34.91, lon: -111.79,
       distance_from_current_km: 6.2, score: 91.3,
       col_coverage_pct: 0.97, nif_status: 'PROMISING',
       daytime_reach_km: 34.1, blanket_population_pct: 0.4,
@@ -309,7 +309,7 @@ const DEMO_RESULT = {
       limitations: ['Wildfire scoring not yet wired', 'Parcel availability not checked', 'NIF status is SCREENING-grade only']
     },
     {
-      rank: 2, lat: 34.83, lon: -111.74,
+      rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
       distance_from_current_km: 7.8, score: 84.0,
       col_coverage_pct: 0.91, nif_status: 'REVIEW',
       daytime_reach_km: 31.2, blanket_population_pct: 0.7,
@@ -327,7 +327,7 @@ const DEMO_RESULT = {
       limitations: ['NIF status REVIEW — engineering DA pattern may be required']
     },
     {
-      rank: 3, lat: 34.95, lon: -111.92,
+      rank: 3, rank_percentile: 72.6, lat: 34.95, lon: -111.92,
       distance_from_current_km: 12.5, score: 71.8,
       col_coverage_pct: 0.78, nif_status: 'PROMISING',
       daytime_reach_km: 28.4, blanket_population_pct: 0.3,
@@ -345,7 +345,7 @@ const DEMO_RESULT = {
       limitations: ['Moderate wildfire exposure — manual review of fuel maps required']
     },
     {
-      rank: 4, lat: 34.78, lon: -111.95,
+      rank: 4, rank_percentile: 24.8, lat: 34.78, lon: -111.95,
       distance_from_current_km: 15.0, score: 58.5,
       col_coverage_pct: 0.62, nif_status: 'FAIL',
       daytime_reach_km: 22.5, blanket_population_pct: 1.1,

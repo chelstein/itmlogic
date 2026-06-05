@@ -326,6 +326,21 @@ test('every GRID candidate carries a valid status_category enum value', async ()
   }
 });
 
+test('every candidate has rank_percentile in [0, 100]; rank 1 gets the highest percentile', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(Number.isFinite(c.rank_percentile), `rank_percentile must be finite (rank ${c.rank})`);
+    assert.ok(c.rank_percentile >= 0 && c.rank_percentile <= 100,
+      `rank_percentile must be in [0,100] (rank ${c.rank}, got ${c.rank_percentile})`);
+  }
+  const sorted = [...out.candidates].sort((a, b) => a.rank - b.rank);
+  if (sorted.length >= 2){
+    assert.ok(sorted[0].rank_percentile >= sorted[1].rank_percentile,
+      'rank 1 should have >= percentile compared to rank 2');
+  }
+});
+
 test('community-of-license polygon path is exercised when supplied', async () => {
   // Small square polygon around the KAZM site, in [lon, lat] order.
   const poly = {

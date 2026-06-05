@@ -175,8 +175,14 @@ export async function runSiteOptimizer(body = {}){
     finalizeLabels(c, scoreCutoff);
   }
 
-  // Re-rank after labeling and assign rank index.
-  scored.forEach((c, i) => { c.rank = i + 1; });
+  // Re-rank after labeling and assign rank index + score percentile.
+  const nScored = scored.length;
+  scored.forEach((c, i) => {
+    c.rank = i + 1;
+    // Percentile = fraction of candidates WITH LOWER score (higher rank = top percentile).
+    // rank 1 (top score) → 100th percentile; rank n (bottom) → 0th percentile.
+    c.rank_percentile = nScored > 1 ? round2(((nScored - i - 1) / (nScored - 1)) * 100) : 100;
+  });
 
   // ---- 5. Score variance stats + clustering audit ----
   const scoreValues = scored.map(c => c.score);
@@ -595,7 +601,7 @@ async function scoreCandidate(pt, ctx, warnings){
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
     sigma_msm, distance_from_current_km: pt.distance_from_current_km,
-    treaty_zone, flags
+    treaty_zone, flags, score, score_breakdown
   });
 
   return {
@@ -694,26 +700,42 @@ function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_
 }
 
 function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct, sigma_msm,
-                          distance_from_current_km, treaty_zone, flags }){
+                          distance_from_current_km, treaty_zone, flags, score, score_breakdown }){
   if (flags.length){
     return `Non-compliant on screening: ${flags.join('; ')}.  Engineer-grade analysis required before filing.`;
   }
+  // Find the leading scoring factor from score_breakdown.
+  let leadFactor = null;
+  if (score_breakdown){
+    let maxPts = 0;
+    const labels = { col_coverage: 'COL coverage', population: 'daytime population reach',
+                     blanket: 'low blanket-pop risk', conductivity: 'ground conductivity',
+                     wildfire: 'wildfire risk avoidance', treaty_zone: 'treaty zone clearance' };
+    for (const [k, v] of Object.entries(score_breakdown)){
+      if ((Number(v) || 0) > maxPts){ maxPts = Number(v); leadFactor = labels[k] || k; }
+    }
+  }
   const bits = [];
+  if (leadFactor && score != null){
+    bits.push(`Composite score ${score.toFixed(1)}; leading factor ${leadFactor}`);
+  }
   if (coverage_pct != null && coverage_pct >= 0.95){
-    bits.push(`Strong COL coverage at ${(coverage_pct * 100).toFixed(0)}%`);
+    bits.push(`strong COL coverage ${(coverage_pct * 100).toFixed(0)}%`);
   } else if (coverage_pct != null){
-    bits.push(`COL coverage ${(coverage_pct * 100).toFixed(0)}% (above §73.24(j) substantial-compliance floor)`);
+    bits.push(`COL coverage ${(coverage_pct * 100).toFixed(0)}%`);
   }
   if (daytime_reach_km != null){
-    bits.push(`daytime 0.5 mV/m reach ${daytime_reach_km.toFixed(0)} km`);
+    bits.push(`0.5 mV/m reach ${daytime_reach_km.toFixed(0)} km`);
   }
   if (sigma_msm >= SIGMA_PREFERRED_MIN_MSM){
-    bits.push(`σ=${sigma_msm} mS/m at M3 high end`);
+    bits.push(`σ=${sigma_msm} mS/m (favourable conductivity)`);
   }
   if (blanket_population_pct != null && blanket_population_pct < 0.5){
-    bits.push(`${blanket_population_pct.toFixed(1)}% blanket population well under §73.24(g) 1% limit`);
+    bits.push(`blanket pop ${blanket_population_pct.toFixed(1)}% well under §73.24(g) 1% limit`);
+  } else if (blanket_population_pct != null && blanket_population_pct > 0.8){
+    bits.push(`blanket pop ${blanket_population_pct.toFixed(1)}% — approaching §73.24(g) limit`);
   }
-  if (treaty_zone) bits.push(`inside ${treaty_zone} treaty zone — verify cross-border §73.187 obligations`);
+  if (treaty_zone) bits.push(`in ${treaty_zone} treaty zone — verify §73.187`);
   bits.push(`${distance_from_current_km.toFixed(0)} km from current site`);
   return bits.join('; ') + '.';
 }
