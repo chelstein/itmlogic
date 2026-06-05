@@ -552,11 +552,13 @@ async function scoreCandidate(pt, ctx, warnings){
   //    physically meaningful: changing conductivity / power / frequency
   //    changes r_1000 which changes the area and therefore the result.
   let blanket_population_pct = null;
+  let blanket_1000mvm_km = null;
   try {
     const r1000 = fccAmDistanceKm({
       frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: tpo_kw
     }).distance_km;
     if (r1000 > 0){
+      blanket_1000mvm_km = round2(r1000);
       const blanket_area_km2 = Math.PI * r1000 * r1000;
       // Urbanisation factor: 1.0 (rural) → 5.0 (central metro).  Linear
       // over 0–50 km from current site; saturates at 50 km out.
@@ -687,6 +689,7 @@ async function scoreCandidate(pt, ctx, warnings){
     nif_status,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
+    blanket_1000mvm_km,
     ground_sigma_mS_m:         sigma_msm,
     ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,

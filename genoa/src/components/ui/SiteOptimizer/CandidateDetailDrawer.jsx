@@ -277,7 +277,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             <div><span className="text-textDim">5 mV/m radius</span>          <span className="text-cream">{fmtNum(candidate.principal_community_5mvm_km)} km</span></div>
             <div><span className="text-textDim">0.5 mV/m reach</span>         <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
-            <div><span className="text-textDim">Blanket pop</span>             <span className="text-cream">{fmtBlanketPct(candidate.blanket_population_pct)}</span></div>
+            <div>
+              <span className="text-textDim">Blanket pop</span>{' '}
+              <span className="text-cream">{fmtBlanketPct(candidate.blanket_population_pct)}</span>
+              {candidate.blanket_1000mvm_km != null && (
+                <span className="text-textDim text-[9px] ml-1.5">(1000 mV/m r={fmtNum(candidate.blanket_1000mvm_km)} km)</span>
+              )}
+            </div>
             <div className="col-span-2">
               <span className="text-textDim">Ground σ</span>{' '}
               <span className="text-cream">{fmtNum(candidate.ground_sigma_mS_m, 0)} mS/m</span>
