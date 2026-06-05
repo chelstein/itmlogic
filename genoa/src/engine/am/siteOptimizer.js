@@ -736,15 +736,18 @@ function baselineSummary(b){
   return {
     lat: b.lat, lon: b.lon,
     score: b.score,
+    rank_percentile:        b.rank_percentile,
     col_coverage_pct:       b.col_coverage_pct,
     daytime_reach_km:       b.daytime_reach_km,
     blanket_population_pct: b.blanket_population_pct,
     ground_sigma_mS_m:         b.ground_sigma_mS_m,
+    ground_sigma_quality:      b.ground_sigma_quality,
     ground_sigma_source:       b.ground_sigma_source,
     ground_sigma_filing_grade: b.ground_sigma_filing_grade,
     nif_status:             b.nif_status,
     treaty_zone:            b.treaty_zone,
-    status_labels:          b.status_labels
+    status_labels:          b.status_labels,
+    score_breakdown:        b.explanation?.score_breakdown ?? null
   };
 }
 

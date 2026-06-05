@@ -306,12 +306,15 @@ const DEMO_RESULT = {
   ],
   current_site_baseline: {
     score: 62.4,
+    rank_percentile: 41.5,
     col_coverage_pct: 0.85,
     blanket_population_pct: 0.6,
     daytime_reach_km: 28.5,
     ground_sigma_mS_m: 8,
+    ground_sigma_quality: 'EXCELLENT',
     ground_sigma_source: 'Desert SW (~2 mS/m, FCC M3 zone estimate)',
-    ground_sigma_filing_grade: 'screening'
+    ground_sigma_filing_grade: 'screening',
+    score_breakdown: { col_coverage: 28.1, population: 20.4, blanket: 12.5, conductivity: 5.2, wildfire: 0, treaty_zone: 0 }
   },
   candidates: [
     {

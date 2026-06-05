@@ -65,12 +65,34 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
         <Stat label="Blanket pop"  value={fmtBlanketPct(baseline.blanket_population_pct)} tone="red"  />
         <div className="flex flex-col">
           <Stat label="Ground σ" value={fmtNum(baseline.ground_sigma_mS_m, 0)} unit="mS/m" tone="green" />
+          {baseline.ground_sigma_quality && (
+            <span
+              className="font-mono text-[8px] uppercase tracking-rack mt-0.5"
+              style={{
+                color: baseline.ground_sigma_quality === 'EXCELLENT' ? '#63d471'
+                     : baseline.ground_sigma_quality === 'GOOD'      ? '#a8d46a'
+                     : baseline.ground_sigma_quality === 'FAIR'      ? '#ffb347'
+                     : '#ff7a7a'
+              }}
+            >
+              {baseline.ground_sigma_quality}
+            </span>
+          )}
           {baseline.ground_sigma_source && (
             <span className="font-mono text-[9px] text-textDim leading-tight mt-0.5">
               {baseline.ground_sigma_source}
             </span>
           )}
         </div>
+        {baseline.rank_percentile != null && (
+          <div className="flex flex-col">
+            <span className="rack-eyebrow">Site rank</span>
+            <span className="font-mono text-[13px] text-textDim">
+              {baseline.rank_percentile.toFixed(0)}
+              <span className="text-[10px] ml-0.5">th pct</span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
