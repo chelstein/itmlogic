@@ -52,7 +52,7 @@ function ScoreHistogram({ histogram }){
   );
 }
 
-export default function OptimizationConfidencePanel({ confidence, scoreStats, scoreHistogram, topCandidatesSummary, conductivityMode, nInfrastructureSites, scoringTimeMs }){
+export default function OptimizationConfidencePanel({ confidence, scoreStats, scoreHistogram, topCandidatesSummary, conductivityMode, frequencyChannelClass, nInfrastructureSites, scoringTimeMs }){
   if (!confidence && !scoreStats) return null;
 
   const level = confidence?.level;
@@ -130,10 +130,25 @@ export default function OptimizationConfidencePanel({ confidence, scoreStats, sc
         )}
 
         {/* Data source strip */}
-        {(conductivityMode || nInfrastructureSites != null) && (
+        {(conductivityMode || frequencyChannelClass || nInfrastructureSites != null) && (
           <div>
             <div className="rack-eyebrow mb-1">Data sources</div>
             <div className="space-y-0.5 font-mono text-[10px]">
+              {frequencyChannelClass && (() => {
+                const isLocal = frequencyChannelClass === 'local';
+                const isClear = frequencyChannelClass === 'clear_channel';
+                const label   = isLocal ? 'Local (§73.27 — Class C, ≤250W)'
+                              : isClear ? 'Clear channel (§73.25 — Class A dominant)'
+                              :           'Regional (§73.26 — Class B/D)';
+                const color = isLocal ? '#ffb347' : isClear ? '#6fd3ff' : '#a8d46a';
+                return (
+                  <div className="flex items-center gap-1.5">
+                    <span style={{ color }}>●</span>
+                    <span className="text-textDim">Channel class:</span>
+                    <span style={{ color }}>{label}</span>
+                  </div>
+                );
+              })()}
               {conductivityMode && (
                 <div className="flex items-center gap-1.5">
                   <span className={conductivityMode === 'raster' ? 'text-green' : 'text-amberDim'}>

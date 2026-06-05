@@ -273,7 +273,15 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           <div className="rack-eyebrow mb-1">Engineering profile</div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 font-mono text-[11px]">
             <div><span className="text-textDim">Distance from current</span> <span className="text-cream">{fmtNum(candidate.distance_from_current_km)} km</span></div>
-            <div><span className="text-textDim">Bearing (true)</span>         <span className="text-cream">{candidate.bearing_deg != null ? `${candidate.bearing_deg}°` : '—'}</span></div>
+            <div>
+              <span className="text-textDim">Bearing (true)</span>{' '}
+              <span className="text-cream">
+                {candidate.bearing_deg != null ? `${candidate.bearing_deg}°` : '—'}
+                {candidate.cardinal_direction && (
+                  <span className="text-textDim text-[9px] ml-1">({candidate.cardinal_direction})</span>
+                )}
+              </span>
+            </div>
             <div><span className="text-textDim">5 mV/m radius</span>          <span className="text-cream">{fmtNum(candidate.principal_community_5mvm_km)} km</span></div>
             <div><span className="text-textDim">0.5 mV/m reach</span>         <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
@@ -322,6 +330,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               )}
               {candidate.ground_sigma_source && (
                 <div className="text-textDim text-[9px] mt-0.5 leading-tight">{candidate.ground_sigma_source}</div>
+              )}
+              {candidate.ground_radial_advisory && (
+                <div className="font-mono text-[9px] text-amber mt-1 leading-snug max-w-xs">
+                  ⚠ {candidate.ground_radial_advisory}
+                </div>
               )}
             </div>
             <div><span className="text-textDim">NIF status</span>              <span className="text-cream">{candidate.nif_status || '—'}</span></div>

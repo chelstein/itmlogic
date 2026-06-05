@@ -183,11 +183,12 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
               </select>
               <button
                 onClick={() => {
-                  const CSV_COLS = ['rank','score','status_category','source','distance_from_current_km',
-                    'bearing_deg','col_coverage_pct','blanket_population_pct','daytime_reach_km',
+                  const CSV_COLS = ['rank','score','score_delta_vs_baseline','status_category','source',
+                    'distance_from_current_km','bearing_deg','cardinal_direction',
+                    'col_coverage_pct','blanket_population_pct','daytime_reach_km',
                     'principal_community_5mvm_km','blanket_1000mvm_km','ground_sigma_mS_m',
-                    'ground_sigma_quality','ground_sigma_filing_grade','lat','lon',
-                    'treaty_zone','minimum_tpo_for_compliance_kw'];
+                    'ground_sigma_quality','ground_sigma_filing_grade','ground_radial_advisory',
+                    'lat','lon','treaty_zone','minimum_tpo_for_compliance_kw'];
                   const esc = v => v == null ? '' : (String(v).includes(',') ? `"${String(v).replace(/"/g,'""')}"` : String(v));
                   const lines = [CSV_COLS.join(','),
                     ...candidates.map(c => CSV_COLS.map(k => esc(c[k])).join(','))];
@@ -296,8 +297,17 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('distance_from_current_km', c.distance_from_current_km)}</td>
                     <td
                       className="px-2 py-1.5 text-right text-textDim font-mono"
-                      title={c.bearing_deg != null ? `${c.bearing_deg}° true` : ''}
-                    >{c.bearing_deg != null ? `${c.bearing_deg}°` : '—'}</td>
+                      title={c.bearing_deg != null ? `${c.bearing_deg}° true ${c.cardinal_direction ? `(${c.cardinal_direction})` : ''}` : ''}
+                    >
+                      {c.bearing_deg != null ? (
+                        <span>
+                          {c.bearing_deg}°
+                          {c.cardinal_direction && (
+                            <span className="text-[9px] ml-0.5 text-textDim/70">{c.cardinal_direction}</span>
+                          )}
+                        </span>
+                      ) : '—'}
+                    </td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('col_coverage_pct', c.col_coverage_pct)}</td>
                     <td
                       className="px-2 py-1.5 text-right"

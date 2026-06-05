@@ -219,6 +219,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               scoreHistogram={result?.score_histogram}
               topCandidatesSummary={result?.top_candidates_summary}
               conductivityMode={result?.conductivity_mode}
+              frequencyChannelClass={result?.frequency_channel_class}
               nInfrastructureSites={result?.n_infrastructure_sites}
               scoringTimeMs={result?.scoring_time_ms}
             />
@@ -312,6 +313,7 @@ const DEMO_RESULT = {
       'COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'
     ]
   },
+  frequency_channel_class: 'clear_channel',
   limitations_global: [
     'Screening-grade output only; engineer-grade NIF / §73.182 / DA-N analysis is required for any filing.',
     'Population sub-score uses a population-density proxy (groundwave reach × density model), not a Census-block sum.',
@@ -334,10 +336,14 @@ const DEMO_RESULT = {
   candidates: [
     {
       rank: 1, rank_percentile: 99.6, lat: 34.91, lon: -111.79,
-      distance_from_current_km: 6.2, score: 91.3,
+      distance_from_current_km: 6.2, bearing_deg: 42, cardinal_direction: 'NE', score: 91.3,
+      score_delta_vs_baseline: 28.9,
       col_coverage_pct: 0.97, nif_status: 'PROMISING',
-      daytime_reach_km: 34.1, blanket_population_pct: 0.4,
-      ground_sigma_mS_m: 8, treaty_zone: null, fuel_risk: 'NOT-EVALUATED',
+      principal_community_5mvm_km: 5.8, daytime_reach_km: 34.1, blanket_population_pct: 0.4,
+      blanket_1000mvm_km: 0.8, minimum_tpo_for_compliance_kw: null,
+      ground_sigma_mS_m: 8, ground_sigma_quality: 'EXCELLENT', ground_sigma_filing_grade: 'screening',
+      ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
+      treaty_zone: null, fuel_risk: 'NOT-EVALUATED',
       notes: '97% city-coverage, σ=8 mS/m, 0.4% blanket pop, 6 km from current.',
       explanation: {
         score_breakdown: { col_coverage: 40.2, population: 32.2, blanket: 16.1, conductivity: 11.5, wildfire: 0, treaty_zone: 0 },
@@ -352,10 +358,14 @@ const DEMO_RESULT = {
     },
     {
       rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
-      distance_from_current_km: 7.8, score: 84.0,
+      distance_from_current_km: 7.8, bearing_deg: 128, cardinal_direction: 'SE', score: 84.0,
+      score_delta_vs_baseline: 21.6,
       col_coverage_pct: 0.91, nif_status: 'REVIEW',
-      daytime_reach_km: 31.2, blanket_population_pct: 0.7,
-      ground_sigma_mS_m: 6, treaty_zone: null, fuel_risk: 'LOW',
+      principal_community_5mvm_km: 4.9, daytime_reach_km: 31.2, blanket_population_pct: 0.7,
+      blanket_1000mvm_km: 0.7, minimum_tpo_for_compliance_kw: null,
+      ground_sigma_mS_m: 6, ground_sigma_quality: 'GOOD', ground_sigma_filing_grade: 'screening',
+      ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
+      treaty_zone: null, fuel_risk: 'LOW',
       notes: '91% city-coverage; ground σ slightly lower; daytime reach acceptable.',
       explanation: {
         score_breakdown: { col_coverage: 35.6, population: 27.6, blanket: 14.9, conductivity: 9.2, wildfire: 0, treaty_zone: 0 },
@@ -370,10 +380,14 @@ const DEMO_RESULT = {
     },
     {
       rank: 3, rank_percentile: 72.6, lat: 34.95, lon: -111.92,
-      distance_from_current_km: 12.5, score: 71.8,
+      distance_from_current_km: 12.5, bearing_deg: 315, cardinal_direction: 'NW', score: 71.8,
+      score_delta_vs_baseline: 9.4,
       col_coverage_pct: 0.78, nif_status: 'PROMISING',
-      daytime_reach_km: 28.4, blanket_population_pct: 0.3,
-      ground_sigma_mS_m: 10, treaty_zone: null, fuel_risk: 'MODERATE',
+      principal_community_5mvm_km: 6.1, daytime_reach_km: 28.4, blanket_population_pct: 0.3,
+      blanket_1000mvm_km: 0.9, minimum_tpo_for_compliance_kw: null,
+      ground_sigma_mS_m: 10, ground_sigma_quality: 'EXCELLENT', ground_sigma_filing_grade: 'screening',
+      ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
+      treaty_zone: null, fuel_risk: 'MODERATE',
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {
         score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0 },
@@ -388,10 +402,15 @@ const DEMO_RESULT = {
     },
     {
       rank: 4, rank_percentile: 24.8, lat: 34.78, lon: -111.95,
-      distance_from_current_km: 15.0, score: 58.5,
+      distance_from_current_km: 15.0, bearing_deg: 247, cardinal_direction: 'WSW', score: 58.5,
+      score_delta_vs_baseline: -3.9,
       col_coverage_pct: 0.62, nif_status: 'FAIL',
-      daytime_reach_km: 22.5, blanket_population_pct: 1.1,
-      ground_sigma_mS_m: 4, treaty_zone: 'US-MX advisory',
+      principal_community_5mvm_km: 3.4, daytime_reach_km: 22.5, blanket_population_pct: 1.1,
+      blanket_1000mvm_km: 0.6, minimum_tpo_for_compliance_kw: 4.2,
+      ground_sigma_mS_m: 1.5, ground_sigma_quality: 'POOR', ground_sigma_filing_grade: 'screening',
+      ground_sigma_source: 'FCC M3 zone table',
+      ground_radial_advisory: 'POOR conductivity (σ=1.5 mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.',
+      treaty_zone: 'US-MX advisory',
       fuel_risk: 'LOW',
       notes: 'Coverage gap on east side of COL; treaty advisory zone.',
       explanation: {
