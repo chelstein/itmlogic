@@ -183,6 +183,20 @@ export async function runSiteOptimizer(body = {}){
     }
   }
 
+  // ---- 1d. Adjacent-channel clear-channel advisory ----
+  // Adjacent channels (±10 kHz) that are §73.25 clear channels warrant a note:
+  // the co-channel / adjacent-channel separation rules under §73.182 may require
+  // larger physical separation or pattern protection for a secondary station
+  // whose frequency is close to a dominant clear-channel assignment.
+  const adjChannels = [-10, 10].map(d => frequency_khz + d).filter(f => CLEAR_CHANNEL_KHZ.has(f));
+  if (adjChannels.length > 0){
+    warnings.push({
+      code: 'ADJACENT_TO_CLEAR_CHANNEL',
+      message: `${frequency_khz} kHz is adjacent to §73.25 clear-channel assignment(s): ${adjChannels.join(', ')} kHz. ` +
+               `Adjacent-channel interference requirements under §73.182 may apply — verify nighttime inter-station separation.`
+    });
+  }
+
   // ---- 2. build candidate grid ----
   const gridPoints = buildGridCandidates({
     center: current_site,

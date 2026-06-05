@@ -717,6 +717,43 @@ test('buildProtectionAdvisory returns MODERATE risk for regional channel Class B
   assert.ok(/§73\.182/i.test(res.protection_class_advisory), 'advisory must mention §73.182');
 });
 
+test('ADJACENT_TO_CLEAR_CHANNEL warning fires when frequency is adjacent to a §73.25 clear channel', async () => {
+  // 790 kHz: 780 kHz is a clear channel → 790 ± 10 = {780, 800}; 780 is clear → should warn.
+  const outAdj = await runSiteOptimizer({ ...KAZM, frequency_khz: 790, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(outAdj.available, true);
+  const adjWarn = outAdj.warnings.find(w => w?.code === 'ADJACENT_TO_CLEAR_CHANNEL');
+  assert.ok(adjWarn, `ADJACENT_TO_CLEAR_CHANNEL warning must fire for 790 kHz (adj to 780 clear); got: ${JSON.stringify(outAdj.warnings)}`);
+  assert.ok(/780/.test(adjWarn.message), 'warning must mention 780 kHz');
+
+  // 700 kHz is itself a clear channel; 710 is also clear, 690 is not clear.
+  // So 700 → adjacent to 710 (clear). Should warn.
+  const out700 = await runSiteOptimizer({ ...KAZM, frequency_khz: 700, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out700.available, true);
+  const adjWarn700 = out700.warnings.find(w => w?.code === 'ADJACENT_TO_CLEAR_CHANNEL');
+  assert.ok(adjWarn700, `ADJACENT_TO_CLEAR_CHANNEL warning must fire for 700 kHz (adj to 710 clear)`);
+
+  // 950 kHz: neither 940 (clear) adjacent fires... actually 940 is in CLEAR_CHANNEL_KHZ.
+  // 950-10=940 is clear. Should warn.
+  const out950 = await runSiteOptimizer({ ...KAZM, frequency_khz: 950, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out950.available, true);
+  const adjWarn950 = out950.warnings.find(w => w?.code === 'ADJACENT_TO_CLEAR_CHANNEL');
+  assert.ok(adjWarn950, `ADJACENT_TO_CLEAR_CHANNEL warning must fire for 950 kHz (adj to 940 clear)`);
+
+  // 600 kHz: neither 590 nor 610 is a clear channel. No warning.
+  const outNo = await runSiteOptimizer({ ...KAZM, frequency_khz: 600, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(outNo.available, true);
+  const adjWarnNo = outNo.warnings.find(w => w?.code === 'ADJACENT_TO_CLEAR_CHANNEL');
+  assert.equal(adjWarnNo, undefined, `No ADJACENT_TO_CLEAR_CHANNEL warning for 600 kHz; got: ${JSON.stringify(outNo.warnings)}`);
+});
+
 test('DA pattern_mode causes protection_class_advisory to mention §73.150', async () => {
   const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1,
     optimization_goals: { maximize_col_coverage: true }
