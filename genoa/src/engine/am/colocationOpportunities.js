@@ -64,7 +64,7 @@ const HOST_KIND_LABEL = Object.freeze({
  * @param {object} body  — see route file.
  * @returns {object} ranked candidates with co-location analytics.
  */
-export function runColocationOpportunities(body = {}){
+export async function runColocationOpportunities(body = {}){
   const warnings = [];
 
   // ---- 1. validate ----
@@ -84,7 +84,7 @@ export function runColocationOpportunities(body = {}){
     // Pure GRID: delegate to the site optimizer for an apples-to-apples
     // comparison, then re-shape candidates with source/infrastructure_ref
     // null fields and re-classify via our status taxonomy.
-    const so = runSiteOptimizer({
+    const so = await runSiteOptimizer({
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
       community_of_license_polygon,
@@ -124,10 +124,10 @@ export function runColocationOpportunities(body = {}){
       spacing_km: grid_spacing_km
     });
     ensureCurrentSiteIncluded(gridPoints, current_site);
-    gridScored = gridPoints.map((pt) => {
-      const c = SO.scoreCandidate(pt, ctx, warnings);
+    gridScored = await Promise.all(gridPoints.map(async (pt) => {
+      const c = await SO.scoreCandidate(pt, ctx, warnings);
       return decorateGridCandidate(c);
-    });
+    }));
   }
 
   // ---- 3b. gather INFRASTRUCTURE candidates ----
@@ -149,7 +149,7 @@ export function runColocationOpportunities(body = {}){
     warnings.push(`infrastructure_source ${infrastructure_source} not yet wired; returning empty infrastructure pool`);
   }
 
-  const infraScored = infraSites.map((site) => scoreInfrastructureCandidate(site, ctx, warnings));
+  const infraScored = await Promise.all(infraSites.map((site) => scoreInfrastructureCandidate(site, ctx, warnings)));
 
   // ---- 4. unify, rank, label ----
   const pool = gridScored.concat(infraScored);
@@ -311,7 +311,7 @@ function decorateGridCandidate(c){
   return decorated;
 }
 
-function scoreInfrastructureCandidate(site, ctx, warnings){
+async function scoreInfrastructureCandidate(site, ctx, warnings){
   // The infrastructure site IS the candidate point.  We score it with
   // siteOptimizer's per-candidate scorer (which handles all of the
   // FCC-curve math and the 5 mV/m COL coverage check), then layer the
@@ -323,7 +323,7 @@ function scoreInfrastructureCandidate(site, ctx, warnings){
       ? site.distance_from_center_km
       : SO.greatCircleKm(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon)
   };
-  const scored = SO.scoreCandidate(pt, ctx, warnings);
+  const scored = await SO.scoreCandidate(pt, ctx, warnings);
 
   const hostKind = HOST_KIND_LABEL[site.kind] || null;
   const sameBandAm = site.kind === 'AM_SITE'

@@ -30,9 +30,9 @@ function baseBody(overrides = {}){
 }
 
 // ---------- Test 1 — INFRASTRUCTURE mode with empty radius ----------
-test('INFRASTRUCTURE-only mode: no infrastructure in radius returns empty candidates, available:true', () => {
+test('INFRASTRUCTURE-only mode: no infrastructure in radius returns empty candidates, available:true', async () => {
   // Center mid-Atlantic so the Arizona-only inventory does not intersect.
-  const out = runColocationOpportunities(baseBody({
+  const out = await runColocationOpportunities(baseBody({
     current_site: { lat: 30.0, lon: -50.0 },
     search_radius_km: 100,
     search_mode: 'INFRASTRUCTURE'
@@ -43,8 +43,8 @@ test('INFRASTRUCTURE-only mode: no infrastructure in radius returns empty candid
 });
 
 // ---------- Test 2 — INFRASTRUCTURE mode pulls and ranks the manual seed ----------
-test('INFRASTRUCTURE mode pulls manual sites and returns them ranked by score (desc)', () => {
-  const out = runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+test('INFRASTRUCTURE mode pulls manual sites and returns them ranked by score (desc)', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
   assert.equal(out.available, true);
   assert.ok(out.n_candidates_returned >= 1, 'at least one seed site within 50 km of KAZM');
   // Every returned candidate is sourced from the manual inventory.
@@ -62,8 +62,8 @@ test('INFRASTRUCTURE mode pulls manual sites and returns them ranked by score (d
 });
 
 // ---------- Test 3 — HYBRID mode returns both source types ----------
-test('HYBRID mode returns both source=GRID and source=INFRASTRUCTURE candidates', () => {
-  const out = runColocationOpportunities(baseBody({
+test('HYBRID mode returns both source=GRID and source=INFRASTRUCTURE candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({
     search_mode: 'HYBRID',
     grid_spacing_km: 20,
     search_radius_km: 40,
@@ -76,8 +76,8 @@ test('HYBRID mode returns both source=GRID and source=INFRASTRUCTURE candidates'
 });
 
 // ---------- Test 4 — Same-band AM host within 10 km triggers diplexing_required ----------
-test('Same-band AM host within 10 km sets diplexing_required:true on that candidate', () => {
-  const out = runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+test('Same-band AM host within 10 km sets diplexing_required:true on that candidate', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
   const kzed = out.candidates.find((c) => c.infrastructure_ref && c.infrastructure_ref.station_call === 'KZED');
   assert.ok(kzed, 'KZED seed record should appear in candidate list');
   assert.equal(kzed.colocation_analysis.diplexing_required, true);
@@ -113,15 +113,15 @@ test('Status RECOVERABLE_WITH_DA assigned when COL coverage fails but score othe
 });
 
 // ---------- Test 6 — Invalid search_mode is rejected ----------
-test('Invalid search_mode produces a 400-equivalent error response', () => {
-  const out = runColocationOpportunities(baseBody({ search_mode: 'WHATEVER' }));
+test('Invalid search_mode produces a 400-equivalent error response', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'WHATEVER' }));
   assert.equal(out.available, false);
   assert.ok(/search_mode/i.test(out.error), `expected error to mention search_mode; got: ${out.error}`);
 });
 
 // ---------- Test 7 (bonus) — ASR candidate gets regulatory note ----------
-test('ASR-kind candidate carries an ASR registration regulatory note', () => {
-  const out = runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+test('ASR-kind candidate carries an ASR registration regulatory note', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
   const asr = out.candidates.find((c) => c.infrastructure_ref && c.infrastructure_ref.kind === 'ASR');
   assert.ok(asr, 'expected at least one ASR-kind seed candidate within radius');
   const hasAsrNote = asr.colocation_analysis.regulatory_notes

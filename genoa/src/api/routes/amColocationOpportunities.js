@@ -22,7 +22,7 @@ r.post('/am/colocation-opportunities', asyncHandler(async (req, res) => {
   if (!body || typeof body !== 'object'){
     return res.status(400).json({ available: false, error: 'JSON body required' });
   }
-  const out = runColocationOpportunities(body);
+  const out = await runColocationOpportunities(body);
   if (out.available === false){
     return res.status(400).json(out);
   }
