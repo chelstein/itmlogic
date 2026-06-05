@@ -531,3 +531,98 @@ test('top_candidates_summary is a non-empty string in the response', async () =>
   // Should mention rank 1 score and status
   assert.ok(/Rank 1/.test(out.top_candidates_summary), 'summary must mention Rank 1');
 });
+
+test('frequencyChannelClass classifies local, clear, and regional channels correctly', () => {
+  const { frequencyChannelClass, LOCAL_CHANNEL_KHZ, CLEAR_CHANNEL_KHZ } = __test__;
+
+  // Local channels — all six §73.27 frequencies
+  for (const f of LOCAL_CHANNEL_KHZ){
+    assert.equal(frequencyChannelClass(f), 'local', `${f} kHz should be local`);
+  }
+
+  // Clear channels — spot-check a few §73.25 frequencies
+  for (const f of [720, 760, 880, 1000, 1210]){
+    assert.equal(frequencyChannelClass(f), 'clear_channel', `${f} kHz should be clear_channel`);
+  }
+
+  // Regional — anything else in the AM band
+  for (const f of [530, 600, 790, 950, 1050, 1300, 1500, 1700]){
+    assert.equal(frequencyChannelClass(f), 'regional', `${f} kHz should be regional`);
+  }
+});
+
+test('frequency_channel_class is included in the runSiteOptimizer response', async () => {
+  // 1240 kHz is a local channel; 780 kHz (KAZM) is clear_channel
+  const localOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 1240, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(localOut.available, true);
+  assert.equal(localOut.frequency_channel_class, 'local', '1240 kHz must classify as local');
+
+  const clearOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(clearOut.available, true);
+  assert.equal(clearOut.frequency_channel_class, 'clear_channel', '780 kHz must classify as clear_channel');
+});
+
+test('TPO_EXCEEDS_CLASS_MAX warning fires when tpo_kw > class maximum', async () => {
+  // Class C max is 250 W (0.25 kW); submitting 5 kW should trigger the warning.
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'C', tpo_kw: 5, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const warn = out.warnings.find(w => w?.code === 'TPO_EXCEEDS_CLASS_MAX');
+  assert.ok(warn, `TPO_EXCEEDS_CLASS_MAX warning must be present for Class C at 5 kW; got: ${JSON.stringify(out.warnings)}`);
+  assert.ok(/0\.25 kW|250 W/i.test(warn.message), 'warning must mention the 0.25 kW Class C limit');
+});
+
+test('TPO_BELOW_CLASS_MIN warning fires when Class A tpo_kw < 10 kW', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', tpo_kw: 5, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const warn = out.warnings.find(w => w?.code === 'TPO_BELOW_CLASS_MIN');
+  assert.ok(warn, `TPO_BELOW_CLASS_MIN warning must be present for Class A at 5 kW; got: ${JSON.stringify(out.warnings)}`);
+  assert.ok(/10 kW/i.test(warn.message), 'warning must mention 10 kW minimum');
+});
+
+test('Class B at 50 kW produces no power-limit warning (50 kW is at the max)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'B', tpo_kw: 50, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const pwrWarns = out.warnings.filter(w => w?.code === 'TPO_EXCEEDS_CLASS_MAX' || w?.code === 'TPO_BELOW_CLASS_MIN');
+  assert.equal(pwrWarns.length, 0, `no power limit warnings for Class B at 50 kW; got: ${JSON.stringify(pwrWarns)}`);
+});
+
+test('every candidate exposes cardinal_direction as a 16-point compass string', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 15,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const COMPASS_16 = new Set(['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW']);
+  for (const c of out.candidates){
+    if (c.distance_from_current_km === 0){
+      // Current site: bearing_deg=0 → cardinal 'N' (or null is also acceptable at distance 0)
+      continue;
+    }
+    assert.ok(c.cardinal_direction != null, `cardinal_direction must be present (rank ${c.rank})`);
+    assert.ok(COMPASS_16.has(c.cardinal_direction),
+      `cardinal_direction must be a valid 16-point compass label; rank ${c.rank} got: ${c.cardinal_direction}`);
+  }
+});
+
+test('buildGroundRadialAdvisory returns null for GOOD/EXCELLENT σ, advisory for POOR/FAIR', () => {
+  const { buildGroundRadialAdvisory } = __test__;
+  assert.equal(buildGroundRadialAdvisory(4),    null,  'σ=4 mS/m (GOOD) should return null');
+  assert.equal(buildGroundRadialAdvisory(8),    null,  'σ=8 mS/m (EXCELLENT) should return null');
+  assert.equal(buildGroundRadialAdvisory(15),   null,  'σ=15 mS/m should return null');
+  assert.ok(buildGroundRadialAdvisory(2) != null,  'σ=2 mS/m (FAIR) should return an advisory');
+  assert.ok(/120.radial|§73\.190/i.test(buildGroundRadialAdvisory(2)),
+    'FAIR advisory should mention §73.190 or radial count');
+  assert.ok(buildGroundRadialAdvisory(0.5) != null, 'σ=0.5 mS/m (POOR) should return an advisory');
+  assert.ok(/POOR/i.test(buildGroundRadialAdvisory(0.5)),
+    'POOR advisory should mention POOR conductivity');
+  assert.equal(buildGroundRadialAdvisory(null), null, 'null σ should return null');
+});

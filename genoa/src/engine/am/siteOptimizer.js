@@ -64,6 +64,25 @@ const R_EARTH_KM = 6371.0088;
 const US_POPULATION_M = 335e6;                    // 2024 US population (persons)
 const US_AVG_POP_DENSITY_PER_KM2 = 34.0;          // national avg (USCB, 2023)
 
+// FCC AM channel classification (47 CFR §73.25-27)
+// Local channels run Class C stations at ≤250 W (§73.27).
+const LOCAL_CHANNEL_KHZ = Object.freeze(new Set([1230, 1240, 1340, 1400, 1450, 1490]));
+// Clear channels are §73.25 dominant Class A channels where skywave protection applies.
+const CLEAR_CHANNEL_KHZ = Object.freeze(new Set([
+  640, 650, 660, 670, 700, 710, 720, 750, 760, 770, 780,
+  820, 830, 840, 870, 880, 890, 940, 990, 1000, 1020, 1030,
+  1040, 1060, 1070, 1100, 1120, 1160, 1180, 1200, 1210
+]));
+
+// FCC class daytime TPO limits (47 CFR §73.21).
+// Nighttime limits for Class D are not enforced here (require separate analysis).
+const FCC_CLASS_POWER_KW = Object.freeze({
+  A: { min: 10,    max: 50   },
+  B: { min: 0.25,  max: 50   },
+  C: { min: 0.001, max: 0.25 },
+  D: { min: 0.001, max: 50   }   // daytime only
+});
+
 // Goals enum — these are the keys the API exposes.  The set is fixed;
 // unknown keys in the request are ignored (forward-compatibility for UI).
 const KNOWN_GOALS = Object.freeze([
@@ -143,6 +162,25 @@ export async function runSiteOptimizer(body = {}){
       code: 'DA_MODE_REQUIRED',
       message: `pattern_mode=${pattern_mode}: a directional antenna (§73.150) pattern design and §73.182 nighttime skywave NIF analysis are required at filing.  Screening scores here are daytime/NDA proxies — DA gain pattern optimization is NOT performed.`
     });
+  }
+
+  // ---- 1c. FCC class power limit advisory ----
+  // Flag when the requested TPO is outside the §73.21 limits for the declared
+  // FCC class.  These are advisory warnings, not hard-stop errors, because
+  // special temporary authorisations and license modifications exist.
+  const classLimits = FCC_CLASS_POWER_KW[fcc_class];
+  if (classLimits){
+    if (tpo_kw > classLimits.max){
+      warnings.push({
+        code: 'TPO_EXCEEDS_CLASS_MAX',
+        message: `tpo_kw ${tpo_kw} kW exceeds the §73.21 daytime maximum for Class ${fcc_class} stations (${classLimits.max} kW). A filing at this power level will require FCC justification or a class reclassification.`
+      });
+    } else if (fcc_class === 'A' && tpo_kw < classLimits.min){
+      warnings.push({
+        code: 'TPO_BELOW_CLASS_MIN',
+        message: `tpo_kw ${tpo_kw} kW is below the §73.21 minimum for Class A stations (${classLimits.min} kW). Class A dominant stations must operate at ≥10 kW to maintain their protected status.`
+      });
+    }
   }
 
   // ---- 2. build candidate grid ----
@@ -354,6 +392,7 @@ export async function runSiteOptimizer(body = {}){
     score_histogram,
     optimization_confidence,
     conductivity_mode,
+    frequency_channel_class: frequencyChannelClass(frequency_khz),
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -735,7 +774,8 @@ async function scoreCandidate(pt, ctx, warnings){
     lat: round6(pt.lat),
     lon: round6(pt.lon),
     distance_from_current_km: round2(pt.distance_from_current_km),
-    bearing_deg: pt.bearing_deg ?? null,
+    bearing_deg:         pt.bearing_deg ?? null,
+    cardinal_direction:  cardinalDir(pt.bearing_deg ?? null),
     score,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
     principal_community_5mvm_km,
@@ -748,6 +788,7 @@ async function scoreCandidate(pt, ctx, warnings){
     ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,
     ground_sigma_filing_grade,
+    ground_radial_advisory:  buildGroundRadialAdvisory(sigma_msm),
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),
@@ -833,6 +874,24 @@ function sigmaQuality(sigma_msm){
   if (sigma_msm >= 4)  return 'GOOD';        // typical mid-continental
   if (sigma_msm >= 2)  return 'FAIR';        // hilly, mixed soil
   return 'POOR';                             // desert, rocky terrain, urban fill
+}
+
+// FCC AM channel classification (§73.25 clear, §73.27 local, §73.26 regional).
+function frequencyChannelClass(frequency_khz){
+  if (LOCAL_CHANNEL_KHZ.has(frequency_khz)) return 'local';
+  if (CLEAR_CHANNEL_KHZ.has(frequency_khz)) return 'clear_channel';
+  return 'regional';
+}
+
+// Ground radial advisory based on soil conductivity (§73.190).
+// Returns null when conductivity is adequate (GOOD or EXCELLENT).
+function buildGroundRadialAdvisory(sigma_msm){
+  if (sigma_msm == null || !Number.isFinite(sigma_msm)) return null;
+  if (sigma_msm >= 4) return null;
+  if (sigma_msm >= 2){
+    return `FAIR conductivity (σ=${sigma_msm} mS/m): §73.190 standard 120-radial system at ≥λ/4 length should be adequate; verify soil resistivity before site commitment.`;
+  }
+  return `POOR conductivity (σ=${sigma_msm} mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.`;
 }
 
 function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km }){
@@ -1072,5 +1131,10 @@ export const __test__ = {
   polygonCoverageFraction,
   lookupM3ZoneFallback,
   sigmaQuality,
+  frequencyChannelClass,
+  buildGroundRadialAdvisory,
+  FCC_CLASS_POWER_KW,
+  LOCAL_CHANNEL_KHZ,
+  CLEAR_CHANNEL_KHZ,
   KNOWN_GOALS
 };
