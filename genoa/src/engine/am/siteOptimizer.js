@@ -1281,6 +1281,13 @@ function buildTopSummary(top, baseline, nEvaluated){
     if (deltas.length) parts.push(`vs current site: ${deltas.join(', ')}`);
   }
 
+  // Estimated population at rank 1.
+  if (r1.estimated_daytime_population_served != null && r1.estimated_daytime_population_served > 0){
+    const pop = r1.estimated_daytime_population_served;
+    const popStr = pop >= 1e6 ? `${(pop / 1e6).toFixed(1)}M` : pop >= 1e3 ? `${Math.round(pop / 1e3)}K` : String(Math.round(pop));
+    parts.push(`est. ${popStr} served @0.5 mV/m`);
+  }
+
   // Conductivity summary across top N.
   const qualityCount = {};
   for (const c of top){ qualityCount[c.ground_sigma_quality || 'UNKNOWN'] = (qualityCount[c.ground_sigma_quality || 'UNKNOWN'] || 0) + 1; }
