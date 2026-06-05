@@ -310,6 +310,16 @@ test('M3 zone lookup: conductivity varies across geographically distinct points'
     'σ should vary across geographically distinct zones');
 });
 
+test('every GRID candidate carries a valid status_category enum value', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const valid = new Set(['PROMISING', 'REVIEW_REQUIRED', 'NON_COMPLIANT', 'RECOVERABLE_WITH_DA']);
+  for (const c of out.candidates){
+    assert.ok(valid.has(c.status_category),
+      `status_category must be a valid enum (got ${JSON.stringify(c.status_category)})`);
+  }
+});
+
 test('community-of-license polygon path is exercised when supplied', async () => {
   // Small square polygon around the KAZM site, in [lon, lat] order.
   const poly = {

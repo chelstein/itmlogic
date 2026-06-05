@@ -601,11 +601,18 @@ function finalizeLabels(c, scoreCutoff){
     // Borderline — within 15% of the PROMISING cutoff.
     labels.add(LABEL_REVIEW_REQUIRED);
   }
-  // Update the candidate's nif_status to PROMISING / NON-COMPLIANT
-  // mirror per the API contract.
-  if (labels.has(LABEL_NON_COMPLIANT))      c.nif_status = LABEL_NON_COMPLIANT;
-  else if (labels.has(LABEL_PROMISING))     c.nif_status = LABEL_PROMISING;
-  // else leave at 'SCREENING ONLY'
+  // Update nif_status mirror and status_category enum for the UI table.
+  if (labels.has(LABEL_NON_COMPLIANT)){
+    c.nif_status     = LABEL_NON_COMPLIANT;
+    c.status_category = 'NON_COMPLIANT';
+  } else if (labels.has(LABEL_PROMISING)){
+    c.nif_status     = LABEL_PROMISING;
+    c.status_category = 'PROMISING';
+  } else if (labels.has(LABEL_REVIEW_REQUIRED)){
+    c.status_category = 'REVIEW_REQUIRED';
+  } else {
+    c.status_category = 'REVIEW_REQUIRED';
+  }
 
   c.status_labels = Array.from(labels);
   // Lift the flags to limitations and remove the private field.
