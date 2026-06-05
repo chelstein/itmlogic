@@ -718,6 +718,7 @@ async function scoreCandidate(pt, ctx, warnings){
   // --- ranking_rationale sentence ---
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
+    principal_community_5mvm_km,
     sigma_msm, distance_from_current_km: pt.distance_from_current_km,
     bearing_deg: pt.bearing_deg ?? null,
     treaty_zone, flags, score, score_breakdown
@@ -842,10 +843,20 @@ function cardinalDir(deg){
   return dirs[Math.round(deg / 22.5) % 16];
 }
 
-function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct, sigma_msm,
+function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct,
+                          principal_community_5mvm_km, sigma_msm,
                           distance_from_current_km, bearing_deg, treaty_zone, flags, score, score_breakdown }){
   if (flags.length){
-    return `Non-compliant on screening: ${flags.join('; ')}.  Engineer-grade analysis required before filing.`;
+    // More specific NON_COMPLIANT message: distinguish which hard limit failed.
+    const colFail = flags.some(f => /COL/i.test(f));
+    const blanketFail = flags.some(f => /Blanket/i.test(f));
+    const failDesc = [];
+    if (colFail && principal_community_5mvm_km != null)
+      failDesc.push(`§73.24(j): 5 mV/m radius ${principal_community_5mvm_km.toFixed(1)} km does not cover the COL`);
+    else if (colFail) failDesc.push(`§73.24(j): COL coverage below 80% floor`);
+    if (blanketFail) failDesc.push(`§73.24(g): blanket pop >1%`);
+    if (!failDesc.length) failDesc.push(...flags);
+    return `Non-compliant on screening: ${failDesc.join('; ')}.  Engineer-grade analysis required before filing.`;
   }
   // Find the leading scoring factor from score_breakdown.
   let leadFactor = null;
