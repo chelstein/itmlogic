@@ -942,30 +942,53 @@ function finalizeLabels(c, scoreCutoff){
   labels.add(LABEL_SCREENING);
   labels.add(LABEL_ENGINEER_REVIEW);
 
-  if (c._flags && c._flags.length){
-    labels.add(LABEL_NON_COMPLIANT);
-  } else if (c.score >= scoreCutoff){
-    labels.add(LABEL_PROMISING);
-  } else if (c.score >= scoreCutoff * 0.85){
-    // Borderline — within 15% of the PROMISING cutoff.
-    labels.add(LABEL_REVIEW_REQUIRED);
-  }
-  // Update nif_status mirror and status_category enum for the UI table.
-  if (labels.has(LABEL_NON_COMPLIANT)){
-    c.nif_status     = LABEL_NON_COMPLIANT;
-    c.status_category = 'NON_COMPLIANT';
-  } else if (labels.has(LABEL_PROMISING)){
-    c.nif_status     = LABEL_PROMISING;
-    c.status_category = 'PROMISING';
-  } else if (labels.has(LABEL_REVIEW_REQUIRED)){
-    c.status_category = 'REVIEW_REQUIRED';
+  const hasFlags  = c._flags && c._flags.length > 0;
+  const colFail   = hasFlags && c._flags.some(f => /COL/i.test(f));
+  const blankFail = hasFlags && c._flags.some(f => /Blanket/i.test(f));
+
+  if (!hasFlags){
+    // No hard compliance failures.
+    if (c.score >= scoreCutoff){
+      labels.add(LABEL_PROMISING);
+    } else {
+      labels.add(LABEL_REVIEW_REQUIRED);
+    }
+    // Treaty zone elevates to TREATY_REVIEW but doesn't disqualify.
+    const statusBase = c.score >= scoreCutoff ? 'PROMISING' : 'REVIEW_REQUIRED';
+    c.nif_status     = c.score >= scoreCutoff ? LABEL_PROMISING : LABEL_REVIEW_REQUIRED;
+    c.status_category = c.treaty_zone ? 'TREATY_REVIEW' : statusBase;
   } else {
-    c.status_category = 'REVIEW_REQUIRED';
+    // At least one hard failure — classify recovery pathway.
+    labels.add(LABEL_NON_COMPLIANT);
+    c.nif_status = LABEL_NON_COMPLIANT;
+
+    if (blankFail && !colFail){
+      // Only blanket pop fails: reduce power to fix.
+      c.status_category = 'RECOVERABLE_WITH_REDUCED_POWER';
+    } else if (colFail && !blankFail){
+      // Only COL coverage fails — check recovery pathway.
+      if (c.minimum_tpo_for_col_coverage_kw != null){
+        // Power increase can push 5 mV/m contour to COL — recoverable with TPO change.
+        // DA is typically a better solution than raw power increase, so prefer DA label.
+        c.status_category = 'RECOVERABLE_WITH_DA';
+      } else if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.50){
+        // Coverage close to 80% floor — DA shaping may help.
+        c.status_category = 'RECOVERABLE_WITH_DA';
+      } else if (c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 0.5){
+        // Field so low even at 50 kW the COL can't be served — community change needed.
+        c.status_category = 'RECOVERABLE_WITH_COL_CHANGE';
+      } else {
+        c.status_category = 'NON_COMPLIANT';
+      }
+    } else {
+      // Both fail or unrecognized combination.
+      c.status_category = 'NON_COMPLIANT';
+    }
   }
 
   c.status_labels = Array.from(labels);
   // Lift the flags to limitations and remove the private field.
-  if (c._flags && c._flags.length){
+  if (hasFlags){
     for (const f of c._flags){
       c.limitations.unshift(`HARD CHECK FAIL: ${f}`);
     }
@@ -1308,8 +1331,8 @@ function buildTopSummary(top, baseline, nEvaluated){
     const fStr = r1.field_at_col_centroid_mvm >= 5
       ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(j) 5 mV/m floor)`
       : r1.field_at_col_centroid_mvm >= 0.5
-        ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(j) floor)`
-        : `COL field ${r1.field_at_col_centroid_mvm.toFixed(3)} mV/m (far below secondary service)`;
+        ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(j) floor${r1.minimum_tpo_for_col_coverage_kw != null ? `; increase TPO to ≥${r1.minimum_tpo_for_col_coverage_kw} kW to fix` : ''})`
+        : `COL field ${r1.field_at_col_centroid_mvm.toFixed(3)} mV/m (far below secondary service${r1.minimum_tpo_for_col_coverage_kw != null ? `; ≥${r1.minimum_tpo_for_col_coverage_kw} kW needed` : ''})`;
     parts.push(fStr);
   }
 

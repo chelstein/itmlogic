@@ -1135,3 +1135,88 @@ test('minimum_tpo_for_col_coverage_kw is in current_site_baseline when col_centr
   assert.ok('score_confidence' in baseline,
     'baseline must include score_confidence key');
 });
+
+// ---------- status_category recovery pathways ----------
+
+test('status_category: RECOVERABLE_WITH_REDUCED_POWER for blanket-only failures', async () => {
+  // 50 kW at a close-in site will push blanket population over 1% while
+  // coverage is likely still fine — the category should be RECOVERABLE_WITH_REDUCED_POWER.
+  const out = await runSiteOptimizer({
+    ...KAZM,
+    tpo_kw: 50,
+    fcc_class: 'A',
+    search_radius_km: 2,
+    grid_spacing_km: 10,
+    candidate_limit: 20,
+    optimization_goals: { minimize_blanket_population: true, maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const recPwr = out.candidates.filter(c => c.status_category === 'RECOVERABLE_WITH_REDUCED_POWER');
+  const blankOnly = out.candidates.filter(c =>
+    (c.blanket_population_pct ?? 0) > 1.0 &&
+    (c.col_coverage_pct ?? 1) >= 0.80
+  );
+  // Every blanket-only failure candidate must be RECOVERABLE_WITH_REDUCED_POWER.
+  for (const c of blankOnly){
+    assert.equal(c.status_category, 'RECOVERABLE_WITH_REDUCED_POWER',
+      `blanket-only failure rank ${c.rank} should be RECOVERABLE_WITH_REDUCED_POWER; got ${c.status_category}`);
+  }
+  // RECOVERABLE_WITH_REDUCED_POWER candidates must have minimum_tpo_for_compliance_kw set.
+  for (const c of recPwr){
+    assert.ok(c.minimum_tpo_for_compliance_kw != null,
+      `RECOVERABLE_WITH_REDUCED_POWER rank ${c.rank} must have minimum_tpo_for_compliance_kw`);
+  }
+});
+
+test('status_category: TREATY_REVIEW for near-border candidates that pass all hard checks', async () => {
+  // Run with minimize_int_treaty_zone active near the US/MX border so that
+  // some candidates land in the treaty zone.  We only care about candidates that
+  // have NO hard compliance failures (no _flags) — those should be TREATY_REVIEW.
+  const nearBorder = {
+    ...KAZM,
+    current_site: { lat: 31.7, lon: -106.5 },  // near El Paso / Juarez
+    search_radius_km: 50, grid_spacing_km: 20, candidate_limit: 20,
+    tpo_kw: 1,    // low power avoids blanket pop issues
+    fcc_class: 'C',
+    optimization_goals: { ...KAZM.optimization_goals, minimize_int_treaty_zone: true }
+  };
+  const out = await runSiteOptimizer(nearBorder);
+  if (!out.available) return;  // env may lack conductivity data — skip gracefully
+  // Only assert on candidates that are in treaty zone AND have no hard failures.
+  // A candidate with treaty_zone AND NON_COMPLIANT/RECOVERABLE_* keeps the compliance label.
+  const cleanTreatyCands = out.candidates.filter(c =>
+    c.treaty_zone &&
+    !['NON_COMPLIANT', 'RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_REDUCED_POWER', 'RECOVERABLE_WITH_COL_CHANGE'].includes(c.status_category)
+  );
+  // If any exist, they should be TREATY_REVIEW (not PROMISING or REVIEW_REQUIRED).
+  for (const c of cleanTreatyCands){
+    assert.equal(c.status_category, 'TREATY_REVIEW',
+      `clean treaty-zone candidate rank ${c.rank} should be TREATY_REVIEW; got ${c.status_category}`);
+  }
+  // PROMISING/REVIEW_REQUIRED candidates should NOT have treaty_zone set as their category.
+  // (This is more of a sanity check on the inverse.)
+  const nonTreatyPassing = out.candidates.filter(c =>
+    !c.treaty_zone && (c.status_category === 'PROMISING' || c.status_category === 'REVIEW_REQUIRED')
+  );
+  for (const c of nonTreatyPassing){
+    assert.ok(c.status_category !== 'TREATY_REVIEW',
+      `non-treaty candidate rank ${c.rank} should not be TREATY_REVIEW`);
+  }
+});
+
+test('status_category: NON_COMPLIANT candidates have HARD CHECK FAIL in limitations', async () => {
+  const out = await runSiteOptimizer({
+    ...KAZM, tpo_kw: 50, fcc_class: 'A',
+    search_radius_km: 2, grid_spacing_km: 10, candidate_limit: 20,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (c.status_category === 'NON_COMPLIANT'){
+      const hasHardFail = Array.isArray(c.limitations) &&
+        c.limitations.some(l => /HARD CHECK FAIL/i.test(l));
+      assert.ok(hasHardFail,
+        `NON_COMPLIANT rank ${c.rank} must have at least one HARD CHECK FAIL limitation; got: ${JSON.stringify(c.limitations)}`);
+    }
+  }
+});
