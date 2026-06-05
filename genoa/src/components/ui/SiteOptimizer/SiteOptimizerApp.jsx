@@ -210,7 +210,10 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               returned={result?.n_candidates_returned}
               countByStatus={result?.candidate_count_by_status}
             />
-            <LimitationsGlobalPanel limitations={result?.limitations_global} />
+            <LimitationsGlobalPanel
+              limitations={result?.limitations_global}
+              warnings={result?.warnings}
+            />
           </>
         )}
         right={(
@@ -348,6 +351,12 @@ const DEMO_RESULT = {
       priority: 'INFORMATIONAL',
       action: 'Commission soil resistivity survey at POOR/FAIR conductivity candidate sites.',
       rationale: 'Rank 4 candidate has POOR ground conductivity (σ = 1.5 mS/m). The §73.190 ground radial system requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.'
+    }
+  ],
+  warnings: [
+    {
+      code: 'ADJACENT_TO_CLEAR_CHANNEL',
+      message: '780 kHz is a §73.25 clear channel. Adjacent frequency separation from the dominant Class A station may require stricter NIF protection analysis. All candidate sites on this frequency must demonstrate nighttime interference compliance.'
     }
   ],
   limitations_global: [
