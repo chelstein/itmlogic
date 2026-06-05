@@ -52,7 +52,7 @@ function ScoreHistogram({ histogram }){
   );
 }
 
-export default function OptimizationConfidencePanel({ confidence, scoreStats, scoreHistogram, conductivityMode, nInfrastructureSites, scoringTimeMs }){
+export default function OptimizationConfidencePanel({ confidence, scoreStats, scoreHistogram, topCandidatesSummary, conductivityMode, nInfrastructureSites, scoringTimeMs }){
   if (!confidence && !scoreStats) return null;
 
   const level = confidence?.level;
@@ -111,6 +111,14 @@ export default function OptimizationConfidencePanel({ confidence, scoreStats, sc
 
         {/* Score histogram */}
         {scoreHistogram && <ScoreHistogram histogram={scoreHistogram} />}
+
+        {/* Top-candidates summary */}
+        {topCandidatesSummary && (
+          <div>
+            <div className="rack-eyebrow mb-1">Quick summary</div>
+            <p className="font-mono text-[10px] text-textDim leading-relaxed">{topCandidatesSummary}</p>
+          </div>
+        )}
 
         {/* Timing strip */}
         {scoringTimeMs != null && (

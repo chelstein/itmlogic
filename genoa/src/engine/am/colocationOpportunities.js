@@ -29,7 +29,7 @@
 //   No IO except for the manual JSON inventory load (delegated to
 //   manualInfrastructureClient).  All scoring is deterministic.
 
-import { runSiteOptimizer, __test__ as SO } from './siteOptimizer.js';
+import { runSiteOptimizer, buildTopSummary, __test__ as SO } from './siteOptimizer.js';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
@@ -123,7 +123,8 @@ export async function runColocationOpportunities(body = {}){
       candidate_count_by_status: so.candidate_count_by_status || null,
       n_infrastructure_sites: 0,
       scoring_time_ms: so.scoring_time_ms ?? null,
-      score_histogram: so.score_histogram ?? null
+      score_histogram: so.score_histogram ?? null,
+      top_candidates_summary: so.top_candidates_summary ?? null
     });
   }
 
@@ -272,7 +273,8 @@ export async function runColocationOpportunities(body = {}){
     candidate_count_by_status,
     n_infrastructure_sites: infraSites.length,
     scoring_time_ms,
-    score_histogram
+    score_histogram,
+    top_candidates_summary: buildTopSummary(returned.slice(0, 5), baseline ? baselineSummary(baseline) : null, pool.length)
   });
 }
 
@@ -587,7 +589,8 @@ function collectHardFails(c){
 
 function composeResponse({ method, candidates, n_candidates_evaluated,
                             baseline, inputs_echo, warnings, so_limitations,
-                            score_stats, score_histogram, optimization_confidence,
+                            score_stats, score_histogram, top_candidates_summary,
+                            optimization_confidence,
                             conductivity_mode, n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   return {
@@ -597,6 +600,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     n_candidates_returned: candidates.length,
     n_infrastructure_sites: n_infrastructure_sites ?? 0,
     candidate_count_by_status: candidate_count_by_status || null,
+    top_candidates_summary: top_candidates_summary ?? null,
     current_site_baseline: baseline,
     candidates,
     score_stats,

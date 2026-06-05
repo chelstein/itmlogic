@@ -329,6 +329,10 @@ export async function runSiteOptimizer(body = {}){
     note: `AM vertical antennas typically run λ/4–λ/2. At ${frequency_khz} kHz all heights in the typical range ${quarter_wave_m > ASR_THRESHOLD_M ? 'EXCEED' : 'may be below'} the §17.7 ASR 200-ft threshold.`
   };
 
+  // ---- 9. Top-candidates summary ----
+  const top5 = returned.slice(0, Math.min(5, returned.length));
+  const top_candidates_summary = buildTopSummary(top5, baseline, scored.length);
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -336,6 +340,7 @@ export async function runSiteOptimizer(body = {}){
     n_candidates_returned:  returned.length,
     scoring_time_ms,
     candidate_count_by_status,
+    top_candidates_summary,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,
@@ -883,6 +888,45 @@ function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct
   return bits.join('; ') + '.';
 }
 
+function buildTopSummary(top, baseline, nEvaluated){
+  if (!top || top.length === 0) return null;
+  const r1 = top[0];
+  const parts = [];
+
+  // Lead: top candidate score + distance/bearing.
+  const card1 = cardinalDir(r1.bearing_deg);
+  const distStr = r1.distance_from_current_km < 0.5
+    ? 'at current location'
+    : `${r1.distance_from_current_km.toFixed(0)} km ${card1 ? `${card1} of` : 'from'} current site`;
+  parts.push(`Rank 1 scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}), ${distStr}, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`);
+
+  // Improvement vs baseline.
+  if (baseline){
+    const dScore = r1.score - (baseline.score || 0);
+    const dReach = r1.daytime_reach_km != null && baseline.daytime_reach_km != null
+      ? r1.daytime_reach_km - baseline.daytime_reach_km : null;
+    const sign = s => s >= 0 ? `+${s.toFixed(1)}` : s.toFixed(1);
+    const deltas = [];
+    if (Math.abs(dScore) > 0.1) deltas.push(`score ${sign(dScore)}`);
+    if (dReach != null && Math.abs(dReach) > 0.5) deltas.push(`reach ${sign(dReach)} km`);
+    if (deltas.length) parts.push(`vs current site: ${deltas.join(', ')}`);
+  }
+
+  // Conductivity summary across top N.
+  const qualityCount = {};
+  for (const c of top){ qualityCount[c.ground_sigma_quality || 'UNKNOWN'] = (qualityCount[c.ground_sigma_quality || 'UNKNOWN'] || 0) + 1; }
+  const qSummary = Object.entries(qualityCount).map(([q, n]) => `${n}×${q}`).join(', ');
+  parts.push(`top ${top.length} σ quality: ${qSummary}`);
+
+  // Status breakdown.
+  const statusCount = {};
+  for (const c of top){ statusCount[c.status_category || 'UNKNOWN'] = (statusCount[c.status_category || 'UNKNOWN'] || 0) + 1; }
+  const sBits = Object.entries(statusCount).map(([s, n]) => `${n} ${s}`).join(', ');
+  parts.push(`statuses: ${sBits} (out of ${nEvaluated} evaluated)`);
+
+  return parts.join('. ') + '.';
+}
+
 // ---------- geometric helpers ----------
 
 function greatCircleKm(lat1, lon1, lat2, lon2){
@@ -998,6 +1042,8 @@ function roundBreakdown(b){
 
 // ---------- public test-only export ----------
 // Exposed for unit tests.  Not part of the public API contract.
+export { buildTopSummary };
+
 export const __test__ = {
   buildGridCandidates,
   scoreCandidate,

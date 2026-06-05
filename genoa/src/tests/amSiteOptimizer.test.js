@@ -520,3 +520,14 @@ test('minimum_tpo_for_compliance_kw computed when blanket_population_pct > 1%', 
       `minimum_tpo_for_compliance_kw must be null when blanket pop ≤ 1%; rank ${c.rank}`);
   }
 });
+
+test('top_candidates_summary is a non-empty string in the response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(typeof out.top_candidates_summary === 'string' && out.top_candidates_summary.length > 20,
+    `top_candidates_summary must be a non-empty string; got: ${JSON.stringify(out.top_candidates_summary)}`);
+  // Should mention rank 1 score and status
+  assert.ok(/Rank 1/.test(out.top_candidates_summary), 'summary must mention Rank 1');
+});

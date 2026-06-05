@@ -217,6 +217,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               confidence={result?.optimization_confidence}
               scoreStats={result?.score_stats}
               scoreHistogram={result?.score_histogram}
+              topCandidatesSummary={result?.top_candidates_summary}
               conductivityMode={result?.conductivity_mode}
               nInfrastructureSites={result?.n_infrastructure_sites}
               scoringTimeMs={result?.scoring_time_ms}
@@ -289,6 +290,7 @@ const DEMO_RESULT = {
   candidate_count_by_status: {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
+  top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. statuses: 3 PROMISING, 1 REVIEW_REQUIRED (out of 234 evaluated).',
   score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
   score_histogram: [
     { bucket: '0–9',   min: 0,  max: 9,  count: 0 },
