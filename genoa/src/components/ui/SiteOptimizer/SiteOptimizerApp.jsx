@@ -384,10 +384,13 @@ const DEMO_COLOCATION_RESULT = {
   n_infrastructure_sites: 4,
   n_candidates_evaluated: 312,
   n_candidates_returned:  6,
+  candidate_count_by_status: {
+    PROMISING: 71, REVIEW_REQUIRED: 178, NON_COMPLIANT: 42, RECOVERABLE_WITH_DA: 21
+  },
   candidates: [
     ...DEMO_RESULT.candidates,
     {
-      rank: 5, lat: 34.88, lon: -111.85,
+      rank: 5, rank_percentile: 97.7, lat: 34.88, lon: -111.85,
       distance_from_current_km: 3.4, score: 88.7,
       col_coverage_pct: 0.94, nif_status: 'PROMISING',
       daytime_reach_km: 33.0, blanket_population_pct: 0.5,
@@ -430,7 +433,7 @@ const DEMO_COLOCATION_RESULT = {
       limitations: ['Shared-lease only; site not owned outright.']
     },
     {
-      rank: 6, lat: 34.81, lon: -111.78,
+      rank: 6, rank_percentile: 83.3, lat: 34.81, lon: -111.78,
       distance_from_current_km: 6.0, score: 76.1,
       col_coverage_pct: 0.86, nif_status: 'REVIEW',
       daytime_reach_km: 29.4, blanket_population_pct: 0.9,
