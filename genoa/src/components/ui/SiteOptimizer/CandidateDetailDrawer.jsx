@@ -432,6 +432,20 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 higherIsBetter
                 fmt={v => `${fmtNum(v, 0)} mS/m`}
               />
+              <DeltaRow
+                label="COL field"
+                candidateVal={candidate.field_at_col_centroid_mvm}
+                baselineVal={baseline.field_at_col_centroid_mvm}
+                higherIsBetter
+                fmt={v => `${fmtNum(v, 2)} mV/m`}
+              />
+              <DeltaRow
+                label="Est. served"
+                candidateVal={candidate.estimated_daytime_population_served}
+                baselineVal={baseline.estimated_daytime_population_served}
+                higherIsBetter
+                fmt={v => fmtPopulation(v)}
+              />
             </div>
           </div>
         )}

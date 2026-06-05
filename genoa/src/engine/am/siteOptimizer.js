@@ -1342,9 +1342,10 @@ function discCoverageFraction({ circle_center, circle_radius_km, disc_center, di
 // Monte-Carlo fraction of a GeoJSON Polygon covered by the disc
 // (circle_center, circle_radius_km).  Polygon is assumed to be in
 // [lon, lat] order per the GeoJSON spec.  Uses the polygon's bounding
-// box × 1024 samples — deterministic via a seeded RNG so results are
-// stable across calls.
-function polygonCoverageFraction({ polygon, circle_center, circle_radius_km, n_samples = 1024 }){
+// box × 2048 samples — deterministic via a seeded RNG so results are
+// stable across calls.  2048 gives ≈ ±2% Monte-Carlo error at screening
+// quality, which is acceptable for §73.24(j) pre-screening.
+function polygonCoverageFraction({ polygon, circle_center, circle_radius_km, n_samples = 2048 }){
   try {
     const ring = polygon.coordinates && polygon.coordinates[0];
     if (!Array.isArray(ring) || ring.length < 3) return null;
