@@ -1145,7 +1145,20 @@ function buildRecommendedActions({
     });
   }
 
-  // 6. MEDIUM: treaty zone consultation needed.
+  // 6. MEDIUM: power increase may resolve §73.24(j) COL coverage failure.
+  const colPwrCandidates = returned?.filter(c =>
+    c.minimum_tpo_for_col_coverage_kw != null && c.rank <= 5
+  ) ?? [];
+  if (colPwrCandidates.length > 0){
+    const topCol = colPwrCandidates[0];
+    actions.push({
+      priority: 'MEDIUM',
+      action: `Evaluate TPO increase for §73.24(j) COL coverage on ${colPwrCandidates.length} candidate(s)${topCol ? ` (Rank ${topCol.rank}: increase to ≥${topCol.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
+      rationale: `One or more top-5 candidates fail the §73.24(j) 5 mV/m principal-community floor at the proposed power. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.`
+    });
+  }
+
+  // 7. MEDIUM: treaty zone consultation needed.
   const treatyCandidates = returned?.filter(c => c.treaty_zone && c.rank <= 10) ?? [];
   if (treatyCandidates.length > 0){
     actions.push({
@@ -1155,7 +1168,7 @@ function buildRecommendedActions({
     });
   }
 
-  // 7. MEDIUM: COL polygon not provided — upgrade to polygon for better coverage scoring.
+  // 8. MEDIUM: COL polygon not provided — upgrade to polygon for better coverage scoring.
   if (!community_of_license_polygon){
     actions.push({
       priority: 'MEDIUM',
@@ -1164,7 +1177,7 @@ function buildRecommendedActions({
     });
   }
 
-  // 8. MEDIUM: clear channel — full NIF required regardless.
+  // 9. MEDIUM: clear channel — full NIF required regardless.
   if (chanClass === 'clear_channel' || skywave_risk_level === 'HIGH'){
     actions.push({
       priority: 'MEDIUM',
@@ -1173,7 +1186,7 @@ function buildRecommendedActions({
     });
   }
 
-  // 9. INFORMATIONAL: ASR pre-application.
+  // 10. INFORMATIONAL: ASR pre-application.
   const asrNeeded = scored?.some(c => c.status_category === 'PROMISING');
   if (asrNeeded){
     actions.push({
@@ -1183,7 +1196,7 @@ function buildRecommendedActions({
     });
   }
 
-  // 10. INFORMATIONAL: ground radial system design needed for low-σ candidates.
+  // 11. INFORMATIONAL: ground radial system design needed for low-σ candidates.
   const poorSigma = returned?.some(c => c.ground_sigma_quality === 'POOR' || c.ground_sigma_quality === 'FAIR');
   if (poorSigma){
     actions.push({

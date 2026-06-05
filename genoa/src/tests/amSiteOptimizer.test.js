@@ -1005,6 +1005,56 @@ test('recommended_actions: priority ordering — URGENT before HIGH before MEDIU
   }
 });
 
+test('recommended_actions: MEDIUM COL power action fires when top-5 candidate has minimum_tpo_for_col_coverage_kw', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null,
+    returned: [{
+      status_category: 'PROMISING',
+      rank: 1,
+      score: 72.1,
+      distance_from_current_km: 14.2,
+      cardinal_direction: 'NW',
+      minimum_tpo_for_col_coverage_kw: 9.8,
+      field_at_col_centroid_mvm: 3.1
+    }],
+    scored: [{ status_category: 'PROMISING' }],
+    candidate_count_by_status: { PROMISING: 1 },
+    fcc_class: 'B', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const colPwrAction = actions.find(a => /Evaluate TPO increase/i.test(a.action));
+  assert.ok(colPwrAction, 'should emit a MEDIUM action for COL coverage power increase');
+  assert.equal(colPwrAction.priority, 'MEDIUM',
+    `COL power action should be MEDIUM priority; got: ${colPwrAction.priority}`);
+  assert.ok(/9\.8/i.test(colPwrAction.action),
+    `COL power action should mention the required TPO (9.8 kW); got: ${colPwrAction.action}`);
+  assert.ok(/§73\.24\(j\)/i.test(colPwrAction.rationale),
+    `COL power rationale should cite §73.24(j); got: ${colPwrAction.rationale}`);
+});
+
+test('recommended_actions: COL power action does NOT fire when no candidate has minimum_tpo_for_col_coverage_kw', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null,
+    returned: [{
+      status_category: 'PROMISING', rank: 1, score: 80.0,
+      distance_from_current_km: 8.0, cardinal_direction: 'N',
+      minimum_tpo_for_col_coverage_kw: null,
+      field_at_col_centroid_mvm: 12.4
+    }],
+    scored: [{ status_category: 'PROMISING' }],
+    candidate_count_by_status: { PROMISING: 1 },
+    fcc_class: 'B', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const colPwrAction = actions.find(a => /Evaluate TPO increase/i.test(a.action));
+  assert.equal(colPwrAction, undefined,
+    'should not emit COL power action when all candidates have field >= 5 mV/m');
+});
+
 // ---------- minimum_tpo_for_col_coverage_kw ----------
 
 test('minimum_tpo_for_col_coverage_kw is null for candidates where field_at_col_centroid_mvm >= 5', async () => {
