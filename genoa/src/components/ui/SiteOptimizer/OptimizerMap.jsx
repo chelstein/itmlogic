@@ -243,17 +243,21 @@ export default function OptimizerMap({
         : '#ffb347';
       const blanketPct = c.blanket_population_pct;
       const blanketStr = blanketPct != null ? `${Number(blanketPct).toFixed(2)}%` : '—';
+      const deltaStr = c.score_delta_vs_baseline != null
+        ? ` <span style="color:${c.score_delta_vs_baseline >= 0 ? '#63d471' : '#ff7a7a'}">${c.score_delta_vs_baseline >= 0 ? '+' : ''}${c.score_delta_vs_baseline.toFixed(1)}</span>`
+        : '';
+      const qualStr = c.ground_sigma_quality ? ` <span style="color:#a89c84">(${c.ground_sigma_quality})</span>` : '';
       const popup = `
         <div style="font-family:ui-monospace,monospace;font-size:11px;line-height:1.4">
-          <div style="font-weight:700;color:${color}">Rank #${c.rank} · score ${Number(c.score).toFixed(1)}</div>
+          <div style="font-weight:700;color:${color}">Rank #${c.rank} · score ${Number(c.score).toFixed(1)}${deltaStr}</div>
           <div style="color:#a89c84;margin-bottom:4px">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
           <div style="margin-bottom:4px">
             <span style="color:${catColor};font-weight:600;text-transform:uppercase;letter-spacing:.06em">${escapeHtml(catLabel)}</span>
           </div>
           <div><span style="color:#a89c84">COL:</span> ${(Number(c.col_coverage_pct) * 100).toFixed(0)}% ·
-               <span style="color:#a89c84">Day:</span> ${Number(c.daytime_reach_km).toFixed(1)} km</div>
+               <span style="color:#a89c84">5mV/m:</span> ${c.principal_community_5mvm_km != null ? `${Number(c.principal_community_5mvm_km).toFixed(1)} km` : '—'}</div>
           <div><span style="color:#a89c84">Blkt pop:</span> ${escapeHtml(blanketStr)} ·
-               <span style="color:#a89c84">σ:</span> ${c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m` : '—'}</div>
+               <span style="color:#a89c84">σ:</span> ${c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m${qualStr}` : '—'}</div>
           <div><span style="color:#a89c84">Dist:</span> ${c.distance_from_current_km != null ? `${Number(c.distance_from_current_km).toFixed(1)} km` : '—'} ·
                <span style="color:#a89c84">Brg:</span> ${c.bearing_deg != null ? `${c.bearing_deg}°` : '—'}</div>
           <div style="margin-top:6px"><i style="color:#6fd3ff">Click row in ledger for full detail.</i></div>
