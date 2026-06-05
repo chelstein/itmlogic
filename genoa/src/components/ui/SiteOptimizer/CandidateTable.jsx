@@ -177,6 +177,27 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
               </select>
               <button
                 onClick={() => {
+                  const CSV_COLS = ['rank','score','status_category','source','distance_from_current_km',
+                    'bearing_deg','col_coverage_pct','blanket_population_pct','daytime_reach_km',
+                    'principal_community_5mvm_km','blanket_1000mvm_km','ground_sigma_mS_m',
+                    'ground_sigma_quality','ground_sigma_filing_grade','lat','lon',
+                    'treaty_zone','minimum_tpo_for_compliance_kw'];
+                  const esc = v => v == null ? '' : (String(v).includes(',') ? `"${String(v).replace(/"/g,'""')}"` : String(v));
+                  const lines = [CSV_COLS.join(','),
+                    ...candidates.map(c => CSV_COLS.map(k => esc(c[k])).join(','))];
+                  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'optimizer-candidates.csv'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
+                title="Download candidates as CSV (Excel-compatible)"
+              >
+                ↓ CSV
+              </button>
+              <button
+                onClick={() => {
                   const blob = new Blob(
                     [JSON.stringify(candidates, null, 2)],
                     { type: 'application/json' }
