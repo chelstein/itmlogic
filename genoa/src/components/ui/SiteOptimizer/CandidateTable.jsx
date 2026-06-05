@@ -18,6 +18,7 @@ import { primaryStatus, rankColor } from './statusUtil.js';
 const COLUMNS = [
   { key: 'rank',                       label: '#',         align: 'right' },
   { key: 'score',                      label: 'Score',     align: 'right' },
+  { key: 'score_delta_vs_baseline',    label: 'Δ Base',    align: 'right' },
   { key: '_source',                    label: 'Source',    align: 'left',  unsortable: true },
   { key: '_host',                      label: 'Host',      align: 'left',  unsortable: true },
   { key: 'distance_from_current_km',   label: 'Dist',      align: 'right' },
@@ -39,6 +40,11 @@ function fmt(key, v){
   if (v == null) return '—';
   if (key === 'rank')                 return String(v);
   if (key === 'score')                return Number(v).toFixed(1);
+  if (key === 'score_delta_vs_baseline'){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return (n >= 0 ? `+${n.toFixed(1)}` : n.toFixed(1));
+  }
   if (key === 'distance_from_current_km') return `${Number(v).toFixed(1)} km`;
   if (key === 'bearing_deg')             return `${Math.round(Number(v))}°`;
   if (key === 'col_coverage_pct')     return `${(Number(v) * 100).toFixed(0)}%`;
@@ -273,6 +279,18 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-right text-cream">{fmt('score', c.score)}</td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono text-[10px]"
+                      style={{
+                        color: c.score_delta_vs_baseline == null ? '#6b6b5e'
+                             : c.score_delta_vs_baseline > 0 ? '#63d471'
+                             : c.score_delta_vs_baseline < 0 ? '#ff7a7a'
+                             : '#6b6b5e'
+                      }}
+                      title={c.score_delta_vs_baseline != null ? `Score vs current site baseline` : 'Baseline unknown'}
+                    >
+                      {fmt('score_delta_vs_baseline', c.score_delta_vs_baseline)}
+                    </td>
                     <td className="px-2 py-1.5"><SourceChip source={c.source} /></td>
                     <td className="px-2 py-1.5"><HostCell candidate={c} /></td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('distance_from_current_km', c.distance_from_current_km)}</td>

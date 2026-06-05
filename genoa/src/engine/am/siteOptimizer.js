@@ -286,6 +286,13 @@ export async function runSiteOptimizer(body = {}){
   // Baseline = the score row for the current site (search by coord match).
   const baseline = scored.find((c) => coordsEqual(c, current_site)) || null;
 
+  // Stamp score_delta_vs_baseline on every candidate (null if baseline unknown).
+  if (baseline){
+    for (const c of scored){
+      c.score_delta_vs_baseline = round2(c.score - baseline.score);
+    }
+  }
+
   const returned = scored.slice(0, candidate_limit);
 
   // Status summary across all evaluated candidates (not just returned).
