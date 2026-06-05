@@ -344,6 +344,7 @@ const DEMO_RESULT = {
       ground_sigma_mS_m: 8, ground_sigma_quality: 'EXCELLENT', ground_sigma_filing_grade: 'screening',
       ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
       score_confidence: 'LOW', field_at_col_centroid_mvm: 18.4,
+      estimated_daytime_population_served: 124800,
       treaty_zone: null, fuel_risk: 'NOT-EVALUATED',
       notes: '97% city-coverage, σ=8 mS/m, 0.4% blanket pop, 6 km from current.',
       explanation: {
@@ -367,6 +368,7 @@ const DEMO_RESULT = {
       ground_sigma_mS_m: 6, ground_sigma_quality: 'GOOD', ground_sigma_filing_grade: 'screening',
       ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
       score_confidence: 'LOW', field_at_col_centroid_mvm: 8.7,
+      estimated_daytime_population_served: 103900,
       treaty_zone: null, fuel_risk: 'LOW',
       notes: '91% city-coverage; ground σ slightly lower; daytime reach acceptable.',
       explanation: {
@@ -390,6 +392,7 @@ const DEMO_RESULT = {
       ground_sigma_mS_m: 10, ground_sigma_quality: 'EXCELLENT', ground_sigma_filing_grade: 'screening',
       ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
       score_confidence: 'LOW', field_at_col_centroid_mvm: 3.2,
+      estimated_daytime_population_served: 85600,
       treaty_zone: null, fuel_risk: 'MODERATE',
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {
@@ -414,6 +417,7 @@ const DEMO_RESULT = {
       ground_sigma_source: 'FCC M3 zone table',
       ground_radial_advisory: 'POOR conductivity (σ=1.5 mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.',
       score_confidence: 'LOW', field_at_col_centroid_mvm: 0.31,
+      estimated_daytime_population_served: 54000,
       treaty_zone: 'US-MX advisory',
       fuel_risk: 'LOW',
       notes: 'Coverage gap on east side of COL; treaty advisory zone.',

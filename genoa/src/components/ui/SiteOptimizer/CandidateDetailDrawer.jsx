@@ -23,6 +23,12 @@ function fmtBlanketPct(v, digits = 2){
   if (v == null || !Number.isFinite(Number(v))) return '—';
   return `${Number(v).toFixed(digits)}%`;
 }
+function fmtPopulation(n){
+  if (n == null || !Number.isFinite(n)) return '—';
+  if (n >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
+  if (n >= 1e3) return `${Math.round(n / 1e3)}K`;
+  return String(Math.round(n));
+}
 function fmtCoord(lat, lon){
   const latDir = lat >= 0 ? 'N' : 'S';
   const lonDir = lon >= 0 ? 'E' : 'W';
@@ -297,7 +303,15 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </span>
             </div>
             <div><span className="text-textDim">5 mV/m radius</span>          <span className="text-cream">{fmtNum(candidate.principal_community_5mvm_km)} km</span></div>
-            <div><span className="text-textDim">0.5 mV/m reach</span>         <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
+            <div>
+              <span className="text-textDim">0.5 mV/m reach</span>{' '}
+              <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span>
+              {candidate.estimated_daytime_population_served != null && (
+                <span className="text-textDim text-[9px] ml-1.5">
+                  (~{fmtPopulation(candidate.estimated_daytime_population_served)} served)
+                </span>
+              )}
+            </div>
             <div className="col-span-2">
               <span className="text-textDim">Field at COL centroid</span>{' '}
               {candidate.distance_from_current_km < 0.5 ? (

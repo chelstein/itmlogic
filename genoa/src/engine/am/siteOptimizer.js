@@ -547,6 +547,7 @@ async function scoreCandidate(pt, ctx, warnings){
     ? (_m3.filing_grade || 'filing')   // GeoTIFF result → filing-grade; zone table sets 'screening'
     : 'screening';
   let daytime_reach_km = null;
+  let estimated_daytime_population_served = null;
   try {
     const r = fccAmDistanceKm({
       frequency_khz,
@@ -555,6 +556,19 @@ async function scoreCandidate(pt, ctx, warnings){
       erp_kw: tpo_kw
     });
     daytime_reach_km = r.distance_km;
+    // Rough estimate: people inside the 0.5 mV/m contour.
+    // Uses the same urbanisation factor as the blanket pop proxy but
+    // inverted (rural = further from current city = lower density).
+    // At large distances (≥ 100 km) the contour is regional; use
+    // the national average density.  Only meaningful for the population
+    // sub-score comparison — treat as a screening-grade proxy.
+    if (daytime_reach_km > 0){
+      const reach_area_km2 = Math.PI * daytime_reach_km * daytime_reach_km;
+      // No urbanisation factor here — daytime reach is regional and the
+      // density of the served area is closer to the national average than
+      // to the dense urban core at distance 0.
+      estimated_daytime_population_served = Math.round(reach_area_km2 * US_AVG_POP_DENSITY_PER_KM2);
+    }
   } catch (e){
     // M3 / range errors fall through to NOT-EVALUATED for this candidate.
     warnings.push({ code: 'CURVE_LOOKUP_FAILED', message: `fccAmDistanceKm failed at (${pt.lat.toFixed(3)}, ${pt.lon.toFixed(3)}): ${e.message}` });
@@ -786,7 +800,7 @@ async function scoreCandidate(pt, ctx, warnings){
   // --- ranking_rationale sentence ---
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
-    principal_community_5mvm_km,
+    principal_community_5mvm_km, field_at_col_centroid_mvm,
     sigma_msm, distance_from_current_km: pt.distance_from_current_km,
     bearing_deg: pt.bearing_deg ?? null,
     treaty_zone, flags, score, score_breakdown
@@ -803,6 +817,7 @@ async function scoreCandidate(pt, ctx, warnings){
     principal_community_5mvm_km,
     nif_status,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
+    estimated_daytime_population_served,
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
@@ -940,14 +955,16 @@ function cardinalDir(deg){
 }
 
 function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct,
-                          principal_community_5mvm_km, sigma_msm,
+                          principal_community_5mvm_km, field_at_col_centroid_mvm, sigma_msm,
                           distance_from_current_km, bearing_deg, treaty_zone, flags, score, score_breakdown }){
   if (flags.length){
     // More specific NON_COMPLIANT message: distinguish which hard limit failed.
     const colFail = flags.some(f => /COL/i.test(f));
     const blanketFail = flags.some(f => /Blanket/i.test(f));
     const failDesc = [];
-    if (colFail && principal_community_5mvm_km != null)
+    if (colFail && field_at_col_centroid_mvm != null)
+      failDesc.push(`§73.24(j): field at COL centroid ${field_at_col_centroid_mvm.toFixed(2)} mV/m is below the 5 mV/m floor`);
+    else if (colFail && principal_community_5mvm_km != null)
       failDesc.push(`§73.24(j): 5 mV/m radius ${principal_community_5mvm_km.toFixed(1)} km does not cover the COL`);
     else if (colFail) failDesc.push(`§73.24(j): COL coverage below 80% floor`);
     if (blanketFail) failDesc.push(`§73.24(g): blanket pop >1%`);
@@ -973,6 +990,15 @@ function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct
     bits.push(`strong COL coverage ${(coverage_pct * 100).toFixed(0)}%`);
   } else if (coverage_pct != null){
     bits.push(`COL coverage ${(coverage_pct * 100).toFixed(0)}%`);
+  }
+  if (field_at_col_centroid_mvm != null && distance_from_current_km >= 0.5){
+    if (field_at_col_centroid_mvm >= 5){
+      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(j) floor)`);
+    } else if (field_at_col_centroid_mvm >= 0.5){
+      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(j) — coverage risk)`);
+    } else {
+      bits.push(`COL field ${field_at_col_centroid_mvm.toFixed(3)} mV/m (far below secondary service threshold)`);
+    }
   }
   if (daytime_reach_km != null){
     bits.push(`0.5 mV/m reach ${daytime_reach_km.toFixed(0)} km`);

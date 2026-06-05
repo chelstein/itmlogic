@@ -659,6 +659,34 @@ test('score_confidence is HIGH/MEDIUM/LOW per candidate based on available data 
   }
 });
 
+test('estimated_daytime_population_served is a positive integer on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(Number.isFinite(c.estimated_daytime_population_served) && c.estimated_daytime_population_served > 0,
+      `estimated_daytime_population_served must be a positive integer; rank ${c.rank} got: ${c.estimated_daytime_population_served}`);
+    // Should be < US population (sanity)
+    assert.ok(c.estimated_daytime_population_served < 335e6,
+      `estimated_daytime_population_served must be < US population (rank ${c.rank}): ${c.estimated_daytime_population_served}`);
+  }
+});
+
+test('ranking_rationale mentions field_at_col_centroid_mvm for non-current-site candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const distant = out.candidates.filter(c => c.distance_from_current_km >= 0.5);
+  assert.ok(distant.length > 0, 'should have distant candidates');
+  for (const c of distant){
+    const rationale = c.explanation?.ranking_rationale || '';
+    assert.ok(/COL field|mV\/m|Non-compliant/i.test(rationale),
+      `rationale should mention COL field or mV/m (rank ${c.rank}): "${rationale}"`);
+  }
+});
+
 test('buildGroundRadialAdvisory returns null for GOOD/EXCELLENT σ, advisory for POOR/FAIR', () => {
   const { buildGroundRadialAdvisory } = __test__;
   assert.equal(buildGroundRadialAdvisory(4),    null,  'σ=4 mS/m (GOOD) should return null');
