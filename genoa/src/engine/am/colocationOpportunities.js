@@ -112,9 +112,23 @@ export async function runColocationOpportunities(body = {}){
   }
 
   // INFRASTRUCTURE-only and HYBRID share the same pool builder.
+  // Compute reach_scale_km (max reach at σ=15 mS/m) so population
+  // sub-score normalises correctly via scoreCandidate.
+  let reach_scale_km = 200;
+  try {
+    const { fccAmDistanceKm } = await import('../curves/fcc/index.mjs');
+    const rMax = fccAmDistanceKm({
+      frequency_khz,
+      target_mvm: 0.5,       // matches DAYTIME_REACH_TARGET_MVM in siteOptimizer
+      conductivity_msm: 15,
+      erp_kw: tpo_kw
+    });
+    if (rMax?.distance_km > 0) reach_scale_km = rMax.distance_km;
+  } catch (_) { /* keep fallback */ }
+
   const ctx = {
     callsign, frequency_khz, tpo_kw, pattern_mode, fcc_class,
-    community_of_license_polygon, goals, current_site
+    community_of_license_polygon, goals, current_site, reach_scale_km
   };
 
   // ---- 3a. gather GRID candidates if applicable ----
