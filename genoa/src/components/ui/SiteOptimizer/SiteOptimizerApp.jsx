@@ -12,6 +12,7 @@ import FuturePlaceholders from './FuturePlaceholders.jsx';
 import ColocationDoctrineBlock from './ColocationDoctrineBlock.jsx';
 import OptimizationConfidencePanel from './OptimizationConfidencePanel.jsx';
 import LimitationsGlobalPanel from './LimitationsGlobalPanel.jsx';
+import TowerReferencePanel from './TowerReferencePanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -219,6 +220,12 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               nInfrastructureSites={result?.n_infrastructure_sites}
               scoringTimeMs={result?.scoring_time_ms}
             />
+            {result && (
+              <TowerReferencePanel
+                towerReference={result.tower_reference}
+                frequency_khz={inputs.frequency_khz}
+              />
+            )}
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
             ) : (
@@ -273,6 +280,11 @@ const DEMO_RESULT = {
   conductivity_mode: 'zone-table',
   n_infrastructure_sites: 0,
   scoring_time_ms: 587,
+  tower_reference: {
+    wavelength_m: 384.62, quarter_wave_m: 96.15, half_wave_m: 192.31,
+    asr_threshold_m: 60.96, asr_registration_required_at_quarter_wave: true,
+    note: 'AM vertical antennas typically run λ/4–λ/2. At 780 kHz all heights in the typical range EXCEED the §17.7 ASR 200-ft threshold.'
+  },
   candidate_count_by_status: {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
