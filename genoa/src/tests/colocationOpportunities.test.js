@@ -239,7 +239,24 @@ test('scoring_time_ms is a non-negative number in HYBRID response', async () => 
     `scoring_time_ms must be a non-negative number, got: ${out.scoring_time_ms}`);
 });
 
-// ---------- Test 13 — RECOVERABLE_WITH_COL_CHANGE for distant COL fail ----------
+// ---------- Test 13 — MPE regulatory notes present on INFRASTRUCTURE candidates ----------
+test('INFRASTRUCTURE candidates carry §1.1310 / OET-65 RF safety regulatory note', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    search_mode: 'INFRASTRUCTURE',
+    tpo_kw: 5.0,
+    frequency_khz: 790
+  }));
+  assert.equal(out.available, true);
+  const infra = out.candidates.filter(c => c.source === 'INFRASTRUCTURE');
+  assert.ok(infra.length > 0, 'need at least one INFRASTRUCTURE candidate');
+  for (const c of infra){
+    const notes = c.colocation_analysis?.regulatory_notes ?? [];
+    const nfNote = notes.find(n => /λ.*2π|near.field boundary/i.test(n));
+    assert.ok(nfNote, `INFRASTRUCTURE candidate at (${c.lat},${c.lon}) missing near-field boundary MPE note; got: ${JSON.stringify(notes)}`);
+  }
+});
+
+// ---------- Test 14 — RECOVERABLE_WITH_COL_CHANGE for distant COL fail ----------
 test('Status RECOVERABLE_WITH_COL_CHANGE when COL fails and site is far from current', () => {
   // Site is > NEARBY_COMMUNITY_RADIUS_KM (25 km) away — COL polygon can be changed.
   const c = {

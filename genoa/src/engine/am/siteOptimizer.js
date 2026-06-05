@@ -285,6 +285,24 @@ export async function runSiteOptimizer(body = {}){
 
   const scoring_time_ms = Date.now() - scoringStart;
 
+  // ---- 8. Tower sizing reference ----
+  // Physical antenna height limits both site selection and ASR requirements.
+  // Standard AM vertical antennas run λ/4 to λ/2; the FCC §17.7 ASR
+  // registration threshold is 200 ft (60.96 m) AGL.
+  const lambda_m       = round2(300000 / frequency_khz);
+  const quarter_wave_m = round2(lambda_m / 4);
+  const half_wave_m    = round2(lambda_m / 2);
+  const ASR_THRESHOLD_M = 60.96;
+  const tower_reference = {
+    wavelength_m:            lambda_m,
+    quarter_wave_m,
+    half_wave_m,
+    typical_range_m:         `${quarter_wave_m}–${half_wave_m}`,
+    asr_threshold_m:         ASR_THRESHOLD_M,
+    asr_registration_required_at_quarter_wave: quarter_wave_m > ASR_THRESHOLD_M,
+    note: `AM vertical antennas typically run λ/4–λ/2. At ${frequency_khz} kHz all heights in the typical range ${quarter_wave_m > ASR_THRESHOLD_M ? 'EXCEED' : 'may be below'} the §17.7 ASR 200-ft threshold.`
+  };
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -297,6 +315,7 @@ export async function runSiteOptimizer(body = {}){
     score_stats,
     optimization_confidence,
     conductivity_mode,
+    tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,

@@ -418,3 +418,20 @@ test('every candidate has bearing_deg in [0, 360); current site gets bearing_deg
   const current = out.candidates.find(c => c.distance_from_current_km === 0);
   if (current) assert.equal(current.bearing_deg, 0, 'current site bearing must be 0');
 });
+
+test('tower_reference block has correct physics for operating frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 790, candidate_limit: 1,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const tr = out.tower_reference;
+  assert.ok(tr, 'tower_reference must be present');
+  // λ = c/f; c = 300,000 km/s = 300,000,000 m/s → λ_m = 300,000/f_khz
+  const expectedLambda = Math.round(300000 / 790 * 100) / 100;
+  assert.ok(Math.abs(tr.wavelength_m - expectedLambda) < 1, `wavelength_m off: got ${tr.wavelength_m} expected ~${expectedLambda}`);
+  assert.ok(Math.abs(tr.quarter_wave_m - expectedLambda / 4) < 1, `quarter_wave_m off`);
+  assert.ok(Math.abs(tr.half_wave_m - expectedLambda / 2) < 1, `half_wave_m off`);
+  assert.equal(tr.asr_threshold_m, 60.96);
+  // At 790 kHz, λ/4 ≈ 95 m > 60.96 m → ASR required
+  assert.equal(tr.asr_registration_required_at_quarter_wave, true);
+});
