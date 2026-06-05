@@ -218,7 +218,23 @@ export default function CandidateDetailDrawer({ candidate, onClose }){
             <div><span className="text-textDim">Daytime reach</span>          <span className="text-cream">{fmtNum(candidate.daytime_reach_km)} km</span></div>
             <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
             <div><span className="text-textDim">Blanket pop</span>             <span className="text-cream">{fmtBlanketPct(candidate.blanket_population_pct)}</span></div>
-            <div><span className="text-textDim">Ground σ</span>                <span className="text-cream">{fmtNum(candidate.ground_sigma_mS_m, 0)} mS/m</span></div>
+            <div className="col-span-2">
+              <span className="text-textDim">Ground σ</span>{' '}
+              <span className="text-cream">{fmtNum(candidate.ground_sigma_mS_m, 0)} mS/m</span>
+              {candidate.ground_sigma_filing_grade && (
+                <span
+                  className="inline-flex items-center font-mono tracking-rack uppercase border rounded-sm px-1 py-0 text-[8px] ml-1.5 align-middle"
+                  style={candidate.ground_sigma_filing_grade === 'filing'
+                    ? { color: '#63d471', background: 'rgba(99,212,113,0.10)', borderColor: 'rgba(99,212,113,0.45)' }
+                    : { color: '#ffb347', background: 'rgba(255,179,71,0.10)', borderColor: 'rgba(255,179,71,0.45)' }}
+                >
+                  {candidate.ground_sigma_filing_grade}
+                </span>
+              )}
+              {candidate.ground_sigma_source && (
+                <div className="text-textDim text-[9px] mt-0.5 leading-tight">{candidate.ground_sigma_source}</div>
+              )}
+            </div>
             <div><span className="text-textDim">NIF status</span>              <span className="text-cream">{candidate.nif_status || '—'}</span></div>
             <div><span className="text-textDim">Fuel / wildfire</span>         <span className="text-cream">{candidate.fuel_risk || '—'}</span></div>
             <div><span className="text-textDim">Treaty zone</span>             <span className="text-cream">{candidate.treaty_zone ?? '—'}</span></div>

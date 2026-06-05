@@ -57,7 +57,14 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
         <Stat label="Score"            value={fmtNum(baseline.score)}                tone="amber" />
         <Stat label="COL coverage"     value={fmtPct(baseline.col_coverage_pct)}     tone="cyan"  />
         <Stat label="Blanket pop"      value={fmtPct(baseline.blanket_population_pct)} tone="red" />
-        <Stat label="Ground σ"         value={fmtNum(baseline.ground_sigma_mS_m, 0)} unit="mS/m"  tone="green" />
+        <div className="flex flex-col">
+          <Stat label="Ground σ" value={fmtNum(baseline.ground_sigma_mS_m, 0)} unit="mS/m" tone="green" />
+          {baseline.ground_sigma_source && (
+            <span className="font-mono text-[9px] text-textDim leading-tight mt-0.5">
+              {baseline.ground_sigma_source}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

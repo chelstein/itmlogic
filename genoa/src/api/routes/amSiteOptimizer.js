@@ -21,7 +21,7 @@ r.post('/am/site-optimizer', asyncHandler(async (req, res) => {
   if (!body || typeof body !== 'object'){
     return res.status(400).json({ available: false, error: 'JSON body required' });
   }
-  const out = runSiteOptimizer(body);
+  const out = await runSiteOptimizer(body);
   if (out.available === false){
     return res.status(400).json(out);
   }
