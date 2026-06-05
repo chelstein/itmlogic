@@ -105,7 +105,9 @@ export async function runColocationOpportunities(body = {}){
         goals, candidate_limit, search_mode, infrastructure_source,
         infrastructure_filters, community_of_license_polygon }),
       warnings,
-      so_limitations: so.limitations_global || []
+      so_limitations: so.limitations_global || [],
+      score_stats: so.score_stats || null,
+      optimization_confidence: so.optimization_confidence || null
     });
   }
 
@@ -165,6 +167,38 @@ export async function runColocationOpportunities(body = {}){
 
   const returned = pool.slice(0, candidate_limit);
 
+  // Score distribution stats over the full pool.
+  const scoreValues = pool.map(c => c.score);
+  const scoreMean = scoreValues.reduce((a, b) => a + b, 0) / Math.max(scoreValues.length, 1);
+  const scoreVar  = scoreValues.reduce((a, v) => a + (v - scoreMean) ** 2, 0) / Math.max(scoreValues.length, 1);
+  const score_stats = {
+    mean:    round2(scoreMean),
+    std_dev: round2(Math.sqrt(scoreVar)),
+    min:     round2(Math.min(...scoreValues)),
+    max:     round2(Math.max(...scoreValues))
+  };
+
+  // Confidence level mirrors siteOptimizer logic.
+  const confidenceLayers = [];
+  if (goals.maximize_col_coverage || goals.maximize_population || goals.minimize_blanket_population){
+    confidenceLayers.push('fcc_groundwave_engine');
+  }
+  if (goals.minimize_blanket_population)   confidenceLayers.push('blanket_population_proxy');
+  if (goals.minimize_int_treaty_zone)      confidenceLayers.push('international_border_detection');
+  if (community_of_license_polygon)        confidenceLayers.push('col_polygon_provided');
+  if (infraSites.length > 0)               confidenceLayers.push('infrastructure_inventory');
+  const nLayers = confidenceLayers.length;
+  const optimization_confidence = {
+    level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
+    contributing_layers: confidenceLayers,
+    notes: [
+      ...(goals.prefer_high_conductivity ? ['Ground conductivity uses FCC M3 zone table (15 zones, ±50% vs. raster); deploy AM_m3.tif for filing-grade σ'] : []),
+      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+      ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
+      ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : [])
+    ]
+  };
+
   return composeResponse({
     method: `${search_mode} (infrastructure source: ${infrastructure_source})`,
     candidates: returned,
@@ -175,7 +209,9 @@ export async function runColocationOpportunities(body = {}){
       goals, candidate_limit, search_mode, infrastructure_source,
       infrastructure_filters, community_of_license_polygon }),
     warnings,
-    so_limitations: []
+    so_limitations: [],
+    score_stats,
+    optimization_confidence
   });
 }
 
@@ -467,7 +503,8 @@ function collectHardFails(c){
 // ---------- response composition ----------
 
 function composeResponse({ method, candidates, n_candidates_evaluated,
-                            baseline, inputs_echo, warnings, so_limitations }){
+                            baseline, inputs_echo, warnings, so_limitations,
+                            score_stats, optimization_confidence }){
   return {
     available: true,
     method,
@@ -475,6 +512,8 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     n_candidates_returned: candidates.length,
     current_site_baseline: baseline,
     candidates,
+    score_stats,
+    optimization_confidence,
     inputs_echo,
     warnings,
     limitations_global: [
@@ -542,6 +581,8 @@ function quantile(arr, q){
   const idx = Math.min(sorted.length - 1, Math.floor(q * sorted.length));
   return sorted[idx];
 }
+
+function round2(x){ return Number.isFinite(x) ? Math.round(x * 100) / 100 : x; }
 
 // ---------- test-only export ----------
 

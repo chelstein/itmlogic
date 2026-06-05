@@ -148,6 +148,33 @@ test('Treaty zone triggers TREATY_REVIEW status', () => {
 });
 
 // ---------- Test 9 — RECOVERABLE_WITH_REDUCED_POWER on blanket fail ----------
+test('HYBRID mode returns score_stats and optimization_confidence', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    search_mode: 'HYBRID',
+    grid_spacing_km: 25,
+    search_radius_km: 40,
+    candidate_limit: 30,
+    optimization_goals: {
+      maximize_col_coverage: true, maximize_population: true,
+      minimize_blanket_population: true, minimize_int_treaty_zone: false,
+      prefer_high_conductivity: true, avoid_wildfire_risk: false
+    }
+  }));
+  assert.equal(out.available, true);
+  // score_stats
+  assert.ok(out.score_stats, 'score_stats must be present in HYBRID response');
+  assert.ok(Number.isFinite(out.score_stats.mean),    'score_stats.mean finite');
+  assert.ok(Number.isFinite(out.score_stats.std_dev), 'score_stats.std_dev finite');
+  assert.ok(Number.isFinite(out.score_stats.min),     'score_stats.min finite');
+  assert.ok(Number.isFinite(out.score_stats.max),     'score_stats.max finite');
+  // optimization_confidence
+  assert.ok(out.optimization_confidence, 'optimization_confidence must be present in HYBRID response');
+  assert.ok(['HIGH', 'MEDIUM', 'LOW'].includes(out.optimization_confidence.level),
+    `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
+  assert.ok(Array.isArray(out.optimization_confidence.contributing_layers));
+  assert.ok(Array.isArray(out.optimization_confidence.notes));
+});
+
 test('Status RECOVERABLE_WITH_REDUCED_POWER when blanket pop fails but COL OK', () => {
   const c = {
     lat: 34.87, lon: -111.83,
