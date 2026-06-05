@@ -399,6 +399,14 @@ export async function runSiteOptimizer(body = {}){
     fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
   });
 
+  // ---- 11. Recommended actions ----
+  // Engine-synthesized next-step list based on the overall findings.
+  const recommended_actions = buildRecommendedActions({
+    baseline, returned, scored, candidate_count_by_status,
+    fcc_class, pattern_mode, chanClass, skywave_risk_level, warnings,
+    community_of_license_polygon
+  });
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -416,6 +424,7 @@ export async function runSiteOptimizer(body = {}){
     frequency_channel_class: chanClass,
     skywave_risk_level,
     protection_class_advisory,
+    recommended_actions,
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -1010,6 +1019,124 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
   };
 }
 
+// Engine-synthesized recommended-actions list.
+// Returns an ordered array of { priority, action, rationale } objects.
+// Priority: 'URGENT', 'HIGH', 'MEDIUM', 'INFORMATIONAL'.
+function buildRecommendedActions({
+  baseline, returned, scored, candidate_count_by_status,
+  fcc_class, pattern_mode, chanClass, skywave_risk_level, warnings,
+  community_of_license_polygon
+}){
+  const actions = [];
+
+  // 1. URGENT: current site is already non-compliant.
+  if (baseline && baseline.status_category === 'NON_COMPLIANT'){
+    actions.push({
+      priority: 'URGENT',
+      action: 'File an STA or Minor Modification for the current site immediately.',
+      rationale: `The current site baseline scores ${baseline.score?.toFixed(1) ?? '?'} and is flagged NON_COMPLIANT on the screening rubric (§73.24(j) coverage or §73.24(g) blanket pop). Do not wait for relocation — address the existing non-compliance first.`
+    });
+  }
+
+  // 2. URGENT: no promising sites found in the grid.
+  const nPromising = candidate_count_by_status?.PROMISING ?? 0;
+  const nTotal = scored?.length ?? 0;
+  if (nTotal > 0 && nPromising === 0){
+    actions.push({
+      priority: 'URGENT',
+      action: 'Expand search radius or reduce TPO — no PROMISING sites in current grid.',
+      rationale: `${nTotal} sites evaluated; none reached the PROMISING threshold. Try a larger search radius, lower power, or relax optimization goals to surface more candidate options.`
+    });
+  }
+
+  // 3. HIGH: advance the top PROMISING candidate.
+  const top = returned?.[0];
+  if (top && top.status_category === 'PROMISING'){
+    const topDist = top.distance_from_current_km ?? 0;
+    const distStr = topDist < 0.5
+      ? 'at current location'
+      : `${topDist.toFixed(0)} km ${top.cardinal_direction ? top.cardinal_direction : ''} of current site`;
+    actions.push({
+      priority: 'HIGH',
+      action: `Advance Rank 1 candidate (score ${top.score != null ? top.score.toFixed(1) : '?'}, ${distStr}) to full §73.182 NIF study and parcel investigation.`,
+      rationale: `This is the top-scoring site with no hard rule failures on the screening rubric. A full engineer-grade analysis (§73.182 nighttime NIF, ground radial system design, parcel/zoning check) is the recommended next step.`
+    });
+  }
+
+  // 4. HIGH: DA pattern required on any promising candidate.
+  const daNeeded = returned?.some(c => c.status_category === 'RECOVERABLE_WITH_DA' && c.rank <= 5);
+  if (daNeeded || /DA/i.test(pattern_mode)){
+    actions.push({
+      priority: 'HIGH',
+      action: 'Commission a §73.150 directional antenna pattern study.',
+      rationale: /DA/i.test(pattern_mode)
+        ? `pattern_mode=${pattern_mode} was requested — a §73.150 DA pattern design and §73.182 nighttime NIF study are mandatory before filing.`
+        : `One or more top-5 candidates are classified RECOVERABLE_WITH_DA — a DA pattern pushing the 5 mV/m contour toward the community of license could bring these into compliance.`
+    });
+  }
+
+  // 5. HIGH: power reduction needed on RECOVERABLE_WITH_REDUCED_POWER candidates.
+  const pwrNeeded = returned?.some(c => c.status_category === 'RECOVERABLE_WITH_REDUCED_POWER' && c.rank <= 5);
+  if (pwrNeeded){
+    const topPwr = returned.find(c => c.status_category === 'RECOVERABLE_WITH_REDUCED_POWER');
+    actions.push({
+      priority: 'HIGH',
+      action: `Evaluate TPO reduction for blanket-pop-failing candidates${topPwr?.minimum_tpo_for_compliance_kw ? ` (Rank ${topPwr.rank}: reduce to ≤${topPwr.minimum_tpo_for_compliance_kw} kW)` : ''}.`,
+      rationale: `One or more top-5 candidates exceed the §73.24(g) 1% blanket population limit. Reducing TPO shrinks the 1000 mV/m contour; the engine has pre-computed the maximum compliant power where available.`
+    });
+  }
+
+  // 6. MEDIUM: treaty zone consultation needed.
+  const treatyCandidates = returned?.filter(c => c.treaty_zone && c.rank <= 10) ?? [];
+  if (treatyCandidates.length > 0){
+    actions.push({
+      priority: 'MEDIUM',
+      action: `Initiate treaty consultation for ${treatyCandidates.length} candidate(s) in international border zones.`,
+      rationale: `Candidate(s) rank ${treatyCandidates.map(c => c.rank).join(', ')} are inside treaty zones (US/MX 1986 agreement or US/CA letter of understanding). These require FCC International Bureau coordination before filing.`
+    });
+  }
+
+  // 7. MEDIUM: COL polygon not provided — upgrade to polygon for better coverage scoring.
+  if (!community_of_license_polygon){
+    actions.push({
+      priority: 'MEDIUM',
+      action: 'Supply the community-of-license GeoJSON polygon for filing-grade COL coverage scoring.',
+      rationale: `Current run uses a 10 km disc proxy for §73.24(j) coverage. Providing the actual COL boundary as a GeoJSON Polygon enables Monte-Carlo polygon overlap scoring and significantly increases confidence in the coverage sub-score.`
+    });
+  }
+
+  // 8. MEDIUM: clear channel — full NIF required regardless.
+  if (chanClass === 'clear_channel' || skywave_risk_level === 'HIGH'){
+    actions.push({
+      priority: 'MEDIUM',
+      action: 'Commission §73.182 nighttime skywave NIF study before selecting any candidate site.',
+      rationale: `The operating frequency is a §73.25 clear channel or the station class carries high skywave risk. A complete NIF analysis is mandatory for any change of community or transmitter site; this should precede site acquisition to avoid committing to a site that fails nighttime skywave protection.`
+    });
+  }
+
+  // 9. INFORMATIONAL: ASR pre-application.
+  const asrNeeded = scored?.some(c => c.status_category === 'PROMISING');
+  if (asrNeeded){
+    actions.push({
+      priority: 'INFORMATIONAL',
+      action: 'Begin 47 CFR §17.7 ASR pre-application process for promising candidate sites.',
+      rationale: `AM towers at the typical λ/4 height commonly exceed the 200-ft (60.96 m) §17.7 threshold requiring FAA notification and ASR registration. Starting the FAA/FCC coordination early avoids delays in the tower permit timeline.`
+    });
+  }
+
+  // 10. INFORMATIONAL: ground radial system design needed for low-σ candidates.
+  const poorSigma = returned?.some(c => c.ground_sigma_quality === 'POOR' || c.ground_sigma_quality === 'FAIR');
+  if (poorSigma){
+    actions.push({
+      priority: 'INFORMATIONAL',
+      action: 'Commission soil resistivity survey at POOR/FAIR conductivity candidate sites.',
+      rationale: `One or more top candidates have FAIR or POOR ground conductivity (σ < 4 mS/m). The §73.190 ground radial system requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.`
+    });
+  }
+
+  return actions;
+}
+
 function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km }){
   const parts = [];
   if (coverage_pct != null) parts.push(`${(coverage_pct * 100).toFixed(0)}% city-coverage`);
@@ -1261,6 +1388,7 @@ export const __test__ = {
   frequencyChannelClass,
   buildGroundRadialAdvisory,
   buildProtectionAdvisory,
+  buildRecommendedActions,
   FCC_CLASS_POWER_KW,
   LOCAL_CHANNEL_KHZ,
   CLEAR_CHANNEL_KHZ,

@@ -776,3 +776,184 @@ test('buildGroundRadialAdvisory returns null for GOOD/EXCELLENT σ, advisory for
     'POOR advisory should mention POOR conductivity');
   assert.equal(buildGroundRadialAdvisory(null), null, 'null σ should return null');
 });
+
+// ---- recommended_actions ----
+
+test('recommended_actions is present in the response and is an array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.recommended_actions),
+    `recommended_actions must be an array; got: ${typeof out.recommended_actions}`);
+});
+
+test('recommended_actions entries have required fields: priority, action, rationale', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.ok(out.recommended_actions.length > 0, 'should produce at least one recommended action');
+  for (const item of out.recommended_actions){
+    assert.ok(typeof item.priority === 'string' && item.priority.length > 0,
+      `action entry must have non-empty priority string; got: ${JSON.stringify(item)}`);
+    assert.ok(typeof item.action === 'string' && item.action.length > 10,
+      `action entry must have non-empty action string; got: ${JSON.stringify(item)}`);
+    assert.ok(typeof item.rationale === 'string' && item.rationale.length > 10,
+      `action entry must have non-empty rationale string; got: ${JSON.stringify(item)}`);
+    assert.ok(['URGENT', 'HIGH', 'MEDIUM', 'INFORMATIONAL'].includes(item.priority),
+      `priority must be URGENT/HIGH/MEDIUM/INFORMATIONAL; got: ${item.priority}`);
+  }
+});
+
+test('recommended_actions: URGENT action fires when baseline is NON_COMPLIANT', () => {
+  const { buildRecommendedActions } = __test__;
+  const baseline = { status_category: 'NON_COMPLIANT', score: 23.4 };
+  const actions = buildRecommendedActions({
+    baseline, returned: [], scored: [],
+    candidate_count_by_status: { NON_COMPLIANT: 1 },
+    fcc_class: 'D', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const urgents = actions.filter(a => a.priority === 'URGENT');
+  assert.ok(urgents.length >= 1, 'should emit at least one URGENT when baseline is NON_COMPLIANT');
+  assert.ok(/STA|Minor Modification/i.test(urgents[0].action),
+    `URGENT action should mention STA or Minor Modification; got: ${urgents[0].action}`);
+});
+
+test('recommended_actions: URGENT action fires when no PROMISING sites found', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null,
+    returned: [],
+    scored: [{ status_category: 'NON_COMPLIANT' }, { status_category: 'NEEDS_REVIEW' }],
+    candidate_count_by_status: { NON_COMPLIANT: 2 },
+    fcc_class: 'B', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const urgents = actions.filter(a => a.priority === 'URGENT');
+  assert.ok(urgents.length >= 1, 'should emit URGENT when no PROMISING sites exist');
+  assert.ok(/radius|search|TPO/i.test(urgents[0].action),
+    `URGENT action should suggest expanding search or reducing TPO; got: ${urgents[0].action}`);
+});
+
+test('recommended_actions: HIGH action to advance Rank 1 fires when top candidate is PROMISING', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null,
+    returned: [{
+      status_category: 'PROMISING',
+      rank: 1,
+      score: 78.3,
+      distance_from_current_km: 12.5,
+      cardinal_direction: 'NNE'
+    }],
+    scored: [{ status_category: 'PROMISING' }],
+    candidate_count_by_status: { PROMISING: 1 },
+    fcc_class: 'D', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const highs = actions.filter(a => a.priority === 'HIGH');
+  assert.ok(highs.length >= 1, 'should emit HIGH action to advance top candidate');
+  assert.ok(/Rank 1|§73\.182|NIF/i.test(highs[0].action),
+    `HIGH action should mention Rank 1 and next step; got: ${highs[0].action}`);
+});
+
+test('recommended_actions: MEDIUM clear_channel NIF action fires for clear channel', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null, returned: [], scored: [],
+    candidate_count_by_status: {},
+    fcc_class: 'A', pattern_mode: 'NDA', chanClass: 'clear_channel',
+    skywave_risk_level: 'HIGH', warnings: [],
+    community_of_license_polygon: null
+  });
+  const niffy = actions.find(a => /NIF|§73\.182|nighttime/i.test(a.action));
+  assert.ok(niffy, 'should recommend NIF study for clear channel stations');
+  assert.ok(niffy.priority === 'MEDIUM' || niffy.priority === 'HIGH',
+    `NIF action should be HIGH or MEDIUM priority; got: ${niffy.priority}`);
+});
+
+test('recommended_actions: MEDIUM COL polygon action fires when polygon not provided', () => {
+  const { buildRecommendedActions } = __test__;
+  const actionsNoPoly = buildRecommendedActions({
+    baseline: null, returned: [], scored: [],
+    candidate_count_by_status: {},
+    fcc_class: 'D', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const polyAction = actionsNoPoly.find(a => /COL|community.of.license|polygon/i.test(a.action));
+  assert.ok(polyAction, 'should recommend providing COL polygon when absent');
+  assert.equal(polyAction.priority, 'MEDIUM', 'COL polygon action should be MEDIUM priority');
+
+  // With polygon provided → no such recommendation
+  const actionsWithPoly = buildRecommendedActions({
+    baseline: null, returned: [], scored: [],
+    candidate_count_by_status: {},
+    fcc_class: 'D', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: { type: 'Polygon', coordinates: [[]] }
+  });
+  const polyActionWith = actionsWithPoly.find(a => /COL|community.of.license|polygon/i.test(a.action));
+  assert.equal(polyActionWith, undefined, 'should NOT emit COL polygon action when polygon is provided');
+});
+
+test('recommended_actions: INFORMATIONAL soil survey fires when POOR/FAIR σ candidates present', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null,
+    returned: [{ ground_sigma_quality: 'POOR', rank: 1, status_category: 'PROMISING' }],
+    scored: [{ status_category: 'PROMISING' }],
+    candidate_count_by_status: { PROMISING: 1 },
+    fcc_class: 'D', pattern_mode: 'NDA', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const survey = actions.find(a => /resistivity|soil|radial/i.test(a.action));
+  assert.ok(survey, 'should recommend soil survey when POOR/FAIR σ candidates present');
+  assert.equal(survey.priority, 'INFORMATIONAL', 'soil survey should be INFORMATIONAL priority');
+});
+
+test('recommended_actions: DA HIGH action fires when pattern_mode contains DA', () => {
+  const { buildRecommendedActions } = __test__;
+  const actions = buildRecommendedActions({
+    baseline: null, returned: [], scored: [],
+    candidate_count_by_status: {},
+    fcc_class: 'B', pattern_mode: 'DA-N', chanClass: 'regional',
+    skywave_risk_level: 'MODERATE', warnings: [],
+    community_of_license_polygon: null
+  });
+  const daAction = actions.find(a => /§73\.150|directional antenna|DA/i.test(a.action));
+  assert.ok(daAction, 'should recommend DA pattern study when DA pattern_mode set');
+  assert.equal(daAction.priority, 'HIGH', 'DA action should be HIGH priority');
+});
+
+test('recommended_actions: priority ordering — URGENT before HIGH before MEDIUM before INFORMATIONAL', () => {
+  const { buildRecommendedActions } = __test__;
+  // Trigger as many action types as possible.
+  const actions = buildRecommendedActions({
+    baseline: { status_category: 'NON_COMPLIANT', score: 20 },
+    returned: [{
+      status_category: 'PROMISING',
+      rank: 1, score: 65.0,
+      distance_from_current_km: 5, cardinal_direction: 'N',
+      ground_sigma_quality: 'POOR'
+    }],
+    scored: [{ status_category: 'PROMISING' }],
+    candidate_count_by_status: { PROMISING: 1 },
+    fcc_class: 'A', pattern_mode: 'DA-D', chanClass: 'clear_channel',
+    skywave_risk_level: 'HIGH', warnings: [],
+    community_of_license_polygon: null
+  });
+
+  const priorityOrder = { URGENT: 0, HIGH: 1, MEDIUM: 2, INFORMATIONAL: 3 };
+  for (let i = 1; i < actions.length; i++){
+    const prev = priorityOrder[actions[i - 1].priority];
+    const curr = priorityOrder[actions[i].priority];
+    assert.ok(prev <= curr,
+      `Priority order violated at index ${i}: ${actions[i-1].priority} (${prev}) > ${actions[i].priority} (${curr})`);
+  }
+});

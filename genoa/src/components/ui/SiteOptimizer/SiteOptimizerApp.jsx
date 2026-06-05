@@ -13,6 +13,7 @@ import ColocationDoctrineBlock from './ColocationDoctrineBlock.jsx';
 import OptimizationConfidencePanel from './OptimizationConfidencePanel.jsx';
 import LimitationsGlobalPanel from './LimitationsGlobalPanel.jsx';
 import TowerReferencePanel from './TowerReferencePanel.jsx';
+import RecommendedActionsPanel from './RecommendedActionsPanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -231,6 +232,9 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 protectionClassAdvisory={result.protection_class_advisory}
               />
             )}
+            {result?.recommended_actions?.length > 0 && (
+              <RecommendedActionsPanel recommended_actions={result.recommended_actions} />
+            )}
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
             ) : (
@@ -318,6 +322,33 @@ const DEMO_RESULT = {
   frequency_channel_class: 'clear_channel',
   skywave_risk_level: 'HIGH',
   protection_class_advisory: 'Class D secondary station on clear channel 780 kHz (§73.25). The dominant Class A retains protected skywave status; your new site must NOT increase nighttime interference into the dominant\'s protected 0.5 mV/m or 25 µV/m contours (§73.182). A §73.182 NIF study demonstrating no new interference at the candidate site is required for filing.',
+  recommended_actions: [
+    {
+      priority: 'HIGH',
+      action: 'Advance Rank 1 candidate (score 91.3, 6 km NE of current site) to full §73.182 NIF study and parcel investigation.',
+      rationale: 'This is the top-scoring site with no hard rule failures on the screening rubric. A full engineer-grade analysis (§73.182 nighttime NIF, ground radial system design, parcel/zoning check) is the recommended next step.'
+    },
+    {
+      priority: 'MEDIUM',
+      action: 'Commission §73.182 nighttime skywave NIF study before selecting any candidate site.',
+      rationale: 'The operating frequency (780 kHz) is a §73.25 clear channel with HIGH skywave risk. A complete NIF analysis is mandatory for any change of community or transmitter site; this should precede site acquisition to avoid committing to a site that fails nighttime skywave protection.'
+    },
+    {
+      priority: 'MEDIUM',
+      action: 'Supply the community-of-license GeoJSON polygon for filing-grade COL coverage scoring.',
+      rationale: 'Current run uses a 10 km disc proxy for §73.24(j) coverage. Providing the actual COL boundary as a GeoJSON Polygon enables Monte-Carlo polygon overlap scoring and significantly increases confidence in the coverage sub-score.'
+    },
+    {
+      priority: 'INFORMATIONAL',
+      action: 'Begin 47 CFR §17.7 ASR pre-application process for promising candidate sites.',
+      rationale: 'AM towers at the typical λ/4 height (96.15 m at 780 kHz) exceed the 200-ft (60.96 m) §17.7 threshold requiring FAA notification and ASR registration. Starting the FAA/FCC coordination early avoids delays in the tower permit timeline.'
+    },
+    {
+      priority: 'INFORMATIONAL',
+      action: 'Commission soil resistivity survey at POOR/FAIR conductivity candidate sites.',
+      rationale: 'Rank 4 candidate has POOR ground conductivity (σ = 1.5 mS/m). The §73.190 ground radial system requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.'
+    }
+  ],
   limitations_global: [
     'Screening-grade output only; engineer-grade NIF / §73.182 / DA-N analysis is required for any filing.',
     'Population sub-score uses a population-density proxy (groundwave reach × density model), not a Census-block sum.',
