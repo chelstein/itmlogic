@@ -1259,6 +1259,16 @@ function buildTopSummary(top, baseline, nEvaluated){
     : `${r1.distance_from_current_km.toFixed(0)} km ${card1 ? `${card1} of` : 'from'} current site`;
   parts.push(`Rank 1 scores ${r1.score.toFixed(1)} (${r1.status_category || 'REVIEW_REQUIRED'}), ${distStr}, σ=${r1.ground_sigma_mS_m} mS/m (${r1.ground_sigma_quality || '—'})`);
 
+  // COL field at rank 1 if available.
+  if (r1.field_at_col_centroid_mvm != null){
+    const fStr = r1.field_at_col_centroid_mvm >= 5
+      ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(1)} mV/m (≥§73.24(j) 5 mV/m floor)`
+      : r1.field_at_col_centroid_mvm >= 0.5
+        ? `COL field ${r1.field_at_col_centroid_mvm.toFixed(2)} mV/m (below 5 mV/m §73.24(j) floor)`
+        : `COL field ${r1.field_at_col_centroid_mvm.toFixed(3)} mV/m (far below secondary service)`;
+    parts.push(fStr);
+  }
+
   // Improvement vs baseline.
   if (baseline){
     const dScore = r1.score - (baseline.score || 0);

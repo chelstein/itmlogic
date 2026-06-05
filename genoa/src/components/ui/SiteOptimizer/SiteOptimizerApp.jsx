@@ -178,6 +178,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
             />
             <OptimizerMap
               currentSite={inputs.current_site}
+              colCentroid={inputs.col_centroid ?? null}
               callsign={inputs.callsign}
               candidates={candidates}
               selectedRank={selectedRank}

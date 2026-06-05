@@ -120,6 +120,7 @@ function inferInfraKind(candidate){
 
 export default function OptimizerMap({
   currentSite,
+  colCentroid,
   callsign,
   candidates,
   selectedRank,
@@ -131,13 +132,14 @@ export default function OptimizerMap({
   const [colorMode, setColorMode] = useState('rank');
   const elRef    = useRef(null);
   const ctxRef   = useRef({
-    map:           null,
-    candLayer:     null,
-    heatLayer:     null,
-    infraLayer:    null,
-    currentMarker: null,
-    radiusCircle:  null,
-    popupsByRank:  new Map()
+    map:            null,
+    candLayer:      null,
+    heatLayer:      null,
+    infraLayer:     null,
+    currentMarker:  null,
+    colMarker:      null,
+    radiusCircle:   null,
+    popupsByRank:   new Map()
   });
 
   // mount / unmount
@@ -206,6 +208,24 @@ export default function OptimizerMap({
       }).addTo(ctx.map);
     }
   }, [currentSite?.lat, currentSite?.lon, callsign, searchRadiusKm]);
+
+  // COL centroid marker — cyan circle when col_centroid is provided
+  useEffect(() => {
+    const L = window.L;
+    const ctx = ctxRef.current;
+    if (!L || !ctx.map) return;
+    if (ctx.colMarker){ ctx.map.removeLayer(ctx.colMarker); ctx.colMarker = null; }
+    if (!colCentroid) return;
+    const clat = Number(colCentroid.lat), clon = Number(colCentroid.lon);
+    if (!Number.isFinite(clat) || !Number.isFinite(clon)) return;
+    ctx.colMarker = L.circleMarker([clat, clon], {
+      radius: 9, color: '#6fd3ff', weight: 2,
+      fillColor: '#6fd3ff', fillOpacity: 0.25, interactive: true
+    }).bindPopup(
+      `<b>COL centroid</b><br/>Supplied as field-strength target for §73.24(j).<br/>${clat.toFixed(4)}, ${clon.toFixed(4)}`
+    ).addTo(ctx.map);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colCentroid?.lat, colCentroid?.lon]);
 
   // re-draw candidate markers + heatmap circles
   useEffect(() => {
