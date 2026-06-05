@@ -121,8 +121,10 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
 
   const baseline    = result?.current_site_baseline || null;
   const candidates  = result?.candidates || [];
+  // Show all structured warnings from the engine (object form with .code/.message).
+  // Plain-string warnings (legacy) are also shown.
   const auditWarnings = (result?.warnings || []).filter(w =>
-    ['SCORE_CLUSTERED', 'REACH_PLACEHOLDER'].includes(typeof w === 'object' ? w.code : null)
+    w != null && (typeof w === 'string' ? w.length > 0 : !!w.code)
   );
 
   // Infrastructure-source sites drive the InfrastructureLegend layer
@@ -161,7 +163,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               running={running}
               error={error}
             />
-            <FuturePlaceholders />
+            <FuturePlaceholders conductivityMode={result?.conductivity_mode} />
           </>
         )}
         center={(

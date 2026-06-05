@@ -8,8 +8,7 @@ import RackPanel from '../RackPanel.jsx';
 
 const ENTRIES = [
   { id: 'sdr',          label: 'SDR residual overlays' },
-  { id: 'conductivity', label: 'Conductivity raster overlay',
-    partial: true, partialNote: 'M3 zone-table active (screening-grade). Deploy AM_m3.tif for per-pixel (filing-grade) raster.' },
+  { id: 'conductivity', label: 'Conductivity raster overlay', partial: true },
   { id: 'wildfire',     label: 'Wildfire / fuel heatmaps' },
   { id: 'parcel',       label: 'Parcel / zoning layers' },
   { id: 'psra',         label: 'PSRA / PSSA optimization' },
@@ -17,7 +16,7 @@ const ENTRIES = [
   { id: 'infra',        label: 'Road / power / fiber overlays' }
 ];
 
-export default function FuturePlaceholders(){
+export default function FuturePlaceholders({ conductivityMode }){
   const [open, setOpen] = useState({});
   return (
     <RackPanel
@@ -47,8 +46,10 @@ export default function FuturePlaceholders(){
             </button>
             {open[e.id] && (
               <div className="border-t border-rule px-3 py-2 font-mono text-[10px] text-textDim">
-                {e.partial && e.partialNote
-                  ? <span className="text-cyan/80">{e.partialNote}</span>
+                {e.id === 'conductivity'
+                  ? (conductivityMode === 'raster'
+                      ? <span style={{ color: '#63d471' }}>M3 GeoTIFF raster active (filing-grade σ). Visual overlay coming soon.</span>
+                      : <span style={{ color: '#6fd3ff' }}>M3 zone-table active (screening-grade). Deploy AM_m3.tif for per-pixel filing-grade raster.</span>)
                   : <>Placeholder.  Layer will render here once the back-end pipeline emits a signal payload for <span className="text-cream">{e.label}</span>.</>
                 }
               </div>
