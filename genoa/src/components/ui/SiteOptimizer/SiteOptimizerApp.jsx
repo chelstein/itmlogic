@@ -246,6 +246,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
       />
       <CandidateDetailDrawer
         candidate={selected}
+        baseline={baseline}
         onClose={() => setSelectedRank(null)}
       />
     </>

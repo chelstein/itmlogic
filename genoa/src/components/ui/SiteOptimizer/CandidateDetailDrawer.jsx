@@ -156,7 +156,30 @@ function ColocationAnalysisSection({ analysis, infra }){
   );
 }
 
-export default function CandidateDetailDrawer({ candidate, onClose }){
+// DeltaRow — one metric comparison vs the baseline site.
+// "higher is better" = true for col_coverage, daytime_reach, ground_sigma.
+// "lower is better"  = true for blanket_population.
+function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
+  if (candidateVal == null || baselineVal == null) return null;
+  const delta = Number(candidateVal) - Number(baselineVal);
+  if (!Number.isFinite(delta)) return null;
+  const improved = higherIsBetter ? delta > 0 : delta < 0;
+  const neutral  = Math.abs(delta) < 0.0001;
+  const arrow = neutral ? '—' : (improved ? '▲' : '▼');
+  const color = neutral ? '#a89c84' : (improved ? '#63d471' : '#ff5a5a');
+  const sign  = delta > 0 ? '+' : '';
+  return (
+    <div className="flex items-baseline gap-1.5">
+      <span className="text-textDim w-28 shrink-0">{label}</span>
+      <span className="text-cream">{fmt(candidateVal)}</span>
+      <span className="font-mono text-[10px]" style={{ color }}>
+        {arrow}{!neutral && ` ${sign}${fmt(delta)}`}
+      </span>
+    </div>
+  );
+}
+
+export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
@@ -241,6 +264,50 @@ export default function CandidateDetailDrawer({ candidate, onClose }){
             <div><span className="text-textDim">Parcel / zoning</span>         <span className="text-cream">UNKNOWN — verify before site survey</span></div>
           </div>
         </div>
+
+        {/* vs baseline delta — only when baseline is provided */}
+        {baseline && (
+          <div>
+            <div className="rack-eyebrow mb-1">vs current site</div>
+            <div className="space-y-1 font-mono text-[11px]">
+              <DeltaRow
+                label="Score"
+                candidateVal={candidate.score}
+                baselineVal={baseline.score}
+                higherIsBetter
+                fmt={v => fmtNum(v, 1)}
+              />
+              <DeltaRow
+                label="COL coverage"
+                candidateVal={candidate.col_coverage_pct}
+                baselineVal={baseline.col_coverage_pct}
+                higherIsBetter
+                fmt={v => fmtPct(v)}
+              />
+              <DeltaRow
+                label="Daytime reach"
+                candidateVal={candidate.daytime_reach_km}
+                baselineVal={baseline.daytime_reach_km}
+                higherIsBetter
+                fmt={v => `${fmtNum(v, 1)} km`}
+              />
+              <DeltaRow
+                label="Blanket pop"
+                candidateVal={candidate.blanket_population_pct}
+                baselineVal={baseline.blanket_population_pct}
+                higherIsBetter={false}
+                fmt={v => fmtBlanketPct(v)}
+              />
+              <DeltaRow
+                label="Ground σ"
+                candidateVal={candidate.ground_sigma_mS_m}
+                baselineVal={baseline.ground_sigma_mS_m}
+                higherIsBetter
+                fmt={v => `${fmtNum(v, 0)} mS/m`}
+              />
+            </div>
+          </div>
+        )}
 
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
         {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}

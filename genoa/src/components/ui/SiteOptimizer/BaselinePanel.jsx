@@ -22,8 +22,13 @@ function Stat({ label, value, unit, tone }){
 
 function fmtPct(v){
   if (v == null || !Number.isFinite(Number(v))) return '—';
-  // backend returns 0..1; render as percentage.
+  // col_coverage_pct is 0..1; multiply to get percent.
   return `${(Number(v) * 100).toFixed(1)}%`;
+}
+// blanket_population_pct is already a percent value (e.g. 0.6 = 0.6%).
+function fmtBlanketPct(v){
+  if (v == null || !Number.isFinite(Number(v))) return '—';
+  return `${Number(v).toFixed(2)}%`;
 }
 function fmtNum(v, digits = 1){
   if (v == null || !Number.isFinite(Number(v))) return '—';
@@ -56,7 +61,7 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Stat label="Score"            value={fmtNum(baseline.score)}                tone="amber" />
         <Stat label="COL coverage"     value={fmtPct(baseline.col_coverage_pct)}     tone="cyan"  />
-        <Stat label="Blanket pop"      value={fmtPct(baseline.blanket_population_pct)} tone="red" />
+        <Stat label="Blanket pop"      value={fmtBlanketPct(baseline.blanket_population_pct)} tone="red" />
         <div className="flex flex-col">
           <Stat label="Ground σ" value={fmtNum(baseline.ground_sigma_mS_m, 0)} unit="mS/m" tone="green" />
           {baseline.ground_sigma_source && (
