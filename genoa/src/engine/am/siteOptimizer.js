@@ -344,7 +344,7 @@ function validateInputs(body, warnings){
     return err('grid_spacing_km must be > 0');
   }
   if (grid_spacing_km > search_radius_km){
-    warnings.push(`grid_spacing_km (${grid_spacing_km}) exceeds search_radius_km (${search_radius_km}); only the current-site point will be evaluated.`);
+    warnings.push({ code: 'GRID_SPACING_LARGE', message: `grid_spacing_km (${grid_spacing_km}) exceeds search_radius_km (${search_radius_km}); only the current-site point will be evaluated` });
   }
 
   // Safety cap on grid size — protects the API from a DOS-y request.
@@ -460,7 +460,7 @@ async function scoreCandidate(pt, ctx, warnings){
     daytime_reach_km = r.distance_km;
   } catch (e){
     // M3 / range errors fall through to NOT-EVALUATED for this candidate.
-    warnings.push(`fccAmDistanceKm failed at (${pt.lat.toFixed(3)}, ${pt.lon.toFixed(3)}): ${e.message}`);
+    warnings.push({ code: 'CURVE_LOOKUP_FAILED', message: `fccAmDistanceKm failed at (${pt.lat.toFixed(3)}, ${pt.lon.toFixed(3)}): ${e.message}` });
   }
 
   // 2. Principal-community coverage (§73.24(j)).  When a polygon was
@@ -500,7 +500,7 @@ async function scoreCandidate(pt, ctx, warnings){
       coverage_computed_from = 'disc-disc analytical proxy (10 km COL)';
     }
   } catch (e){
-    warnings.push(`fccAmDistanceKm(5 mV/m) failed: ${e.message}`);
+    warnings.push({ code: 'COL_CURVE_FAILED', message: `fccAmDistanceKm(5 mV/m) failed: ${e.message}` });
   }
 
   // 3. Blanket population — fraction of US population inside the 1000 mV/m

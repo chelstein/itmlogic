@@ -160,7 +160,7 @@ export async function runColocationOpportunities(body = {}){
     try {
       raw = loadManualInfrastructureSites();
     } catch (e) {
-      warnings.push(`manual infrastructure inventory load failed: ${e.message}`);
+      warnings.push({ code: 'INFRA_LOAD_FAILED', message: `Manual infrastructure inventory load failed: ${e.message}` });
       raw = [];
     }
     infraSites = filterInfrastructureSites(raw, {
@@ -169,7 +169,7 @@ export async function runColocationOpportunities(body = {}){
       filters: infrastructure_filters
     });
   } else {
-    warnings.push(`infrastructure_source ${infrastructure_source} not yet wired; returning empty infrastructure pool`);
+    warnings.push({ code: 'INFRA_SOURCE_NOT_WIRED', message: `infrastructure_source '${infrastructure_source}' is not yet wired; returning empty infrastructure pool` });
   }
 
   const infraScored = await Promise.all(infraSites.map((site) => scoreInfrastructureCandidate(site, ctx, warnings)));
@@ -292,7 +292,7 @@ function validateInputs(body, warnings){
 
   if (search_mode !== 'INFRASTRUCTURE'){
     if (grid_spacing_km > search_radius_km){
-      warnings.push(`grid_spacing_km (${grid_spacing_km}) exceeds search_radius_km (${search_radius_km}); only the current-site point will be evaluated.`);
+      warnings.push({ code: 'GRID_SPACING_LARGE', message: `grid_spacing_km (${grid_spacing_km}) exceeds search_radius_km (${search_radius_km}); only the current-site point will be evaluated` });
     }
     const est_n = Math.ceil((2 * search_radius_km / grid_spacing_km) + 1) ** 2;
     if (est_n > 10_000){
