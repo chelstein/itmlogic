@@ -639,6 +639,7 @@ async function scoreCandidate(pt, ctx, warnings){
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
     sigma_msm, distance_from_current_km: pt.distance_from_current_km,
+    bearing_deg: pt.bearing_deg ?? null,
     treaty_zone, flags, score, score_breakdown
   });
 
@@ -738,8 +739,14 @@ function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_
   return parts.join(', ') + '.';
 }
 
+function cardinalDir(deg){
+  if (deg == null || !Number.isFinite(deg)) return null;
+  const dirs = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+  return dirs[Math.round(deg / 22.5) % 16];
+}
+
 function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct, sigma_msm,
-                          distance_from_current_km, treaty_zone, flags, score, score_breakdown }){
+                          distance_from_current_km, bearing_deg, treaty_zone, flags, score, score_breakdown }){
   if (flags.length){
     return `Non-compliant on screening: ${flags.join('; ')}.  Engineer-grade analysis required before filing.`;
   }
@@ -775,7 +782,12 @@ function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct
     bits.push(`blanket pop ${blanket_population_pct.toFixed(1)}% — approaching §73.24(g) limit`);
   }
   if (treaty_zone) bits.push(`in ${treaty_zone} treaty zone — verify §73.187`);
-  bits.push(`${distance_from_current_km.toFixed(0)} km from current site`);
+  if (distance_from_current_km < 0.5){
+    bits.push('current site location');
+  } else {
+    const card = cardinalDir(bearing_deg);
+    bits.push(`${distance_from_current_km.toFixed(0)} km from current site${card ? ` (${card})` : ''}`);
+  }
   return bits.join('; ') + '.';
 }
 
