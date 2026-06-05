@@ -86,6 +86,18 @@ export default function OptimizerInputsPanel({
   const showInfra = mode !== 'GRID';
   const gridSpacingDisabled = mode === 'INFRASTRUCTURE';
   const filters = inputs.infrastructure_filters || {};
+
+  // Grid point estimate — gives the operator feedback before running.
+  const estGridPoints = (() => {
+    if (gridSpacingDisabled) return null;
+    const r = Number(inputs.search_radius_km);
+    const s = Number(inputs.grid_spacing_km);
+    if (!r || !s || s <= 0) return null;
+    const n = Math.ceil((2 * r / s) + 1);
+    const total = n * n;
+    // Approximate points inside the circle (π/4 × square).
+    return Math.round(total * Math.PI / 4);
+  })();
   return (
     <RackPanel
       eyebrow="Mission Inputs"
@@ -167,7 +179,9 @@ export default function OptimizerInputsPanel({
             step="0.5"
             suffix="km"
             disabled={gridSpacingDisabled}
-            hint={gridSpacingDisabled ? 'n/a in infrastructure-only mode' : 'Finer = more candidates.'}
+            hint={gridSpacingDisabled ? 'n/a in infrastructure-only mode'
+              : estGridPoints != null ? `~${estGridPoints.toLocaleString()} grid pts`
+              : 'Finer = more candidates.'}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -274,6 +288,14 @@ export default function OptimizerInputsPanel({
             </div>
           </fieldset>
         )}
+
+        <NumField
+          label="Candidate limit"
+          value={inputs.candidate_limit}
+          onChange={(v) => onChange('candidate_limit', v)}
+          step="5"
+          hint="Max results returned (1–200)."
+        />
 
         {error && (
           <div className="font-mono text-[11px] text-red border border-red/40 bg-red/10 rounded-sm px-3 py-2">
