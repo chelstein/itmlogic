@@ -350,6 +350,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
               )}
             </div>
+            {candidate.minimum_tpo_for_col_coverage_kw != null && (
+              <div className="col-span-2">
+                <div className="font-mono text-[9px] leading-tight mt-0.5" style={{ color: '#ffb347' }}>
+                  §73.24(j) COL coverage: increase TPO to ≥ {candidate.minimum_tpo_for_col_coverage_kw} kW to reach 5 mV/m at COL centroid
+                </div>
+              </div>
+            )}
             <div className="col-span-2">
               <span className="text-textDim">Ground σ</span>{' '}
               <span className="text-cream">{fmtNum(candidate.ground_sigma_mS_m, 0)} mS/m</span>

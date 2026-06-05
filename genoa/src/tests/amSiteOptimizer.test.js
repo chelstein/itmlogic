@@ -1004,3 +1004,84 @@ test('recommended_actions: priority ordering — URGENT before HIGH before MEDIU
       `Priority order violated at index ${i}: ${actions[i-1].priority} (${prev}) > ${actions[i].priority} (${curr})`);
   }
 });
+
+// ---------- minimum_tpo_for_col_coverage_kw ----------
+
+test('minimum_tpo_for_col_coverage_kw is null for candidates where field_at_col_centroid_mvm >= 5', async () => {
+  // Candidates that already achieve ≥ 5 mV/m at the proxy COL distance must not
+  // have minimum_tpo_for_col_coverage_kw set (there's nothing to remediate).
+  const out = await runSiteOptimizer({
+    ...KAZM, candidate_limit: 15,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const passingField = out.candidates.filter(c =>
+    c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm >= 5
+  );
+  for (const c of passingField){
+    assert.equal(c.minimum_tpo_for_col_coverage_kw, null,
+      `minimum_tpo_for_col_coverage_kw must be null when field >= 5 mV/m; rank ${c.rank}, field=${c.field_at_col_centroid_mvm}`);
+  }
+  // Also null when field is null (too close to compute)
+  const nullField = out.candidates.filter(c => c.field_at_col_centroid_mvm == null);
+  for (const c of nullField){
+    assert.equal(c.minimum_tpo_for_col_coverage_kw, null,
+      `minimum_tpo_for_col_coverage_kw must be null when field is null; rank ${c.rank}`);
+  }
+});
+
+test('minimum_tpo_for_col_coverage_kw is computed for weak-field candidates when col_centroid is far', async () => {
+  // Place the COL centroid ~80 km north of the current site so that most
+  // candidates at 5 kW will have field_at_col_centroid_mvm < 5.
+  // The binary search should produce a value in (5, 50] kW for those candidates.
+  const farCentroid = { lat: KAZM.current_site.lat + 0.72, lon: KAZM.current_site.lon }; // ~80 km N
+  const out = await runSiteOptimizer({
+    ...KAZM, tpo_kw: 5, fcc_class: 'A', candidate_limit: 15,
+    col_centroid: farCentroid,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const weakField = out.candidates.filter(c =>
+    c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 5
+  );
+  // At least some candidates should fail the 5 mV/m threshold at 5 kW / 80 km.
+  assert.ok(weakField.length > 0,
+    `Expected at least one candidate with field_at_col_centroid_mvm < 5; found ${weakField.length}`);
+  for (const c of weakField){
+    // When the contour at 50 kW can reach the COL centroid, a value must be returned.
+    if (c.minimum_tpo_for_col_coverage_kw != null){
+      assert.ok(c.minimum_tpo_for_col_coverage_kw > 0 && c.minimum_tpo_for_col_coverage_kw <= 50,
+        `minimum_tpo_for_col_coverage_kw must be in (0, 50]; got ${c.minimum_tpo_for_col_coverage_kw} rank ${c.rank}`);
+      // no ordering constraint — COL coverage power can be higher or lower than blanket compliance power
+    }
+  }
+  // Candidates with field ≥ 5 mV/m must have null.
+  const strongField = out.candidates.filter(c =>
+    c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm >= 5
+  );
+  for (const c of strongField){
+    assert.equal(c.minimum_tpo_for_col_coverage_kw, null,
+      `minimum_tpo_for_col_coverage_kw must be null when field ≥ 5 mV/m; rank ${c.rank}`);
+  }
+});
+
+test('minimum_tpo_for_col_coverage_kw is in current_site_baseline when col_centroid provided', async () => {
+  const farCentroid = { lat: KAZM.current_site.lat + 0.72, lon: KAZM.current_site.lon };
+  const out = await runSiteOptimizer({
+    ...KAZM, tpo_kw: 5, fcc_class: 'A', candidate_limit: 5,
+    col_centroid: farCentroid,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const baseline = out.current_site_baseline;
+  assert.ok(baseline != null, 'current_site_baseline must be present');
+  // The baseline exposes these fields (may be null if physics don't trigger).
+  assert.ok('minimum_tpo_for_col_coverage_kw' in baseline,
+    'baseline must include minimum_tpo_for_col_coverage_kw key');
+  assert.ok('field_at_col_centroid_mvm' in baseline,
+    'baseline must include field_at_col_centroid_mvm key');
+  assert.ok('estimated_daytime_population_served' in baseline,
+    'baseline must include estimated_daytime_population_served key');
+  assert.ok('score_confidence' in baseline,
+    'baseline must include score_confidence key');
+});

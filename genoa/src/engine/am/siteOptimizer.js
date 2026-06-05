@@ -754,6 +754,31 @@ async function scoreCandidate(pt, ctx, warnings){
     } catch (_){ /* leave null */ }
   }
 
+  // 3d. Minimum TPO for §73.24(j) COL coverage compliance.
+  //     Only computed when field_at_col_centroid_mvm < 5 mV/m (coverage fails).
+  //     Binary-searches TPO to find the minimum power where the 5 mV/m contour
+  //     extends to the COL centroid distance.  Limited to [tpo_kw, 50 kW] so
+  //     we don't recommend power beyond the Class A ceiling.
+  let minimum_tpo_for_col_coverage_kw = null;
+  if (field_at_col_centroid_mvm != null && field_at_col_centroid_mvm < 5
+      && colDist != null && colDist >= 0.5 && sigma_msm != null){
+    try {
+      // Binary search on TPO: higher TPO → longer 5 mV/m reach.
+      // Find min TPO where fccAmDistanceKm(target=5).distance_km >= colDist.
+      let lo = tpo_kw, hi = 50;
+      // Check if 50 kW is even sufficient; if not, leave null.
+      const r_hi = fccAmDistanceKm({ frequency_khz, target_mvm: 5, conductivity_msm: sigma_msm, erp_kw: hi }).distance_km;
+      if (r_hi >= colDist){
+        for (let iter = 0; iter < 40; iter++){
+          const mid = (lo + hi) / 2;
+          const r = fccAmDistanceKm({ frequency_khz, target_mvm: 5, conductivity_msm: sigma_msm, erp_kw: mid }).distance_km;
+          if (r >= colDist) hi = mid; else lo = mid;
+        }
+        minimum_tpo_for_col_coverage_kw = round2(hi);
+      }
+    } catch (_){ /* leave null */ }
+  }
+
   // 4. NIF status (screening grade) — pass-through for now; future
   //    versions will run a partial §73.182 NIF screening here.
   const nif_status = 'SCREENING ONLY';
@@ -881,6 +906,7 @@ async function scoreCandidate(pt, ctx, warnings){
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
+    minimum_tpo_for_col_coverage_kw,
     ground_sigma_mS_m:         sigma_msm,
     ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,
@@ -957,7 +983,12 @@ function baselineSummary(b){
     rank_percentile:        b.rank_percentile,
     col_coverage_pct:       b.col_coverage_pct,
     daytime_reach_km:       b.daytime_reach_km,
-    blanket_population_pct: b.blanket_population_pct,
+    blanket_population_pct:          b.blanket_population_pct,
+    minimum_tpo_for_compliance_kw:   b.minimum_tpo_for_compliance_kw ?? null,
+    minimum_tpo_for_col_coverage_kw: b.minimum_tpo_for_col_coverage_kw ?? null,
+    field_at_col_centroid_mvm:       b.field_at_col_centroid_mvm ?? null,
+    estimated_daytime_population_served: b.estimated_daytime_population_served ?? null,
+    score_confidence: b.score_confidence ?? null,
     ground_sigma_mS_m:         b.ground_sigma_mS_m,
     ground_sigma_quality:      b.ground_sigma_quality,
     ground_sigma_source:       b.ground_sigma_source,
