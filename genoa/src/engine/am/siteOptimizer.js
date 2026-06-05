@@ -266,11 +266,19 @@ export async function runSiteOptimizer(body = {}){
 
   const returned = scored.slice(0, candidate_limit);
 
+  // Status summary across all evaluated candidates (not just returned).
+  const candidate_count_by_status = {};
+  for (const c of scored){
+    const s = c.status_category || 'UNKNOWN_DATA';
+    candidate_count_by_status[s] = (candidate_count_by_status[s] || 0) + 1;
+  }
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
     n_candidates_evaluated: scored.length,
     n_candidates_returned:  returned.length,
+    candidate_count_by_status,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,

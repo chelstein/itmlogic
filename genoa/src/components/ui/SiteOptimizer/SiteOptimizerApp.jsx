@@ -203,6 +203,7 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
               onSelect={setSelectedRank}
               evaluated={result?.n_candidates_evaluated}
               returned={result?.n_candidates_returned}
+              countByStatus={result?.candidate_count_by_status}
             />
             <LimitationsGlobalPanel limitations={result?.limitations_global} />
           </>
@@ -264,6 +265,9 @@ const DEMO_RESULT = {
   n_candidates_returned:  4,
   conductivity_mode: 'zone-table',
   n_infrastructure_sites: 0,
+  candidate_count_by_status: {
+    PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
+  },
   score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
   optimization_confidence: {
     level: 'MEDIUM',

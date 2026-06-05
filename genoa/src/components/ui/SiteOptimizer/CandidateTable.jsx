@@ -85,7 +85,7 @@ function HostCell({ candidate }){
   );
 }
 
-export default function CandidateTable({ candidates, selectedRank, onSelect, evaluated, returned }){
+export default function CandidateTable({ candidates, selectedRank, onSelect, evaluated, returned, countByStatus }){
   const [sortKey, setSortKey] = useState('rank');
   const [sortDir, setSortDir] = useState('asc');
 
@@ -120,9 +120,30 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
       tone="amber"
       dense
       right={(
-        <div className="font-mono text-[10px] tracking-rack uppercase text-textDim">
-          {returned != null ? `${returned} shown` : ''}
-          {evaluated != null ? ` · ${evaluated} evaluated` : ''}
+        <div className="flex items-center gap-3">
+          {countByStatus && (
+            <div className="flex items-center gap-1.5 font-mono text-[9px]">
+              {countByStatus.PROMISING > 0 && (
+                <span style={{ color: '#63d471' }} title="PROMISING candidates (all evaluated)">
+                  ● {countByStatus.PROMISING} P
+                </span>
+              )}
+              {countByStatus.REVIEW_REQUIRED > 0 && (
+                <span style={{ color: '#ffb347' }} title="REVIEW REQUIRED candidates">
+                  ! {countByStatus.REVIEW_REQUIRED} R
+                </span>
+              )}
+              {countByStatus.NON_COMPLIANT > 0 && (
+                <span style={{ color: '#ff5a5a' }} title="NON-COMPLIANT candidates">
+                  ✕ {countByStatus.NON_COMPLIANT} NC
+                </span>
+              )}
+            </div>
+          )}
+          <div className="font-mono text-[10px] tracking-rack uppercase text-textDim">
+            {returned != null ? `${returned} shown` : ''}
+            {evaluated != null ? ` · ${evaluated} evaluated` : ''}
+          </div>
         </div>
       )}
     >
