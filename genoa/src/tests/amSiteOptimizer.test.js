@@ -374,6 +374,53 @@ test('community-of-license polygon path is exercised when supplied', async () =>
   assert.equal(out.inputs_echo.community_of_license_polygon_provided, true);
 });
 
+test('col_centroid input changes field_at_col_centroid_mvm for distant candidates', async () => {
+  // Without col_centroid: field is computed using distance from candidate to current_site.
+  // With a col_centroid 40 km away from current_site, the field for a candidate AT the
+  // current_site should reflect that 40 km distance, not ~0 km.
+  const colCenter = { lat: KAZM.current_site.lat + 0.36, lon: KAZM.current_site.lon }; // ~40 km N
+  const outNoCentroid = await runSiteOptimizer({
+    ...KAZM, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  const outWithCentroid = await runSiteOptimizer({
+    ...KAZM, candidate_limit: 5, col_centroid: colCenter,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(outWithCentroid.available, true);
+  assert.equal(outWithCentroid.inputs_echo.col_centroid_provided, true);
+  // For the current-site candidate (distance ~0), no-centroid field is null (distance < 0.5 km).
+  // With centroid 40 km away, field should be computed and likely < 5 mV/m.
+  const currentCandNoCentroid = outNoCentroid.candidates.find(c => c.distance_from_current_km < 0.5);
+  const currentCandWithCentroid = outWithCentroid.candidates.find(c => c.distance_from_current_km < 0.5);
+  if (currentCandNoCentroid) {
+    assert.equal(currentCandNoCentroid.field_at_col_centroid_mvm, null,
+      'current-site candidate should have null field when no col_centroid (distance < 0.5 km)');
+  }
+  if (currentCandWithCentroid) {
+    assert.ok(currentCandWithCentroid.field_at_col_centroid_mvm != null,
+      'current-site candidate should have non-null field when col_centroid supplied ~40 km away');
+    assert.ok(currentCandWithCentroid.field_at_col_centroid_mvm > 0,
+      `field must be > 0 mV/m; got ${currentCandWithCentroid.field_at_col_centroid_mvm}`);
+  }
+  // inputs_echo should record col_centroid
+  assert.deepEqual(outWithCentroid.inputs_echo.col_centroid, colCenter,
+    'inputs_echo.col_centroid should echo the supplied centroid');
+});
+
+test('invalid col_centroid emits COL_CENTROID_INVALID warning and falls back', async () => {
+  const out = await runSiteOptimizer({
+    ...KAZM, candidate_limit: 3,
+    col_centroid: { lat: 999, lon: 0 },   // lat out of range
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const warn = out.warnings.find(w => w?.code === 'COL_CENTROID_INVALID');
+  assert.ok(warn, `COL_CENTROID_INVALID warning must fire for invalid centroid; got: ${JSON.stringify(out.warnings)}`);
+  assert.equal(out.inputs_echo.col_centroid_provided, false,
+    'col_centroid_provided should be false when centroid was invalid');
+});
+
 test('score_breakdown values sum to approximately the candidate score', async () => {
   const out = await runSiteOptimizer({
     ...KAZM,

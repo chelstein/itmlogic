@@ -79,7 +79,7 @@ export async function runColocationOpportunities(body = {}){
   const {
     callsign, frequency_khz, current_site, search_radius_km,
     grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
-    community_of_license_polygon, goals, candidate_limit,
+    community_of_license_polygon, col_centroid, goals, candidate_limit,
     search_mode, infrastructure_source, infrastructure_filters
   } = v.value;
 
@@ -112,7 +112,7 @@ export async function runColocationOpportunities(body = {}){
     const so = await runSiteOptimizer({
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
-      community_of_license_polygon,
+      community_of_license_polygon, col_centroid,
       optimization_goals: rawGoalFlags(goals),
       candidate_limit: Math.min(candidate_limit, 200)
     });
@@ -162,7 +162,7 @@ export async function runColocationOpportunities(body = {}){
 
   const ctx = {
     callsign, frequency_khz, tpo_kw, pattern_mode, fcc_class,
-    community_of_license_polygon, goals, current_site, reach_scale_km
+    community_of_license_polygon, col_centroid, goals, current_site, reach_scale_km
   };
 
   const scoringStart = Date.now();
@@ -382,6 +382,19 @@ function validateInputs(body, warnings){
 
   const infrastructure_filters = sanitizeFilters(body.infrastructure_filters);
 
+  // Optional COL centroid — passed through to scoreCandidate via siteOptimizer ctx.
+  let col_centroid = null;
+  if (body.col_centroid){
+    const clat = Number(body.col_centroid.lat), clon = Number(body.col_centroid.lon);
+    if (Number.isFinite(clat) && clat >= -90 && clat <= 90 &&
+        Number.isFinite(clon) && clon >= -180 && clon <= 180){
+      col_centroid = { lat: clat, lon: clon };
+    } else {
+      warnings.push({ code: 'COL_CENTROID_INVALID',
+        message: 'col_centroid.lat/lon invalid — ignoring; field_at_col_centroid_mvm will use distance to current_site instead.' });
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -390,6 +403,7 @@ function validateInputs(body, warnings){
       search_radius_km, grid_spacing_km, tpo_kw,
       pattern_mode, fcc_class,
       community_of_license_polygon: body.community_of_license_polygon || null,
+      col_centroid,
       goals,
       candidate_limit,
       search_mode,

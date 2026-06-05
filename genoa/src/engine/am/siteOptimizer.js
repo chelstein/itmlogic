@@ -124,6 +124,10 @@ const LABEL_NOT_EVALUATED    = 'NOT-EVALUATED';
  * @param {string} body.pattern_mode 'NDA' | 'DA-D' | 'DA-N' | 'DA-2' | …
  * @param {string} body.fcc_class    'A' | 'B' | 'C' | 'D'
  * @param {object} [body.community_of_license_polygon]  GeoJSON Polygon (optional)
+ * @param {{lat:number,lon:number}} [body.col_centroid]  COL centroid lat/lon (optional).
+ *   When provided, field_at_col_centroid_mvm uses the distance from each candidate to
+ *   the COL centroid rather than to the current transmitter site.  Useful when the
+ *   current transmitter is not co-located with the community of license.
  * @param {object} body.optimization_goals  flags — see KNOWN_GOALS
  * @param {object} [body.candidate_limit]   how many ranked results to return (default 20)
  *
@@ -149,7 +153,7 @@ export async function runSiteOptimizer(body = {}){
   const {
     callsign, frequency_khz, current_site, search_radius_km,
     grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
-    community_of_license_polygon, goals, candidate_limit
+    community_of_license_polygon, col_centroid, goals, candidate_limit
   } = v.value;
 
   // ---- 1b. DA mode notice ----
@@ -235,6 +239,7 @@ export async function runSiteOptimizer(body = {}){
     pattern_mode,
     fcc_class,
     community_of_license_polygon,
+    col_centroid,
     goals,
     current_site,
     reach_scale_km
@@ -431,6 +436,8 @@ export async function runSiteOptimizer(body = {}){
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
       goals_enabled: Object.entries(goals).filter(([_, v]) => v).map(([k]) => k),
       community_of_license_polygon_provided: !!community_of_license_polygon,
+      col_centroid_provided: !!col_centroid,
+      col_centroid: col_centroid || null,
       candidate_limit,
       reach_scale_km: round2(reach_scale_km)
     },
@@ -494,6 +501,21 @@ function validateInputs(body, warnings){
     ? Math.max(1, Math.min(200, Math.floor(Number(body.candidate_limit))))
     : 20;
 
+  // Optional COL centroid — when provided, field_at_col_centroid_mvm is
+  // computed using the distance from each candidate to this point rather
+  // than to the current transmitter site.
+  let col_centroid = null;
+  if (body.col_centroid){
+    const clat = Number(body.col_centroid.lat), clon = Number(body.col_centroid.lon);
+    if (Number.isFinite(clat) && clat >= -90 && clat <= 90 &&
+        Number.isFinite(clon) && clon >= -180 && clon <= 180){
+      col_centroid = { lat: clat, lon: clon };
+    } else {
+      warnings.push({ code: 'COL_CENTROID_INVALID',
+        message: 'col_centroid.lat/lon invalid — ignoring; field_at_col_centroid_mvm will use distance to current_site instead.' });
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -502,6 +524,7 @@ function validateInputs(body, warnings){
       search_radius_km, grid_spacing_km, tpo_kw,
       pattern_mode, fcc_class,
       community_of_license_polygon: body.community_of_license_polygon || null,
+      col_centroid,
       goals,
       candidate_limit
     }
@@ -562,7 +585,7 @@ function ensureCurrentSiteIncluded(points, current){
  */
 async function scoreCandidate(pt, ctx, warnings){
   const { frequency_khz, tpo_kw, current_site, goals,
-          community_of_license_polygon, reach_scale_km = 200 } = ctx;
+          community_of_license_polygon, col_centroid, reach_scale_km = 200 } = ctx;
 
   // --- raw sub-metrics (computed independent of weighting) ---
 
@@ -706,10 +729,15 @@ async function scoreCandidate(pt, ctx, warnings){
 
   // 3c. Field strength at the COL centroid — inverts the FCC groundwave curve
   //     via binary search on target_mvm to find the field at the distance from
-  //     this candidate to the community of license (proxied as the current site).
+  //     this candidate to the community of license.  When a col_centroid is
+  //     supplied we use the great-circle distance from the candidate to that
+  //     point; otherwise we fall back to the candidate's distance from the
+  //     current transmitter site as a proxy.
   //     §73.24(j) requires the community receive ≥ 5 mV/m daytime.
   let field_at_col_centroid_mvm = null;
-  const colDist = pt.distance_from_current_km;
+  const colDist = col_centroid
+    ? greatCircleKm(pt.lat, pt.lon, col_centroid.lat, col_centroid.lon)
+    : pt.distance_from_current_km;
   if (colDist != null && colDist >= 0.5 && sigma_msm != null){
     try {
       // Binary search: find X s.t. fccAmDistanceKm(target_mvm=X).distance_km ≈ colDist.

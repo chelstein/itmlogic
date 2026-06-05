@@ -164,6 +164,30 @@ export default function OptimizerInputsPanel({
             suffix="°E"
           />
         </div>
+        {/* Optional COL centroid — overrides default (current_site as proxy). */}
+        <fieldset className="border border-rule rounded-sm p-3">
+          <legend className="rack-eyebrow px-1">COL centroid (optional)</legend>
+          <p className="font-mono text-[9px] text-textDim leading-tight mb-2">
+            If the community of license is not co-located with the transmitter, supply
+            the COL centre here for a more accurate §73.24(j) field calculation.
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <NumField
+              label="COL lat"
+              value={inputs.col_centroid?.lat ?? ''}
+              onChange={(v) => onChange('col_centroid', { ...(inputs.col_centroid || {}), lat: v === '' ? undefined : v })}
+              step="0.0001"
+              suffix="°N"
+            />
+            <NumField
+              label="COL lon"
+              value={inputs.col_centroid?.lon ?? ''}
+              onChange={(v) => onChange('col_centroid', { ...(inputs.col_centroid || {}), lon: v === '' ? undefined : v })}
+              step="0.0001"
+              suffix="°E"
+            />
+          </div>
+        </fieldset>
         <div className="grid grid-cols-2 gap-3">
           <NumField
             label="Search radius"
