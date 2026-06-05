@@ -31,7 +31,7 @@
 
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
-import { lookupM3Conductivity, lookupM3ZoneFallback } from './m3.js';
+import { lookupM3Conductivity, lookupM3ZoneFallback, m3LoadStatus } from './m3.js';
 
 // ---------- thresholds & weights ----------
 
@@ -201,6 +201,11 @@ export async function runSiteOptimizer(body = {}){
   }
 
   // ---- 6. Daytime-reach clustering audit ----
+  // Zone-table mode naturally produces clusters (all candidates in a zone
+  // share the same σ → same reach).  Only emit a real warning when the
+  // GeoTIFF raster IS loaded — at that point flat clusters would indicate
+  // a broken per-pixel lookup.
+  const rasterLoaded = m3LoadStatus().loaded;
   const reachBuckets = {};
   for (const c of scored){
     if (c.daytime_reach_km != null){
@@ -210,14 +215,22 @@ export async function runSiteOptimizer(body = {}){
   }
   for (const [val, n] of Object.entries(reachBuckets)){
     if (n > 10){
-      warnings.push({ code: 'REACH_PLACEHOLDER', message: `${n} candidates share identical daytime_reach_km=${val} km — propagation result appears flat (same σ and TPO across candidates); per-site conductivity raster not yet wired` });
+      if (rasterLoaded){
+        warnings.push({ code: 'REACH_FLAT_RASTER', message: `${n} candidates share identical daytime_reach_km=${val} km despite GeoTIFF raster being loaded — possible per-pixel lookup fault` });
+      }
+      // Zone-table: flat clusters are expected (per-zone σ); no warning needed.
     }
   }
 
   // ---- 7. Optimization confidence ----
+  const conductivity_mode = rasterLoaded ? 'raster' : 'zone-table';
+
   const confidenceLayers = [];
   if (goals.maximize_col_coverage || goals.maximize_population || goals.minimize_blanket_population){
     confidenceLayers.push('fcc_groundwave_engine');
+  }
+  if (rasterLoaded){
+    confidenceLayers.push('m3_conductivity_raster');
   }
   if (goals.minimize_blanket_population){
     confidenceLayers.push('blanket_population_proxy');
@@ -233,9 +246,9 @@ export async function runSiteOptimizer(body = {}){
     level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
     contributing_layers: confidenceLayers,
     notes: [
-      ...(goals.prefer_high_conductivity ? ['Ground conductivity uses FCC M3 zone table (15 zones, ±50% vs. raster); deploy AM_m3.tif for filing-grade σ'] : []),
-      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
-      ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : [])
+      ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
+      ...(goals.avoid_wildfire_risk ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+      ...(!community_of_license_polygon ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : [])
     ]
   };
 
@@ -253,6 +266,7 @@ export async function runSiteOptimizer(body = {}){
     candidates: returned,
     score_stats,
     optimization_confidence,
+    conductivity_mode,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,

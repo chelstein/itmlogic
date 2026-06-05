@@ -196,8 +196,11 @@ test('SCORE_CLUSTERED warning fires when many candidates share the same score', 
   assert.ok(clustered, 'SCORE_CLUSTERED warning must fire when >10 candidates share the same score');
 });
 
-test('REACH_PLACEHOLDER warning fires when many candidates share identical reach', async () => {
-  // Large grid, same sigma region for all candidates → identical reach.
+test('zone-table mode does NOT emit REACH_PLACEHOLDER for clusters (expected per-zone behaviour)', async () => {
+  // Zone-table mode naturally produces reach clusters within each M3 zone.
+  // The old REACH_PLACEHOLDER code was a false-positive in that case.
+  // Now it is silent in zone-table mode; REACH_FLAT_RASTER only fires
+  // when the GeoTIFF is loaded and results are still flat (unusual).
   const out = await runSiteOptimizer({
     ...KAZM,
     search_radius_km: 30,
@@ -205,10 +208,13 @@ test('REACH_PLACEHOLDER warning fires when many candidates share identical reach
     candidate_limit:  200,
     optimization_goals: { ...KAZM.optimization_goals, maximize_population: true }
   });
-  const reachPlaceholder = out.warnings.some(w =>
+  const legacyCode = out.warnings.some(w =>
     (typeof w === 'object' ? w.code : w) === 'REACH_PLACEHOLDER'
   );
-  assert.ok(reachPlaceholder, 'REACH_PLACEHOLDER warning must fire when >10 candidates share identical daytime_reach_km');
+  assert.ok(!legacyCode, 'REACH_PLACEHOLDER must NOT fire in zone-table mode (clusters are expected per-zone)');
+  // conductivity_mode field must be present
+  assert.ok(out.conductivity_mode === 'raster' || out.conductivity_mode === 'zone-table',
+    `conductivity_mode must be 'raster' or 'zone-table', got: ${out.conductivity_mode}`);
 });
 
 test('placeholder goal (avoid_wildfire_risk) surfaces in candidate limitations', async () => {

@@ -212,6 +212,8 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
             <OptimizationConfidencePanel
               confidence={result?.optimization_confidence}
               scoreStats={result?.score_stats}
+              conductivityMode={result?.conductivity_mode}
+              nInfrastructureSites={result?.n_infrastructure_sites}
             />
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
@@ -260,12 +262,14 @@ const DEMO_RESULT = {
   available: true,
   n_candidates_evaluated: 234,
   n_candidates_returned:  4,
+  conductivity_mode: 'zone-table',
+  n_infrastructure_sites: 0,
   score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
   optimization_confidence: {
     level: 'MEDIUM',
     contributing_layers: ['fcc_groundwave_engine', 'blanket_population_proxy'],
     notes: [
-      'Ground conductivity uses FCC M3 zone table (15 zones, ±50% vs. raster); deploy AM_m3.tif for filing-grade σ',
+      'Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ',
       'COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'
     ]
   },
@@ -368,6 +372,8 @@ const DEMO_RESULT = {
 // `colocation_analysis`, `status_category`).
 const DEMO_COLOCATION_RESULT = {
   ...DEMO_RESULT,
+  conductivity_mode: 'zone-table',
+  n_infrastructure_sites: 4,
   n_candidates_evaluated: 312,
   n_candidates_returned:  6,
   candidates: [

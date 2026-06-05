@@ -31,6 +31,7 @@
 
 import { runSiteOptimizer, __test__ as SO } from './siteOptimizer.js';
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
+import { m3LoadStatus } from './m3.js';
 import {
   loadManualInfrastructureSites,
   filterInfrastructureSites
@@ -108,7 +109,9 @@ export async function runColocationOpportunities(body = {}){
       warnings,
       so_limitations: so.limitations_global || [],
       score_stats: so.score_stats || null,
-      optimization_confidence: so.optimization_confidence || null
+      optimization_confidence: so.optimization_confidence || null,
+      conductivity_mode: so.conductivity_mode || null,
+      n_infrastructure_sites: 0
     });
   }
 
@@ -225,7 +228,9 @@ export async function runColocationOpportunities(body = {}){
     warnings,
     so_limitations: [],
     score_stats,
-    optimization_confidence
+    optimization_confidence,
+    conductivity_mode: m3LoadStatus().loaded ? 'raster' : 'zone-table',
+    n_infrastructure_sites: infraSites.length
   });
 }
 
@@ -518,16 +523,19 @@ function collectHardFails(c){
 
 function composeResponse({ method, candidates, n_candidates_evaluated,
                             baseline, inputs_echo, warnings, so_limitations,
-                            score_stats, optimization_confidence }){
+                            score_stats, optimization_confidence,
+                            conductivity_mode, n_infrastructure_sites }){
   return {
     available: true,
     method,
     n_candidates_evaluated,
     n_candidates_returned: candidates.length,
+    n_infrastructure_sites: n_infrastructure_sites ?? 0,
     current_site_baseline: baseline,
     candidates,
     score_stats,
     optimization_confidence,
+    conductivity_mode: conductivity_mode || null,
     inputs_echo,
     warnings,
     limitations_global: [

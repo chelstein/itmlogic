@@ -13,6 +13,7 @@ const LEVEL_PALETTE = {
 
 const LAYER_LABELS = {
   fcc_groundwave_engine:          'FCC groundwave engine',
+  m3_conductivity_raster:         'M3 conductivity raster (filing-grade σ)',
   blanket_population_proxy:       'Blanket population proxy',
   international_border_detection: 'International border detection',
   col_polygon_provided:           'COL polygon (user-supplied)',
@@ -24,7 +25,7 @@ function fmtNum(v, d = 1){
   return Number(v).toFixed(d);
 }
 
-export default function OptimizationConfidencePanel({ confidence, scoreStats }){
+export default function OptimizationConfidencePanel({ confidence, scoreStats, conductivityMode, nInfrastructureSites }){
   if (!confidence && !scoreStats) return null;
 
   const level = confidence?.level;
@@ -77,6 +78,35 @@ export default function OptimizationConfidencePanel({ confidence, scoreStats }){
               <div><span className="text-textDim">σ</span>     <span className="text-cream ml-1">{fmtNum(scoreStats.std_dev)}</span></div>
               <div><span className="text-textDim">Min</span>   <span className="text-cream ml-1">{fmtNum(scoreStats.min)}</span></div>
               <div><span className="text-textDim">Max</span>   <span className="text-cream ml-1">{fmtNum(scoreStats.max)}</span></div>
+            </div>
+          </div>
+        )}
+
+        {/* Data source strip */}
+        {(conductivityMode || nInfrastructureSites != null) && (
+          <div>
+            <div className="rack-eyebrow mb-1">Data sources</div>
+            <div className="space-y-0.5 font-mono text-[10px]">
+              {conductivityMode && (
+                <div className="flex items-center gap-1.5">
+                  <span className={conductivityMode === 'raster' ? 'text-green' : 'text-amberDim'}>
+                    {conductivityMode === 'raster' ? '●' : '○'}
+                  </span>
+                  <span className="text-textDim">Ground σ:</span>
+                  <span className={conductivityMode === 'raster' ? 'text-green' : 'text-amber'}>
+                    {conductivityMode === 'raster' ? 'M3 GeoTIFF (filing-grade)' : 'M3 zone table (screening-grade)'}
+                  </span>
+                </div>
+              )}
+              {nInfrastructureSites != null && (
+                <div className="flex items-center gap-1.5">
+                  <span className={nInfrastructureSites > 0 ? 'text-cyan' : 'text-textDim'}>●</span>
+                  <span className="text-textDim">Infrastructure inventory:</span>
+                  <span className={nInfrastructureSites > 0 ? 'text-cyan' : 'text-textDim'}>
+                    {nInfrastructureSites > 0 ? `${nInfrastructureSites} site${nInfrastructureSites === 1 ? '' : 's'}` : 'none in radius'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}

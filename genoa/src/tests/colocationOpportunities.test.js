@@ -173,6 +173,12 @@ test('HYBRID mode returns score_stats and optimization_confidence', async () => 
     `level must be HIGH/MEDIUM/LOW, got ${out.optimization_confidence.level}`);
   assert.ok(Array.isArray(out.optimization_confidence.contributing_layers));
   assert.ok(Array.isArray(out.optimization_confidence.notes));
+  // conductivity_mode
+  assert.ok(out.conductivity_mode === 'raster' || out.conductivity_mode === 'zone-table',
+    `conductivity_mode must be 'raster' or 'zone-table', got: ${out.conductivity_mode}`);
+  // n_infrastructure_sites
+  assert.ok(typeof out.n_infrastructure_sites === 'number' && out.n_infrastructure_sites >= 0,
+    `n_infrastructure_sites must be a non-negative number, got: ${out.n_infrastructure_sites}`);
 });
 
 test('Status RECOVERABLE_WITH_REDUCED_POWER when blanket pop fails but COL OK', () => {
