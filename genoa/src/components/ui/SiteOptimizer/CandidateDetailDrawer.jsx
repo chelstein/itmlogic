@@ -183,7 +183,7 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
 // from the chip row when status_category already carries the key signal.
 const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
 
-export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
+export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
@@ -220,13 +220,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose }){
             ))}
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="font-mono text-[11px] uppercase tracking-rack text-textDim hover:text-cream border border-rule rounded-sm px-2 py-1"
-          aria-label="Close detail"
-        >
-          Close
-        </button>
+        <div className="flex flex-col gap-1.5 shrink-0">
+          {onPromoteToStudio && candidate.status_category !== 'NON_COMPLIANT' && (
+            <button
+              onClick={() => onPromoteToStudio({
+                lat: candidate.lat, lon: candidate.lon,
+                callsign, frequency_khz, tpo_kw,
+                rank: candidate.rank,
+                status_category: candidate.status_category
+              })}
+              className="font-mono text-[11px] uppercase tracking-rack border rounded-sm px-2 py-1 transition-colors"
+              style={{ color: '#63d471', borderColor: 'rgba(99,212,113,0.45)', background: 'rgba(99,212,113,0.08)' }}
+              title="Load this candidate into the Contour Studio for full-physics analysis"
+            >
+              Promote →
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="font-mono text-[11px] uppercase tracking-rack text-textDim hover:text-cream border border-rule rounded-sm px-2 py-1"
+            aria-label="Close detail"
+          >
+            Close
+          </button>
+        </div>
       </header>
 
       <section className="px-4 py-4 space-y-5">

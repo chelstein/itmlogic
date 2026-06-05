@@ -251,6 +251,10 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
         candidate={selected}
         baseline={baseline}
         onClose={() => setSelectedRank(null)}
+        onPromoteToStudio={onNavigate ? (params) => onNavigate('contour-studio', params) : null}
+        callsign={inputs.callsign}
+        frequency_khz={inputs.frequency_khz}
+        tpo_kw={inputs.tpo_kw}
       />
     </>
   );
