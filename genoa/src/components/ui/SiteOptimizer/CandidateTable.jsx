@@ -99,7 +99,8 @@ const STATUS_FILTERS = [
   { value: 'PROMISING', label: 'Promising' },
   { value: 'REVIEW_REQUIRED', label: 'Review req.' },
   { value: 'RECOVERABLE_WITH_DA', label: 'Rec. DA' },
-  { value: 'RECOVERABLE_WITH_REDUCED_POWER', label: 'Rec. power' },
+  { value: 'RECOVERABLE_WITH_POWER_INCREASE', label: 'Rec. power↑' },
+  { value: 'RECOVERABLE_WITH_REDUCED_POWER', label: 'Rec. power↓' },
   { value: 'RECOVERABLE_WITH_COL_CHANGE', label: 'Rec. COL' },
   { value: 'TREATY_REVIEW', label: 'Treaty' },
   { value: 'NON_COMPLIANT', label: 'Non-compliant' }
@@ -158,6 +159,7 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
               )}
               {(() => {
                 const recCount = (countByStatus.RECOVERABLE_WITH_DA || 0)
+                  + (countByStatus.RECOVERABLE_WITH_POWER_INCREASE || 0)
                   + (countByStatus.RECOVERABLE_WITH_REDUCED_POWER || 0)
                   + (countByStatus.RECOVERABLE_WITH_COL_CHANGE || 0);
                 return recCount > 0 ? (

@@ -404,6 +404,24 @@ export async function runSiteOptimizer(body = {}){
     fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
   });
 
+  // ---- 10b. Enrich nif_status with station-level skywave risk ----
+  // After finalizeLabels() sets the status category, suffix the nif_status
+  // with the skywave risk tier so it doubles as a meaningful NIF advisory
+  // rather than just mirroring the compliance label.
+  // skywave_risk_level is the same for all candidates (determined by station
+  // class + channel, not by candidate location within a regional search area).
+  for (const c of scored){
+    if (!c.nif_status || c.nif_status === LABEL_SCREENING) continue;
+    if (c.treaty_zone){
+      c.nif_status += ' — TREATY COORDINATION REQUIRED';
+    } else if (skywave_risk_level === 'HIGH'){
+      c.nif_status += ' — HIGH skywave risk (§73.182 NIF study required)';
+    } else if (skywave_risk_level === 'MODERATE'){
+      c.nif_status += ' — MODERATE skywave risk';
+    }
+    // LOW risk (local channel ≤250 W): no suffix — the label is already clear.
+  }
+
   // ---- 11. Recommended actions ----
   // Engine-synthesized next-step list based on the overall findings.
   const recommended_actions = buildRecommendedActions({
@@ -867,6 +885,22 @@ async function scoreCandidate(pt, ctx, warnings){
     score_breakdown[k] = round2(score_breakdown[k] * normFactor);
   }
 
+  // Confidence dampening — candidates scored without filing-grade conductivity
+  // data or a real COL polygon carry more physical uncertainty.  Apply a small
+  // haircut so well-constrained candidates rank ahead of estimates derived from
+  // zone-table σ and a 10-km disc proxy when scores are close.
+  // HIGH (filing σ AND polygon): no adjustment.
+  // MEDIUM (one of the two): −3%.
+  // LOW (neither — zone σ + disc proxy): −7%.
+  const _confTier = (ground_sigma_filing_grade === 'filing' && community_of_license_polygon) ? 'HIGH'
+    : (ground_sigma_filing_grade === 'filing' || community_of_license_polygon) ? 'MEDIUM'
+    : 'LOW';
+  const _confFactor = { HIGH: 1.00, MEDIUM: 0.97, LOW: 0.93 }[_confTier];
+  const score_final = round2(score * _confFactor);
+  // Record the penalty in the breakdown for transparency; omit when zero.
+  const _confPenalty = round2(score_final - score);
+  if (_confPenalty !== 0) score_breakdown.confidence_penalty = _confPenalty;
+
   // --- compliance & label flags ---
   const flags = [];
   if (coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR){
@@ -892,7 +926,7 @@ async function scoreCandidate(pt, ctx, warnings){
     minimum_tpo_for_col_coverage_kw, minimum_tpo_for_compliance_kw,
     sigma_msm, distance_from_current_km: pt.distance_from_current_km,
     bearing_deg: pt.bearing_deg ?? null,
-    treaty_zone, flags, score, score_breakdown
+    treaty_zone, flags, score: score_final, score_breakdown
   });
 
   return {
@@ -901,7 +935,7 @@ async function scoreCandidate(pt, ctx, warnings){
     distance_from_current_km: round2(pt.distance_from_current_km),
     bearing_deg:         pt.bearing_deg ?? null,
     cardinal_direction:  cardinalDir(pt.bearing_deg ?? null),
-    score,
+    score: score_final,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
     principal_community_5mvm_km,
     nif_status,
@@ -976,15 +1010,20 @@ function finalizeLabels(c, scoreCutoff){
       // Only blanket pop fails: reduce power to fix.
       c.status_category = 'RECOVERABLE_WITH_REDUCED_POWER';
     } else if (colFail && !blankFail){
-      // Only COL coverage fails — check recovery pathway.
-      if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.50){
-        // Coverage close to 80% floor — DA shaping may recover it.
-        c.status_category = 'RECOVERABLE_WITH_DA';
-      } else if (c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 0.5 && c.minimum_tpo_for_col_coverage_kw == null){
-        // Field so low even at 50 kW can't reach COL — community change needed.
+      // Only COL coverage fails — classify by most specific recovery path.
+      if (c.minimum_tpo_for_col_coverage_kw != null){
+        // Engine found a feasible TPO (≤50 kW) that reaches the §73.24(j) 5 mV/m floor —
+        // direct power increase is the most actionable fix.
+        c.status_category = 'RECOVERABLE_WITH_POWER_INCREASE';
+      } else if (c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 0.5){
+        // Field so weak that even 50 kW cannot reach the COL — a community boundary
+        // amendment is the only viable path.
         c.status_category = 'RECOVERABLE_WITH_COL_CHANGE';
+      } else if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.50){
+        // Coverage close to the 80% floor — DA shaping may push the contour over.
+        c.status_category = 'RECOVERABLE_WITH_DA';
       } else {
-        // Power increase might help, but DA is the primary path.
+        // Default: DA pattern design is the primary engineering tool.
         c.status_category = 'RECOVERABLE_WITH_DA';
       }
     } else {
@@ -1175,17 +1214,31 @@ function buildRecommendedActions({
     });
   }
 
-  // 6. MEDIUM: power increase may resolve §73.24(j) COL coverage failure.
-  const colPwrCandidates = returned?.filter(c =>
-    c.minimum_tpo_for_col_coverage_kw != null && c.rank <= 5
+  // 6. HIGH: direct TPO increase available for RECOVERABLE_WITH_POWER_INCREASE candidates.
+  const pwrIncrCandidates = returned?.filter(c =>
+    c.status_category === 'RECOVERABLE_WITH_POWER_INCREASE' && c.rank <= 5
   ) ?? [];
-  if (colPwrCandidates.length > 0){
-    const topCol = colPwrCandidates[0];
+  if (pwrIncrCandidates.length > 0){
+    const topPwrIncr = pwrIncrCandidates[0];
     actions.push({
-      priority: 'MEDIUM',
-      action: `Evaluate TPO increase for §73.24(j) COL coverage on ${colPwrCandidates.length} candidate(s)${topCol ? ` (Rank ${topCol.rank}: increase to ≥${topCol.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
-      rationale: `One or more top-5 candidates fail the §73.24(j) 5 mV/m principal-community floor at the proposed power. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.`
+      priority: 'HIGH',
+      action: `Increase TPO to resolve §73.24(j) COL coverage on ${pwrIncrCandidates.length} candidate(s)${topPwrIncr ? ` (Rank ${topPwrIncr.rank}: increase to ≥${topPwrIncr.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
+      rationale: `The engine found a feasible power level (≤50 kW) at which the §73.24(j) 5 mV/m groundwave contour reaches the community-of-license centroid. This is the most direct fix — no DA pattern study required. Verify the increased TPO is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket-population problems before filing.`
     });
+  } else {
+    // Fallback: any candidate with a computed COL power fix not already in RECOVERABLE_WITH_POWER_INCREASE.
+    const colPwrCandidates = returned?.filter(c =>
+      c.minimum_tpo_for_col_coverage_kw != null &&
+      c.status_category !== 'RECOVERABLE_WITH_POWER_INCREASE' && c.rank <= 5
+    ) ?? [];
+    if (colPwrCandidates.length > 0){
+      const topCol = colPwrCandidates[0];
+      actions.push({
+        priority: 'MEDIUM',
+        action: `Evaluate TPO increase for §73.24(j) COL coverage on ${colPwrCandidates.length} candidate(s)${topCol ? ` (Rank ${topCol.rank}: increase to ≥${topCol.minimum_tpo_for_col_coverage_kw} kW)` : ''}.`,
+        rationale: `One or more top-5 candidates fail the §73.24(j) 5 mV/m principal-community floor at the proposed power. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.`
+      });
+    }
   }
 
   // 7. MEDIUM: treaty zone consultation needed.

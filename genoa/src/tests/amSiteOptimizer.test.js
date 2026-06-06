@@ -325,7 +325,8 @@ test('every GRID candidate carries a valid status_category enum value', async ()
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
   assert.equal(out.available, true);
   const valid = new Set(['PROMISING', 'REVIEW_REQUIRED', 'NON_COMPLIANT',
-    'RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_REDUCED_POWER', 'RECOVERABLE_WITH_COL_CHANGE', 'TREATY_REVIEW']);
+    'RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_POWER_INCREASE',
+    'RECOVERABLE_WITH_REDUCED_POWER', 'RECOVERABLE_WITH_COL_CHANGE', 'TREATY_REVIEW']);
   for (const c of out.candidates){
     assert.ok(valid.has(c.status_category),
       `status_category must be a valid enum (got ${JSON.stringify(c.status_category)})`);
@@ -1187,7 +1188,8 @@ test('status_category: TREATY_REVIEW for near-border candidates that pass all ha
   // A candidate with treaty_zone AND NON_COMPLIANT/RECOVERABLE_* keeps the compliance label.
   const cleanTreatyCands = out.candidates.filter(c =>
     c.treaty_zone &&
-    !['NON_COMPLIANT', 'RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_REDUCED_POWER', 'RECOVERABLE_WITH_COL_CHANGE'].includes(c.status_category)
+    !['NON_COMPLIANT', 'RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_POWER_INCREASE',
+      'RECOVERABLE_WITH_REDUCED_POWER', 'RECOVERABLE_WITH_COL_CHANGE'].includes(c.status_category)
   );
   // If any exist, they should be TREATY_REVIEW (not PROMISING or REVIEW_REQUIRED).
   for (const c of cleanTreatyCands){
@@ -1202,6 +1204,30 @@ test('status_category: TREATY_REVIEW for near-border candidates that pass all ha
   for (const c of nonTreatyPassing){
     assert.ok(c.status_category !== 'TREATY_REVIEW',
       `non-treaty candidate rank ${c.rank} should not be TREATY_REVIEW`);
+  }
+});
+
+test('status_category: RECOVERABLE_WITH_POWER_INCREASE when engine computed a COL-coverage TPO fix', async () => {
+  // Run with a low power at a distance from the current site.
+  // Low TPO → small 5 mV/m radius → COL coverage fail, but power can be increased to fix it.
+  // Use col_centroid far away to force field_at_col_centroid_mvm to be low and trigger binary search.
+  const farColCentroid = { lat: 34.86 + 0.5, lon: -111.82 };  // ~55 km north
+  const out = await runSiteOptimizer({
+    ...KAZM, tpo_kw: 1, fcc_class: 'D',
+    col_centroid: farColCentroid,
+    search_radius_km: 10, grid_spacing_km: 5, candidate_limit: 20,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  // Any candidate where minimum_tpo_for_col_coverage_kw is set AND colFail should be
+  // RECOVERABLE_WITH_POWER_INCREASE.
+  const pwrIncrCands = out.candidates.filter(c =>
+    c.minimum_tpo_for_col_coverage_kw != null &&
+    Array.isArray(c.limitations) && c.limitations.some(l => /COL/i.test(l))
+  );
+  for (const c of pwrIncrCands){
+    assert.equal(c.status_category, 'RECOVERABLE_WITH_POWER_INCREASE',
+      `candidate with minimum_tpo_for_col_coverage_kw and COL failure should be RECOVERABLE_WITH_POWER_INCREASE; rank ${c.rank} got ${c.status_category}`);
   }
 });
 
@@ -1269,5 +1295,73 @@ test('ranking_rationale for non-compliant candidates includes fix hint when mini
     const kw = c.minimum_tpo_for_compliance_kw;
     assert.ok(rationale.includes(String(kw)),
       `rationale should include the blanket fix TPO (${kw} kW) for rank ${c.rank}: "${rationale}"`);
+  }
+});
+
+test('score_breakdown includes confidence_penalty for LOW-confidence candidates', async () => {
+  // No polygon, no raster → all candidates are LOW confidence → each should
+  // carry a negative confidence_penalty in score_breakdown.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true,
+                          prefer_high_conductivity: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.equal(c.score_confidence, 'LOW', `expected LOW confidence; rank ${c.rank}`);
+    const bd = c.explanation?.score_breakdown;
+    assert.ok(bd != null, `score_breakdown must exist; rank ${c.rank}`);
+    if (c.score > 0){
+      // LOW confidence → 7% haircut → penalty must be negative and present.
+      assert.ok('confidence_penalty' in bd,
+        `confidence_penalty must be in score_breakdown for LOW-confidence non-zero score (rank ${c.rank})`);
+      assert.ok(bd.confidence_penalty < 0,
+        `confidence_penalty must be negative for LOW confidence; rank ${c.rank} got ${bd.confidence_penalty}`);
+      // Verify it restores: breakdown sum ≈ score (within 0.5 rounding tolerance).
+      const sumPts = Object.values(bd).reduce((a, v) => a + (Number(v) || 0), 0);
+      assert.ok(Math.abs(sumPts - c.score) <= 0.5,
+        `breakdown sum ${sumPts.toFixed(2)} should ≈ score ${c.score} including confidence_penalty (rank ${c.rank})`);
+    }
+  }
+});
+
+test('score_confidence dampening: confidence_penalty absent when score is 0', async () => {
+  // Zero-weight run → score=0 for all → penalty=0 → not added to breakdown.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5,
+    optimization_goals: {}
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.equal(c.score, 0, `score must be 0 with empty goals (rank ${c.rank})`);
+    const bd = c.explanation?.score_breakdown;
+    if (bd){
+      assert.ok(!('confidence_penalty' in bd),
+        `confidence_penalty should not be in breakdown when score=0 (rank ${c.rank})`);
+    }
+  }
+});
+
+test('nif_status includes skywave risk suffix for HIGH-risk station (clear channel)', async () => {
+  // KAZM is on 780 kHz (clear channel) Class D → HIGH skywave risk.
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  // Every candidate should have the HIGH skywave risk suffix in nif_status.
+  for (const c of out.candidates){
+    assert.ok(c.nif_status && /HIGH skywave risk/i.test(c.nif_status),
+      `nif_status for clear-channel Class A should mention HIGH skywave risk; rank ${c.rank} got: "${c.nif_status}"`);
+  }
+});
+
+test('nif_status does NOT include skywave suffix for LOW-risk station (local channel)', async () => {
+  // Local channel (1230 kHz) Class C → LOW skywave risk.
+  const localKazm = { ...KAZM, frequency_khz: 1230, fcc_class: 'C', tpo_kw: 0.1 };
+  const out = await runSiteOptimizer({ ...localKazm, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(!c.nif_status || !/HIGH skywave risk|MODERATE skywave risk/i.test(c.nif_status),
+      `nif_status for local channel should NOT mention HIGH/MODERATE skywave risk; rank ${c.rank} got: "${c.nif_status}"`);
   }
 });
