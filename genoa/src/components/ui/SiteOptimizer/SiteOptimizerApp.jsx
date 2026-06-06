@@ -714,7 +714,66 @@ const DEMO_RESULT = {
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
       },
-      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' }
+      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' },
+      site_viability_summary: {
+        go_no_go: 'GO', confidence: 'PROMISING',
+        one_line: 'Meets §73.24(j) COL floor (97%) and §73.24(g) blanket limit at current TPO.',
+        evaluated_at_tpo_kw: 5
+      },
+      tower_cost_estimate: {
+        tower_height_m: 96.15, asr_lighting_required: true, cost_tier: 'MODERATE',
+        total_low_usd: 164000, total_high_usd: 404000,
+        range_label: '$164k–$404k (2024 USD, screening only)',
+        breakdown: {
+          tower_steel:   { low: 5000,   high: 15000,  note: 'Guyed λ/4 monopole at 96 m' },
+          ground_system: { low: 80000,  high: 120000, note: '120-radial copper; σ=8 mS/m soil factor' },
+          faa_lighting:  { low: 20000,  high: 60000,  note: 'ASR threshold exceeded (47 CFR §17.7)' },
+          civil_work:    { low: 50000,  high: 150000, note: 'Grading, access road, fence, foundation' }
+        },
+        disclaimer: 'SCREENING ESTIMATE ONLY.'
+      },
+      coverage_overlap_analysis: {
+        candidate_reach_km: 34.1, current_site_reach_km_proxy: 28.5,
+        tower_separation_km: 6.2, overlap_area_km2: 2256,
+        overlap_fraction: 0.87, coverage_continuity: 'HIGH',
+        note: 'Screening-grade 2-circle model using same TPO.',
+        rule: '§73.24 service area continuity.'
+      },
+      seasonal_conductivity_note: {
+        sigma_msm: 8, sigma_quality: 'EXCELLENT', seasonal_variability: 'LOW',
+        risk_level: 'MINIMAL',
+        notes: ['High-conductivity soil (σ=8 mS/m) — seasonal moisture variation is modest (±10–20%) and unlikely to affect §73.24(j) compliance.',
+                'Annual-average FCC M3 value is a reliable proxy for filing-grade conductivity at this site.'],
+        rule: '47 CFR §73.190', disclaimer: 'Seasonal variability is a screening-grade proxy.'
+      },
+      antenna_height_options: {
+        frequency_khz: 780, full_wavelength_m: 384.62, reference_tpo_kw: 5,
+        options: [
+          { id: '5_8_LAMBDA', label: '5/8 λ (optimum)', electrical_deg: 225, height_m: 240.39, height_ft: 788, gain_vs_qw_db: 1.7, erp_vs_tpo_ratio: 1.48, estimated_erp_kw: 7.4, asr_required: true, pros: '~1.7 dB ERP gain over λ/4; maximum groundwave efficiency.', cons: 'Taller physical structure; always triggers §17.7 ASR + FAA study.' },
+          { id: 'QUARTER_WAVE', label: 'λ/4 (standard)', electrical_deg: 90, height_m: 96.15, height_ft: 315, gain_vs_qw_db: 0.0, erp_vs_tpo_ratio: 1.0, estimated_erp_kw: 5.0, asr_required: true, pros: 'Industry standard; FCC groundwave curves calibrated to λ/4 reference.', cons: 'Not maximum efficiency. Exceeds ASR threshold (200 ft = 60.96 m).' },
+          { id: '0_19_LAMBDA', label: '0.19 λ (compact)', electrical_deg: 68, height_m: 73.08, height_ft: 240, gain_vs_qw_db: -3.0, erp_vs_tpo_ratio: 0.5, estimated_erp_kw: 2.5, asr_required: true, pros: 'Lower steel cost. Useful for DA-in, series-capacitor base tuning.', cons: '~3 dB ERP penalty vs. λ/4; requires larger ground system.' }
+        ],
+        note: 'Efficiency figures are engineering approximations from FCC R-4 table.'
+      },
+      population_reach_bands: {
+        bands: [
+          { target_mvm: 5.0,  label: '5 mV/m (§73.24(j) principal community)', distance_km: 5.8,  area_km2: 105.7,  estimated_population: 179690 },
+          { target_mvm: 2.0,  label: '2 mV/m (urban fringe / primary coverage)', distance_km: 11.2, area_km2: 394.1, estimated_population: 669970 },
+          { target_mvm: 1.0,  label: '1 mV/m (rural primary)', distance_km: 19.4, area_km2: 1183.8, estimated_population: 2012460 },
+          { target_mvm: 0.5,  label: '0.5 mV/m (§73.24 secondary daytime)', distance_km: 34.1, area_km2: 3656.5, estimated_population: 6212050 },
+          { target_mvm: 0.25, label: '0.25 mV/m (fringe / distant secondary)', distance_km: 56.8, area_km2: 10137.2, estimated_population: 17233240 }
+        ],
+        note: 'Screening-grade circular-area population estimate.'
+      },
+      power_upgrade_analysis: {
+        applicable: true, current_tpo_kw: 5, max_class_power_kw: 50,
+        headroom_kw: 45, headroom_pct: 900,
+        col_coverage_estimate_at_max_pct: 100, reach_at_max_class_power_km: 78.4,
+        col_would_comply_at_max: true,
+        blanket_concern_at_max: { blanket_1000mvm_km: 2.3, estimated_blanket_pop_pct: 0.8, would_exceed_limit: false },
+        verdict: 'UPGRADE_RESOLVES_COL',
+        note: 'Class D ceiling is 50 kW (+45 kW / +900% over current TPO).'
+      }
     },
     {
       rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
