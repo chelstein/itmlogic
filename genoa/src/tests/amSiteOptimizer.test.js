@@ -4061,3 +4061,59 @@ test('filing_complexity_score for local channel is LOW complexity', async () => 
       `local channel complexity_tier "${tier}" should be LOW or MODERATE`);
   }
 });
+
+// ---------- transmission_line_analysis ----------
+
+test('transmission_line_analysis is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.transmission_line_analysis != null,
+      `transmission_line_analysis must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('transmission_line_analysis has 4 feedline options', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const tl = c.transmission_line_analysis;
+    assert.equal(tl.feedline_options.length, 4,
+      `feedline_options must have 4 entries for rank ${c.rank}`);
+  }
+});
+
+test('transmission_line_analysis feedline loss is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    for (const fl of c.transmission_line_analysis.feedline_options) {
+      assert.ok(fl.total_loss_db_at_60m > 0,
+        `feedline ${fl.id} total_loss_db_at_60m must be positive for rank ${c.rank}`);
+      assert.ok(fl.erp_at_antenna_kw > 0 && fl.erp_at_antenna_kw <= c.transmission_line_analysis.reference_tpo_kw,
+        `erp_at_antenna_kw must be in (0, TPO] for rank ${c.rank}`);
+    }
+  }
+});
+
+test('transmission_line_analysis open-wire has lowest loss', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const fls = c.transmission_line_analysis.feedline_options;
+    const openWire = fls.find(f => f.id === 'OPEN_WIRE');
+    for (const other of fls.filter(f => f.id !== 'OPEN_WIRE')) {
+      assert.ok(openWire.attenuation_db_per_100m < other.attenuation_db_per_100m,
+        `OPEN_WIRE must have lowest attenuation vs ${other.id} for rank ${c.rank}`);
+    }
+  }
+});
+
+test('transmission_line_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('feedline_loss_db' in row, 'feedline_loss_db must be in comparison table');
+    assert.ok('erp_at_antenna_kw' in row, 'erp_at_antenna_kw must be in comparison table');
+  }
+});

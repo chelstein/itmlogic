@@ -734,7 +734,9 @@ export async function runSiteOptimizer(body = {}){
     headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null,
     da_study_recommended:   c.directional_antenna_study_guide?.recommended ?? null,
     da_study_type:          c.directional_antenna_study_guide?.study_type ?? null,
-    skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null
+    skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null,
+    feedline_loss_db:       c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.total_loss_db_at_60m ?? null,
+    erp_at_antenna_kw:      c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.erp_at_antenna_kw ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -1976,6 +1978,81 @@ async function scoreCandidate(pt, ctx, warnings){
         blanket_concern_at_max,
         verdict,
         note: `Class ${fcc_class} ceiling is ${classCeil} kW (+${headroom_kw} kW / +${headroom_pct}% over current TPO).`
+      };
+    })(),
+    // Transmission line analysis — feedline type selection and loss budget.
+    // AM broadcast transmission lines run from the transmitter output to the
+    // antenna base matching network.  At AM frequencies (530–1700 kHz) coaxial
+    // cable has higher attenuation per unit length than open-wire parallel lines,
+    // but coax is preferred for modern installations due to interference immunity,
+    // weathering, and NEC/fire code compliance.  ERP loss = 10^(loss_dB/10).
+    // This is a SCREENING-GRADE estimate; actual feedline must be engineered to
+    // match the antenna base impedance (typically 25–75 Ω for λ/4 monopole).
+    transmission_line_analysis: (() => {
+      const freq_mhz  = frequency_khz / 1000;
+      const freq_sqrt = Math.sqrt(freq_mhz);  // used in coax attenuation formula
+
+      // Conservative feedline run assumption: transmitter building at 60 m from
+      // tower base (adequate for a minimal building setback + safe distance).
+      // Actual run depends on site layout; operator may need to add length.
+      const assumed_run_m = 60;
+
+      // Coaxial attenuation approximation (dB / 100 m) using classical skin-effect model:
+      //   A_total ≈ A_cond × sqrt(f_MHz) + A_diel × f_MHz
+      // Reference values for EIA standard hardline at 1 MHz (manufacturer data sheets):
+      //   7/8" EIA 50-Ω: A_cond ≈ 0.18, A_diel ≈ 0.004
+      //   1-5/8" EIA 50-Ω: A_cond ≈ 0.10, A_diel ≈ 0.002
+      //   3-1/8" EIA 50-Ω: A_cond ≈ 0.063, A_diel ≈ 0.001
+      // Open-wire 600-Ω: extremely low loss — typical 0.01–0.03 dB/100m at AM freqs.
+      const feedlines = [
+        { id: 'EIA_7_8_IN',   label: '7/8" EIA 50-Ω hardline',   a_cond: 0.18,  a_diel: 0.004,  max_power_kw: 30,  note: 'Common AM broadcast choice; good balance of loss and handling.' },
+        { id: 'EIA_1_5_8_IN', label: '1-5/8" EIA 50-Ω hardline', a_cond: 0.10,  a_diel: 0.002,  max_power_kw: 80,  note: 'Lower loss; preferred for higher-power AM (>25 kW).' },
+        { id: 'EIA_3_1_8_IN', label: '3-1/8" EIA 50-Ω hardline', a_cond: 0.063, a_diel: 0.001,  max_power_kw: 250, note: 'Lowest coax loss; used for Class A 50 kW installations.' },
+        { id: 'OPEN_WIRE',    label: 'Open-wire parallel (600 Ω)', a_cond: 0.012, a_diel: 0.0005, max_power_kw: 999, note: 'Lowest loss option. Requires impedance matching transformer at both ends. Cannot be used indoors.' }
+      ];
+
+      const results = feedlines.map(fl => {
+        const atten_db_per_100m = round2(fl.a_cond * freq_sqrt + fl.a_diel * freq_mhz);
+        const total_loss_db     = round2(atten_db_per_100m * (assumed_run_m / 100));
+        const loss_factor       = Math.pow(10, -total_loss_db / 10);
+        const erp_at_antenna_kw = round2(tpo_kw * loss_factor);
+        const power_reduction_pct = round2((1 - loss_factor) * 100);
+        const suitable_for_tpo  = tpo_kw <= fl.max_power_kw;
+        return {
+          id:                   fl.id,
+          label:                fl.label,
+          attenuation_db_per_100m: atten_db_per_100m,
+          total_loss_db_at_60m: total_loss_db,
+          erp_at_antenna_kw,
+          power_reduction_pct,
+          max_power_rating_kw:  fl.max_power_kw,
+          suitable_for_tpo,
+          note:                 fl.note
+        };
+      });
+
+      // Recommended feedline based on TPO.
+      let recommended_id;
+      if (tpo_kw > 50) {
+        recommended_id = 'EIA_3_1_8_IN';
+      } else if (tpo_kw > 25) {
+        recommended_id = 'EIA_1_5_8_IN';
+      } else {
+        recommended_id = 'EIA_7_8_IN';
+      }
+      const bestCoax = results.find(r => r.id === recommended_id);
+
+      return {
+        assumed_feedline_run_m: assumed_run_m,
+        frequency_khz,
+        reference_tpo_kw:   tpo_kw,
+        feedline_options:   results,
+        recommended_feedline_id: recommended_id,
+        recommended_summary: bestCoax
+          ? `Recommended: ${bestCoax.label} — ${bestCoax.attenuation_db_per_100m} dB/100m at ${frequency_khz} kHz → ${bestCoax.total_loss_db_at_60m} dB loss over ${assumed_run_m} m → ${bestCoax.erp_at_antenna_kw} kW ERP at antenna base (−${bestCoax.power_reduction_pct}% from TPO).`
+          : null,
+        note: `Attenuation modeled with skin-effect formula (A_cond×√f + A_diel×f). Actual loss depends on connectors, VSWR, temperature, and installation quality. Feedline run assumed ${assumed_run_m} m (transmitter building at tower base).`,
+        rule: 'FCC Form 302-AM Part III / Broadcast Engineering (Whitaker 2013) §11.5'
       };
     })(),
     // Per-candidate engineering checklist — what studies must be done if this site

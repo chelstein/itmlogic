@@ -1706,6 +1706,52 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmission line analysis */}
+        {candidate.transmission_line_analysis && (() => {
+          const tl = candidate.transmission_line_analysis;
+          const recId = tl.recommended_feedline_id;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Feedline loss budget ({tl.assumed_feedline_run_m} m run)</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="text-textDim/60 text-[9px]">
+                  At {tl.frequency_khz} kHz · TPO {tl.reference_tpo_kw} kW → ERP at antenna base
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-[9px]">
+                    <thead>
+                      <tr className="text-textDim/50 uppercase text-[8px] tracking-rack border-b border-rule/20">
+                        <th className="text-left pb-1 pr-3">Feedline</th>
+                        <th className="text-right pb-1 pr-3">dB/100m</th>
+                        <th className="text-right pb-1 pr-3">Loss</th>
+                        <th className="text-right pb-1">ERP kW</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tl.feedline_options.map((fl) => (
+                        <tr key={fl.id}
+                          className={fl.id === recId ? 'text-cream' : 'text-textDim/70'}
+                          style={fl.id === recId ? { background: '#63d47111' } : {}}>
+                          <td className="py-0.5 pr-3">
+                            {fl.id === recId && <span className="text-[8px] text-green-400 mr-1">▶</span>}
+                            {fl.label}
+                          </td>
+                          <td className="text-right pr-3">{fl.attenuation_db_per_100m?.toFixed(3)}</td>
+                          <td className="text-right pr-3">{fl.total_loss_db_at_60m?.toFixed(2)} dB</td>
+                          <td className="text-right">{fl.erp_at_antenna_kw?.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {tl.recommended_summary && (
+                  <div className="text-textDim/60 leading-snug text-[9px]">{tl.recommended_summary}</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>
