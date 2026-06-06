@@ -608,6 +608,85 @@ export async function runSiteOptimizer(body = {}){
     min_tpo_for_col_kw:     c.minimum_tpo_for_col_coverage_kw ?? null
   }));
 
+  // ---- 16. Engineering summary (executive-level synthesis) ----
+  // A structured plain-language summary suitable for inclusion in an engineering
+  // report, legal memo, or FCC counsel briefing.  Synthesizes the top findings
+  // across all candidates into 3-5 actionable statements.
+  const engineering_summary = (() => {
+    const promising = returned.filter(c => c.status_category === 'PROMISING');
+    const nCompliant = candidate_count_by_status.NON_COMPLIANT ?? 0;
+    const nPromising = candidate_count_by_status.PROMISING ?? 0;
+    const nReview    = candidate_count_by_status.REVIEW_REQUIRED ?? 0;
+    const bestCandidate = returned[0] ?? null;
+    const treatyCandidates = returned.filter(c => !!c.treaty_zone);
+
+    // Headline: how many usable sites were found?
+    const sitePoolStatement = nPromising > 0
+      ? `Screening of ${scored.length} grid candidates within ${search_radius_km} km of ${callsign}'s current site (${current_site.lat.toFixed(4)}°N, ${Math.abs(current_site.lon).toFixed(4)}°W) identified ${nPromising} PROMISING candidate(s) and ${nReview} candidates requiring engineering review.`
+      : nCompliant < scored.length
+      ? `Screening of ${scored.length} grid candidates identified no PROMISING candidates — ${nCompliant} are non-compliant with §73.24(j)/(g) at current TPO and ${scored.length - nCompliant} require engineering review.`
+      : `All ${scored.length} grid candidates evaluated at ${tpo_kw} kW TPO are non-compliant at current power. Power increase or DA pattern may recover some candidates.`;
+
+    // Top candidate statement
+    let topStatement = null;
+    if (bestCandidate){
+      const dir = bestCandidate.cardinal_direction ?? '';
+      const dist = bestCandidate.distance_from_current_km != null ? `${bestCandidate.distance_from_current_km.toFixed(1)} km ${dir}` : '';
+      const col = bestCandidate.col_coverage_pct != null ? `${(bestCandidate.col_coverage_pct * 100).toFixed(0)}% COL coverage` : null;
+      const reach = bestCandidate.daytime_reach_km != null ? `${bestCandidate.daytime_reach_km.toFixed(0)} km daytime reach` : null;
+      const risk = bestCandidate.regulatory_risk_score?.risk_category ?? null;
+      const parts = [col, reach].filter(Boolean).join(', ');
+      topStatement = `The top-ranked site (${dist}) achieves ${parts || 'competitive screening metrics'} at ${tpo_kw} kW TPO on ${frequency_khz} kHz.${risk ? ` Regulatory risk: ${risk}.` : ''}`;
+    }
+
+    // Conductivity statement
+    const poorSigmaCandidates = returned.filter(c => (c.ground_sigma_mS_m ?? 4) < 2).length;
+    const conductivityStatement = !rasterLoaded
+      ? `Conductivity data uses the FCC M3 zone table (15-zone fallback). Deploying the AM_m3.tif GeoTIFF raster will improve ranking precision and bring conductivity sub-scores to filing-grade accuracy.`
+      : poorSigmaCandidates > 0
+      ? `${poorSigmaCandidates} returned candidate(s) have POOR conductivity (σ < 2 mS/m); extended ground systems and §73.190 surveys will be required before site commitment.`
+      : null;
+
+    // ASR statement
+    const asrRequired = quarter_wave_m > 60.96;
+    const asrStatement = asrRequired
+      ? `At ${frequency_khz} kHz, all standard antenna heights (λ/4 = ${quarter_wave_m} m) exceed the §17.7 200-ft (60.96 m) ASR threshold — every candidate requires FCC Form 854 registration and FAA aeronautical study before construction.`
+      : null;
+
+    // Treaty statement
+    const treatyStatement = treatyCandidates.length > 0
+      ? `${treatyCandidates.length} candidate(s) fall within an international treaty zone — FCC International Bureau coordination is a blocking prerequisite for those sites.`
+      : null;
+
+    // NIF statement
+    const nifStatement = chanClass !== 'local'
+      ? `As a ${chanClass} channel station (${frequency_khz} kHz Class ${fcc_class}), a §73.182 nighttime NIF study is required at any selected site before Form 301-AM can be filed. ${skywave_risk_level === 'HIGH' ? 'Clear-channel NIF is complex — budget 4–12 weeks of consulting time.' : ''}`
+      : null;
+
+    const statements = [sitePoolStatement, topStatement, conductivityStatement, asrStatement, treatyStatement, nifStatement]
+      .filter(Boolean);
+
+    return {
+      callsign,
+      frequency_khz,
+      fcc_class,
+      tpo_kw,
+      n_candidates_evaluated: scored.length,
+      n_promising: nPromising,
+      n_review_required: nReview,
+      n_non_compliant: nCompliant,
+      overall_feasibility: nPromising > 0 ? 'SITES_AVAILABLE'
+        : (nReview > 0 || (candidate_count_by_status.RECOVERABLE_WITH_POWER_INCREASE ?? 0) > 0) ? 'SITES_RECOVERABLE'
+        : 'NO_SITES_AT_CURRENT_PARAMETERS',
+      statements,
+      caveats: [
+        'This is a SCREENING-GRADE analysis only — field measurements, §73.182 NIF study, and full engineering design are required before filing.',
+        'Candidate scores use FCC M3 groundwave curves and population proxies; actual coverage contours must be computed per §73.183/§73.184.',
+        'Parcel availability, lease feasibility, zoning, and environmental review are outside the scope of this analysis.'
+      ]
+    };
+  })();
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -619,6 +698,7 @@ export async function runSiteOptimizer(body = {}){
     candidate_shortlist,
     candidate_set_diversity,
     candidate_comparison_table,
+    engineering_summary,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,

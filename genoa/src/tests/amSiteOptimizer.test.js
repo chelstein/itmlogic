@@ -2851,3 +2851,49 @@ test('mpe_rf_exposure_summary fence distance increases with higher TPO', async (
   assert.ok(fenceHigh > fenceLow,
     `higher TPO should produce larger fence distance: ${fenceHigh} not > ${fenceLow}`);
 });
+
+// ---------- engineering_summary ----------
+
+test('engineering_summary is present with required shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const es = out.engineering_summary;
+  assert.ok(es != null, 'engineering_summary must be present');
+  assert.ok(typeof es.callsign === 'string', 'callsign must be string');
+  assert.ok(typeof es.frequency_khz === 'number', 'frequency_khz must be number');
+  assert.ok(typeof es.n_candidates_evaluated === 'number', 'n_candidates_evaluated must be number');
+  assert.ok(typeof es.overall_feasibility === 'string', 'overall_feasibility must be string');
+  assert.ok(Array.isArray(es.statements) && es.statements.length >= 1, 'statements must be non-empty array');
+  assert.ok(Array.isArray(es.caveats) && es.caveats.length >= 1, 'caveats must be non-empty array');
+});
+
+test('engineering_summary.overall_feasibility is one of SITES_AVAILABLE, SITES_RECOVERABLE, NO_SITES_AT_CURRENT_PARAMETERS', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['SITES_AVAILABLE', 'SITES_RECOVERABLE', 'NO_SITES_AT_CURRENT_PARAMETERS']);
+  assert.ok(VALID.has(out.engineering_summary.overall_feasibility),
+    `overall_feasibility "${out.engineering_summary.overall_feasibility}" must be one of the valid values`);
+});
+
+test('engineering_summary.n_candidates_evaluated matches n_candidates_evaluated in response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.equal(out.engineering_summary.n_candidates_evaluated, out.n_candidates_evaluated,
+    'engineering_summary.n_candidates_evaluated must match out.n_candidates_evaluated');
+});
+
+test('engineering_summary.n_promising matches candidate_count_by_status.PROMISING', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  assert.equal(out.engineering_summary.n_promising, out.candidate_count_by_status.PROMISING ?? 0,
+    'engineering_summary.n_promising must match candidate_count_by_status.PROMISING');
+});
+
+test('engineering_summary statements are all non-empty strings', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const s of out.engineering_summary.statements){
+    assert.ok(typeof s === 'string' && s.length > 10,
+      `All statements must be non-empty strings; got "${s}"`);
+  }
+});
