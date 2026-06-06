@@ -16,17 +16,20 @@ import { primaryStatus, rankColor } from './statusUtil.js';
 //     present, otherwise falls back to legacy free-text labels.
 
 const COLUMNS = [
-  { key: 'rank',                       label: '#',                  align: 'right' },
-  { key: 'score',                      label: 'Score',              align: 'right' },
-  { key: '_source',                    label: 'Source',             align: 'left',  unsortable: true },
-  { key: '_host',                      label: 'Host',               align: 'left',  unsortable: true },
-  { key: 'distance_from_current_km',   label: 'Dist',               align: 'right' },
-  { key: 'col_coverage_pct',           label: 'COL %',              align: 'right' },
-  { key: 'nif_status',                 label: 'NIF',                align: 'left'  },
-  { key: 'daytime_reach_km',           label: 'Day reach',          align: 'right' },
-  { key: 'fuel_risk',                  label: 'Fuel risk',          align: 'left'  },
-  { key: '_status',                    label: 'Status',             align: 'left',  unsortable: true },
-  { key: 'notes',                      label: 'Notes',              align: 'left',  unsortable: true }
+  { key: 'rank',                       label: '#',         align: 'right' },
+  { key: 'score',                      label: 'Score',     align: 'right' },
+  { key: 'score_delta_vs_baseline',    label: 'Δ Base',    align: 'right' },
+  { key: '_source',                    label: 'Source',    align: 'left',  unsortable: true },
+  { key: '_host',                      label: 'Host',      align: 'left',  unsortable: true },
+  { key: 'distance_from_current_km',   label: 'Dist',      align: 'right' },
+  { key: 'bearing_deg',                label: 'Brg',       align: 'right' },
+  { key: 'col_coverage_pct',           label: 'COL %',     align: 'right' },
+  { key: 'col_coverage_gap_pct',       label: 'COL gap',   align: 'right' },
+  { key: 'blanket_population_pct',     label: 'Blkt pop',  align: 'right' },
+  { key: 'daytime_reach_km',           label: 'Reach',     align: 'right' },
+  { key: 'population_delta_vs_baseline', label: 'Pop Δ',   align: 'right' },
+  { key: 'ground_sigma_mS_m',          label: 'σ mS/m',    align: 'right' },
+  { key: '_status',                    label: 'Status',    align: 'left',  unsortable: true }
 ];
 
 function cellValue(c, key){
@@ -37,13 +40,40 @@ function cellValue(c, key){
 
 function fmt(key, v){
   if (v == null) return '—';
-  if (key === 'rank')   return String(v);
-  if (key === 'score')  return Number(v).toFixed(1);
+  if (key === 'rank')                 return String(v);
+  if (key === 'score')                return Number(v).toFixed(1);
+  if (key === 'score_delta_vs_baseline'){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    return (n >= 0 ? `+${n.toFixed(1)}` : n.toFixed(1));
+  }
   if (key === 'distance_from_current_km') return `${Number(v).toFixed(1)} km`;
-  if (key === 'col_coverage_pct')         return `${(Number(v) * 100).toFixed(0)}%`;
-  if (key === 'daytime_reach_km')         return `${Number(v).toFixed(1)} km`;
-  if (key === 'notes') return String(v);
+  if (key === 'bearing_deg')             return `${Math.round(Number(v))}°`;
+  if (key === 'col_coverage_pct')     return `${(Number(v) * 100).toFixed(0)}%`;
+  if (key === 'col_coverage_gap_pct'){
+    const n = Number(v);
+    return n > 0 ? `+${(n * 100).toFixed(0)}%` : '—';
+  }
+  if (key === 'blanket_population_pct') return `${Number(v).toFixed(2)}%`;
+  if (key === 'daytime_reach_km')     return `${Number(v).toFixed(1)} km`;
+  if (key === 'population_delta_vs_baseline'){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    if (Math.abs(n) >= 1e6) return (n >= 0 ? '+' : '') + (n / 1e6).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1e3) return (n >= 0 ? '+' : '') + Math.round(n / 1e3) + 'K';
+    return (n >= 0 ? '+' : '') + String(Math.round(n));
+  }
+  if (key === 'ground_sigma_mS_m')    return Number.isFinite(Number(v)) ? Number(v).toFixed(0) : '—';
   return String(v);
+}
+
+function sigmaColor(v){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '#6b6b5e';
+  if (n >= 8)  return '#63d471';   // EXCELLENT
+  if (n >= 4)  return '#a8d46a';   // GOOD
+  if (n >= 2)  return '#ffb347';   // FAIR
+  return '#ff7a7a';                // POOR
 }
 
 function SourceChip({ source }){
@@ -77,12 +107,27 @@ function HostCell({ candidate }){
   );
 }
 
-export default function CandidateTable({ candidates, selectedRank, onSelect, evaluated, returned }){
+const STATUS_FILTERS = [
+  { value: '', label: 'All' },
+  { value: 'PROMISING', label: 'Promising' },
+  { value: 'REVIEW_REQUIRED', label: 'Review req.' },
+  { value: 'RECOVERABLE_WITH_DA', label: 'Rec. DA' },
+  { value: 'RECOVERABLE_WITH_POWER_INCREASE', label: 'Rec. power↑' },
+  { value: 'RECOVERABLE_WITH_REDUCED_POWER', label: 'Rec. power↓' },
+  { value: 'RECOVERABLE_WITH_COL_CHANGE', label: 'Rec. COL' },
+  { value: 'TREATY_REVIEW', label: 'Treaty' },
+  { value: 'NON_COMPLIANT', label: 'Non-compliant' }
+];
+
+export default function CandidateTable({ candidates, selectedRank, onSelect, evaluated, returned, countByStatus }){
   const [sortKey, setSortKey] = useState('rank');
   const [sortDir, setSortDir] = useState('asc');
+  const [statusFilter, setStatusFilter] = useState('');
 
   const rows = useMemo(() => {
-    const arr = [...(candidates || [])];
+    const arr = [...(candidates || [])].filter(c =>
+      !statusFilter || (c.status_category || '') === statusFilter
+    );
     arr.sort((a, b) => {
       const av = cellValue(a, sortKey);
       const bv = cellValue(b, sortKey);
@@ -112,9 +157,104 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
       tone="amber"
       dense
       right={(
-        <div className="font-mono text-[10px] tracking-rack uppercase text-textDim">
-          {returned != null ? `${returned} shown` : ''}
-          {evaluated != null ? ` · ${evaluated} evaluated` : ''}
+        <div className="flex items-center gap-3">
+          {countByStatus && (
+            <div className="flex items-center gap-1.5 font-mono text-[9px]">
+              {countByStatus.PROMISING > 0 && (
+                <span style={{ color: '#63d471' }} title="PROMISING candidates">
+                  ● {countByStatus.PROMISING} P
+                </span>
+              )}
+              {countByStatus.REVIEW_REQUIRED > 0 && (
+                <span style={{ color: '#ffb347' }} title="REVIEW REQUIRED candidates">
+                  ! {countByStatus.REVIEW_REQUIRED} R
+                </span>
+              )}
+              {(() => {
+                const recCount = (countByStatus.RECOVERABLE_WITH_DA || 0)
+                  + (countByStatus.RECOVERABLE_WITH_POWER_INCREASE || 0)
+                  + (countByStatus.RECOVERABLE_WITH_REDUCED_POWER || 0)
+                  + (countByStatus.RECOVERABLE_WITH_COL_CHANGE || 0);
+                return recCount > 0 ? (
+                  <span style={{ color: '#6fd3ff' }} title="RECOVERABLE candidates (DA / power / COL change)">
+                    ↻ {recCount} REC
+                  </span>
+                ) : null;
+              })()}
+              {countByStatus.TREATY_REVIEW > 0 && (
+                <span style={{ color: '#c79bff' }} title="TREATY REVIEW candidates">
+                  § {countByStatus.TREATY_REVIEW} TR
+                </span>
+              )}
+              {countByStatus.NON_COMPLIANT > 0 && (
+                <span style={{ color: '#ff5a5a' }} title="NON-COMPLIANT candidates">
+                  ✕ {countByStatus.NON_COMPLIANT} NC
+                </span>
+              )}
+            </div>
+          )}
+          <div className="font-mono text-[10px] tracking-rack uppercase text-textDim">
+            {statusFilter
+              ? `${rows.length} shown (filtered)`
+              : (returned != null ? `${returned} shown` : '')}
+            {!statusFilter && evaluated != null ? ` · ${evaluated} evaluated` : ''}
+          </div>
+          {candidates && candidates.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
+                className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1 py-0.5 bg-panelDeep text-textDim hover:text-cream transition-colors"
+                title="Filter by status category"
+              >
+                {STATUS_FILTERS.map(f => (
+                  <option key={f.value} value={f.value}>{f.label}</option>
+                ))}
+              </select>
+              <button
+                onClick={() => {
+                  const CSV_COLS = ['rank','score','score_delta_vs_baseline','status_category','source',
+                    'distance_from_current_km','bearing_deg','cardinal_direction',
+                    'col_coverage_pct','col_coverage_gap_pct','blanket_population_pct','blanket_pop_risk','daytime_reach_km',
+                    'principal_community_5mvm_km','blanket_1000mvm_km','ground_sigma_mS_m',
+                    'ground_sigma_quality','ground_sigma_filing_grade','ground_radial_advisory',
+                    'field_at_col_centroid_mvm','estimated_daytime_population_served',
+                    'population_delta_vs_baseline','score_confidence',
+                    'lat','lon','treaty_zone',
+                    'minimum_tpo_for_compliance_kw','minimum_tpo_for_col_coverage_kw',
+                    'power_class_ceiling_kw','mpe_evaluation_required'];
+                  const esc = v => v == null ? '' : (String(v).includes(',') ? `"${String(v).replace(/"/g,'""')}"` : String(v));
+                  const lines = [CSV_COLS.join(','),
+                    ...candidates.map(c => CSV_COLS.map(k => esc(c[k])).join(','))];
+                  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'optimizer-candidates.csv'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
+                title="Download candidates as CSV (Excel-compatible)"
+              >
+                ↓ CSV
+              </button>
+              <button
+                onClick={() => {
+                  const blob = new Blob(
+                    [JSON.stringify(candidates, null, 2)],
+                    { type: 'application/json' }
+                  );
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url; a.download = 'optimizer-candidates.json'; a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="font-mono text-[9px] uppercase tracking-rack border border-rule rounded-sm px-1.5 py-0.5 text-textDim hover:text-cream transition-colors"
+                title="Download all displayed candidates as JSON"
+              >
+                ↓ JSON
+              </button>
+            </div>
+          )}
         </div>
       )}
     >
@@ -174,20 +314,79 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                       </span>
                     </td>
                     <td className="px-2 py-1.5 text-right text-cream">{fmt('score', c.score)}</td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono text-[10px]"
+                      style={{
+                        color: c.score_delta_vs_baseline == null ? '#6b6b5e'
+                             : c.score_delta_vs_baseline > 0 ? '#63d471'
+                             : c.score_delta_vs_baseline < 0 ? '#ff7a7a'
+                             : '#6b6b5e'
+                      }}
+                      title={c.score_delta_vs_baseline != null ? `Score vs current site baseline` : 'Baseline unknown'}
+                    >
+                      {fmt('score_delta_vs_baseline', c.score_delta_vs_baseline)}
+                    </td>
                     <td className="px-2 py-1.5"><SourceChip source={c.source} /></td>
                     <td className="px-2 py-1.5"><HostCell candidate={c} /></td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('distance_from_current_km', c.distance_from_current_km)}</td>
-                    <td className="px-2 py-1.5 text-right text-textDim">{fmt('col_coverage_pct', c.col_coverage_pct)}</td>
-                    <td className="px-2 py-1.5 text-textDim">{c.nif_status || '—'}</td>
+                    <td
+                      className="px-2 py-1.5 text-right text-textDim font-mono"
+                      title={c.bearing_deg != null ? `${c.bearing_deg}° true ${c.cardinal_direction ? `(${c.cardinal_direction})` : ''}` : ''}
+                    >
+                      {c.bearing_deg != null ? (
+                        <span>
+                          {c.bearing_deg}°
+                          {c.cardinal_direction && (
+                            <span className="text-[9px] ml-0.5 text-textDim/70">{c.cardinal_direction}</span>
+                          )}
+                        </span>
+                      ) : '—'}
+                    </td>
+                    <td
+                      className="px-2 py-1.5 text-right"
+                      style={{ color: c.col_coverage_pct != null && c.col_coverage_pct < 0.80 ? '#ff7a7a' : '#b8d0cc' }}
+                      title={c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}% (floor 80% §73.24(j))` : ''}
+                    >
+                      {fmt('col_coverage_pct', c.col_coverage_pct)}
+                    </td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono text-[10px]"
+                      style={{ color: c.col_coverage_gap_pct > 0 ? '#ff7a7a' : '#444' }}
+                      title={c.col_coverage_gap_pct > 0 ? `${(c.col_coverage_gap_pct * 100).toFixed(0)}% additional COL coverage needed` : ''}
+                    >
+                      {fmt('col_coverage_gap_pct', c.col_coverage_gap_pct)}
+                    </td>
+                    <td
+                      className="px-2 py-1.5 text-right"
+                      style={{ color: c.blanket_population_pct > 1 ? '#ff5a5a' : c.blanket_population_pct > 0.5 ? '#ffb347' : '#63d471' }}
+                      title={c.blanket_population_pct != null ? `${c.blanket_population_pct.toFixed(3)}% (§73.24(g) limit: 1%)` : ''}
+                    >
+                      {fmt('blanket_population_pct', c.blanket_population_pct)}
+                    </td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('daytime_reach_km', c.daytime_reach_km)}</td>
-                    <td className="px-2 py-1.5 text-textDim">{c.fuel_risk || '—'}</td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono text-[10px]"
+                      style={{
+                        color: c.population_delta_vs_baseline == null ? '#444'
+                             : c.population_delta_vs_baseline > 0 ? '#63d471'
+                             : c.population_delta_vs_baseline < 0 ? '#ff7a7a'
+                             : '#6b6b5e'
+                      }}
+                      title={c.population_delta_vs_baseline != null ? `Population delta vs current site baseline` : ''}
+                    >
+                      {fmt('population_delta_vs_baseline', c.population_delta_vs_baseline)}
+                    </td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono"
+                      style={{ color: sigmaColor(c.ground_sigma_mS_m) }}
+                      title={c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m — ${c.ground_sigma_quality || ''} (${c.ground_sigma_source || 'M3 zone'})` : ''}
+                    >
+                      {fmt('ground_sigma_mS_m', c.ground_sigma_mS_m)}
+                    </td>
                     <td className="px-2 py-1.5">
                       {statusCode
                         ? <StatusChip status={statusCode} dense />
                         : <StatusChip label={statusLegacy} dense />}
-                    </td>
-                    <td className="px-2 py-1.5 text-textDim truncate max-w-[260px]" title={c.notes || ''}>
-                      {c.notes || ''}
                     </td>
                   </tr>
                 );

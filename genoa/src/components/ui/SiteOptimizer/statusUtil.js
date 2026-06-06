@@ -7,14 +7,15 @@
 //     SCREENING ONLY, NON-COMPLIANT).
 //
 //  2) Co-location opportunity engine `status_category` enum:
-//        PROMISING                      — green
-//        REVIEW_REQUIRED                — amber
-//        RECOVERABLE_WITH_DA            — cyan (DA variant)
-//        RECOVERABLE_WITH_REDUCED_POWER — cyan (reduced power variant)
-//        RECOVERABLE_WITH_COL_CHANGE    — cyan (COL change variant)
-//        TREATY_REVIEW                  — violet
-//        NON_COMPLIANT                  — red
-//        UNKNOWN_DATA                   — neutral grey
+//        PROMISING                       — green
+//        REVIEW_REQUIRED                 — amber
+//        RECOVERABLE_WITH_DA             — cyan (DA variant)
+//        RECOVERABLE_WITH_POWER_INCREASE — teal (power-up variant)
+//        RECOVERABLE_WITH_REDUCED_POWER  — sage (power-down variant)
+//        RECOVERABLE_WITH_COL_CHANGE     — light-blue (COL change variant)
+//        TREATY_REVIEW                   — violet
+//        NON_COMPLIANT                   — red
+//        UNKNOWN_DATA                    — neutral grey
 
 export const STATUS_TONES = {
   // legacy free-text labels
@@ -26,9 +27,10 @@ export const STATUS_TONES = {
 
   // co-location status_category enum
   'REVIEW_REQUIRED':                { fg: '#ffb347', bg: 'rgba(255,179,71,0.12)',  border: 'rgba(255,179,71,0.5)'  },
-  'RECOVERABLE_WITH_DA':            { fg: '#6fd3ff', bg: 'rgba(111,211,255,0.12)', border: 'rgba(111,211,255,0.55)' },
-  'RECOVERABLE_WITH_REDUCED_POWER': { fg: '#9fd3bd', bg: 'rgba(159,211,189,0.12)', border: 'rgba(159,211,189,0.55)' },
-  'RECOVERABLE_WITH_COL_CHANGE':    { fg: '#7ec8ff', bg: 'rgba(126,200,255,0.12)', border: 'rgba(126,200,255,0.55)' },
+  'RECOVERABLE_WITH_DA':             { fg: '#6fd3ff', bg: 'rgba(111,211,255,0.12)', border: 'rgba(111,211,255,0.55)' },
+  'RECOVERABLE_WITH_POWER_INCREASE': { fg: '#5de0c0', bg: 'rgba(93,224,192,0.12)',  border: 'rgba(93,224,192,0.55)'  },
+  'RECOVERABLE_WITH_REDUCED_POWER':  { fg: '#9fd3bd', bg: 'rgba(159,211,189,0.12)', border: 'rgba(159,211,189,0.55)' },
+  'RECOVERABLE_WITH_COL_CHANGE':     { fg: '#7ec8ff', bg: 'rgba(126,200,255,0.12)', border: 'rgba(126,200,255,0.55)' },
   'TREATY_REVIEW':                  { fg: '#c79bff', bg: 'rgba(199,155,255,0.12)', border: 'rgba(199,155,255,0.55)' },
   'NON_COMPLIANT':                  { fg: '#ff5a5a', bg: 'rgba(255,90,90,0.12)',   border: 'rgba(255,90,90,0.55)'  },
   'UNKNOWN_DATA':                   { fg: '#a89c84', bg: 'rgba(168,156,132,0.10)', border: 'rgba(168,156,132,0.45)' }
@@ -38,9 +40,10 @@ export const STATUS_TONES = {
 export const STATUS_LABELS = {
   'PROMISING':                      'PROMISING',
   'REVIEW_REQUIRED':                'REVIEW REQUIRED',
-  'RECOVERABLE_WITH_DA':            'RECOVERABLE · DA',
-  'RECOVERABLE_WITH_REDUCED_POWER': 'RECOVERABLE · REDUCED PWR',
-  'RECOVERABLE_WITH_COL_CHANGE':    'RECOVERABLE · COL CHANGE',
+  'RECOVERABLE_WITH_DA':             'RECOVERABLE · DA',
+  'RECOVERABLE_WITH_POWER_INCREASE': 'RECOVERABLE · POWER ↑',
+  'RECOVERABLE_WITH_REDUCED_POWER':  'RECOVERABLE · POWER ↓',
+  'RECOVERABLE_WITH_COL_CHANGE':     'RECOVERABLE · COL CHANGE',
   'TREATY_REVIEW':                  'TREATY REVIEW',
   'NON_COMPLIANT':                  'NON-COMPLIANT',
   'UNKNOWN_DATA':                   'UNKNOWN DATA'
@@ -51,9 +54,10 @@ export const STATUS_LABELS = {
 export const STATUS_ICONS = {
   'PROMISING':                      '●',
   'REVIEW_REQUIRED':                '!',
-  'RECOVERABLE_WITH_DA':            '↻',
-  'RECOVERABLE_WITH_REDUCED_POWER': '↓',
-  'RECOVERABLE_WITH_COL_CHANGE':    '⇄',
+  'RECOVERABLE_WITH_DA':             '↻',
+  'RECOVERABLE_WITH_POWER_INCREASE': '↑',
+  'RECOVERABLE_WITH_REDUCED_POWER':  '↓',
+  'RECOVERABLE_WITH_COL_CHANGE':     '⇄',
   'TREATY_REVIEW':                  '§',
   'NON_COMPLIANT':                  '✕',
   'UNKNOWN_DATA':                   '?'

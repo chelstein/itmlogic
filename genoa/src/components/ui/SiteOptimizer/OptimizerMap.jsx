@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import RackPanel from '../RackPanel.jsx';
 import { primaryStatus, rankColor } from './statusUtil.js';
 import InfrastructureLegend, { INFRA_MARKER_SPEC } from './InfrastructureLegend.jsx';
@@ -22,6 +22,25 @@ import InfrastructureLegend, { INFRA_MARKER_SPEC } from './InfrastructureLegend.
 // the map pans to the candidate and opens its popup.
 
 const HEATMAP_MAX_ZOOM = 9;
+
+const COLOR_MODES = ['rank', 'status', 'sigma'];
+const COLOR_MODE_LABELS = { rank: 'By rank', status: 'By status', sigma: 'By σ' };
+
+function sigmaMarkerColor(sigma){
+  if (sigma == null || !Number.isFinite(sigma)) return '#6b6b5e';
+  if (sigma >= 8)  return '#63d471';
+  if (sigma >= 5)  return '#ffb347';
+  return '#ff7a7a';
+}
+
+function statusMarkerColor(c){
+  const cat = c.status_category;
+  if (cat === 'PROMISING')                      return '#63d471';
+  if (cat === 'NON_COMPLIANT')                  return '#ff5a5a';
+  if (cat === 'TREATY_REVIEW')                  return '#c79bff';
+  if (cat && cat.startsWith('RECOVERABLE'))     return '#6fd3ff';
+  return '#ffb347';
+}
 
 function escapeHtml(s){
   return String(s ?? '')
@@ -101,6 +120,7 @@ function inferInfraKind(candidate){
 
 export default function OptimizerMap({
   currentSite,
+  colCentroid,
   callsign,
   candidates,
   selectedRank,
@@ -109,15 +129,17 @@ export default function OptimizerMap({
   searchMode = 'GRID',
   infrastructureSites = []
 }){
+  const [colorMode, setColorMode] = useState('rank');
   const elRef    = useRef(null);
   const ctxRef   = useRef({
-    map:           null,
-    candLayer:     null,
-    heatLayer:     null,
-    infraLayer:    null,
-    currentMarker: null,
-    radiusCircle:  null,
-    popupsByRank:  new Map()
+    map:            null,
+    candLayer:      null,
+    heatLayer:      null,
+    infraLayer:     null,
+    currentMarker:  null,
+    colMarker:      null,
+    radiusCircle:   null,
+    popupsByRank:   new Map()
   });
 
   // mount / unmount
@@ -187,6 +209,24 @@ export default function OptimizerMap({
     }
   }, [currentSite?.lat, currentSite?.lon, callsign, searchRadiusKm]);
 
+  // COL centroid marker — cyan circle when col_centroid is provided
+  useEffect(() => {
+    const L = window.L;
+    const ctx = ctxRef.current;
+    if (!L || !ctx.map) return;
+    if (ctx.colMarker){ ctx.map.removeLayer(ctx.colMarker); ctx.colMarker = null; }
+    if (!colCentroid) return;
+    const clat = Number(colCentroid.lat), clon = Number(colCentroid.lon);
+    if (!Number.isFinite(clat) || !Number.isFinite(clon)) return;
+    ctx.colMarker = L.circleMarker([clat, clon], {
+      radius: 9, color: '#6fd3ff', weight: 2,
+      fillColor: '#6fd3ff', fillOpacity: 0.25, interactive: true
+    }).bindPopup(
+      `<b>COL centroid</b><br/>Supplied as field-strength target for §73.24(j).<br/>${clat.toFixed(4)}, ${clon.toFixed(4)}`
+    ).addTo(ctx.map);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [colCentroid?.lat, colCentroid?.lon]);
+
   // re-draw candidate markers + heatmap circles
   useEffect(() => {
     const L = window.L;
@@ -202,7 +242,9 @@ export default function OptimizerMap({
     list.forEach((c) => {
       const lat = Number(c.lat), lon = Number(c.lon);
       if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-      const color  = rankColor(c.rank);
+      const color  = colorMode === 'status' ? statusMarkerColor(c)
+                   : colorMode === 'sigma'  ? sigmaMarkerColor(c.ground_sigma_mS_m)
+                   : rankColor(c.rank);
       const status = primaryStatus(c.status_labels);
 
       // markers — smaller for lower ranks
@@ -214,17 +256,30 @@ export default function OptimizerMap({
         fillColor:   color,
         fillOpacity: 0.95
       });
+      const catLabel = (c.status_category || status || '').replace(/_/g, ' ');
+      const catColor = (c.status_category === 'PROMISING') ? '#63d471'
+        : (c.status_category === 'NON_COMPLIANT') ? '#ff5a5a'
+        : (c.status_category && c.status_category.startsWith('RECOVERABLE')) ? '#6fd3ff'
+        : '#ffb347';
+      const blanketPct = c.blanket_population_pct;
+      const blanketStr = blanketPct != null ? `${Number(blanketPct).toFixed(2)}%` : '—';
+      const deltaStr = c.score_delta_vs_baseline != null
+        ? ` <span style="color:${c.score_delta_vs_baseline >= 0 ? '#63d471' : '#ff7a7a'}">${c.score_delta_vs_baseline >= 0 ? '+' : ''}${c.score_delta_vs_baseline.toFixed(1)}</span>`
+        : '';
+      const qualStr = c.ground_sigma_quality ? ` <span style="color:#a89c84">(${c.ground_sigma_quality})</span>` : '';
       const popup = `
         <div style="font-family:ui-monospace,monospace;font-size:11px;line-height:1.4">
-          <div style="font-weight:700;color:${color}">Rank #${c.rank} · score ${Number(c.score).toFixed(1)}</div>
-          <div style="color:#a89c84">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
-          <div style="margin-top:4px">
-            <span style="color:#a89c84">Status:</span> ${escapeHtml(status)}
+          <div style="font-weight:700;color:${color}">Rank #${c.rank} · score ${Number(c.score).toFixed(1)}${deltaStr}</div>
+          <div style="color:#a89c84;margin-bottom:4px">${lat.toFixed(4)}, ${lon.toFixed(4)}</div>
+          <div style="margin-bottom:4px">
+            <span style="color:${catColor};font-weight:600;text-transform:uppercase;letter-spacing:.06em">${escapeHtml(catLabel)}</span>
           </div>
           <div><span style="color:#a89c84">COL:</span> ${(Number(c.col_coverage_pct) * 100).toFixed(0)}% ·
-               <span style="color:#a89c84">Day:</span> ${Number(c.daytime_reach_km).toFixed(1)} km</div>
-          <div><span style="color:#a89c84">NIF:</span> ${escapeHtml(c.nif_status || '—')}</div>
-          <div style="margin-top:4px;color:#efe6d6">${escapeHtml(c.notes || '')}</div>
+               <span style="color:#a89c84">5mV/m:</span> ${c.principal_community_5mvm_km != null ? `${Number(c.principal_community_5mvm_km).toFixed(1)} km` : '—'}</div>
+          <div><span style="color:#a89c84">Blkt pop:</span> ${escapeHtml(blanketStr)} ·
+               <span style="color:#a89c84">σ:</span> ${c.ground_sigma_mS_m != null ? `${c.ground_sigma_mS_m} mS/m${qualStr}` : '—'}</div>
+          <div><span style="color:#a89c84">Dist:</span> ${c.distance_from_current_km != null ? `${Number(c.distance_from_current_km).toFixed(1)} km` : '—'} ·
+               <span style="color:#a89c84">Brg:</span> ${c.bearing_deg != null ? `${c.bearing_deg}°` : '—'}</div>
           <div style="margin-top:6px"><i style="color:#6fd3ff">Click row in ledger for full detail.</i></div>
         </div>`;
       marker.bindPopup(popup);
@@ -244,7 +299,7 @@ export default function OptimizerMap({
       });
       heat.addTo(ctx.heatLayer);
     });
-  }, [candidates, onSelectCandidate]);
+  }, [candidates, onSelectCandidate, colorMode]);
 
   // re-draw infrastructure layer (one marker per infrastructure-source
   // candidate, plus its 9-treatment glyph from INFRA_MARKER_SPEC).
@@ -289,26 +344,60 @@ export default function OptimizerMap({
     m.openPopup();
   }, [selectedRank]);
 
+  const modeNextIdx = (COLOR_MODES.indexOf(colorMode) + 1) % COLOR_MODES.length;
+  const modeNext = COLOR_MODES[modeNextIdx];
+
   return (
     <RackPanel
       eyebrow="Chart Room"
       title="Regional candidate map"
-      italicAccent="Markers colour-coded by rank.  Zoom out for the heatmap layer."
+      italicAccent={`Markers coloured by ${colorMode}.  Zoom out for heatmap.`}
       tone="cyan"
       right={(
-        <div className="flex items-center gap-3 font-mono text-[10px] tracking-rack uppercase">
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-3 h-3" style={{ background: '#ffb347', clipPath: 'polygon(50% 0,100% 50%,50% 100%,0 50%)' }} aria-hidden="true" />
-            <span className="text-textDim">Current</span>
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#ffb347' }} aria-hidden="true" />
-            <span className="text-textDim">Rank 1</span>
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#6fd3ff' }} aria-hidden="true" />
-            <span className="text-textDim">Lower rank</span>
-          </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setColorMode(modeNext)}
+            className="font-mono text-[10px] tracking-rack uppercase border border-rule rounded-sm px-2 py-0.5 text-textDim hover:text-cream transition-colors"
+            title={`Switch to colour by ${modeNext}`}
+          >
+            {COLOR_MODE_LABELS[colorMode]} ⇄
+          </button>
+          {colorMode === 'rank' && (
+            <div className="flex items-center gap-2 font-mono text-[10px] tracking-rack uppercase">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#ffb347' }} />
+                <span className="text-textDim">Rank 1</span>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#6fd3ff' }} />
+                <span className="text-textDim">Low rank</span>
+              </span>
+            </div>
+          )}
+          {colorMode === 'status' && (
+            <div className="flex items-center gap-2 font-mono text-[10px] tracking-rack uppercase">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#63d471' }} />
+                <span className="text-textDim">Promising</span>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#ff5a5a' }} />
+                <span className="text-textDim">Non-cmp</span>
+              </span>
+            </div>
+          )}
+          {colorMode === 'sigma' && (
+            <div className="flex items-center gap-2 font-mono text-[10px] tracking-rack uppercase">
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#63d471' }} />
+                <span className="text-textDim">≥8 mS/m</span>
+              </span>
+              <span className="inline-flex items-center gap-1">
+                <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: '#ff7a7a' }} />
+                <span className="text-textDim">&lt;5 mS/m</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
     >

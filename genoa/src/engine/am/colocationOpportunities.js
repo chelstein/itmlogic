@@ -20,8 +20,8 @@
 //   Each candidate gets a single `status_category` from a fixed
 //   vocabulary so the UI can render a colored chip per result:
 //     PROMISING, REVIEW_REQUIRED, RECOVERABLE_WITH_DA,
-//     RECOVERABLE_WITH_REDUCED_POWER, RECOVERABLE_WITH_COL_CHANGE,
-//     TREATY_REVIEW, NON_COMPLIANT, UNKNOWN_DATA.
+//     RECOVERABLE_WITH_POWER_INCREASE, RECOVERABLE_WITH_REDUCED_POWER,
+//     RECOVERABLE_WITH_COL_CHANGE, TREATY_REVIEW, NON_COMPLIANT, UNKNOWN_DATA.
 //   The recovery-state logic is fully explained in
 //   explanation.recovery_reasoning.
 //
@@ -29,7 +29,11 @@
 //   No IO except for the manual JSON inventory load (delegated to
 //   manualInfrastructureClient).  All scoring is deterministic.
 
-import { runSiteOptimizer, __test__ as SO } from './siteOptimizer.js';
+import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline, buildFilingComplexityScore, __test__ as SO } from './siteOptimizer.js';
+const { buildProtectionAdvisory, buildMinimumSpacingReference, buildRecommendedActions } = SO;
+import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
+import { m3LoadStatus } from './m3.js';
+import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
 import {
   loadManualInfrastructureSites,
   filterInfrastructureSites
@@ -75,9 +79,30 @@ export async function runColocationOpportunities(body = {}){
   const {
     callsign, frequency_khz, current_site, search_radius_km,
     grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
-    community_of_license_polygon, goals, candidate_limit,
+    community_of_license_polygon, col_centroid, goals, candidate_limit,
     search_mode, infrastructure_source, infrastructure_filters
   } = v.value;
+
+  // ---- 1b. DA mode notice ----
+  if (/DA/i.test(pattern_mode)){
+    warnings.push({
+      code: 'DA_MODE_REQUIRED',
+      message: `pattern_mode=${pattern_mode}: §73.150 DA pattern design and §73.182 nighttime NIF analysis required at filing. Screening scores are daytime/NDA proxies — DA gain pattern optimization not performed.`
+    });
+  }
+
+  // ---- 1c. FCC class power limit advisory (mirrors siteOptimizer §73.21 check) ----
+  const FCC_CLASS_POWER_KW = { A:{min:10,max:50}, B:{min:0.25,max:50}, C:{min:0.001,max:0.25}, D:{min:0.001,max:50} };
+  const classLimits = FCC_CLASS_POWER_KW[fcc_class];
+  if (classLimits){
+    if (tpo_kw > classLimits.max){
+      warnings.push({ code: 'TPO_EXCEEDS_CLASS_MAX',
+        message: `tpo_kw ${tpo_kw} kW exceeds §73.21 daytime maximum for Class ${fcc_class} (${classLimits.max} kW).` });
+    } else if (fcc_class === 'A' && tpo_kw < classLimits.min){
+      warnings.push({ code: 'TPO_BELOW_CLASS_MIN',
+        message: `tpo_kw ${tpo_kw} kW is below §73.21 minimum for Class A stations (${classLimits.min} kW).` });
+    }
+  }
 
   // ---- 2. choose path ----
   if (search_mode === 'GRID'){
@@ -87,7 +112,7 @@ export async function runColocationOpportunities(body = {}){
     const so = await runSiteOptimizer({
       callsign, frequency_khz, current_site, search_radius_km,
       grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
-      community_of_license_polygon,
+      community_of_license_polygon, col_centroid,
       optimization_goals: rawGoalFlags(goals),
       candidate_limit: Math.min(candidate_limit, 200)
     });
@@ -105,15 +130,55 @@ export async function runColocationOpportunities(body = {}){
         goals, candidate_limit, search_mode, infrastructure_source,
         infrastructure_filters, community_of_license_polygon }),
       warnings,
-      so_limitations: so.limitations_global || []
+      so_limitations: so.limitations_global || [],
+      score_stats: so.score_stats || null,
+      optimization_confidence: so.optimization_confidence || null,
+      conductivity_mode: so.conductivity_mode || null,
+      frequency_channel_class: so.frequency_channel_class || null,
+      skywave_risk_level: so.skywave_risk_level ?? null,
+      protection_class_advisory: so.protection_class_advisory ?? null,
+      recommended_actions: so.recommended_actions ?? [],
+      candidate_count_by_status: so.candidate_count_by_status || null,
+      n_infrastructure_sites: 0,
+      scoring_time_ms: so.scoring_time_ms ?? null,
+      score_histogram: so.score_histogram ?? null,
+      top_candidates_summary: so.top_candidates_summary ?? null,
+      minimum_spacing_reference:    so.minimum_spacing_reference ?? null,
+      regulatory_timeline_estimate: so.regulatory_timeline_estimate ?? null,
+      frequency_allocation_context: so.frequency_allocation_context ?? null,
+      candidate_set_statistics:     so.candidate_set_statistics ?? null,
+      filing_complexity_score:       so.filing_complexity_score ?? null,
+      geographic_diversity_analysis:   so.geographic_diversity_analysis ?? null,
+      candidate_set_recommendation:    so.candidate_set_recommendation ?? null,
+      tower_construction_timeline:     so.tower_construction_timeline ?? null,
+      engineering_confidence_matrix:   so.engineering_confidence_matrix ?? null
+      // Note: per-candidate fcc_lms_filing_checklist, seasonal_propagation_summary,
+      // fcc_class_power_ceiling_analysis, technical_proof_guide, site_acquisition_checklist,
+      // and spectrum_interference_summary are generated by scoreCandidate and
+      // passed through automatically on each candidate object.
     });
   }
 
   // INFRASTRUCTURE-only and HYBRID share the same pool builder.
+  // Compute reach_scale_km (max reach at σ=15 mS/m) so population
+  // sub-score normalises correctly via scoreCandidate.
+  let reach_scale_km = 200;
+  try {
+    const rMax = fccAmDistanceKm({
+      frequency_khz,
+      target_mvm: 0.5,       // matches DAYTIME_REACH_TARGET_MVM in siteOptimizer
+      conductivity_msm: 15,
+      erp_kw: tpo_kw
+    });
+    if (rMax?.distance_km > 0) reach_scale_km = rMax.distance_km;
+  } catch (_) { /* keep fallback */ }
+
   const ctx = {
     callsign, frequency_khz, tpo_kw, pattern_mode, fcc_class,
-    community_of_license_polygon, goals, current_site
+    community_of_license_polygon, col_centroid, goals, current_site, reach_scale_km
   };
+
+  const scoringStart = Date.now();
 
   // ---- 3a. gather GRID candidates if applicable ----
   let gridScored = [];
@@ -137,7 +202,7 @@ export async function runColocationOpportunities(body = {}){
     try {
       raw = loadManualInfrastructureSites();
     } catch (e) {
-      warnings.push(`manual infrastructure inventory load failed: ${e.message}`);
+      warnings.push({ code: 'INFRA_LOAD_FAILED', message: `Manual infrastructure inventory load failed: ${e.message}` });
       raw = [];
     }
     infraSites = filterInfrastructureSites(raw, {
@@ -146,7 +211,7 @@ export async function runColocationOpportunities(body = {}){
       filters: infrastructure_filters
     });
   } else {
-    warnings.push(`infrastructure_source ${infrastructure_source} not yet wired; returning empty infrastructure pool`);
+    warnings.push({ code: 'INFRA_SOURCE_NOT_WIRED', message: `infrastructure_source '${infrastructure_source}' is not yet wired; returning empty infrastructure pool` });
   }
 
   const infraScored = await Promise.all(infraSites.map((site) => scoreInfrastructureCandidate(site, ctx, warnings)));
@@ -158,24 +223,216 @@ export async function runColocationOpportunities(body = {}){
   const cutoff = quantile(pool.map((c) => c.score), PROMISING_TOP_QUANTILE);
   for (const c of pool) assignStatusCategory(c, cutoff, { current_site });
 
-  pool.forEach((c, i) => { c.rank = i + 1; });
+  const nPool = pool.length;
+  pool.forEach((c, i) => {
+    c.rank = i + 1;
+    c.rank_percentile = nPool > 1 ? Math.round(((nPool - i - 1) / (nPool - 1)) * 10000) / 100 : 100;
+  });
 
   // Baseline = score row for the current site, if it's in the pool.
   const baseline = pool.find((c) => coordsEqual(c, current_site));
 
+  // Stamp baseline-relative deltas and coverage gap on every pool candidate.
+  for (const c of pool){
+    c.col_coverage_gap_pct = (c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR)
+      ? round2(COL_COVERAGE_HARD_FLOOR - c.col_coverage_pct)
+      : null;
+    if (baseline){
+      c.score_delta_vs_baseline = round2(c.score - baseline.score);
+      if (c.estimated_daytime_population_served != null && baseline.estimated_daytime_population_served != null){
+        c.population_delta_vs_baseline = Math.round(
+          c.estimated_daytime_population_served - baseline.estimated_daytime_population_served
+        );
+      }
+      const cbd  = c.explanation?.score_breakdown ?? {};
+      const bBd  = baseline.explanation?.score_breakdown ?? {};
+      const keys = new Set([...Object.keys(cbd), ...Object.keys(bBd)]);
+      const componentDeltas = {};
+      for (const k of keys){
+        const delta = round2((cbd[k] ?? 0) - (bBd[k] ?? 0));
+        if (delta !== 0) componentDeltas[k] = delta;
+      }
+      c.score_delta_explanation = { total: c.score_delta_vs_baseline, components: componentDeltas };
+    }
+  }
+
   const returned = pool.slice(0, candidate_limit);
+
+  // Score distribution stats over the full pool.
+  const scoreValues = pool.map(c => c.score);
+  const scoreMean = scoreValues.reduce((a, b) => a + b, 0) / Math.max(scoreValues.length, 1);
+  const scoreVar  = scoreValues.reduce((a, v) => a + (v - scoreMean) ** 2, 0) / Math.max(scoreValues.length, 1);
+  const score_stats = {
+    mean:    round2(scoreMean),
+    std_dev: round2(Math.sqrt(scoreVar)),
+    min:     round2(Math.min(...scoreValues)),
+    max:     round2(Math.max(...scoreValues))
+  };
+
+  // Confidence level mirrors siteOptimizer logic.
+  const rasterLoaded = m3LoadStatus().loaded;
+  const confidenceLayers = [];
+  if (goals.maximize_col_coverage || goals.maximize_population || goals.minimize_blanket_population){
+    confidenceLayers.push('fcc_groundwave_engine');
+  }
+  if (rasterLoaded){
+    confidenceLayers.push('m3_conductivity_raster');
+  }
+  if (goals.minimize_blanket_population)   confidenceLayers.push('blanket_population_proxy');
+  if (goals.minimize_int_treaty_zone)      confidenceLayers.push('international_border_detection');
+  if (community_of_license_polygon)        confidenceLayers.push('col_polygon_provided');
+  if (infraSites.length > 0)               confidenceLayers.push('infrastructure_inventory');
+  const nLayers = confidenceLayers.length;
+
+  // Per-candidate confidence distribution over the scored pool.
+  const confDist = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+  for (const c of pool) confDist[c.score_confidence || 'LOW'] = (confDist[c.score_confidence || 'LOW'] || 0) + 1;
+  const nPoolTotal = pool.length || 1;
+  const pctLow = ((confDist.LOW / nPoolTotal) * 100).toFixed(0);
+  const optimization_confidence = {
+    level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
+    contributing_layers: confidenceLayers,
+    per_candidate_confidence: confDist,
+    notes: [
+      ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
+      ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+      ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
+      ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : []),
+      ...(confDist.LOW === nPoolTotal ? [`All ${nPoolTotal} candidates scored at LOW confidence (zone-table σ + disc-proxy COL) — provide AM_m3.tif and community_of_license_polygon to raise ranking reliability.`]
+        : confDist.LOW > nPoolTotal * 0.7 ? [`${pctLow}% of candidates scored at LOW confidence — upgrade conductivity raster and/or COL polygon for more reliable ranking.`]
+        : [])
+    ]
+  };
+
+  const candidate_count_by_status = {};
+  for (const c of pool){
+    const s = c.status_category || 'UNKNOWN_DATA';
+    candidate_count_by_status[s] = (candidate_count_by_status[s] || 0) + 1;
+  }
+
+  const scoring_time_ms = Date.now() - scoringStart;
+
+  // Build score histogram for INFRASTRUCTURE/HYBRID pool.
+  const score_histogram = Array.from({ length: 10 }, (_, i) => ({
+    bucket: `${i * 10}–${i * 10 + 9}`, min: i * 10, max: i * 10 + 9, count: 0, promising_count: 0
+  }));
+  for (const c of pool){
+    const idx = Math.min(9, Math.floor(c.score / 10));
+    score_histogram[idx].count += 1;
+    if (c.status_category === 'PROMISING') score_histogram[idx].promising_count += 1;
+  }
+
+  const chanClass = frequencyChannelClass(frequency_khz);
+  const { skywave_risk_level, protection_class_advisory } = buildProtectionAdvisory({
+    fcc_class, frequency_khz, channel_class: chanClass, pattern_mode
+  });
+
+  const baselineSumm = baseline ? baselineSummary(baseline) : null;
+  const recommended_actions = buildRecommendedActions({
+    baseline: baselineSumm,
+    returned,
+    scored: pool,
+    candidate_count_by_status,
+    fcc_class,
+    pattern_mode,
+    chanClass,
+    skywave_risk_level,
+    warnings,
+    community_of_license_polygon
+  });
 
   return composeResponse({
     method: `${search_mode} (infrastructure source: ${infrastructure_source})`,
     candidates: returned,
     n_candidates_evaluated: pool.length,
-    baseline: baseline ? baselineSummary(baseline) : null,
+    baseline: baselineSumm,
     inputs_echo: echoInputs({ callsign, frequency_khz, current_site,
       search_radius_km, grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
       goals, candidate_limit, search_mode, infrastructure_source,
       infrastructure_filters, community_of_license_polygon }),
     warnings,
-    so_limitations: []
+    so_limitations: [],
+    score_stats,
+    optimization_confidence,
+    conductivity_mode: m3LoadStatus().loaded ? 'raster' : 'zone-table',
+    frequency_channel_class: chanClass,
+    skywave_risk_level,
+    protection_class_advisory,
+    recommended_actions,
+    minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
+    regulatory_timeline_estimate: buildRegulatoryTimeline({
+      fcc_class, channel_class: chanClass, skywave_risk_level,
+      asr_required: (300000 / frequency_khz / 4) > 60.96,
+      has_treaty_candidates: returned.some(c => !!c.treaty_zone),
+      any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
+      n_promising: Object.keys(candidate_count_by_status || {}).includes('PROMISING')
+        ? (candidate_count_by_status.PROMISING ?? 0) : 0
+    }),
+    candidate_count_by_status,
+    n_infrastructure_sites: infraSites.length,
+    scoring_time_ms,
+    score_histogram,
+    top_candidates_summary: buildTopSummary(returned.slice(0, 5), baselineSumm, pool.length),
+    filing_complexity_score: buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: 60.96 }),
+    geographic_diversity_analysis: (() => {
+      const top5 = returned.slice(0, 5);
+      const bearingToQ = b => { const n = ((b % 360) + 360) % 360; return n < 90 ? 'NE' : n < 180 ? 'SE' : n < 270 ? 'SW' : 'NW'; };
+      const qm = { NE: [], SE: [], SW: [], NW: [] };
+      for (const c of top5) qm[bearingToQ(c.bearing_deg ?? 0)].push(c.rank);
+      const covered = Object.values(qm).filter(a => a.length > 0).length;
+      const diversity_score = Math.round((covered / 4) * 100);
+      const diversity_tier = covered === 4 ? 'EXCELLENT' : covered === 3 ? 'GOOD' : covered === 2 ? 'MODERATE' : 'POOR';
+      const LABELS = { NE: 'NE (0–90°)', SE: 'SE (90–180°)', SW: 'SW (180–270°)', NW: 'NW (270–360°)' };
+      return {
+        n_candidates_analyzed: top5.length,
+        quadrants_covered: covered, diversity_score, diversity_tier,
+        quadrant_summary: Object.fromEntries(Object.entries(qm).map(([q, r]) => [q, { label: LABELS[q], candidates: r, covered: r.length > 0 }])),
+        uncovered_quadrants: Object.entries(qm).filter(([, r]) => r.length === 0).map(([q]) => q),
+        median_distance_km: (() => { if (!top5.length) return null; const d = top5.map(c => c.distance_from_current_km ?? 0).sort((a, b) => a - b); const m = Math.floor(d.length / 2); return Math.round((d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2) * 100) / 100; })()
+      };
+    })(),
+    candidate_set_recommendation: (() => {
+      const top5 = returned.slice(0, 5);
+      if (!top5.length) return null;
+      const bearingToQ = b => { const n = ((b % 360) + 360) % 360; return n < 90 ? 'NE' : n < 180 ? 'SE' : n < 270 ? 'SW' : 'NW'; };
+      const entries = top5.map(c => {
+        const gateFails = c.regulatory_gate_summary?.fail_count ?? 0;
+        const isProm = c.status_category === 'PROMISING';
+        const isRec = c.status_category?.startsWith('RECOVERABLE');
+        const isNonComp = c.status_category === 'NON_COMPLIANT';
+        let priority, action;
+        if (gateFails > 0 || isNonComp) {
+          priority = 'HOLD'; action = `Hold — ${gateFails} gate failure(s) require engineering remediation.`;
+        } else if (isProm) {
+          priority = 'ADVANCE_IMMEDIATELY'; action = 'Advance to full §73.182 NIF study + parcel investigation.';
+        } else if (isRec) {
+          priority = 'ADVANCE_AFTER_REMEDY'; action = `Advance after resolving recovery path — see compliance_pathway.`;
+        } else {
+          priority = 'MONITOR'; action = 'Monitor — viable fallback site.';
+        }
+        return { rank: c.rank, status: c.status_category, score: c.score, gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? null, gate_fail_count: gateFails, quadrant: bearingToQ(c.bearing_deg ?? 0), action, priority };
+      });
+      const n_advance_ready = entries.filter(e => e.priority === 'ADVANCE_IMMEDIATELY').length;
+      const n_need_remedy   = entries.filter(e => e.priority === 'ADVANCE_AFTER_REMEDY').length;
+      const n_hold          = entries.filter(e => e.priority === 'HOLD').length;
+      const primary = entries.find(e => e.priority === 'ADVANCE_IMMEDIATELY') ?? entries[0];
+      return { overall_guidance: n_advance_ready >= 1 ? `${n_advance_ready} candidate(s) ready to advance to NIF study + parcel investigation.` : 'No immediately advanceable candidates — resolve remediation items first.', primary_recommended_rank: primary?.rank ?? null, n_advance_ready, n_need_remedy, n_hold, candidates: entries, note: 'Screening-grade advisory — qualified broadcast engineer and FCC counsel must review before site commitment or filing.' };
+    })(),
+    engineering_confidence_matrix: (() => {
+      const rasterLoaded = m3LoadStatus().loaded;
+      const hasColPolygon = !!community_of_license_polygon;
+      const conductivity_mode_loc = rasterLoaded ? 'raster' : 'zone-table';
+      const dimensions = [
+        { id: 'CONDUCTIVITY', label: 'Ground conductivity (σ)', confidence: rasterLoaded ? 'FILING_GRADE' : 'SCREENING', score_impact_pts: 12, upgrade_action: rasterLoaded ? null : 'Deploy AM_m3.tif GeoTIFF raster.' },
+        { id: 'COL_COVERAGE', label: 'Principal community coverage', confidence: hasColPolygon ? 'HIGH' : 'SCREENING', score_impact_pts: 10, upgrade_action: hasColPolygon ? null : 'Supply community_of_license_polygon GeoJSON.' },
+        { id: 'POPULATION', label: 'Population / people served', confidence: 'SCREENING', score_impact_pts: 8, upgrade_action: 'Integrate Census TIGER block-level population.' },
+        { id: 'BLANKET_POPULATION', label: 'Blanket population fraction', confidence: 'SCREENING', score_impact_pts: 6, upgrade_action: 'Integrate Census blocks within 1000 mV/m contour.' },
+        { id: 'NIGHTTIME_NIF', label: 'Nighttime skywave (§73.182)', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Integrate FCC OET-72 skywave engine + LMS.' },
+        { id: 'WILDFIRE_RISK', label: 'Wildfire / fuel risk', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Wire USFS FIA / LANDFIRE raster.' }
+      ];
+      const filing_grade = dimensions.filter(d => d.confidence === 'FILING_GRADE').length;
+      return { overall_confidence: filing_grade >= 2 ? 'MEDIUM_HIGH' : filing_grade >= 1 ? 'MEDIUM' : 'LOW', conductivity_mode: conductivity_mode_loc, col_polygon_supplied: hasColPolygon, dimensions, n_filing_grade: filing_grade, n_screening: dimensions.filter(d => d.confidence === 'SCREENING').length, n_not_evaluated: dimensions.filter(d => d.confidence === 'NOT_EVALUATED').length, note: 'Confidence matrix shows the data quality behind each scoring dimension.' };
+    })()
   });
 }
 
@@ -215,7 +472,7 @@ function validateInputs(body, warnings){
 
   if (search_mode !== 'INFRASTRUCTURE'){
     if (grid_spacing_km > search_radius_km){
-      warnings.push(`grid_spacing_km (${grid_spacing_km}) exceeds search_radius_km (${search_radius_km}); only the current-site point will be evaluated.`);
+      warnings.push({ code: 'GRID_SPACING_LARGE', message: `grid_spacing_km (${grid_spacing_km}) exceeds search_radius_km (${search_radius_km}); only the current-site point will be evaluated` });
     }
     const est_n = Math.ceil((2 * search_radius_km / grid_spacing_km) + 1) ** 2;
     if (est_n > 10_000){
@@ -242,6 +499,19 @@ function validateInputs(body, warnings){
 
   const infrastructure_filters = sanitizeFilters(body.infrastructure_filters);
 
+  // Optional COL centroid — passed through to scoreCandidate via siteOptimizer ctx.
+  let col_centroid = null;
+  if (body.col_centroid){
+    const clat = Number(body.col_centroid.lat), clon = Number(body.col_centroid.lon);
+    if (Number.isFinite(clat) && clat >= -90 && clat <= 90 &&
+        Number.isFinite(clon) && clon >= -180 && clon <= 180){
+      col_centroid = { lat: clat, lon: clon };
+    } else {
+      warnings.push({ code: 'COL_CENTROID_INVALID',
+        message: 'col_centroid.lat/lon invalid — ignoring; field_at_col_centroid_mvm will use distance to current_site instead.' });
+    }
+  }
+
   return {
     ok: true,
     value: {
@@ -250,6 +520,7 @@ function validateInputs(body, warnings){
       search_radius_km, grid_spacing_km, tpo_kw,
       pattern_mode, fcc_class,
       community_of_license_polygon: body.community_of_license_polygon || null,
+      col_centroid,
       goals,
       candidate_limit,
       search_mode,
@@ -316,12 +587,16 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
   // siteOptimizer's per-candidate scorer (which handles all of the
   // FCC-curve math and the 5 mV/m COL coverage check), then layer the
   // co-location advisory block on top.
+  const dist = Number.isFinite(site.distance_from_center_km)
+    ? site.distance_from_center_km
+    : SO.greatCircleKm(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon);
+  const bearing = dist < 0.01 ? 0
+    : Math.round(SO.bearingDeg(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon));
   const pt = {
     lat: site.lat,
     lon: site.lon,
-    distance_from_current_km: Number.isFinite(site.distance_from_center_km)
-      ? site.distance_from_center_km
-      : SO.greatCircleKm(ctx.current_site.lat, ctx.current_site.lon, site.lat, site.lon)
+    distance_from_current_km: dist,
+    bearing_deg: bearing
   };
   const scored = await SO.scoreCandidate(pt, ctx, warnings);
 
@@ -351,6 +626,51 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
   if (site.kind === 'FM_SITE' || site.kind === 'TV_SITE'){
     regulatory_notes.push(`${site.kind} host – evaluate RF safety (47 CFR §1.1310 / OET-65) and IM products.`);
   }
+  // MPE screening: compute the §1.1310 near-field boundary and far-field
+  // compliance distance for the AM station.  For AM (< 30 MHz) the
+  // near-field zone extends λ/(2π) from the antenna and a near-field study
+  // is always required regardless of the far-field result.
+  try {
+    const freq_mhz = ctx.frequency_khz / 1000;
+    const nfBound = nearFieldBoundary_m(freq_mhz);
+    const mpe = complianceDistance_m({ erp_kw: ctx.tpo_kw, frequency_mhz: freq_mhz, exposure_class: 'uncontrolled' });
+    const nfStr = Number.isFinite(nfBound) ? `near-field boundary λ/(2π) ≈ ${Math.round(nfBound)} m` : null;
+    const ffStr = (mpe && Number.isFinite(mpe.distance_m)) ? `far-field compliance distance ≈ ${Math.ceil(mpe.distance_m)} m` : null;
+    if (nfStr || ffStr){
+      const parts = [nfStr, ffStr].filter(Boolean);
+      regulatory_notes.push(
+        `RF safety (§1.1310 / OET-65): ${parts.join('; ')} at ${ctx.tpo_kw} kW / ${ctx.frequency_khz} kHz.` +
+        ` AM < 30 MHz: near-field analysis (OET-65 §3.B) required out to the λ/(2π) boundary.`
+      );
+    }
+  } catch (_){ /* skip if OET-65 lookup fails */ }
+
+  // Co-siting complexity score: 0 (trivial) to 10 (highly complex).
+  const loadingAdvisory = site.tower_loading_advisory || 'UNKNOWN';
+  const structEngRequired = loadingAdvisory !== 'OK_PER_INVENTORY';
+  let complexityScore = 0;
+  if (diplex) complexityScore += 3;
+  if (interferenceRisk === 'HIGH') complexityScore += 3;
+  else if (interferenceRisk === 'MODERATE') complexityScore += 1;
+  if (structEngRequired) complexityScore += 2;
+  if (loadingAdvisory === 'UNKNOWN') complexityScore += 1;
+  complexityScore = Math.min(10, complexityScore);
+
+  const complexityLabel = complexityScore <= 2 ? 'LOW — straightforward co-location'
+    : complexityScore <= 5 ? 'MODERATE — engineering coordination required'
+    : 'HIGH — significant regulatory and structural work expected';
+
+  // Lease synergy advisory — qualitative guidance on the host-sharing advantage.
+  let leaseSynergyAdvisory;
+  if (site.kind === 'AM_SITE'){
+    leaseSynergyAdvisory = 'STRONG: existing AM vertical antenna tower — most physical infrastructure already licensed for AM use; land-use coordination straightforward.';
+  } else if (site.kind === 'FM_SITE' || site.kind === 'TV_SITE'){
+    leaseSynergyAdvisory = `MODERATE: existing ${site.kind} tower — structural assessment and RF compatibility study required; shared lease reduces site acquisition risk.`;
+  } else if (site.kind === 'CELL_TOWER' || site.kind === 'UTILITY_TOWER'){
+    leaseSynergyAdvisory = 'MODERATE: non-broadcast tower — land-use and structural approval likely required; existing lease infrastructure reduces permitting timeline.';
+  } else {
+    leaseSynergyAdvisory = 'UNKNOWN: host tower kind unspecified — verify lease terms and structural capacity before proceeding.';
+  }
 
   const decorated = {
     ...scored,
@@ -373,11 +693,13 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
       host_kind: hostKind,
       host_owner: site.owner ?? null,
       host_height_m: site.height_m ?? null,
-      tower_loading_advisory: site.tower_loading_advisory || 'UNKNOWN',
+      tower_loading_advisory: loadingAdvisory,
       same_band_interference_risk: interferenceRisk,
-      structural_engineering_required: site.tower_loading_advisory !== 'OK_PER_INVENTORY',
+      structural_engineering_required: structEngRequired,
       shared_lease_advantage: true,
       diplexing_required: !!diplex,
+      co_siting_complexity: { score: complexityScore, label: complexityLabel },
+      lease_synergy_advisory: leaseSynergyAdvisory,
       regulatory_notes
     }
   };
@@ -407,9 +729,13 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
     category = 'TREATY_REVIEW';
     reasoning.push(`Candidate sits inside ${c.treaty_zone}; cross-border treaty review required.`);
   } else if (colFail && !blanketFail && c.score >= RECOVERY_SCORE_FLOOR){
-    // COL coverage fails but the rest of the score is healthy — a DA
-    // pattern can usually pull the 5 mV/m contour toward the city.
-    if (c.distance_from_current_km <= NEARBY_COMMUNITY_RADIUS_KM){
+    // COL coverage fails but the rest of the score is healthy — determine
+    // the most specific recovery path.
+    if (c.minimum_tpo_for_col_coverage_kw != null){
+      // Engine found a feasible power level (≤50 kW) — direct TPO increase is the fix.
+      category = 'RECOVERABLE_WITH_POWER_INCREASE';
+      reasoning.push(`Engine computed minimum TPO of ${c.minimum_tpo_for_col_coverage_kw} kW to reach §73.24(j) 5 mV/m at COL centroid distance; direct power increase (no DA pattern) is the primary path.`);
+    } else if (c.distance_from_current_km <= NEARBY_COMMUNITY_RADIUS_KM){
       category = 'RECOVERABLE_WITH_DA';
       reasoning.push('Principal-community 5 mV/m contour shortfall is plausibly recoverable via directional-antenna design (§73.150).');
     } else {
@@ -448,6 +774,21 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
   c.status_category = category;
   c.explanation = c.explanation || {};
   c.explanation.recovery_reasoning = reasoning.join(' ');
+
+  // Align nif_status with the assigned category so colocation candidates
+  // carry a meaningful label (not just the default 'SCREENING ONLY').
+  const NIF_MAP = {
+    PROMISING:                     'PROMISING',
+    REVIEW_REQUIRED:               'REVIEW REQUIRED',
+    NON_COMPLIANT:                 'NON-COMPLIANT',
+    RECOVERABLE_WITH_DA:           'NON-COMPLIANT',
+    RECOVERABLE_WITH_POWER_INCREASE: 'NON-COMPLIANT',
+    RECOVERABLE_WITH_REDUCED_POWER: 'NON-COMPLIANT',
+    RECOVERABLE_WITH_COL_CHANGE:   'NON-COMPLIANT',
+    TREATY_REVIEW:                 'REVIEW REQUIRED',
+    UNKNOWN_DATA:                  'SCREENING ONLY'
+  };
+  c.nif_status = NIF_MAP[category] ?? 'SCREENING ONLY';
 }
 
 function collectHardFails(c){
@@ -467,14 +808,130 @@ function collectHardFails(c){
 // ---------- response composition ----------
 
 function composeResponse({ method, candidates, n_candidates_evaluated,
-                            baseline, inputs_echo, warnings, so_limitations }){
+                            baseline, inputs_echo, warnings, so_limitations,
+                            score_stats, score_histogram, top_candidates_summary,
+                            optimization_confidence,
+                            conductivity_mode, frequency_channel_class,
+                            skywave_risk_level, protection_class_advisory,
+                            recommended_actions,
+                            minimum_spacing_reference,
+                            regulatory_timeline_estimate = null,
+                            frequency_allocation_context = null,
+                            candidate_set_statistics = null,
+                            filing_complexity_score = null,
+                            geographic_diversity_analysis = null,
+                            candidate_set_recommendation = null,
+                            tower_construction_timeline = null,
+                            engineering_confidence_matrix = null,
+                            n_infrastructure_sites,
+                            candidate_count_by_status, scoring_time_ms }){
+  // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
+  for (const c of candidates){
+    if (!c.nif_status || c.nif_status === 'SCREENING ONLY') continue;
+    if (c.treaty_zone){
+      c.nif_status += ' — TREATY COORDINATION REQUIRED';
+    } else if (skywave_risk_level === 'HIGH'){
+      c.nif_status += ' — HIGH skywave risk (§73.182 NIF study required)';
+    } else if (skywave_risk_level === 'MODERATE'){
+      c.nif_status += ' — MODERATE skywave risk';
+    }
+  }
+  // Candidate shortlist — top 3 promising picks (mirrors siteOptimizer).
+  const candidate_shortlist = (() => {
+    const promising = candidates.filter(c => c.status_category === 'PROMISING');
+    const pool = promising.length > 0 ? promising : candidates.filter(c => c.status_category !== 'NON_COMPLIANT');
+    return pool.slice(0, 3).map(c => {
+      const dist = c.distance_from_current_km != null ? `${c.distance_from_current_km.toFixed(1)} km ${c.cardinal_direction ?? ''}` : 'unknown distance';
+      const col  = c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}%` : '?%';
+      const sigma = c.ground_sigma_quality ?? 'unknown';
+      const band = c.score_confidence_band;
+      const bandStr = band ? `score ${c.score.toFixed(1)} [${band.score_low}–${band.score_high}]` : `score ${c.score?.toFixed(1) ?? '?'}`;
+      const isInfra = c.source === 'INFRASTRUCTURE';
+      const infra = isInfra ? ` (${c.infrastructure_ref?.kind ?? 'host tower'}: ${c.infrastructure_ref?.name ?? 'unnamed'})` : '';
+      const action = c.status_category === 'PROMISING'
+        ? `Advance to full §73.182 NIF study and parcel investigation.`
+        : c.status_category === 'RECOVERABLE_WITH_POWER_INCREASE'
+        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(j) compliance, then advance to NIF study.`
+        : c.status_category === 'RECOVERABLE_WITH_DA'
+        ? `Commission §73.150 directional antenna study to push 5 mV/m contour toward community of license.`
+        : c.status_category === 'TREATY_REVIEW'
+        ? `Initiate FCC International Bureau treaty coordination before any other action.`
+        : `Engineering review required before advancing — see per_candidate_engineering_checklist.`;
+      return {
+        rank: c.rank, lat: c.lat, lon: c.lon,
+        status_category: c.status_category,
+        source: c.source,
+        score_with_band: bandStr,
+        summary: `Rank ${c.rank}${infra} @ ${dist}: COL coverage ${col}, σ=${c.ground_sigma_mS_m ?? '?'} mS/m (${sigma}), reach ${c.daytime_reach_km?.toFixed(0) ?? '?'} km. ${action}`,
+        recommended_next_step: action
+      };
+    });
+  })();
+
+  // Build comparison table (mirrors siteOptimizer candidate_comparison_table).
+  const r2 = (x) => (typeof x === 'number' && isFinite(x)) ? Math.round(x * 100) / 100 : x;
+  const candidate_comparison_table = candidates.map(c => ({
+    rank:                   c.rank,
+    go_no_go:               c.site_viability_summary?.go_no_go ?? null,
+    viability_confidence:   c.site_viability_summary?.confidence ?? null,
+    lat:                    c.lat,
+    lon:                    c.lon,
+    distance_km:            c.distance_from_current_km,
+    direction:              c.cardinal_direction,
+    score:                  c.score,
+    status:                 c.status_category,
+    col_coverage_pct:       c.col_coverage_pct,
+    daytime_reach_km:       c.daytime_reach_km,
+    blanket_pop_pct:        c.blanket_population_pct,
+    sigma_msm:              c.ground_sigma_mS_m,
+    sigma_quality:          c.ground_sigma_quality,
+    treaty_zone:            c.treaty_zone ?? null,
+    score_confidence:       c.score_confidence,
+    risk_score:             c.regulatory_risk_score?.risk_score ?? null,
+    risk_category:          c.regulatory_risk_score?.risk_category ?? null,
+    source:                 c.source ?? null,
+    overlap_fraction:       c.coverage_overlap_analysis?.overlap_fraction ?? null,
+    coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null,
+    cost_tier:              c.tower_cost_estimate?.cost_tier ?? null,
+    cost_low_usd:           c.tower_cost_estimate?.total_low_usd ?? null,
+    cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null,
+    power_upgrade_verdict:  c.power_upgrade_analysis?.verdict ?? null,
+    headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null,
+    da_study_recommended:   c.directional_antenna_study_guide?.recommended ?? null,
+    da_study_type:          c.directional_antenna_study_guide?.study_type ?? null,
+    skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null
+  }));
+
   return {
     available: true,
     method,
     n_candidates_evaluated,
     n_candidates_returned: candidates.length,
+    n_infrastructure_sites: n_infrastructure_sites ?? 0,
+    candidate_count_by_status: candidate_count_by_status || null,
+    top_candidates_summary: top_candidates_summary ?? null,
+    candidate_shortlist,
+    candidate_comparison_table,
     current_site_baseline: baseline,
     candidates,
+    score_stats,
+    score_histogram: score_histogram ?? null,
+    optimization_confidence,
+    conductivity_mode: conductivity_mode || null,
+    frequency_channel_class: frequency_channel_class || null,
+    skywave_risk_level: skywave_risk_level ?? null,
+    protection_class_advisory: protection_class_advisory ?? null,
+    recommended_actions: recommended_actions ?? [],
+    minimum_spacing_reference:    minimum_spacing_reference ?? null,
+    regulatory_timeline_estimate: regulatory_timeline_estimate ?? null,
+    frequency_allocation_context: frequency_allocation_context ?? null,
+    candidate_set_statistics:     candidate_set_statistics ?? null,
+    filing_complexity_score:       filing_complexity_score ?? null,
+    geographic_diversity_analysis:    geographic_diversity_analysis ?? null,
+    candidate_set_recommendation:     candidate_set_recommendation ?? null,
+    tower_construction_timeline:      tower_construction_timeline ?? null,
+    engineering_confidence_matrix:    engineering_confidence_matrix ?? null,
+    scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,
     limitations_global: [
@@ -491,17 +948,32 @@ function baselineSummary(b){
   return {
     lat: b.lat, lon: b.lon,
     score: b.score,
-    col_coverage_pct:          b.col_coverage_pct,
-    daytime_reach_km:          b.daytime_reach_km,
-    blanket_population_pct:    b.blanket_population_pct,
-    ground_sigma_mS_m:         b.ground_sigma_mS_m,
-    ground_sigma_source:       b.ground_sigma_source,
-    ground_sigma_filing_grade: b.ground_sigma_filing_grade,
-    nif_status:                b.nif_status,
-    treaty_zone:               b.treaty_zone,
-    status_category:           b.status_category,
-    status_labels:             b.status_labels,
-    source:                    b.source
+    rank_percentile:              b.rank_percentile,
+    col_coverage_pct:             b.col_coverage_pct,
+    principal_community_5mvm_km:  b.principal_community_5mvm_km,
+    daytime_reach_km:             b.daytime_reach_km,
+    blanket_population_pct:       b.blanket_population_pct,
+    blanket_1000mvm_km:           b.blanket_1000mvm_km,
+    minimum_tpo_for_compliance_kw:   b.minimum_tpo_for_compliance_kw ?? null,
+    minimum_tpo_for_col_coverage_kw: b.minimum_tpo_for_col_coverage_kw ?? null,
+    col_coverage_gap_pct:            b.col_coverage_gap_pct ?? null,
+    ground_sigma_mS_m:            b.ground_sigma_mS_m,
+    ground_sigma_quality:         b.ground_sigma_quality,
+    ground_sigma_source:          b.ground_sigma_source,
+    ground_sigma_filing_grade:    b.ground_sigma_filing_grade,
+    nif_status:                   b.nif_status,
+    treaty_zone:                  b.treaty_zone,
+    status_category:              b.status_category,
+    status_labels:                b.status_labels,
+    source:                       b.source,
+    score_breakdown:              b.explanation?.score_breakdown ?? null,
+    // Fields added in recent optimizer upgrades.
+    field_at_col_centroid_mvm:            b.field_at_col_centroid_mvm ?? null,
+    estimated_daytime_population_served:  b.estimated_daytime_population_served ?? null,
+    score_confidence:                     b.score_confidence ?? null,
+    regulatory_compliance_summary:        b.regulatory_compliance_summary ?? null,
+    power_class_ceiling_kw:               b.power_class_ceiling_kw ?? null,
+    mpe_evaluation_required:              b.mpe_evaluation_required ?? null
   };
 }
 
@@ -517,6 +989,8 @@ function echoInputs(o){
     fcc_class: o.fcc_class,
     goals_enabled: Object.entries(o.goals).filter(([_, v]) => v).map(([k]) => k),
     community_of_license_polygon_provided: !!o.community_of_license_polygon,
+    col_centroid_provided: !!o.col_centroid,
+    col_centroid: o.col_centroid ?? null,
     candidate_limit: o.candidate_limit,
     search_mode: o.search_mode,
     infrastructure_source: o.infrastructure_source,
@@ -528,7 +1002,7 @@ function echoInputs(o){
 
 function ensureCurrentSiteIncluded(points, current){
   if (!points.some((p) => coordsEqual(p, current))){
-    points.push({ lat: current.lat, lon: current.lon, distance_from_current_km: 0 });
+    points.push({ lat: current.lat, lon: current.lon, distance_from_current_km: 0, bearing_deg: 0 });
   }
 }
 
@@ -542,6 +1016,8 @@ function quantile(arr, q){
   const idx = Math.min(sorted.length - 1, Math.floor(q * sorted.length));
   return sorted[idx];
 }
+
+function round2(x){ return Number.isFinite(x) ? Math.round(x * 100) / 100 : x; }
 
 // ---------- test-only export ----------
 
