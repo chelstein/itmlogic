@@ -777,6 +777,64 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         )}
 
+        {/* TPO power sweep */}
+        {candidate.tpo_power_sweep?.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">Power sweep — coverage vs TPO</div>
+            <table className="w-full font-mono text-[10px] border-collapse">
+              <thead>
+                <tr className="text-textDim text-left">
+                  <th className="pb-0.5 pr-2 font-normal">TPO</th>
+                  <th className="pb-0.5 pr-2 font-normal">0.5 mV/m reach</th>
+                  <th className="pb-0.5 pr-2 font-normal">5 mV/m (COL)</th>
+                  <th className="pb-0.5 pr-2 font-normal">Blanket</th>
+                  <th className="pb-0.5 font-normal">§73.24</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidate.tpo_power_sweep.map(row => {
+                  const compliant = row.compliant;
+                  const isCurrent = row.is_current_tpo;
+                  const rowStyle = isCurrent ? { background: 'rgba(255,255,255,0.04)' } : {};
+                  const statusCol = compliant ? '#63d471' : compliant === false ? '#ff7a7a' : '#888';
+                  return (
+                    <tr key={row.tpo_kw} className="border-t border-white/5" style={rowStyle}>
+                      <td className="py-0.5 pr-2" style={{ color: isCurrent ? '#b8d0cc' : '#888', fontWeight: isCurrent ? 600 : 400 }}>
+                        {row.tpo_kw} kW{isCurrent ? ' ←' : ''}
+                      </td>
+                      <td className="py-0.5 pr-2 text-textDim">
+                        {row.daytime_reach_km != null ? `${row.daytime_reach_km} km` : '—'}
+                      </td>
+                      <td className="py-0.5 pr-2" style={{ color: row.col_5mvm_km != null ? '#b8d0cc' : '#444' }}>
+                        {row.col_5mvm_km != null ? `${row.col_5mvm_km} km` : '—'}
+                        {row.col_coverage_pct_est != null && (
+                          <span style={{ color: row.col_meets_floor ? '#63d471' : '#ff7a7a' }}>
+                            {' '}{(row.col_coverage_pct_est * 100).toFixed(0)}%
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-0.5 pr-2" style={{ color: row.blanket_1000mvm_km != null ? '#b8d0cc' : '#444' }}>
+                        {row.blanket_1000mvm_km != null ? `${row.blanket_1000mvm_km} km` : '—'}
+                        {row.blanket_pop_pct_est != null && (
+                          <span style={{ color: row.blanket_pop_ok ? '#63d471' : '#ff7a7a' }}>
+                            {' '}{row.blanket_pop_pct_est.toFixed(2)}%
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-0.5 text-[9px]" style={{ color: statusCol }}>
+                        {compliant == null ? '—' : compliant ? '✓' : '✕'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="font-mono text-[9px] text-textDim/60 mt-1">
+              COL coverage % uses 10 km disc proxy. ← marks current TPO. §73.24(j) floor = 80%, §73.24(g) blanket limit = 1%.
+            </div>
+          </div>
+        )}
+
         {/* Groundwave contour table */}
         {candidate.groundwave_contour_table?.length > 0 && (
           <div>

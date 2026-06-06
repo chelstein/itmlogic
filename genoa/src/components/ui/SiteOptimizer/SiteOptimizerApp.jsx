@@ -523,6 +523,13 @@ const DEMO_RESULT = {
         { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=8 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
         { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
         { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' }
+      ],
+      tpo_power_sweep: [
+        { tpo_kw: 0.001, is_current_tpo: false, daytime_reach_km: 5.1, col_5mvm_km: 1.2, blanket_1000mvm_km: 0.04, col_coverage_pct_est: 0.11, blanket_pop_pct_est: 0.00, col_meets_floor: false, blanket_pop_ok: true, compliant: false },
+        { tpo_kw: 2.5,   is_current_tpo: false, daytime_reach_km: 24.3, col_5mvm_km: 4.7, blanket_1000mvm_km: 0.38, col_coverage_pct_est: 0.87, blanket_pop_pct_est: 0.07, col_meets_floor: true,  blanket_pop_ok: true, compliant: true },
+        { tpo_kw: 5,     is_current_tpo: true,  daytime_reach_km: 34.1, col_5mvm_km: 5.8, blanket_1000mvm_km: 0.52, col_coverage_pct_est: 0.97, blanket_pop_pct_est: 0.13, col_meets_floor: true,  blanket_pop_ok: true, compliant: true },
+        { tpo_kw: 10,    is_current_tpo: false, daytime_reach_km: 46.8, col_5mvm_km: 7.6, blanket_1000mvm_km: 0.74, col_coverage_pct_est: 0.99, blanket_pop_pct_est: 0.27, col_meets_floor: true,  blanket_pop_ok: true, compliant: true },
+        { tpo_kw: 50,    is_current_tpo: false, daytime_reach_km: 88.2, col_5mvm_km: 14.1, blanket_1000mvm_km: 1.61, col_coverage_pct_est: 1.00, blanket_pop_pct_est: 1.28, col_meets_floor: true, blanket_pop_ok: false, compliant: false }
       ]
     },
     {

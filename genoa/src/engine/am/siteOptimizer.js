@@ -1351,6 +1351,76 @@ async function scoreCandidate(pt, ctx, warnings){
           : 'LIMITED VALUE — conductivity upgrade would have minor coverage impact; survey still required for §73.190 ground system design.'
       };
     })(),
+    // TPO power sweep — for 4-5 representative transmitter power levels within the
+    // FCC class ceiling, shows what groundwave coverage metrics you'd get.
+    // Answers the screening question: "what's the optimal TPO for this site?"
+    // Each row: daytime reach, 5 mV/m (COL) radius, 1000 mV/m (blanket) radius,
+    // estimated COL coverage %, estimated blanket pop %, and a compliant flag.
+    tpo_power_sweep: (() => {
+      const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? 50;
+      const classMin  = FCC_CLASS_POWER_KW[fcc_class]?.min ?? 0.001;
+      // Deduplicated, sorted sweep points spanning class range + current TPO
+      const rawPoints = [
+        round2(classMin),
+        round2(Math.max(classMin, tpo_kw / 2)),
+        round2(tpo_kw),
+        round2(Math.min(classCeil, tpo_kw * 2)),
+        round2(classCeil)
+      ];
+      const sweepTpos = [...new Set(rawPoints.filter(t => t >= classMin && t <= classCeil))].sort((a, b) => a - b);
+
+      // COL center reference: same as main score (col_centroid ?? current_site).
+      const colCenter = col_centroid ?? current_site;
+      const colDistKm = greatCircleKm(pt.lat, pt.lon, colCenter.lat, colCenter.lon);
+
+      return sweepTpos.map(sweepTpo => {
+        let reach_km = null, col_5mvm_km = null, blanket_km = null;
+        try {
+          reach_km = round2(fccAmDistanceKm({ frequency_khz, target_mvm: DAYTIME_REACH_TARGET_MVM, conductivity_msm: sigma_msm, erp_kw: sweepTpo }).distance_km);
+        } catch(_){}
+        try {
+          col_5mvm_km = round2(fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: sigma_msm, erp_kw: sweepTpo }).distance_km);
+        } catch(_){}
+        try {
+          const rb = fccAmDistanceKm({ frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: sweepTpo });
+          blanket_km = round2(rb.distance_km);
+        } catch(_){}
+
+        // COL coverage estimate via disc proxy — same 10 km disc as main score.
+        let col_coverage_pct_est = null;
+        if (col_5mvm_km != null && !community_of_license_polygon){
+          col_coverage_pct_est = round2(discCoverageFraction({
+            circle_center: pt,
+            circle_radius_km: col_5mvm_km,
+            disc_center: colCenter,
+            disc_radius_km: 10
+          }));
+        }
+
+        // Blanket pop estimate via same proxy as main score.
+        let blanket_pop_pct_est = null;
+        if (blanket_km != null){
+          const urbanFactor = Math.max(1.0, Math.min(5.0, 1.0 + (colDistKm < 10 ? 4.0 : colDistKm < 25 ? 2.0 : colDistKm < 50 ? 1.0 : 0.5)));
+          blanket_pop_pct_est = round2(Math.PI * blanket_km * blanket_km * US_AVG_POP_DENSITY_PER_KM2 * urbanFactor / US_POPULATION_M * 100);
+        }
+
+        const col_meets_floor = col_coverage_pct_est != null ? col_coverage_pct_est >= COL_COVERAGE_HARD_FLOOR : null;
+        const blanket_pop_ok  = blanket_pop_pct_est != null ? blanket_pop_pct_est <= BLANKET_POP_HARD_CEIL_PCT : null;
+
+        return {
+          tpo_kw: sweepTpo,
+          is_current_tpo: Math.abs(sweepTpo - tpo_kw) < 0.001,
+          daytime_reach_km: reach_km,
+          col_5mvm_km,
+          blanket_1000mvm_km: blanket_km,
+          col_coverage_pct_est,
+          blanket_pop_pct_est,
+          col_meets_floor,
+          blanket_pop_ok,
+          compliant: col_meets_floor === true && blanket_pop_ok !== false
+        };
+      });
+    })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
     // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically

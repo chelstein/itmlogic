@@ -1744,6 +1744,69 @@ test('score_confidence_band: HIGH confidence (polygon + centroid) has fewer fact
     `providing polygon+centroid should reduce number of uncertainty_factors`);
 });
 
+test('tpo_power_sweep is present on every candidate with 2-5 rows', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(Array.isArray(c.tpo_power_sweep) && c.tpo_power_sweep.length >= 2,
+      `tpo_power_sweep must be an array with ≥2 rows (rank ${c.rank})`);
+    assert.ok(c.tpo_power_sweep.length <= 5,
+      `tpo_power_sweep must have ≤5 rows (rank ${c.rank}); got ${c.tpo_power_sweep.length}`);
+  }
+});
+
+test('tpo_power_sweep: exactly one row has is_current_tpo = true and matches input tpo_kw', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const currentRows = c.tpo_power_sweep.filter(r => r.is_current_tpo === true);
+    assert.equal(currentRows.length, 1,
+      `tpo_power_sweep must have exactly one is_current_tpo=true row (rank ${c.rank})`);
+    assert.ok(Math.abs(currentRows[0].tpo_kw - KAZM.tpo_kw) < 0.01,
+      `is_current_tpo row must have tpo_kw ≈ ${KAZM.tpo_kw}; got ${currentRows[0].tpo_kw} (rank ${c.rank})`);
+  }
+});
+
+test('tpo_power_sweep: rows are sorted ascending by tpo_kw', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const tpos = c.tpo_power_sweep.map(r => r.tpo_kw);
+    for (let i = 1; i < tpos.length; i++){
+      assert.ok(tpos[i] >= tpos[i - 1],
+        `tpo_power_sweep must be sorted ascending; row ${i-1}=${tpos[i-1]} > row ${i}=${tpos[i]} (rank ${c.rank})`);
+    }
+  }
+});
+
+test('tpo_power_sweep: higher tpo rows have larger daytime_reach_km', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rows = c.tpo_power_sweep.filter(r => r.daytime_reach_km != null);
+    if (rows.length < 2) continue;
+    for (let i = 1; i < rows.length; i++){
+      assert.ok(rows[i].daytime_reach_km >= rows[i - 1].daytime_reach_km,
+        `higher TPO must not decrease daytime reach; row ${i-1} reach=${rows[i-1].daytime_reach_km} > row ${i} reach=${rows[i].daytime_reach_km} (rank ${c.rank})`);
+    }
+  }
+});
+
+test('tpo_power_sweep: all rows within class ceiling and class minimum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const { __test__: { FCC_CLASS_POWER_KW } } = await import('../engine/am/siteOptimizer.js');
+  const classLimits = FCC_CLASS_POWER_KW[KAZM.fcc_class];
+  for (const c of out.candidates){
+    for (const row of c.tpo_power_sweep){
+      assert.ok(row.tpo_kw >= classLimits.min - 0.001,
+        `tpo_power_sweep row tpo_kw must be >= class min ${classLimits.min}; got ${row.tpo_kw} (rank ${c.rank})`);
+      assert.ok(row.tpo_kw <= classLimits.max + 0.001,
+        `tpo_power_sweep row tpo_kw must be <= class max ${classLimits.max}; got ${row.tpo_kw} (rank ${c.rank})`);
+    }
+  }
+});
+
 test('groundwave_contour_table present on every candidate with 4 standard FCC contours', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);
