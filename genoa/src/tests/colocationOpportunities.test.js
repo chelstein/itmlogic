@@ -973,3 +973,17 @@ test('colocation GRID candidates have da_array_design_guide', async () => {
     assert.strictEqual(c.da_array_design_guide.n_hrp_radials, 36, `rank ${c.rank} must have 36 HRP radials`);
   }
 });
+
+test('colocation GRID candidates have am_fm_translator_opportunity', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.am_fm_translator_opportunity != null, `rank ${c.rank} missing am_fm_translator_opportunity`);
+    assert.strictEqual(c.am_fm_translator_opportunity.am_revitalization_eligible, true, `rank ${c.rank} must be eligible`);
+  }
+});

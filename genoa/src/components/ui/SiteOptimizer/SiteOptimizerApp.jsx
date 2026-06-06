@@ -1385,6 +1385,51 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.1560; §73.1350; §73.61; Part 11; §1.1307; §73.3539; §73.99',
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
+      am_fm_translator_opportunity: {
+        am_revitalization_eligible: true, translator_max_erp_kw: 0.25,
+        translator_haat_m_assumed: 30, fm_60dbu_radius_screening_km: 12.5,
+        am_2mvm_contour_km: 21.67, miles_25_threshold_km: 40.23,
+        translator_contour_check: 'PASS',
+        translator_contour_note: 'FM 60 dBu contour (≈12.5 km) fits within AM 2 mV/m contour (≈21.67 km). Contour overlap requirement likely met at this candidate site.',
+        filing_windows: [
+          { window: 'First AM Revitalization Window', dates: 'October 2015 – February 2016', eligibility: 'All AM stations in continuous operation since October 1, 2015', status: 'CLOSED' },
+          { window: 'Second AM Revitalization Window', dates: 'September 2020 – November 2020', eligibility: 'AM stations that did not receive a translator in the first window', status: 'CLOSED' },
+          { window: 'Future Windows (FCC discretion)', dates: 'Not yet announced', eligibility: 'Watch FCC Public Notice in MB Docket 13-249', status: 'WATCH' }
+        ],
+        spectrum_search_guidance: {
+          tool: 'FCC CDBS / LMS FM Query at stations.fcc.gov',
+          candidate_site_coords: { lat: 34.86, lon: -111.82 },
+          method: 'Search for available FM channels at candidate lat/lon.',
+          key_checks: [
+            'No co-channel full-power FM within 115 km (§73.207 Class A)',
+            'No first-adjacent FM within 72 km',
+            'No second-adjacent FM within 32 km',
+            'No third-adjacent FM within 32 km (§73.207)',
+            'LPFM protection: translator must not cause interference to LPFM stations on or adjacent to desired channel',
+            'Interference to existing translators: check for co-channel translators within 63 km'
+          ],
+          note: 'Run a full LMS search using the CDBS FM query tool or BIA FM database.'
+        },
+        lpfm_protection: {
+          rule: '47 CFR §73.850(d)',
+          co_channel: 'AM-revitalization translator must protect LPFM stations on the same channel within 7 km',
+          first_adjacent: 'Protect LPFM stations on ±200 kHz within FCC-defined short-spacing distances',
+          note: 'LPFM has secondary but protected status relative to translators under the 2015 rules.'
+        },
+        form_349_exhibits: [
+          { exhibit: 'Exhibit A (Technical)', description: 'Proposed FM translator coordinates, antenna height, ERP, FM channel', required: true },
+          { exhibit: 'Exhibit B (Interference)', description: '§73.207 spacing analysis showing no conflicts with co/adj-channel FM', required: true },
+          { exhibit: 'Exhibit C (LPFM)', description: '§73.807/§73.850(d) LPFM protection showing minimum separation met', required: true },
+          { exhibit: 'Exhibit D (AM Contour)', description: 'FM 60 dBu contour within AM 2 mV/m daytime contour or 25 mi of AM transmitter', required: true },
+          { exhibit: 'Exhibit E (Eligibility)', description: 'Certification of continuous AM operation since October 1, 2015', required: true },
+          { exhibit: 'Environmental Certification', description: 'NEPA §1.1307 environmental assessment or negative declaration', required: true }
+        ],
+        audience_gain_note: 'A 250 W FM translator at 34.8600, -111.8200 would provide a ≈12.5 km 60 dBu coverage radius, potentially reaching an additional FM audience not served by the AM signal.',
+        filing_form: 'FCC Form 349 (Translator / Booster Station Application)',
+        docket: 'MB Docket No. 13-249 (FCC 15-142)',
+        reference: '47 CFR §73.850; §73.850(b); §73.850(d); §73.207; §73.313; MB Docket 13-249',
+        note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis using FCC LMS data.'
+      },
       da_array_design_guide: {
         applicable: true, pattern_mode: 'DA-D', da_mode_type: 'DA-D',
         has_daytime_pattern: true, has_nighttime_pattern: false,

@@ -816,7 +816,10 @@ export async function runSiteOptimizer(body = {}){
     ops_eas_required:       c.operational_monitoring_requirements?.eas_requirements != null,
     da_array_applicable:    c.da_array_design_guide?.applicable ?? null,
     da_array_min_elements:  c.da_array_design_guide?.recommended_min_elements ?? null,
-    da_array_footprint_m:   c.da_array_design_guide?.recommended_config?.property_footprint_m ?? null
+    da_array_footprint_m:   c.da_array_design_guide?.recommended_config?.property_footprint_m ?? null,
+    trans_contour_check:    c.am_fm_translator_opportunity?.translator_contour_check ?? null,
+    trans_60dbu_km:         c.am_fm_translator_opportunity?.fm_60dbu_radius_screening_km ?? null,
+    trans_am_2mvm_km:       c.am_fm_translator_opportunity?.am_2mvm_contour_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6860,6 +6863,125 @@ async function scoreCandidate(pt, ctx, warnings){
         base_current_monitoring: baseCurrentMonitoring_da,
         reference: '47 CFR §73.150 (DA authorization); §73.152 (DA-D/DA-N); §73.316 (pattern measurements/HRP); §73.207 (co-channel D/U protection); §73.61 (base current monitoring); §73.182 (NIF analysis)',
         note: 'DA array element positions, amplitude ratios, and phase angles are engineering estimates for screening purposes. Actual design requires a licensed broadcast engineer, full mutual impedance matrix computation, and §73.182 NIF analysis. Proof-of-performance field measurements per §73.154 required before FCC issues license to cover (Form 302-AM).'
+      };
+    })(),
+
+    // FCC AM Revitalization FM Translator Opportunity.
+    // §73.850 + MB Docket 13-249 (Report & Order, FCC 15-142, adopted Jul 2015).
+    // AM stations may apply for an FM translator (≤250 W ERP) to rebroadcast the AM
+    // programming.  The translator 60 dBu contour must lie entirely within the AM
+    // station's daytime 2 mV/m groundwave contour OR within 25 miles of the AM
+    // transmitter site (whichever is more favorable).
+    am_fm_translator_opportunity: (() => {
+      // FM 60 dBu contour radius: ITU-R P.370 / FCC 47 CFR §73.313 curves.
+      // For FM Class A translator at 250 W ERP, 60 dBu radius ≈ 12–15 km depending on HAAT.
+      // Screening approximation: r_60dbu_km ≈ 12.5 km for 250 W ERP / 30 m HAAT.
+      // (Standard HAAT for a new translator on a short tower.)
+      const TRANSLATOR_MAX_ERP_KW_ft = 0.25;     // 250 W ERP maximum per §73.850(b)
+      const TRANSLATOR_HAAT_M        = 30;        // typical low-tower translator HAAT for screening
+      const FM_60DBU_RADIUS_250W_KM  = 12.5;      // screening approximation at 250 W / 30 m HAAT
+
+      // AM 2 mV/m daytime contour radius — the translator must stay within this or 25 mi.
+      // Use the FCC groundwave curve estimate for the candidate's σ.
+      let am_2mvm_contour_km = null;
+      try {
+        const r2 = fccAmDistanceKm({
+          frequency_khz,
+          target_mvm:       2.0,
+          conductivity_msm: sigma_msm,
+          erp_kw:           tpo_kw
+        });
+        am_2mvm_contour_km = r2?.distance_km != null ? round2(r2.distance_km) : null;
+      } catch { /* ok */ }
+
+      const MILES_25_KM = round2(25 * 1.60934);  // = 40.23 km
+
+      // Translator eligibility: within AM 2 mV/m contour OR within 40.2 km of transmitter
+      const within_25mi    = true;   // candidate site IS the transmitter site (or near it)
+      const contour_km_for_check = am_2mvm_contour_km ?? MILES_25_KM;
+      const contour_check_passes = FM_60DBU_RADIUS_250W_KM <= contour_km_for_check;
+
+      // AM revitalization filing windows and eligibility
+      const amRevitWindow = [
+        {
+          window: 'First AM Revitalization Window',
+          dates:  'October 2015 – February 2016',
+          eligibility: 'All AM stations in continuous operation since October 1, 2015',
+          status: 'CLOSED'
+        },
+        {
+          window: 'Second AM Revitalization Window',
+          dates:  'September 2020 – November 2020',
+          eligibility: 'AM stations that did not receive a translator in the first window',
+          status: 'CLOSED'
+        },
+        {
+          window: 'Future Windows (FCC discretion)',
+          dates:  'Not yet announced',
+          eligibility: 'Watch FCC Public Notice in MB Docket 13-249',
+          status: 'WATCH'
+        }
+      ];
+
+      // FM spectrum search guidance — without actual FM band data, we give the method.
+      const spectrumSearchGuidance = {
+        tool:      'FCC CDBS / LMS FM Query at stations.fcc.gov',
+        candidate_site_coords: { lat: pt.lat, lon: pt.lon },
+        method:    'Search for available FM channels at candidate lat/lon. Look for Class A FM channels (87.9–107.9 MHz) with no conflicts to full-power FM within §73.207 D/U contours.',
+        key_checks: [
+          'No co-channel full-power FM within 115 km (§73.207 Class A)',
+          'No first-adjacent FM within 72 km',
+          'No second-adjacent FM within 32 km',
+          'No third-adjacent FM within 32 km (§73.207)',
+          'LPFM protection: translator must not cause interference to LPFM stations on or adjacent to desired channel',
+          'Interference to existing translators: check for co-channel translators within 63 km'
+        ],
+        note: 'Run a full LMS search using the CDBS FM query tool or BIA FM database. A broadcast engineer or attorney can run the §73.207 spacing table analysis.'
+      };
+
+      // LPFM protection requirements per §73.850(d)
+      const lpfmProtection = {
+        rule:            '47 CFR §73.850(d)',
+        co_channel:      'AM-revitalization translator must protect LPFM stations on the same channel within 7 km (or per §73.807 minimum distance)',
+        first_adjacent:  'Protect LPFM stations on ±200 kHz within FCC-defined short-spacing table distances',
+        note:            'LPFM has secondary but protected status relative to translators under the 2015 rules. Conduct full §73.807 analysis before selecting an FM channel.'
+      };
+
+      // Form 349 application requirements
+      const form349Exhibits = [
+        { exhibit: 'Exhibit A (Technical)', description: 'Proposed FM translator coordinates, antenna height (HAAT), ERP, FM channel, directional antenna (if any)', required: true },
+        { exhibit: 'Exhibit B (Interference)', description: '§73.207 spacing analysis showing no conflicts with co/adj-channel full-power FM or translators', required: true },
+        { exhibit: 'Exhibit C (LPFM)', description: '§73.807/§73.850(d) LPFM protection showing minimum separation met', required: true },
+        { exhibit: 'Exhibit D (AM Contour)', description: 'Demonstration that FM 60 dBu contour is within AM 2 mV/m daytime contour or 25 mi of AM transmitter', required: true },
+        { exhibit: 'Exhibit E (AM Revitalization Eligibility)', description: 'Certification of continuous AM operation since October 1, 2015 (or applicable date)', required: true },
+        { exhibit: 'Environmental Certification', description: 'NEPA §1.1307 environmental assessment or negative declaration', required: true }
+      ];
+
+      // Economic benefit estimate
+      const audienceGainNote = FM_60DBU_RADIUS_250W_KM > 0
+        ? `A 250 W FM translator at ${pt.lat.toFixed(4)}, ${pt.lon.toFixed(4)} would provide a ≈${FM_60DBU_RADIUS_250W_KM} km 60 dBu coverage radius (screening), potentially reaching an additional FM audience not served by the AM signal.`
+        : null;
+
+      return {
+        am_revitalization_eligible:   true,   // All licensed AM stations are eligible
+        translator_max_erp_kw:        TRANSLATOR_MAX_ERP_KW_ft,
+        translator_haat_m_assumed:    TRANSLATOR_HAAT_M,
+        fm_60dbu_radius_screening_km: FM_60DBU_RADIUS_250W_KM,
+        am_2mvm_contour_km,
+        miles_25_threshold_km:        MILES_25_KM,
+        translator_contour_check:     contour_check_passes ? 'PASS' : 'CHECK_REQUIRED',
+        translator_contour_note:      contour_check_passes
+          ? `FM 60 dBu contour (≈${FM_60DBU_RADIUS_250W_KM} km) fits within AM 2 mV/m contour (≈${am_2mvm_contour_km ?? MILES_25_KM} km). Contour overlap requirement likely met at this candidate site.`
+          : `FM 60 dBu contour (≈${FM_60DBU_RADIUS_250W_KM} km) may exceed AM 2 mV/m contour (≈${am_2mvm_contour_km} km). Verify with precise FCC §73.313 FM coverage study.`,
+        filing_windows:               amRevitWindow,
+        spectrum_search_guidance:     spectrumSearchGuidance,
+        lpfm_protection:              lpfmProtection,
+        form_349_exhibits:            form349Exhibits,
+        audience_gain_note:           audienceGainNote,
+        filing_form:                  'FCC Form 349 (Translator / Booster Station Application)',
+        docket:                       'MB Docket No. 13-249 (FCC 15-142)',
+        reference: '47 CFR §73.850 (translator general); §73.850(b) (AM revitalization power limit); §73.850(d) (LPFM protection); §73.207 (spacing tables); §73.313 (FM propagation); MB Docket 13-249',
+        note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis against all FM stations in the area using FCC LMS data. A licensed broadcast engineer or communications attorney should conduct the channel search and prepare Form 349.'
       };
     })(),
 

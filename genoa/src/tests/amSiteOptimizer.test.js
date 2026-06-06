@@ -5765,3 +5765,48 @@ test('da_array_design_guide comparison table columns present', async () => {
     assert.ok('da_array_footprint_m' in row, 'da_array_footprint_m missing from comparison table');
   }
 });
+
+// ---- am_fm_translator_opportunity ----
+
+test('am_fm_translator_opportunity present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_fm_translator_opportunity != null, `rank ${c.rank} missing am_fm_translator_opportunity`);
+  }
+});
+
+test('am_fm_translator_opportunity has correct shape and key fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].am_fm_translator_opportunity;
+  assert.strictEqual(t.am_revitalization_eligible, true, 'all AM stations eligible for revitalization');
+  assert.strictEqual(t.translator_max_erp_kw, 0.25, '250 W ERP max per §73.850(b)');
+  assert.strictEqual(t.fm_60dbu_radius_screening_km, 12.5, '60 dBu screening radius must be 12.5 km');
+  assert.strictEqual(t.filing_windows.length, 3, 'must have 3 filing window entries');
+  assert.strictEqual(t.form_349_exhibits.length, 6, 'must have 6 Form 349 exhibits');
+});
+
+test('am_fm_translator_opportunity contour check PASS when 60dbu < 2mvm contour', async () => {
+  // 5 kW at 780 kHz on KAZM gives a 2 mV/m contour >> 12.5 km, so PASS expected
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].am_fm_translator_opportunity;
+  assert.strictEqual(t.translator_contour_check, 'PASS', '5 kW station should pass the 60dBu contour check');
+  assert.ok(t.am_2mvm_contour_km > 12.5, 'AM 2 mV/m contour must exceed 60dBu radius for PASS');
+});
+
+test('am_fm_translator_opportunity lpfm_protection and spectrum guidance present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].am_fm_translator_opportunity;
+  assert.ok(t.lpfm_protection != null, 'lpfm_protection must be present');
+  assert.ok(t.spectrum_search_guidance != null, 'spectrum_search_guidance must be present');
+  assert.ok(Array.isArray(t.spectrum_search_guidance.key_checks), 'spectrum key_checks must be an array');
+  assert.ok(t.spectrum_search_guidance.key_checks.length >= 4, 'must have at least 4 spectrum key checks');
+});
+
+test('am_fm_translator_opportunity comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('trans_contour_check' in row, 'trans_contour_check missing from comparison table');
+    assert.ok('trans_60dbu_km' in row, 'trans_60dbu_km missing from comparison table');
+    assert.ok('trans_am_2mvm_km' in row, 'trans_am_2mvm_km missing from comparison table');
+  }
+});

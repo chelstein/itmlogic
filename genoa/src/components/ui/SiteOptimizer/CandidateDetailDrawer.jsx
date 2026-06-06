@@ -2226,6 +2226,79 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Revitalization FM Translator Opportunity */}
+        {candidate.am_fm_translator_opportunity && (() => {
+          const t = candidate.am_fm_translator_opportunity;
+          const checkColor = s => s === 'PASS' ? 'text-emerald-400' : s === 'CHECK_REQUIRED' ? 'text-amber-400' : 'text-textDim';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">AM Revitalization FM Translator (MB 13-249)</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule text-emerald-400">ELIGIBLE</span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${checkColor(t.translator_contour_check)}`}>
+                  CONTOUR: {t.translator_contour_check}
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  ≤{t.translator_max_erp_kw * 1000} W ERP · 60 dBu ≈ {t.fm_60dbu_radius_screening_km} km
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'FM 60 dBu radius',  value: `${t.fm_60dbu_radius_screening_km} km` },
+                  { label: 'AM 2 mV/m contour', value: t.am_2mvm_contour_km != null ? `${t.am_2mvm_contour_km} km` : '—' },
+                  { label: '25-mi threshold',    value: `${t.miles_25_threshold_km} km` }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{t.translator_contour_note}</div>
+              <div className="font-mono text-[9px] text-textDim mb-1">AM Revitalization Filing Windows</div>
+              <div className="space-y-0.5 mb-2">
+                {t.filing_windows?.map((w, i) => {
+                  const wColor = w.status === 'CLOSED' ? 'text-rose-400' : w.status === 'WATCH' ? 'text-amber-400' : 'text-emerald-400';
+                  return (
+                    <div key={i} className="flex gap-2 items-start">
+                      <span className={`font-mono text-[8px] shrink-0 font-bold ${wColor}`}>[{w.status}]</span>
+                      <div>
+                        <span className="font-mono text-[8px] text-textBright font-bold">{w.window}: </span>
+                        <span className="font-mono text-[8px] text-textDim">{w.dates}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="font-mono text-[9px] text-textDim mb-1">FM Channel Availability Checks (§73.207)</div>
+              <div className="space-y-0.5 mb-2">
+                {t.spectrum_search_guidance?.key_checks?.slice(0, 4).map((chk, i) => (
+                  <div key={i} className="flex gap-1.5 items-start">
+                    <span className="text-blue-400 font-mono text-[8px] shrink-0">•</span>
+                    <span className="font-mono text-[8px] text-textDim">{chk}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[9px] text-textDim mb-1">Form 349 Required Exhibits</div>
+              <div className="space-y-0.5 mb-2">
+                {t.form_349_exhibits?.filter(e => e.required).map((ex, i) => (
+                  <div key={i} className="flex gap-1.5 items-start">
+                    <span className="text-emerald-400 font-mono text-[8px] shrink-0">✓</span>
+                    <div>
+                      <span className="font-mono text-[8px] text-textBright font-bold">{ex.exhibit}: </span>
+                      <span className="font-mono text-[8px] text-textDim">{ex.description}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {t.audience_gain_note && (
+                <div className="font-mono text-[8px] text-blue-300/80 leading-snug mb-1">{t.audience_gain_note}</div>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug">{t.note}</div>
+            </div>
+          );
+        })()}
+
         {/* DA Array Design Guide */}
         {candidate.da_array_design_guide && (() => {
           const da = candidate.da_array_design_guide;
