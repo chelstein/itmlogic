@@ -1325,6 +1325,20 @@ test('colocation GRID candidates have license_renewal_compliance_guide', async (
   }
 });
 
+test('colocation GRID candidates have broadcast_content_compliance_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.broadcast_content_compliance_guide != null, `rank ${c.rank} missing broadcast_content_compliance_guide`);
+    assert.strictEqual(c.broadcast_content_compliance_guide.indecency_rules.safe_harbor_start, '22:00', `rank ${c.rank} safe harbor must start at 22:00`);
+  }
+});
+
 test('colocation GRID candidates have political_programming_compliance_guide', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },

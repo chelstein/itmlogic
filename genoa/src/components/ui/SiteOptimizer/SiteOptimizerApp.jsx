@@ -1717,6 +1717,37 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      broadcast_content_compliance_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        indecency_rules: {
+          prohibited_hours_start: '06:00', prohibited_hours_end: '22:00',
+          safe_harbor_start: '22:00', safe_harbor_end: '06:00',
+          cfr: '§73.3999', max_forfeiture_per_incident_usd: 503000,
+          note: 'FCC indecency forfeiture cap is $503,000 per incident; $3,021,500 for continuing violations'
+        },
+        telephone_consent: {
+          required: true, cfr: '§73.1206',
+          method: 'Oral notice to caller before recording or broadcast; or written consent',
+          exception: 'Emergency calls, calls not intended for broadcast',
+          forfeiture_risk_usd: { low: 8000, high: 25000 }
+        },
+        rebroadcast_rules: {
+          consent_required: true, cfr: '§73.1207', anti_simulcast_cfr: '§73.242',
+          am_fm_simulcast_restriction: 'AM and commonly-owned FM may simulcast if FM is within AM service area, but must offer separate programming for some portion of broadcast day'
+        },
+        compliance_elements: [
+          { id: 'INDECENCY_POLICY',  label: 'Written indecency/obscenity policy for all staff and contractors', cfr: '§73.3999', priority: 'HIGH' },
+          { id: 'TELEPHONE_PROC',    label: 'Telephone consent procedure for all on-air calls', cfr: '§73.1206', priority: 'HIGH' },
+          { id: 'COMPLAINT_LOG',     label: 'Log all content complaints received; retain for 2 years', cfr: '§73.3526(e)(7)', priority: 'MEDIUM' },
+          { id: 'HOAX_POLICY',       label: 'Written policy prohibiting broadcast hoaxes', cfr: '§73.1217', priority: 'MEDIUM' },
+          { id: 'JSA_LMA_REVIEW',    label: 'Review any JSA/LMA for attribution compliance', cfr: '§73.1210; §73.3555', priority: 'MEDIUM' },
+          { id: 'SPONSORSHIP_LOG',   label: 'Document all paid/sponsored programming (sponsorship ID)', cfr: '§73.1212', priority: 'HIGH' }
+        ],
+        n_compliance_elements: 6, high_priority_elements: 3,
+        max_forfeiture_indecency_usd: 503000,
+        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.4035',
+        note: 'Content compliance: 6 elements, 3 HIGH priority. Indecency safe harbor: 10 PM–6 AM. Max forfeiture: $503,000 per incident.'
+      },
       political_programming_compliance_guide: {
         frequency_khz: 780, fcc_class: 'D',
         candidate_site_lat: 34.86, candidate_site_lon: -111.82,

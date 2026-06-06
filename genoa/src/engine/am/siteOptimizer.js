@@ -972,7 +972,10 @@ export async function runSiteOptimizer(body = {}){
     trg_gen_kva:            c.transmitter_redundancy_guide?.generator_guidance?.recommended_kva ?? null,
     ppg_n_obligations:      c.political_programming_compliance_guide?.n_obligations ?? null,
     ppg_n_required:         c.political_programming_compliance_guide?.n_required_impacts ?? null,
-    ppg_luc_general_days:   c.political_programming_compliance_guide?.election_windows?.luc_pre_general_days ?? null
+    ppg_luc_general_days:   c.political_programming_compliance_guide?.election_windows?.luc_pre_general_days ?? null,
+    bccg_n_elements:        c.broadcast_content_compliance_guide?.n_compliance_elements ?? null,
+    bccg_high_priority:     c.broadcast_content_compliance_guide?.high_priority_elements ?? null,
+    bccg_max_forfeiture:    c.broadcast_content_compliance_guide?.max_forfeiture_indecency_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6707,6 +6710,80 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    broadcast_content_compliance_guide: (() => {
+      // §73.3999: Indecency and obscenity — FCC prohibits indecent content between 6 AM and 10 PM
+      // §73.4005: Obscene content — prohibited at all times
+      // §73.1206: Telephone conversation broadcasts — must get consent before recording/airing a call
+      // §73.1207: Rebroadcasting — must get consent of originating station; FCC anti-simulcast rule (§73.242)
+      // §73.4035: Lotteries — lottery information may be broadcast only for authorized lotteries
+      // §73.1217: Broadcast hoaxes — FCC may impose forfeitures for hoaxes that cause harm
+      // §73.1210: Joint sales agreements (JSA) / Local marketing agreements (LMA) — attribution rules
+      //
+      // Relocation relevance: when a station relocates and potentially changes format or ownership,
+      // content compliance is a key due diligence area, especially in license renewal context.
+      // Indecency complaints in the 2-year period before renewal weigh against renewal.
+      // A clean content record helps demonstrate local service and public interest during relocation CP.
+
+      // Safe harbor for indecency
+      // §73.3999(b): FCC has found that indecent material is permissible between 10 PM and 6 AM local time
+      const INDECENCY_RULES = {
+        prohibited_hours_start: '06:00', // 6 AM local
+        prohibited_hours_end: '22:00',   // 10 PM local
+        safe_harbor_start: '22:00',
+        safe_harbor_end: '06:00',
+        cfr: '§73.3999',
+        max_forfeiture_per_incident_usd: 503000, // FCC maximum forfeiture for indecency (per 2023 adjustment)
+        note: 'FCC indecency forfeiture cap is $503,000 per incident; $3,021,500 for continuing violations'
+      };
+
+      // Telephone consent
+      // §73.1206: Before airing a phone call, broadcaster must inform caller that the call may be aired
+      // Exception: calls not expected to be aired (news monitoring, etc.)
+      const TELEPHONE_CONSENT = {
+        required: true,
+        cfr: '§73.1206',
+        method: 'Oral notice to caller before recording or broadcast; or written consent',
+        exception: 'Emergency calls, calls not intended for broadcast',
+        forfeiture_risk_usd: { low: 8000, high: 25000 }
+      };
+
+      // Rebroadcasting
+      // §73.1207: Must get written or oral consent of originating station before rebroadcasting
+      // §73.242: AM stations may not simulcast on FM under certain circumstances (anti-simulcast rule)
+      const REBROADCAST_RULES = {
+        consent_required: true,
+        cfr: '§73.1207',
+        anti_simulcast_cfr: '§73.242',
+        am_fm_simulcast_restriction: 'AM and commonly-owned FM may simulcast if FM is within AM service area, but must offer separate programming for some portion of broadcast day'
+      };
+
+      // Compliance program elements
+      const COMPLIANCE_ELEMENTS = [
+        { id: 'INDECENCY_POLICY',   label: 'Written indecency/obscenity policy for all staff and contractors', cfr: '§73.3999', priority: 'HIGH' },
+        { id: 'TELEPHONE_PROC',     label: 'Telephone consent procedure for all on-air calls', cfr: '§73.1206', priority: 'HIGH' },
+        { id: 'COMPLAINT_LOG',      label: 'Log all content complaints received; retain for 2 years', cfr: '§73.3526(e)(7)', priority: 'MEDIUM' },
+        { id: 'HOAX_POLICY',        label: 'Written policy prohibiting broadcast hoaxes', cfr: '§73.1217', priority: 'MEDIUM' },
+        { id: 'JSA_LMA_REVIEW',     label: 'Review any JSA/LMA for attribution compliance under ownership rules', cfr: '§73.1210; §73.3555', priority: 'MEDIUM' },
+        { id: 'SPONSORSHIP_LOG',    label: 'Document all paid/sponsored programming (sponsorship ID)', cfr: '§73.1212', priority: 'HIGH' }
+      ];
+
+      const high_priority = COMPLIANCE_ELEMENTS.filter(e => e.priority === 'HIGH').length;
+
+      return {
+        frequency_khz, fcc_class,
+        indecency_rules: INDECENCY_RULES,
+        telephone_consent: TELEPHONE_CONSENT,
+        rebroadcast_rules: REBROADCAST_RULES,
+        compliance_elements: COMPLIANCE_ELEMENTS,
+        n_compliance_elements: COMPLIANCE_ELEMENTS.length,
+        high_priority_elements: high_priority,
+        max_forfeiture_indecency_usd: INDECENCY_RULES.max_forfeiture_per_incident_usd,
+        relocation_note: 'Content compliance is evaluated during license renewal; ensure a clean complaint record during the 2-year period before renewal to support the relocation and license continuation.',
+        reference: '47 CFR §73.1206; §73.1207; §73.1210; §73.1212; §73.1217; §73.3526; §73.3555; §73.3999; §73.4005; §73.4035; FCC Enforcement Bureau indecency forfeiture policy',
+        note: `Content compliance: ${COMPLIANCE_ELEMENTS.length} program elements required, ${high_priority} HIGH priority. Indecency safe harbor: 10 PM–6 AM. Max forfeiture: $${INDECENCY_RULES.max_forfeiture_per_incident_usd.toLocaleString()} per incident.`
       };
     })(),
 

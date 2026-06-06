@@ -2226,6 +2226,44 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Broadcast Content Compliance Guide */}
+        {candidate.broadcast_content_compliance_guide && (() => {
+          const g = candidate.broadcast_content_compliance_guide;
+          const prioColors = { HIGH: '#f87171', MEDIUM: '#fbbf24', LOW: '#34d399' };
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Broadcast Content Compliance <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3999</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Safe Harbor</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.indecency_rules?.safe_harbor_start ?? '—'}–{g.indecency_rules?.safe_harbor_end ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Max Forfeiture</div>
+                  <div style={{ color: '#f87171', fontSize: 13, fontWeight: 600 }}>${g.indecency_rules?.max_forfeiture_per_incident_usd?.toLocaleString() ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>HIGH Priority</div>
+                  <div style={{ color: '#fbbf24', fontSize: 14, fontWeight: 700 }}>{g.high_priority_elements ?? 0} items</div>
+                </div>
+              </div>
+              {g.compliance_elements && g.compliance_elements.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Compliance Elements</div>
+                  {g.compliance_elements.map((el, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
+                      <span style={{ color: prioColors[el.priority] ?? '#94a3b8', fontSize: 11, fontWeight: 700, width: 55, flexShrink: 0 }}>{el.priority}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{el.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Political Programming Compliance Guide */}
         {candidate.political_programming_compliance_guide && (() => {
           const g = candidate.political_programming_compliance_guide;

@@ -5683,6 +5683,51 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- broadcast_content_compliance_guide ----
+
+test('broadcast_content_compliance_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.broadcast_content_compliance_guide != null, 'broadcast_content_compliance_guide missing');
+  const g = c.broadcast_content_compliance_guide;
+  assert.ok('indecency_rules' in g, 'indecency_rules missing');
+  assert.ok('telephone_consent' in g, 'telephone_consent missing');
+  assert.ok('rebroadcast_rules' in g, 'rebroadcast_rules missing');
+  assert.ok(Array.isArray(g.compliance_elements), 'compliance_elements must be array');
+});
+
+test('broadcast_content_compliance_guide indecency safe harbor is 10 PM–6 AM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_content_compliance_guide;
+  assert.strictEqual(g.indecency_rules.safe_harbor_start, '22:00', 'safe harbor must start at 22:00');
+  assert.strictEqual(g.indecency_rules.safe_harbor_end, '06:00', 'safe harbor must end at 06:00');
+  assert.ok(g.indecency_rules.max_forfeiture_per_incident_usd > 0, 'max forfeiture must be positive');
+});
+
+test('broadcast_content_compliance_guide telephone consent is required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_content_compliance_guide;
+  assert.strictEqual(g.telephone_consent.required, true, 'telephone consent must be required per §73.1206');
+  assert.ok(typeof g.telephone_consent.cfr === 'string' && g.telephone_consent.cfr.includes('73.1206'), 'telephone consent must cite §73.1206');
+});
+
+test('broadcast_content_compliance_guide compliance elements include HIGH priority items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_content_compliance_guide;
+  assert.ok(g.compliance_elements.length >= 4, 'must have at least 4 compliance elements');
+  assert.strictEqual(g.n_compliance_elements, g.compliance_elements.length, 'n_compliance_elements must match array length');
+  assert.ok(g.high_priority_elements >= 2, 'must have at least 2 HIGH priority elements');
+});
+
+test('broadcast_content_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bccg_n_elements' in row, 'bccg_n_elements missing from comparison table');
+    assert.ok('bccg_high_priority' in row, 'bccg_high_priority missing from comparison table');
+    assert.ok('bccg_max_forfeiture' in row, 'bccg_max_forfeiture missing from comparison table');
+  }
+});
+
 // ---- political_programming_compliance_guide ----
 
 test('political_programming_compliance_guide presence and structure', async () => {
