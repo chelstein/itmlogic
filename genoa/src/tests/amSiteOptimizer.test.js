@@ -3761,3 +3761,31 @@ test('power_upgrade_analysis comparison table column exists (via candidate)', as
     assert.ok('power_upgrade_analysis' in c, `power_upgrade_analysis must be in candidate (rank ${c.rank})`);
   }
 });
+
+// ---------- comparison table completeness (session additions) ----------
+
+test('candidate_comparison_table has all session-added columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const SESSION_COLUMNS = [
+    'go_no_go', 'viability_confidence',
+    'overlap_fraction', 'coverage_continuity',
+    'cost_tier', 'cost_low_usd', 'cost_high_usd',
+    'seasonal_variability', 'seasonal_risk',
+    'power_upgrade_verdict', 'headroom_kw',
+    'land_use_class', 'density_factor',
+    'estimated_erp_kw', 'erp_efficiency_pct',
+    'da_applicable', 'da_col_pct_estimate', 'da_would_recover',
+    'people_per_kw', 'km2_per_kw', 'efficiency_tier',
+    'nighttime_eligibility', 'nif_complexity',
+    'spacing_verdict', 'fence_m', 'blanket_km',
+    'pathway_weeks', 'pathway_min_weeks', 'timeline_label',
+    'risk_score', 'risk_category'
+  ];
+  for (const row of out.candidate_comparison_table) {
+    for (const col of SESSION_COLUMNS) {
+      assert.ok(col in row,
+        `comparison table missing column "${col}" (rank ${row.rank})`);
+    }
+  }
+});
