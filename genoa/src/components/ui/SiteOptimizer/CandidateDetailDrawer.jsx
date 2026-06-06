@@ -342,6 +342,56 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Risk triage ribbon — top 3 filing barriers at a glance */}
+        {candidate.regulatory_risk_score?.risk_factors?.length > 0 && (() => {
+          const rrs = candidate.regulatory_risk_score;
+          const top3 = [...rrs.risk_factors].sort((a, b) => b.points - a.points).slice(0, 3);
+          const catColor = rrs.risk_category === 'VERY_HIGH' ? '#ff4d4d'
+            : rrs.risk_category === 'HIGH' ? '#ff9b5a'
+            : rrs.risk_category === 'MODERATE' ? '#f6c90e'
+            : '#4ec9b0';
+          const FACTOR_LABEL = {
+            TREATY_ZONE: 'Treaty',
+            ASR_REQUIRED: 'ASR/FAA',
+            POOR_CONDUCTIVITY: 'Poor σ',
+            FAIR_CONDUCTIVITY: 'Fair σ',
+            MODERATE_CONDUCTIVITY: 'Mod σ',
+            BLANKET_POP_EXCEEDS_LIMIT: 'Blanket >1%',
+            BLANKET_POP_HIGH: 'Blanket high',
+            BLANKET_POP_ELEVATED: 'Blanket elev.',
+            COL_COVERAGE_FAILS: 'COL gap',
+            NIF_STUDY_REQUIRED: 'NIF study',
+            DA_PATTERN_REQUIRED: 'DA pattern'
+          };
+          return (
+            <div className="border rounded p-2.5"
+              style={{ borderColor: catColor + '44', background: catColor + '0a' }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="rack-eyebrow" style={{ color: catColor }}>
+                  risk triage — {rrs.risk_category?.replace(/_/g, ' ')}
+                </span>
+                <span className="font-mono text-[10px]" style={{ color: catColor }}>
+                  {rrs.risk_score}/100
+                </span>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {top3.map(f => (
+                  <div key={f.factor} className="flex items-center gap-1.5 font-mono text-[9px] rounded px-1.5 py-0.5"
+                    style={{ background: catColor + '18', border: `1px solid ${catColor}33` }}>
+                    <span style={{ color: catColor }}>{FACTOR_LABEL[f.factor] ?? f.factor.replace(/_/g, ' ')}</span>
+                    <span className="text-textDim">+{f.points}</span>
+                  </div>
+                ))}
+                {rrs.risk_factors.length > 3 && (
+                  <span className="font-mono text-[9px] text-textDim self-center">
+                    +{rrs.risk_factors.length - 3} more
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Why it ranked */}
         <div>
           <div className="rack-eyebrow mb-1">Why it ranked here</div>
@@ -1150,9 +1200,13 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           <div>
             <div className="rack-eyebrow mb-1">
               Compliance pathway
-              {candidate.compliance_pathway.estimated_weeks_to_filing != null && (
+              {candidate.compliance_pathway.timeline_label != null ? (
                 <span className="normal-case text-textDim ml-2">
-                  ~{candidate.compliance_pathway.estimated_weeks_to_filing} wk to filing (worst-case sum)
+                  {candidate.compliance_pathway.timeline_label} to filing · {candidate.compliance_pathway.blocking_steps ?? '?'} blocking steps
+                </span>
+              ) : candidate.compliance_pathway.estimated_weeks_to_filing != null && (
+                <span className="normal-case text-textDim ml-2">
+                  ~{candidate.compliance_pathway.estimated_weeks_to_filing} wk to filing (worst-case)
                 </span>
               )}
             </div>

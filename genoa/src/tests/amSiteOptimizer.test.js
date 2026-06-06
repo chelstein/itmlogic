@@ -3113,3 +3113,59 @@ test('da_gain_potential comparison table fields are present', async () => {
     assert.ok('da_would_recover' in row, `comparison table row missing da_would_recover (rank ${row.rank})`);
   }
 });
+
+// ---------- compliance_pathway enrichment ----------
+
+test('compliance_pathway has timeline_label, estimated_weeks_min, blocking_steps fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const cp = c.compliance_pathway;
+    assert.ok(cp != null, `compliance_pathway must be present (rank ${c.rank})`);
+    assert.ok('timeline_label' in cp, `compliance_pathway missing timeline_label (rank ${c.rank})`);
+    assert.ok('estimated_weeks_min' in cp, `compliance_pathway missing estimated_weeks_min (rank ${c.rank})`);
+    assert.ok('blocking_steps' in cp, `compliance_pathway missing blocking_steps (rank ${c.rank})`);
+  }
+});
+
+test('compliance_pathway.estimated_weeks_min <= estimated_weeks_to_filing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const cp = c.compliance_pathway;
+    if (cp.estimated_weeks_min != null && cp.estimated_weeks_to_filing != null){
+      assert.ok(cp.estimated_weeks_min <= cp.estimated_weeks_to_filing,
+        `estimated_weeks_min ${cp.estimated_weeks_min} must be ≤ estimated_weeks_to_filing ${cp.estimated_weeks_to_filing} (rank ${c.rank})`);
+    }
+  }
+});
+
+test('compliance_pathway.blocking_steps is a non-negative integer', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const bs = c.compliance_pathway?.blocking_steps;
+    assert.ok(Number.isInteger(bs) && bs >= 0,
+      `blocking_steps must be a non-negative integer; got ${bs} (rank ${c.rank})`);
+  }
+});
+
+test('candidate_comparison_table has timeline_label column', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table){
+    assert.ok('timeline_label' in row, `comparison table row missing timeline_label (rank ${row.rank})`);
+  }
+});
+
+// ---------- site_risk_summary ribbon (engine no-op, drawer-only UI) ----------
+
+test('regulatory_risk_score.risk_factors is an array on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rrs = c.regulatory_risk_score;
+    assert.ok(Array.isArray(rrs?.risk_factors),
+      `regulatory_risk_score.risk_factors must be an array (rank ${c.rank})`);
+  }
+});

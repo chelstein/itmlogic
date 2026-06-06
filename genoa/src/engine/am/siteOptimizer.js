@@ -601,6 +601,8 @@ export async function runSiteOptimizer(body = {}){
     uncertainty_pts:        c.score_confidence_band?.uncertainty_pts ?? null,
     feasibility_verdict:    c.coverage_feasibility_assessment?.verdict ?? null,
     pathway_weeks:          c.compliance_pathway?.estimated_weeks_to_filing ?? null,
+    pathway_min_weeks:      c.compliance_pathway?.estimated_weeks_min ?? null,
+    timeline_label:         c.compliance_pathway?.timeline_label ?? null,
     risk_score:             c.regulatory_risk_score?.risk_score ?? null,
     risk_category:          c.regulatory_risk_score?.risk_category ?? null,
     score_delta:            c.score_delta_vs_baseline ?? null,
@@ -1609,12 +1611,24 @@ async function scoreCandidate(pt, ctx, warnings){
         blocking: true
       });
 
+      const maxWeeks = steps.reduce((acc, s) => {
+        const wks = s.timeline_weeks.split('–');
+        return acc + (parseInt(wks[wks.length - 1], 10) || 0);
+      }, 0);
+      const minWeeks = steps.reduce((acc, s) => {
+        const wks = s.timeline_weeks.split('–');
+        return acc + (parseInt(wks[0], 10) || 0);
+      }, 0);
+      const blockingCount = steps.filter(s => s.blocking).length;
+      const timelineLabel = maxWeeks > 52
+        ? `${Math.round(minWeeks / 4)}–${Math.round(maxWeeks / 4)} months`
+        : `${minWeeks}–${maxWeeks} weeks`;
       return {
         total_steps: steps.length,
-        estimated_weeks_to_filing: steps.reduce((acc, s) => {
-          const wks = s.timeline_weeks.split('–');
-          return acc + (parseInt(wks[wks.length - 1], 10) || 0);
-        }, 0),
+        blocking_steps: blockingCount,
+        estimated_weeks_min: minWeeks,
+        estimated_weeks_to_filing: maxWeeks,
+        timeline_label: timelineLabel,
         steps
       };
     })(),
