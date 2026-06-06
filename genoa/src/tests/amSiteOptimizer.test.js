@@ -3462,3 +3462,59 @@ test('candidate_set_statistics.overlap_fraction has mean in [0,1] when present',
     assert.ok(ov.mean >= 0 && ov.mean <= 1, `overlap_fraction.mean ${ov.mean} out of [0,1]`);
   }
 });
+
+// ---------- site_viability_summary ----------
+
+test('site_viability_summary is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.site_viability_summary != null,
+      `site_viability_summary must be present (rank ${c.rank})`);
+  }
+});
+
+test('site_viability_summary.go_no_go is a valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['GO', 'CONDITIONAL', 'NO_GO', 'INSUFFICIENT_DATA']);
+  for (const c of out.candidates) {
+    const gng = c.site_viability_summary?.go_no_go;
+    assert.ok(VALID.has(gng),
+      `go_no_go "${gng}" not a valid enum (rank ${c.rank})`);
+  }
+});
+
+test('site_viability_summary.one_line is a non-empty string', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const ol = c.site_viability_summary?.one_line;
+    assert.ok(typeof ol === 'string' && ol.length > 0,
+      `one_line must be a non-empty string (rank ${c.rank})`);
+  }
+});
+
+test('NON_COMPLIANT candidates have go_no_go of NO_GO or CONDITIONAL', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    if (c.status_category === 'NON_COMPLIANT') {
+      const gng = c.site_viability_summary?.go_no_go;
+      assert.ok(gng === 'NO_GO' || gng === 'CONDITIONAL' || gng === 'INSUFFICIENT_DATA',
+        `NON_COMPLIANT candidate should not be GO (rank ${c.rank}, go_no_go=${gng})`);
+    }
+  }
+});
+
+test('PROMISING candidates have go_no_go of GO or CONDITIONAL', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    if (c.status_category === 'PROMISING') {
+      const gng = c.site_viability_summary?.go_no_go;
+      assert.ok(gng === 'GO' || gng === 'CONDITIONAL',
+        `PROMISING candidate should be GO or CONDITIONAL (rank ${c.rank}, go_no_go=${gng})`);
+    }
+  }
+});

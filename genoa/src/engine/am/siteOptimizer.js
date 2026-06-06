@@ -1587,6 +1587,52 @@ async function scoreCandidate(pt, ctx, warnings){
         summary: summaryParts.join('; ') || 'Insufficient data for feasibility assessment'
       };
     })(),
+    // Site viability summary — single go/no-go verdict with one-line rationale.
+    // The simplest possible distillation: can a licensed AM station operate at this
+    // location within its FCC class limits?  Intended as the first field a PM, FCC
+    // counsel, or LLM reads before diving into detail.
+    site_viability_summary: (() => {
+      const colOk   = coverage_pct == null ? null : coverage_pct >= COL_COVERAGE_HARD_FLOOR;
+      const blankOk = blanket_population_pct == null ? null : blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT;
+      const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
+      const powerFixAvailable = minimum_tpo_for_col_coverage_kw != null
+        && classCeil != null
+        && minimum_tpo_for_col_coverage_kw <= classCeil;
+
+      let go_no_go, confidence, one_line;
+
+      if (colOk === true && blankOk !== false && !treaty_zone) {
+        go_no_go = 'GO';
+        confidence = 'PROMISING';
+        one_line = `Meets §73.24(j) COL floor (${Math.round((coverage_pct ?? 0) * 100)}%) and §73.24(g) blanket limit at current TPO.`;
+      } else if (colOk === true && blankOk !== false && treaty_zone) {
+        go_no_go = 'CONDITIONAL';
+        confidence = 'TREATY_REVIEW';
+        one_line = `Meets coverage floors but falls in ${treaty_zone} treaty zone — FCC International Bureau coordination required before any commitment.`;
+      } else if (colOk === false && powerFixAvailable && blankOk !== false) {
+        go_no_go = 'CONDITIONAL';
+        confidence = 'RECOVERABLE';
+        one_line = `COL coverage recoverable at ${minimum_tpo_for_col_coverage_kw} kW (within Class ${fcc_class} ceiling). Blanket limit OK.`;
+      } else if (colOk === false && coverage_pct != null && coverage_pct >= 0.50) {
+        go_no_go = 'CONDITIONAL';
+        confidence = 'DA_OPTION';
+        one_line = `COL coverage ${Math.round((coverage_pct ?? 0) * 100)}% — gap is DA-rescuable (§73.150); directional pattern required before filing.`;
+      } else if (colOk === true && blankOk === false) {
+        go_no_go = 'CONDITIONAL';
+        confidence = 'BLANKET_ISSUE';
+        one_line = `COL coverage OK but §73.24(g) blanket population (${round2(blanket_population_pct)}%) exceeds 1% limit. Power reduction or DA required.`;
+      } else if (colOk === false) {
+        go_no_go = 'NO_GO';
+        confidence = 'NON_COMPLIANT';
+        one_line = `COL coverage ${coverage_pct != null ? Math.round(coverage_pct * 100) + '%' : 'unavailable'} — below §73.24(j) 80% floor with no feasible recovery within class limits at current frequency/power.`;
+      } else {
+        go_no_go = 'INSUFFICIENT_DATA';
+        confidence = 'LOW';
+        one_line = 'COL polygon not provided; §73.24(j) compliance cannot be screened. Provide community_of_license_polygon for a complete assessment.';
+      }
+
+      return { go_no_go, confidence, one_line, evaluated_at_tpo_kw: tpo_kw };
+    })(),
     // Per-candidate engineering checklist — what studies must be done if this site
     // is selected for detailed engineering evaluation.  Derived from the candidate's
     // physical characteristics; complements the station-level form_301_checklist.
