@@ -579,6 +579,30 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
+  // ---- 15. Candidate comparison table ----
+  // Compact tabular view of all returned candidates on the 7 key screening metrics.
+  // Useful for UI comparison tables and quick-scan decision making.
+  // Supplements `candidates` (which has full details) with a lighter structure.
+  const candidate_comparison_table = returned.map(c => ({
+    rank:                   c.rank,
+    lat:                    c.lat,
+    lon:                    c.lon,
+    distance_km:            c.distance_from_current_km,
+    direction:              c.cardinal_direction,
+    score:                  c.score,
+    status:                 c.status_category,
+    col_coverage_pct:       c.col_coverage_pct,
+    daytime_reach_km:       c.daytime_reach_km,
+    blanket_pop_pct:        c.blanket_population_pct,
+    sigma_msm:              c.ground_sigma_mS_m,
+    sigma_quality:          c.ground_sigma_quality,
+    treaty_zone:            c.treaty_zone ?? null,
+    score_confidence:       c.score_confidence,
+    uncertainty_pts:        c.score_confidence_band?.uncertainty_pts ?? null,
+    feasibility_verdict:    c.coverage_feasibility_assessment?.verdict ?? null,
+    pathway_weeks:          c.compliance_pathway?.estimated_weeks_to_filing ?? null
+  }));
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -589,6 +613,7 @@ export async function runSiteOptimizer(body = {}){
     top_candidates_summary,
     candidate_shortlist,
     candidate_set_diversity,
+    candidate_comparison_table,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,

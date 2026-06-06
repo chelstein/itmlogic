@@ -2546,3 +2546,77 @@ test('compliance_pathway: step numbers are sequential starting at 1', async () =
     }
   }
 });
+
+// ---------- candidate_comparison_table ----------
+
+test('candidate_comparison_table is present and is an array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.candidate_comparison_table),
+    'candidate_comparison_table must be an array');
+});
+
+test('candidate_comparison_table length matches n_candidates_returned', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.equal(out.candidate_comparison_table.length, out.n_candidates_returned,
+    'candidate_comparison_table.length must equal n_candidates_returned');
+});
+
+test('candidate_comparison_table rows have required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const REQUIRED = ['rank','lat','lon','distance_km','direction','score','status',
+    'sigma_msm','sigma_quality','score_confidence'];
+  for (const row of out.candidate_comparison_table){
+    for (const field of REQUIRED){
+      assert.ok(field in row,
+        `candidate_comparison_table row missing field '${field}' (rank ${row.rank})`);
+    }
+  }
+});
+
+test('candidate_comparison_table ranks match returned candidates ranks', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const tableRanks = out.candidate_comparison_table.map(r => r.rank);
+  const candidateRanks = out.candidates.map(c => c.rank);
+  assert.deepEqual(tableRanks, candidateRanks,
+    'candidate_comparison_table ranks must match candidates ranks in order');
+});
+
+test('candidate_comparison_table feasibility_verdict matches coverage_feasibility_assessment.verdict', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (let i = 0; i < out.candidates.length; i++){
+    const c = out.candidates[i];
+    const row = out.candidate_comparison_table[i];
+    const expected = c.coverage_feasibility_assessment?.verdict ?? null;
+    assert.equal(row.feasibility_verdict, expected,
+      `feasibility_verdict mismatch at rank ${c.rank}: got ${row.feasibility_verdict}, expected ${expected}`);
+  }
+});
+
+test('candidate_comparison_table pathway_weeks matches compliance_pathway.estimated_weeks_to_filing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (let i = 0; i < out.candidates.length; i++){
+    const c = out.candidates[i];
+    const row = out.candidate_comparison_table[i];
+    const expected = c.compliance_pathway?.estimated_weeks_to_filing ?? null;
+    assert.equal(row.pathway_weeks, expected,
+      `pathway_weeks mismatch at rank ${c.rank}: got ${row.pathway_weeks}, expected ${expected}`);
+  }
+});
+
+test('candidate_comparison_table uncertainty_pts matches score_confidence_band.uncertainty_pts', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (let i = 0; i < out.candidates.length; i++){
+    const c = out.candidates[i];
+    const row = out.candidate_comparison_table[i];
+    const expected = c.score_confidence_band?.uncertainty_pts ?? null;
+    assert.equal(row.uncertainty_pts, expected,
+      `uncertainty_pts mismatch at rank ${c.rank}: got ${row.uncertainty_pts}, expected ${expected}`);
+  }
+});
