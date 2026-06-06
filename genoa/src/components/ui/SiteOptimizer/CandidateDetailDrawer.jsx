@@ -2226,6 +2226,85 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* RF Exposure Compliance Guide */}
+        {candidate.rf_exposure_compliance_guide && (() => {
+          const r = candidate.rf_exposure_compliance_guide;
+          const gpZone   = (r.exposure_zones || []).find(z => z.id === 'UNCONTROLLED');
+          const occZone  = (r.exposure_zones || []).find(z => z.id === 'CONTROLLED');
+          return (
+            <div>
+              <h4 style={{ color: '#f87171', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                RF Exposure Compliance (OET-65 / §1.1310)
+              </h4>
+              <div style={{ background: '#1a0505', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Frequency:</span> <strong>{r.frequency_mhz != null ? `${r.frequency_mhz} MHz` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>TPO:</span> <strong>{r.tpo_kw != null ? `${r.tpo_kw} kW` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>MPE eval required:</span> <strong style={{ color: r.mpe_evaluation_required ? '#ef4444' : '#22c55e' }}>{r.mpe_evaluation_required ? `Yes (≥${r.mpe_threshold_kw} kW)` : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>GP MPE limit:</span> <strong>{r.mpe_limit_gp_mwcm2 != null ? `${r.mpe_limit_gp_mwcm2} mW/cm²` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>GP exclusion zone:</span> <strong style={{ color: '#f87171' }}>{r.exclusion_radius_gp_m != null ? `${r.exclusion_radius_gp_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Occupational zone:</span> <strong style={{ color: '#fca5a5' }}>{r.exclusion_radius_occ_m != null ? `${r.exclusion_radius_occ_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Occ. MPE limit:</span> <strong>{r.mpe_limit_occ_mwcm2 != null ? `${r.mpe_limit_occ_mwcm2} mW/cm²` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Compliance steps:</span> <strong>{r.n_compliance_steps ?? '—'} ({r.total_compliance_days != null ? `~${r.total_compliance_days} days` : '—'})</strong></div>
+                </div>
+              </div>
+              {gpZone && (
+                <div style={{ background: '#140303', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 4 }}>
+                  <span style={{ color: '#f87171', fontWeight: 700 }}>General Population Zone: </span>
+                  <span style={{ color: '#d1d5db' }}>≤{r.mpe_limit_gp_mwcm2} mW/cm² within {r.exclusion_radius_gp_m}m — fence, warning signs, and public access barrier required. Averaging time: {gpZone.averaging_time_min} min.</span>
+                </div>
+              )}
+              {occZone && (
+                <div style={{ background: '#140303', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#fca5a5', fontWeight: 700 }}>Occupational Zone: </span>
+                  <span style={{ color: '#d1d5db' }}>≤{r.mpe_limit_occ_mwcm2} mW/cm² within {r.exclusion_radius_occ_m}m — trained personnel only. Averaging time: {occZone.averaging_time_min} min.</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{r.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Tower Structural Analysis Guide */}
+        {candidate.tower_structural_analysis_guide && (() => {
+          const t = candidate.tower_structural_analysis_guide;
+          const wc = { LIGHT: '#22c55e', MEDIUM: '#f59e0b', HEAVY: '#ef4444' };
+          const reqInspections = (t.inspection_schedule || []).filter(i => i.required);
+          return (
+            <div>
+              <h4 style={{ color: '#fde68a', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Tower Structural Analysis (TIA-222-H)
+              </h4>
+              <div style={{ background: '#1a1500', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Tower height:</span> <strong>{t.tower_height_m != null ? `${t.tower_height_m} m (${t.tower_height_ft} ft)` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Weight class:</span> <strong style={{ color: wc[t.tower_weight_class] || '#9ca3af' }}>{t.tower_weight_class || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Design standard:</span> <strong style={{ fontSize: 10 }}>{t.design_standard || 'TIA-222-H'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: t.asr_required ? '#ef4444' : '#22c55e' }}>{t.asr_required ? 'Yes (§17.7)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Wind exposure:</span> <strong>{t.selected_exposure?.id} — {t.selected_exposure?.basic_wind_speed_mph} mph</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Ice zone:</span> <strong>{t.ice_zone || '—'} ({t.ice_load_psf != null ? `${t.ice_load_psf} psf` : '—'})</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Est. structural cost:</span> <strong style={{ color: '#f59e0b' }}>{t.total_structural_cost_usd != null ? `$${t.total_structural_cost_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Required inspections:</span> <strong>{t.n_required_inspections ?? '—'} types</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Inspection Schedule (TIA-222-H)</div>
+                {reqInspections.map((ins, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: '#fde68a', minWidth: 8, marginTop: 1 }}>●</span>
+                    <div>
+                      <span style={{ color: '#d1d5db', fontWeight: 600 }}>{ins.type} ({ins.frequency})</span>
+                      <span style={{ color: '#6b7280' }}> — est. ${ins.cost_est_usd?.toLocaleString()}</span>
+                      <div style={{ color: '#9ca3af' }}>{ins.notes?.substring(0, 100)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{t.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Directional Antenna Proof Guide */}
         {candidate.directional_antenna_proof_guide && (() => {
           const d = candidate.directional_antenna_proof_guide;

@@ -6696,6 +6696,99 @@ test('directional_antenna_proof_guide comparison table columns present', async (
   }
 });
 
+test('tower_structural_analysis_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_structural_analysis_guide;
+  assert.ok(t != null, 'tower_structural_analysis_guide must be present');
+  assert.ok(t.tower_height_m > 0, 'tower_height_m must be positive');
+  assert.ok(t.tower_height_ft > 0, 'tower_height_ft must be positive');
+  assert.ok(['LIGHT', 'MEDIUM', 'HEAVY'].includes(t.tower_weight_class), `tower_weight_class must be valid: got ${t.tower_weight_class}`);
+  assert.ok(t.total_structural_cost_usd > 0, 'total_structural_cost_usd must be positive');
+});
+
+test('tower_structural_analysis_guide TIA-222 wind exposure categories present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_structural_analysis_guide;
+  assert.ok(Array.isArray(t.wind_exposure_categories), 'wind_exposure_categories must be an array');
+  assert.strictEqual(t.n_exposure_categories, t.wind_exposure_categories.length, 'n_exposure_categories must match');
+  const expB = t.wind_exposure_categories.find(e => e.id === 'B');
+  const expC = t.wind_exposure_categories.find(e => e.id === 'C');
+  assert.ok(expB != null, 'Exposure B must be present');
+  assert.ok(expC != null, 'Exposure C must be present');
+  assert.ok(expC.basic_wind_speed_mph > expB.basic_wind_speed_mph, 'Exposure C wind speed must exceed Exposure B');
+});
+
+test('tower_structural_analysis_guide inspection schedule has required inspections', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_structural_analysis_guide;
+  assert.ok(Array.isArray(t.inspection_schedule), 'inspection_schedule must be an array');
+  assert.ok(t.n_required_inspections > 0, 'must have required inspections');
+  const initial = t.inspection_schedule.find(i => i.type === 'Initial');
+  assert.ok(initial != null, 'Initial inspection must be present');
+  assert.strictEqual(initial.required, true, 'Initial inspection must be required');
+});
+
+test('tower_structural_analysis_guide ASR required for 780 kHz tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_structural_analysis_guide;
+  // 780 kHz: 3/8λ ≈ 144m > 60.96m → ASR required
+  assert.strictEqual(t.asr_required, true, '780 kHz tower (~144m) must require ASR per §17.7');
+  assert.ok(t.cost_estimates.structural_analysis_pe_usd > 0, 'PE structural analysis cost must be positive');
+});
+
+test('tower_structural_analysis_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tsa_tower_height_ft' in row, 'tsa_tower_height_ft missing from comparison table');
+    assert.ok('tsa_weight_class'    in row, 'tsa_weight_class missing from comparison table');
+    assert.ok('tsa_total_cost_usd'  in row, 'tsa_total_cost_usd missing from comparison table');
+  }
+});
+
+test('rf_exposure_compliance_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].rf_exposure_compliance_guide;
+  assert.ok(r != null, 'rf_exposure_compliance_guide must be present');
+  assert.ok(Array.isArray(r.exposure_zones), 'exposure_zones must be an array');
+  assert.ok(r.n_exposure_zones === r.exposure_zones.length, 'n_exposure_zones must match array length');
+  assert.ok(r.exclusion_radius_gp_m > 0, 'exclusion_radius_gp_m must be positive');
+  assert.ok(r.exclusion_radius_occ_m > 0, 'exclusion_radius_occ_m must be positive');
+});
+
+test('rf_exposure_compliance_guide MPE evaluation required at 5 kW threshold', async () => {
+  const out5  = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const out1  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
+  const r5 = out5.candidates[0].rf_exposure_compliance_guide;
+  const r1 = out1.candidates[0].rf_exposure_compliance_guide;
+  assert.strictEqual(r5.mpe_evaluation_required, true,  '5 kW must require MPE evaluation (§1.1310 threshold)');
+  assert.strictEqual(r1.mpe_evaluation_required, false, '1 kW must not require MPE evaluation');
+});
+
+test('rf_exposure_compliance_guide uncontrolled zone is stricter than controlled', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].rf_exposure_compliance_guide;
+  assert.ok(r.mpe_limit_gp_mwcm2 < r.mpe_limit_occ_mwcm2, 'GP MPE limit must be less than occupational limit');
+  assert.ok(r.exclusion_radius_gp_m > r.exclusion_radius_occ_m, 'GP exclusion zone must be larger than controlled zone');
+});
+
+test('rf_exposure_compliance_guide exclusion zones scale with power', async () => {
+  const out5  = await runSiteOptimizer({ ...KAZM, tpo_kw: 5,  candidate_limit: 1 });
+  const out50 = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  const r5  = out5.candidates[0].rf_exposure_compliance_guide;
+  const r50 = out50.candidates[0].rf_exposure_compliance_guide;
+  assert.ok(r50.exclusion_radius_gp_m > r5.exclusion_radius_gp_m, '50 kW GP zone must be larger than 5 kW zone');
+  assert.ok(r50.exclusion_radius_occ_m > r5.exclusion_radius_occ_m, '50 kW occupational zone must be larger than 5 kW zone');
+});
+
+test('rf_exposure_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rfe_eval_required'     in row, 'rfe_eval_required missing from comparison table');
+    assert.ok('rfe_excl_radius_gp_m'  in row, 'rfe_excl_radius_gp_m missing from comparison table');
+    assert.ok('rfe_excl_radius_occ_m' in row, 'rfe_excl_radius_occ_m missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;

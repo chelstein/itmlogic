@@ -1717,6 +1717,57 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      rf_exposure_compliance_guide: {
+        frequency_mhz: 0.78, tpo_kw: 5, mpe_evaluation_required: true, mpe_threshold_kw: 5,
+        mpe_limit_gp_mwcm2: 100, mpe_limit_occ_mwcm2: 500,
+        exclusion_radius_gp_m: 38.73, exclusion_radius_occ_m: 17.32,
+        exposure_zones: [
+          { id: 'CONTROLLED', label: 'Controlled (Occupational) Zone', cfr: '47 CFR §1.1310 Table 1', mpe_limit_mwcm2: 500, mpe_limit_vm: 1374.77, exclusion_radius_m: 17.32, who_is_exposed: 'Station employees and contractors aware of and able to exercise control over their exposure', marking_required: 'RF Caution signs; personnel dosimeter recommended', averaging_time_min: 6 },
+          { id: 'UNCONTROLLED', label: 'Uncontrolled (General Population) Zone', cfr: '47 CFR §1.1310 Table 1', mpe_limit_mwcm2: 100, mpe_limit_vm: 614.43, exclusion_radius_m: 38.73, who_is_exposed: 'General public, including bystanders without RF training', marking_required: 'RF Warning signs at fence perimeter; barrier required if within exclusion zone', averaging_time_min: 30 }
+        ],
+        n_exposure_zones: 2,
+        evaluation_triggers: [
+          { trigger: 'ERP ≥ 5 kW', applicable: true, note: 'AM broadcast evaluation threshold per §1.1310 Table 1' },
+          { trigger: 'New construction or modification', applicable: true, note: 'Any new CP or modification requires evaluation or categorical exclusion determination' },
+          { trigger: 'Tower within 50m of public access', applicable: true, note: 'Any publicly accessible area within exclusion zone triggers formal MPE evaluation' },
+          { trigger: 'Colocation with other RF sources', applicable: false, note: 'Multiple RF sources may require combined field strength analysis per OET-65 §4' }
+        ],
+        compliance_steps: [
+          { step: 1, label: 'Calculate exclusion zones', tool: 'FCC online MPE calculator or OET-65 Supplement B worksheets', days_est: 1 },
+          { step: 2, label: 'Survey site for public access points', tool: 'Site walkthrough + aerial mapping', days_est: 1 },
+          { step: 3, label: 'Install warning signs at controlled/uncontrolled boundaries', tool: 'ANSI Z535.2 signs; RF WARNING yellow/black', days_est: 1 },
+          { step: 4, label: 'Verify fence/barrier compliance per §73.49', tool: 'Physical inspection', days_est: 0.5 },
+          { step: 5, label: 'Document and file MPE analysis with Form 301-AM if required', tool: 'FCC LMS filing system', days_est: 1 }
+        ],
+        n_compliance_steps: 5, total_compliance_days: 4.5,
+        applicable_bulletin: 'OET Bulletin 65, Edition 97-01 (August 1997)',
+        reference: '47 CFR §1.1310; 47 CFR §1.1307; OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2005; ANSI Z535.2',
+        note: 'AM 0.78 MHz, 5 kW ERP. MPE eval required. Uncontrolled exclusion zone: 38.73m; controlled: 17.32m.'
+      },
+      tower_structural_analysis_guide: {
+        tower_height_m: 144.23, tower_height_ft: 473.21, tower_weight_class: 'MEDIUM', asr_required: true,
+        wind_exposure_categories: [
+          { id: 'B', label: 'Exposure B — Urban / Suburban', basic_wind_speed_mph: 115, design_pressure_psf: 33.84 },
+          { id: 'C', label: 'Exposure C — Open Terrain', basic_wind_speed_mph: 120, design_pressure_psf: 36.86 },
+          { id: 'D', label: 'Exposure D — Coastal / Exposed', basic_wind_speed_mph: 130, design_pressure_psf: 43.26 }
+        ],
+        n_exposure_categories: 3,
+        selected_exposure: { id: 'C', label: 'Exposure C — Open Terrain', basic_wind_speed_mph: 120, design_pressure_psf: 36.86 },
+        design_standard: 'TIA-222-H (2018) / ASCE 7-16',
+        antenna_loads: { antenna_assembly_lbs: 275, base_insulator_lbs: 400, guy_wire_tension_lbs: 2163, n_guy_levels: 3, total_tension_load_lbs: 6490 },
+        ice_zone: 'MEDIUM', ice_load_psf: 0.75,
+        inspection_schedule: [
+          { type: 'Initial', frequency: 'Before first use', cfr: 'TIA-222-H §4', required: true, cost_est_usd: 3500, notes: 'PE-stamped report required for FCC ASR if height > 200 ft' },
+          { type: 'Periodic', frequency: 'Every 3 years', cfr: 'TIA-222-H §4.2', required: true, cost_est_usd: 2500, notes: 'Visual inspection of all structural members, guy wires, and anchors' },
+          { type: 'Post-event', frequency: 'After wind/ice/seismic event', cfr: 'TIA-222-H §4.3', required: true, cost_est_usd: 1500, notes: 'Immediate inspection after any significant weather event exceeding design criteria' },
+          { type: 'Corrosion', frequency: 'Every 5 years', cfr: 'SSPC-SP2', required: false, cost_est_usd: 4000, notes: 'Full corrosion inspection and paint/galvanizing assessment.' }
+        ],
+        n_inspection_types: 4, n_required_inspections: 3,
+        cost_estimates: { structural_analysis_pe_usd: 10048, foundation_design_pe_usd: 5885, tower_erection_usd: 55384, guy_wire_system_usd: 14490 },
+        total_structural_cost_usd: 85807,
+        reference: 'TIA-222-H (2018); ASCE 7-16; 47 CFR §73.49; 47 CFR §17.7; FCC Antenna Structure Registration; SSPC-SP2',
+        note: 'Tower 144.23m (473.21ft) — MEDIUM class. Wind exposure C: 120 mph. Ice zone: MEDIUM. Est. structural cost: $85,807.'
+      },
       directional_antenna_proof_guide: {
         applicable: false,
         reason: "Pattern mode 'NDA' is not a directional antenna (DA) pattern. §73.154 proof not required.",

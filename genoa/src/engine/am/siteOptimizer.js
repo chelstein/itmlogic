@@ -909,7 +909,13 @@ export async function runSiteOptimizer(body = {}){
     ins_asr_required:       c.insurance_liability_analysis?.asr_required ?? null,
     dapg_applicable:        c.directional_antenna_proof_guide?.applicable ?? null,
     dapg_n_radials:         c.directional_antenna_proof_guide?.recommended_proof?.radials ?? null,
-    dapg_proof_cost_usd:    c.directional_antenna_proof_guide?.estimated_total_proof_cost_usd ?? null
+    dapg_proof_cost_usd:    c.directional_antenna_proof_guide?.estimated_total_proof_cost_usd ?? null,
+    tsa_tower_height_ft:    c.tower_structural_analysis_guide?.tower_height_ft ?? null,
+    tsa_weight_class:       c.tower_structural_analysis_guide?.tower_weight_class ?? null,
+    tsa_total_cost_usd:     c.tower_structural_analysis_guide?.total_structural_cost_usd ?? null,
+    rfe_eval_required:      c.rf_exposure_compliance_guide?.mpe_evaluation_required ?? null,
+    rfe_excl_radius_gp_m:   c.rf_exposure_compliance_guide?.exclusion_radius_gp_m ?? null,
+    rfe_excl_radius_occ_m:  c.rf_exposure_compliance_guide?.exclusion_radius_occ_m ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -9981,6 +9987,163 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_requirement: 'Proof must be filed with FCC as Exhibit to Form 302-AM (License to Cover) within 12 months of CP grant',
         reference: '47 CFR §73.154; 47 CFR §73.62; FCC Media Bureau DA Proof Guidelines (2016); NAB Engineering Handbook §6.3',
         note: `DA pattern — §73.154 proof required. Full proof: ${PROOF_METHODS[0].radials} radials at ${PROOF_METHODS[0].degree_interval}° intervals; est. ${PROOF_METHODS[0].estimated_days} days / $${PROOF_METHODS[0].cost_est_usd.toLocaleString()}.`
+      };
+    })(),
+
+    tower_structural_analysis_guide: (() => {
+      // Structural analysis for AM broadcast towers per TIA-222-H (2018) and ANSI/TIA-222
+      // §73.49 requires substantial structure; §17.7 ASR requires PE-stamped structural analysis
+      // Key: wind zone, ice loading, antenna weight, and foundation capacity all drive tower selection
+      const towerH_tsa = round2(0.375 * 300000 / frequency_khz); // 3/8λ standard
+      const asr_required_tsa = towerH_tsa > 60.96;
+
+      // TIA-222-H wind speed exposure categories (ASCE 7-16 basis)
+      // Basic wind speed by exposure: urban/suburban (B), open terrain (C), coastal/exposed (D)
+      const WIND_EXPOSURE_CATEGORIES = [
+        { id: 'B', label: 'Exposure B — Urban / Suburban', basic_wind_speed_mph: 115, design_pressure_psf: round2(0.00256 * Math.pow(115, 2) * 1.0), description: 'Buildings, trees, or other surface irregularities ≥ 20 ft height in terrain upwind for ≥ 1500 ft', typical_location: 'Urban or suburban setting' },
+        { id: 'C', label: 'Exposure C — Open Terrain', basic_wind_speed_mph: 120, design_pressure_psf: round2(0.00256 * Math.pow(120, 2) * 1.0), description: 'Open terrain with scattered obstructions having heights < 30 ft for ≥ 1500 ft upwind', typical_location: 'Flat open country, grasslands, rural' },
+        { id: 'D', label: 'Exposure D — Coastal / Exposed', basic_wind_speed_mph: 130, design_pressure_psf: round2(0.00256 * Math.pow(130, 2) * 1.0), description: 'Flat, unobstructed coastal areas exposed to wind from ocean, bay, or large lake', typical_location: 'Shorelines, large water bodies' }
+      ];
+
+      // Default to Exposure C (open terrain most common for AM towers)
+      const selectedExposure = WIND_EXPOSURE_CATEGORIES[1];
+
+      // Tower height tiers and typical weight bearing capacity
+      const towerApproxHeightFt = round2(towerH_tsa * 3.28084);
+      const towerWeightClass   = towerH_tsa < 60 ? 'LIGHT' : towerH_tsa < 150 ? 'MEDIUM' : 'HEAVY';
+
+      // Standard AM tower antenna loads
+      const ANTENNA_LOADS = {
+        antenna_assembly_lbs: Math.round(tpo_kw * 25 + 150),  // rough estimate
+        base_insulator_lbs: 400,
+        guy_wire_tension_lbs: Math.round(towerH_tsa * 15),    // each level
+        n_guy_levels: towerH_tsa < 100 ? 2 : 3,
+        total_tension_load_lbs: Math.round(towerH_tsa * 15 * (towerH_tsa < 100 ? 2 : 3))
+      };
+
+      // Structural inspection schedule per TIA-222
+      const INSPECTION_SCHEDULE = [
+        { type: 'Initial', frequency: 'Before first use', cfr: 'TIA-222-H §4', required: true, cost_est_usd: 3500, notes: 'PE-stamped report required for FCC ASR if height > 200 ft' },
+        { type: 'Periodic', frequency: 'Every 3 years', cfr: 'TIA-222-H §4.2', required: true, cost_est_usd: 2500, notes: 'Visual inspection of all structural members, guy wires, and anchors' },
+        { type: 'Post-event', frequency: 'After wind/ice/seismic event', cfr: 'TIA-222-H §4.3', required: true, cost_est_usd: 1500, notes: 'Immediate inspection after any significant weather event exceeding design criteria' },
+        { type: 'Corrosion', frequency: 'Every 5 years', cfr: 'SSPC-SP2', required: false, cost_est_usd: 4000, notes: 'Full corrosion inspection and paint/galvanizing assessment. Critical in coastal environments.' }
+      ];
+
+      // Ice loading (TIA-222-H Appendix B)
+      const ICE_ZONE = towerH_tsa > 100 ? 'MEDIUM' : 'LIGHT'; // simplified; actual depends on geography
+      const iceLoadPsf = ICE_ZONE === 'MEDIUM' ? 0.75 : 0.25;
+
+      // Cost estimates
+      const COST_ESTIMATES = {
+        structural_analysis_pe_usd: Math.round(towerH_tsa * 35 + 5000),
+        foundation_design_pe_usd: Math.round(towerH_tsa * 20 + 3000),
+        tower_erection_usd: Math.round(towerH_tsa * 280 + 15000),
+        guy_wire_system_usd: asr_required_tsa ? Math.round(towerH_tsa * 45 + 8000) : 0
+      };
+      const total_structural_cost_usd = Object.values(COST_ESTIMATES).reduce((s, v) => s + v, 0);
+
+      return {
+        tower_height_m: towerH_tsa,
+        tower_height_ft: towerApproxHeightFt,
+        tower_weight_class: towerWeightClass,
+        asr_required: asr_required_tsa,
+        wind_exposure_categories: WIND_EXPOSURE_CATEGORIES,
+        n_exposure_categories: WIND_EXPOSURE_CATEGORIES.length,
+        selected_exposure: selectedExposure,
+        design_standard: 'TIA-222-H (2018) / ASCE 7-16',
+        antenna_loads: ANTENNA_LOADS,
+        ice_zone: ICE_ZONE,
+        ice_load_psf: iceLoadPsf,
+        inspection_schedule: INSPECTION_SCHEDULE,
+        n_inspection_types: INSPECTION_SCHEDULE.length,
+        n_required_inspections: INSPECTION_SCHEDULE.filter(i => i.required).length,
+        cost_estimates: COST_ESTIMATES,
+        total_structural_cost_usd,
+        reference: 'TIA-222-H (2018); ASCE 7-16; 47 CFR §73.49; 47 CFR §17.7; FCC Antenna Structure Registration; SSPC-SP2',
+        note: `Tower ${towerH_tsa}m (${towerApproxHeightFt}ft) — ${towerWeightClass} class. Wind exposure ${selectedExposure.id}: ${selectedExposure.basic_wind_speed_mph} mph. Ice zone: ${ICE_ZONE}. Est. structural cost: $${total_structural_cost_usd.toLocaleString()}.`
+      };
+    })(),
+
+    rf_exposure_compliance_guide: (() => {
+      // OET Bulletin 65 / 47 CFR §1.1310 MPE (Maximum Permissible Exposure) analysis for AM broadcast
+      // AM frequency range 0.3–3 MHz: general population MPE limit = 100 mW/cm²
+      // Controlled (occupational) MPE = 500 mW/cm² at 0.3–3 MHz
+      // Evaluation threshold for AM: 5 kW ERP
+
+      const freq_mhz    = frequency_khz / 1000;
+      const mpe_eval_required = tpo_kw >= 5; // §1.1310 Table 1 threshold for AM
+      const MPE_LIMIT_GP_mwcm2  = 100; // general population / uncontrolled (0.3–3 MHz)
+      const MPE_LIMIT_OCC_mwcm2 = 500; // occupational / controlled (0.3–3 MHz)
+
+      // Near-field estimate: approximate exclusion zones
+      // Power density S (mW/cm²) near a vertical monopole ≈ 60 * P_kW * (1000)^2 / (4π * r_m²)
+      // Simplified: at r metres, S = (30 * P_kW) / r²  [mW/cm² approximation at AM freq]
+      const erp_w = tpo_kw * 1000;
+      // Distance for GP limit: S = limit → r = sqrt(30 * P_kW / limit_mw_cm2) * 100
+      const r_gp_m  = round2(Math.sqrt(erp_w * 30 / MPE_LIMIT_GP_mwcm2)  / 10);
+      const r_occ_m = round2(Math.sqrt(erp_w * 30 / MPE_LIMIT_OCC_mwcm2) / 10);
+
+      const EXPOSURE_ZONES = [
+        {
+          id: 'CONTROLLED',
+          label: 'Controlled (Occupational) Zone',
+          cfr: '47 CFR §1.1310 Table 1',
+          mpe_limit_mwcm2: MPE_LIMIT_OCC_mwcm2,
+          mpe_limit_vm: round2(Math.sqrt(MPE_LIMIT_OCC_mwcm2 * 10 * 377)),
+          exclusion_radius_m: r_occ_m,
+          who_is_exposed: 'Station employees and contractors aware of and able to exercise control over their exposure',
+          marking_required: 'RF Caution signs; personnel dosimeter recommended',
+          averaging_time_min: 6
+        },
+        {
+          id: 'UNCONTROLLED',
+          label: 'Uncontrolled (General Population) Zone',
+          cfr: '47 CFR §1.1310 Table 1',
+          mpe_limit_mwcm2: MPE_LIMIT_GP_mwcm2,
+          mpe_limit_vm: round2(Math.sqrt(MPE_LIMIT_GP_mwcm2 * 10 * 377)),
+          exclusion_radius_m: r_gp_m,
+          who_is_exposed: 'General public, including bystanders without RF training',
+          marking_required: 'RF Warning signs at fence perimeter; barrier required if within exclusion zone',
+          averaging_time_min: 30
+        }
+      ];
+
+      // §1.1310 evaluation triggers
+      const EVALUATION_TRIGGERS = [
+        { trigger: 'ERP ≥ 5 kW', applicable: mpe_eval_required, note: 'AM broadcast evaluation threshold per §1.1310 Table 1' },
+        { trigger: 'New construction or modification', applicable: true, note: 'Any new CP or modification requires evaluation or categorical exclusion determination' },
+        { trigger: 'Tower within 50m of public access', applicable: true, note: 'Any publicly accessible area within exclusion zone triggers formal MPE evaluation' },
+        { trigger: 'Colocation with other RF sources', applicable: false, note: 'Multiple RF sources may require combined field strength analysis per OET-65 §4' }
+      ];
+
+      const COMPLIANCE_STEPS = [
+        { step: 1, label: 'Calculate exclusion zones', tool: 'FCC online MPE calculator or OET-65 Supplement B worksheets', days_est: 1 },
+        { step: 2, label: 'Survey site for public access points', tool: 'Site walkthrough + aerial mapping', days_est: 1 },
+        { step: 3, label: 'Install warning signs at controlled/uncontrolled boundaries', tool: 'ANSI Z535.2 signs; RF WARNING yellow/black', days_est: 1 },
+        { step: 4, label: 'Verify fence/barrier compliance per §73.49', tool: 'Physical inspection', days_est: 0.5 },
+        { step: 5, label: 'Document and file MPE analysis with Form 301-AM if required', tool: 'FCC LMS filing system', days_est: 1 }
+      ];
+
+      const total_compliance_days = COMPLIANCE_STEPS.reduce((s, c) => s + c.days_est, 0);
+
+      return {
+        frequency_mhz: freq_mhz,
+        tpo_kw,
+        mpe_evaluation_required: mpe_eval_required,
+        mpe_threshold_kw: 5,
+        mpe_limit_gp_mwcm2: MPE_LIMIT_GP_mwcm2,
+        mpe_limit_occ_mwcm2: MPE_LIMIT_OCC_mwcm2,
+        exclusion_radius_gp_m: r_gp_m,
+        exclusion_radius_occ_m: r_occ_m,
+        exposure_zones: EXPOSURE_ZONES,
+        n_exposure_zones: EXPOSURE_ZONES.length,
+        evaluation_triggers: EVALUATION_TRIGGERS,
+        compliance_steps: COMPLIANCE_STEPS,
+        n_compliance_steps: COMPLIANCE_STEPS.length,
+        total_compliance_days,
+        applicable_bulletin: 'OET Bulletin 65, Edition 97-01 (August 1997)',
+        reference: '47 CFR §1.1310; 47 CFR §1.1307; OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2005; ANSI Z535.2',
+        note: `AM ${freq_mhz} MHz, ${tpo_kw} kW ERP. MPE eval ${mpe_eval_required ? 'required' : 'not required'}. Uncontrolled exclusion zone: ${r_gp_m}m; controlled: ${r_occ_m}m.`
       };
     })(),
 
