@@ -5683,6 +5683,61 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- fcc_license_modification_guide ----
+
+test('fcc_license_modification_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.fcc_license_modification_guide != null, 'fcc_license_modification_guide missing');
+  const g = c.fcc_license_modification_guide;
+  assert.ok('fcc_form' in g, 'fcc_form missing');
+  assert.ok('required_exhibits' in g, 'required_exhibits missing');
+  assert.ok('fcc_processing_steps' in g, 'fcc_processing_steps missing');
+  assert.ok('filing_fee_usd' in g, 'filing_fee_usd missing');
+});
+
+test('fcc_license_modification_guide uses Form 301-AM with correct filing fee', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_license_modification_guide;
+  assert.strictEqual(g.fcc_form, '301-AM', 'AM CP form must be 301-AM');
+  assert.strictEqual(g.filing_fee_usd, 325, 'AM CP filing fee must be $325');
+  assert.strictEqual(g.cp_term_years, 3, 'CP term must be 3 years');
+  assert.strictEqual(g.extension_available, true, 'extension must be available');
+});
+
+test('fcc_license_modification_guide NDA station requires fewer exhibits than DA', async () => {
+  const [ndaOut, daOut] = await Promise.all([
+    runSiteOptimizer({ ...KAZM, candidate_limit: 1, pattern_mode: 'NDA' }),
+    runSiteOptimizer({ ...KAZM, candidate_limit: 1, pattern_mode: 'DA-2' })
+  ]);
+  const ndaG = ndaOut.candidates[0].fcc_license_modification_guide;
+  const daG  = daOut.candidates[0].fcc_license_modification_guide;
+  assert.strictEqual(ndaG.is_directional, false, 'NDA must not be flagged as directional');
+  assert.strictEqual(daG.is_directional, true, 'DA-2 must be flagged as directional');
+  assert.ok(daG.n_required_exhibits >= ndaG.n_required_exhibits, 'DA must require at least as many exhibits as NDA');
+  const daExhibitIds = daG.required_exhibits.map(e => e.id);
+  assert.ok(daExhibitIds.includes('DA_PATTERN'), 'DA station must require DA_PATTERN exhibit');
+});
+
+test('fcc_license_modification_guide processing steps include CP grant and Form 302-AM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_license_modification_guide;
+  assert.ok(Array.isArray(g.fcc_processing_steps), 'fcc_processing_steps must be array');
+  assert.ok(g.n_processing_steps >= 4, 'must have at least 4 processing steps');
+  const actions = g.fcc_processing_steps.map(s => s.action.toLowerCase());
+  assert.ok(actions.some(a => a.includes('301') || a.includes('lms')), 'must include Form 301-AM filing step');
+  assert.ok(actions.some(a => a.includes('302') || a.includes('license')), 'must include Form 302-AM / license step');
+});
+
+test('fcc_license_modification_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('flmg_form' in row, 'flmg_form missing from comparison table');
+    assert.ok('flmg_n_exhibits' in row, 'flmg_n_exhibits missing from comparison table');
+    assert.ok('flmg_filing_fee_usd' in row, 'flmg_filing_fee_usd missing from comparison table');
+  }
+});
+
 // ---- transmitter_building_design_guide ----
 
 test('transmitter_building_design_guide presence and structure', async () => {

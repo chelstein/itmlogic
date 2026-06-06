@@ -2226,6 +2226,64 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FCC License Modification Guide */}
+        {candidate.fcc_license_modification_guide && (() => {
+          const g = candidate.fcc_license_modification_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                FCC License Modification <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3533 / Form 301-AM</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>FCC Form</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.fcc_form} via LMS</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>{g.fcc_system}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Filing Fee</div>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 600 }}>${g.filing_fee_usd}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Required Exhibits</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.n_required_exhibits}</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>{g.is_directional ? 'includes DA pattern' : 'NDA station'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>CP Term</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.cp_term_years} years</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>{g.extension_months}-month extension available</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Processing (optimistic)</div>
+                  <div style={{ color: '#34d399', fontSize: 12 }}>{g.is_directional ? g.processing_time_estimate?.da_optimistic_months : g.processing_time_estimate?.nda_optimistic_months} months</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Processing (conservative)</div>
+                  <div style={{ color: '#f87171', fontSize: 12 }}>{g.is_directional ? g.processing_time_estimate?.da_conservative_months : g.processing_time_estimate?.nda_conservative_months} months</div>
+                </div>
+              </div>
+              {g.fcc_processing_steps && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Processing Steps</div>
+                  {g.fcc_processing_steps.slice(0, 3).map((s, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: '#334155', color: '#f1f5f9', borderRadius: 4, padding: '1px 6px', fontSize: 10, minWidth: 20, textAlign: 'center', marginTop: 1 }}>{s.step}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{s.action}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{s.timeline}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Transmitter Building Design Guide */}
         {candidate.transmitter_building_design_guide && (() => {
           const g = candidate.transmitter_building_design_guide;

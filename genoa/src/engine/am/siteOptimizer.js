@@ -996,7 +996,10 @@ export async function runSiteOptimizer(body = {}){
     ampg_annual_cost_usd:   c.am_monitoring_point_guide?.estimated_annual_monitoring_cost_usd ?? null,
     tbdg_min_area_sqft:     c.transmitter_building_design_guide?.min_floor_area_sqft ?? null,
     tbdg_hvac_tons:         c.transmitter_building_design_guide?.hvac_tons_required ?? null,
-    tbdg_build_cost_usd:    c.transmitter_building_design_guide?.estimated_building_cost_usd?.typical ?? null
+    tbdg_build_cost_usd:    c.transmitter_building_design_guide?.estimated_building_cost_usd?.typical ?? null,
+    flmg_form:              c.fcc_license_modification_guide?.fcc_form ?? null,
+    flmg_n_exhibits:        c.fcc_license_modification_guide?.n_required_exhibits ?? null,
+    flmg_filing_fee_usd:    c.fcc_license_modification_guide?.filing_fee_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6731,6 +6734,99 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    fcc_license_modification_guide: (() => {
+      // To relocate an AM transmitter site, the licensee must file an application for a
+      // Construction Permit (CP) with the FCC. The CP authorizes the new site and technical parameters.
+      //
+      // Applicable FCC form:
+      //   - FCC Form 301-AM: Application for AM Broadcast Construction Permit
+      //   - Filed electronically via FCC LMS (Licensing and Management System) at lms.fcc.gov
+      //   - §73.3533(a): Application for CP required before any site change
+      //   - §73.3534: CP must be filed and granted before construction begins at new site
+      //
+      // Required technical exhibits for Form 301-AM (site relocation):
+      //   1. Site coordinates (NAD83): latitude, longitude of proposed antenna reference point
+      //   2. Contour map: daytime and nighttime 0.5 mV/m and 0.1 mV/m service contours
+      //   3. Interference analysis: showing no new interference under §73.182 to co-channel/adj-channel
+      //   4. DA horizontal radiation pattern (if directional): table of normalized relative field values
+      //      at 5° increments per §73.316; must show day and night patterns separately
+      //   5. Antenna efficiency data: calculated from proposed ground system parameters
+      //   6. Tower height and structure: AGL and AMSL heights; guy configuration if applicable
+      //   7. FAA Form 7460-1 (Notice of Proposed Construction) or FAA determination if tower > 61m AGL
+      //   8. Environmental assessment (EA) or categorical exclusion (CE) per §1.1301–§1.1319
+      //   9. ASR (FCC Antenna Structure Registration) number if tower > 60.96m AGL (§17.7)
+      //  10. Spectrum access justification: AM channel authorization and clearing
+      //      (for existing station, this is the existing license; no new frequency authorization needed)
+      //
+      // FCC processing:
+      //   - Standard processing: 3–6 months for routine non-DA NDA AM site modifications
+      //   - Complex or DA applications: 6–18 months; engineering review required for DA proof
+      //   - Petitions to deny: 30-day public comment period for major changes (§73.3580)
+      //   - Major vs. minor modification: Site relocation > 3.2 km (2 miles) is a major change
+      //     requiring full public notice; < 3.2 km may qualify as minor modification
+      //
+      // §73.3539: CP expires if construction not completed within 3 years of grant
+      // §73.3534(b): 6-month extension available upon showing of good cause before expiration
+      //
+      // Filing fee (FCC Schedule of Application Fees, as of 2024):
+      //   - AM CP (major modification): $325 filing fee
+      //   - Some applications fee-exempt if filed with waiver request
+
+      const isDA_lm = /^DA/i.test(pattern_mode);
+
+      const REQUIRED_EXHIBITS = [
+        { id: 'SITE_COORDS',      label: 'Site coordinates (NAD83 lat/lon)', cfr: '§73.3533; §73.25', required: true, note: 'Must be NAD83 datum; GPS survey with sub-meter accuracy required' },
+        { id: 'CONTOUR_MAP',      label: 'Service area contour map', cfr: '§73.182; §73.3533', required: true, note: 'Day and night 0.5 mV/m and 0.1 mV/m service contours using FCC curves (§73.190)' },
+        { id: 'INTERFERENCE',     label: 'Interference analysis', cfr: '§73.182', required: true, note: 'Must show no new objectionable interference to all co-channel and adjacent-channel stations' },
+        { id: 'DA_PATTERN',       label: 'DA horizontal radiation pattern table', cfr: '§73.316', required: isDA_lm, note: 'Normalized relative field values at 5° increments; day and night patterns separately' },
+        { id: 'ANTENNA_EFF',      label: 'Antenna efficiency and ground system data', cfr: '§73.190; §73.24', required: true, note: 'Ground system parameters; predicted efficiency factor used in power/contour calculations' },
+        { id: 'TOWER_HEIGHT',     label: 'Tower height (AGL/AMSL) and structural data', cfr: '§73.1560; §17.7', required: true, note: 'Height of antenna structure above ground level and above mean sea level' },
+        { id: 'FAA_CLEARANCE',    label: 'FAA Form 7460-1 or FAA determination', cfr: '§17.7; §17.23', required: true, note: 'Required for any structure > 61m AGL; FAA determination must be attached to LMS filing' },
+        { id: 'ENVIRONMENTAL',    label: 'EA or categorical exclusion finding', cfr: '§1.1301–§1.1319', required: true, note: 'Most AM tower relocations qualify for categorical exclusion; full EA required if in floodplain, wetland, etc.' },
+        { id: 'ASR_NUMBER',       label: 'FCC ASR registration number', cfr: '§17.7', required: true, note: 'Tower > 60.96m AGL must be registered in FCC Antenna Structure Registration system before CP grant' },
+        { id: 'TECH_PARAMS',      label: 'Technical parameters (frequency, power, pattern, class)', cfr: '§73.21; §73.182', required: true, note: 'ERP, TPO, antenna system parameters, and authorized power class must be filed and consistent' }
+      ];
+
+      const required_exhibits = REQUIRED_EXHIBITS.filter(e => e.required);
+      const n_required_exhibits = required_exhibits.length;
+
+      const FCC_PROCESSING_STEPS = [
+        { step: 1, action: 'File FCC Form 301-AM via LMS', detail: 'Complete all sections; attach all required exhibits; pay $325 filing fee electronically', timeline: 'Day 1 of application process', cfr: '§73.3533(a)' },
+        { step: 2, action: 'FCC issues public notice (PNOH)', detail: 'FCC Public Notice of Hearing or Application — 30-day window for petitions to deny (major modifications)', timeline: '30-day public comment period', cfr: '§73.3580' },
+        { step: 3, action: 'FCC engineering review', detail: 'FCC Media Bureau AM engineers review technical exhibits, interference analysis, and DA proof if applicable', timeline: '3–18 months (NDA faster; DA longer)', cfr: '§73.3533' },
+        { step: 4, action: 'FCC issues CP grant', detail: 'Upon grant, upload CP to OPIF within 24 hours; begin construction per CP specifications', timeline: 'After engineering clearance', cfr: '§73.3534; §73.3526(e)(1)' },
+        { step: 5, action: 'Construct and file Form 302-AM (license to cover)', detail: 'After construction and proof-of-performance, file Form 302-AM with proof exhibits for license to cover', timeline: '3-year CP term; file 302-AM before CP expiration', cfr: '§73.3539; §73.3534(b)' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        pattern_mode,
+        is_directional: isDA_lm,
+        fcc_form: '301-AM',
+        fcc_system: 'FCC LMS (lms.fcc.gov)',
+        filing_fee_usd: 325,
+        required_exhibits,
+        n_required_exhibits,
+        all_exhibits: REQUIRED_EXHIBITS,
+        fcc_processing_steps: FCC_PROCESSING_STEPS,
+        n_processing_steps: FCC_PROCESSING_STEPS.length,
+        cp_term_years: 3,
+        extension_available: true,
+        extension_months: 6,
+        major_change_radius_km: 3.2,
+        major_change_radius_miles: 2,
+        processing_time_estimate: {
+          nda_optimistic_months: 3,
+          nda_conservative_months: 9,
+          da_optimistic_months: 9,
+          da_conservative_months: 18
+        },
+        relocation_note: `File FCC Form 301-AM via LMS. ${n_required_exhibits} required exhibits including interference analysis, contour map, FAA determination, and ASR number. $325 filing fee. ${isDA_lm ? 'DA station requires horizontal radiation pattern table (§73.316). Processing: 9–18 months.' : 'NDA station. Processing: 3–9 months.'} CP valid for 3 years; 6-month extension available.`,
+        reference: '47 CFR §73.3533; §73.3534; §73.3539; §73.3580; §73.316; §17.7; §1.1301; FCC LMS (lms.fcc.gov); FCC Schedule of Application Fees',
+        note: `Form 301-AM via FCC LMS. ${n_required_exhibits} required exhibits. Filing fee: $325. CP term: 3 years + 6-month extension. Processing: ${isDA_lm ? '9–18' : '3–9'} months. Public notice triggers 30-day petition window for major changes.`
       };
     })(),
 
