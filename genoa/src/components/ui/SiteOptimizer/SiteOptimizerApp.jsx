@@ -1717,6 +1717,35 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      am_propagation_variability_guide: {
+        frequency_khz: 780, fcc_class: 'D', sigma_msm: 8,
+        channel_type: 'CLEAR',
+        seasonal_variation: {
+          seasons: [
+            { id: 'WINTER', label: 'Winter (Dec–Feb)', sigma_factor: 0.85, coverage_factor: 0.92, notes: 'Frozen ground reduces conductivity; reduced groundwave reach' },
+            { id: 'SPRING', label: 'Spring (Mar–May)', sigma_factor: 1.25, coverage_factor: 1.06, notes: 'Wet soil, high moisture; peak conductivity; best groundwave reach' },
+            { id: 'SUMMER', label: 'Summer (Jun–Aug)', sigma_factor: 1.00, coverage_factor: 1.00, notes: 'Baseline; typical FCC curve conductivity assumption' },
+            { id: 'FALL',   label: 'Fall (Sep–Nov)',   sigma_factor: 0.90, coverage_factor: 0.95, notes: 'Drying soils; conductivity declining toward winter minimum' }
+          ],
+          worst_case_season: 'WINTER', best_case_season: 'SPRING',
+          worst_case_change_pct: -8, best_case_change_pct: 6
+        },
+        ionospheric_skip: {
+          min_skip_distance_km: 274, max_skip_distance_km: 509,
+          typical_night_boost_db: 15,
+          interference_risk: 'LOW — this station is or shares the dominant assignment'
+        },
+        fade_margins: { groundwave_seasonal_db: { min: 1, max: 6, typical: 3 }, diurnal_skywave_db: { min: 10, max: 20, typical: 15 }, building_loss_urban_db: { min: 5, max: 12, typical: 8 }, vehicle_mobile_db: { min: 2, max: 6, typical: 4 } },
+        mitigation_options: [
+          { id: 'GROUND_SYSTEM', label: 'Ground radial system improvement', effectiveness: 'HIGH', notes: 'Adding radials from 60→120 can increase ERP by 1–3 dB; reduces seasonal variation' },
+          { id: 'ERECT_HEIGHT',  label: 'Tower height optimization (3/8λ)', effectiveness: 'HIGH', notes: 'Optimal at ~144.2m for 780 kHz; reduces reactive component' },
+          { id: 'NIGHT_REDUCTION', label: 'Nighttime power reduction per §73.99', effectiveness: 'MODERATE', notes: 'Accepted regulatory mitigation for secondary stations on clear/regional channels' },
+          { id: 'TRANSLATOR', label: 'FM translator supplemental coverage', effectiveness: 'MODERATE', notes: 'FM unaffected by AM skywave; provides reliable night coverage in urban cores' }
+        ],
+        n_mitigation_options: 4,
+        reference: '47 CFR §73.182 Note; ITU-R P.368-10; FCC R&O DA 04-3586; OET Bulletin 73; §73.99',
+        note: '780 kHz clear channel. Seasonal coverage swing: -8% to +6%. Night skip zone: 274–509 km. Night boost ~15 dB.'
+      },
       adjacent_market_coverage_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         candidate_dist_from_current_km: 20,

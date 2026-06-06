@@ -2226,6 +2226,87 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Propagation Variability Guide */}
+        {candidate.am_propagation_variability_guide && (() => {
+          const g = candidate.am_propagation_variability_guide;
+          const sv = g.seasonal_variation || {};
+          const sk = g.ionospheric_skip || {};
+          const mit = g.mitigation_options || [];
+          const channelColors = { CLEAR: '#34d399', REGIONAL: '#fbbf24', LOCAL: '#f87171' };
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                AM Propagation Variability (§73.182 / ITU-R P.368)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Channel Type</span>
+                  <span style={{ color: channelColors[g.channel_type] || '#e2e8f0', fontWeight: 700 }}>{g.channel_type}</span>
+                  <span style={{ color: '#94a3b8' }}>Frequency</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.frequency_khz} kHz</span>
+                  <span style={{ color: '#94a3b8' }}>Soil σ (Site)</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.sigma_msm} mS/m</span>
+                  <span style={{ color: '#94a3b8' }}>Seasonal Swing</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>{sv.worst_case_change_pct}% to +{sv.best_case_change_pct}%</span>
+                  <span style={{ color: '#94a3b8' }}>Worst Season</span>
+                  <span style={{ color: '#f87171', fontWeight: 600 }}>{sv.worst_case_season}</span>
+                  <span style={{ color: '#94a3b8' }}>Best Season</span>
+                  <span style={{ color: '#34d399', fontWeight: 600 }}>{sv.best_case_season}</span>
+                </div>
+              </div>
+              {/* Seasonal Breakdown */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>SEASONAL GROUNDWAVE VARIATION</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+                  {(sv.seasons || []).map(s => (
+                    <div key={s.id} style={{ background: '#020c18', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                      <div style={{ color: '#e2e8f0', fontWeight: 700, marginBottom: 2 }}>{s.id}</div>
+                      <div style={{ color: s.coverage_factor >= 1 ? '#34d399' : '#f87171', fontWeight: 700 }}>
+                        {s.coverage_factor >= 1 ? '+' : ''}{Math.round((s.coverage_factor - 1) * 100)}%
+                      </div>
+                      <div style={{ color: '#64748b', fontSize: 10, marginTop: 2 }}>{s.notes?.split(';')[0]}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Ionospheric Skip */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ color: '#fbbf24', fontWeight: 700, marginBottom: 6 }}>Ionospheric Skip (Skywave)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Skip Zone</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{sk.min_skip_distance_km}–{sk.max_skip_distance_km} km</span>
+                  <span style={{ color: '#94a3b8' }}>Night Boost</span>
+                  <span style={{ color: '#34d399', fontWeight: 600 }}>+{sk.typical_night_boost_db} dB</span>
+                  <span style={{ color: '#94a3b8' }}>Interference Risk</span>
+                  <span style={{ color: sk.interference_risk?.startsWith('LOW') ? '#34d399' : sk.interference_risk?.startsWith('MODERATE') ? '#fbbf24' : '#f87171', fontWeight: 600, fontSize: 11 }}>
+                    {sk.interference_risk?.split(' — ')[0]}
+                  </span>
+                </div>
+                {sk.interference_risk && (
+                  <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 5, fontStyle: 'italic' }}>{sk.interference_risk.split(' — ')[1]}</div>
+                )}
+              </div>
+              {/* Mitigation Options */}
+              {mit.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>MITIGATION OPTIONS</div>
+                  {mit.map(m => (
+                    <div key={m.id} style={{ background: '#020c18', borderRadius: 4, padding: '6px 10px', marginBottom: 4, fontSize: 12, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <span style={{ color: m.effectiveness === 'HIGH' ? '#34d399' : '#fbbf24', fontWeight: 700, minWidth: 70 }}>{m.effectiveness}</span>
+                      <div>
+                        <div style={{ color: '#e2e8f0', fontWeight: 600, marginBottom: 2 }}>{m.label}</div>
+                        <div style={{ color: '#64748b', fontSize: 11 }}>{m.notes}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

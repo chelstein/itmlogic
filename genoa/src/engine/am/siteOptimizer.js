@@ -927,7 +927,10 @@ export async function runSiteOptimizer(body = {}){
     lrc_n_opif_required:    c.license_renewal_compliance_guide?.n_opif_required ?? null,
     amca_primary_reach_km:  c.adjacent_market_coverage_analysis?.primary_service_radius_km ?? null,
     amca_primary_area_km2:  c.adjacent_market_coverage_analysis?.primary_service_area_km2 ?? null,
-    amca_translator_ok:     c.adjacent_market_coverage_analysis?.translator_opportunity?.authorized ?? null
+    amca_translator_ok:     c.adjacent_market_coverage_analysis?.translator_opportunity?.authorized ?? null,
+    apvg_seasonal_var_pct:  c.am_propagation_variability_guide?.seasonal_variation?.worst_case_change_pct ?? null,
+    apvg_skip_zone_km:      c.am_propagation_variability_guide?.ionospheric_skip?.min_skip_distance_km ?? null,
+    apvg_night_boost_db:    c.am_propagation_variability_guide?.ionospheric_skip?.typical_night_boost_db ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -10386,6 +10389,92 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_propagation_variability_guide: (() => {
+      // AM groundwave propagation is affected by seasonal soil moisture, temperature,
+      // and ionospheric conditions. Skywave (nighttime) skip interference is a key
+      // concern for all classes operating on clear and regional channels.
+      // References: ITU-R P.368, FCC R&O DA 04-3586, §73.182 Note, Annex II (groundwave)
+
+      // Seasonal groundwave variation
+      // Soil moisture peaks in spring (Feb–Apr in N. Hemisphere), drops in late summer.
+      // Effect on conductivity: wet soil can increase effective σ by 50–200%.
+      // This translates to ~3–8% extension of coverage contour seasonally.
+      const SEASONAL_DATA = [
+        { id: 'WINTER', label: 'Winter (Dec–Feb)', sigma_factor: 0.85, coverage_factor: 0.92, notes: 'Frozen ground reduces conductivity; reduced groundwave reach' },
+        { id: 'SPRING', label: 'Spring (Mar–May)', sigma_factor: 1.25, coverage_factor: 1.06, notes: 'Wet soil, high moisture; peak conductivity; best groundwave reach' },
+        { id: 'SUMMER', label: 'Summer (Jun–Aug)', sigma_factor: 1.00, coverage_factor: 1.00, notes: 'Baseline; typical FCC curve conductivity assumption' },
+        { id: 'FALL',   label: 'Fall (Sep–Nov)',   sigma_factor: 0.90, coverage_factor: 0.95, notes: 'Drying soils; conductivity declining toward winter minimum' }
+      ];
+      const worst_case_season   = SEASONAL_DATA.reduce((a, b) => a.coverage_factor < b.coverage_factor ? a : b);
+      const best_case_season    = SEASONAL_DATA.reduce((a, b) => a.coverage_factor > b.coverage_factor ? a : b);
+      const worst_case_change_pct = round2((worst_case_season.coverage_factor - 1) * 100);
+      const best_case_change_pct  = round2((best_case_season.coverage_factor - 1)  * 100);
+
+      // Ionospheric skip (skywave) analysis
+      // At AM frequencies, ionospheric E/F-layer reflection creates night skywave.
+      // Skip zone: ~200–500 km depending on frequency and time of year.
+      // Clear-channel stations (Class A) dominate due to high power + single dominant.
+      // Secondary stations face potential interference from dominant station skywave.
+      const isClearCh = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isRegionalCh = !isClearCh && !LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Skip distance for MF AM E-layer: higher freq → shorter skip within 530–1700 kHz band
+      // At 530 kHz: ~300–550 km; at 1700 kHz: ~150–300 km; linear interpolation
+      const freq_mhz = frequency_khz / 1000;
+      const base_skip_km = Math.round(300 - (frequency_khz - 530) / (1700 - 530) * 150);
+      const min_skip_km   = round2(Math.max(150, Math.min(350, base_skip_km)));
+      const max_skip_km   = round2(Math.min(650, min_skip_km + 150 + Math.round(base_skip_km * 0.4)));
+      const typical_night_boost_db = isClearCh ? 15 : (isRegionalCh ? 12 : 10); // clear channels reflect better
+
+      // Interference risk from dominant station skywave (for secondary stations)
+      const skywave_interference_risk = (() => {
+        if (isClearCh) return 'LOW — this station is or shares the dominant assignment';
+        if (isRegionalCh) return 'MODERATE — regional channels share multiple assignments; nighttime skywave interference expected seasonally';
+        return 'HIGH — local channel congestion; nighttime skywave from multiple sources likely';
+      })();
+
+      // Fade margin analysis
+      // AM signals exhibit ~3–6 dB seasonal fade; ~10–20 dB diurnal (day/night) swing
+      const FADE_DATA = {
+        groundwave_seasonal_db: { min: 1, max: 6, typical: 3 },
+        diurnal_skywave_db:     { min: 10, max: 20, typical: 15 },
+        building_loss_urban_db: { min: 5, max: 12, typical: 8 },
+        vehicle_mobile_db:      { min: 2, max: 6, typical: 4 }
+      };
+
+      // Practical mitigation options
+      const MITIGATION = [
+        { id: 'GROUND_SYSTEM', label: 'Ground radial system improvement', effectiveness: 'HIGH', notes: 'Adding radials from 60→120 can increase ERP by 1–3 dB; reduces seasonal variation' },
+        { id: 'ERECT_HEIGHT', label: 'Tower height optimization (3/8λ)', effectiveness: 'HIGH', notes: `Optimal at ~${round2(299.792 / (frequency_khz / 1000) * 3 / 8)}m for ${frequency_khz} kHz; reduces reactive component` },
+        { id: 'NIGHT_REDUCTION', label: 'Nighttime power reduction per §73.99', effectiveness: 'MODERATE', notes: 'Accepted regulatory mitigation for secondary stations on clear/regional channels' },
+        { id: 'TRANSLATOR', label: 'FM translator supplemental coverage', effectiveness: 'MODERATE', notes: 'FM unaffected by AM skywave; provides reliable night coverage in urban cores' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        sigma_msm,
+        channel_type: isClearCh ? 'CLEAR' : (isRegionalCh ? 'REGIONAL' : 'LOCAL'),
+        seasonal_variation: {
+          seasons: SEASONAL_DATA,
+          worst_case_season: worst_case_season.id,
+          best_case_season:  best_case_season.id,
+          worst_case_change_pct,
+          best_case_change_pct
+        },
+        ionospheric_skip: {
+          min_skip_distance_km: min_skip_km,
+          max_skip_distance_km: max_skip_km,
+          typical_night_boost_db,
+          interference_risk: skywave_interference_risk
+        },
+        fade_margins: FADE_DATA,
+        mitigation_options: MITIGATION,
+        n_mitigation_options: MITIGATION.length,
+        reference: '47 CFR §73.182 Note; ITU-R P.368-10; FCC R&O DA 04-3586; OET Bulletin 73; §73.99',
+        note: `${frequency_khz} kHz ${isClearCh ? 'clear channel' : isRegionalCh ? 'regional channel' : 'local channel'}. Seasonal coverage swing: ${worst_case_change_pct}% to +${best_case_change_pct}%. Night skip zone: ${min_skip_km}–${max_skip_km} km. Night boost ~${typical_night_boost_db} dB.`
       };
     })(),
 

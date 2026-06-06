@@ -6929,6 +6929,55 @@ test('license_renewal_compliance_guide comparison table columns present', async 
   }
 });
 
+test('am_propagation_variability_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.am_propagation_variability_guide != null, 'am_propagation_variability_guide missing');
+  const g = c.am_propagation_variability_guide;
+  assert.ok(['CLEAR', 'REGIONAL', 'LOCAL'].includes(g.channel_type), 'channel_type must be CLEAR/REGIONAL/LOCAL');
+  assert.ok(g.seasonal_variation != null, 'seasonal_variation block missing');
+  assert.ok(Array.isArray(g.seasonal_variation.seasons), 'seasons must be an array');
+  assert.equal(g.seasonal_variation.seasons.length, 4, 'must have 4 seasons');
+  assert.ok(g.ionospheric_skip != null, 'ionospheric_skip block missing');
+  assert.ok(g.ionospheric_skip.min_skip_distance_km > 0, 'min_skip_distance_km must be positive');
+  assert.ok(Array.isArray(g.mitigation_options), 'mitigation_options must be array');
+  assert.ok(g.mitigation_options.length >= 3, 'at least 3 mitigation options expected');
+});
+
+test('am_propagation_variability_guide KAZM is clear channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_propagation_variability_guide;
+  assert.equal(g.channel_type, 'CLEAR', 'KAZM 780 kHz must be CLEAR channel');
+  assert.equal(g.frequency_khz, 780, 'frequency_khz must be 780');
+});
+
+test('am_propagation_variability_guide seasonal variation worst/best case', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const sv = out.candidates[0].am_propagation_variability_guide.seasonal_variation;
+  assert.ok(sv.worst_case_change_pct < 0, 'worst case change must be negative (coverage reduction)');
+  assert.ok(sv.best_case_change_pct > 0, 'best case change must be positive (coverage gain)');
+  assert.ok(['WINTER', 'FALL'].includes(sv.worst_case_season), 'worst case season should be winter or fall');
+  assert.ok(sv.best_case_season === 'SPRING', 'best case season should be spring');
+});
+
+test('am_propagation_variability_guide ionospheric skip distances valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const sk = out.candidates[0].am_propagation_variability_guide.ionospheric_skip;
+  assert.ok(sk.min_skip_distance_km >= 100, 'min skip must be >= 100 km');
+  assert.ok(sk.max_skip_distance_km > sk.min_skip_distance_km, 'max skip must exceed min skip');
+  assert.ok(sk.typical_night_boost_db > 0, 'night boost must be positive dB');
+  assert.ok(typeof sk.interference_risk === 'string', 'interference_risk must be string');
+});
+
+test('am_propagation_variability_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('apvg_seasonal_var_pct' in row, 'apvg_seasonal_var_pct missing from comparison table');
+    assert.ok('apvg_skip_zone_km' in row, 'apvg_skip_zone_km missing from comparison table');
+    assert.ok('apvg_night_boost_db' in row, 'apvg_night_boost_db missing from comparison table');
+  }
+});
+
 test('adjacent_market_coverage_analysis presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const a = out.candidates[0].adjacent_market_coverage_analysis;
