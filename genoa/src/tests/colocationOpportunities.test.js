@@ -1099,3 +1099,17 @@ test('colocation GRID candidates have construction_permit_timeline_optimizer', a
     assert.strictEqual(c.construction_permit_timeline_optimizer.n_phases, 6, `rank ${c.rank} must have 6 phases`);
   }
 });
+
+test('colocation GRID candidates have radial_system_engineering_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.radial_system_engineering_guide != null, `rank ${c.rank} missing radial_system_engineering_guide`);
+    assert.ok(c.radial_system_engineering_guide.recommended_n_radials > 0, `rank ${c.rank} radial count must be positive`);
+  }
+});

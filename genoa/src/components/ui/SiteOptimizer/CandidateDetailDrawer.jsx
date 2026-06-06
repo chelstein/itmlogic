@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Radial System Engineering Guide */}
+        {candidate.radial_system_engineering_guide && (() => {
+          const r = candidate.radial_system_engineering_guide;
+          const tierColor = n => n >= 120 ? 'text-green-400' : n >= 60 ? 'text-amber-400' : 'text-red-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Ground Radial System Engineering (§73.190 · Terman/Belrose)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  λ = {r.wavelength_m} m at {r.frequency_khz} kHz.
+                  Optimum radial: <span className="text-white font-mono">0.4λ = {r.optimum_radial_length_m} m ({r.optimum_radial_length_ft} ft)</span>.
+                  Recommended: <span className={`font-bold font-mono ${tierColor(r.recommended_n_radials)}`}>{r.recommended_n_radials} radials</span>
+                  at {r.radial_spacing_deg}° spacing.
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs text-center mb-2">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Total Copper</div>
+                    <div className="text-white font-mono">{r.total_radial_length_m?.toLocaleString()} m</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Material Cost</div>
+                    <div className="text-amber-300 font-mono">${r.material_cost_usd_estimate?.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Copper Mass</div>
+                    <div className="text-white font-mono">{r.copper_mass_kg} kg</div>
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Radial Count Tiers (Terman/Belrose)</div>
+                <div className="space-y-1 mb-2">
+                  {r.radial_tiers?.map(t => (
+                    <div key={t.n} className={`flex items-center gap-2 text-xs rounded px-2 py-1 ${t.n === r.recommended_n_radials ? 'bg-blue-900 border border-blue-600' : 'bg-gray-800'}`}>
+                      <span className={`font-mono font-bold w-8 ${tierColor(t.n)}`}>{t.n}</span>
+                      <span className="text-gray-400 flex-1">{t.label}</span>
+                      <span className="text-white font-mono">{t.efficiency_pct}%</span>
+                      <span className="text-gray-500 font-mono">{t.ground_loss_ohm} Ω</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-400 mb-1">
+                  Wire: #{r.recommended_awg} AWG copper · Burial: ≥ {r.burial_depth_inches}" depth
+                </div>
+                <div className="text-xs text-gray-500">{r.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Construction Permit Timeline Optimizer */}
         {candidate.construction_permit_timeline_optimizer && (() => {
           const t = candidate.construction_permit_timeline_optimizer;

@@ -843,7 +843,10 @@ export async function runSiteOptimizer(body = {}){
     du_n_mitigations:       c.co_channel_interference_budget?.n_applicable_mitigations ?? null,
     cpt_optimistic_months:  c.construction_permit_timeline_optimizer?.total_optimistic_months ?? null,
     cpt_conservative_months:c.construction_permit_timeline_optimizer?.total_conservative_months ?? null,
-    cpt_n_milestones:       c.construction_permit_timeline_optimizer?.total_milestones ?? null
+    cpt_n_milestones:       c.construction_permit_timeline_optimizer?.total_milestones ?? null,
+    radial_n_recommended:   c.radial_system_engineering_guide?.recommended_n_radials ?? null,
+    radial_len_m:           c.radial_system_engineering_guide?.optimum_radial_length_m ?? null,
+    radial_cost_usd:        c.radial_system_engineering_guide?.material_cost_usd_estimate ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7845,6 +7848,87 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_fee_major_change_usd: 6465,
         reference: '47 CFR §73.3533; §73.3598; §73.3561; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
         note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
+      };
+    })(),
+
+    radial_system_engineering_guide: (() => {
+      // AM ground radial system design per §73.190 and Terman/Belrose (1966) groundwave efficiency theory
+      // Terman (1943): N radials reduces ground loss resistance; optimum: 120 radials at 0.4λ length
+      // Belrose (1966): marginal benefit of each additional radial diminishes beyond ~120
+      const lambda_rs   = round2(300000 / frequency_khz);        // wavelength in meters
+      const qwave_rs    = round2(lambda_rs / 4);                  // quarter-wave (m)
+      const optRadialLen_m = round2(0.4 * lambda_rs);             // Terman optimum: 0.4λ
+      const optRadialLen_ft= round2(optRadialLen_m * 3.28084);
+
+      // Standard FCC radial counts: §73.190 footnote recommends 120 radials for efficient system
+      const N_RADIAL_TIERS = [
+        { n: 16,  label: 'Minimum practical', efficiency_pct: 50, ground_loss_ohm: round2(1.65 / (16  * sigma_msm * 0.001)), note: 'Severely limited; acceptable only for very low TPO.' },
+        { n: 30,  label: 'Reduced',           efficiency_pct: 70, ground_loss_ohm: round2(1.65 / (30  * sigma_msm * 0.001)), note: 'Common for low-power translators; 70% of optimum efficiency.' },
+        { n: 60,  label: 'Moderate',          efficiency_pct: 85, ground_loss_ohm: round2(1.65 / (60  * sigma_msm * 0.001)), note: 'FCC minimum guidance for Class C/D stations per §73.190.' },
+        { n: 120, label: 'FCC recommended',   efficiency_pct: 95, ground_loss_ohm: round2(1.65 / (120 * sigma_msm * 0.001)), note: '120 radials at 0.4λ: FCC §73.190 / Terman optimum. Diminishing returns beyond this.' },
+        { n: 240, label: 'High-performance',  efficiency_pct: 98, ground_loss_ohm: round2(1.65 / (240 * sigma_msm * 0.001)), note: 'Used by clear-channel Class A stations. Marginal 3% gain over 120.' }
+      ];
+
+      // Recommended radial count based on class and TPO
+      const recommendedN = ['A', 'B'].includes(fcc_class) ? 120 :
+                            tpo_kw >= 5 ? 120 :
+                            tpo_kw >= 1 ? 60  : 30;
+      const recommendedTier = N_RADIAL_TIERS.find(t => t.n === recommendedN) ?? N_RADIAL_TIERS[3];
+      const groundLoss_recommended = recommendedTier.ground_loss_ohm;
+
+      // Radial wire specifications
+      // #10 AWG (2.59 mm dia) copper: most common for AM radials
+      // Resistance: #10 AWG = 3.28 mΩ/m; #12 = 5.21 mΩ/m; #8 = 2.06 mΩ/m
+      const AWG_OPTIONS = [
+        { awg: 8,  dia_mm: 3.26, resist_mohm_per_m: 2.06, cost_usd_per_m: 1.85, note: 'Over-spec for most AM radials; used at high-power sites.' },
+        { awg: 10, dia_mm: 2.59, resist_mohm_per_m: 3.28, cost_usd_per_m: 1.12, note: 'Industry standard for AM ground radials.' },
+        { awg: 12, dia_mm: 2.05, resist_mohm_per_m: 5.21, cost_usd_per_m: 0.78, note: 'Acceptable for low-power (< 1 kW) installations.' }
+      ];
+      const recommendedAWG = tpo_kw >= 5 ? AWG_OPTIONS[0] : AWG_OPTIONS[1]; // #8 for >= 5 kW; #10 otherwise
+
+      // Copper weight and cost for recommended system
+      const totalRadialLength_m  = round2(recommendedN * optRadialLen_m);
+      const totalRadialLength_ft = round2(totalRadialLength_m * 3.28084);
+      const copperMass_kg  = round2(totalRadialLength_m * (recommendedAWG.awg === 8 ? 0.050 : 0.026)); // kg/m approx
+      const materialCost_usd = round2(totalRadialLength_m * recommendedAWG.cost_usd_per_m);
+
+      // Burial depth: §73.190 and NEC Article 250 — typically 2–4 inches for AM radials
+      const burialDepth_in   = 2; // minimum per common practice; NEC §250.52 says no minimum for radio radials
+
+      // Measurement and FCC compliance
+      const complianceItems = [
+        { id: 'wenner_before', task: 'Wenner 4-electrode σ measurement before installation', rule: '§73.190', days: 2, note: 'Baseline σ measurement at electrode spacings 5, 10, 20, 30 m.' },
+        { id: 'radial_layout', task: 'Survey and layout of radial azimuths (360° / N radials)', rule: null, days: 1, note: `${recommendedN} radials at ${round2(360 / recommendedN)}° spacing.` },
+        { id: 'radial_trench', task: 'Trenching or direct burial of copper wire', rule: null, days: round2(recommendedN * optRadialLen_m / 1000), note: `${totalRadialLength_m} m total copper; bury at ≥ 2 inches depth.` },
+        { id: 'bonding',       task: 'Bond all radials to common ground bus at tower base', rule: 'IEEE 1100', days: 1, note: 'Single-point ground bus; exothermic weld joints at tower base.' },
+        { id: 'wenner_after',  task: 'Post-installation σ measurement for FCC filing', rule: '§73.190', days: 2, note: 'Document σ improvement for FCC conductivity filing if claiming measured σ > FCC M3 zone value.' }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        sigma_msm_current: sigma_msm,
+        wavelength_m:        lambda_rs,
+        quarter_wave_m:      qwave_rs,
+        optimum_radial_length_m:  optRadialLen_m,
+        optimum_radial_length_ft: optRadialLen_ft,
+        recommended_n_radials:    recommendedN,
+        recommended_radial_tier:  recommendedTier,
+        ground_loss_ohm_recommended: groundLoss_recommended,
+        radial_tiers:             N_RADIAL_TIERS,
+        recommended_awg:          recommendedAWG.awg,
+        awg_options:              AWG_OPTIONS,
+        total_radial_length_m:    totalRadialLength_m,
+        total_radial_length_ft:   totalRadialLength_ft,
+        copper_mass_kg:           copperMass_kg,
+        material_cost_usd_estimate: materialCost_usd,
+        burial_depth_inches:      burialDepth_in,
+        radial_spacing_deg:       round2(360 / recommendedN),
+        compliance_checklist:     complianceItems,
+        n_compliance_items:       complianceItems.length,
+        reference: '47 CFR §73.190; Terman (1943) "Radio Engineers Handbook"; Belrose (1966) IRE; IEEE 1100; NEC Article 250',
+        note: `Recommended: ${recommendedN} radials at ${optRadialLen_m} m (0.4λ) length, #${recommendedAWG.awg} AWG copper. Total copper: ${totalRadialLength_m} m. Estimated material cost: $${materialCost_usd.toLocaleString()}.`
       };
     })(),
 

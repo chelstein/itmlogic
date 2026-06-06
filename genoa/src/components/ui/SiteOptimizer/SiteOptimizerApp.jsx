@@ -1717,6 +1717,40 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      radial_system_engineering_guide: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5, sigma_msm_current: 9,
+        wavelength_m: 384.62, quarter_wave_m: 96.15,
+        optimum_radial_length_m: 153.85, optimum_radial_length_ft: 504.76,
+        recommended_n_radials: 120, radial_spacing_deg: 3,
+        recommended_radial_tier: { n: 120, label: 'FCC recommended', efficiency_pct: 95, ground_loss_ohm: 0.15, note: '120 radials at 0.4λ: FCC §73.190 / Terman optimum.' },
+        ground_loss_ohm_recommended: 0.15,
+        radial_tiers: [
+          { n: 16,  label: 'Minimum practical', efficiency_pct: 50, ground_loss_ohm: 1.15, note: 'Severely limited.' },
+          { n: 30,  label: 'Reduced',           efficiency_pct: 70, ground_loss_ohm: 0.61, note: 'Common for low-power translators.' },
+          { n: 60,  label: 'Moderate',          efficiency_pct: 85, ground_loss_ohm: 0.31, note: 'FCC minimum guidance for Class C/D stations.' },
+          { n: 120, label: 'FCC recommended',   efficiency_pct: 95, ground_loss_ohm: 0.15, note: '120 radials at 0.4λ: Terman optimum.' },
+          { n: 240, label: 'High-performance',  efficiency_pct: 98, ground_loss_ohm: 0.08, note: 'Used by clear-channel Class A stations.' }
+        ],
+        recommended_awg: 8,
+        awg_options: [
+          { awg: 8,  dia_mm: 3.26, resist_mohm_per_m: 2.06, cost_usd_per_m: 1.85, note: 'Industry standard for ≥5 kW AM sites.' },
+          { awg: 10, dia_mm: 2.59, resist_mohm_per_m: 3.28, cost_usd_per_m: 1.12, note: 'Standard for AM ground radials.' },
+          { awg: 12, dia_mm: 2.05, resist_mohm_per_m: 5.21, cost_usd_per_m: 0.78, note: 'Acceptable for < 1 kW installations.' }
+        ],
+        total_radial_length_m: 18462, total_radial_length_ft: 60571,
+        copper_mass_kg: 923, material_cost_usd_estimate: 34155,
+        burial_depth_inches: 2,
+        compliance_checklist: [
+          { id: 'wenner_before', task: 'Wenner 4-electrode σ measurement before installation', rule: '§73.190', days: 2 },
+          { id: 'radial_layout', task: 'Survey and layout of radial azimuths (3° spacing)',    rule: null,     days: 1 },
+          { id: 'radial_trench', task: 'Trenching or direct burial of copper wire',            rule: null,     days: 18 },
+          { id: 'bonding',       task: 'Bond all radials to common ground bus at tower base',  rule: 'IEEE 1100', days: 1 },
+          { id: 'wenner_after',  task: 'Post-installation σ measurement for FCC filing',       rule: '§73.190', days: 2 }
+        ],
+        n_compliance_items: 5,
+        reference: '47 CFR §73.190; Terman (1943); Belrose (1966) IRE; IEEE 1100; NEC Article 250',
+        note: 'Recommended: 120 radials at 153.85 m (0.4λ) length, #8 AWG copper. Total copper: 18,462 m. Estimated material cost: $34,155.'
+      },
       construction_permit_timeline_optimizer: {
         fcc_class: 'D', frequency_khz: 780, pattern_mode: 'NDA',
         is_major_change: true, is_directional: false, is_clear_channel: true,

@@ -6180,3 +6180,50 @@ test('construction_permit_timeline_optimizer comparison table columns present', 
     assert.ok('cpt_n_milestones' in row,        'cpt_n_milestones missing from comparison table');
   }
 });
+
+test('radial_system_engineering_guide presence and radial tiers', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].radial_system_engineering_guide;
+  assert.ok(r != null, 'radial_system_engineering_guide must be present');
+  assert.ok(Array.isArray(r.radial_tiers), 'radial_tiers must be an array');
+  assert.ok(r.radial_tiers.length >= 4, 'must have at least 4 radial count tiers');
+  assert.ok(r.recommended_n_radials > 0, 'recommended radial count must be positive');
+});
+
+test('radial_system_engineering_guide wavelength and radial length', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].radial_system_engineering_guide;
+  const lambda = 300000 / KAZM.frequency_khz;
+  assert.ok(Math.abs(r.wavelength_m - lambda) < 1, 'wavelength must match 300000/freq_khz');
+  assert.ok(r.optimum_radial_length_m > 0, 'optimum radial length must be positive');
+  assert.ok(r.optimum_radial_length_m < r.wavelength_m, 'radial length (0.4λ) must be less than full wavelength');
+  assert.ok(r.optimum_radial_length_ft > r.optimum_radial_length_m, 'ft must be greater than m');
+});
+
+test('radial_system_engineering_guide ground loss decreases with more radials', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].radial_system_engineering_guide;
+  const sorted = [...r.radial_tiers].sort((a, b) => a.n - b.n);
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(sorted[i].ground_loss_ohm < sorted[i-1].ground_loss_ohm,
+      `ground loss must decrease as radial count increases (${sorted[i].n} vs ${sorted[i-1].n})`);
+  }
+});
+
+test('radial_system_engineering_guide material cost and copper mass positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].radial_system_engineering_guide;
+  assert.ok(r.material_cost_usd_estimate > 0, 'material cost must be positive');
+  assert.ok(r.copper_mass_kg > 0, 'copper mass must be positive');
+  assert.ok(r.total_radial_length_m > 0, 'total radial length must be positive');
+  assert.ok(r.compliance_checklist.length > 0, 'compliance checklist must be non-empty');
+});
+
+test('radial_system_engineering_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('radial_n_recommended' in row, 'radial_n_recommended missing from comparison table');
+    assert.ok('radial_len_m' in row,         'radial_len_m missing from comparison table');
+    assert.ok('radial_cost_usd' in row,      'radial_cost_usd missing from comparison table');
+  }
+});
