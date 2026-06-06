@@ -338,3 +338,74 @@ test('GRID search_mode forwards skywave_risk_level + recommended_actions from si
   assert.ok(Array.isArray(out.recommended_actions),
     `recommended_actions must be array in GRID mode; got: ${typeof out.recommended_actions}`);
 });
+
+// ---------- Test 18 — assignStatusCategory sets nif_status ----------
+test('assignStatusCategory sets nif_status aligned with status_category', () => {
+  const promisingC = {
+    lat: 34.87, lon: -111.83, distance_from_current_km: 5,
+    score: 95, col_coverage_pct: 0.92, blanket_population_pct: 0.2,
+    daytime_reach_km: 60, ground_sigma_mS_m: 8, treaty_zone: null,
+    source: 'INFRASTRUCTURE',
+    colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
+  };
+  __test__.assignStatusCategory(promisingC, /*scoreCutoff=*/80, { current_site: KAZM });
+  assert.equal(promisingC.status_category, 'PROMISING');
+  assert.equal(promisingC.nif_status, 'PROMISING',
+    `PROMISING candidate should have nif_status='PROMISING'; got: ${promisingC.nif_status}`);
+
+  const nonCompliantC = {
+    lat: 34.87, lon: -111.83, distance_from_current_km: 5,
+    score: 90, col_coverage_pct: 0.30, blanket_population_pct: 0.2,
+    daytime_reach_km: 60, ground_sigma_mS_m: 8, treaty_zone: null,
+    source: 'INFRASTRUCTURE',
+    colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
+  };
+  __test__.assignStatusCategory(nonCompliantC, /*scoreCutoff=*/80, { current_site: KAZM });
+  // Status depends on distance and minimum_tpo_for_col_coverage_kw.
+  assert.ok(['RECOVERABLE_WITH_DA', 'RECOVERABLE_WITH_COL_CHANGE', 'NON_COMPLIANT',
+    'RECOVERABLE_WITH_POWER_INCREASE'].includes(nonCompliantC.status_category),
+    `expected a recovery or NON_COMPLIANT category; got: ${nonCompliantC.status_category}`);
+  assert.equal(nonCompliantC.nif_status, 'NON-COMPLIANT',
+    `recovery/non-compliant candidate should have nif_status='NON-COMPLIANT'; got: ${nonCompliantC.nif_status}`);
+});
+
+// ---------- Test 19 — RECOVERABLE_WITH_POWER_INCREASE in colocation engine ----------
+test('RECOVERABLE_WITH_POWER_INCREASE assigned when minimum_tpo_for_col_coverage_kw is set', () => {
+  const c = {
+    lat: 34.87, lon: -111.83, distance_from_current_km: 10,
+    score: 80,
+    col_coverage_pct: 0.60,          // below §73.24(j) 0.80 floor
+    blanket_population_pct: 0.20,    // OK
+    daytime_reach_km: 50,
+    ground_sigma_mS_m: 6,
+    treaty_zone: null,
+    minimum_tpo_for_col_coverage_kw: 12.5,  // engine found a fix
+    source: 'INFRASTRUCTURE',
+    colocation_analysis: { diplexing_required: false, same_band_interference_risk: 'LOW' }
+  };
+  __test__.assignStatusCategory(c, /*scoreCutoff=*/90, { current_site: KAZM });
+  assert.equal(c.status_category, 'RECOVERABLE_WITH_POWER_INCREASE',
+    `candidate with minimum_tpo_for_col_coverage_kw set should be RECOVERABLE_WITH_POWER_INCREASE; got: ${c.status_category}`);
+  assert.ok(c.explanation.recovery_reasoning.includes('12.5'),
+    `recovery_reasoning should cite the minimum TPO; got: ${c.explanation.recovery_reasoning}`);
+  assert.equal(c.nif_status, 'NON-COMPLIANT',
+    `RECOVERABLE_WITH_POWER_INCREASE should have nif_status='NON-COMPLIANT'; got: ${c.nif_status}`);
+});
+
+// ---------- Test 20 — nif_status enriched with skywave risk in INFRASTRUCTURE response ----------
+test('nif_status includes skywave risk suffix in INFRASTRUCTURE response for clear channel', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    frequency_khz: 780,
+    fcc_class: 'A',
+    search_mode: 'INFRASTRUCTURE',
+    candidate_limit: 5
+  }));
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    // Every candidate whose nif_status is not SCREENING ONLY should include skywave risk.
+    if (c.nif_status && c.nif_status !== 'SCREENING ONLY'){
+      assert.ok(/HIGH skywave risk/i.test(c.nif_status) || /TREATY/i.test(c.nif_status),
+        `nif_status for Class A clear-channel INFRA candidate should mention HIGH skywave risk; rank ${c.rank} got: "${c.nif_status}"`);
+    }
+  }
+});
