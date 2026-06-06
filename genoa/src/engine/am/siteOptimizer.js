@@ -624,7 +624,9 @@ export async function runSiteOptimizer(body = {}){
     erp_efficiency_pct:     c.antenna_system_summary?.erp_vs_tpo_ratio != null
       ? round2(c.antenna_system_summary.erp_vs_tpo_ratio * 100) : null,
     land_use_class:         c.land_use_classification?.class ?? null,
-    density_factor:         c.land_use_classification?.density_factor ?? null
+    density_factor:         c.land_use_classification?.density_factor ?? null,
+    overlap_fraction:       c.coverage_overlap_analysis?.overlap_fraction ?? null,
+    coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null
   }));
 
   // ---- 16. Engineering summary (executive-level synthesis) ----
@@ -2255,6 +2257,72 @@ async function scoreCandidate(pt, ctx, warnings){
         distance_km: round2(dist),
         notes: notes.length > 0 ? notes : [`No specific signal environment alerts for this candidate location.`],
         caution: `This is a screening-grade directional assessment only. Full §73.37 co-channel/adjacent-channel separation must be measured to all licensed stations in the region before filing.`
+      };
+    })(),
+    // Coverage overlap analysis — two-circle intersection model.
+    // Estimates what fraction of the current site's 0.5 mV/m service area
+    // would be covered by this candidate at the same TPO.  Zero distance (current
+    // site itself) = 100% overlap.  Useful for evaluating listener continuity
+    // during the relocation: a candidate far away may serve a completely different
+    // geographic area from the current license.
+    coverage_overlap_analysis: (() => {
+      const dist = pt.distance_from_current_km ?? 0;
+      if (daytime_reach_km == null) return null;
+      const r = daytime_reach_km;  // candidate reach radius (km)
+      // Current site reach — approximate with same TPO + conductivity
+      // (we don't have the current site σ here, so use the same σ as this candidate
+      // as a conservative proxy — if current site is better soil it has wider reach).
+      let current_reach_km = null;
+      try {
+        const rCur = fccAmDistanceKm({ frequency_khz, target_mvm: DAYTIME_REACH_TARGET_MVM, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        current_reach_km = rCur?.distance_km ?? null;
+      } catch (_){ /* ignore */ }
+      if (current_reach_km == null) return null;
+      const R = current_reach_km;  // current site reach radius (km)
+      const d = dist;              // distance between towers (km)
+
+      let overlap_area_km2 = null;
+      let overlap_fraction = null;
+      if (d === 0){
+        // Same location — 100% overlap
+        overlap_area_km2 = round2(Math.PI * R * R);
+        overlap_fraction = 1.0;
+      } else if (d >= R + r){
+        // Circles don't overlap at all
+        overlap_area_km2 = 0;
+        overlap_fraction = 0;
+      } else if (d + r <= R){
+        // Candidate circle fully inside current circle
+        overlap_area_km2 = round2(Math.PI * r * r);
+        overlap_fraction = round2((r * r) / (R * R));
+      } else if (d + R <= r){
+        // Current circle fully inside candidate circle
+        overlap_area_km2 = round2(Math.PI * R * R);
+        overlap_fraction = 1.0;
+      } else {
+        // Partial overlap — circular segment formula
+        const a1 = 2 * Math.acos(Math.min(1, (d * d + R * R - r * r) / (2 * d * R)));
+        const a2 = 2 * Math.acos(Math.min(1, (d * d + r * r - R * R) / (2 * d * r)));
+        const area = 0.5 * R * R * (a1 - Math.sin(a1)) + 0.5 * r * r * (a2 - Math.sin(a2));
+        overlap_area_km2 = round2(Math.max(0, area));
+        const current_area_km2 = Math.PI * R * R;
+        overlap_fraction = round2(Math.max(0, Math.min(1, area / current_area_km2)));
+      }
+
+      const coverage_continuity = overlap_fraction == null ? 'UNKNOWN'
+        : overlap_fraction >= 0.70 ? 'HIGH'
+        : overlap_fraction >= 0.40 ? 'MODERATE'
+        : overlap_fraction >= 0.10 ? 'LOW'
+        : 'MINIMAL';
+      return {
+        candidate_reach_km: round2(r),
+        current_site_reach_km_proxy: round2(R),
+        tower_separation_km: round2(d),
+        overlap_area_km2,
+        overlap_fraction,
+        coverage_continuity,
+        note: `Screening-grade 2-circle model using same TPO (${tpo_kw} kW) and σ=${sigma_msm} mS/m. Current site σ may differ; a measured σ at both locations would refine this estimate.`,
+        rule: '§73.24 service area continuity — not an FCC filing requirement, but relevant for listener base analysis'
       };
     })(),
     treaty_zone,

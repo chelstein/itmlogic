@@ -3308,3 +3308,71 @@ test('current-site candidate (dist=0) has NEAR proximity_tier', async () => {
       `Current site should have NEAR proximity_tier`);
   }
 });
+
+// ---------- coverage_overlap_analysis ----------
+
+test('coverage_overlap_analysis is present on all candidates (or null when reach unavailable)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    // may be null if daytime_reach_km is null, but key should exist
+    assert.ok('coverage_overlap_analysis' in c,
+      `coverage_overlap_analysis key must be present (rank ${c.rank})`);
+  }
+});
+
+test('coverage_overlap_analysis.overlap_fraction is in [0, 1] when present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const oa = c.coverage_overlap_analysis;
+    if (oa == null) continue;
+    assert.ok(oa.overlap_fraction >= 0 && oa.overlap_fraction <= 1,
+      `overlap_fraction ${oa.overlap_fraction} out of [0,1] (rank ${c.rank})`);
+  }
+});
+
+test('current-site candidate (dist=0) has overlap_fraction = 1.0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const currentSite = out.candidates.find(c => c.distance_from_current_km === 0);
+  if (currentSite && currentSite.coverage_overlap_analysis != null) {
+    assert.equal(currentSite.coverage_overlap_analysis.overlap_fraction, 1.0,
+      'Current site (dist=0) should have overlap_fraction = 1.0');
+    assert.equal(currentSite.coverage_overlap_analysis.coverage_continuity, 'HIGH',
+      'Current site should have HIGH coverage_continuity');
+  }
+});
+
+test('coverage_overlap_analysis.coverage_continuity is a valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['HIGH', 'MODERATE', 'LOW', 'MINIMAL', 'UNKNOWN']);
+  for (const c of out.candidates) {
+    const oa = c.coverage_overlap_analysis;
+    if (oa == null) continue;
+    assert.ok(VALID.has(oa.coverage_continuity),
+      `coverage_continuity "${oa.coverage_continuity}" not valid (rank ${c.rank})`);
+  }
+});
+
+test('candidate_comparison_table has overlap_fraction and coverage_continuity columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('overlap_fraction' in row, `comparison table missing overlap_fraction (rank ${row.rank})`);
+    assert.ok('coverage_continuity' in row, `comparison table missing coverage_continuity (rank ${row.rank})`);
+  }
+});
+
+test('coverage_overlap_analysis.tower_separation_km matches distance_from_current_km', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const oa = c.coverage_overlap_analysis;
+    if (oa == null) continue;
+    const expectedDist = Math.round((c.distance_from_current_km ?? 0) * 100) / 100;
+    assert.equal(oa.tower_separation_km, expectedDist,
+      `tower_separation_km should match distance_from_current_km (rank ${c.rank})`);
+  }
+});

@@ -1084,6 +1084,41 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Coverage overlap analysis */}
+        {candidate.coverage_overlap_analysis && (() => {
+          const oa = candidate.coverage_overlap_analysis;
+          const contColor = oa.coverage_continuity === 'HIGH' ? '#63d471'
+            : oa.coverage_continuity === 'MODERATE' ? '#a8d46a'
+            : oa.coverage_continuity === 'LOW' ? '#ffb347'
+            : '#ff7a7a';
+          const pct = oa.overlap_fraction != null ? `${Math.round(oa.overlap_fraction * 100)}%` : '—';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.24 Coverage continuity (2-circle model)</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: contColor + '22', color: contColor }}>
+                    {oa.coverage_continuity}
+                  </span>
+                  <span className="text-cream text-[9px] font-bold">{pct} overlap</span>
+                  {oa.overlap_area_km2 != null && (
+                    <span className="text-textDim text-[9px]">{oa.overlap_area_km2.toLocaleString()} km²</span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-[9px]">
+                  <div><span className="text-textDim">Tower sep.</span> <span className="text-cream">{oa.tower_separation_km ?? '—'} km</span></div>
+                  <div><span className="text-textDim">Cand. reach</span> <span className="text-cream">{oa.candidate_reach_km ?? '—'} km</span></div>
+                  <div><span className="text-textDim">Current reach</span> <span className="text-cream">{oa.current_site_reach_km_proxy ?? '—'} km</span></div>
+                </div>
+                {oa.note && (
+                  <div className="text-textDim/40 text-[9px] leading-tight">{oa.note}</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Co-channel spacing estimate */}
         {candidate.co_channel_spacing_estimate && (() => {
           const ccs = candidate.co_channel_spacing_estimate;
