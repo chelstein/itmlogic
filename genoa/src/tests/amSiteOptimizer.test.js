@@ -2959,3 +2959,65 @@ test('co_channel_spacing_estimate: adjacent spacing minimums decrease from co-ch
       `adj10 min must be >= adj20 min (rank ${c.rank})`);
   }
 });
+
+// ---------- nighttime_classification ----------
+
+test('nighttime_classification is present on every candidate with required shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const nc = c.nighttime_classification;
+    assert.ok(nc != null, `nighttime_classification must be present (rank ${c.rank})`);
+    assert.ok(typeof nc.eligibility === 'string', `eligibility must be string (rank ${c.rank})`);
+    assert.ok(typeof nc.nif_complexity === 'string', `nif_complexity must be string (rank ${c.rank})`);
+    assert.ok(typeof nc.protection_class === 'string', `protection_class must be string (rank ${c.rank})`);
+    assert.ok(typeof nc.key_constraint === 'string' && nc.key_constraint.length > 0,
+      `key_constraint must be non-empty string (rank ${c.rank})`);
+    assert.ok(typeof nc.nif_study_required === 'boolean', `nif_study_required must be boolean (rank ${c.rank})`);
+    assert.ok(typeof nc.rule === 'string', `rule must be string (rank ${c.rank})`);
+  }
+});
+
+test('nighttime_classification.eligibility is one of YES, LIMITED, RESTRICTED, PROHIBITED', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['YES', 'LIMITED', 'RESTRICTED', 'PROHIBITED']);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.nighttime_classification.eligibility),
+      `eligibility "${c.nighttime_classification.eligibility}" must be valid (rank ${c.rank})`);
+  }
+});
+
+test('nighttime_classification.nif_complexity is one of LOW, MODERATE, HIGH, VERY_HIGH', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.nighttime_classification.nif_complexity),
+      `nif_complexity "${c.nighttime_classification.nif_complexity}" must be valid (rank ${c.rank})`);
+  }
+});
+
+test('nighttime_classification: local channel (1230 kHz) has LIMITED eligibility and nif_study_required=false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1230, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates.slice(0, 1)){
+    const nc = c.nighttime_classification;
+    assert.equal(nc.eligibility, 'LIMITED',
+      `Local channel should have LIMITED nighttime eligibility; got ${nc.eligibility}`);
+    assert.equal(nc.nif_study_required, false,
+      `Local channel should have nif_study_required=false; got ${nc.nif_study_required}`);
+  }
+});
+
+test('nighttime_classification: clear channel (660 kHz) Class A has VERY_HIGH NIF complexity', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 660, fcc_class: 'A', tpo_kw: 50, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates.slice(0, 1)){
+    const nc = c.nighttime_classification;
+    assert.equal(nc.nif_complexity, 'VERY_HIGH',
+      `Class A clear channel should have VERY_HIGH NIF complexity; got ${nc.nif_complexity}`);
+    assert.equal(nc.nif_study_required, true,
+      `Class A clear channel should have nif_study_required=true`);
+  }
+});

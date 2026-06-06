@@ -1870,6 +1870,86 @@ async function scoreCandidate(pt, ctx, warnings){
         note: `AM stations require an RF exposure evaluation at every new/modified site. Near-field boundary: ${near_field_boundary_m} m (λ/(2π) at ${frequency_khz} kHz). Estimated public exclusion zone: ${exclusion_m} m at ${tpo_kw} kW TPO. Minimum fence distance: ${fence_distance_m} m. Actual exclusion zone must be computed with the filed antenna pattern — this is a free-space screening estimate.`
       };
     })(),
+    // Nighttime service classification — station-class and channel-based
+    // assessment of nighttime eligibility.  AM nighttime operation is governed
+    // by §73.182 (skywave NIF), §73.25 (clear-channel protection), and
+    // §73.27 (local channel).  This is a STATION-LEVEL assessment
+    // (same for all candidates) but included per-candidate for API completeness.
+    nighttime_classification: (() => {
+      const isLocal = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isClear = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isClassA = fcc_class === 'A';
+      const isClassB = fcc_class === 'B';
+      const isClassC = fcc_class === 'C';
+
+      let eligibility, nif_complexity, protection_class, key_constraint, nighttime_power_max_kw;
+
+      if (isLocal){
+        // Local channels: 6 clear local channels at ≤250 W daytime; limited/shared nighttime.
+        eligibility = 'LIMITED';
+        nif_complexity = 'LOW';
+        protection_class = 'local_channel';
+        key_constraint = `Local channel (${frequency_khz} kHz, §73.27): nighttime operation at ≤250 W with sharing on most local channels. §73.182 NIF not required for local-channel stations — share the channel with others.`;
+        nighttime_power_max_kw = 0.25;
+      } else if (isClassA && isClear){
+        // Class A dominant on clear channel — full nighttime, most protected status.
+        eligibility = 'YES';
+        nif_complexity = 'VERY_HIGH';
+        protection_class = 'class_A_dominant_clear_channel';
+        key_constraint = `Class A dominant on clear channel (${frequency_khz} kHz, §73.25): full nighttime operation; must file §73.182 NIF to demonstrate no increase in interference to OTHER stations' protected contours. Typically requires detailed skywave contour study + DA-N pattern.`;
+        nighttime_power_max_kw = 50;
+      } else if (isClear && !isClassA){
+        // Secondary station on clear channel — nighttime operation VERY restricted.
+        eligibility = 'RESTRICTED';
+        nif_complexity = 'VERY_HIGH';
+        protection_class = `class_${fcc_class}_secondary_clear_channel`;
+        key_constraint = `Class ${fcc_class} secondary on clear channel (${frequency_khz} kHz, §73.25): nighttime operation restricted — must not increase interference to dominant Class A protected contours (0.5 mV/m and 25 µV/m). Complex §73.182 NIF study required; authorization may be limited or denied.`;
+        nighttime_power_max_kw = fcc_class === 'B' ? 50 : fcc_class === 'C' ? 0.25 : 50;
+      } else if (isClassA){
+        // Class A on regional channel.
+        eligibility = 'YES';
+        nif_complexity = 'HIGH';
+        protection_class = 'class_A_regional';
+        key_constraint = `Class A on regional channel (${frequency_khz} kHz): nighttime operation at up to 50 kW. §73.182 NIF required — must not cause objectionable interference to other stations' protected contours.`;
+        nighttime_power_max_kw = 50;
+      } else if (isClassB){
+        // Class B regional.
+        eligibility = 'YES';
+        nif_complexity = 'MODERATE';
+        protection_class = 'class_B_regional';
+        key_constraint = `Class B on regional channel (${frequency_khz} kHz): nighttime operation up to 50 kW. §73.182 NIF required; typically straightforward on uncrowded regional channels.`;
+        nighttime_power_max_kw = 50;
+      } else if (isClassC){
+        // Class C local.
+        eligibility = 'LIMITED';
+        nif_complexity = 'LOW';
+        protection_class = 'class_C_local';
+        key_constraint = `Class C local (${frequency_khz} kHz, §73.27): ≤250 W with same-channel sharing. Full §73.182 NIF not required — follow local sharing framework.`;
+        nighttime_power_max_kw = 0.25;
+      } else {
+        // Class D regional.
+        eligibility = 'LIMITED';
+        nif_complexity = 'MODERATE';
+        protection_class = 'class_D_regional';
+        key_constraint = `Class D secondary (${frequency_khz} kHz): daytime-only authorization is common. Nighttime requires §73.182 NIF demonstrating no interference — Class D nighttime is discretionary and may be denied.`;
+        nighttime_power_max_kw = 50; // daytime limit; nighttime may be less
+      }
+
+      if (treaty_zone){
+        eligibility = eligibility === 'YES' ? 'RESTRICTED' : eligibility;
+        key_constraint += ` Additionally in treaty zone (${treaty_zone}): international coordination adds nighttime power constraints.`;
+      }
+
+      return {
+        eligibility,
+        nif_complexity,
+        protection_class,
+        key_constraint,
+        nighttime_power_max_kw,
+        nif_study_required: !isLocal && !isClassC,
+        rule: isLocal || isClassC ? '47 CFR §73.27 (local channel sharing)' : '47 CFR §73.182 / §73.25'
+      };
+    })(),
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
     minimum_tpo_for_col_coverage_kw,
