@@ -994,6 +994,63 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         )}
 
+        {/* Regulatory risk score */}
+        {candidate.regulatory_risk_score && (() => {
+          const rrs = candidate.regulatory_risk_score;
+          const riskColor = rrs.risk_category === 'VERY_HIGH' ? '#ff4d4d'
+            : rrs.risk_category === 'HIGH' ? '#ff9b5a'
+            : rrs.risk_category === 'MODERATE' ? '#f6c90e'
+            : '#4ec9b0';
+          const barWidth = Math.min(100, rrs.risk_score);
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">
+                Regulatory risk
+                <span className="normal-case text-textDim ml-2">
+                  (filing complexity index — lower = easier path)
+                </span>
+              </div>
+              {/* Risk score bar */}
+              <div className="mb-2">
+                <div className="flex items-center gap-2 mb-0.5">
+                  <span className="font-mono text-[11px]" style={{ color: riskColor }}>
+                    {rrs.risk_score}/100
+                  </span>
+                  <span className="font-mono text-[9px] uppercase tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: riskColor + '22', color: riskColor }}>
+                    {rrs.risk_category.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <div className="w-full h-1.5 rounded-full" style={{ background: '#1a2e35' }}>
+                  <div className="h-1.5 rounded-full transition-all"
+                    style={{ width: `${barWidth}%`, background: riskColor }} />
+                </div>
+                <div className="font-mono text-[9px] text-textDim mt-1 leading-snug">
+                  {rrs.interpretation}
+                </div>
+              </div>
+              {/* Risk factors */}
+              {rrs.risk_factors.length > 0 && (
+                <div className="space-y-1">
+                  {rrs.risk_factors.map((f, i) => (
+                    <div key={i} className="flex gap-2 font-mono text-[10px]">
+                      <span className="shrink-0 font-bold" style={{ color: riskColor }}>
+                        +{f.points}
+                      </span>
+                      <div>
+                        <span className="uppercase text-[9px] tracking-rack text-textDim/70">
+                          {f.factor.replace(/_/g, ' ')}
+                        </span>
+                        <div className="text-textDim/80 leading-snug mt-0.5">{f.note}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Schematic contour preview */}
         <div>
           <div className="rack-eyebrow mb-1">Contour preview <span className="normal-case text-textDim">(schematic — daytime reach circle)</span></div>

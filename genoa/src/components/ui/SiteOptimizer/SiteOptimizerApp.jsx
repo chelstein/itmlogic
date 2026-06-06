@@ -612,7 +612,17 @@ const DEMO_RESULT = {
         { tpo_kw: 5,     is_current_tpo: true,  daytime_reach_km: 34.1, col_5mvm_km: 5.8, blanket_1000mvm_km: 0.52, col_coverage_pct_est: 0.97, blanket_pop_pct_est: 0.13, col_meets_floor: true,  blanket_pop_ok: true, compliant: true },
         { tpo_kw: 10,    is_current_tpo: false, daytime_reach_km: 46.8, col_5mvm_km: 7.6, blanket_1000mvm_km: 0.74, col_coverage_pct_est: 0.99, blanket_pop_pct_est: 0.27, col_meets_floor: true,  blanket_pop_ok: true, compliant: true },
         { tpo_kw: 50,    is_current_tpo: false, daytime_reach_km: 88.2, col_5mvm_km: 14.1, blanket_1000mvm_km: 1.61, col_coverage_pct_est: 1.00, blanket_pop_pct_est: 1.28, col_meets_floor: true, blanket_pop_ok: false, compliant: false }
-      ]
+      ],
+      regulatory_risk_score: {
+        risk_score: 35, risk_category: 'MODERATE',
+        risk_factors: [
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks' },
+          { factor: 'MODERATE_CONDUCTIVITY', points: 5, note: 'σ=8 mS/m (GOOD): standard 120-radial system adequate but soil survey still required for §73.190 certification' },
+          { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' },
+          { factor: 'DA_PATTERN_REQUIRED', points: 5, note: 'NDA operation reviewed; DA may be needed if sky-wave NIF fails' }
+        ],
+        interpretation: 'MODERATE risk — routine but non-trivial filing requirements; plan for soil survey, ASR, or NIF as applicable.'
+      }
     },
     {
       rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
@@ -643,7 +653,16 @@ const DEMO_RESULT = {
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
-      limitations: ['NIF status REVIEW — engineering DA pattern may be required']
+      limitations: ['NIF status REVIEW — engineering DA pattern may be required'],
+      regulatory_risk_score: {
+        risk_score: 30, risk_category: 'MODERATE',
+        risk_factors: [
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
+          { factor: 'FAIR_CONDUCTIVITY', points: 5, note: 'σ=6 mS/m (GOOD): soil survey still required for §73.190 certification' },
+          { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' }
+        ],
+        interpretation: 'MODERATE risk — routine but non-trivial filing requirements; plan for ASR and NIF study.'
+      }
     },
     {
       rank: 3, rank_percentile: 72.6, lat: 34.95, lon: -111.92,
@@ -699,7 +718,18 @@ const DEMO_RESULT = {
         { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
         { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' },
         { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(j) 80% floor. Increase TPO to ≥8.5 kW or design DA pattern (§73.150) to push coverage above floor.' }
-      ]
+      ],
+      regulatory_risk_score: {
+        risk_score: 45, risk_category: 'HIGH',
+        risk_factors: [
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required' },
+          { factor: 'MODERATE_CONDUCTIVITY', points: 5, note: 'σ=10 mS/m (EXCELLENT): standard 120-radial system adequate but soil survey still required' },
+          { factor: 'COL_COVERAGE_FAILS', points: 10, note: 'COL coverage 78% < §73.24(j) 80% floor (gap 2%): coverage remedy required before filing' },
+          { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' },
+          { factor: 'DA_PATTERN_REQUIRED', points: 5, note: 'DA pattern shaping may close coverage gap — §73.150 pattern design may be needed' }
+        ],
+        interpretation: 'HIGH regulatory risk — at least one major filing barrier present (COL coverage gap); budget additional engineering resources.'
+      }
     },
     {
       rank: 4, rank_percentile: 24.8, lat: 34.78, lon: -111.95,
@@ -725,7 +755,19 @@ const DEMO_RESULT = {
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
-      limitations: ['§73.182 NIF projected to fail', 'US/MX treaty advisory in scope']
+      limitations: ['§73.182 NIF projected to fail', 'US/MX treaty advisory in scope'],
+      regulatory_risk_score: {
+        risk_score: 100, risk_category: 'VERY_HIGH',
+        risk_factors: [
+          { factor: 'TREATY_ZONE', points: 40, note: 'In treaty zone (US-MX advisory): FCC IB coordination adds 12–52 weeks; power/pattern restrictions likely' },
+          { factor: 'ASR_REQUIRED', points: 15, note: 'λ/4 ≈ 96 m at 780 kHz exceeds 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction' },
+          { factor: 'POOR_CONDUCTIVITY', points: 20, note: 'σ=1.5 mS/m (POOR): extended ground system required; adds cost, time, and uncertainty to §73.190 certification' },
+          { factor: 'BLANKET_POP_EXCEEDS_LIMIT', points: 25, note: 'Estimated blanket pop 1.1% > §73.24(g) 1% limit: filing cannot proceed without power reduction or DA-N pattern' },
+          { factor: 'COL_COVERAGE_FAILS', points: 20, note: 'COL coverage 62% < §73.24(j) 80% floor (gap 18%): coverage remedy required before filing' },
+          { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required; failure likely due to coverage constraints' }
+        ],
+        interpretation: 'VERY HIGH regulatory complexity — multiple blocking issues; recommend deprioritizing unless site has exceptional propagation advantages.'
+      }
     }
   ]
 };
