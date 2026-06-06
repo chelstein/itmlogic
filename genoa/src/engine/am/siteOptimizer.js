@@ -1008,7 +1008,10 @@ export async function runSiteOptimizer(body = {}){
     sbpg_forfeiture_usd:    c.signal_booster_prohibited_guide?.forfeiture_risk_usd?.typical ?? null,
     tig_equipment_value_usd: c.transmitter_insurance_guide?.estimated_equipment_value_usd ?? null,
     tig_annual_premium_usd:  c.transmitter_insurance_guide?.estimated_annual_premium_usd?.typical ?? null,
-    tig_tower_coverage:      c.transmitter_insurance_guide?.tower_covered ?? null
+    tig_tower_coverage:      c.transmitter_insurance_guide?.tower_covered ?? null,
+    nlng_n_notification_methods: c.neighboring_landowner_notification_guide?.n_notification_methods ?? null,
+    nlng_fcc_notice_required: c.neighboring_landowner_notification_guide?.fcc_public_notice_required ?? null,
+    nlng_notice_radius_km:   c.neighboring_landowner_notification_guide?.recommended_notice_radius_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6743,6 +6746,87 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    neighboring_landowner_notification_guide: (() => {
+      // When an AM station proposes to relocate its transmitter, several notification obligations
+      // arise under FCC rules and local/state law. These are distinct from the FCC public notice
+      // requirement under §73.3580 (which is national publication in the Federal Register/FCC database).
+      //
+      // FCC-required public notice:
+      //   - §73.3580: Major changes to AM stations (including transmitter site relocation >3.2 km)
+      //     require "local public notice" in the community of license — publication in a local newspaper
+      //     or website with adequate community reach, for two consecutive weeks
+      //   - §73.3580(c): The licensee must file a certificate of local notice with the FCC after publication
+      //   - §73.3580(h): If there is no local newspaper, the FCC may allow other notification methods
+      //
+      // FAA neighbor notification:
+      //   - FAA Form 7460-1 (Notice of Proposed Construction) does not directly notify neighbors,
+      //     but neighboring landowners may be notified through local zoning/CUP hearings
+      //
+      // Local zoning and CUP hearings:
+      //   - Most jurisdictions require a public hearing before issuing a conditional use permit (CUP)
+      //     or special exception for a tower > 35–50 feet
+      //   - Adjoining landowners within a defined radius (typically 300–1,000 feet) are notified
+      //     by certified mail of the hearing date and the nature of the proposed use
+      //   - The zoning notice is separate from the FCC notice; the broadcaster must coordinate both
+      //
+      // NEPA/NHPA notification (environmental):
+      //   - §1.1307 / §1.1317: If the proposed tower is within or adjacent to protected areas,
+      //     FCC requires tribal, SHPO, and/or public notification as part of the EA/CE process
+      //   - §106 NHPA process: if tower is in an area with potential historic or cultural significance,
+      //     FCC requires notification of potentially affected parties, including tribes
+      //   - §73.3583: AM towers near wetlands, floodplains, or ESA critical habitat require
+      //     coordination with relevant federal/state agencies
+      //
+      // Best practices for neighbor relations:
+      //   - Proactive outreach to immediately adjacent landowners before filing the CUP application
+      //   - Address concerns about: RF exposure (provide RF safety fact sheet), visual impact (tower color/height),
+      //     noise (generator, HVAC), lighting (FAA lights at night), and property values
+      //   - A neighbor opposition campaign can delay or kill a CUP application; early engagement is key
+
+      const tower_height_m = 144.23; // 3/8λ at 780 kHz
+      const rf_safety_radius_m = 30; // MPE exclusion zone radius for 5 kW at 780 kHz (approximate)
+      const typical_zoning_notice_radius_ft = 500; // feet from tower base
+      const typical_zoning_notice_radius_m = Math.round(typical_zoning_notice_radius_ft * 0.3048);
+      const recommended_notice_radius_km = 2; // proactive outreach radius
+
+      const NOTIFICATION_METHODS = [
+        { id: 'FCC_NEWSPAPER',   label: 'FCC local public notice (§73.3580)', cfr: '§73.3580', required: true, note: 'Two consecutive weeks in local newspaper or equivalent; certificate of notice filed with FCC', timeline: 'After FCC PNOH; before CP grant' },
+        { id: 'ZONING_CERT_MAIL',label: 'Zoning CUP hearing certified mail notice', cfr: 'Local ordinance', required: true, note: `Adjoining owners within ${typical_zoning_notice_radius_ft} ft (${typical_zoning_notice_radius_m}m) notified by certified mail of CUP hearing; county/city mails on applicant's behalf`, timeline: 'Per local zoning code' },
+        { id: 'NEPA_NHPA',       label: 'NEPA/§106 NHPA tribal and SHPO notification', cfr: '§1.1307; §1.1317; 36 CFR Part 800', required: false, note: 'Required if tower is in or adjacent to historic/cultural resource areas; notify tribes and SHPO as part of EA/CE process', timeline: 'Before filing CP application' },
+        { id: 'PROACTIVE',       label: 'Proactive neighbor outreach (best practice)', cfr: 'N/A', required: false, note: `Direct letter or door-knock to landowners within ${recommended_notice_radius_km} km; provide RF safety fact sheet and project overview before CUP filing`, timeline: 'Before CUP application' },
+        { id: 'RF_SAFETY_INFO',  label: 'RF safety fact sheet distribution', cfr: '§1.1310; OET Bulletin 56', required: false, note: 'FCC OET Bulletin 56 (RF exposure public information); provide to immediate neighbors; reduces opposition from RF health concerns', timeline: 'With proactive outreach' }
+      ];
+
+      const required_methods = NOTIFICATION_METHODS.filter(m => m.required);
+
+      const OPPOSITION_MITIGATION = [
+        { concern: 'RF exposure health fear', mitigation: 'Distribute FCC OET Bulletin 56; show RF safety zone map; note FCC MPE compliance', cfr: '§1.1310; OET Bulletin 56' },
+        { concern: 'Tower visual impact', mitigation: 'Share FAA-approved tower design renderings; propose native vegetation screening near fence', cfr: 'Local ordinance' },
+        { concern: 'Nighttime lighting', mitigation: 'Explain FAA lighting requirements; note modern LED beacons are lower intensity than older incandescent', cfr: '§17.21; FAA AC 70/7460-1M' },
+        { concern: 'Property value decrease', mitigation: 'Provide tower/property value research; note tower is behind fence and not on residential parcel', cfr: 'Local ordinance' },
+        { concern: 'Construction noise/traffic', mitigation: 'Provide construction schedule; limit heavy equipment hours; notify of expected delivery trucks', cfr: 'N/A' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        fcc_public_notice_required: true,
+        fcc_public_notice_weeks: 2,
+        fcc_public_notice_cfr: '§73.3580',
+        zoning_notice_radius_ft: typical_zoning_notice_radius_ft,
+        zoning_notice_radius_m: typical_zoning_notice_radius_m,
+        recommended_notice_radius_km,
+        rf_safety_radius_m,
+        notification_methods: NOTIFICATION_METHODS,
+        n_notification_methods: NOTIFICATION_METHODS.length,
+        n_required_methods: required_methods.length,
+        opposition_mitigation: OPPOSITION_MITIGATION,
+        n_opposition_concerns: OPPOSITION_MITIGATION.length,
+        relocation_note: `FCC requires local public notice (§73.3580) in 2 consecutive weekly publications. Local zoning requires certified mail notice to owners within ~${typical_zoning_notice_radius_ft} ft (${typical_zoning_notice_radius_m}m) of tower base. Proactively outreach to owners within ${recommended_notice_radius_km} km before filing CUP application to reduce opposition risk.`,
+        reference: '47 CFR §73.3580; §1.1307; §1.1310; 36 CFR Part 800 (§106 NHPA); local zoning ordinance; FAA AC 70/7460-1M; FCC OET Bulletin 56',
+        note: `Neighbor notification: ${NOTIFICATION_METHODS.length} methods (${required_methods.length} required by FCC/zoning). Proactive outreach within ${recommended_notice_radius_km} km recommended. ${OPPOSITION_MITIGATION.length} common opposition concerns identified.`
       };
     })(),
 

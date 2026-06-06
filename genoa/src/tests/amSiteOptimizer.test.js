@@ -5683,6 +5683,55 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- neighboring_landowner_notification_guide ----
+
+test('neighboring_landowner_notification_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.neighboring_landowner_notification_guide != null, 'neighboring_landowner_notification_guide missing');
+  const g = c.neighboring_landowner_notification_guide;
+  assert.ok('fcc_public_notice_required' in g, 'fcc_public_notice_required missing');
+  assert.ok('notification_methods' in g, 'notification_methods missing');
+  assert.ok('opposition_mitigation' in g, 'opposition_mitigation missing');
+  assert.ok('recommended_notice_radius_km' in g, 'recommended_notice_radius_km missing');
+});
+
+test('neighboring_landowner_notification_guide FCC public notice is required for major changes', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].neighboring_landowner_notification_guide;
+  assert.strictEqual(g.fcc_public_notice_required, true, 'FCC local public notice must be required');
+  assert.strictEqual(g.fcc_public_notice_weeks, 2, 'FCC notice must be 2 consecutive weeks per §73.3580');
+  assert.ok(g.fcc_public_notice_cfr.includes('73.3580'), 'FCC notice must reference §73.3580');
+});
+
+test('neighboring_landowner_notification_guide has at least 3 notification methods', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].neighboring_landowner_notification_guide;
+  assert.ok(Array.isArray(g.notification_methods), 'notification_methods must be array');
+  assert.ok(g.n_notification_methods >= 3, 'must have at least 3 notification methods');
+  assert.ok(g.n_required_methods >= 2, 'at least 2 methods must be required (FCC + zoning)');
+  const ids = g.notification_methods.map(m => m.id);
+  assert.ok(ids.includes('FCC_NEWSPAPER'), 'FCC_NEWSPAPER notification method required');
+});
+
+test('neighboring_landowner_notification_guide opposition mitigation covers RF safety', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].neighboring_landowner_notification_guide;
+  assert.ok(Array.isArray(g.opposition_mitigation), 'opposition_mitigation must be array');
+  assert.ok(g.n_opposition_concerns >= 3, 'must address at least 3 opposition concerns');
+  const concerns = g.opposition_mitigation.map(o => o.concern.toLowerCase());
+  assert.ok(concerns.some(c => c.includes('rf') || c.includes('exposure')), 'must address RF exposure concern');
+});
+
+test('neighboring_landowner_notification_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('nlng_n_notification_methods' in row, 'nlng_n_notification_methods missing from comparison table');
+    assert.ok('nlng_fcc_notice_required' in row, 'nlng_fcc_notice_required missing from comparison table');
+    assert.ok('nlng_notice_radius_km' in row, 'nlng_notice_radius_km missing from comparison table');
+  }
+});
+
 // ---- transmitter_insurance_guide ----
 
 test('transmitter_insurance_guide presence and structure', async () => {

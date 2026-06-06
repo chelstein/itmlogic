@@ -1717,6 +1717,38 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      neighboring_landowner_notification_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        fcc_public_notice_required: true,
+        fcc_public_notice_weeks: 2,
+        fcc_public_notice_cfr: '§73.3580',
+        zoning_notice_radius_ft: 500,
+        zoning_notice_radius_m: 152,
+        recommended_notice_radius_km: 2,
+        rf_safety_radius_m: 30,
+        n_notification_methods: 5,
+        n_required_methods: 2,
+        notification_methods: [
+          { id: 'FCC_PUBLIC_NOTICE', label: 'FCC public notice (§73.3580)', required: true, description: 'Published in a newspaper of general circulation in the community of license for 2 consecutive weeks before filing; must include application filing date, facility ID, and contact information', typical_cost_usd: 300 },
+          { id: 'CERTIFIED_MAIL', label: 'Certified mail to adjacent landowners', required: true, description: 'Written notification sent via USPS certified mail to all landowners within recommended notice radius; provides documented delivery for FCC record', typical_cost_usd: 150 },
+          { id: 'IN_PERSON', label: 'In-person community meeting', required: false, description: 'Optional but highly recommended for contested sites; allows Q&A on RF safety, tower aesthetics, and property values; significantly reduces formal opposition', typical_cost_usd: 500 },
+          { id: 'LOCAL_GOV', label: 'Local government courtesy notice', required: false, description: 'Proactive notice to city/county planning department, zoning board, and local elected officials; reduces risk of zoning opposition coordinated through government channels', typical_cost_usd: 0 },
+          { id: 'RF_SAFETY_INFO', label: 'RF safety information packet', required: false, description: 'Distribute FCC OET Bulletin 56 plain-language RF safety summary; address misconceptions about AM tower health effects; include site-specific MPE analysis results', typical_cost_usd: 100 }
+        ],
+        n_opposition_concerns: 5,
+        opposition_mitigation: [
+          { concern: 'RF radiation health fears', severity: 'HIGH', mitigation: 'Provide FCC OET Bulletin 56 plain-language summary; show site-specific MPE analysis confirming compliance with §1.1310 general population limits; offer open site tours', cfr_support: '§1.1310; OET Bulletin 56; OET Bulletin 65' },
+          { concern: 'Property value impacts', severity: 'HIGH', mitigation: 'Commission independent property value study for comparable tower sites; provide real estate data showing minimal impact in similar markets; offer property value guarantee agreement', cfr_support: 'N/A (private law matter)' },
+          { concern: 'Tower aesthetics and view obstruction', severity: 'MEDIUM', mitigation: 'Share tower design renderings; propose lighting minimization plan per FAA §17.23 requirements; consider stealth design if structurally feasible; propose landscaping buffer', cfr_support: '47 CFR §17.23; FAA Advisory Circular 70/7460-1' },
+          { concern: 'Construction noise and traffic', severity: 'MEDIUM', mitigation: 'Provide construction schedule with noise mitigation plan; commit to daylight-only construction hours; designate dedicated construction access route minimizing residential traffic', cfr_support: 'N/A (local ordinance)' },
+          { concern: 'Emergency access and security', severity: 'LOW', mitigation: 'Provide site security plan per §73.49 fence requirements; include emergency services contact plan; agree to immediate shut-down protocol for emergency RF safety incidents', cfr_support: '47 CFR §73.49' }
+        ],
+        estimated_total_notification_cost_usd: { low: 800, typical: 1400, high: 3000 },
+        opposition_risk: 'MEDIUM',
+        relocation_note: 'FCC public notice required per §73.3580 (2 weeks in local newspaper before filing). Additional outreach to landowners within 2km radius is not FCC-required but significantly reduces formal opposition risk. RF safety concerns are the highest-severity issue; provide OET Bulletin 56 materials and site-specific MPE analysis.',
+        reference: '47 CFR §73.3580; §73.49; §1.1310; OET Bulletin 56; OET Bulletin 65; FCC Media Bureau public notice requirements',
+        note: 'FCC §73.3580 public notice required (2 weeks). Proactive outreach within 2km recommended. 5 notification methods (2 required). 5 opposition concerns with mitigation strategies.'
+      },
       transmitter_insurance_guide: {
         frequency_khz: 780, fcc_class: 'D',
         tpo_kw: 5,

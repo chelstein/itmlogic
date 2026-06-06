@@ -2226,6 +2226,50 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Neighboring Landowner Notification Guide */}
+        {candidate.neighboring_landowner_notification_guide && (() => {
+          const g = candidate.neighboring_landowner_notification_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Neighbor Notification Plan <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3580 / Local Zoning</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>FCC Public Notice</div>
+                  <div style={{ color: g.fcc_public_notice_required ? '#fbbf24' : '#34d399', fontSize: 12, fontWeight: 600 }}>
+                    {g.fcc_public_notice_required ? `Required — ${g.fcc_public_notice_weeks} weeks (${g.fcc_public_notice_cfr})` : 'Not required'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Zoning Notice Radius</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.zoning_notice_radius_ft} ft ({g.zoning_notice_radius_m}m)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Notification Methods</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.n_notification_methods} ({g.n_required_methods} required)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Proactive Outreach Radius</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.recommended_notice_radius_km} km</div>
+                </div>
+              </div>
+              {g.opposition_mitigation && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Opposition Concerns & Mitigation</div>
+                  {g.opposition_mitigation.slice(0, 3).map((o, i) => (
+                    <div key={i} style={{ marginBottom: 4, background: '#0f172a', borderRadius: 5, padding: 7 }}>
+                      <div style={{ color: '#fbbf24', fontSize: 11, fontWeight: 600 }}>{o.concern}</div>
+                      <div style={{ color: '#94a3b8', fontSize: 10 }}>{o.mitigation}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Transmitter Insurance Guide */}
         {candidate.transmitter_insurance_guide && (() => {
           const g = candidate.transmitter_insurance_guide;
