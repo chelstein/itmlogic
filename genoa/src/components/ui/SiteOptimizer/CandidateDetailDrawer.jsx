@@ -2226,6 +2226,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Political Programming Compliance Guide */}
+        {candidate.political_programming_compliance_guide && (() => {
+          const g = candidate.political_programming_compliance_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Political Programming Compliance <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1940</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Obligations</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 700 }}>{g.n_obligations ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>LUC Primary</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>{g.election_windows?.luc_pre_primary_days ?? '—'} days</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>LUC General</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>{g.election_windows?.luc_pre_general_days ?? '—'} days</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Required Actions</div>
+                  <div style={{ color: (g.n_required_impacts ?? 0) > 0 ? '#fbbf24' : '#34d399', fontSize: 14, fontWeight: 700 }}>{g.n_required_impacts ?? 0}</div>
+                </div>
+              </div>
+              {g.political_obligations && g.political_obligations.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Key Obligations</div>
+                  {g.political_obligations.map((o, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#818cf8', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>{o.cfr.split(';')[0]}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{o.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.relocation_impacts && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Relocation Impact</div>
+                  {g.relocation_impacts.filter(i => i.impact === 'REQUIRED').map((imp, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#f87171', fontSize: 11, fontWeight: 600, flexShrink: 0, marginTop: 1 }}>REQ</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{imp.detail}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Transmitter Redundancy Guide */}
         {candidate.transmitter_redundancy_guide && (() => {
           const g = candidate.transmitter_redundancy_guide;

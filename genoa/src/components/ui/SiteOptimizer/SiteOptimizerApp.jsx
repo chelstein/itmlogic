@@ -1717,6 +1717,38 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      political_programming_compliance_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        candidate_site_lat: 34.86, candidate_site_lon: -111.82,
+        region_note: 'Southern/Western latitude — verify congressional district coverage change post-relocation',
+        political_obligations: [
+          { id: 'REASONABLE_ACCESS', label: 'Reasonable access to federal candidates (§312(a)(7))', cfr: '§73.1940; §73.1944', applies_to: 'Federal candidates only', trigger: 'Candidate request during campaign season' },
+          { id: 'EQUAL_OPPORTUNITIES', label: 'Equal opportunities if any candidate receives air time (§315)', cfr: '§73.1941', applies_to: 'All legally qualified candidates for same office', trigger: 'Within 7 days of opponent use' },
+          { id: 'LOWEST_UNIT_CHARGE', label: 'Lowest unit charge during LUC windows', cfr: '§73.1942; §73.1943', applies_to: 'Legally qualified candidates', trigger: '45/60 day windows before elections' },
+          { id: 'POLITICAL_FILE',    label: 'Maintain political file in OPIF', cfr: '§73.1943(f); §73.3526(e)(6)', applies_to: 'All candidates requesting time', trigger: 'Continuous; requests logged within 24 hours' },
+          { id: 'SPONSORSHIP_ID',   label: 'Sponsorship identification for political ads', cfr: '§73.1212', applies_to: 'All political advertising', trigger: 'Each political broadcast' }
+        ],
+        n_obligations: 5,
+        election_windows: {
+          luc_pre_primary_days: 45, luc_pre_general_days: 60,
+          equal_opp_request_days: 7, political_file_retention_years: 2, cfr: '§73.1942; §73.1943'
+        },
+        relocation_impacts: [
+          { id: 'DISTRICT_CHANGE',  impact: 'EVALUATE', detail: 'Relocation changes service area; identify new federal/state/local districts served', cfr: '§73.1940' },
+          { id: 'OPIF_UPDATE',      impact: 'REQUIRED',  detail: 'Political file in OPIF must be updated when station moves', cfr: '§73.3526; §73.3527' },
+          { id: 'COL_CHANGE',       impact: 'EVALUATE', detail: 'If COL changes, political programming obligations may shift to new community', cfr: '§73.3533; §73.3562' },
+          { id: 'MAIN_STUDIO_FILE', impact: 'REQUIRED',  detail: 'Political file address must be updated when studio moves', cfr: '§73.3526(b); §73.1943(f)' }
+        ],
+        n_required_impacts: 2,
+        compliance_cost: {
+          political_file_software_usd: { low: 0, high: 3000 },
+          legal_counsel_per_election_usd: { low: 2000, high: 8000 },
+          staff_training_usd: { low: 500, high: 2000 },
+          total_annual_estimate_usd: { low: 2500, high: 13000 }
+        },
+        reference: '47 CFR §73.1212; §73.1940; §73.1941; §73.1942; §73.1943; §73.1944; §73.3526; §73.3527; 47 U.S.C. §312(a)(7); §315',
+        note: 'Political programming: 5 obligations. LUC windows: 45 days pre-primary / 60 days pre-general. Political file retention: 2 years. OPIF update required post-relocation.'
+      },
       transmitter_redundancy_guide: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
         backup_required_by_fcc: false, backup_strongly_recommended: true,

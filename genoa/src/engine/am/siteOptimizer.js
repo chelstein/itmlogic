@@ -969,7 +969,10 @@ export async function runSiteOptimizer(body = {}){
     fmpg_da_curr_required:  c.frequency_monitoring_plan_guide?.da_base_current_monitoring?.required ?? null,
     trg_backup_req_fcc:     c.transmitter_redundancy_guide?.backup_required_by_fcc ?? null,
     trg_input_kva:          c.transmitter_redundancy_guide?.input_power_kva_estimate ?? null,
-    trg_gen_kva:            c.transmitter_redundancy_guide?.generator_guidance?.recommended_kva ?? null
+    trg_gen_kva:            c.transmitter_redundancy_guide?.generator_guidance?.recommended_kva ?? null,
+    ppg_n_obligations:      c.political_programming_compliance_guide?.n_obligations ?? null,
+    ppg_n_required:         c.political_programming_compliance_guide?.n_required_impacts ?? null,
+    ppg_luc_general_days:   c.political_programming_compliance_guide?.election_windows?.luc_pre_general_days ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6704,6 +6707,82 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    political_programming_compliance_guide: (() => {
+      // §73.1940: Legally qualified candidates — reasonable access required for federal candidates
+      // §73.1941: Equal opportunities — if one candidate gets time, opponents may demand equal time
+      // §73.1943: Lowest unit charge (LUC) — during 45/60 days before primary/general, must offer
+      //   candidates the same rates as the station's most favored commercial advertiser
+      // §73.1944: Reasonable access for federal candidates (§312(a)(7) Communications Act)
+      // §73.1942: Candidate rates — no discrimination based on viewpoint
+      // §315 Communications Act: "equal time" doctrine
+      //
+      // Relocation relevance: when the AM station relocates, its community of license (COL) changes.
+      // This can change:
+      //   - Which federal/state/local election districts the station primarily serves
+      //   - Whether the station's service area now overlaps new congressional districts
+      //   - Political file obligations (§73.1943(f): political file kept for 2 years at main studio)
+      //
+      // §73.3526(e)(6): Political file is part of the online public inspection file (OPIF)
+      // Political file must include: all requests for broadcast time from candidates, decisions, rates charged
+
+      // Determine which electoral environment the candidate site serves
+      // This is a planning-level estimate; actual district mapping requires GIS
+      const lat_ppg = pt.lat ?? 34.9;
+      const lon_ppg = pt.lon ?? -111.8;
+      // Very rough congressional district zone estimate by geographic region
+      const region_note = lat_ppg > 40 ? 'Northern latitude — likely serves different congressional districts than current site' : 'Southern/Western latitude — verify congressional district coverage change post-relocation';
+
+      // Political programming obligations for AM stations
+      const POLITICAL_OBLIGATIONS = [
+        { id: 'REASONABLE_ACCESS', label: 'Reasonable access to federal candidates (§312(a)(7))', cfr: '§73.1940; §73.1944', applies_to: 'Federal candidates only', trigger: 'Candidate request during campaign season' },
+        { id: 'EQUAL_OPPORTUNITIES', label: 'Equal opportunities if any candidate receives air time (§315)', cfr: '§73.1941', applies_to: 'All legally qualified candidates for same office', trigger: 'Within 7 days of opponent use' },
+        { id: 'LOWEST_UNIT_CHARGE', label: 'Lowest unit charge during windows: 45 days pre-primary, 60 days pre-general', cfr: '§73.1942; §73.1943', applies_to: 'Legally qualified candidates', trigger: '45/60 day windows before elections' },
+        { id: 'POLITICAL_FILE',    label: 'Maintain political file in OPIF (online public inspection file)', cfr: '§73.1943(f); §73.3526(e)(6)', applies_to: 'All candidates requesting time', trigger: 'Continuous; requests must be logged within 24 hours' },
+        { id: 'SPONSORSHIP_ID',   label: 'Sponsorship identification for political ads ("paid for by...")', cfr: '§73.1212', applies_to: 'All political advertising', trigger: 'Each political broadcast' }
+      ];
+
+      // Key timelines
+      const ELECTION_WINDOWS = {
+        luc_pre_primary_days: 45,
+        luc_pre_general_days: 60,
+        equal_opp_request_days: 7, // candidate must request equal time within 7 days of opponent use
+        political_file_retention_years: 2,
+        cfr: '§73.1942; §73.1943'
+      };
+
+      // Relocation impact on political programming compliance
+      const RELOCATION_IMPACTS_PPG = [
+        { id: 'DISTRICT_CHANGE',   impact: 'EVALUATE', detail: 'Relocation changes the station\'s primary service area; identify new federal/state/local districts served', cfr: '§73.1940' },
+        { id: 'OPIF_UPDATE',       impact: 'REQUIRED',  detail: 'Political file location and station information in OPIF must be updated when station moves', cfr: '§73.3526; §73.3527' },
+        { id: 'COL_CHANGE',        impact: 'EVALUATE', detail: 'If community of license changes (requires FCC approval), political programming obligations may shift to new community', cfr: '§73.3533; §73.3562' },
+        { id: 'MAIN_STUDIO_FILE',  impact: 'REQUIRED', detail: 'Political file must be kept at main studio (or electronically via OPIF); update address when studio moves', cfr: '§73.3526(b); §73.1943(f)' }
+      ];
+
+      // Cost of political programming compliance
+      const COMPLIANCE_COST = {
+        political_file_software_usd: { low: 0, high: 3000 }, // many use FCC OPIF directly (free)
+        legal_counsel_per_election_usd: { low: 2000, high: 8000 }, // election cycle
+        staff_training_usd: { low: 500, high: 2000 },
+        total_annual_estimate_usd: { low: 2500, high: 13000 }
+      };
+
+      return {
+        frequency_khz, fcc_class,
+        candidate_site_lat: round2(lat_ppg),
+        candidate_site_lon: round2(lon_ppg),
+        region_note,
+        political_obligations: POLITICAL_OBLIGATIONS,
+        n_obligations: POLITICAL_OBLIGATIONS.length,
+        election_windows: ELECTION_WINDOWS,
+        relocation_impacts: RELOCATION_IMPACTS_PPG,
+        n_required_impacts: RELOCATION_IMPACTS_PPG.filter(i => i.impact === 'REQUIRED').length,
+        compliance_cost: COMPLIANCE_COST,
+        relocation_note: 'Relocating the transmitter changes the station\'s primary service area and may alter the congressional and state legislative districts served. Verify new district coverage and update OPIF station information promptly after relocation.',
+        reference: '47 CFR §73.1212; §73.1940; §73.1941; §73.1942; §73.1943; §73.1944; §73.3526; §73.3527; 47 U.S.C. §312(a)(7); §315 (Communications Act); FCC Political Programming FAQs',
+        note: `Political programming: ${POLITICAL_OBLIGATIONS.length} obligations apply. LUC windows: 45 days pre-primary / 60 days pre-general. Political file retention: ${ELECTION_WINDOWS.political_file_retention_years} years. OPIF update required post-relocation.`
       };
     })(),
 

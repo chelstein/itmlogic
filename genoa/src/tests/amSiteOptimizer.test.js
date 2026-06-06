@@ -5683,6 +5683,56 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- political_programming_compliance_guide ----
+
+test('political_programming_compliance_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.political_programming_compliance_guide != null, 'political_programming_compliance_guide missing');
+  const g = c.political_programming_compliance_guide;
+  assert.ok(Array.isArray(g.political_obligations), 'political_obligations must be array');
+  assert.ok('election_windows' in g, 'election_windows missing');
+  assert.ok(Array.isArray(g.relocation_impacts), 'relocation_impacts must be array');
+  assert.ok('compliance_cost' in g, 'compliance_cost missing');
+});
+
+test('political_programming_compliance_guide includes all 5 core obligations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].political_programming_compliance_guide;
+  assert.ok(g.political_obligations.length >= 4, 'must have at least 4 political programming obligations');
+  assert.strictEqual(g.n_obligations, g.political_obligations.length, 'n_obligations must match array length');
+  const luc = g.political_obligations.find(o => o.id === 'LOWEST_UNIT_CHARGE');
+  assert.ok(luc != null, 'LOWEST_UNIT_CHARGE obligation missing');
+  const eql = g.political_obligations.find(o => o.id === 'EQUAL_OPPORTUNITIES');
+  assert.ok(eql != null, 'EQUAL_OPPORTUNITIES obligation missing');
+});
+
+test('political_programming_compliance_guide LUC windows are 45 and 60 days', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].political_programming_compliance_guide;
+  assert.strictEqual(g.election_windows.luc_pre_primary_days, 45, 'LUC pre-primary window must be 45 days');
+  assert.strictEqual(g.election_windows.luc_pre_general_days, 60, 'LUC pre-general window must be 60 days');
+  assert.ok(g.election_windows.political_file_retention_years >= 2, 'political file retention must be at least 2 years');
+});
+
+test('political_programming_compliance_guide relocation impacts include REQUIRED entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].political_programming_compliance_guide;
+  assert.ok(g.relocation_impacts.length >= 2, 'must have at least 2 relocation impacts');
+  const required = g.relocation_impacts.filter(i => i.impact === 'REQUIRED');
+  assert.ok(required.length >= 1, 'at least 1 REQUIRED relocation impact must exist');
+  assert.strictEqual(g.n_required_impacts, required.length, 'n_required_impacts must match count');
+});
+
+test('political_programming_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ppg_n_obligations' in row, 'ppg_n_obligations missing from comparison table');
+    assert.ok('ppg_n_required' in row, 'ppg_n_required missing from comparison table');
+    assert.ok('ppg_luc_general_days' in row, 'ppg_luc_general_days missing from comparison table');
+  }
+});
+
 // ---- transmitter_redundancy_guide ----
 
 test('transmitter_redundancy_guide presence and structure', async () => {
