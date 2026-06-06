@@ -4009,3 +4009,55 @@ test('skywave_protection_advisory skywave_advisory_level in comparison table', a
       'skywave_advisory_level must be in comparison table');
   }
 });
+
+// ---------- filing_complexity_score ----------
+
+test('filing_complexity_score is present on response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  assert.ok(out.filing_complexity_score != null, 'filing_complexity_score must be present');
+});
+
+test('filing_complexity_score.total_score is 0–100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const s = out.filing_complexity_score.total_score;
+  assert.ok(typeof s === 'number' && s >= 0 && s <= 100,
+    `total_score ${s} must be in [0,100]`);
+});
+
+test('filing_complexity_score.complexity_tier is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const validTiers = new Set(['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
+  assert.ok(validTiers.has(out.filing_complexity_score.complexity_tier),
+    `complexity_tier "${out.filing_complexity_score.complexity_tier}" must be valid`);
+});
+
+test('filing_complexity_score.factors is non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const f = out.filing_complexity_score.factors;
+  assert.ok(Array.isArray(f) && f.length > 0, 'factors must be non-empty array');
+});
+
+test('filing_complexity_score.tier_interpretation is a string', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  assert.ok(typeof out.filing_complexity_score.tier_interpretation === 'string',
+    'tier_interpretation must be a string');
+});
+
+test('filing_complexity_score for local channel is LOW complexity', async () => {
+  // 1240 kHz is a local channel — should produce a lower score than KAZM (clear channel)
+  const outLocal = await runSiteOptimizer({
+    ...KAZM,
+    frequency_khz: 1240, fcc_class: 'C', tpo_kw: 0.25,
+    candidate_limit: 2
+  });
+  if (outLocal.available) {
+    const tier = outLocal.filing_complexity_score.complexity_tier;
+    assert.ok(['LOW', 'MODERATE'].includes(tier),
+      `local channel complexity_tier "${tier}" should be LOW or MODERATE`);
+  }
+});

@@ -887,7 +887,32 @@ const DEMO_RESULT = {
         nif_study_required: true,
         rule: '47 CFR §73.182 / §73.25'
       },
-      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' }
+      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' },
+      directional_antenna_study_guide: {
+        recommended: true,
+        primary_reason: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
+        study_type: 'DA_N_NIGHTTIME_ONLY',
+        triggers: [
+          { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N required at night to protect WJR Class A skywave contours.', cfr: '47 CFR §73.25 / §73.182' }
+        ],
+        key_constraints: [
+          'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
+          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
+          'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
+        ],
+        pattern_radials_required: 72, additional_engineering_weeks_min: 8, additional_engineering_weeks_max: 16,
+        note: 'Commission a DA N NIGHTTIME ONLY study before filing.', rule: '47 CFR §73.150 / §73.316'
+      },
+      skywave_protection_advisory: {
+        advisory_level: 'HIGH', nif_required: true,
+        nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, OET-72 methodology)',
+        protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 31.2,
+        advisory_items: [
+          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WJR\'s 0.5 mV/m and 25 µV/m contours.',
+          '§73.182 NIF must demonstrate interference not materially increased from current authorized site.'
+        ],
+        key_risk: 'Secondary on §73.25 clear channel — delta comparison to current authorized site', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
+      }
     },
     {
       rank: 3, rank_percentile: 72.6, lat: 34.95, lon: -111.92,
@@ -1000,6 +1025,33 @@ const DEMO_RESULT = {
         da_erp_boost_modeled: '4× NDA ERP toward COL bearing (best-case pattern)',
         recommendation: 'DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing',
         rule: '47 CFR §73.150 / §73.24(j)'
+      },
+      directional_antenna_study_guide: {
+        recommended: true,
+        primary_reason: 'COL_COVERAGE_GAP',
+        study_type: 'FULL_DA_STUDY_DAY_NIGHT',
+        triggers: [
+          { trigger: 'COL_COVERAGE_GAP', detail: 'NDA coverage 78% < §73.24(j) 80% floor. DA with max ERP toward COL centroid bearing can recover compliance.', cfr: '47 CFR §73.150 / §73.24(j)' },
+          { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N also required at night.', cfr: '47 CFR §73.25 / §73.182' }
+        ],
+        key_constraints: [
+          'Maximize ERP toward COL centroid bearing (§73.24(j) ≥80% coverage goal).',
+          'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
+          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
+          'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
+        ],
+        pattern_radials_required: 72, additional_engineering_weeks_min: 16, additional_engineering_weeks_max: 32,
+        note: 'Commission a FULL DA STUDY DAY NIGHT before filing. Adds 16–32 weeks to engineering timeline.', rule: '47 CFR §73.150 / §73.316'
+      },
+      skywave_protection_advisory: {
+        advisory_level: 'HIGH', nif_required: true,
+        nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, OET-72 methodology)',
+        protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 28.4,
+        advisory_items: [
+          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WJR\'s 0.5 mV/m and 25 µV/m contours.',
+          'Increasing TPO from 5→8.5 kW significantly increases skywave NIF complexity — must re-study full azimuthal skywave exposure at the higher power level.'
+        ],
+        key_risk: 'Secondary on §73.25 clear channel — power increase amplifies NIF burden on all bearings', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
       }
     },
     {
@@ -1084,6 +1136,38 @@ const DEMO_RESULT = {
         da_erp_boost_modeled: '4× NDA ERP toward COL bearing (best-case pattern)',
         recommendation: 'DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing',
         rule: '47 CFR §73.150 / §73.24(j)'
+      },
+      directional_antenna_study_guide: {
+        recommended: true,
+        primary_reason: 'COL_COVERAGE_GAP',
+        study_type: 'FULL_DA_STUDY_DAY_NIGHT',
+        triggers: [
+          { trigger: 'COL_COVERAGE_GAP', detail: 'NDA coverage 62% < §73.24(j) 80% floor. DA with max ERP toward COL centroid bearing can recover compliance.', cfr: '47 CFR §73.150 / §73.24(j)' },
+          { trigger: 'BLANKET_POP_SUPPRESSION', detail: 'Blanket pop 1.1% exceeding §73.24(g) 1% limit. DA must also null the 1000 mV/m lobe away from population centers.', cfr: '47 CFR §73.24(g) / §73.150' },
+          { trigger: 'TREATY_CONSTRAINT', detail: 'Within US-MX treaty zone. DA likely required to reduce power toward the border.', cfr: '1986 US/Mexico AM Agreement' },
+          { trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME', detail: 'Secondary Class D on clear channel 780 kHz — DA-N required at night.', cfr: '47 CFR §73.25 / §73.182' }
+        ],
+        key_constraints: [
+          'Maximize ERP toward COL centroid bearing (§73.24(j) ≥80% coverage goal).',
+          'Null 1000 mV/m contour away from populated areas (§73.24(g) ≤1% blanket limit).',
+          'Reduce power toward US-MX border for binational coordination.',
+          'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
+          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).'
+        ],
+        pattern_radials_required: 72, additional_engineering_weeks_min: 16, additional_engineering_weeks_max: 32,
+        note: 'Commission a FULL DA STUDY DAY NIGHT before filing. Multiple competing constraints — expect 16–32 weeks additional DA engineering.', rule: '47 CFR §73.150 / §73.316'
+      },
+      skywave_protection_advisory: {
+        advisory_level: 'CRITICAL', nif_required: true,
+        nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, OET-72 methodology)',
+        protected_contour_25uvm_est_km: 120.21, groundwave_05mvm_est_km: 22.5,
+        advisory_items: [
+          'Secondary Class D on clear channel 780 kHz: must not increase nighttime interference to dominant Class A WJR\'s 0.5 mV/m and 25 µV/m contours.',
+          '§73.182 NIF must demonstrate interference not materially increased from current authorized site — this is a delta comparison.',
+          'TREATY ZONE US-MX: binational skywave coordination required — FCC IB review adds 12–52 weeks. Pattern authorization likely restricted in directions toward the border.'
+        ],
+        key_risk: 'Secondary on §73.25 clear channel IN treaty zone — maximum NIF complexity class; CRITICAL advisory',
+        treaty_factor: 'US-MX advisory', rule: '47 CFR §73.25 / §73.182'
       }
     }
   ]
