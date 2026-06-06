@@ -29,7 +29,7 @@
 //   - 47 CFR §73.184 groundwave method (FCC gwave.js)
 //   - US/Mexico AM Agreement (1986); US/Canada AM treaty
 
-import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
+import { fccAmDistanceKm, fccAmFieldMvmAtDistance } from '../curves/fcc/index.mjs';
 import { detectInternationalBorder } from '../regulatory/internationalBorderDetect.js';
 import { lookupM3Conductivity, lookupM3ZoneFallback, m3LoadStatus } from './m3.js';
 
@@ -810,6 +810,33 @@ async function scoreCandidate(pt, ctx, warnings){
     });
   })();
 
+  // 3a-d. Field strength profile at key distances — used by engineers to
+  // assess service at specific community locations without running a full
+  // contour study.  6 canonical distances: 1, 5, 10, 25, 50, 100 km.
+  const field_strength_profile = (() => {
+    const distances = [1, 5, 10, 25, 50, 100];
+    return distances.map(d => {
+      try {
+        const mvm = fccAmFieldMvmAtDistance({ frequency_khz, distance_km: d, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        const mvmR = Math.round(mvm * 1000) / 1000;
+        return {
+          distance_km: d,
+          field_mvm: mvmR,
+          // FCC service tier labels.
+          tier: mvmR >= 1000 ? 'blanket (§73.24(g))'
+              : mvmR >= 25   ? 'local dominant (25 mV/m)'
+              : mvmR >= 5    ? 'COL service (§73.24(j))'
+              : mvmR >= 2    ? 'secondary service'
+              : mvmR >= 0.5  ? 'protected daytime'
+              : mvmR >= 0.1  ? 'fringe'
+              : 'below fringe'
+        };
+      } catch (_){
+        return { distance_km: d, field_mvm: null, tier: null };
+      }
+    });
+  })();
+
   // 3b. Minimum-TPO for §73.24(g) compliance — only computed when blanket
   //     pop fails (blanket_population_pct > 1%).  Binary search on TPO to
   //     find the highest power where the proxy blanket pop stays ≤ 1%.
@@ -1062,6 +1089,7 @@ async function scoreCandidate(pt, ctx, warnings){
       }
     },
     groundwave_contour_table,
+    field_strength_profile,
     // Antenna system summary — efficiency estimate, power headroom, service area proxy.
     antenna_system_summary: (() => {
       // Antenna efficiency range: based on empirical M3 conductivity correlations.

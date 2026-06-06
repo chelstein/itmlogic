@@ -1714,6 +1714,36 @@ test('antenna_system_summary present on every candidate with correct structure',
   }
 });
 
+test('field_strength_profile present on every candidate with 6 distance entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const EXPECTED_KM = [1, 5, 10, 25, 50, 100];
+  for (const c of out.candidates){
+    assert.ok(Array.isArray(c.field_strength_profile),
+      `field_strength_profile must be an array (rank ${c.rank})`);
+    assert.equal(c.field_strength_profile.length, 6,
+      `field_strength_profile must have 6 entries (rank ${c.rank})`);
+    for (let i = 0; i < 6; i++){
+      assert.equal(c.field_strength_profile[i].distance_km, EXPECTED_KM[i],
+        `profile[${i}].distance_km must be ${EXPECTED_KM[i]} (rank ${c.rank})`);
+      assert.ok(typeof c.field_strength_profile[i].tier === 'string',
+        `profile[${i}].tier must be a string (rank ${c.rank})`);
+    }
+  }
+});
+
+test('field_strength_profile: field decreases monotonically with distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const profile = c.field_strength_profile.filter(r => r.field_mvm != null);
+    for (let i = 1; i < profile.length; i++){
+      assert.ok(profile[i].field_mvm <= profile[i-1].field_mvm,
+        `field strength must decrease with distance: profile[${i}]=${profile[i].field_mvm} > profile[${i-1}]=${profile[i-1].field_mvm} (rank ${c.rank})`);
+    }
+  }
+});
+
 test('antenna_system_summary.effective_service_area_km2 ≈ π×daytime_reach²', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);

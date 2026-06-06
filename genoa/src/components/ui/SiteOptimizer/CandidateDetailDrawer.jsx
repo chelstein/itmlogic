@@ -607,6 +607,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         )}
 
+        {/* Field strength profile */}
+        {candidate.field_strength_profile?.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">Field strength profile</div>
+            <table className="w-full font-mono text-[10px] border-collapse">
+              <thead>
+                <tr className="text-textDim text-left">
+                  <th className="pb-0.5 pr-3 font-normal">Distance</th>
+                  <th className="pb-0.5 pr-3 font-normal">Field</th>
+                  <th className="pb-0.5 font-normal">Service tier</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidate.field_strength_profile.map(row => {
+                  const col = row.field_mvm == null ? '#444'
+                    : row.field_mvm >= 5 ? '#63d471'
+                    : row.field_mvm >= 2 ? '#a8d46a'
+                    : row.field_mvm >= 0.5 ? '#ffb347'
+                    : row.field_mvm >= 0.1 ? '#9b9b9b'
+                    : '#555';
+                  return (
+                    <tr key={row.distance_km} className="border-t border-white/5">
+                      <td className="py-0.5 pr-3 text-textDim">{row.distance_km} km</td>
+                      <td className="py-0.5 pr-3" style={{ color: col }}>
+                        {row.field_mvm != null ? row.field_mvm >= 100
+                          ? `${row.field_mvm.toFixed(0)} mV/m`
+                          : `${row.field_mvm.toFixed(2)} mV/m` : '—'}
+                      </td>
+                      <td className="py-0.5 text-textDim text-[9px]">{row.tier ?? '—'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            <div className="font-mono text-[9px] text-textDim mt-1">
+              Screening-grade — M3 zone conductivity, omnidirectional.
+            </div>
+          </div>
+        )}
+
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
         {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}
 
