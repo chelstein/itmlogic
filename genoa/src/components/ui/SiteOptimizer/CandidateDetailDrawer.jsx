@@ -2226,6 +2226,86 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Site Security Perimeter Guide */}
+        {candidate.site_security_perimeter_guide && (() => {
+          const s = candidate.site_security_perimeter_guide;
+          const requiredComps = (s.security_components || []).filter(c => c.required);
+          return (
+            <div>
+              <h4 style={{ color: '#fb923c', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Site Security Perimeter (§73.49)
+              </h4>
+              <div style={{ background: '#1a0c05', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Tower height est.:</span> <strong>{s.tower_height_m != null ? `${s.tower_height_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Fence radius:</span> <strong>{s.fence_radius_m != null ? `${s.fence_radius_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Perimeter:</span> <strong style={{ color: '#fb923c' }}>{s.perimeter_m != null ? `${s.perimeter_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>MPE eval req'd:</span> <strong style={{ color: s.mpe_evaluation_required ? '#ef4444' : '#22c55e' }}>{s.mpe_evaluation_required ? `Yes (≥${s.mpe_threshold_kw} kW)` : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Components:</span> <strong>{s.n_components ?? '—'} ({s.n_required_components ?? '—'} required)</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Total capex:</span> <strong style={{ color: '#f59e0b' }}>{s.total_capex_usd != null ? `$${s.total_capex_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Annual maint.:</span> <strong>{s.annual_maintenance_usd != null ? `$${s.annual_maintenance_usd.toLocaleString()}/yr` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Violation risk:</span> <strong style={{ color: '#ef4444', fontSize: 10 }}>Up to $10k/day</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Required Security Components (§73.49)</div>
+                {requiredComps.map((c, i) => (
+                  <div key={i} style={{ background: '#120a02', borderRadius: 3, padding: '5px 8px', marginBottom: 4, fontSize: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 1 }}>
+                      <span style={{ color: '#fb923c', fontWeight: 700 }}>{c.label}</span>
+                      <span style={{ color: '#6b7280' }}>{c.cost_usd != null ? `$${c.cost_usd.toLocaleString()}` : ''}</span>
+                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: 10 }}>{c.spec}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{s.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Environmental Impact Assessment */}
+        {candidate.environmental_impact_assessment && (() => {
+          const e = candidate.environmental_impact_assessment;
+          const riskColor = { LOW: '#22c55e', MODERATE: '#f59e0b', HIGH: '#ef4444', VERY_HIGH: '#dc2626' };
+          return (
+            <div>
+              <h4 style={{ color: '#4ade80', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Environmental Impact Assessment
+              </h4>
+              <div style={{ background: '#030f06', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Env. risk level:</span> <strong style={{ color: riskColor[e.env_risk_level] || '#9ca3af' }}>{e.env_risk_level || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Cat. exclusion:</span> <strong style={{ color: e.categorical_exclusion?.applies ? '#22c55e' : '#ef4444' }}>{e.categorical_exclusion?.applies ? 'Applies' : 'EA required'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Checklist items:</span> <strong>{e.n_checklist_items ?? '—'} ({e.n_required_items ?? '—'} required)</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Est. EA days:</span> <strong style={{ color: '#f59e0b' }}>{e.estimated_ea_days != null ? `${e.estimated_ea_days} days` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Tower height est.:</span> <strong>{e.tower_height_est_m != null ? `${e.tower_height_est_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>§106 total days:</span> <strong>{e.nhpa_106?.total_process_days != null ? `~${e.nhpa_106.total_process_days} days` : '—'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Environmental Checklist</div>
+                {(e.environmental_checklist || []).map((c, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: c.required ? '#4ade80' : '#6b7280', minWidth: 8, marginTop: 1 }}>{c.required ? '●' : '○'}</span>
+                    <div>
+                      <span style={{ color: c.required ? '#d1d5db' : '#9ca3af' }}>{c.item}</span>
+                      <span style={{ color: '#6b7280' }}> (~{c.duration_days}d)</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {e.nhpa_106 && (
+                <div style={{ background: '#031205', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#4ade80', fontWeight: 700 }}>NHPA §106: </span>
+                  <span style={{ color: '#d1d5db' }}>{e.nhpa_106.process_steps?.length ?? 5}-step process; SHPO has 30 days to respond. APE delineation → historic property search → effect assessment → consultation → resolution.</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{e.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Ground Conductivity Improvement */}
         {candidate.ground_conductivity_improvement && (() => {
           const g = candidate.ground_conductivity_improvement;

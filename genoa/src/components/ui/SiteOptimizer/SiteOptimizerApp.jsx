@@ -1717,6 +1717,85 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      site_security_perimeter_guide: {
+        tower_height_m: 144.23, fence_radius_m: 7.21, perimeter_m: 45.3,
+        mpe_evaluation_required: true, mpe_threshold_kw: 5,
+        security_components: [
+          { id: 'FENCE', label: '§73.49 Chain-Link Fence or Enclosure', required: true, cfr: '47 CFR §73.49', spec: '8-foot chain-link (ASTM F567), galvanized, with locked entry gate', perimeter_m: 45.3, unit_cost_per_m: 85, cost_usd: 3850.50, notes: 'FCC requires substantial barrier; most inspectors accept 8-ft chain-link with barbed wire top' },
+          { id: 'RF_WARNING', label: 'RF Exposure Warning Signs (OET Bulletin 65)', required: true, cfr: '47 CFR §1.1310; OET Bulletin 65', spec: 'ANSI Z535.2 caution signs at all fence entry points; post at ≤ 10m intervals', n_signs: 5, cost_usd: 175, notes: 'ERP 5 kW meets §1.1310 evaluation threshold — RF signage required' },
+          { id: 'ANTI_CLIMB', label: 'Anti-Climb Device / Tower Base Barrier', required: true, cfr: '47 CFR §73.49', spec: 'Anti-climb collar on tower base sections (first 4m); smooth conduit sleeve or steel collar', cost_usd: 1200, notes: 'Required at any accessible tower; deters unauthorized climbing' },
+          { id: 'INTRUSION_DETECTION', label: 'Intrusion Detection and CCTV', required: false, cfr: 'DHS/CISA Tower Security Guidance', spec: '4-camera IP CCTV system with motion detection; cellular alarm relay to station', n_cameras: 4, cost_usd: 4800, notes: 'Not explicitly required by FCC but strongly recommended post-2001' },
+          { id: 'EQUIPMENT_ROOM', label: 'Transmitter Building Physical Security', required: true, cfr: '47 CFR §73.1745; §11.35', spec: 'Solid-core door with deadbolt; no accessible windows at ground level; alarm monitoring', cost_usd: 1800, notes: '§11.35 requires EAS equipment remain secure and operable' }
+        ],
+        n_components: 5, n_required_components: 4,
+        total_capex_usd: 11825.50, annual_maintenance_usd: 473.02,
+        primary_regulation: '47 CFR §73.49',
+        inspection_authority: 'FCC Field Offices; FCC Enforcement Bureau',
+        violation_risk: 'Forfeiture up to $10,000 per violation per day (47 CFR §1.80)',
+        reference: '47 CFR §73.49; 47 CFR §1.1310; OET Bulletin 65; ANSI Z535.2; DHS CISA AM Tower Security Guide',
+        note: '§73.49 requires fence/enclosure around AM antenna base. Perimeter est. 45.3m at 7.21m radius. Total security capex est. $11,826.'
+      },
+      environmental_impact_assessment: {
+        n_nepa_exclusions: 8,
+        categorical_exclusion: {
+          applies: true,
+          cfr: '47 CFR §11.4(a)',
+          basis: 'Replacement or modification of existing AM broadcast facility with no substantial change in physical structure',
+          conditions: ['No wilderness area', 'Outside floodplain', 'No wetland impact', 'No ESA-listed species in APE'],
+          limitations: ['Antenna height < 60m above mean terrain', 'No new ground disturbance > 0.5 acres']
+        },
+        nhpa_106: {
+          applicable: true,
+          statute: 'National Historic Preservation Act §106 (36 CFR Part 800)',
+          trigger: 'Undertaking with federal nexus (FCC license action)',
+          process_steps: [
+            { step: 1, label: 'APE Delineation', description: 'Define Area of Potential Effect for direct and indirect effects on historic properties', days_est: 10 },
+            { step: 2, label: 'Historic Property Identification', description: 'Search National Register, consult SHPO, conduct Phase I survey if needed', days_est: 30 },
+            { step: 3, label: 'Effect Assessment', description: 'Determine No Effect / No Adverse Effect / Adverse Effect per 36 CFR §800.5', days_est: 15 },
+            { step: 4, label: 'SHPO Consultation', description: 'Submit effect determination to SHPO for 30-day review and concurrence', days_est: 30 },
+            { step: 5, label: 'Resolution of Adverse Effects', description: 'If adverse effect: MOA negotiation, public involvement, mitigation measures', days_est: 25 }
+          ],
+          total_process_days: 110,
+          shpo_contact: 'State Historic Preservation Office',
+          note: 'FCC will not grant construction permit until §106 compliance is documented'
+        },
+        esa_section7: {
+          statute: 'Endangered Species Act §7 (50 CFR Part 402)',
+          screening_tool: 'IPaC (Information for Planning and Consultation)',
+          trigger_conditions: ['ESA-listed species in APE', 'Critical habitat overlap'],
+          consultation_types: ['Informal consultation (species not likely affected)', 'Formal consultation (may affect, likely to adversely affect)'],
+          informal_days_est: 30,
+          formal_days_est: 135
+        },
+        wetland_analysis: {
+          statute: 'Clean Water Act §404',
+          nationwide_permit_applicable: true,
+          nwp_62: {
+            number: 62,
+            title: 'Recreational Facilities and Broadcast Antenna Structures',
+            max_structure_height_m: 150,
+            requires_pre_construction_notification: true,
+            usace_district: 'Contact local USACE district office',
+            conditions: ['Minimize fill in wetlands', 'Mitigation for impacts > 0.1 acre', 'No conversion of special aquatic sites']
+          },
+          wetland_delineation_required: true,
+          firm_flood_zone_check: 'Required — consult FEMA Flood Insurance Rate Map'
+        },
+        env_risk_level: 'LOW',
+        estimated_ea_days: 90,
+        environmental_checklist: [
+          { id: 'CAT_EX', label: '47 CFR §11.4 Categorical Exclusion Review', required: true, completed: false, responsible: 'Applicant / Consultant' },
+          { id: 'NHPA_106', label: 'NHPA §106 Consultation with SHPO', required: true, completed: false, responsible: 'Applicant / FCC' },
+          { id: 'ESA_IPAC', label: 'ESA §7 IPaC Species Screening', required: true, completed: false, responsible: 'Applicant / USFWS' },
+          { id: 'CWA_404', label: 'CWA §404 Wetland Delineation & NWP-62', required: true, completed: false, responsible: 'Applicant / USACE' },
+          { id: 'FIRM_MAP', label: 'FEMA FIRM Floodplain Map Review', required: true, completed: false, responsible: 'Applicant' },
+          { id: 'TRIBAL', label: 'Tribal Historic Preservation Office (THPO) Notification', required: false, completed: false, responsible: 'FCC / Applicant' }
+        ],
+        n_checklist_items: 6,
+        n_required_items: 5,
+        reference: '47 CFR §11.4; NHPA §106 (36 CFR Part 800); ESA §7; CWA §404; NEPA; EO 11988; FCC Environmental Review Guidelines',
+        note: 'NEPA categorical exclusion assumed for standard AM relocation with no unusual environmental conditions. EA or EIS required if exclusion criteria not met.'
+      },
       ground_conductivity_improvement: {
         frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
         baseline_sigma_msm: 9, is_high_conductivity: true, is_moderate_conductivity: false, is_low_conductivity: false,

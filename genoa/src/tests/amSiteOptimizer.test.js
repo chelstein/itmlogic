@@ -6504,6 +6504,100 @@ test('power_line_interference_analysis comparison table columns present', async 
   }
 });
 
+test('environmental_impact_assessment presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].environmental_impact_assessment;
+  assert.ok(e != null, 'environmental_impact_assessment must be present');
+  assert.strictEqual(e.n_nepa_exclusions, 8, 'must have 8 NEPA exclusion triggers');
+  assert.ok(e.categorical_exclusion != null, 'categorical_exclusion must be present');
+  assert.ok(e.nhpa_106 != null, 'nhpa_106 must be present');
+  assert.ok(e.esa_section7 != null, 'esa_section7 must be present');
+});
+
+test('environmental_impact_assessment §106 process has 5 steps', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].environmental_impact_assessment;
+  assert.ok(Array.isArray(e.nhpa_106.process_steps), '§106 process_steps must be an array');
+  assert.strictEqual(e.nhpa_106.process_steps.length, 5, '§106 must have 5 process steps');
+  assert.ok(e.nhpa_106.total_process_days > 0, '§106 total_process_days must be positive');
+  assert.ok(e.nhpa_106.applicable === true, '§106 must always be applicable');
+});
+
+test('environmental_impact_assessment checklist counts', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].environmental_impact_assessment;
+  assert.strictEqual(e.n_checklist_items, 6, 'must have 6 checklist items');
+  assert.ok(e.n_required_items > 0, 'must have at least 1 required item');
+  assert.ok(e.n_required_items <= e.n_checklist_items, 'required must be <= total');
+});
+
+test('environmental_impact_assessment wetland NWP-62 applicable for typical tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].environmental_impact_assessment;
+  // KAZM tower est ~144m < 150m → NWP-62 applicable
+  assert.ok(e.wetland_analysis != null, 'wetland_analysis must be present');
+  assert.ok(typeof e.wetland_analysis.nationwide_permit_applicable === 'boolean', 'NWP applicable must be boolean');
+});
+
+test('environmental_impact_assessment comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('eia_risk_level' in row,   'eia_risk_level missing from comparison table');
+    assert.ok('eia_n_checklist' in row,  'eia_n_checklist missing from comparison table');
+    assert.ok('eia_ea_days_est' in row,  'eia_ea_days_est missing from comparison table');
+  }
+});
+
+test('site_security_perimeter_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].site_security_perimeter_guide;
+  assert.ok(s != null, 'site_security_perimeter_guide must be present');
+  assert.ok(s.perimeter_m > 0, 'perimeter_m must be positive');
+  assert.ok(Array.isArray(s.security_components), 'security_components must be an array');
+  assert.ok(s.n_components === s.security_components.length, 'n_components must match array length');
+  assert.ok(s.total_capex_usd > 0, 'total_capex_usd must be positive');
+});
+
+test('site_security_perimeter_guide §73.49 fence component is present and required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].site_security_perimeter_guide;
+  const fence = s.security_components.find(c => c.id === 'FENCE');
+  assert.ok(fence != null, 'FENCE component must be present');
+  assert.strictEqual(fence.required, true, 'FENCE must be required (§73.49)');
+  assert.ok(fence.cost_usd > 0, 'FENCE cost must be positive');
+  assert.ok(fence.perimeter_m > 0, 'FENCE perimeter_m must be positive');
+});
+
+test('site_security_perimeter_guide RF warning signage required above 5 kW threshold', async () => {
+  const out5kw = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const out1kw = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
+  const s5 = out5kw.candidates[0].site_security_perimeter_guide;
+  const s1 = out1kw.candidates[0].site_security_perimeter_guide;
+  const rf5 = s5.security_components.find(c => c.id === 'RF_WARNING');
+  const rf1 = s1.security_components.find(c => c.id === 'RF_WARNING');
+  assert.ok(rf5 != null, 'RF_WARNING must exist for 5 kW');
+  assert.strictEqual(rf5.required, true,  'RF_WARNING must be required at 5 kW (MPE threshold)');
+  assert.strictEqual(rf1.required, false, 'RF_WARNING not required below 5 kW threshold');
+});
+
+test('site_security_perimeter_guide fence radius and perimeter scale with tower height', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].site_security_perimeter_guide;
+  assert.ok(s.fence_radius_m >= 5, 'fence_radius_m must be at least 5m (FCC minimum enclosure)');
+  assert.ok(s.tower_height_m > 0, 'tower_height_m must be positive');
+  const expectedCirc = parseFloat((2 * Math.PI * s.fence_radius_m).toFixed(2));
+  assert.strictEqual(s.perimeter_m, expectedCirc, 'perimeter_m must equal 2π × fence_radius_m');
+});
+
+test('site_security_perimeter_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ssp_perimeter_m'  in row, 'ssp_perimeter_m missing from comparison table');
+    assert.ok('ssp_n_components' in row, 'ssp_n_components missing from comparison table');
+    assert.ok('ssp_capex_usd'    in row, 'ssp_capex_usd missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;

@@ -1198,6 +1198,34 @@ test('colocation GRID candidates have power_line_interference_analysis', async (
   }
 });
 
+test('colocation GRID candidates have environmental_impact_assessment', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.environmental_impact_assessment != null, `rank ${c.rank} missing environmental_impact_assessment`);
+    assert.strictEqual(c.environmental_impact_assessment.n_nepa_exclusions, 8, `rank ${c.rank} must have 8 NEPA triggers`);
+  }
+});
+
+test('colocation GRID candidates have site_security_perimeter_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.site_security_perimeter_guide != null, `rank ${c.rank} missing site_security_perimeter_guide`);
+    assert.ok(c.site_security_perimeter_guide.perimeter_m > 0, `rank ${c.rank} perimeter_m must be positive`);
+  }
+});
+
 test('colocation GRID candidates have ground_conductivity_improvement', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
