@@ -348,12 +348,23 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             </div>
             <div className="col-span-2">
               <span className="text-textDim">Blanket pop</span>{' '}
-              <span
-                className="text-cream"
-                style={Number(candidate.blanket_population_pct) > 1 ? { color: '#ff5a5a' } : undefined}
-              >
-                {fmtBlanketPct(candidate.blanket_population_pct)}
-              </span>
+              {(() => {
+                const risk = candidate.blanket_pop_risk;
+                const col = risk === 'EXCEEDS_LIMIT' ? '#ff5a5a'
+                          : risk === 'HIGH'          ? '#ff9b5a'
+                          : risk === 'ELEVATED'      ? '#ffb347'
+                          : '#b8d0cc';
+                const tag = risk === 'EXCEEDS_LIMIT' ? ' ✕ >1% LIMIT'
+                          : risk === 'HIGH'          ? ' ⚠ near limit'
+                          : risk === 'ELEVATED'      ? ' △ elevated'
+                          : '';
+                return (
+                  <span>
+                    <span style={{ color: col }}>{fmtBlanketPct(candidate.blanket_population_pct)}</span>
+                    {tag && <span className="font-mono text-[9px] ml-1" style={{ color: col }}>{tag}</span>}
+                  </span>
+                );
+              })()}
               {candidate.blanket_1000mvm_km != null && (
                 <span className="text-textDim text-[9px] ml-1.5">(r={fmtNum(candidate.blanket_1000mvm_km)} km at 1000 mV/m)</span>
               )}

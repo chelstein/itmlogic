@@ -974,6 +974,13 @@ async function scoreCandidate(pt, ctx, warnings){
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     estimated_daytime_population_served,
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
+    // Qualitative §73.24(g) blanket-population risk tier.
+    // OK: well clear of limit; ELEVATED: monitoring warranted; HIGH: near limit; EXCEEDS_LIMIT: non-compliant.
+    blanket_pop_risk: blanket_population_pct == null ? null
+      : blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT ? 'EXCEEDS_LIMIT'
+      : blanket_population_pct >= 0.8 ? 'HIGH'
+      : blanket_population_pct >= 0.5 ? 'ELEVATED'
+      : 'OK',
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
     minimum_tpo_for_col_coverage_kw,

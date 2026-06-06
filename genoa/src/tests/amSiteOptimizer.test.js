@@ -1435,3 +1435,42 @@ test('optimization_confidence notes include all-LOW advisory when no filing-grad
   assert.ok(hasAdvisory,
     `optimization_confidence.notes should include a LOW-confidence advisory; got: ${JSON.stringify(notes)}`);
 });
+
+test('blanket_pop_risk is set correctly based on blanket_population_pct tier', async () => {
+  // Standard KAZM run: blanket pop will be very low → expect OK or ELEVATED.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 15,
+    optimization_goals: { minimize_blanket_population: true }
+  });
+  assert.equal(out.available, true);
+  const VALID_RISK = new Set(['OK', 'ELEVATED', 'HIGH', 'EXCEEDS_LIMIT']);
+  for (const c of out.candidates){
+    if (c.blanket_population_pct == null){
+      assert.equal(c.blanket_pop_risk, null,
+        `blanket_pop_risk should be null when blanket_population_pct is null (rank ${c.rank})`);
+    } else {
+      assert.ok(VALID_RISK.has(c.blanket_pop_risk),
+        `blanket_pop_risk must be OK/ELEVATED/HIGH/EXCEEDS_LIMIT; rank ${c.rank} got: ${c.blanket_pop_risk}`);
+      // Tier consistency checks.
+      if (c.blanket_population_pct > 1) assert.equal(c.blanket_pop_risk, 'EXCEEDS_LIMIT', `>1% should be EXCEEDS_LIMIT`);
+      if (c.blanket_population_pct >= 0.8 && c.blanket_population_pct <= 1) assert.equal(c.blanket_pop_risk, 'HIGH', `0.8-1% should be HIGH`);
+      if (c.blanket_population_pct >= 0.5 && c.blanket_population_pct < 0.8) assert.equal(c.blanket_pop_risk, 'ELEVATED', `0.5-0.8% should be ELEVATED`);
+      if (c.blanket_population_pct < 0.5) assert.equal(c.blanket_pop_risk, 'OK', `<0.5% should be OK`);
+    }
+  }
+});
+
+test('score_histogram buckets include promising_count field', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.score_histogram), 'score_histogram must be an array');
+  for (const bucket of out.score_histogram){
+    assert.ok('promising_count' in bucket,
+      `every histogram bucket must have promising_count; bucket ${bucket.bucket} is missing it`);
+    assert.ok(Number.isInteger(bucket.promising_count) && bucket.promising_count >= 0,
+      `promising_count must be a non-negative integer; bucket ${bucket.bucket} got ${bucket.promising_count}`);
+    assert.ok(bucket.promising_count <= bucket.count,
+      `promising_count must be ≤ count; bucket ${bucket.bucket}: ${bucket.promising_count} > ${bucket.count}`);
+  }
+});

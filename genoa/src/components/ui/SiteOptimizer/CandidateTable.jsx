@@ -202,7 +202,7 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                 onClick={() => {
                   const CSV_COLS = ['rank','score','score_delta_vs_baseline','status_category','source',
                     'distance_from_current_km','bearing_deg','cardinal_direction',
-                    'col_coverage_pct','col_coverage_gap_pct','blanket_population_pct','daytime_reach_km',
+                    'col_coverage_pct','col_coverage_gap_pct','blanket_population_pct','blanket_pop_risk','daytime_reach_km',
                     'principal_community_5mvm_km','blanket_1000mvm_km','ground_sigma_mS_m',
                     'ground_sigma_quality','ground_sigma_filing_grade','ground_radial_advisory',
                     'field_at_col_centroid_mvm','estimated_daytime_population_served',
