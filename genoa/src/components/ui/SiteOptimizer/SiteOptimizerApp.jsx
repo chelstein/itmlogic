@@ -476,6 +476,13 @@ const DEMO_RESULT = {
       ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
       score_confidence: 'LOW', field_at_col_centroid_mvm: 18.4,
       estimated_daytime_population_served: 124800,
+      score_confidence_band: {
+        score_low: 69.3, score_high: 100, uncertainty_pts: 22,
+        uncertainty_factors: [
+          'zone-table conductivity (±12 pts): measured σ could shift conductivity sub-score — commission soil survey to resolve',
+          'COL disc proxy (±10 pts): polygon-based coverage analysis could differ materially from 10 km radius disc'
+        ]
+      },
       treaty_zone: null, fuel_risk: 'NOT-EVALUATED',
       notes: '97% city-coverage, σ=8 mS/m, 0.4% blanket pop, 6 km from current.',
       explanation: {
@@ -529,6 +536,13 @@ const DEMO_RESULT = {
       ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
       score_confidence: 'LOW', field_at_col_centroid_mvm: 8.7,
       estimated_daytime_population_served: 103900,
+      score_confidence_band: {
+        score_low: 62.0, score_high: 100, uncertainty_pts: 22,
+        uncertainty_factors: [
+          'zone-table conductivity (±12 pts): measured σ could shift conductivity sub-score — commission soil survey to resolve',
+          'COL disc proxy (±10 pts): polygon-based coverage analysis could differ materially from 10 km radius disc'
+        ]
+      },
       treaty_zone: null, fuel_risk: 'LOW',
       notes: '91% city-coverage; ground σ slightly lower; daytime reach acceptable.',
       explanation: {
@@ -553,6 +567,13 @@ const DEMO_RESULT = {
       ground_sigma_source: 'FCC M3 zone table', ground_radial_advisory: null,
       score_confidence: 'LOW', field_at_col_centroid_mvm: 3.2,
       estimated_daytime_population_served: 85600,
+      score_confidence_band: {
+        score_low: 49.8, score_high: 93.8, uncertainty_pts: 22,
+        uncertainty_factors: [
+          'zone-table conductivity (±12 pts): measured σ could shift conductivity sub-score — commission soil survey to resolve',
+          'COL disc proxy (±10 pts): polygon-based coverage analysis could differ materially from 10 km radius disc'
+        ]
+      },
       treaty_zone: null, fuel_risk: 'MODERATE',
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {

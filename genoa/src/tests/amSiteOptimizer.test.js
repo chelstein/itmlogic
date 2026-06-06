@@ -1664,6 +1664,86 @@ test('form_301_checklist omits DA_PATTERN for non-directional stations', async (
     'form_301_checklist must NOT include DA_PATTERN for ND stations');
 });
 
+test('form_301_checklist always includes HAAT_CALCULATION and CP_OR_LICENSE_MOD', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const ids = out.form_301_checklist.map(i => i.id);
+  assert.ok(ids.includes('HAAT_CALCULATION'),
+    'form_301_checklist must always include HAAT_CALCULATION');
+  assert.ok(ids.includes('CP_OR_LICENSE_MOD'),
+    'form_301_checklist must always include CP_OR_LICENSE_MOD');
+  const haatItem = out.form_301_checklist.find(i => i.id === 'HAAT_CALCULATION');
+  assert.equal(haatItem.status, 'REQUIRED', 'HAAT_CALCULATION must be REQUIRED');
+  const cpItem = out.form_301_checklist.find(i => i.id === 'CP_OR_LICENSE_MOD');
+  assert.equal(cpItem.status, 'REQUIRED', 'CP_OR_LICENSE_MOD must be REQUIRED');
+});
+
+test('form_301_checklist includes CONDUCTIVITY_FIELD_SURVEY when zone-table sigma used', async () => {
+  // KAZM uses zone-table sigma (no M3 raster loaded in tests), so CONDUCTIVITY_FIELD_SURVEY
+  // should always appear in test runs.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const ids = out.form_301_checklist.map(i => i.id);
+  assert.ok(ids.includes('CONDUCTIVITY_FIELD_SURVEY'),
+    'form_301_checklist must include CONDUCTIVITY_FIELD_SURVEY when zone-table sigma is used');
+  const item = out.form_301_checklist.find(i => i.id === 'CONDUCTIVITY_FIELD_SURVEY');
+  const VALID_STATUS = new Set(['REQUIRED', 'CONDITIONAL', 'ADVISORY']);
+  assert.ok(VALID_STATUS.has(item.status), `CONDUCTIVITY_FIELD_SURVEY status must be valid; got '${item.status}'`);
+});
+
+test('score_confidence_band is present on every candidate with score_low, score_high, uncertainty_pts', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const band = c.score_confidence_band;
+    assert.ok(band != null, `score_confidence_band must be present (rank ${c.rank})`);
+    assert.ok(typeof band.score_low === 'number' && band.score_low >= 0,
+      `score_low must be a non-negative number (rank ${c.rank})`);
+    assert.ok(typeof band.score_high === 'number' && band.score_high <= 100,
+      `score_high must be <= 100 (rank ${c.rank})`);
+    assert.ok(band.score_low <= c.score && c.score <= band.score_high,
+      `score ${c.score} must be within [${band.score_low}, ${band.score_high}] (rank ${c.rank})`);
+    assert.ok(typeof band.uncertainty_pts === 'number' && band.uncertainty_pts >= 0,
+      `uncertainty_pts must be non-negative (rank ${c.rank})`);
+    assert.ok(Array.isArray(band.uncertainty_factors),
+      `uncertainty_factors must be an array (rank ${c.rank})`);
+  }
+});
+
+test('score_confidence_band: LOW confidence (no polygon, no centroid, zone-table sigma) has uncertainty_pts >= 22', async () => {
+  // KAZM: no polygon, no centroid, zone-table sigma → should accumulate all three factors
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const band = c.score_confidence_band;
+    assert.ok(band.uncertainty_pts >= 22,
+      `KAZM (no polygon/centroid, zone-table sigma) should have uncertainty_pts >= 22; got ${band.uncertainty_pts} (rank ${c.rank})`);
+  }
+});
+
+test('score_confidence_band: HIGH confidence (polygon + centroid) has fewer factors than LOW', async () => {
+  const withPolygon = {
+    ...KAZM,
+    community_of_license_polygon: {
+      type: 'Feature',
+      geometry: { type: 'Polygon', coordinates: [[
+        [-118.3, 34.0], [-118.2, 34.0], [-118.2, 34.1], [-118.3, 34.1], [-118.3, 34.0]
+      ]]}
+    },
+    col_centroid: { lat: 34.05, lon: -118.25 },
+    candidate_limit: 5
+  };
+  const outLow  = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const outHigh = await runSiteOptimizer(withPolygon);
+  assert.equal(outHigh.available, true);
+  const lowBand  = outLow.candidates[0].score_confidence_band;
+  const highBand = outHigh.candidates[0].score_confidence_band;
+  assert.ok(highBand.uncertainty_pts < lowBand.uncertainty_pts,
+    `providing polygon+centroid should reduce uncertainty_pts (high=${highBand.uncertainty_pts}, low=${lowBand.uncertainty_pts})`);
+  assert.ok(highBand.uncertainty_factors.length < lowBand.uncertainty_factors.length,
+    `providing polygon+centroid should reduce number of uncertainty_factors`);
+});
+
 test('groundwave_contour_table present on every candidate with 4 standard FCC contours', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);

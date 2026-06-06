@@ -483,7 +483,12 @@ export async function runSiteOptimizer(body = {}){
     channel_class: chanClass, skywave_risk_level,
     asr_registration_required: quarter_wave_m > ASR_THRESHOLD_M,
     community_of_license_polygon: !!community_of_license_polygon,
-    col_centroid: col_centroid || null
+    col_centroid: col_centroid || null,
+    // Pass aggregated candidate context so checklist can surface station-level items
+    // that depend on whether ANY promising candidate triggers a given requirement.
+    has_treaty_candidates: scored.some(c => !!c.treaty_zone),
+    any_poor_conductivity:  scored.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
+    any_zone_table_sigma:   scored.some(c => c.ground_sigma_filing_grade !== 'filing')
   });
 
   return {
@@ -1367,6 +1372,35 @@ async function scoreCandidate(pt, ctx, warnings){
     score_confidence: ground_sigma_filing_grade === 'filing' && community_of_license_polygon ? 'HIGH'
       : ground_sigma_filing_grade === 'filing' || community_of_license_polygon ? 'MEDIUM'
       : 'LOW',
+    // Numeric uncertainty bounds on the composite score.
+    // Not a statistical confidence interval — a practical range showing how much
+    // the score could shift if the operator supplies higher-quality input data.
+    // Uncertainty sources:
+    //   zone-table σ  → ±12 pts (measured conductivity can flip POOR↔GOOD)
+    //   missing COL polygon → ±10 pts (disc proxy vs real polygon boundary)
+    //   missing COL centroid → ±5 pts (field at centroid uses best-guess geography)
+    score_confidence_band: (() => {
+      const factors = [];
+      let uncertainty = 0;
+      if (ground_sigma_filing_grade !== 'filing'){
+        factors.push(`zone-table conductivity (±12 pts): measured σ could shift conductivity sub-score — commission soil survey to resolve`);
+        uncertainty += 12;
+      }
+      if (!community_of_license_polygon){
+        factors.push(`COL disc proxy (±10 pts): polygon-based coverage analysis could differ materially from 10 km radius disc`);
+        uncertainty += 10;
+      }
+      if (!col_centroid){
+        factors.push(`COL centroid not provided (±5 pts): field at community center computed from best-guess geography`);
+        uncertainty += 5;
+      }
+      return {
+        score_low:         round2(Math.max(0,   score_final - uncertainty)),
+        score_high:        round2(Math.min(100, score_final + uncertainty)),
+        uncertainty_pts:   uncertainty,
+        uncertainty_factors: factors
+      };
+    })(),
     field_at_col_centroid_mvm,
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
@@ -1891,7 +1925,9 @@ function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_
 // status: 'REQUIRED' | 'CONDITIONAL' | 'ADVISORY'
 function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
   channel_class, skywave_risk_level, asr_registration_required,
-  community_of_license_polygon, col_centroid }){
+  community_of_license_polygon, col_centroid,
+  has_treaty_candidates = false, any_poor_conductivity = false,
+  any_zone_table_sigma = false }){
   const items = [];
   const isDa = /DA/i.test(pattern_mode);
 
@@ -2013,6 +2049,53 @@ function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
     rule: '47 CFR §17.7; 14 CFR Part 77',
     note: 'Required if tower height > 200 ft AGL or if within obstacle free zone of an airport'
   });
+
+  // HAAT calculation — required for all AM tower site submissions.
+  // Height Above Average Terrain must be computed over 50 radials at 3.2 km intervals
+  // per §73.684 procedure even though §73.684 is primarily FM; AM engineers use the
+  // same metric for comparative analysis and NIF study inputs.
+  items.push({
+    id: 'HAAT_CALCULATION',
+    description: 'Compute Height Above Average Terrain (HAAT) over 50 radials at 3.2 km intervals',
+    status: 'REQUIRED',
+    rule: '47 CFR §73.684 procedure (AM engineering practice)',
+    note: 'HAAT is required as input to NIF study and §73.182 interference calculations; compute using USGS DEM data over 50 radials (360° / 7.2° spacing) at 3.2 km to 16 km from the proposed site.'
+  });
+
+  // License modification / construction permit notice.
+  items.push({
+    id: 'CP_OR_LICENSE_MOD',
+    description: 'File FCC Form 301-AM for construction permit (or Form 302-AM for license); existing CP may require modification if previously filed',
+    status: 'REQUIRED',
+    rule: '47 CFR §73.1690 / FCC Form 301-AM',
+    note: `Class ${fcc_class} AM station relocation requires a new or modified construction permit (CP). If a prior CP exists for the current site, file a CP modification. License is filed on Form 302-AM after construction and proof-of-performance.`
+  });
+
+  // International treaty coordination — surface only when at least one candidate
+  // is near a treaty zone border so the operator plans for IB coordination early.
+  if (has_treaty_candidates){
+    items.push({
+      id: 'INTERNATIONAL_TREATY_COORDINATION',
+      description: 'Initiate FCC International Bureau coordination for US/MX or US/CA treaty compliance',
+      status: 'REQUIRED',
+      rule: 'US/Mexico AM Agreement (1986); US/Canada Letter of Understanding (1991); 47 CFR §73.1205',
+      note: 'One or more candidate sites fall within treaty coordination zones. FCC IB approval is required before filing; the process adds 3–12 months. Power limits, antenna pattern restrictions, and frequency assignments may be modified as a result.'
+    });
+  }
+
+  // Conductivity field study — surface when screening data reveals poor conductivity
+  // in the candidate pool; the engineer should budget for a Wenner array survey.
+  if (any_poor_conductivity || any_zone_table_sigma){
+    items.push({
+      id: 'CONDUCTIVITY_FIELD_SURVEY',
+      description: 'Commission 4-electrode Wenner array soil conductivity survey at finalist sites',
+      status: any_poor_conductivity ? 'REQUIRED' : 'CONDITIONAL',
+      rule: '47 CFR §73.190 / FCC Form 302-AM ground system certification',
+      note: any_poor_conductivity
+        ? 'One or more candidates have POOR conductivity (σ < 2 mS/m). FCC Form 302-AM requires measured soil resistivity (ρ, Ω·m) for ground system certification. Survey is mandatory before construction permit submission.'
+        : 'Candidate screening used M3 zone-table conductivity estimates. For any finalist site, a Wenner array survey (or equivalent) should be conducted to confirm σ before committing to a ground system design.'
+    });
+  }
 
   return items;
 }
@@ -2298,6 +2381,7 @@ export const __test__ = {
   buildProtectionAdvisory,
   buildMinimumSpacingReference,
   buildRecommendedActions,
+  buildForm301Checklist,
   FCC_CLASS_POWER_KW,
   LOCAL_CHANNEL_KHZ,
   CLEAR_CHANNEL_KHZ,

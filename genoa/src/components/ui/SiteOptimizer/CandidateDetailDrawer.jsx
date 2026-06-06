@@ -303,6 +303,45 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           />
         </div>
 
+        {/* Score confidence band */}
+        {candidate.score_confidence_band && (() => {
+          const band = candidate.score_confidence_band;
+          const range = band.score_high - band.score_low;
+          const rangeColor = range <= 5 ? '#63d471' : range <= 15 ? '#ffb347' : '#e05252';
+          const score = candidate.score ?? 0;
+          const low   = band.score_low ?? 0;
+          const high  = band.score_high ?? 100;
+          return (
+            <div className="border border-rule rounded bg-surface/40 p-3">
+              <div className="rack-eyebrow mb-2">Score uncertainty band</div>
+              {/* Visual range bar */}
+              <div className="relative h-[6px] bg-rule/40 rounded-full mb-2">
+                <div className="absolute top-0 h-full rounded-full opacity-30"
+                  style={{ left: `${low}%`, width: `${high - low}%`, background: rangeColor }} />
+                <div className="absolute top-[-3px] h-[12px] w-[2px] rounded"
+                  style={{ left: `${score}%`, background: rangeColor }} />
+              </div>
+              <div className="flex justify-between font-mono text-[10px] text-textDim mb-2">
+                <span>0</span>
+                <span className="font-semibold" style={{ color: rangeColor }}>
+                  {low.toFixed(1)} – {score.toFixed(1)} – {high.toFixed(1)}
+                </span>
+                <span>100</span>
+              </div>
+              <div className="font-mono text-[10px] text-textDim">
+                ±{band.uncertainty_pts} pt uncertainty
+                {band.uncertainty_factors.length > 0 && (
+                  <ul className="mt-1 space-y-0.5 list-none pl-0">
+                    {band.uncertainty_factors.map((f, i) => (
+                      <li key={i} className="text-textDim/80">· {f}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Why it ranked */}
         <div>
           <div className="rack-eyebrow mb-1">Why it ranked here</div>
