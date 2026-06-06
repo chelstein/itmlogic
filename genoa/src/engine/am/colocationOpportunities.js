@@ -29,7 +29,7 @@
 //   No IO except for the manual JSON inventory load (delegated to
 //   manualInfrastructureClient).  All scoring is deterministic.
 
-import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline, __test__ as SO } from './siteOptimizer.js';
+import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline, buildFilingComplexityScore, __test__ as SO } from './siteOptimizer.js';
 const { buildProtectionAdvisory, buildMinimumSpacingReference, buildRecommendedActions } = SO;
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
@@ -146,7 +146,8 @@ export async function runColocationOpportunities(body = {}){
       minimum_spacing_reference:    so.minimum_spacing_reference ?? null,
       regulatory_timeline_estimate: so.regulatory_timeline_estimate ?? null,
       frequency_allocation_context: so.frequency_allocation_context ?? null,
-      candidate_set_statistics:     so.candidate_set_statistics ?? null
+      candidate_set_statistics:     so.candidate_set_statistics ?? null,
+      filing_complexity_score:      so.filing_complexity_score ?? null
     });
   }
 
@@ -363,7 +364,8 @@ export async function runColocationOpportunities(body = {}){
     n_infrastructure_sites: infraSites.length,
     scoring_time_ms,
     score_histogram,
-    top_candidates_summary: buildTopSummary(returned.slice(0, 5), baselineSumm, pool.length)
+    top_candidates_summary: buildTopSummary(returned.slice(0, 5), baselineSumm, pool.length),
+    filing_complexity_score: buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: 60.96 })
   });
 }
 
@@ -749,6 +751,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             regulatory_timeline_estimate = null,
                             frequency_allocation_context = null,
                             candidate_set_statistics = null,
+                            filing_complexity_score = null,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
@@ -794,6 +797,40 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     });
   })();
 
+  // Build comparison table (mirrors siteOptimizer candidate_comparison_table).
+  const r2 = (x) => (typeof x === 'number' && isFinite(x)) ? Math.round(x * 100) / 100 : x;
+  const candidate_comparison_table = candidates.map(c => ({
+    rank:                   c.rank,
+    go_no_go:               c.site_viability_summary?.go_no_go ?? null,
+    viability_confidence:   c.site_viability_summary?.confidence ?? null,
+    lat:                    c.lat,
+    lon:                    c.lon,
+    distance_km:            c.distance_from_current_km,
+    direction:              c.cardinal_direction,
+    score:                  c.score,
+    status:                 c.status_category,
+    col_coverage_pct:       c.col_coverage_pct,
+    daytime_reach_km:       c.daytime_reach_km,
+    blanket_pop_pct:        c.blanket_population_pct,
+    sigma_msm:              c.ground_sigma_mS_m,
+    sigma_quality:          c.ground_sigma_quality,
+    treaty_zone:            c.treaty_zone ?? null,
+    score_confidence:       c.score_confidence,
+    risk_score:             c.regulatory_risk_score?.risk_score ?? null,
+    risk_category:          c.regulatory_risk_score?.risk_category ?? null,
+    source:                 c.source ?? null,
+    overlap_fraction:       c.coverage_overlap_analysis?.overlap_fraction ?? null,
+    coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null,
+    cost_tier:              c.tower_cost_estimate?.cost_tier ?? null,
+    cost_low_usd:           c.tower_cost_estimate?.total_low_usd ?? null,
+    cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null,
+    power_upgrade_verdict:  c.power_upgrade_analysis?.verdict ?? null,
+    headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null,
+    da_study_recommended:   c.directional_antenna_study_guide?.recommended ?? null,
+    da_study_type:          c.directional_antenna_study_guide?.study_type ?? null,
+    skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null
+  }));
+
   return {
     available: true,
     method,
@@ -803,6 +840,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     candidate_count_by_status: candidate_count_by_status || null,
     top_candidates_summary: top_candidates_summary ?? null,
     candidate_shortlist,
+    candidate_comparison_table,
     current_site_baseline: baseline,
     candidates,
     score_stats,
@@ -817,6 +855,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     regulatory_timeline_estimate: regulatory_timeline_estimate ?? null,
     frequency_allocation_context: frequency_allocation_context ?? null,
     candidate_set_statistics:     candidate_set_statistics ?? null,
+    filing_complexity_score:      filing_complexity_score ?? null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,

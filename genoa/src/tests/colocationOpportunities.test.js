@@ -597,3 +597,74 @@ test('colocation candidates have population_reach_bands with 5 entries', async (
       `colocation candidate rank ${c.rank} should have 5 population_reach_bands`);
   }
 });
+
+// ---------- Test 33 — directional_antenna_study_guide in colocation candidates ----------
+
+test('colocation candidates have directional_antenna_study_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.directional_antenna_study_guide;
+    assert.ok(g != null, `colocation candidate rank ${c.rank} missing directional_antenna_study_guide`);
+    assert.ok(typeof g.recommended === 'boolean', `directional_antenna_study_guide.recommended must be boolean`);
+  }
+});
+
+// ---------- Test 34 — skywave_protection_advisory in colocation candidates ----------
+
+test('colocation candidates have skywave_protection_advisory', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const validLevels = new Set(['NONE', 'LOW', 'MODERATE', 'HIGH', 'CRITICAL']);
+  for (const c of out.candidates) {
+    const s = c.skywave_protection_advisory;
+    assert.ok(s != null, `colocation candidate rank ${c.rank} missing skywave_protection_advisory`);
+    assert.ok(validLevels.has(s.advisory_level), `advisory_level "${s.advisory_level}" must be valid`);
+    assert.ok(typeof s.nif_required === 'boolean', `nif_required must be boolean`);
+  }
+});
+
+// ---------- Test 35 — filing_complexity_score in colocation response ----------
+
+test('colocation response has filing_complexity_score', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const fcs = out.filing_complexity_score;
+  assert.ok(fcs != null, 'colocation response must have filing_complexity_score');
+  assert.ok(typeof fcs.total_score === 'number' && fcs.total_score >= 0 && fcs.total_score <= 100,
+    'total_score must be in [0,100]');
+  assert.ok(['LOW','MODERATE','HIGH','VERY_HIGH'].includes(fcs.complexity_tier),
+    `complexity_tier "${fcs.complexity_tier}" must be valid`);
+});
+
+// ---------- Test 36 — comparison table has new columns ----------
+
+test('colocation comparison table has da_study_recommended and skywave_advisory_level', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('da_study_recommended' in row, 'da_study_recommended must be in comparison table');
+    assert.ok('da_study_type' in row, 'da_study_type must be in comparison table');
+    assert.ok('skywave_advisory_level' in row, 'skywave_advisory_level must be in comparison table');
+  }
+});

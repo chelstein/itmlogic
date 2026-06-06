@@ -885,98 +885,9 @@ export async function runSiteOptimizer(body = {}){
   })();
 
   // ---- 18. Filing complexity score ----
-  // Composite 0–100 index that quantifies how difficult the FCC filing is likely
-  // to be for this station/frequency/class combination — independent of which
-  // specific candidate is selected.  Lower = simpler; higher = more pre-work
-  // and longer FCC processing time.  Designed to set stakeholder expectations
-  // and prioritize pre-filing mitigation work.
-  const filing_complexity_score = (() => {
-    let score = 0;
-    const factors = [];
-
-    // Channel class base (reflects NIF complexity inherent to the frequency class).
-    const isClearCh  = chanClass === 'clear_channel';
-    const isLocalCh  = chanClass === 'local';
-    if (isClearCh) {
-      score += 40;
-      factors.push({ factor: 'CLEAR_CHANNEL', points: 40, note: `${frequency_khz} kHz is a §73.25 clear channel — §73.182 full azimuthal skywave NIF required; FCC IB scrutiny is highest on clear channels.` });
-    } else if (isLocalCh) {
-      score += 5;
-      factors.push({ factor: 'LOCAL_CHANNEL', points: 5, note: `${frequency_khz} kHz local channel — no §73.182 NIF required; simplified filing pathway.` });
-    } else {
-      score += 20;
-      factors.push({ factor: 'REGIONAL_CHANNEL', points: 20, note: `${frequency_khz} kHz regional channel — §73.182 NIF required; complexity scales with co-channel station density.` });
-    }
-
-    // FCC class modifier.
-    if (fcc_class === 'A') {
-      score += 10;
-      factors.push({ factor: 'CLASS_A', points: 10, note: 'Class A authorization — highest-tier filing; any coverage/power change requires full NIF re-study.' });
-    } else if (fcc_class === 'D') {
-      score += 5;
-      factors.push({ factor: 'CLASS_D_SECONDARY', points: 5, note: 'Class D secondary — daytime authorization may be straightforward but nighttime is discretionary.' });
-    }
-
-    // Treaty zone: present in any returned candidate → add treaty burden.
-    if (returned.some(c => !!c.treaty_zone)) {
-      score += 25;
-      factors.push({ factor: 'TREATY_ZONE_CANDIDATES', points: 25, note: 'One or more top candidates are within a US/MX or US/CA treaty zone — FCC IB international coordination required, adding 12–52 weeks.' });
-    }
-
-    // ASR: quarter-wave at this frequency triggers §17.7 FAA study.
-    const qwM_fcs = (300000 / frequency_khz) / 4;
-    if (qwM_fcs > ASR_THRESHOLD_M) {
-      score += 10;
-      factors.push({ factor: 'ASR_REQUIRED', points: 10, note: `λ/4 ≈ ${Math.round(qwM_fcs)} m > §17.7 60.96 m threshold — FAA 7460-1 aeronautical study + FCC Form 854 required for any standard tower.` });
-    }
-
-    // DA study burden.
-    const anyDaRecommended = returned.some(c => c.directional_antenna_study_guide?.recommended === true);
-    const anyFullDA = returned.some(c => c.directional_antenna_study_guide?.study_type === 'FULL_DA_STUDY_DAY_NIGHT');
-    if (anyFullDA) {
-      score += 15;
-      factors.push({ factor: 'FULL_DA_STUDY_LIKELY', points: 15, note: 'Top candidates suggest a full day+night DA study is likely — §73.150 pattern engineering + §73.182 DA-N NIF add significant pre-filing time.' });
-    } else if (anyDaRecommended) {
-      score += 8;
-      factors.push({ factor: 'DA_STUDY_LIKELY', points: 8, note: 'One or more top candidates recommend a DA study — §73.150 pattern engineering adds 8–16 weeks to the timeline.' });
-    }
-
-    // Poor conductivity across returned candidates.
-    const poorSigmaCount = returned.filter(c => (c.ground_sigma_mS_m ?? 4) < 2).length;
-    if (poorSigmaCount > 0) {
-      score += 5;
-      factors.push({ factor: 'POOR_CONDUCTIVITY_CANDIDATES', points: 5, note: `${poorSigmaCount} top candidate(s) have σ<2 mS/m — soil resistivity surveys, extended ground systems, and §73.190 re-certification add complexity.` });
-    }
-
-    // COL compliance gap: any non-compliant top candidate means operator must choose
-    // between power upgrade, DA, or site adjustment before filing.
-    const nonCompliantCount = returned.filter(c => c.status_category === 'NON_COMPLIANT').length;
-    if (nonCompliantCount > 0) {
-      score += 5;
-      factors.push({ factor: 'NON_COMPLIANT_TOP_CANDIDATES', points: 5, note: `${nonCompliantCount} top candidate(s) fail §73.24(j) COL floor — power upgrade or DA required before any of these can be filed.` });
-    }
-
-    const total = Math.min(100, Math.round(score));
-    const complexity_tier = total >= 75 ? 'VERY_HIGH'
-      : total >= 50 ? 'HIGH'
-      : total >= 25 ? 'MODERATE'
-      : 'LOW';
-
-    const tier_interpretation = {
-      VERY_HIGH: 'Expect 18–36+ months from site selection to on-air. Retain experienced FCC broadcast counsel before site selection is finalized.',
-      HIGH:      'Expect 12–24 months. Commission NIF study, DA engineering (if applicable), and ASR process in parallel to avoid sequential delays.',
-      MODERATE:  'Expect 9–18 months. Standard filing with NIF study; complexity is manageable with experienced engineering firm.',
-      LOW:       'Expect 6–12 months. Simplified filing pathway; no international coordination or DA study required.'
-    }[complexity_tier];
-
-    return {
-      total_score: total,
-      complexity_tier,
-      tier_interpretation,
-      factors,
-      note: 'Filing complexity score is a SCREENING-GRADE composite index — not a substitute for a broadcast engineering filing timeline estimate from qualified FCC counsel.'
-    };
-  })();
+  const filing_complexity_score = buildFilingComplexityScore({
+    chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: ASR_THRESHOLD_M
+  });
 
   return {
     available: true,
@@ -4231,6 +4142,84 @@ function roundBreakdown(b){
   const o = {};
   for (const [k, v] of Object.entries(b)) o[k] = round2(v);
   return o;
+}
+
+// ---------- public helpers ----------
+
+// buildFilingComplexityScore — extracted so colocationOpportunities can reuse it.
+// Accepts the same shape of data that the GRID path uses internally:
+//   { chanClass, fcc_class, frequency_khz, returned, ASR_THRESHOLD_M }
+// where `returned` is the already-scored candidate array.
+export function buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz, returned, asr_threshold_m }){
+  const ASR_THRESH = asr_threshold_m ?? 60.96;
+  let score = 0;
+  const factors = [];
+
+  const isClearCh = chanClass === 'clear_channel';
+  const isLocalCh = chanClass === 'local';
+  if (isClearCh) {
+    score += 40;
+    factors.push({ factor: 'CLEAR_CHANNEL', points: 40, note: `${frequency_khz} kHz is a §73.25 clear channel — §73.182 full azimuthal skywave NIF required; FCC IB scrutiny is highest on clear channels.` });
+  } else if (isLocalCh) {
+    score += 5;
+    factors.push({ factor: 'LOCAL_CHANNEL', points: 5, note: `${frequency_khz} kHz local channel — no §73.182 NIF required; simplified filing pathway.` });
+  } else {
+    score += 20;
+    factors.push({ factor: 'REGIONAL_CHANNEL', points: 20, note: `${frequency_khz} kHz regional channel — §73.182 NIF required; complexity scales with co-channel station density.` });
+  }
+  if (fcc_class === 'A') {
+    score += 10;
+    factors.push({ factor: 'CLASS_A', points: 10, note: 'Class A authorization — highest-tier filing; any coverage/power change requires full NIF re-study.' });
+  } else if (fcc_class === 'D') {
+    score += 5;
+    factors.push({ factor: 'CLASS_D_SECONDARY', points: 5, note: 'Class D secondary — daytime authorization may be straightforward but nighttime is discretionary.' });
+  }
+  if (returned.some(c => !!c.treaty_zone)) {
+    score += 25;
+    factors.push({ factor: 'TREATY_ZONE_CANDIDATES', points: 25, note: 'One or more top candidates are within a US/MX or US/CA treaty zone — FCC IB international coordination required, adding 12–52 weeks.' });
+  }
+  const qwM_fcs = (300000 / frequency_khz) / 4;
+  if (qwM_fcs > ASR_THRESH) {
+    score += 10;
+    factors.push({ factor: 'ASR_REQUIRED', points: 10, note: `λ/4 ≈ ${Math.round(qwM_fcs)} m > §17.7 ${ASR_THRESH} m threshold — FAA 7460-1 aeronautical study + FCC Form 854 required for any standard tower.` });
+  }
+  const anyFullDA = returned.some(c => c.directional_antenna_study_guide?.study_type === 'FULL_DA_STUDY_DAY_NIGHT');
+  const anyDaRec  = returned.some(c => c.directional_antenna_study_guide?.recommended === true);
+  if (anyFullDA) {
+    score += 15;
+    factors.push({ factor: 'FULL_DA_STUDY_LIKELY', points: 15, note: 'Top candidates suggest a full day+night DA study is likely — §73.150 pattern engineering + §73.182 DA-N NIF add significant pre-filing time.' });
+  } else if (anyDaRec) {
+    score += 8;
+    factors.push({ factor: 'DA_STUDY_LIKELY', points: 8, note: 'One or more top candidates recommend a DA study — §73.150 pattern engineering adds 8–16 weeks to the timeline.' });
+  }
+  const poorSigmaCount = returned.filter(c => (c.ground_sigma_mS_m ?? 4) < 2).length;
+  if (poorSigmaCount > 0) {
+    score += 5;
+    factors.push({ factor: 'POOR_CONDUCTIVITY_CANDIDATES', points: 5, note: `${poorSigmaCount} top candidate(s) have σ<2 mS/m — soil resistivity surveys, extended ground systems, and §73.190 re-certification add complexity.` });
+  }
+  const nonCompliantCount = returned.filter(c => c.status_category === 'NON_COMPLIANT').length;
+  if (nonCompliantCount > 0) {
+    score += 5;
+    factors.push({ factor: 'NON_COMPLIANT_TOP_CANDIDATES', points: 5, note: `${nonCompliantCount} top candidate(s) fail §73.24(j) COL floor — power upgrade or DA required before any of these can be filed.` });
+  }
+  const total = Math.min(100, Math.round(score));
+  const complexity_tier = total >= 75 ? 'VERY_HIGH'
+    : total >= 50 ? 'HIGH'
+    : total >= 25 ? 'MODERATE'
+    : 'LOW';
+  const tier_interpretation = {
+    VERY_HIGH: 'Expect 18–36+ months from site selection to on-air. Retain experienced FCC broadcast counsel before site selection is finalized.',
+    HIGH:      'Expect 12–24 months. Commission NIF study, DA engineering (if applicable), and ASR process in parallel to avoid sequential delays.',
+    MODERATE:  'Expect 9–18 months. Standard filing with NIF study; complexity is manageable with experienced engineering firm.',
+    LOW:       'Expect 6–12 months. Simplified filing pathway; no international coordination or DA study required.'
+  }[complexity_tier];
+  return {
+    total_score: total,
+    complexity_tier,
+    tier_interpretation,
+    factors,
+    note: 'Filing complexity score is a SCREENING-GRADE composite index — not a substitute for a broadcast engineering filing timeline estimate from qualified FCC counsel.'
+  };
 }
 
 // ---------- public test-only export ----------
