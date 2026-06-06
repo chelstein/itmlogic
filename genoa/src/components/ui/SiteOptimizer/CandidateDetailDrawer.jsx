@@ -2226,6 +2226,69 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Antenna Height Optimization */}
+        {candidate.antenna_height_optimization && (() => {
+          const a = candidate.antenna_height_optimization;
+          const fmtM = v => v != null ? `${v.toLocaleString()} m` : '—';
+          const fmtFt = v => v != null ? `${v.toLocaleString()} ft` : '—';
+          const fmtDeg = v => v != null ? `${v}°` : '—';
+          return (
+            <div>
+              <h4 style={{ color: '#a78bfa', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Antenna Height Optimization
+              </h4>
+              <div style={{ background: '#1a1a2e', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Wavelength:</span> <strong>{fmtM(a.wavelength_m)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>¼-wave (λ/4):</span> <strong>{fmtM(a.quarter_wave_m)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>5/8-wave optimum:</span> <strong>{fmtM(a.five_eighths_wave_m)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Std height fraction:</span> <strong>{a.standard_height_fraction != null ? `${(a.standard_height_fraction * 100).toFixed(1)}%λ` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Std height:</span> <strong style={{ color: '#a78bfa' }}>{fmtM(a.standard_height_m)} / {fmtFt(a.standard_height_ft)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Electrical degrees:</span> <strong style={{ color: '#a78bfa' }}>{fmtDeg(a.standard_elec_deg)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Base loading needed:</span> <strong style={{ color: a.base_loading_needed ? '#f59e0b' : '#22c55e' }}>{a.base_loading_needed ? 'Yes' : 'No'}</strong></div>
+                  {a.base_loading_needed && <div><span style={{ color: '#9ca3af' }}>Est. coil inductance:</span> <strong>{a.base_coil_uh_est != null ? `${a.base_coil_uh_est} µH` : '—'}</strong></div>}
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Height Tiers (efficiency relative to 5/8λ optimum)</div>
+                <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: '#6b7280', borderBottom: '1px solid #374151' }}>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>Label</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Deg</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Height</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Eff.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(a.height_tiers || []).map((tier, i) => {
+                      const isRec = a.recommended_tier && tier.elec_deg === a.recommended_tier.elec_deg;
+                      const isOpt = tier.eff_rel === 1.00;
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid #1f2937', background: isRec ? '#1e1b4b' : 'transparent' }}>
+                          <td style={{ padding: '2px 4px', color: isRec ? '#a78bfa' : isOpt ? '#fbbf24' : '#d1d5db' }}>
+                            {tier.label}{isRec ? ' ★' : ''}{isOpt ? ' ◆' : ''}
+                          </td>
+                          <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>{tier.elec_deg}°</td>
+                          <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>{tier.height_m != null ? `${tier.height_m} m` : '—'}</td>
+                          <td style={{ padding: '2px 4px', textAlign: 'right', color: tier.eff_rel === 1.00 ? '#fbbf24' : '#9ca3af' }}>{tier.eff_rel != null ? `${(tier.eff_rel * 100).toFixed(0)}%` : '—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {a.proof_of_performance && (
+                <div style={{ background: '#0c1a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#9ca3af' }}>Proof method:</span> <span style={{ color: '#d1d5db' }}>{a.proof_of_performance}</span>
+                </div>
+              )}
+              {a.note && <div style={{ color: '#6b7280', fontSize: 10, fontStyle: 'italic', marginBottom: 4 }}>{a.note}</div>}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{a.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Population Demographics Overlay */}
         {candidate.population_demographics_overlay && (() => {
           const p = candidate.population_demographics_overlay;

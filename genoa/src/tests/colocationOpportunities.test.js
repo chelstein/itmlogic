@@ -1198,6 +1198,20 @@ test('colocation GRID candidates have power_line_interference_analysis', async (
   }
 });
 
+test('colocation GRID candidates have antenna_height_optimization', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.antenna_height_optimization != null, `rank ${c.rank} missing antenna_height_optimization`);
+    assert.strictEqual(c.antenna_height_optimization.n_height_tiers, 6, `rank ${c.rank} must have 6 height tiers`);
+  }
+});
+
 test('colocation GRID candidates have population_demographics_overlay', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },

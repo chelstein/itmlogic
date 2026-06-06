@@ -6504,6 +6504,56 @@ test('power_line_interference_analysis comparison table columns present', async 
   }
 });
 
+test('antenna_height_optimization presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].antenna_height_optimization;
+  assert.ok(a != null, 'antenna_height_optimization must be present');
+  assert.strictEqual(a.n_height_tiers, 6, 'must have 6 height tiers');
+  assert.ok(Array.isArray(a.height_tiers), 'height_tiers must be an array');
+  assert.ok(a.optimum_tier != null, 'optimum_tier must be present');
+  assert.ok(a.recommended_tier != null, 'recommended_tier must be present');
+});
+
+test('antenna_height_optimization wavelength and height math', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].antenna_height_optimization;
+  // KAZM: 780 kHz → λ = 300000/780 = 384.62m; Class D → 3/8λ = 0.375 × 384.62 = 144.23m; elec deg = 135
+  assert.ok(Math.abs(a.wavelength_m - 384.62) < 0.1, `wavelength_m should be ~384.62, got ${a.wavelength_m}`);
+  assert.ok(Math.abs(a.standard_height_m - 144.23) < 0.5, `standard_height_m should be ~144.23, got ${a.standard_height_m}`);
+  assert.strictEqual(a.standard_elec_deg, 135, 'Class D should use 135° (3/8λ)');
+  assert.ok(a.standard_height_ft > a.standard_height_m, 'height in feet must exceed meters');
+});
+
+test('antenna_height_optimization efficiency ordering and optimum tier', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].antenna_height_optimization;
+  const optimum = a.height_tiers.find(t => t.elec_deg === 225);
+  assert.ok(optimum != null, 'must have 225° (5/8λ) optimum tier');
+  assert.strictEqual(optimum.eff_rel, 1.00, '225° tier must have eff_rel = 1.00');
+  const qwave = a.height_tiers.find(t => t.elec_deg === 90);
+  assert.ok(qwave != null, 'must have 90° (λ/4) tier');
+  assert.ok(qwave.eff_rel < optimum.eff_rel, 'λ/4 efficiency must be < optimum');
+  assert.strictEqual(a.five_eighths_wave_m, a.optimum_tier.height_m, '5/8λ height must match optimum tier height_m');
+});
+
+test('antenna_height_optimization base loading for Class D at 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].antenna_height_optimization;
+  // KAZM Class D: 3/8λ = 144.23m > 61m zoning max → loading needed
+  assert.strictEqual(a.base_loading_needed, true, 'Class D at 780 kHz needs base loading (144m > 61m)');
+  assert.ok(a.base_coil_uh_est > 0, 'base_coil_uh_est must be positive when loading needed');
+  assert.strictEqual(a.zoning_max_height_m, 61, 'zoning_max_height_m must be 61m (ASR threshold)');
+});
+
+test('antenna_height_optimization comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ant_elec_deg' in row,      'ant_elec_deg missing from comparison table');
+    assert.ok('ant_height_m' in row,      'ant_height_m missing from comparison table');
+    assert.ok('ant_loading_needed' in row,'ant_loading_needed missing from comparison table');
+  }
+});
+
 test('population_demographics_overlay presence and contour count', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const p = out.candidates[0].population_demographics_overlay;

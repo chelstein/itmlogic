@@ -1717,6 +1717,29 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      antenna_height_optimization: {
+        fcc_class: 'D', frequency_khz: 780,
+        wavelength_m: 384.62, quarter_wave_m: 96.15, five_eighths_wave_m: 240.38,
+        standard_height_fraction: 0.375, standard_height_m: 144.23, standard_height_ft: 473.19,
+        standard_elec_deg: 135,
+        height_tiers: [
+          { elec_deg: 90,  frac_lambda: 0.25,  label: 'Quarter-wave (λ/4)',   eff_rel: 0.78, height_m: 96.15,  height_ft: 315.46 },
+          { elec_deg: 120, frac_lambda: 0.33,  label: 'One-third wave',        eff_rel: 0.88, height_m: 128.21, height_ft: 420.64 },
+          { elec_deg: 135, frac_lambda: 0.375, label: 'Three-eighth wave',     eff_rel: 0.93, height_m: 144.23, height_ft: 473.19 },
+          { elec_deg: 180, frac_lambda: 0.50,  label: 'Half-wave (λ/2)',       eff_rel: 0.97, height_m: 192.31, height_ft: 630.93 },
+          { elec_deg: 225, frac_lambda: 0.625, label: '5/8-wave (optimum)',    eff_rel: 1.00, height_m: 240.38, height_ft: 788.67 },
+          { elec_deg: 270, frac_lambda: 0.75,  label: 'Three-quarter wave',    eff_rel: 0.95, height_m: 288.46, height_ft: 946.41 }
+        ],
+        n_height_tiers: 6,
+        optimum_tier: { elec_deg: 225, frac_lambda: 0.625, label: '5/8-wave (optimum)', eff_rel: 1.00, height_m: 240.38, height_ft: 788.67 },
+        recommended_tier: { elec_deg: 135, frac_lambda: 0.375, label: 'Three-eighth wave', eff_rel: 0.93, height_m: 144.23, height_ft: 473.19 },
+        zoning_max_height_m: 61, base_loading_needed: true, base_coil_uh_est: 66.58,
+        top_loading_note: 'Top loading (capacitance hat) may reduce base current and radiated field; not recommended for NDA.',
+        haat_note: 'HAAT (height above average terrain) differs from physical height and is computed per §73.313 for coverage predictions.',
+        proof_of_performance: '§73.154: 72-radial field intensity traversal; Form 302-AM; base current ±5%; phase ±3°',
+        reference: '47 CFR §73.150; §73.154; FCC AM antenna efficiency curves; Ballantine (1924); Belrose (1966) IRE',
+        note: 'Class D at 780 kHz: standard height 3/8λ = 144.23 m (473 ft), base loading required. Class A/B would use 5/8λ = 240.38 m for maximum radiation efficiency.'
+      },
       population_demographics_overlay: {
         candidate_lat: 34.8606, candidate_lon: -111.8206,
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 9,

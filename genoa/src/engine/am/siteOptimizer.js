@@ -867,7 +867,10 @@ export async function runSiteOptimizer(body = {}){
     pline_n_mitigations:    c.power_line_interference_analysis?.n_applicable_mitigations ?? null,
     pop_col_estimate:       c.population_demographics_overlay?.col_population_estimate ?? null,
     pop_primary_estimate:   c.population_demographics_overlay?.primary_population_estimate ?? null,
-    pop_col_radius_km:      c.population_demographics_overlay?.col_service_radius_km ?? null
+    pop_col_radius_km:      c.population_demographics_overlay?.col_service_radius_km ?? null,
+    ant_elec_deg:           c.antenna_height_optimization?.standard_elec_deg ?? null,
+    ant_height_m:           c.antenna_height_optimization?.standard_height_m ?? null,
+    ant_loading_needed:     c.antenna_height_optimization?.base_loading_needed ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8479,6 +8482,90 @@ async function scoreCandidate(pt, ctx, warnings){
         pop_data_source: 'US Census ACS 5-year estimates (not yet integrated); disc-area approximation with conductivity-based density proxy',
         reference: '47 CFR §73.24(j); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
         note: `Population overlay at ${frequency_khz} kHz, ${tpo_kw} kW, σ=${sigma_msm} mS/m. COL radius: ${col_radius_pd ?? 'N/A'} km. Primary radius: ${primary_radius_pd ?? 'N/A'} km. Replace density proxy with Census API for filing-grade estimates.`
+      };
+    })(),
+
+    antenna_height_optimization: (() => {
+      // Electrical height vs. physical height for AM towers
+      // §73.150: FCC specifies antenna efficiency by electrical height (degrees)
+      // Optimum electrical height: 180–225° (5/8λ to 5/8λ + 1/8λ)
+      // Ground wave efficiency vs. electrical height per Ballantine (1924) / Belrose model
+      const lambda_ah    = round2(300000 / frequency_khz);
+      const qwave_ah     = round2(lambda_ah / 4);
+      const fiveEightsL  = round2(0.625 * lambda_ah); // 225° — near-optimum for groundwave
+
+      // Electrical height tiers and their efficiency relative to optimum (5/8λ)
+      // FCC §73.150(a): radiation efficiency tables
+      const HEIGHT_TIERS_ah = [
+        { elec_deg: 90,  frac_lambda: 0.25,  label: 'Quarter-wave (λ/4)',    eff_rel: 0.78, height_m: round2(0.25  * lambda_ah), height_ft: round2(0.25  * lambda_ah * 3.28084), note: 'Standard NDA height; acceptable for most AM. Low sky wave, good ground wave.' },
+        { elec_deg: 120, frac_lambda: 0.33,  label: 'One-third wave',        eff_rel: 0.88, height_m: round2(0.33  * lambda_ah), height_ft: round2(0.33  * lambda_ah * 3.28084), note: 'Good compromise; useful when site limits full 5/8λ.' },
+        { elec_deg: 135, frac_lambda: 0.375, label: 'Three-eighth wave',     eff_rel: 0.93, height_m: round2(0.375 * lambda_ah), height_ft: round2(0.375 * lambda_ah * 3.28084), note: 'Common FCC standard; strong ground wave, acceptable skywave.' },
+        { elec_deg: 180, frac_lambda: 0.50,  label: 'Half-wave (λ/2)',       eff_rel: 0.97, height_m: round2(0.50  * lambda_ah), height_ft: round2(0.50  * lambda_ah * 3.28084), note: 'Near-optimum for groundwave; diminishing skywave benefit.' },
+        { elec_deg: 225, frac_lambda: 0.625, label: '5/8-wave (optimum)',    eff_rel: 1.00, height_m: round2(0.625 * lambda_ah), height_ft: round2(0.625 * lambda_ah * 3.28084), note: 'Peak radiation efficiency per §73.150. Maximum ground wave. Used by Class A 50 kW stations.' },
+        { elec_deg: 270, frac_lambda: 0.75,  label: 'Three-quarter wave',    eff_rel: 0.95, height_m: round2(0.75  * lambda_ah), height_ft: round2(0.75  * lambda_ah * 3.28084), note: 'Slight reduction vs 5/8λ; requires top-loading or series reactance.' }
+      ];
+
+      // Typical Class D and Class A physical height targets
+      const standardHeightFrac = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.375;
+      const standardHeightM    = round2(standardHeightFrac * lambda_ah);
+      const standardHeightFt   = round2(standardHeightM * 3.28084);
+      const standardElecDeg    = round2(standardHeightFrac * 360);
+
+      // Base loading coil: if physical height is restricted (e.g., zoning max 60m)
+      // Must add series inductance (base loading coil) to reach design electrical height
+      const ZONING_MAX_HEIGHT_M = 61; // common zoning limit (~200 ft)
+      const baseLodingNeeded = standardHeightM > ZONING_MAX_HEIGHT_M;
+      const baseCoilL_uh = baseLodingNeeded
+        ? round2((standardHeightM - ZONING_MAX_HEIGHT_M) * 0.8) // rough approximation µH per missing meter
+        : 0;
+
+      // Roof loading vs series inductance comparison
+      const topLoadingAvailable = standardHeightM > ZONING_MAX_HEIGHT_M;
+      const topLoadingNote = topLoadingAvailable
+        ? `Physical height limited by zoning (~${ZONING_MAX_HEIGHT_M}m). Add base-loading coil (~${baseCoilL_uh} µH) or capacitive top-loading to reach ${standardElecDeg}° electrical height.`
+        : `Physical height ${standardHeightM}m (${standardHeightFt} ft) achieves design electrical height (${standardElecDeg}°) without loading.`;
+
+      // HAAT (Height Above Average Terrain) — not directly FCC-required for AM
+      // but affects sky-wave path and pattern modeling
+      const haatNote = 'AM §73.150 height is electrical height (degrees), not HAAT. HAAT is used for FM coverage but not AM groundwave calculations.';
+
+      const isDA_ah = /^DA/i.test(pattern_mode);
+
+      // FCC §73.150(b): proof of performance electrical height verification
+      const proofMethod = {
+        method: 'FCC §73.154 antenna proof of performance',
+        required_measurements: [
+          'Base current ratio (measured vs. authorized)',
+          'Operating power (calculated from base current and resistance)',
+          isDA_ah ? 'Phase and amplitude at each tower (DA monitoring points)' : 'Non-directional field strength at 1 km',
+          'Vertical radiation pattern (spot radials at 10° increments per §73.150)'
+        ],
+        filing_form: 'FCC Form 302-AM (after CP; within 6 months of license grant)',
+        tolerance: '±5% base current; ±3° phase (if DA)'
+      };
+
+      return {
+        fcc_class,
+        frequency_khz,
+        wavelength_m:          lambda_ah,
+        quarter_wave_m:        qwave_ah,
+        five_eighths_wave_m:   fiveEightsL,
+        standard_height_fraction: standardHeightFrac,
+        standard_height_m:     standardHeightM,
+        standard_height_ft:    standardHeightFt,
+        standard_elec_deg:     standardElecDeg,
+        height_tiers:          HEIGHT_TIERS_ah,
+        n_height_tiers:        HEIGHT_TIERS_ah.length,
+        optimum_tier:          HEIGHT_TIERS_ah.find(t => t.frac_lambda === 0.625),
+        recommended_tier:      HEIGHT_TIERS_ah.find(t => t.frac_lambda === standardHeightFrac) ?? HEIGHT_TIERS_ah[2],
+        zoning_max_height_m:   ZONING_MAX_HEIGHT_M,
+        base_loading_needed:   baseLodingNeeded,
+        base_coil_uh_est:      baseCoilL_uh,
+        top_loading_note:      topLoadingNote,
+        haat_note:             haatNote,
+        proof_of_performance:  proofMethod,
+        reference: '47 CFR §73.150; §73.154; FCC AM antenna efficiency curves; Ballantine (1924); Belrose (1966) IRE',
+        note: `Recommended electrical height: ${standardElecDeg}° (${standardHeightM} m / ${standardHeightFt} ft = ${standardHeightFrac}λ) for Class ${fcc_class}. Base loading: ${baseLodingNeeded ? `needed (~${baseCoilL_uh} µH)` : 'not needed'}.`
       };
     })(),
 
