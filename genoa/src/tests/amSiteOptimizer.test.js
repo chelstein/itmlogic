@@ -6085,3 +6085,52 @@ test('iboc_hd_radio_analysis comparison table columns present', async () => {
     assert.ok('iboc_night_risk' in row,       'iboc_night_risk missing from comparison table');
   }
 });
+
+test('co_channel_interference_budget presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].co_channel_interference_budget;
+  assert.ok(d != null, 'co_channel_interference_budget must be present');
+  assert.ok(Array.isArray(d.threat_tiers), 'threat_tiers must be an array');
+  assert.strictEqual(d.n_threat_tiers, 4, 'must have 4 threat tiers (CC, FA, SA, IBOC)');
+  assert.ok(d.required_cc_spacing_km > 0, 'required co-channel spacing must be positive');
+});
+
+test('co_channel_interference_budget D/U thresholds and NIF', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].co_channel_interference_budget;
+  assert.strictEqual(d.du_daytime_min_db, 20, 'daytime co-channel D/U must be 20 dB');
+  assert.strictEqual(d.du_nighttime_min_db, 0, 'nighttime D/U must be 0 dB');
+  // KAZM is Class D on clear channel 780 kHz — NIF required
+  assert.strictEqual(d.nif_study_required, true, 'Class D on clear channel must require NIF study');
+  assert.ok(d.nif_study_type === 'FULL_CLEAR_CHANNEL_NIF', 'clear channel NIF type must be FULL_CLEAR_CHANNEL_NIF');
+});
+
+test('co_channel_interference_budget threat tiers have correct offsets', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].co_channel_interference_budget;
+  const cc  = d.threat_tiers.find(t => t.offset_khz === 0);
+  const fa  = d.threat_tiers.find(t => t.offset_khz === 10);
+  const sa  = d.threat_tiers.find(t => t.offset_khz === 20);
+  assert.ok(cc != null, 'co-channel tier (0 kHz) must exist');
+  assert.ok(fa != null, 'first-adjacent tier (10 kHz) must exist');
+  assert.ok(sa != null, 'second-adjacent tier (20 kHz) must exist');
+  assert.ok(cc.du_threshold_db > fa.du_threshold_db, 'co-channel D/U must be stricter than first-adjacent');
+});
+
+test('co_channel_interference_budget mitigation strategies non-empty', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].co_channel_interference_budget;
+  assert.ok(d.mitigation_strategies.length > 0, 'must have applicable mitigation strategies');
+  assert.ok(d.n_applicable_mitigations > 0, 'n_applicable_mitigations must be positive');
+  assert.ok(Array.isArray(d.propagation_factors), 'propagation_factors must be an array');
+  assert.ok(d.propagation_factors.length > 0, 'must have propagation factors');
+});
+
+test('co_channel_interference_budget comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('du_cc_spacing_km' in row,  'du_cc_spacing_km missing from comparison table');
+    assert.ok('du_nif_required' in row,   'du_nif_required missing from comparison table');
+    assert.ok('du_n_mitigations' in row,  'du_n_mitigations missing from comparison table');
+  }
+});

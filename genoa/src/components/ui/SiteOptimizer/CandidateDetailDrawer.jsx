@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Co-Channel Interference Budget */}
+        {candidate.co_channel_interference_budget && (() => {
+          const d = candidate.co_channel_interference_budget;
+          const tierColor = du => du >= 20 ? 'text-green-400' : du >= 6 ? 'text-amber-400' : 'text-red-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Co-Channel Interference Budget (§73.182 · §73.207)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  D/U ratio framework for co-channel AM interference at {d.frequency_khz} kHz.
+                  Required co-channel spacing: <span className="text-white font-mono">{d.required_cc_spacing_km} km</span> (Class {d.fcc_class}).
+                  NIF study: <span className={d.nif_study_required ? 'text-amber-300 font-bold' : 'text-green-300'}>{d.nif_study_required ? d.nif_study_type : 'NOT REQUIRED'}</span>.
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2 text-xs">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Daytime D/U Min</div>
+                    <div className="text-white font-mono">{d.du_daytime_min_db} dB</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Nighttime D/U Min</div>
+                    <div className="text-white font-mono">{d.du_nighttime_min_db} dB</div>
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Threat Tiers</div>
+                <div className="space-y-1 mb-2">
+                  {d.threat_tiers?.map(t => (
+                    <div key={t.tier} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="text-gray-500 w-4">{t.tier}</span>
+                      <span className="text-gray-300 flex-1">{t.label}</span>
+                      <span className={`font-mono font-bold ${tierColor(t.du_threshold_db)}`}>{t.du_threshold_db} dB</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Mitigation Strategies</div>
+                <div className="space-y-1 mb-2">
+                  {d.mitigation_strategies?.map(m => (
+                    <div key={m.id} className="text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="text-blue-300 font-semibold">{m.strategy}</span>
+                      <span className="text-gray-400 ml-2">· {m.impact_db}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500">{d.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM IBOC / HD Radio Analysis */}
         {candidate.iboc_hd_radio_analysis && (() => {
           const h = candidate.iboc_hd_radio_analysis;

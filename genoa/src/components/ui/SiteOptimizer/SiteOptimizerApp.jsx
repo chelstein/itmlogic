@@ -1717,6 +1717,39 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      co_channel_interference_budget: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5, is_clear_channel: true, is_directional: false,
+        du_daytime_min_db: 20, du_nighttime_min_db: 0,
+        required_cc_spacing_km: 402, nif_study_required: true, nif_study_type: 'FULL_CLEAR_CHANNEL_NIF',
+        du_budget_by_distance: [
+          { distance_km: 50,  protection_status: 'PROTECTED',   du_threshold_db: 20 },
+          { distance_km: 100, protection_status: 'PROTECTED',   du_threshold_db: 20 },
+          { distance_km: 200, protection_status: 'MARGINAL',    du_threshold_db: 20 },
+          { distance_km: 400, protection_status: 'UNPROTECTED', du_threshold_db: 20 }
+        ],
+        threat_tiers: [
+          { tier: 1, label: 'Co-channel (0 kHz offset)',   offset_khz: 0,  du_threshold_db: 20,  spacing_req_km: 402, rule: '§73.37 Table 1 / §73.182' },
+          { tier: 2, label: 'First Adjacent (±10 kHz)',    offset_khz: 10, du_threshold_db: 6,   spacing_req_km: null, rule: '§73.37 Table 1 (FA column)' },
+          { tier: 3, label: 'Second Adjacent (±20 kHz)',   offset_khz: 20, du_threshold_db: 0,   spacing_req_km: null, rule: '§73.37 Table 1 (SA column)' },
+          { tier: 4, label: 'IBOC Sideband (±10–15 kHz)', offset_khz: 12, du_threshold_db: -10, spacing_req_km: null, rule: '§73.404(c) / NRSC-5-D' }
+        ],
+        n_threat_tiers: 4,
+        propagation_factors: [
+          { factor: 'Daytime groundwave',   mode: 'RELIABLE', applicability: 'Primary service area',       du_assumption: 'Field at 0.5 mV/m protection contour relative to co-channel undesired' },
+          { factor: 'Nighttime skywave',    mode: 'VARIABLE', applicability: 'NIF study (FULL_CLEAR_CHANNEL_NIF)', du_assumption: '1% of nights, 50% of locations (§73.182 envelope)' },
+          { factor: 'Ionospheric scatter',  mode: 'RARE',     applicability: 'Trans-horizon anomalies',   du_assumption: 'Typically neglected in FCC AM engineering' },
+          { factor: 'Conductivity gradient',mode: 'STATIC',   applicability: 'Mixed terrain path loss',   du_assumption: 'σ = 9 mS/m at candidate; may differ along propagation paths' }
+        ],
+        mitigation_strategies: [
+          { id: 'da_nulling',     strategy: 'Directional Antenna (DA) null toward interferer', applicable: true, impact_db: '20–35 dB null depth achievable', rule: '§73.316', note: 'Most effective single mitigation; requires §73.316 directional antenna authorization.' },
+          { id: 'power_reduction',strategy: 'Nighttime power reduction',                       applicable: true, impact_db: '3–10 dB reduction in undesired signal at victim', rule: '§73.21/§73.25', note: 'Reduces interference but also reduces desired coverage.' },
+          { id: 'site_selection', strategy: 'Site relocation away from interfered-with contour',applicable: true, impact_db: 'Variable — depends on distance improvement', rule: '§73.37', note: 'Optimizer primary function: find sites with improved D/U margins.' },
+          { id: 'iboc_reduction', strategy: 'IBOC nighttime digital power reduction',          applicable: true, impact_db: '6–10 dB reduction in IBOC hash', rule: '§73.404(c)', note: 'Reduces IBOC sideband interference without affecting analog coverage.' }
+        ],
+        n_applicable_mitigations: 4,
+        reference: '47 CFR §73.182; §73.207; §73.37; §73.404(c); FCC OET Bulletin 69',
+        note: 'D/U budget framework for co-channel interference assessment at 780 kHz. Required co-channel spacing: 402 km for Class D. NIF study: FULL_CLEAR_CHANNEL_NIF.'
+      },
       iboc_hd_radio_analysis: {
         applicable: true, fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         is_clear_channel: true, hybrid_mode_available: true, all_digital_available: false,
