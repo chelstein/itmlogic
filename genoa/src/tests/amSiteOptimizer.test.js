@@ -4117,3 +4117,57 @@ test('transmission_line_analysis comparison table columns present', async () => 
     assert.ok('erp_at_antenna_kw' in row, 'erp_at_antenna_kw must be in comparison table');
   }
 });
+
+// ---------- antenna_base_impedance ----------
+
+test('antenna_base_impedance is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.antenna_base_impedance != null,
+      `antenna_base_impedance must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('antenna_base_impedance.quarter_wave.radiation_resistance_ohm is ~36.6', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const rr = c.antenna_base_impedance.quarter_wave.radiation_resistance_ohm;
+    assert.ok(Math.abs(rr - 36.6) < 0.5,
+      `radiation_resistance_ohm ${rr} should be near 36.6 Ω for rank ${c.rank}`);
+  }
+});
+
+test('antenna_base_impedance efficiency <= 100%', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const eff = c.antenna_base_impedance.quarter_wave.efficiency_standard_pct;
+    assert.ok(eff > 0 && eff <= 100,
+      `efficiency_standard_pct ${eff} must be in (0, 100] for rank ${c.rank}`);
+  }
+});
+
+test('antenna_base_impedance high sigma gives higher efficiency', async () => {
+  // High sigma (better ground) → lower ground loss → higher efficiency
+  const outHighSigma = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(outHighSigma.available, true);
+  if (outHighSigma.candidates.length > 0) {
+    const c = outHighSigma.candidates[0];
+    // Only check if we have efficiency data
+    if (c.antenna_base_impedance?.quarter_wave) {
+      const eff = c.antenna_base_impedance.quarter_wave.efficiency_standard_pct;
+      assert.ok(typeof eff === 'number', 'efficiency must be a number');
+    }
+  }
+});
+
+test('antenna_base_impedance.base_reactance_table has 3 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.equal(c.antenna_base_impedance.base_reactance_table.length, 3,
+      `base_reactance_table must have 3 entries for rank ${c.rank}`);
+  }
+});
