@@ -868,6 +868,13 @@ export async function runSiteOptimizer(body = {}){
       fcc_class, frequency_khz, channel_class: chanClass
     }),
     minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
+    regulatory_timeline_estimate: buildRegulatoryTimeline({
+      fcc_class, channel_class: chanClass, skywave_risk_level,
+      asr_required: quarter_wave_m > ASR_THRESHOLD_M,
+      has_treaty_candidates: returned.some(c => !!c.treaty_zone),
+      any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
+      n_promising: candidate_count_by_status.PROMISING ?? 0
+    }),
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -3061,6 +3068,105 @@ function buildMinimumSpacingReference({ fcc_class, channel_class }){
     co_channel,
     adjacent_10khz,
     adjacent_20khz
+  };
+}
+
+// Regulatory timeline estimate — phase-by-phase timeline for a full AM relocation.
+// Weeks are realistic ranges based on FCC processing times (2022-2025 data) and
+// typical consulting/construction durations.  Not a legal guarantee.
+function buildRegulatoryTimeline({ fcc_class, channel_class, skywave_risk_level,
+  asr_required, has_treaty_candidates, any_poor_sigma, n_promising }){
+
+  const isClear = channel_class === 'clear_channel';
+  const isLocal = channel_class === 'local';
+  const highNif  = isClear || skywave_risk_level === 'HIGH';
+
+  const phases = [
+    {
+      id:    'SITE_SELECTION',
+      label: 'Site selection & parcel diligence',
+      weeks: '4–12',
+      description: 'Finalize candidate shortlist, negotiate lease options, zoning pre-check, environmental screening.',
+      blocking: true
+    },
+    {
+      id:    'ENGINEERING_DESIGN',
+      label: 'Engineering design',
+      weeks: any_poor_sigma ? '12–24' : '8–16',
+      description: `Soil resistivity surveys, antenna system design (§73.316/§73.45), ${any_poor_sigma ? 'extended ground system engineering (poor σ), ' : ''}RF exposure study (OET-65 §1.1307).`,
+      blocking: true
+    },
+    {
+      id:    'ASR_FAA',
+      label: 'ASR registration + FAA aeronautical study',
+      weeks: asr_required ? '6–16' : '0–2',
+      description: asr_required
+        ? 'File FCC Form 854; trigger FAA aeronautical study. FAA processing averages 10–14 weeks for complex sites.'
+        : 'Tower height below §17.7 threshold — minimal ASR requirement.',
+      blocking: asr_required
+    },
+    {
+      id:    'NIF_STUDY',
+      label: `§73.182 NIF protection study`,
+      weeks: highNif ? '8–20' : isLocal ? '0–2' : '4–10',
+      description: highNif
+        ? `Clear-channel NIF study — complex skywave modeling required. Budget 8–20 weeks for consultant.`
+        : isLocal
+        ? 'Local channel — §73.182 NIF not required.'
+        : `Regional channel NIF study — moderate complexity. Budget 4–10 weeks.`,
+      blocking: !isLocal
+    },
+    {
+      id:    'TREATY_COORD',
+      label: 'International treaty coordination (if applicable)',
+      weeks: has_treaty_candidates ? '12–52' : '0',
+      description: has_treaty_candidates
+        ? 'FCC International Bureau coordination required for treaty-zone candidates. Timing highly variable — plan 3–12 months.'
+        : 'No treaty-zone candidates in this search; skip if final site is confirmed outside treaty zone.',
+      blocking: has_treaty_candidates
+    },
+    {
+      id:    'FCC_FILING',
+      label: 'FCC Form 301-AM filing preparation',
+      weeks: '4–8',
+      description: 'Assemble all exhibits, certifications, engineering studies. File FCC Form 301-AM (major modification).',
+      blocking: true
+    },
+    {
+      id:    'FCC_PROCESSING',
+      label: 'FCC processing — major modification',
+      weeks: '12–26',
+      description: `FCC Media Bureau processing for AM major modification (§73.3573). Current average processing time 3–6 months. Clear-channel or contested applications may take longer.`,
+      blocking: true
+    },
+    {
+      id:    'CONSTRUCTION',
+      label: 'Tower construction',
+      weeks: '16–40',
+      description: 'Tower erection, ground system installation, transmitter installation, proof of performance (§73.62).',
+      blocking: true
+    }
+  ];
+
+  const activePhasesWeeks = phases
+    .filter(p => p.blocking)
+    .map(p => p.weeks.split('–').map(Number));
+
+  const totalMin = activePhasesWeeks.reduce((a, r) => a + (r[0] || 0), 0);
+  const totalMax = activePhasesWeeks.reduce((a, r) => a + (r[r.length - 1] || 0), 0);
+
+  const totalMonthsMin = Math.round(totalMin / 4.3);
+  const totalMonthsMax = Math.round(totalMax / 4.3);
+
+  return {
+    fcc_class,
+    channel_class,
+    asr_required,
+    total_estimated_weeks_min: totalMin,
+    total_estimated_weeks_max: totalMax,
+    total_estimated_months_range: `${totalMonthsMin}–${totalMonthsMax} months`,
+    phases,
+    disclaimer: 'Timeline is a screening-grade estimate based on typical FCC processing and construction durations (2022–2025). Actual timelines depend on FCC workload, site complexity, environmental review, treaty coordination, and construction contractor availability.'
   };
 }
 

@@ -3789,3 +3789,48 @@ test('candidate_comparison_table has all session-added columns', async () => {
     }
   }
 });
+
+// ---------- regulatory_timeline_estimate ----------
+
+test('regulatory_timeline_estimate is present on response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  assert.ok(out.regulatory_timeline_estimate != null,
+    'regulatory_timeline_estimate must be present');
+});
+
+test('regulatory_timeline_estimate.phases is a non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  const rte = out.regulatory_timeline_estimate;
+  assert.ok(Array.isArray(rte.phases) && rte.phases.length > 0,
+    'phases must be a non-empty array');
+});
+
+test('regulatory_timeline_estimate.total_estimated_weeks_min <= total_estimated_weeks_max', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  const rte = out.regulatory_timeline_estimate;
+  assert.ok(rte.total_estimated_weeks_min <= rte.total_estimated_weeks_max,
+    'weeks_min must be <= weeks_max');
+  assert.ok(rte.total_estimated_weeks_min > 0, 'total weeks must be > 0');
+});
+
+test('regulatory_timeline_estimate.total_estimated_months_range is a string with "-"', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  const range = out.regulatory_timeline_estimate.total_estimated_months_range;
+  assert.ok(typeof range === 'string' && range.includes('–'),
+    `months_range "${range}" must contain "–"`);
+});
+
+test('regulatory_timeline_estimate phases each have id, label, weeks, blocking', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  for (const p of out.regulatory_timeline_estimate.phases) {
+    assert.ok(p.id, `phase must have id`);
+    assert.ok(p.label, `phase must have label`);
+    assert.ok(p.weeks, `phase must have weeks`);
+    assert.ok(typeof p.blocking === 'boolean', `phase.blocking must be boolean`);
+  }
+});
