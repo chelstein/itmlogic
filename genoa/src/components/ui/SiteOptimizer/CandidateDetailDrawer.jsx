@@ -2226,6 +2226,82 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Facility Design Guide */}
+        {candidate.transmitter_facility_design_guide && (() => {
+          const f = candidate.transmitter_facility_design_guide;
+          const fuelColor = s => s === 'AST_SECONDARY_CONTAINMENT' ? 'text-amber-400' : 'text-blue-300';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.49 Transmitter Facility Design Guide</div>
+              {/* Electrical service metrics */}
+              <div className="grid grid-cols-4 gap-1 mb-2">
+                {[
+                  { label: 'TX efficiency', value: `${f.transmitter_efficiency_pct}%` },
+                  { label: 'AC draw',        value: `${f.ac_power_draw_kw} kW` },
+                  { label: 'Service size',   value: `${f.recommended_service_size_a}A` },
+                  { label: 'HVAC req.',      value: `${f.hvac_required_tons} tons` }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Fencing */}
+              <div className="font-mono text-[9px] text-textDim mb-1">§73.49 Fencing Requirement</div>
+              <div className="bg-surface rounded p-2 border border-rule mb-2">
+                <div className="flex gap-2 items-center mb-1">
+                  <span className={`font-mono text-[8px] font-bold ${f.fencing.required ? 'text-amber-400' : 'text-emerald-400'}`}>
+                    {f.fencing.required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </span>
+                  {f.fencing.minimum_height_ft && (
+                    <span className="font-mono text-[8px] text-textDim">Min {f.fencing.minimum_height_ft} ft · {f.fencing.material}</span>
+                  )}
+                </div>
+                {f.fencing.warning_signs && (
+                  <div className="font-mono text-[8px] text-textDim">Signs: {f.fencing.warning_signs}</div>
+                )}
+              </div>
+              {/* Standby generator */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Standby Generator</div>
+              <div className="grid grid-cols-2 gap-1 mb-2">
+                {[
+                  { label: 'Rating',         value: `${f.standby_generator?.rating_kw} kW` },
+                  { label: 'Fuel',           value: f.standby_generator?.fuel_type?.toUpperCase() ?? '—' },
+                  { label: 'Tank (gal)',      value: `${f.standby_generator?.fuel_tank_gallons}` },
+                  { label: '72-hr runtime',  value: `${f.standby_generator?.runtime_hours_72hr_load} hr` }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {f.standby_generator?.fuel_storage_requirement && (
+                <div className={`font-mono text-[8px] mb-1 ${fuelColor(f.standby_generator.fuel_storage_requirement)}`}>
+                  Fuel storage: {f.standby_generator.fuel_storage_requirement.replace(/_/g, ' ')}
+                </div>
+              )}
+              {/* Building specs */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Transmitter Building</div>
+              <div className="grid grid-cols-2 gap-1 mb-2">
+                {[
+                  { label: 'Type',       value: f.building_specs?.type?.replace(/_/g, ' ') ?? '—' },
+                  { label: 'Min area',   value: `${f.building_specs?.min_floor_area_sf ?? '—'} sf` },
+                  { label: 'Elec panel', value: f.building_specs?.electrical_panel ?? '—' },
+                  { label: 'Cost est.',  value: f.construction_cost_estimate_usd ? `$${f.construction_cost_estimate_usd.low?.toLocaleString()}–$${f.construction_cost_estimate_usd.high?.toLocaleString()}` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 border border-rule">
+                    <div className="font-mono text-[8px] text-textDim">{m.label}</div>
+                    <div className="font-mono text-[8px] text-textBright font-bold leading-tight">{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{f.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Soil Conductivity Improvement Guide */}
         {candidate.soil_conductivity_improvement_guide && (() => {
           const sc = candidate.soil_conductivity_improvement_guide;

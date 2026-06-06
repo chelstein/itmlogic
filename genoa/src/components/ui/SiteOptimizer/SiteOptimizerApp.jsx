@@ -1385,6 +1385,17 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.1560; §73.1350; §73.61; Part 11; §1.1307; §73.3539; §73.99',
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
+      transmitter_facility_design_guide: {
+        tpo_kw: 5, transmitter_efficiency_pct: 28, ac_power_draw_kw: 17.86, total_facility_load_kw: 22.86,
+        service_amps_240v: 95, recommended_service_size_a: 100,
+        heat_dissipated_kw: 12.86, heat_dissipated_btu_hr: 43882, hvac_required_tons: 3.66,
+        fencing: { required: true, rule: '47 CFR §73.49', minimum_height_ft: 8, material: 'Chain-link or equivalent — must prevent unauthorized access', warning_signs: 'High voltage warning signs at each entrance and at intervals not exceeding 100 feet', lock_required: 'Deadbolt or padlock; key held by licensed operator', access_gate_count: 1, estimated_perimeter_ft: 80, note: '§73.49: locked enclosure required for all AM transmitting systems > 250 W.' },
+        standby_generator: { recommended: true, rating_kw: 28.58, fuel_type: 'diesel', fuel_tank_gallons: 1029, runtime_hours_72hr_load: 72, fuel_storage_requirement: 'AST_SECONDARY_CONTAINMENT', note: 'Not FCC-mandated but required for EAS §11.35 compliance continuity during utility outages.' },
+        building_specs: { type: 'CONCRETE_BLOCK_OR_PREFAB', min_floor_area_sf: 120, min_ceiling_height_ft: 10, hvac_required: true, hvac_tons: 3.66, electrical_panel: '100A main breaker panel', grounding: 'Single-point ground bus to tower base per IEEE 1100', rf_shielding: 'STANDARD', exterior_finish: 'Non-combustible; meet local building code fire rating', security: '§73.49 lock + exterior motion-activated lighting recommended' },
+        construction_cost_estimate_usd: { low: 83580, high: 177160 },
+        reference: '47 CFR §73.49; §11.35; NEC Article 250; IEEE 1100; NFPA 110',
+        note: 'Facility design guide is a screening-grade estimate. Actual requirements depend on transmitter model efficiency and local utility voltage.'
+      },
       soil_conductivity_improvement_guide: {
         sigma_msm_current: 2, soil_class_current: 'FAIR', soil_resistivity_ohm_m: 500,
         improvement_needed: true, sigma_target_msm: 8,

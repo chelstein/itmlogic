@@ -828,7 +828,10 @@ export async function runSiteOptimizer(body = {}){
     class_upg_to_class:     c.license_class_upgrade_analysis?.upgrade_paths?.[0]?.to_class ?? null,
     soil_class:             c.soil_conductivity_improvement_guide?.soil_class_current ?? null,
     soil_improv_needed:     c.soil_conductivity_improvement_guide?.improvement_needed ?? null,
-    soil_reach_gain_km:     c.soil_conductivity_improvement_guide?.reach_gain_km ?? null
+    soil_reach_gain_km:     c.soil_conductivity_improvement_guide?.reach_gain_km ?? null,
+    fac_service_a:          c.transmitter_facility_design_guide?.recommended_service_size_a ?? null,
+    fac_hvac_tons:          c.transmitter_facility_design_guide?.hvac_required_tons ?? null,
+    fac_fence_required:     c.transmitter_facility_design_guide?.fencing?.required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7359,6 +7362,111 @@ async function scoreCandidate(pt, ctx, warnings){
         note: improvementNeeded
           ? `Current soil conductivity (${sigma_msm} mS/m, ${soilClass_sc}) is below the preferred minimum (${SIGMA_PREFERRED_MIN_MSM} mS/m). Implementing soil amendment techniques could extend daytime reach by up to ${reach_gain_km ?? '?'} km. Conduct Wenner survey before and after amendments to document improvement for §73.190 filing credit.`
           : `Current soil conductivity (${sigma_msm} mS/m, ${soilClass_sc}) meets the preferred minimum (${SIGMA_PREFERRED_MIN_MSM} mS/m). Soil amendments have limited additional benefit at this site. Standard 120-radial ground system is recommended.`
+      };
+    })(),
+
+    // Transmitter facility design guide.
+    // Covers the physical infrastructure required for the transmitter building/shelter:
+    // §73.49 fenced transmitter area, electrical service sizing, HVAC/cooling,
+    // standby generator fuel storage, and NEC/UL compliance requirements.
+    // Distinct from transmission_system_design_guide (which covers the RF chain:
+    // feedline, ATU, base impedance) — this block is about the BUILDING.
+    transmitter_facility_design_guide: (() => {
+      // Electrical service sizing.
+      // AM transmitter power consumption ≈ 3–4× TPO (typical 25–30% efficiency at full load).
+      // At 5 kW TPO: ~15–20 kW draw. Plus HVAC, lighting, battery charger: ~+5 kW.
+      // Total load estimate: tpo_kw × 4 + 5 kW headroom.
+      const txEfficiency = 0.28;   // typical AM class C transmitter efficiency (28%)
+      const acPowerDraw_kw   = round2(tpo_kw / txEfficiency);
+      const facilityLoad_kw  = round2(acPowerDraw_kw + 5);   // + HVAC/misc
+      const serviceAmps_240v = round2((facilityLoad_kw * 1000) / 240);
+      const serviceAmps_208v = round2((facilityLoad_kw * 1000) / (208 * 1.732));  // 3-phase
+
+      const recommendedServiceSize_a = serviceAmps_240v <= 100 ? 100
+        : serviceAmps_240v <= 200 ? 200
+        : serviceAmps_240v <= 400 ? 400
+        : 600;
+
+      // Transmitter cooling requirement (BTU/hr).
+      // Heat dissipated ≈ (1 - efficiency) × AC power draw × 3412 BTU/kWh.
+      const heatDissipated_kw    = round2(acPowerDraw_kw * (1 - txEfficiency));
+      const heatDissipated_btu   = round2(heatDissipated_kw * 3412);
+      const hvacTons             = round2(heatDissipated_btu / 12000);  // 12,000 BTU/ton
+
+      // §73.49 fencing requirements.
+      // All AM transmitting systems in excess of 250 W must be enclosed in a locked fence.
+      // The fence must be locked at all times and must bear warning signs.
+      const fencingRequired = tpo_kw > 0.25;
+      const fenceSpecs = fencingRequired ? {
+        required: true,
+        rule: '47 CFR §73.49',
+        minimum_height_ft: 8,
+        material: 'Chain-link or equivalent — must prevent unauthorized access',
+        warning_signs: 'High voltage warning signs at each entrance and at intervals not to exceed 100 feet',
+        lock_required: 'Deadbolt or padlock; key held by licensed operator',
+        access_gate_count: Math.max(1, Math.ceil(tpo_kw / 25)),  // more gates for higher power
+        estimated_perimeter_ft: round2(Math.sqrt(300 * tpo_kw / 5) * 4),  // rough scaling
+        note: '§73.49: locked enclosure required for all AM transmitting systems > 250 W. Ground system radials must be within the fenced area or covered by a grounding mat accessible only to authorized personnel.'
+      } : {
+        required: false,
+        rule: '47 CFR §73.49',
+        note: 'Fencing not required for stations at or below 250 W.'
+      };
+
+      // Standby generator requirements.
+      // Not FCC-mandated but strongly recommended for broadcast continuity.
+      // EAS (§11.35) obligations are interrupted during power outages.
+      const genRating_kw   = round2(facilityLoad_kw * 1.25);  // 25% headroom
+      const fuelType       = 'diesel';   // Most common for broadcast standby
+      const fuelTank_gal   = round2(genRating_kw * 0.5 * 24 * 3);  // 72-hr run at 0.5 gal/kW/hr
+      const fuelStorageReq = fuelTank_gal > 660 ? 'AST_SECONDARY_CONTAINMENT' : 'STANDARD_ABOVEGROUND';
+
+      // Transmitter building specifications
+      const buildingType = facilityLoad_kw <= 10 ? 'PREFAB_METAL_SHED'
+        : facilityLoad_kw <= 25 ? 'CONCRETE_BLOCK_OR_PREFAB'
+        : 'REINFORCED_CONCRETE';
+
+      const buildingSpecs = {
+        type: buildingType,
+        min_floor_area_sf: round2(Math.max(120, tpo_kw * 8)),
+        min_ceiling_height_ft: 10,
+        hvac_required: true,
+        hvac_tons: hvacTons,
+        electrical_panel: `${recommendedServiceSize_a}A main breaker panel`,
+        grounding: 'Single-point ground bus to tower base per IEEE 1100',
+        rf_shielding: tpo_kw >= 10 ? 'RF_SHIELDING_REQUIRED' : 'STANDARD',
+        exterior_finish: 'Non-combustible; meet local building code fire rating',
+        security: '§73.49 lock + exterior motion-activated lighting recommended'
+      };
+
+      // Estimated construction cost
+      const buildCostLow  = round2(facilityLoad_kw * 3000 + 15000);
+      const buildCostHigh = round2(facilityLoad_kw * 6000 + 40000);
+
+      return {
+        tpo_kw,
+        transmitter_efficiency_pct: round2(txEfficiency * 100),
+        ac_power_draw_kw: acPowerDraw_kw,
+        total_facility_load_kw: facilityLoad_kw,
+        service_amps_240v: serviceAmps_240v,
+        recommended_service_size_a: recommendedServiceSize_a,
+        heat_dissipated_kw: heatDissipated_kw,
+        heat_dissipated_btu_hr: heatDissipated_btu,
+        hvac_required_tons: hvacTons,
+        fencing: fenceSpecs,
+        standby_generator: {
+          recommended: true,
+          rating_kw: genRating_kw,
+          fuel_type: fuelType,
+          fuel_tank_gallons: fuelTank_gal,
+          runtime_hours_72hr_load: 72,
+          fuel_storage_requirement: fuelStorageReq,
+          note: 'Not FCC-mandated but required for EAS §11.35 compliance continuity during utility outages.'
+        },
+        building_specs: buildingSpecs,
+        construction_cost_estimate_usd: { low: buildCostLow, high: buildCostHigh },
+        reference: '47 CFR §73.49 (transmitter enclosure); §11.35 (EAS); NEC Article 250 (grounding); IEEE 1100 (single-point ground); NFPA 110 (emergency power)',
+        note: 'Facility design guide is a screening-grade estimate. Actual electrical service requirements depend on the specific transmitter model efficiency, local utility voltage, and HVAC heat load. Hire a licensed electrical contractor and broadcast facility designer for detailed plans.'
       };
     })(),
 

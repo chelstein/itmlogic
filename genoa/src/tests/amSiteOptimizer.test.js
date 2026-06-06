@@ -5948,3 +5948,46 @@ test('soil_conductivity_improvement_guide comparison table columns present', asy
     assert.ok('soil_reach_gain_km' in row, 'soil_reach_gain_km missing from comparison table');
   }
 });
+
+// ---- transmitter_facility_design_guide ----
+
+test('transmitter_facility_design_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.transmitter_facility_design_guide != null, `rank ${c.rank} missing transmitter_facility_design_guide`);
+  }
+});
+
+test('transmitter_facility_design_guide has correct power calculations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const f = out.candidates[0].transmitter_facility_design_guide;
+  assert.ok(f.ac_power_draw_kw > KAZM.tpo_kw, 'ac draw must exceed TPO (transmitter efficiency < 100%)');
+  assert.ok(f.total_facility_load_kw > f.ac_power_draw_kw, 'facility load must exceed tx draw (HVAC + misc)');
+  assert.ok(f.recommended_service_size_a >= 100, 'service size must be at least 100A');
+  assert.ok(f.hvac_required_tons > 0, 'HVAC must be required');
+});
+
+test('transmitter_facility_design_guide §73.49 fencing required when TPO > 250W', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const f = out.candidates[0].transmitter_facility_design_guide;
+  assert.strictEqual(f.fencing.required, true, '5 kW station must require §73.49 fencing');
+  assert.ok(f.fencing.minimum_height_ft >= 8, 'fence must be at least 8 ft');
+  assert.ok(typeof f.fencing.warning_signs === 'string', 'warning signs spec must be present');
+});
+
+test('transmitter_facility_design_guide standby generator has correct fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const f = out.candidates[0].transmitter_facility_design_guide;
+  assert.ok(f.standby_generator.rating_kw > 0, 'generator rating must be positive');
+  assert.ok(f.standby_generator.fuel_tank_gallons > 0, 'fuel tank must have volume');
+  assert.ok(f.standby_generator.runtime_hours_72hr_load === 72, 'must specify 72hr runtime');
+});
+
+test('transmitter_facility_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fac_service_a' in row, 'fac_service_a missing from comparison table');
+    assert.ok('fac_hvac_tons' in row, 'fac_hvac_tons missing from comparison table');
+    assert.ok('fac_fence_required' in row, 'fac_fence_required missing from comparison table');
+  }
+});
