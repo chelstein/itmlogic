@@ -1325,6 +1325,34 @@ test('colocation GRID candidates have license_renewal_compliance_guide', async (
   }
 });
 
+test('colocation GRID candidates have broadcast_attorney_and_consulting_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.broadcast_attorney_and_consulting_guide != null, `rank ${c.rank} missing broadcast_attorney_and_consulting_guide`);
+    assert.ok(c.broadcast_attorney_and_consulting_guide.combined_total_usd.typical > 0, `rank ${c.rank} combined professional fees must be positive`);
+  }
+});
+
+test('colocation GRID candidates have zoning_and_land_use_compliance_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.zoning_and_land_use_compliance_guide != null, `rank ${c.rank} missing zoning_and_land_use_compliance_guide`);
+    assert.strictEqual(c.zoning_and_land_use_compliance_guide.tca_preemption_applies, false, `rank ${c.rank} TCA §332 must not apply to AM towers`);
+  }
+});
+
 test('colocation GRID candidates have faa_obstruction_marking_guide', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },

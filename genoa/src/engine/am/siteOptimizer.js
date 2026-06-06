@@ -1035,7 +1035,13 @@ export async function runSiteOptimizer(body = {}){
     atug_cost_typ_usd:          c.antenna_tuning_unit_commissioning_guide?.total_atu_cost_usd?.typical ?? null,
     fomg_tower_height_ft:       c.faa_obstruction_marking_guide?.tower_height_ft ?? null,
     fomg_lighting_tier:         c.faa_obstruction_marking_guide?.faa_lighting_tier ?? null,
-    fomg_marking_cost_usd:      c.faa_obstruction_marking_guide?.total_marking_cost_usd ?? null
+    fomg_marking_cost_usd:      c.faa_obstruction_marking_guide?.total_marking_cost_usd ?? null,
+    zulcg_setback_m:            c.zoning_and_land_use_compliance_guide?.setback_m_required ?? null,
+    zulcg_n_env_triggers:       c.zoning_and_land_use_compliance_guide?.n_environmental_triggers ?? null,
+    zulcg_permit_weeks_rural:   c.zoning_and_land_use_compliance_guide?.permit_weeks_high_rural ?? null,
+    bacg_attorney_total_usd:    c.broadcast_attorney_and_consulting_guide?.attorney_total_typ_usd ?? null,
+    bacg_engineering_total_usd: c.broadcast_attorney_and_consulting_guide?.engineering_total_typ_usd ?? null,
+    bacg_combined_typ_usd:      c.broadcast_attorney_and_consulting_guide?.combined_total_usd?.typical ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6770,6 +6776,193 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    broadcast_attorney_and_consulting_guide: (() => {
+      // AM transmitter relocation requires both FCC communications attorneys and broadcast
+      // engineers. This guide estimates professional fees for a complete relocation project.
+      //
+      // FCC Communications Attorney:
+      //   Role: Prepare and file FCC Form 301-AM (CP application); respond to FCC staff
+      //   comments; handle FCC processing; coordinate NHPA §106 and NEPA requirements;
+      //   file Form 302-AM (license to cover); handle STA requests if needed.
+      //
+      //   Fee structure (2024 US market for small/mid-market AM stations):
+      //   - CP application (Form 301-AM): $8,000–$15,000 flat fee
+      //   - Technical amendment if needed: $2,000–$5,000
+      //   - License to cover (Form 302-AM): $3,000–$6,000
+      //   - STA requests: $1,500–$3,000 each
+      //   - Environmental/NHPA coordination: $3,000–$8,000
+      //   - Ongoing FCC watch/compliance during construction: $2,000–$5,000/yr
+      //
+      // Broadcast Engineer/Consulting Firm:
+      //   Role: Site selection analysis; propagation modeling; interference analysis;
+      //   Form 301-AM technical exhibits; proof-of-performance measurements; ATU design.
+      //
+      //   Fee structure:
+      //   - Site search and selection analysis: $3,000–$8,000
+      //   - Form 301-AM technical exhibits: $5,000–$12,000
+      //   - NDA proof of performance: $8,000–$15,000 (field work + report)
+      //   - DA proof of performance: $15,000–$35,000 (more complex)
+      //   - ATU design and commissioning supervision: $3,000–$8,000
+      //   - Interference analysis exhibits: $3,000–$8,000
+      //   - On-site construction supervision: $1,500–$3,000/day
+
+      const isDA_bac = /^DA/i.test(pattern_mode);
+
+      // Attorney fee estimates
+      const attorney_cp_application   = 11500;  // typical mid-range
+      const attorney_license_to_cover = 4500;
+      const attorney_environmental    = 5000;
+      const attorney_ongoing          = 3000;
+      const attorney_total_typ        = attorney_cp_application + attorney_license_to_cover + attorney_environmental + attorney_ongoing;
+
+      // Engineering fee estimates (DA costs more due to proof complexity)
+      const eng_site_selection        = 5500;
+      const eng_technical_exhibits    = 8500;
+      const eng_proof_typ             = isDA_bac ? 25000 : 11500;
+      const eng_atu_commissioning     = 5500;
+      const eng_interference_analysis = 5500;
+      const eng_total_typ             = eng_site_selection + eng_technical_exhibits + eng_proof_typ + eng_atu_commissioning + eng_interference_analysis;
+
+      const combined_total_typ        = attorney_total_typ + eng_total_typ;
+      const combined_total_low        = Math.round(combined_total_typ * 0.65);
+      const combined_total_high       = Math.round(combined_total_typ * 1.55);
+
+      const PROFESSIONAL_SERVICES = [
+        // Attorney services
+        { type: 'ATTORNEY', id: 'CP_APPLICATION', label: 'FCC Form 301-AM (CP application)', typical_cost_usd: attorney_cp_application, required: true, notes: 'Engineering exhibits prepared by consulting engineer; attorney handles filing, FCC correspondence, processing' },
+        { type: 'ATTORNEY', id: 'LICENSE_TO_COVER', label: 'FCC Form 302-AM (license to cover)', typical_cost_usd: attorney_license_to_cover, required: true, notes: 'Filed after proof-of-performance is complete; includes proof report as exhibit' },
+        { type: 'ATTORNEY', id: 'ENV_NHPA', label: 'Environmental/NHPA §106 coordination', typical_cost_usd: attorney_environmental, required: true, notes: 'TCNS tribal consultation; EA or CATX if environmental factors present; FCC review coordination' },
+        { type: 'ATTORNEY', id: 'ONGOING', label: 'Ongoing FCC watch and compliance (1yr)', typical_cost_usd: attorney_ongoing, required: false, notes: 'Monitor FCC processing; respond to petitions to deny; handle any FCC staff inquiries during construction' },
+        // Engineering services
+        { type: 'ENGINEER', id: 'SITE_SELECTION', label: 'Site search and selection analysis', typical_cost_usd: eng_site_selection, required: true, notes: 'Coverage modeling, interference analysis, FCC spacing table check; produces ranked candidate site list' },
+        { type: 'ENGINEER', id: 'TECH_EXHIBITS', label: 'Form 301-AM technical exhibits preparation', typical_cost_usd: eng_technical_exhibits, required: true, notes: `Coverage contour maps, ${isDA_bac ? 'DA pattern calculations and 72-radial FI pattern' : 'NDA contour calculations'}, interference analysis, RF exposure study` },
+        { type: 'ENGINEER', id: 'PROOF', label: `Proof-of-performance (${isDA_bac ? 'DA 72-radial FI' : 'NDA inverse-distance'})`, typical_cost_usd: eng_proof_typ, required: true, notes: `Field measurements, data reduction, and report for FCC Form 302-AM; ${isDA_bac ? 'DA proof is ~2× cost of NDA due to 72-radial traversal requirement (§73.154(a))' : 'NDA proof: 8-radial inverse-distance measurement (§73.154(b))'}` },
+        { type: 'ENGINEER', id: 'ATU_COMMISSIONING', label: 'ATU design and commissioning', typical_cost_usd: eng_atu_commissioning, required: true, notes: 'Base impedance measurement; ATU design; commissioning supervision at site during tower erection and tuning' },
+        { type: 'ENGINEER', id: 'INTERFERENCE', label: 'Interference analysis (short-spacing)', typical_cost_usd: eng_interference_analysis, required: false, notes: 'Required only if short-spaced to another station; co-channel and adjacent-channel D/U analysis per §73.182/§73.207' }
+      ];
+
+      const n_required_services = PROFESSIONAL_SERVICES.filter(s => s.required).length;
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                        isDA_bac,
+        attorney_cp_application_usd:  attorney_cp_application,
+        attorney_license_to_cover_usd: attorney_license_to_cover,
+        attorney_environmental_usd:   attorney_environmental,
+        attorney_total_typ_usd:       attorney_total_typ,
+        engineering_site_selection_usd: eng_site_selection,
+        engineering_technical_exhibits_usd: eng_technical_exhibits,
+        engineering_proof_usd:        eng_proof_typ,
+        engineering_atu_usd:          eng_atu_commissioning,
+        engineering_total_typ_usd:    eng_total_typ,
+        combined_total_usd:           { low: combined_total_low, typical: combined_total_typ, high: combined_total_high },
+        n_professional_services:      PROFESSIONAL_SERVICES.length,
+        n_required_services,
+        professional_services:        PROFESSIONAL_SERVICES,
+        reference: 'FCC Form 301-AM instructions; 47 CFR §73.3533; §73.3534; §73.154; §73.190; Communications Law Center (FCC attorney fee surveys); BIA Advisory Services (broadcast engineering fee surveys)',
+        note: `${isDA_bac ? 'DA' : 'NDA'} ${frequency_khz} kHz relocation. Attorney fees: ~$${attorney_total_typ.toLocaleString()} total. Engineering fees: ~$${eng_total_typ.toLocaleString()} total. Combined professional services: $${combined_total_low.toLocaleString()}–$${combined_total_high.toLocaleString()} (typ. $${combined_total_typ.toLocaleString()}). ${n_required_services} required services.`
+      };
+    })(),
+
+    zoning_and_land_use_compliance_guide: (() => {
+      // AM transmitter relocation requires local zoning and land use approval in addition
+      // to FCC licensing. Broadcast towers are regulated at both the federal (FCC/FAA) and
+      // local (municipal/county) levels. The Telecommunications Act of 1996 §332(c)(7)
+      // limits local government authority over wireless facilities but does NOT preempt
+      // local zoning for broadcast towers (AM/FM/TV towers are NOT wireless facilities
+      // under TCA §332 — that provision applies to personal wireless service facilities).
+      //
+      // Key federal preemptions that DO apply:
+      //   - FCC §25.104(a): state/local governments may not prohibit federally authorized
+      //     broadcast tower construction (but this is narrow; aesthetics, setbacks are local)
+      //   - NEPA: FCC requires environmental review for towers in certain conditions
+      //     (FCC §1.1307: towers that may affect national register properties, wilderness areas,
+      //     floodplains, or threaten endangered species require environmental assessment)
+      //   - NHPA Section 106: programmatic agreement between FCC and ACHP for tower review
+      //     (FCC-ACHP-NCSHPO PA governs historic property review for new tower construction)
+      //   - ESA Section 7: FCC consults with USFWS for towers that may affect listed species
+      //
+      // Common local zoning requirements for AM towers:
+      //   1. Use permit / conditional use permit (CUP): most jurisdictions require CUP for
+      //      towers > 60–100ft in most zones; towers in agricultural zones often allowed by right
+      //   2. Setback requirements: many jurisdictions require setback = tower height (1:1 fall zone)
+      //      or 50–100% of tower height from property lines and occupied structures
+      //   3. Height limits: local zoning height limits may not accommodate AM tower height (λ/4)
+      //      → variance or special exception required
+      //   4. Environmental review: CEQA (California), SEPA (Washington), or local EIR
+      //   5. Neighbor notification: typically 300–500ft radius for public hearing notice
+      //
+      // Best site selection criteria for zoning compliance:
+      //   - Agricultural (A) or industrial (M) zoning allows towers with minimal permits
+      //   - Rural areas outside municipal jurisdiction have simpler county permit processes
+      //   - Sites with existing tower infrastructure (colocation) reduce zoning burden
+      //   - Avoid residential zones: most stringent and most likely to generate opposition
+
+      const wavelength_m     = 300000 / frequency_khz;
+      const tower_height_m   = Math.round(wavelength_m * 0.25);
+      const tower_height_ft  = Math.round(tower_height_m * 3.281);
+
+      // Typical zoning permit timeline for AM tower in rural/agricultural zone
+      const permit_weeks_low_rural  = 8;
+      const permit_weeks_high_rural = 24;
+      // Suburban/residential zoning (variance required)
+      const permit_weeks_low_res    = 16;
+      const permit_weeks_high_res   = 52;
+
+      // Typical setback requirement (most common: 1:1 fall zone)
+      const setback_m_required = tower_height_m;  // fall-zone setback = tower height
+      const setback_ft_required= tower_height_ft;
+
+      // Federal environmental review triggers (FCC §1.1307)
+      const ENVIRONMENTAL_TRIGGERS = [
+        { id: 'HISTORIC', label: 'National Register historic properties in area of effect', cfr: 'FCC §1.1307(a)(4); NHPA §106', note: 'Programmatic Agreement (FCC-ACHP-NCSHPO) governs review; Tower Construction Notification System (TCNS) must be used' },
+        { id: 'FLOODPLAIN', label: 'Location in FEMA 100-year floodplain', cfr: 'FCC §1.1307(a)(6); EO 11988', note: 'Floodplain development permit required from local authority; FCC environmental assessment required' },
+        { id: 'WETLANDS', label: 'Wetlands present on or adjacent to site', cfr: 'FCC §1.1307(a)(7); CWA §404', note: 'Army Corps of Engineers Section 404 permit required; FCC environmental assessment required' },
+        { id: 'ENDANGERED_SPECIES', label: 'Listed species habitat (ESA §7)', cfr: 'FCC §1.1307(a)(3); ESA §7', note: 'FCC consults with USFWS/NMFS; biological opinion required if jeopardy possible; tower lighting affects migratory birds (MBTA)' },
+        { id: 'WILDERNESS', label: 'Wilderness, wild/scenic river, or national forest', cfr: 'FCC §1.1307(a)(5)', note: 'Federal land use agency concurrence required; FCC environmental assessment required' },
+        { id: 'NATIVE_AMERICAN', label: 'Native American religious or cultural sites (NHPA §106)', cfr: 'FCC §1.1307(a)(4); NHPA §106', note: 'Tribal consultation required via TCNS; 30-day tribal comment period mandatory for all new tower construction' }
+      ];
+
+      // Standard local permits needed for AM tower
+      const LOCAL_PERMITS = [
+        { id: 'BUILDING_PERMIT', label: 'Building permit', required: true, typical_weeks: 4, typical_cost_usd: 2000, notes: 'Structural plans and TIA-222-H analysis required; building official must approve' },
+        { id: 'USE_PERMIT', label: 'Use permit / conditional use permit (CUP)', required: true, typical_weeks: 12, typical_cost_usd: 3000, notes: 'Public hearing typically required; neighbors notified within 300–500ft; planning commission approval' },
+        { id: 'GRADING_PERMIT', label: 'Grading and drainage permit', required: false, typical_weeks: 3, typical_cost_usd: 1500, notes: 'Required if site grading exceeds local threshold (typically >50 cy of cut/fill)' },
+        { id: 'ENCROACHMENT', label: 'Road encroachment permit', required: false, typical_weeks: 2, typical_cost_usd: 500, notes: 'Required if construction access requires disturbing public right-of-way' }
+      ];
+
+      const n_required_permits = LOCAL_PERMITS.filter(p => p.required).length;
+      const total_permit_cost   = LOCAL_PERMITS.reduce((s, p) => s + p.typical_cost_usd, 0);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tower_height_m,
+        tower_height_ft,
+        setback_m_required,
+        setback_ft_required,
+        permit_weeks_low_rural,
+        permit_weeks_high_rural,
+        permit_weeks_low_residential:  permit_weeks_low_res,
+        permit_weeks_high_residential: permit_weeks_high_res,
+        preferred_zoning_type:         'AGRICULTURAL',
+        n_environmental_triggers:      ENVIRONMENTAL_TRIGGERS.length,
+        environmental_review_triggers: ENVIRONMENTAL_TRIGGERS,
+        n_local_permits:               LOCAL_PERMITS.length,
+        n_required_local_permits:      n_required_permits,
+        local_permits:                 LOCAL_PERMITS,
+        total_permit_cost_usd:         total_permit_cost,
+        tca_preemption_applies:        false,  // TCA §332(c)(7) does NOT apply to AM broadcast towers
+        fcc_env_review_cfr:            '47 CFR §1.1307',
+        nhpa_section_106_required:     true,   // required for all new tower construction
+        tribal_consultation_required:  true,   // TCNS 30-day tribal comment required
+        reference: 'TCA §332(c)(7); 47 CFR §1.1307 (environmental review); NHPA §106; ESA §7; CWA §404; FCC-ACHP-NCSHPO Programmatic Agreement; FEMA National Flood Insurance Program',
+        note: `Tower: ${tower_height_ft}ft (${tower_height_m}m), setback ≥${setback_ft_required}ft (fall zone). Preferred zone: agricultural/industrial. Permit timeline: ${permit_weeks_low_rural}–${permit_weeks_high_rural} wks (rural) or ${permit_weeks_low_res}–${permit_weeks_high_res} wks (residential). TCA §332(c)(7) does NOT preempt local zoning for AM broadcast towers. ${ENVIRONMENTAL_TRIGGERS.length} federal environmental review triggers. NHPA §106 tribal consultation required.`
       };
     })(),
 

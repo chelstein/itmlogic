@@ -2226,6 +2226,116 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Broadcast Attorney and Consulting Guide */}
+        {candidate.broadcast_attorney_and_consulting_guide && (() => {
+          const g = candidate.broadcast_attorney_and_consulting_guide;
+          const typCost = g.combined_total_usd?.typical;
+          const lowCost = g.combined_total_usd?.low;
+          const highCost = g.combined_total_usd?.high;
+          const attorneys = (g.professional_services || []).filter(s => s.type === 'ATTORNEY');
+          const engineers = (g.professional_services || []).filter(s => s.type === 'ENGINEER');
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                ⚖️ Professional Fees: FCC Attorney + Engineering
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Attorney Fees</div>
+                  <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>${(g.attorney_total_typ_usd || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>CP + LTC + NHPA</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Engineering Fees</div>
+                  <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>${(g.engineering_total_typ_usd || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>{g.is_da ? 'DA proof included' : 'NDA proof included'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Combined Total</div>
+                  <div style={{ fontWeight: 700, color: '#f97316', fontSize: 15 }}>${(typCost || 0).toLocaleString()}</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>${(lowCost || 0).toLocaleString()}–${(highCost || 0).toLocaleString()}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Services</div>
+                  <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>{g.n_required_services} req'd</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>{g.n_professional_services} total</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600 }}>Attorney Services</div>
+                  {attorneys.map((s, i) => (
+                    <div key={i} style={{ background: '#0f172a', borderRadius: 4, padding: 6, marginBottom: 3 }}>
+                      <div style={{ fontSize: 10, color: s.required ? '#f1f5f9' : '#64748b' }}>{s.label}</div>
+                      <div style={{ fontSize: 10, color: '#60a5fa' }}>${s.typical_cost_usd.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4, fontWeight: 600 }}>Engineering Services</div>
+                  {engineers.map((s, i) => (
+                    <div key={i} style={{ background: '#0f172a', borderRadius: 4, padding: 6, marginBottom: 3 }}>
+                      <div style={{ fontSize: 10, color: s.required ? '#f1f5f9' : '#64748b' }}>{s.label}</div>
+                      <div style={{ fontSize: 10, color: '#60a5fa' }}>${s.typical_cost_usd.toLocaleString()}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Zoning and Land Use Compliance Guide */}
+        {candidate.zoning_and_land_use_compliance_guide && (() => {
+          const g = candidate.zoning_and_land_use_compliance_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                🏛️ Zoning & Land Use Compliance (§1.1307 / NHPA §106)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Required Setback</div>
+                  <div style={{ fontWeight: 700, color: '#f97316', fontSize: 15 }}>{g.setback_ft_required} ft</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>{g.setback_m_required}m (1:1 fall zone)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>Permit Timeline (Rural)</div>
+                  <div style={{ fontWeight: 700, color: '#f1f5f9', fontSize: 15 }}>{g.permit_weeks_low_rural}–{g.permit_weeks_high_rural} wks</div>
+                  <div style={{ fontSize: 10, color: '#ef4444' }}>Residential: {g.permit_weeks_low_residential}–{g.permit_weeks_high_residential} wks</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>TCA §332 Preemption</div>
+                  <div style={{ fontWeight: 700, color: '#ef4444', fontSize: 13 }}>{g.tca_preemption_applies ? 'APPLIES' : 'DOES NOT APPLY'}</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>AM towers not covered</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 10 }}>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 2 }}>NHPA §106 / Tribal</div>
+                  <div style={{ fontWeight: 700, color: '#ef4444', fontSize: 13 }}>REQUIRED</div>
+                  <div style={{ fontSize: 10, color: '#64748b' }}>30-day TCNS comment</div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>Federal Environmental Review Triggers ({g.n_environmental_triggers})</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  {(g.environmental_review_triggers || []).map((t, i) => (
+                    <div key={i} style={{ background: '#0f172a', borderRadius: 4, padding: 7 }}>
+                      <div style={{ fontSize: 11, color: '#f1f5f9', fontWeight: 600 }}>{t.label}</div>
+                      <div style={{ fontSize: 10, color: '#64748b' }}>{t.cfr}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ background: '#1c1917', borderRadius: 6, padding: 10, marginBottom: 8, borderLeft: '3px solid #f97316' }}>
+                <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600, marginBottom: 4 }}>Preferred Site: {g.preferred_zoning_type} Zone</div>
+                <div style={{ fontSize: 10, color: '#94a3b8' }}>Agricultural and industrial zones have lowest zoning burden. Residential zones require variance and carry highest opposition risk. {g.n_required_local_permits} local permits required (building permit + use permit).</div>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* FAA Obstruction Marking Guide */}
         {candidate.faa_obstruction_marking_guide && (() => {
           const g = candidate.faa_obstruction_marking_guide;

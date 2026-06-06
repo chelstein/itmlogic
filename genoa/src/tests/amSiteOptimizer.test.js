@@ -5683,6 +5683,120 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- broadcast_attorney_and_consulting_guide ----
+
+test('broadcast_attorney_and_consulting_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.broadcast_attorney_and_consulting_guide != null, 'broadcast_attorney_and_consulting_guide missing');
+  const g = c.broadcast_attorney_and_consulting_guide;
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz mismatch');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
+  assert.ok(g.attorney_total_typ_usd > 0, 'attorney total must be positive');
+  assert.ok(g.engineering_total_typ_usd > 0, 'engineering total must be positive');
+  assert.ok(g.combined_total_usd.typical > 0, 'combined total must be positive');
+});
+
+test('broadcast_attorney_and_consulting_guide NDA KAZM fee structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_attorney_and_consulting_guide;
+  assert.strictEqual(g.is_da, false, 'KAZM NDA must produce is_da=false');
+  assert.strictEqual(g.n_professional_services, 9, 'must have 9 professional service items');
+  assert.ok(g.combined_total_usd.high > g.combined_total_usd.typical, 'high cost must exceed typical');
+  assert.ok(g.combined_total_usd.typical > g.combined_total_usd.low, 'typical must exceed low');
+  const services = g.professional_services;
+  assert.ok(Array.isArray(services), 'professional_services must be array');
+  assert.strictEqual(services.filter(s => s.type === 'ATTORNEY').length, 4, 'must have 4 attorney services');
+  assert.strictEqual(services.filter(s => s.type === 'ENGINEER').length, 5, 'must have 5 engineering services');
+});
+
+test('broadcast_attorney_and_consulting_guide DA has higher proof cost', async () => {
+  const DA_KAZM = { ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 };
+  const NDA_out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const DA_out  = await runSiteOptimizer(DA_KAZM);
+  const nda_g = NDA_out.candidates[0].broadcast_attorney_and_consulting_guide;
+  const da_g  = DA_out.candidates[0].broadcast_attorney_and_consulting_guide;
+  assert.ok(da_g.engineering_proof_usd > nda_g.engineering_proof_usd, 'DA proof must cost more than NDA proof');
+  assert.ok(da_g.combined_total_usd.typical > nda_g.combined_total_usd.typical, 'DA total must exceed NDA total');
+});
+
+test('broadcast_attorney_and_consulting_guide required services count', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_attorney_and_consulting_guide;
+  assert.strictEqual(g.n_required_services, 7, 'must have 7 required services');
+  const required = g.professional_services.filter(s => s.required);
+  assert.strictEqual(required.length, 7, 'professional_services array must have 7 required items');
+  const optionalIds = g.professional_services.filter(s => !s.required).map(s => s.id);
+  assert.ok(optionalIds.includes('ONGOING'), 'attorney ongoing monitoring must be optional');
+  assert.ok(optionalIds.includes('INTERFERENCE'), 'interference analysis must be optional');
+});
+
+test('broadcast_attorney_and_consulting_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bacg_attorney_total_usd' in row, `rank ${row.rank} missing bacg_attorney_total_usd`);
+    assert.ok('bacg_engineering_total_usd' in row, `rank ${row.rank} missing bacg_engineering_total_usd`);
+    assert.ok('bacg_combined_typ_usd' in row, `rank ${row.rank} missing bacg_combined_typ_usd`);
+    assert.ok(row.bacg_combined_typ_usd > 0, `rank ${row.rank} combined cost must be positive`);
+  }
+});
+
+// ---- zoning_and_land_use_compliance_guide ----
+
+test('zoning_and_land_use_compliance_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.zoning_and_land_use_compliance_guide != null, 'zoning_and_land_use_compliance_guide missing');
+  const g = c.zoning_and_land_use_compliance_guide;
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz mismatch');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class mismatch');
+  assert.strictEqual(g.tca_preemption_applies, false, 'TCA §332(c)(7) does NOT apply to AM towers');
+  assert.strictEqual(g.nhpa_section_106_required, true, 'NHPA §106 required for all new tower construction');
+  assert.strictEqual(g.tribal_consultation_required, true, 'tribal consultation required via TCNS');
+});
+
+test('zoning_and_land_use_compliance_guide KAZM 780kHz tower setback physics', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].zoning_and_land_use_compliance_guide;
+  // λ/4 at 780 kHz = 96m = 315ft; setback = tower height (1:1 fall zone)
+  assert.strictEqual(g.tower_height_m, 96, 'tower height must be λ/4 = 96m');
+  assert.strictEqual(g.setback_m_required, 96, 'setback must equal tower height (1:1 fall zone)');
+  assert.strictEqual(g.setback_ft_required, Math.round(96 * 3.281), 'setback ft mismatch');
+  assert.strictEqual(g.preferred_zoning_type, 'AGRICULTURAL', 'agricultural zoning must be preferred');
+});
+
+test('zoning_and_land_use_compliance_guide environmental review triggers', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].zoning_and_land_use_compliance_guide;
+  assert.strictEqual(g.n_environmental_triggers, 6, 'must have 6 federal environmental review triggers');
+  assert.ok(Array.isArray(g.environmental_review_triggers), 'environmental_review_triggers must be array');
+  const ids = g.environmental_review_triggers.map(t => t.id);
+  assert.ok(ids.includes('HISTORIC'), 'must include HISTORIC trigger');
+  assert.ok(ids.includes('NATIVE_AMERICAN'), 'must include NATIVE_AMERICAN/tribal consultation trigger');
+  assert.ok(ids.includes('ENDANGERED_SPECIES'), 'must include ENDANGERED_SPECIES trigger');
+});
+
+test('zoning_and_land_use_compliance_guide local permits and timeline', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].zoning_and_land_use_compliance_guide;
+  assert.strictEqual(g.n_local_permits, 4, 'must have 4 local permit types');
+  assert.strictEqual(g.n_required_local_permits, 2, 'must have 2 required local permits');
+  assert.strictEqual(g.permit_weeks_low_rural, 8, 'rural permit min must be 8 weeks');
+  assert.strictEqual(g.permit_weeks_high_rural, 24, 'rural permit max must be 24 weeks');
+  assert.ok(g.permit_weeks_high_residential > g.permit_weeks_high_rural, 'residential permits take longer than rural');
+});
+
+test('zoning_and_land_use_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('zulcg_setback_m' in row, `rank ${row.rank} missing zulcg_setback_m`);
+    assert.ok('zulcg_n_env_triggers' in row, `rank ${row.rank} missing zulcg_n_env_triggers`);
+    assert.ok('zulcg_permit_weeks_rural' in row, `rank ${row.rank} missing zulcg_permit_weeks_rural`);
+    assert.strictEqual(row.zulcg_setback_m, 96, `rank ${row.rank} setback must be 96m`);
+    assert.strictEqual(row.zulcg_n_env_triggers, 6, `rank ${row.rank} must have 6 env triggers`);
+  }
+});
+
 // ---- faa_obstruction_marking_guide ----
 
 test('faa_obstruction_marking_guide presence and structure', async () => {

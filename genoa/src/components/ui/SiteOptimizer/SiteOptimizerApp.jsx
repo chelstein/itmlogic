@@ -1717,6 +1717,58 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      broadcast_attorney_and_consulting_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
+        attorney_total_typ_usd: 24000,
+        engineering_total_typ_usd: 36500,
+        combined_total_usd: { low: 39325, typical: 60500, high: 93775 },
+        n_professional_services: 9,
+        n_required_services: 7,
+        professional_services: [
+          { type: 'ATTORNEY', service: 'CP Application Filing (Form 301-AM)', required: true, cost_low_usd: 7500, cost_typical_usd: 11500, cost_high_usd: 18000, notes: 'Includes FCC Form 301-AM preparation, environmental review checklist, and NEPA initial screening' },
+          { type: 'ATTORNEY', service: 'FCC License Coordination and Correspondence', required: true, cost_low_usd: 2500, cost_typical_usd: 4500, cost_high_usd: 7000, notes: 'Letter of acceptance, informal objection responses, Media Bureau correspondence' },
+          { type: 'ATTORNEY', service: 'CP Modification and Amendment Filing', required: true, cost_low_usd: 3000, cost_typical_usd: 5000, cost_high_usd: 9000, notes: 'Minor modifications, second-window amendments, tolling petitions' },
+          { type: 'ATTORNEY', service: 'License to Cover Filing (Form 302-AM)', required: true, cost_low_usd: 1500, cost_typical_usd: 3000, cost_high_usd: 5000, notes: 'Form 302-AM preparation, proof-of-performance certification, equipment filing' },
+          { type: 'ATTORNEY', service: 'Ongoing FCC Compliance and Annual Reporting', required: false, cost_low_usd: 1000, cost_typical_usd: 2000, cost_high_usd: 4000, notes: 'Optional: FCC ownership reports, public file compliance, license renewal planning' },
+          { type: 'ENGINEER', service: 'Site Survey and Propagation Analysis', required: true, cost_low_usd: 3500, cost_typical_usd: 5500, cost_high_usd: 8500, notes: 'Ground conductivity measurement, topographic analysis, ITM/longley-rice propagation modeling' },
+          { type: 'ENGINEER', service: 'Antenna System Engineering (NDA)', required: true, cost_low_usd: 5500, cost_typical_usd: 8500, cost_high_usd: 13000, notes: 'Monopole design, impedance matching, ATU specification, grounding system layout' },
+          { type: 'ENGINEER', service: 'NDA Proof of Performance', required: true, cost_low_usd: 7000, cost_typical_usd: 11500, cost_high_usd: 18000, notes: 'NDA: 8 cardinal + spot check measurements; inverse-distance field-strength verification per §73.154' },
+          { type: 'ENGINEER', service: 'FCC Form 301-AM Technical Exhibits', required: true, cost_low_usd: 3500, cost_typical_usd: 5500, cost_high_usd: 8500, notes: 'Radiation pattern computation, coverage contour map, interference analysis exhibits' },
+          { type: 'ENGINEER', service: 'Interference Study (Adjacent/Co-channel)', required: false, cost_low_usd: 3000, cost_typical_usd: 5500, cost_high_usd: 9000, notes: 'Optional but common: D/U ratio analysis vs. protected contours, sky-wave interference, §73.182 compliance verification' }
+        ],
+        reference: '47 CFR §73.3533; §73.3534; §73.154; §73.182; FCC Form 301-AM; NABOB Engineering Manual',
+        note: 'Cost estimates reflect 2024 market rates for experienced broadcast communications attorneys and licensed RF engineers. NDA proof is less costly than full DA proof (72-radial FI traversal). Attorney fees vary by firm size and market.'
+      },
+      zoning_and_land_use_compliance_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        tower_height_m: 96, tower_height_ft: 315,
+        setback_m_required: 96, setback_ft_required: 315,
+        permit_weeks_low_rural: 8, permit_weeks_high_rural: 24,
+        permit_weeks_low_residential: 16, permit_weeks_high_residential: 52,
+        preferred_zoning_type: 'AGRICULTURAL',
+        n_environmental_triggers: 6,
+        environmental_review_triggers: [
+          { id: 'HISTORIC', label: 'National Register historic properties in area of effect', cfr: 'FCC §1.1307(a)(4); NHPA §106', note: 'Programmatic Agreement (FCC-ACHP-NCSHPO) governs review; Tower Construction Notification System (TCNS) must be used' },
+          { id: 'FLOODPLAIN', label: 'Location in FEMA 100-year floodplain', cfr: 'FCC §1.1307(a)(6); EO 11988', note: 'Floodplain development permit required from local authority; FCC environmental assessment required' },
+          { id: 'WETLANDS', label: 'Wetlands present on or adjacent to site', cfr: 'FCC §1.1307(a)(7); CWA §404', note: 'Army Corps of Engineers Section 404 permit required; FCC environmental assessment required' },
+          { id: 'ENDANGERED_SPECIES', label: 'Listed species habitat (ESA §7)', cfr: 'FCC §1.1307(a)(3); ESA §7', note: 'FCC consults with USFWS/NMFS; biological opinion required if jeopardy possible; tower lighting affects migratory birds (MBTA)' },
+          { id: 'WILDERNESS', label: 'Wilderness, wild/scenic river, or national forest', cfr: 'FCC §1.1307(a)(5)', note: 'Federal land use agency concurrence required; FCC environmental assessment required' },
+          { id: 'NATIVE_AMERICAN', label: 'Native American religious or cultural sites (NHPA §106)', cfr: 'FCC §1.1307(a)(4); NHPA §106', note: 'Tribal consultation required via TCNS; 30-day tribal comment period mandatory for all new tower construction' }
+        ],
+        n_local_permits: 4, n_required_local_permits: 2,
+        local_permits: [
+          { id: 'BUILDING_PERMIT', label: 'Building permit', required: true, typical_weeks: 4, typical_cost_usd: 2000, notes: 'Structural plans and TIA-222-H analysis required; building official must approve' },
+          { id: 'USE_PERMIT', label: 'Use permit / conditional use permit (CUP)', required: true, typical_weeks: 12, typical_cost_usd: 3000, notes: 'Public hearing typically required; neighbors notified within 300–500ft; planning commission approval' },
+          { id: 'GRADING_PERMIT', label: 'Grading and drainage permit', required: false, typical_weeks: 3, typical_cost_usd: 1500, notes: 'Required if site grading exceeds local threshold (typically >50 cy of cut/fill)' },
+          { id: 'ENCROACHMENT', label: 'Road encroachment permit', required: false, typical_weeks: 2, typical_cost_usd: 500, notes: 'Required if construction access requires disturbing public right-of-way' }
+        ],
+        total_permit_cost_usd: 7000,
+        tca_preemption_applies: false,
+        fcc_env_review_cfr: '47 CFR §1.1307',
+        nhpa_section_106_required: true, tribal_consultation_required: true,
+        reference: 'TCA §332(c)(7); 47 CFR §1.1307 (environmental review); NHPA §106; ESA §7; CWA §404; FCC-ACHP-NCSHPO Programmatic Agreement; FEMA National Flood Insurance Program',
+        note: 'Tower: 315ft (96m), setback ≥315ft (fall zone). Preferred zone: agricultural/industrial. Permit timeline: 8–24 wks (rural) or 16–52 wks (residential). TCA §332(c)(7) does NOT preempt local zoning for AM broadcast towers. 6 federal environmental review triggers. NHPA §106 tribal consultation required.'
+      },
       faa_obstruction_marking_guide: {
         frequency_khz: 780, fcc_class: 'D',
         tower_height_m: 96, tower_height_ft: 315,
