@@ -946,17 +946,23 @@ function finalizeLabels(c, scoreCutoff){
   const colFail   = hasFlags && c._flags.some(f => /COL/i.test(f));
   const blankFail = hasFlags && c._flags.some(f => /Blanket/i.test(f));
 
-  if (!hasFlags){
+  if (c.treaty_zone){
+    // Treaty zone takes highest priority — FCC IB coordination required
+    // before any other action regardless of coverage/blanket status.
+    if (hasFlags) labels.add(LABEL_NON_COMPLIANT); else labels.add(LABEL_REVIEW_REQUIRED);
+    c.nif_status = hasFlags ? LABEL_NON_COMPLIANT : LABEL_REVIEW_REQUIRED;
+    c.status_category = 'TREATY_REVIEW';
+  } else if (!hasFlags){
     // No hard compliance failures.
     if (c.score >= scoreCutoff){
       labels.add(LABEL_PROMISING);
+      c.nif_status = LABEL_PROMISING;
+      c.status_category = 'PROMISING';
     } else {
       labels.add(LABEL_REVIEW_REQUIRED);
+      c.nif_status = LABEL_REVIEW_REQUIRED;
+      c.status_category = 'REVIEW_REQUIRED';
     }
-    // Treaty zone elevates to TREATY_REVIEW but doesn't disqualify.
-    const statusBase = c.score >= scoreCutoff ? 'PROMISING' : 'REVIEW_REQUIRED';
-    c.nif_status     = c.score >= scoreCutoff ? LABEL_PROMISING : LABEL_REVIEW_REQUIRED;
-    c.status_category = c.treaty_zone ? 'TREATY_REVIEW' : statusBase;
   } else {
     // At least one hard failure — classify recovery pathway.
     labels.add(LABEL_NON_COMPLIANT);
@@ -967,18 +973,15 @@ function finalizeLabels(c, scoreCutoff){
       c.status_category = 'RECOVERABLE_WITH_REDUCED_POWER';
     } else if (colFail && !blankFail){
       // Only COL coverage fails — check recovery pathway.
-      if (c.minimum_tpo_for_col_coverage_kw != null){
-        // Power increase can push 5 mV/m contour to COL — recoverable with TPO change.
-        // DA is typically a better solution than raw power increase, so prefer DA label.
+      if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.50){
+        // Coverage close to 80% floor — DA shaping may recover it.
         c.status_category = 'RECOVERABLE_WITH_DA';
-      } else if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.50){
-        // Coverage close to 80% floor — DA shaping may help.
-        c.status_category = 'RECOVERABLE_WITH_DA';
-      } else if (c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 0.5){
-        // Field so low even at 50 kW the COL can't be served — community change needed.
+      } else if (c.field_at_col_centroid_mvm != null && c.field_at_col_centroid_mvm < 0.5 && c.minimum_tpo_for_col_coverage_kw == null){
+        // Field so low even at 50 kW can't reach COL — community change needed.
         c.status_category = 'RECOVERABLE_WITH_COL_CHANGE';
       } else {
-        c.status_category = 'NON_COMPLIANT';
+        // Power increase might help, but DA is the primary path.
+        c.status_category = 'RECOVERABLE_WITH_DA';
       }
     } else {
       // Both fail or unrecognized combination.
