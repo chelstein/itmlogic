@@ -1717,6 +1717,31 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      signal_booster_prohibited_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        am_booster_authorized: false,
+        am_translator_authorized: true,
+        n_legal_alternatives: 5,
+        legal_alternatives: [
+          { id: 'RELOCATION', label: 'Main transmitter relocation (this optimizer)', cfr: '§73.3533; §73.3534', authorized: true, note: 'Move transmitter to better site for coverage improvement — requires FCC CP and construction' },
+          { id: 'AM_TRANSLATOR', label: 'AM-to-FM translator', cfr: '§74.1201; MB 13-249', authorized: true, note: 'FCC authorized AM-to-FM translator service; 250W ERP FM fill-in translator within AM contour' },
+          { id: 'IBOC_HD', label: 'AM HD Radio (IBOC digital sidebands)', cfr: '§73.406; FCC IBOC authorization', authorized: true, note: 'Digital audio sidebands on AM carrier; improves quality and perceived coverage; requires separate FCC authorization' },
+          { id: 'PART15_CC', label: 'Part 15 carrier current (in-building only)', cfr: '§15.221', authorized: true, note: 'Unlicensed; power limit 100 mW; effective only inside the building connected to the power line; not practical for area coverage' },
+          { id: 'NEW_STATION', label: 'New AM station at a different frequency', cfr: '§73.3533; §73.21', authorized: true, note: 'Requires full FCC application, auction if competing applications, and separate license; very expensive' }
+        ],
+        prohibited_devices: [
+          { id: 'AM_BOOSTER', label: 'AM broadcast booster/repeater', cfr: '§73.1660', prohibited: true, note: 'FCC does not authorize AM boosters; any device retransmitting AM on the same frequency at another location is illegal' },
+          { id: 'UNAUTH_TX', label: 'Unauthorized AM transmitter', cfr: '§301; §503(b)', prohibited: true, note: 'Operating any radio transmitter without FCC license is illegal; penalties up to $10,000/day and equipment seizure' },
+          { id: 'PART15_EXCEED', label: 'Part 15 AM device exceeding limits', cfr: '§15.209; §15.5', prohibited: true, note: 'Part 15 AM devices have strict field strength limits (250 µV/m at 30m for 535–1705 kHz); exceeding limits is prohibited' }
+        ],
+        n_prohibited: 3,
+        forfeiture_risk_usd: { unauthorized_transmitter: { low: 10000, typical: 15000, high: 25000 }, part15_violation: { low: 4000, typical: 8000, high: 15000 }, typical: 15000 },
+        best_legal_option: 'RELOCATION',
+        part15_limit_uv_m: 250,
+        relocation_note: 'AM broadcast boosters are NOT authorized (§73.1660). The legally correct approach to coverage improvement is transmitter relocation (this optimizer), an AM-to-FM translator (§74.1201), or AM HD Radio. Unauthorized AM repeater devices can result in $10,000–$25,000 FCC forfeitures.',
+        reference: '47 CFR §73.1660; §73.406; §74.1201; §15.209; §15.221; §15.5; §301; §503(b); MB 13-249 (AM revitalization)',
+        note: 'AM boosters: PROHIBITED (§73.1660). 5 legal alternatives available. Best option: transmitter relocation. AM-to-FM translator also authorized. Unauthorized booster forfeiture: $10k–$25k (§503b).'
+      },
       community_of_license_change_guide: {
         frequency_khz: 780, fcc_class: 'D',
         col_centroid: { lat: 34.7418, lon: -112.0110 },

@@ -2226,6 +2226,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Signal Booster Prohibited Guide */}
+        {candidate.signal_booster_prohibited_guide && (() => {
+          const g = candidate.signal_booster_prohibited_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                AM Signal Booster / Coverage Extension <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1660</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>AM Booster</div>
+                  <div style={{ color: '#f87171', fontSize: 12, fontWeight: 600 }}>PROHIBITED (§73.1660)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>AM-to-FM Translator</div>
+                  <div style={{ color: '#34d399', fontSize: 12, fontWeight: 600 }}>Authorized (§74.1201)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Legal Alternatives</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.n_legal_alternatives} options</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Unauth. Booster Forfeiture</div>
+                  <div style={{ color: '#f87171', fontSize: 12 }}>${g.forfeiture_risk_usd?.unauthorized_transmitter?.low?.toLocaleString()}–${g.forfeiture_risk_usd?.unauthorized_transmitter?.high?.toLocaleString()}</div>
+                </div>
+              </div>
+              {g.legal_alternatives && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Authorized Coverage Extension Options</div>
+                  {g.legal_alternatives.map((a, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: '#1d4ed8', color: '#f1f5f9', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, textAlign: 'center', marginTop: 1, whiteSpace: 'nowrap' }}>AUTH</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{a.label}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{a.cfr}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>Part 15 AM limit: {g.part15_limit_uv_m} µV/m at 30m (§15.209)</div>
+            </div>
+          );
+        })()}
+
         {/* Community of License Change Guide */}
         {candidate.community_of_license_change_guide && (() => {
           const g = candidate.community_of_license_change_guide;

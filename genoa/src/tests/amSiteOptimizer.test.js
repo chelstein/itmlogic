@@ -5683,6 +5683,55 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- signal_booster_prohibited_guide ----
+
+test('signal_booster_prohibited_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.signal_booster_prohibited_guide != null, 'signal_booster_prohibited_guide missing');
+  const g = c.signal_booster_prohibited_guide;
+  assert.ok('am_booster_authorized' in g, 'am_booster_authorized missing');
+  assert.ok('legal_alternatives' in g, 'legal_alternatives missing');
+  assert.ok('prohibited_devices' in g, 'prohibited_devices missing');
+  assert.ok('forfeiture_risk_usd' in g, 'forfeiture_risk_usd missing');
+});
+
+test('signal_booster_prohibited_guide confirms AM boosters are prohibited', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].signal_booster_prohibited_guide;
+  assert.strictEqual(g.am_booster_authorized, false, 'AM boosters must be prohibited (§73.1660)');
+  assert.strictEqual(g.am_translator_authorized, true, 'AM-to-FM translators must be authorized (§74.1201)');
+  const prohibitedIds = g.prohibited_devices.map(d => d.id);
+  assert.ok(prohibitedIds.includes('AM_BOOSTER'), 'AM_BOOSTER must be in prohibited devices list');
+});
+
+test('signal_booster_prohibited_guide has at least 4 legal alternatives including relocation and translator', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].signal_booster_prohibited_guide;
+  assert.ok(Array.isArray(g.legal_alternatives), 'legal_alternatives must be array');
+  assert.ok(g.n_legal_alternatives >= 4, 'must have at least 4 legal alternatives');
+  const altIds = g.legal_alternatives.map(a => a.id);
+  assert.ok(altIds.includes('RELOCATION'), 'RELOCATION must be a legal alternative');
+  assert.ok(altIds.includes('AM_TRANSLATOR'), 'AM_TRANSLATOR must be a legal alternative');
+});
+
+test('signal_booster_prohibited_guide forfeiture risk is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].signal_booster_prohibited_guide;
+  assert.ok(g.forfeiture_risk_usd.unauthorized_transmitter.low >= 5000, 'unauthorized transmitter forfeiture must be at least $5,000');
+  assert.ok(g.forfeiture_risk_usd.unauthorized_transmitter.high >= 10000, 'unauthorized transmitter forfeiture high must be at least $10,000');
+  assert.ok(g.part15_limit_uv_m === 250, 'Part 15 AM limit must be 250 µV/m at 30m per §15.209');
+});
+
+test('signal_booster_prohibited_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sbpg_am_booster_authorized' in row, 'sbpg_am_booster_authorized missing from comparison table');
+    assert.ok('sbpg_legal_alternatives' in row, 'sbpg_legal_alternatives missing from comparison table');
+    assert.ok('sbpg_forfeiture_usd' in row, 'sbpg_forfeiture_usd missing from comparison table');
+  }
+});
+
 // ---- community_of_license_change_guide ----
 
 test('community_of_license_change_guide presence and structure', async () => {
