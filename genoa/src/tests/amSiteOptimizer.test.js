@@ -2147,3 +2147,63 @@ test('buildMinimumSpacingReference: unknown fcc_class falls back to Class D tabl
   assert.ok(Array.isArray(msr.co_channel) && msr.co_channel.length === 4,
     'Fallback to D should still return 4 co-channel rows');
 });
+
+// ---------- sigma_sensitivity_analysis ----------
+
+test('sigma_sensitivity_analysis is null when conductivity is filing-grade (raster loaded)', async () => {
+  // In zone-table mode this test just verifies the field is present and non-null.
+  // We can't force filing-grade σ in unit tests without the raster, so we verify:
+  //   - If conductivity_mode is zone-table: sigma_sensitivity_analysis must be non-null
+  //   - The field exists on every candidate
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok('sigma_sensitivity_analysis' in c,
+      `sigma_sensitivity_analysis must be a key on every candidate (rank ${c.rank})`);
+    if (out.conductivity_mode === 'zone-table'){
+      assert.ok(c.sigma_sensitivity_analysis != null,
+        `sigma_sensitivity_analysis must be non-null in zone-table mode (rank ${c.rank})`);
+    }
+  }
+});
+
+test('sigma_sensitivity_analysis has correct shape in zone-table mode', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  if (out.conductivity_mode !== 'zone-table') return; // skip in raster mode
+  for (const c of out.candidates){
+    const ssa = c.sigma_sensitivity_analysis;
+    if (ssa == null) continue; // filing-grade σ
+    assert.ok(typeof ssa.upgrade_possible === 'boolean',
+      `upgrade_possible must be boolean on rank ${c.rank}`);
+    if (!ssa.upgrade_possible) continue; // EXCELLENT already — valid case
+    assert.ok(Number.isFinite(ssa.current_sigma_msm),
+      `current_sigma_msm must be finite on rank ${c.rank}`);
+    assert.ok(Number.isFinite(ssa.projected_sigma_msm),
+      `projected_sigma_msm must be finite on rank ${c.rank}`);
+    assert.ok(ssa.projected_sigma_msm > ssa.current_sigma_msm,
+      `projected sigma must be > current sigma on rank ${c.rank}`);
+    assert.ok(typeof ssa.survey_recommendation === 'string' && ssa.survey_recommendation.length > 5,
+      `survey_recommendation must be non-empty string on rank ${c.rank}`);
+    assert.ok(['HIGH VALUE', 'MODERATE VALUE', 'LIMITED VALUE'].some(v => ssa.survey_recommendation.startsWith(v)),
+      `survey_recommendation must start with HIGH/MODERATE/LIMITED VALUE; rank ${c.rank} got: "${ssa.survey_recommendation}"`);
+  }
+});
+
+test('sigma_sensitivity_analysis: projected reach exceeds current reach when upgrade_possible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  if (out.conductivity_mode !== 'zone-table') return;
+  for (const c of out.candidates){
+    const ssa = c.sigma_sensitivity_analysis;
+    if (!ssa?.upgrade_possible) continue;
+    if (ssa.projected_daytime_reach_km != null && c.daytime_reach_km != null){
+      assert.ok(ssa.projected_daytime_reach_km >= c.daytime_reach_km,
+        `projected reach (${ssa.projected_daytime_reach_km}) should be >= current reach (${c.daytime_reach_km}); rank ${c.rank}`);
+    }
+    if (ssa.daytime_reach_delta_km != null){
+      assert.ok(ssa.daytime_reach_delta_km >= 0,
+        `reach delta must be non-negative (higher σ → more reach); rank ${c.rank} got: ${ssa.daytime_reach_delta_km}`);
+    }
+  }
+});

@@ -441,6 +441,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   ⚠ {candidate.ground_radial_advisory}
                 </div>
               )}
+              {candidate.sigma_sensitivity_analysis?.upgrade_possible && (() => {
+                const ssa = candidate.sigma_sensitivity_analysis;
+                const recColor = ssa.survey_recommendation?.startsWith('HIGH') ? '#63d471'
+                  : ssa.survey_recommendation?.startsWith('MODERATE') ? '#ffb347'
+                  : '#9b9b9b';
+                return (
+                  <div className="font-mono text-[9px] text-textDim mt-1 leading-tight border-t border-rule/30 pt-1">
+                    <div className="font-semibold mb-0.5" style={{ color: recColor }}>
+                      σ survey impact
+                    </div>
+                    <div>
+                      {ssa.current_sigma_msm} → {ssa.projected_sigma_msm} mS/m (
+                      {ssa.current_sigma_quality} → {ssa.projected_sigma_quality})
+                    </div>
+                    {ssa.daytime_reach_delta_km != null && (
+                      <div>reach: {ssa.daytime_reach_delta_km > 0 ? '+' : ''}{ssa.daytime_reach_delta_km} km</div>
+                    )}
+                    {ssa.col_5mvm_delta_km != null && (
+                      <div>5 mV/m: {ssa.col_5mvm_delta_km > 0 ? '+' : ''}{ssa.col_5mvm_delta_km} km</div>
+                    )}
+                    <div className="opacity-70 mt-0.5">{ssa.survey_recommendation}</div>
+                  </div>
+                );
+              })()}
               {candidate.antenna_system_summary && (
                 <div className="font-mono text-[9px] text-textDim mt-1 leading-tight space-y-0.5">
                   <div>

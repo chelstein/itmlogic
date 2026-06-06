@@ -1290,6 +1290,62 @@ async function scoreCandidate(pt, ctx, warnings){
       }
       return items;
     })(),
+    // Sigma sensitivity analysis — quantifies the benefit of a filed-grade soil
+    // resistivity survey by projecting what the reach and score WOULD be if actual σ
+    // were one quality tier better.  Only meaningful when zone-table σ is in use.
+    // Returns null when σ is already filing-grade (raster loaded).
+    sigma_sensitivity_analysis: ground_sigma_filing_grade === 'filing' ? null : (() => {
+      // Next-tier σ values — what a 4-electrode Wenner array survey might reveal.
+      const nextTierSigma = sigma_msm < 2  ? 3.0   // POOR → FAIR (realistic improvement in non-desert soils)
+        : sigma_msm < 4  ? 6.0             // FAIR → GOOD
+        : sigma_msm < 8  ? 10.0            // GOOD → EXCELLENT
+        : null;                            // EXCELLENT already — no upgrade possible
+
+      if (nextTierSigma == null){
+        return { upgrade_possible: false, note: `σ already in EXCELLENT range (${sigma_msm} mS/m) — filing-grade survey still required for §73.190 design but score impact would be minimal.` };
+      }
+
+      let upgrade_reach_km = null;
+      let upgrade_col_5mvm_km = null;
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: DAYTIME_REACH_TARGET_MVM, conductivity_msm: nextTierSigma, erp_kw: tpo_kw });
+        upgrade_reach_km = round2(r.distance_km);
+      } catch (_){ /* leave null */ }
+      try {
+        const r5 = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: nextTierSigma, erp_kw: tpo_kw });
+        upgrade_col_5mvm_km = round2(r5.distance_km);
+      } catch (_){ /* leave null */ }
+
+      const reach_delta_km = daytime_reach_km != null && upgrade_reach_km != null
+        ? round2(upgrade_reach_km - daytime_reach_km) : null;
+      const col_5mvm_delta_km = principal_community_5mvm_km != null && upgrade_col_5mvm_km != null
+        ? round2(upgrade_col_5mvm_km - principal_community_5mvm_km) : null;
+
+      // Rough score impact: conductivity sub-score at upgrade vs current σ.
+      const subCurrent = Math.max(0, Math.min(100, Math.sqrt(sigma_msm / SIGMA_PREFERRED_MIN_MSM) * 100));
+      const subUpgrade = Math.max(0, Math.min(100, Math.sqrt(nextTierSigma / SIGMA_PREFERRED_MIN_MSM) * 100));
+      const conductivity_score_delta = goals.prefer_high_conductivity
+        ? round2((subUpgrade - subCurrent) / 100 * (weightPool.prefer_high_conductivity || 0) * (100 / Math.max(Object.values(weightPool).reduce((a, b) => a + b, 0), 1)))
+        : null;
+
+      return {
+        upgrade_possible: true,
+        current_sigma_msm: sigma_msm,
+        current_sigma_quality: sigmaQuality(sigma_msm),
+        projected_sigma_msm: nextTierSigma,
+        projected_sigma_quality: sigmaQuality(nextTierSigma),
+        projected_daytime_reach_km: upgrade_reach_km,
+        daytime_reach_delta_km: reach_delta_km,
+        projected_col_5mvm_km: upgrade_col_5mvm_km,
+        col_5mvm_delta_km,
+        conductivity_score_delta,
+        survey_recommendation: reach_delta_km != null && reach_delta_km > 5
+          ? 'HIGH VALUE — reach improvement > 5 km projected; survey strongly recommended before site commitment.'
+          : reach_delta_km != null && reach_delta_km > 2
+          ? 'MODERATE VALUE — some reach improvement projected; survey recommended if site is a finalist.'
+          : 'LIMITED VALUE — conductivity upgrade would have minor coverage impact; survey still required for §73.190 ground system design.'
+      };
+    })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
     // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically
