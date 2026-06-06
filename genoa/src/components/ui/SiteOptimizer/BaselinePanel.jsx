@@ -135,6 +135,24 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
             </span>
           </div>
         )}
+        {baseline.power_class_ceiling_kw != null && (
+          <div className="flex flex-col">
+            <span className="rack-eyebrow">Class ceiling</span>
+            <span className="font-mono text-[13px] text-textDim">
+              {baseline.power_class_ceiling_kw}
+              <span className="text-[10px] ml-0.5">kW §73.21</span>
+            </span>
+          </div>
+        )}
+        {baseline.col_coverage_gap_pct > 0 && (
+          <div className="flex flex-col">
+            <span className="rack-eyebrow">COL gap</span>
+            <span className="font-mono text-[13px]" style={{ color: '#ff7a7a' }}>
+              +{(baseline.col_coverage_gap_pct * 100).toFixed(0)}
+              <span className="text-[10px] ml-0.5">% needed</span>
+            </span>
+          </div>
+        )}
       </div>
       {(baseline.minimum_tpo_for_col_coverage_kw != null || baseline.minimum_tpo_for_compliance_kw != null) && (
         <div className="mt-2 space-y-1">
@@ -150,6 +168,29 @@ export default function BaselinePanel({ callsign, baseline, comparedTo }){
           )}
         </div>
       )}
+      {baseline.regulatory_compliance_summary && (() => {
+        const rcs = baseline.regulatory_compliance_summary;
+        const rowColor = s => s === 'PASS' ? '#63d471' : s === 'FAIL' ? '#ff5a5a' : s === 'ADVISORY' ? '#ffb347' : '#a89c84';
+        const entries = [
+          { label: '§73.24(j) COL', entry: rcs.col_coverage },
+          { label: '§73.24(g) Blanket', entry: rcs.blanket_pop },
+          { label: '§73.21 Class power', entry: rcs.class_power },
+          { label: 'Treaty zone', entry: rcs.treaty_zone }
+        ];
+        return (
+          <div className="mt-2 border-t border-rule pt-2">
+            <div className="rack-eyebrow mb-1">Current site compliance</div>
+            <div className="flex gap-4 flex-wrap font-mono text-[9px]">
+              {entries.map(({ label, entry }) => (
+                <div key={label} className="flex items-center gap-1">
+                  <span className="text-textDim">{label}</span>
+                  <span style={{ color: rowColor(entry.status) }}>{entry.status}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
