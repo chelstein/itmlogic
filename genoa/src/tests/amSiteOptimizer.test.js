@@ -4270,3 +4270,44 @@ test('total_project_cost_estimate.lowest_cost_candidate_rank is a valid rank', a
       `lowest_cost_candidate_rank ${tpc.lowest_cost_candidate_rank} must be a valid rank`);
   }
 });
+
+// ---------- candidate_narrative_summary ----------
+
+test('candidate_narrative_summary is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.candidate_narrative_summary != null,
+      `candidate_narrative_summary must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('candidate_narrative_summary.summary is a non-empty string', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const ns = c.candidate_narrative_summary;
+    assert.ok(typeof ns.summary === 'string' && ns.summary.length > 20,
+      `summary must be a non-empty string for rank ${c.rank}`);
+  }
+});
+
+test('candidate_narrative_summary.summary mentions COL coverage', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    if (c.col_coverage_pct != null) {
+      assert.ok(c.candidate_narrative_summary.summary.includes('%'),
+        `summary should mention COL% for rank ${c.rank}`);
+    }
+  }
+});
+
+test('candidate_narrative_summary.recommendation is a string', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(typeof c.candidate_narrative_summary.recommendation === 'string',
+      `recommendation must be a string for rank ${c.rank}`);
+  }
+});

@@ -1572,6 +1572,49 @@ async function scoreCandidate(pt, ctx, warnings){
   limitations.push('Parcel / zoning availability not checked.');
   limitations.push('NIF status is SCREENING-grade only — full §73.182 nighttime analysis required for filing.');
 
+  // --- candidate narrative summary (plain-English 3-sentence briefing) ---
+  const candidate_narrative_summary = (() => {
+    const colPctNum   = coverage_pct != null ? Math.round(coverage_pct * 100) : null;
+    const colStatus   = coverage_pct == null  ? 'unknown COL coverage'
+      : coverage_pct >= COL_COVERAGE_HARD_FLOOR
+        ? `${colPctNum}% COL coverage (§73.24(j) PASS)`
+        : `${colPctNum}% COL coverage (BELOW §73.24(j) 80% floor)`;
+    const sigmaDesc   = sigma_msm >= 8 ? 'excellent' : sigma_msm >= 4 ? 'good' : sigma_msm >= 2 ? 'fair' : 'poor';
+    const blankNote   = blanket_population_pct != null && blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT
+      ? ` Blanket pop ${round2(blanket_population_pct)}% exceeds §73.24(g) 1% limit — DA pattern or TPO reduction required.`
+      : '';
+    const treatyNote  = treaty_zone ? ` In ${treaty_zone} treaty zone — FCC IB coordination required.` : '';
+    const chanCls     = LOCAL_CHANNEL_KHZ.has(frequency_khz) ? 'local'
+      : CLEAR_CHANNEL_KHZ.has(frequency_khz) ? 'clear' : 'regional';
+    const nightNote   = chanCls === 'local' ? 'No §73.182 NIF required (local channel).'
+      : chanCls === 'clear' && fcc_class !== 'A'
+        ? 'Secondary on §73.25 clear channel — §73.182 NIF + DA-N pattern likely required at night.'
+        : `§73.182 NIF required (${chanCls} channel).`;
+    const remedy      = coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR
+      ? minimum_tpo_for_col_coverage_kw != null
+        ? ` Remedy: increase TPO to ≥${minimum_tpo_for_col_coverage_kw} kW.`
+        : ` Remedy: §73.150 DA study toward COL bearing.`
+      : '';
+
+    const s1 = `${round2(pt.distance_from_current_km ?? 0)} km ${cardinalDir(pt.bearing_deg ?? null)} of current site (score ${score_final}/100): ${colStatus}.${remedy}`;
+    const s2 = `Ground conductivity σ=${sigma_msm} mS/m (${sigmaDesc}); daytime reach ${daytime_reach_km != null ? round2(daytime_reach_km) + ' km' : '?'} to 0.5 mV/m.${blankNote}${treatyNote}`;
+    const s3 = nightNote;
+
+    const is_compliant = coverage_pct != null && coverage_pct >= COL_COVERAGE_HARD_FLOOR
+      && (blanket_population_pct == null || blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT);
+
+    return {
+      summary:        [s1, s2, s3].filter(Boolean).join(' '),
+      status_phrase:  flags.length === 0 ? 'Screening-compliant'
+        : `${flags.length} compliance flag(s): ${flags.slice(0,2).join('; ')}`,
+      recommendation: is_compliant
+        ? 'Advance to site investigation, parcel check, and §73.182 NIF study.'
+        : coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR
+        ? 'Resolve COL coverage gap before advancing to full engineering.'
+        : 'Review compliance flags before committing engineering resources.'
+    };
+  })();
+
   // --- ranking_rationale sentence ---
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
@@ -1589,6 +1632,7 @@ async function scoreCandidate(pt, ctx, warnings){
     bearing_deg:         pt.bearing_deg ?? null,
     cardinal_direction:  cardinalDir(pt.bearing_deg ?? null),
     score: score_final,
+    candidate_narrative_summary,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
     principal_community_5mvm_km,
     nif_status,
