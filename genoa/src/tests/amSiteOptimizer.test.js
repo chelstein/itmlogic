@@ -5683,6 +5683,55 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- antenna_deicing_guide ----
+
+test('antenna_deicing_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.antenna_deicing_guide != null, 'antenna_deicing_guide missing');
+  const g = c.antenna_deicing_guide;
+  assert.ok('ice_zone' in g, 'ice_zone missing');
+  assert.ok('ice_mm' in g, 'ice_mm missing');
+  assert.ok('deicing_recommended' in g, 'deicing_recommended missing');
+  assert.ok('electrical_risks' in g, 'electrical_risks missing');
+});
+
+test('antenna_deicing_guide KAZM at 34.86N is Zone II — deicing not required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_deicing_guide;
+  // KAZM search is centered at 34.86N → candidate_lat will be in ~Zone II range
+  assert.ok(['Zone I', 'Zone II'].includes(g.ice_zone), `KAZM-area candidates at ~34.86°N should be Zone I or II, got: ${g.ice_zone}`);
+  assert.strictEqual(g.deicing_recommended, false, 'Zone I/II should not require active deicing');
+});
+
+test('antenna_deicing_guide electrical risks include carrier frequency drift', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_deicing_guide;
+  assert.ok(Array.isArray(g.electrical_risks), 'electrical_risks must be array');
+  assert.ok(g.n_electrical_risks >= 1, 'must have at least 1 electrical risk');
+  const riskLabels = g.electrical_risks.map(r => r.risk.toLowerCase());
+  assert.ok(riskLabels.some(r => r.includes('carrier') || r.includes('frequency')), 'carrier frequency drift risk must be present');
+  const carrierRisk = g.electrical_risks.find(r => r.risk.toLowerCase().includes('carrier') || r.risk.toLowerCase().includes('frequency'));
+  assert.ok(carrierRisk.cfr.includes('73.1215'), 'carrier frequency risk must reference §73.1215');
+});
+
+test('antenna_deicing_guide annual cost is non-negative and deicing systems array is present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_deicing_guide;
+  assert.ok(g.estimated_annual_deicing_cost_usd.typical >= 0, 'annual deicing cost must be non-negative');
+  assert.ok(Array.isArray(g.all_deicing_systems), 'all_deicing_systems must be array');
+  assert.ok(g.all_deicing_systems.length >= 3, 'must list at least 3 deicing system options');
+});
+
+test('antenna_deicing_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('adg_ice_zone' in row, 'adg_ice_zone missing from comparison table');
+    assert.ok('adg_deicing_required' in row, 'adg_deicing_required missing from comparison table');
+    assert.ok('adg_annual_cost_usd' in row, 'adg_annual_cost_usd missing from comparison table');
+  }
+});
+
 // ---- ground_lease_negotiation_guide ----
 
 test('ground_lease_negotiation_guide presence and structure', async () => {

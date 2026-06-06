@@ -2226,6 +2226,53 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Antenna Deicing Guide */}
+        {candidate.antenna_deicing_guide && (() => {
+          const g = candidate.antenna_deicing_guide;
+          const zoneColor = { 'Zone I': '#34d399', 'Zone II': '#fbbf24', 'Zone III': '#f97316', 'Zone IV': '#f87171' };
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Antenna / Tower Deicing <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>TIA-222-H / §73.1215</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Ice Zone</div>
+                  <div style={{ color: zoneColor[g.ice_zone] || '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.ice_zone} ({g.ice_mm}mm design)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Active Deicing</div>
+                  <div style={{ color: g.deicing_recommended ? '#f87171' : '#34d399', fontSize: 12, fontWeight: 600 }}>
+                    {g.deicing_recommended ? 'Recommended' : 'Not required (monitor)'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Est. Annual Deicing Cost</div>
+                  <div style={{ color: '#fbbf24', fontSize: 12 }}>
+                    {g.estimated_annual_deicing_cost_usd.typical === 0 ? 'None required' : `$${g.estimated_annual_deicing_cost_usd.typical.toLocaleString()}/yr`}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Applicable Systems</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.n_applicable_systems} of {g.all_deicing_systems?.length} options apply</div>
+                </div>
+              </div>
+              {g.electrical_risks && g.electrical_risks.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Electrical / RF Risks from Ice</div>
+                  {g.electrical_risks.map((r, i) => (
+                    <div key={i} style={{ marginBottom: 4, background: '#0f172a', borderRadius: 5, padding: 7 }}>
+                      <div style={{ color: '#f1f5f9', fontSize: 12 }}>{r.risk} <span style={{ color: '#64748b', fontSize: 10 }}>{r.cfr}</span></div>
+                      <div style={{ color: '#94a3b8', fontSize: 10 }}>{r.mitigation}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Ground Lease Negotiation Guide */}
         {candidate.ground_lease_negotiation_guide && (() => {
           const g = candidate.ground_lease_negotiation_guide;

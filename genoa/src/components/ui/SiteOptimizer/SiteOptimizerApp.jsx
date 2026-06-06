@@ -1717,6 +1717,34 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      antenna_deicing_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        candidate_lat: 34.86,
+        ice_zone: 'Zone II',
+        ice_mm: 12.5,
+        deicing_recommended: false,
+        n_applicable_systems: 1,
+        all_deicing_systems: [
+          { id: 'HEAT_TAPE', label: 'Resistive heat tape (guy anchor points)', cost_usd_per_year: { low: 800, high: 2000 }, ice_zone_threshold: 'Zone III', note: 'Protects guy wire anchor hardware from ice seizure; effective in Zones III–IV' },
+          { id: 'ICEPHOBIC', label: 'Ice-phobic coating (tower base sections)', cost_usd_per_year: { low: 500, high: 1500 }, ice_zone_threshold: 'Zone III', note: 'Reduces ice adhesion; must be reapplied every 3–5 years' },
+          { id: 'HEATED_ATU', label: 'Heated ATU/base insulator enclosure', cost_usd_per_year: { low: 300, high: 800 }, ice_zone_threshold: 'Zone II', note: 'Prevents ice from affecting base impedance matching network and carrier frequency stability' },
+          { id: 'ICE_MONITOR', label: 'Remote ice/weather monitoring', cost_usd_per_year: { low: 400, high: 1200 }, ice_zone_threshold: 'Zone II', note: 'Allows early warning of icing events for ATU retuning and structural inspection scheduling' }
+        ],
+        applicable_deicing_systems: [
+          { id: 'HEATED_ATU', label: 'Heated ATU/base insulator enclosure', cost_usd_per_year: { low: 300, high: 800 }, ice_zone_threshold: 'Zone II', note: 'Prevents ice from affecting base impedance matching network and carrier frequency stability' },
+          { id: 'ICE_MONITOR', label: 'Remote ice/weather monitoring', cost_usd_per_year: { low: 400, high: 1200 }, ice_zone_threshold: 'Zone II', note: 'Allows early warning of icing events for ATU retuning and structural inspection scheduling' }
+        ],
+        estimated_annual_deicing_cost_usd: { low: 700, typical: 1150, high: 2000 },
+        electrical_risks: [
+          { risk: 'Carrier frequency drift', cfr: '§73.1215', trigger: '25mm radial ice on tower base can shift ATU impedance, causing carrier drift >±20 Hz', mitigation: 'Monitor carrier frequency during icing events; retune ATU as needed' },
+          { risk: 'DA pattern distortion', cfr: '§73.182', trigger: 'Non-uniform ice on DA elements distorts radiation pattern; may cause interference to co-channel stations', mitigation: 'Pattern monitoring during icing; inspect antenna elements post-storm' },
+          { risk: 'Base insulator flashover', cfr: '§73.49', trigger: 'Ice bridging across base insulator can cause flashover and transmitter shutdown', mitigation: 'Heated ATU enclosure; insulator inspection after freeze/thaw cycles' }
+        ],
+        n_electrical_risks: 3,
+        relocation_note: 'Site at 34.86°N is Zone II (radial ice design thickness: 12.5mm). Icing events occur; ATU heated enclosure and remote monitoring recommended at minimum. Monitor carrier frequency (§73.1215) during icing events.',
+        reference: 'TIA-222-H (2017); ASCE 7-22; 47 CFR §73.1215; §73.49; §73.182; ANSI/TIA-322 tower climbing safety',
+        note: 'Ice zone: Zone II (12.5mm design thickness at 34.86°N). 2 applicable deicing systems. Estimated annual cost: $1,150. Deicing not required but monitor.'
+      },
       ground_lease_negotiation_guide: {
         frequency_khz: 780, fcc_class: 'D',
         recommended_lease_term_years: 25,

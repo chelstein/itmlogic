@@ -984,7 +984,10 @@ export async function runSiteOptimizer(body = {}){
     easg_test_weekly:       c.emergency_alert_system_equipment_guide?.weekly_test_required ?? null,
     glng_lease_term_yrs:    c.ground_lease_negotiation_guide?.recommended_lease_term_years ?? null,
     glng_base_rent_usd:     c.ground_lease_negotiation_guide?.estimated_annual_rent_usd?.typical ?? null,
-    glng_option_to_buy:     c.ground_lease_negotiation_guide?.option_to_purchase_recommended ?? null
+    glng_option_to_buy:     c.ground_lease_negotiation_guide?.option_to_purchase_recommended ?? null,
+    adg_ice_zone:           c.antenna_deicing_guide?.ice_zone ?? null,
+    adg_deicing_required:   c.antenna_deicing_guide?.deicing_recommended ?? null,
+    adg_annual_cost_usd:    c.antenna_deicing_guide?.estimated_annual_deicing_cost_usd?.typical ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6719,6 +6722,96 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    antenna_deicing_guide: (() => {
+      // AM towers in cold-climate zones accumulate ice, which affects antenna electrical performance
+      // and poses structural loading risk. Key regulatory and engineering references:
+      //
+      // TIA-222-H (2017): Structural standard for antenna supporting structures; defines ice loads
+      // by geographic zone (30-year MRI radial ice thickness map). AM towers must be designed for
+      // the ice zone at the site. Guy wire ice load can increase tension by 200–400% over bare wire.
+      //
+      // Electrical effects of ice on AM antennas:
+      //   - Ice dielectric lowers effective antenna impedance and shifts resonant frequency
+      //   - At 780 kHz, a 25mm ice sleeve on the tower base section can shift base impedance by 5–15 Ω
+      //   - Frequency shift may cause carrier to drift outside ±20 Hz tolerance (§73.1215)
+      //   - ATU (antenna tuning unit) may need retuning during and after icing events
+      //   - Directional antenna patterns may be distorted when ice accumulation is non-uniform
+      //
+      // Ice zone estimation by latitude:
+      //   - < 30°N: ASCE 7 ice zone = none (Zone I, 0 mm)
+      //   - 30–37°N: Zone II (nominal 12.5mm radial ice; SW US, Gulf Coast)
+      //   - 37–43°N: Zone III (nominal 25mm radial ice; mid-US, Pacific NW)
+      //   - > 43°N: Zone IV (nominal 38mm+ radial ice; northern tier, New England)
+      //
+      // KAZM is at ~34.86°N (Sedona/Cottonwood AZ area) → Zone II; deicing usually not required
+      // but icing events occur; monitoring recommended.
+      //
+      // Deicing systems for AM towers:
+      //   - Resistive heat tape on guy wire anchor points (most common, low cost)
+      //   - Ice-phobic coatings on tower base sections (moderately effective, 5-year refresh)
+      //   - Heated ATU/base insulator enclosure (protects impedance matching network)
+      //   - Active tower excitation deicing (AC current warming, complex, rare)
+      //
+      // §73.1215: Carrier frequency must remain within ±20 Hz; icing that shifts ATU resonance
+      // can cause carrier drift — operator must monitor and retune during icing events
+      // §73.49: Fence and tower structure must remain in good repair — ice damage must be repaired
+
+      // Ice zone by latitude
+      const candidate_lat = pt.lat;
+      let ice_zone, ice_mm, deicing_recommended;
+      if (candidate_lat < 30) {
+        ice_zone = 'Zone I'; ice_mm = 0;  deicing_recommended = false;
+      } else if (candidate_lat < 37) {
+        ice_zone = 'Zone II'; ice_mm = 12.5; deicing_recommended = false;
+      } else if (candidate_lat < 43) {
+        ice_zone = 'Zone III'; ice_mm = 25; deicing_recommended = true;
+      } else {
+        ice_zone = 'Zone IV'; ice_mm = 38; deicing_recommended = true;
+      }
+
+      const DEICING_SYSTEMS = [
+        { id: 'HEAT_TAPE',      label: 'Resistive heat tape (guy anchor points)', cost_usd_per_year: { low: 800, high: 2000 }, ice_zone_threshold: 'Zone III', note: 'Protects guy wire anchor hardware from ice seizure; effective in Zones III–IV' },
+        { id: 'ICEPHOBIC',      label: 'Ice-phobic coating (tower base sections)', cost_usd_per_year: { low: 500, high: 1500 }, ice_zone_threshold: 'Zone III', note: 'Reduces ice adhesion; must be reapplied every 3–5 years' },
+        { id: 'HEATED_ATU',     label: 'Heated ATU/base insulator enclosure', cost_usd_per_year: { low: 300, high: 800 }, ice_zone_threshold: 'Zone II', note: 'Prevents ice from affecting base impedance matching network and carrier frequency stability' },
+        { id: 'ICE_MONITOR',    label: 'Remote ice/weather monitoring', cost_usd_per_year: { low: 400, high: 1200 }, ice_zone_threshold: 'Zone II', note: 'Allows early warning of icing events for ATU retuning and structural inspection scheduling' }
+      ];
+
+      const applicable_systems = DEICING_SYSTEMS.filter(s => {
+        const threshold = parseInt(s.ice_zone_threshold.replace('Zone ', ''));
+        const current = parseInt(ice_zone.replace('Zone ', ''));
+        return current >= threshold;
+      });
+
+      const annual_cost_typical = applicable_systems.reduce((sum, s) => sum + Math.round((s.cost_usd_per_year.low + s.cost_usd_per_year.high) / 2), 0);
+
+      const ELECTRICAL_RISKS = [
+        { risk: 'Carrier frequency drift', cfr: '§73.1215', trigger: `25mm radial ice on tower base can shift ATU impedance, causing carrier drift >±20 Hz`, mitigation: 'Monitor carrier frequency during icing events; retune ATU as needed' },
+        { risk: 'DA pattern distortion', cfr: '§73.182', trigger: 'Non-uniform ice on DA elements distorts radiation pattern; may cause interference to co-channel stations', mitigation: 'Pattern monitoring during icing; inspect antenna elements post-storm' },
+        { risk: 'Base insulator flashover', cfr: '§73.49', trigger: 'Ice bridging across base insulator can cause flashover and transmitter shutdown', mitigation: 'Heated ATU enclosure; insulator inspection after freeze/thaw cycles' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        candidate_lat: round2(candidate_lat),
+        ice_zone,
+        ice_mm,
+        deicing_recommended,
+        applicable_deicing_systems: applicable_systems,
+        n_applicable_systems: applicable_systems.length,
+        all_deicing_systems: DEICING_SYSTEMS,
+        estimated_annual_deicing_cost_usd: {
+          low: applicable_systems.reduce((s, d) => s + d.cost_usd_per_year.low, 0),
+          typical: annual_cost_typical,
+          high: applicable_systems.reduce((s, d) => s + d.cost_usd_per_year.high, 0)
+        },
+        electrical_risks: ELECTRICAL_RISKS,
+        n_electrical_risks: ELECTRICAL_RISKS.length,
+        relocation_note: `Site at ${round2(candidate_lat)}°N is ${ice_zone} (radial ice design thickness: ${ice_mm}mm). ${deicing_recommended ? 'Active deicing systems recommended.' : 'Icing events occur; ATU heated enclosure and remote monitoring recommended at minimum.'} Monitor carrier frequency (§73.1215) during icing events.`,
+        reference: 'TIA-222-H (2017); ASCE 7-22; 47 CFR §73.1215; §73.49; §73.182; ANSI/TIA-322 tower climbing safety',
+        note: `Ice zone: ${ice_zone} (${ice_mm}mm design thickness at ${round2(candidate_lat)}°N). ${applicable_systems.length} applicable deicing systems. Estimated annual cost: $${annual_cost_typical.toLocaleString()}. Deicing ${deicing_recommended ? 'RECOMMENDED' : 'not required but monitor'}.`
       };
     })(),
 
