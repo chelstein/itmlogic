@@ -5683,6 +5683,56 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- interference_complaint_resolution_guide ----
+
+test('interference_complaint_resolution_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.interference_complaint_resolution_guide != null, 'interference_complaint_resolution_guide missing');
+  const g = c.interference_complaint_resolution_guide;
+  assert.ok('protected_contours_mvm' in g, 'protected_contours_mvm missing');
+  assert.ok(Array.isArray(g.complaint_types), 'complaint_types must be array');
+  assert.ok(Array.isArray(g.mitigation_steps), 'mitigation_steps must be array');
+  assert.ok('resolution_timeline' in g, 'resolution_timeline missing');
+  assert.ok('defense_cost_estimate' in g, 'defense_cost_estimate missing');
+});
+
+test('interference_complaint_resolution_guide KAZM Class D protected contours', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].interference_complaint_resolution_guide;
+  assert.strictEqual(g.protected_contours_mvm.day, 0.5, 'Class D daytime protected contour must be 0.5 mV/m');
+  assert.strictEqual(g.protected_contours_mvm.night, null, 'Class D has no nighttime protection');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz must be 780');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+});
+
+test('interference_complaint_resolution_guide complaint types include co-channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].interference_complaint_resolution_guide;
+  const coCh = g.complaint_types.find(t => t.id === 'CO_CHANNEL_DAY');
+  assert.ok(coCh != null, 'CO_CHANNEL_DAY complaint type missing');
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(coCh.probability), 'probability must be LOW/MODERATE/HIGH');
+  assert.ok(g.n_complaint_types === g.complaint_types.length, 'n_complaint_types must match array length');
+});
+
+test('interference_complaint_resolution_guide mitigation steps are ordered', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].interference_complaint_resolution_guide;
+  assert.ok(g.mitigation_steps.length >= 3, 'must have at least 3 mitigation steps');
+  assert.strictEqual(g.n_mitigation_steps, g.mitigation_steps.length, 'n_mitigation_steps must match array length');
+  const steps = g.mitigation_steps.map(s => s.step);
+  assert.deepStrictEqual(steps, [...steps].sort((a, b) => a - b), 'mitigation steps must be in ascending order');
+});
+
+test('interference_complaint_resolution_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('icrg_high_risk_types' in row, 'icrg_high_risk_types missing from comparison table');
+    assert.ok('icrg_mod_risk_types' in row, 'icrg_mod_risk_types missing from comparison table');
+    assert.ok('icrg_n_complaints' in row, 'icrg_n_complaints missing from comparison table');
+  }
+});
+
 // ---- am_broadcast_translator_path_guide ----
 
 test('am_broadcast_translator_path_guide presence and structure', async () => {

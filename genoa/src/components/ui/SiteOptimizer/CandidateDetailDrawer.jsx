@@ -2226,6 +2226,52 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Interference Complaint Resolution Guide */}
+        {candidate.interference_complaint_resolution_guide && (() => {
+          const g = candidate.interference_complaint_resolution_guide;
+          const riskColors = { LOW: '#34d399', MODERATE: '#fbbf24', HIGH: '#f87171' };
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Interference Complaint Resolution <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.182</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>High Risk Types</div>
+                  <div style={{ color: g.high_risk_types > 0 ? '#f87171' : '#34d399', fontSize: 15, fontWeight: 700 }}>{g.high_risk_types ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Moderate Risk</div>
+                  <div style={{ color: g.moderate_risk_types > 0 ? '#fbbf24' : '#34d399', fontSize: 15, fontWeight: 700 }}>{g.moderate_risk_types ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Day Contour</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{g.protected_contours_mvm?.day ?? '—'} mV/m</div>
+                </div>
+              </div>
+              {g.complaint_types && g.complaint_types.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Complaint Types</div>
+                  {g.complaint_types.map((t, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
+                      <span style={{ color: riskColors[t.probability] ?? '#94a3b8', fontSize: 11, fontWeight: 700, width: 70, flexShrink: 0 }}>{t.probability}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{t.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.defense_cost_estimate && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Defense Cost Estimate</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>
+                    ${g.defense_cost_estimate.total_estimated_usd?.low?.toLocaleString()} – ${g.defense_cost_estimate.total_estimated_usd?.high?.toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Broadcast Translator Path Guide */}
         {candidate.am_broadcast_translator_path_guide && (() => {
           const g = candidate.am_broadcast_translator_path_guide;

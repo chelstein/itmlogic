@@ -1717,6 +1717,39 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      interference_complaint_resolution_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
+        protected_contours_mvm: { day: 0.5, night: null },
+        complaint_types: [
+          { id: 'CO_CHANNEL_DAY',    label: 'Co-channel daytime interference',             cfr: '§73.182(a)', trigger: 'New site groundwave reduces co-channel protected area', probability: 'MODERATE', resolution: 'Reduce TPO or add directional pattern' },
+          { id: 'CO_CHANNEL_NIGHT',  label: 'Co-channel nighttime skywave interference',   cfr: '§73.182(k)', trigger: 'Skywave reaches Class A or B night-protected area',     probability: 'LOW',      resolution: 'Class D has no nighttime protection' },
+          { id: 'ADJACENT_SPURIOUS', label: 'Spurious/harmonic emissions complaint',       cfr: '§73.44',     trigger: 'New transmitter with higher spurious emissions',        probability: 'LOW',      resolution: 'Ensure §73.44 compliance; add filtering if needed' },
+          { id: 'GROUNDWAVE_OVERLAP', label: 'Groundwave overlap with nearby co-channel', cfr: '§73.182; §73.37', trigger: 'New site closer to co-channel AM station',        probability: 'MODERATE', resolution: 'Engineering analysis showing contour separation' }
+        ],
+        n_complaint_types: 4, high_risk_types: 0, moderate_risk_types: 2,
+        resolution_timeline: {
+          informal_objection_weeks: { min: 8, typical: 16, max: 52 },
+          formal_petition_weeks: { min: 26, typical: 52, max: 156 },
+          field_inspection_weeks: { min: 4, typical: 12, max: 26 },
+          engineering_analysis_weeks: { min: 2, typical: 4, max: 8 }
+        },
+        defense_cost_estimate: {
+          engineering_study_usd: { low: 2000, high: 8000 },
+          fcc_counsel_usd: { low: 5000, high: 25000 },
+          field_measurement_usd: { low: 3000, high: 10000 },
+          total_estimated_usd: { low: 10000, high: 43000 }
+        },
+        mitigation_steps: [
+          { step: 1, action: 'Pre-relocation interference study', detail: 'Commission §73.182 groundwave study vs. co-channel stations within 1000 km', cfr: '§73.182' },
+          { step: 2, action: 'FCC LMS co-channel search', detail: 'Identify all AM stations within 3-skywave-skip distances on same channel', cfr: '§73.37(a)' },
+          { step: 3, action: 'DA pattern evaluation', detail: 'Evaluate if directional antenna would reduce interference risk', cfr: '§73.150; §73.154' },
+          { step: 4, action: 'Notify potentially affected stations', detail: 'Informal notification to co-channel stations whose protected area may be affected', cfr: 'Best practice; §73.3533(a)(7)' },
+          { step: 5, action: 'Retain engineering record', detail: 'Document all pre-move interference analyses', cfr: '§73.1800; §73.1840' }
+        ],
+        n_mitigation_steps: 5,
+        reference: '47 CFR §73.37; §73.44; §73.88; §73.150; §73.154; §73.182; §73.3587; §1.106',
+        note: 'Interference complaint risk for Class D station at 780 kHz: 0 HIGH, 2 MODERATE. NDA pattern — no directional mitigation available.'
+      },
       am_broadcast_translator_path_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
         translator_opportunity_available: true,

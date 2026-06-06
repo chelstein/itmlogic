@@ -948,7 +948,10 @@ export async function runSiteOptimizer(body = {}){
     dtog_fulltime_eligible: c.daytime_only_operation_guide?.fulltime_upgrade?.eligible ?? null,
     amtp_2mvm_radius_km:    c.am_broadcast_translator_path_guide?.am_2mvm_coverage_radius_km ?? null,
     amtp_60dbu_radius_km:   c.am_broadcast_translator_path_guide?.fm_translator?.estimated_60dbu_radius_km ?? null,
-    amtp_max_erp_w:         c.am_broadcast_translator_path_guide?.fm_translator?.max_erp_w ?? null
+    amtp_max_erp_w:         c.am_broadcast_translator_path_guide?.fm_translator?.max_erp_w ?? null,
+    icrg_high_risk_types:   c.interference_complaint_resolution_guide?.high_risk_types ?? null,
+    icrg_mod_risk_types:    c.interference_complaint_resolution_guide?.moderate_risk_types ?? null,
+    icrg_n_complaints:      c.interference_complaint_resolution_guide?.n_complaint_types ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6683,6 +6686,110 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    interference_complaint_resolution_guide: (() => {
+      // §73.88 (AM co-channel), §73.182 (AM interference calculations), §73.814 (FM/AM interference complaint process)
+      // AM stations are secondary to their protected contours only; interference "by-right" to other stations
+      // is a function of whether the complaining station is within a protected service area.
+      // Relocation can trigger NEW interference complaints from neighbors OR resolve existing ones.
+      // The FCC's Engineering Division (OET) and Media Bureau adjudicate interference complaints.
+      // FCC complaint process:
+      //   1. Informal complaint: §73.3587 — informal objection filed by letter with Engineering
+      //   2. Formal complaint: §1.106 petition for reconsideration of a grant
+      //   3. Bureau-initiated investigation: if interference is widespread
+      //   4. Field inspection: FCC Enforcement Bureau may conduct field measurements
+      // Key metric: "objectionable interference" — FCC §73.182(k) defines this as interference
+      //   that causes the received signal level to drop below the protected contour value.
+
+      const isDA_icrg = /^DA/i.test(pattern_mode);
+
+      // Identify the station's protected service area contours
+      // §73.182 Table 1: protected field strength at various distances for AM classes
+      const CLASS_PROTECTED_MVM = {
+        A: { day: 0.5, night: 0.5 },  // 0.5 mV/m day and night
+        B: { day: 0.5, night: 0.5 },
+        C: { day: 0.5, night: 0.5 },
+        D: { day: 0.5, night: null }   // Class D: daytime 0.5 mV/m; no nighttime protection from others
+      };
+      const protectedContours = CLASS_PROTECTED_MVM[fcc_class.toUpperCase()] ?? { day: 0.5, night: null };
+
+      // Interference complaint types most likely for a relocating AM station
+      const COMPLAINT_TYPES = [
+        {
+          id:          'CO_CHANNEL_DAY',
+          label:       'Co-channel daytime interference',
+          cfr:         '§73.182(a)',
+          trigger:     'New site generates groundwave that reduces co-channel protected area below 0.5 mV/m contour',
+          probability: fcc_class.toUpperCase() === 'A' ? 'LOW' : 'MODERATE',
+          resolution:  'Reduce TPO, add directional pattern, or demonstrate separation per §73.182 Table II'
+        },
+        {
+          id:          'CO_CHANNEL_NIGHT',
+          label:       'Co-channel nighttime skywave interference',
+          cfr:         '§73.182(k)',
+          trigger:     'Skywave from new site reaches a Class A or B night-protected area',
+          probability: fcc_class.toUpperCase() === 'D' ? 'LOW' : 'HIGH',
+          resolution:  'Class D has no nighttime protection; Class A/B may need directional night pattern'
+        },
+        {
+          id:          'ADJACENT_SPURIOUS',
+          label:       'Spurious/harmonic emissions complaint',
+          cfr:         '§73.44',
+          trigger:     'New site uses different transmitter with higher spurious emissions; neighbor complains about interference to FM or other services',
+          probability: 'LOW',
+          resolution:  'Ensure transmitter meets §73.44 spurious emissions limits; add filtering if needed'
+        },
+        {
+          id:          'GROUNDWAVE_OVERLAP',
+          label:       'Groundwave overlap with nearby same-frequency station',
+          cfr:         '§73.182; §73.37',
+          trigger:     'New site is closer to a co-channel AM station, reducing signal-to-interference ratio below FCC minimum',
+          probability: 'MODERATE',
+          resolution:  'Engineering analysis showing contour separation meets §73.182 Table II requirements; may require reduced power or directional antenna'
+        }
+      ];
+
+      // Timeline for FCC complaint resolution
+      const RESOLUTION_TIMELINE = {
+        informal_objection_weeks: { min: 8, typical: 16, max: 52 },
+        formal_petition_weeks: { min: 26, typical: 52, max: 156 },
+        field_inspection_weeks: { min: 4, typical: 12, max: 26 },
+        engineering_analysis_weeks: { min: 2, typical: 4, max: 8 }
+      };
+
+      // Cost estimate for defending an interference complaint
+      const DEFENSE_COST_EST = {
+        engineering_study_usd: { low: 2000, high: 8000 },
+        fcc_counsel_usd: { low: 5000, high: 25000 },
+        field_measurement_usd: { low: 3000, high: 10000 },
+        total_estimated_usd: { low: 10000, high: 43000 }
+      };
+
+      // Mitigation measures available pre-relocation to reduce complaint risk
+      const MITIGATION_STEPS = [
+        { step: 1, action: 'Pre-relocation interference study', detail: 'Commission §73.182 groundwave study for new site vs. all co-channel stations within 1000 km', cfr: '§73.182' },
+        { step: 2, action: 'FCC LMS co-channel search', detail: 'Identify all AM stations within 3-skywave-skip distances on the same channel', cfr: '§73.37(a)' },
+        { step: 3, action: 'DA pattern evaluation', detail: isDA_icrg ? 'Verify directional pattern reduces interference toward sensitive co-channel directions' : 'Evaluate if directional antenna would reduce interference risk', cfr: '§73.150; §73.154' },
+        { step: 4, action: 'Notify potentially affected stations', detail: 'Informal notification to co-channel stations whose protected area may be affected; allows for pre-dispute resolution', cfr: 'Best practice; §73.3533(a)(7)' },
+        { step: 5, action: 'Retain engineering record', detail: 'Document all pre-move interference analyses; critical if complaint filed after CP grant', cfr: '§73.1800; §73.1840' }
+      ];
+
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        protected_contours_mvm: protectedContours,
+        complaint_types: COMPLAINT_TYPES,
+        n_complaint_types: COMPLAINT_TYPES.length,
+        high_risk_types: COMPLAINT_TYPES.filter(t => t.probability === 'HIGH').length,
+        moderate_risk_types: COMPLAINT_TYPES.filter(t => t.probability === 'MODERATE').length,
+        resolution_timeline: RESOLUTION_TIMELINE,
+        defense_cost_estimate: DEFENSE_COST_EST,
+        mitigation_steps: MITIGATION_STEPS,
+        n_mitigation_steps: MITIGATION_STEPS.length,
+        relocation_note: 'A new transmitter site may generate interference to co-channel and adjacent stations that was not present at the current site. Pre-relocation §73.182 interference study is strongly recommended before filing CP.',
+        reference: '47 CFR §73.37; §73.44; §73.88; §73.150; §73.154; §73.182; §73.3587; §1.106; FCC Engineering Division interference complaint procedures',
+        note: `Interference complaint risk for ${fcc_class} station at ${frequency_khz} kHz: ${COMPLAINT_TYPES.filter(t => t.probability === 'HIGH').length} HIGH, ${COMPLAINT_TYPES.filter(t => t.probability === 'MODERATE').length} MODERATE. ${isDA_icrg ? 'Directional antenna provides some interference mitigation flexibility.' : 'NDA pattern — no directional mitigation available.'}`
       };
     })(),
 
