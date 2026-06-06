@@ -881,6 +881,56 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Power upgrade analysis */}
+        {candidate.power_upgrade_analysis?.applicable && (() => {
+          const pua = candidate.power_upgrade_analysis;
+          const verdictColor = pua.verdict === 'UPGRADE_RESOLVES_COL' ? '#63d471'
+            : pua.verdict === 'UPGRADE_CAUSES_BLANKET_VIOLATION' ? '#ffb347'
+            : '#e05252';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Max class power upgrade analysis</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: verdictColor + '22', color: verdictColor }}>
+                    {pua.verdict?.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-textDim text-[9px]">
+                    +{pua.headroom_kw} kW headroom → {pua.max_class_power_kw} kW max
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 text-[9px]">
+                  {pua.col_coverage_estimate_at_max_pct != null && (
+                    <div>
+                      <span className="text-textDim">COL at max: </span>
+                      <span style={{ color: pua.col_would_comply_at_max ? '#63d471' : '#ff7a7a' }}>
+                        {pua.col_coverage_estimate_at_max_pct}%
+                      </span>
+                    </div>
+                  )}
+                  {pua.reach_at_max_class_power_km != null && (
+                    <div>
+                      <span className="text-textDim">5 mV/m reach: </span>
+                      <span className="text-cream">{pua.reach_at_max_class_power_km} km</span>
+                    </div>
+                  )}
+                  {pua.blanket_concern_at_max && (
+                    <div>
+                      <span className="text-textDim">Blanket at max: </span>
+                      <span style={{ color: pua.blanket_concern_at_max.would_exceed_limit ? '#ff7a7a' : '#63d471' }}>
+                        {pua.blanket_concern_at_max.estimated_blanket_pop_pct}%
+                        {pua.blanket_concern_at_max.would_exceed_limit ? ' ✕ EXCEEDS §73.24(g)' : ' ✓'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {pua.note && <div className="text-textDim/40 text-[9px] leading-tight">{pua.note}</div>}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* TPO-to-coverage table */}
         {candidate.tpo_to_coverage_table?.length > 0 && (
           <div>

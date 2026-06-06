@@ -687,7 +687,9 @@ export async function runSiteOptimizer(body = {}){
     cost_low_usd:           c.tower_cost_estimate?.total_low_usd ?? null,
     cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null,
     seasonal_variability:   c.seasonal_conductivity_note?.seasonal_variability ?? null,
-    seasonal_risk:          c.seasonal_conductivity_note?.risk_level ?? null
+    seasonal_risk:          c.seasonal_conductivity_note?.risk_level ?? null,
+    power_upgrade_verdict:  c.power_upgrade_analysis?.verdict ?? null,
+    headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
