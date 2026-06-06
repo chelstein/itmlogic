@@ -274,6 +274,7 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             totalScore={candidate.score}
             baselineBreakdown={baseline?.score_breakdown ?? null}
             baselineTotalScore={baseline?.score ?? null}
+            rawComponents={e.score_components_raw ?? null}
           />
         </div>
 

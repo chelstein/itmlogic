@@ -6,24 +6,26 @@ import React from 'react';
 // explainable at a glance.
 
 const GOAL_COLORS = {
-  col_coverage:  '#ffb347',
-  population:    '#f3c86d',
-  blanket:       '#6fd3ff',
-  conductivity:  '#63d471',
-  wildfire:      '#e89972',
-  treaty_zone:   '#c98aff'
+  col_coverage:        '#ffb347',
+  population:          '#f3c86d',
+  blanket:             '#6fd3ff',
+  conductivity:        '#63d471',
+  wildfire:            '#e89972',
+  treaty_zone:         '#c98aff',
+  confidence_penalty:  '#ff7a7a'
 };
 
 const GOAL_LABELS = {
-  col_coverage: 'COL coverage',
-  population:   'Population',
-  blanket:      'Blanket pop.',
-  conductivity: 'Conductivity',
-  wildfire:     'Wildfire risk',
-  treaty_zone:  'Treaty zone'
+  col_coverage:       'COL coverage',
+  population:         'Population',
+  blanket:            'Blanket pop.',
+  conductivity:       'Conductivity',
+  wildfire:           'Wildfire risk',
+  treaty_zone:        'Treaty zone',
+  confidence_penalty: 'Confidence ↓'
 };
 
-export default function ScoreBreakdownChart({ breakdown, totalScore, baselineBreakdown, baselineTotalScore }){
+export default function ScoreBreakdownChart({ breakdown, totalScore, baselineBreakdown, baselineTotalScore, rawComponents }){
   const entries = Object.entries(breakdown || {});
   if (entries.length === 0){
     return (
@@ -126,6 +128,31 @@ export default function ScoreBreakdownChart({ breakdown, totalScore, baselineBre
       {inactive.length > 0 && (
         <div className="border-t border-rule/30 mt-1.5 pt-1.5 space-y-1.5">
           {inactive.map(([k, v]) => renderRow(k, v, true))}
+        </div>
+      )}
+      {rawComponents && Object.keys(rawComponents).filter(k => rawComponents[k] != null).length > 0 && (
+        <div className="border-t border-rule/30 mt-2 pt-2">
+          <div className="rack-eyebrow mb-1">Raw sub-scores (unweighted 0–100)</div>
+          <div className="space-y-1">
+            {Object.entries(rawComponents)
+              .filter(([, v]) => v != null)
+              .map(([k, v]) => {
+                const col = GOAL_COLORS[k] || '#a89c84';
+                return (
+                  <div key={k} className="grid grid-cols-[110px_1fr_40px] items-center gap-2">
+                    <span className="font-mono text-[9px] uppercase tracking-rack text-textDim opacity-60">
+                      {GOAL_LABELS[k] || k}
+                    </span>
+                    <div className="h-1.5 bg-[#06141a] border border-rule rounded-sm overflow-hidden">
+                      <div style={{ width: `${Math.max(0, Math.min(100, Number(v)))}%`, background: col + '66', height: '100%' }} />
+                    </div>
+                    <span className="font-mono text-[9px] text-right" style={{ color: col + 'aa' }}>
+                      {Number(v).toFixed(0)}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
     </div>
