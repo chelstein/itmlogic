@@ -628,6 +628,21 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
   c.status_category = category;
   c.explanation = c.explanation || {};
   c.explanation.recovery_reasoning = reasoning.join(' ');
+
+  // Align nif_status with the assigned category so colocation candidates
+  // carry a meaningful label (not just the default 'SCREENING ONLY').
+  const NIF_MAP = {
+    PROMISING:                     'PROMISING',
+    REVIEW_REQUIRED:               'REVIEW REQUIRED',
+    NON_COMPLIANT:                 'NON-COMPLIANT',
+    RECOVERABLE_WITH_DA:           'NON-COMPLIANT',
+    RECOVERABLE_WITH_POWER_INCREASE: 'NON-COMPLIANT',
+    RECOVERABLE_WITH_REDUCED_POWER: 'NON-COMPLIANT',
+    RECOVERABLE_WITH_COL_CHANGE:   'NON-COMPLIANT',
+    TREATY_REVIEW:                 'REVIEW REQUIRED',
+    UNKNOWN_DATA:                  'SCREENING ONLY'
+  };
+  c.nif_status = NIF_MAP[category] ?? 'SCREENING ONLY';
 }
 
 function collectHardFails(c){
@@ -655,6 +670,17 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             recommended_actions,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
+  // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
+  for (const c of candidates){
+    if (!c.nif_status || c.nif_status === 'SCREENING ONLY') continue;
+    if (c.treaty_zone){
+      c.nif_status += ' — TREATY COORDINATION REQUIRED';
+    } else if (skywave_risk_level === 'HIGH'){
+      c.nif_status += ' — HIGH skywave risk (§73.182 NIF study required)';
+    } else if (skywave_risk_level === 'MODERATE'){
+      c.nif_status += ' — MODERATE skywave risk';
+    }
+  }
   return {
     available: true,
     method,
@@ -698,6 +724,7 @@ function baselineSummary(b){
     blanket_1000mvm_km:           b.blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw:   b.minimum_tpo_for_compliance_kw ?? null,
     minimum_tpo_for_col_coverage_kw: b.minimum_tpo_for_col_coverage_kw ?? null,
+    col_coverage_gap_pct:            b.col_coverage_gap_pct ?? null,
     ground_sigma_mS_m:            b.ground_sigma_mS_m,
     ground_sigma_quality:         b.ground_sigma_quality,
     ground_sigma_source:          b.ground_sigma_source,
