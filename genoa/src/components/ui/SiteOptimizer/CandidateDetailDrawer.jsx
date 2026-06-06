@@ -972,6 +972,42 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         )}
 
+        {/* Population reach bands */}
+        {candidate.population_reach_bands?.bands?.length > 0 && (() => {
+          const bands = candidate.population_reach_bands.bands;
+          const maxDist = Math.max(...bands.map(b => b.distance_km ?? 0));
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Multi-contour reach <span className="normal-case text-textDim/60">(screening-grade population proxy)</span></div>
+              <div className="space-y-1">
+                {bands.map(band => {
+                  const pct = maxDist > 0 ? (band.distance_km ?? 0) / maxDist : 0;
+                  const isFive = band.target_mvm === 5.0;
+                  const isHalf = band.target_mvm === 0.5;
+                  const barColor = isFive ? '#63d471' : isHalf ? '#7ec8e3' : '#a89c84';
+                  return (
+                    <div key={band.target_mvm} className="font-mono text-[9px]">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <span className="text-textDim w-24 shrink-0">{band.target_mvm} mV/m</span>
+                        <span className="text-cream w-16 text-right shrink-0">
+                          {band.distance_km != null ? `${band.distance_km} km` : '—'}
+                        </span>
+                        <span className="text-textDim/60 w-24 text-right shrink-0">
+                          {band.estimated_population != null ? `~${(band.estimated_population / 1000).toFixed(0)}k pop` : ''}
+                        </span>
+                      </div>
+                      <div className="h-1 bg-rule/20 rounded-sm overflow-hidden">
+                        <div className="h-full rounded-sm transition-all"
+                          style={{ width: `${Math.round(pct * 100)}%`, background: barColor + 'aa' }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Groundwave contour table */}
         {candidate.groundwave_contour_table?.length > 0 && (
           <div>
