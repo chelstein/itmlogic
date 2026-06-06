@@ -2796,3 +2796,58 @@ test('ground_radial_advisory REQUIRED advisory has extended_system_required=true
     }
   }
 });
+
+// ---------- mpe_rf_exposure_summary ----------
+
+test('mpe_rf_exposure_summary is present on every candidate with required shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const mpe = c.mpe_rf_exposure_summary;
+    assert.ok(mpe != null, `mpe_rf_exposure_summary must be present (rank ${c.rank})`);
+    assert.equal(mpe.evaluation_required, true, `evaluation_required must be true (rank ${c.rank})`);
+    assert.ok(typeof mpe.near_field_boundary_m === 'number' && mpe.near_field_boundary_m > 0,
+      `near_field_boundary_m must be > 0 (rank ${c.rank})`);
+    assert.ok(typeof mpe.mpe_limit_mw_cm2 === 'number' && mpe.mpe_limit_mw_cm2 > 0,
+      `mpe_limit_mw_cm2 must be > 0 (rank ${c.rank})`);
+    assert.ok(typeof mpe.far_field_exclusion_m === 'number' && mpe.far_field_exclusion_m > 0,
+      `far_field_exclusion_m must be > 0 (rank ${c.rank})`);
+    assert.ok(typeof mpe.recommended_fence_distance_m === 'number' && mpe.recommended_fence_distance_m > 0,
+      `recommended_fence_distance_m must be > 0 (rank ${c.rank})`);
+    assert.ok(typeof mpe.note === 'string' && mpe.note.length > 0,
+      `note must be non-empty string (rank ${c.rank})`);
+  }
+});
+
+test('mpe_rf_exposure_summary.near_field_boundary_m ≈ lambda/(2*pi) at station frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1000, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  // At 1000 kHz: lambda = 300 m, lambda/(2*pi) ≈ 47.75 m
+  const expected = 300000 / 1000 / (2 * Math.PI);
+  for (const c of out.candidates.slice(0, 1)){
+    const mpe = c.mpe_rf_exposure_summary;
+    assert.ok(Math.abs(mpe.near_field_boundary_m - Math.round(expected * 100) / 100) < 1,
+      `near_field_boundary_m should be ≈${expected.toFixed(2)} at 1000 kHz; got ${mpe.near_field_boundary_m}`);
+  }
+});
+
+test('mpe_rf_exposure_summary.recommended_fence_distance_m >= near_field_boundary_m', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const mpe = c.mpe_rf_exposure_summary;
+    assert.ok(mpe.recommended_fence_distance_m >= mpe.near_field_boundary_m,
+      `fence distance must be >= near_field_boundary (rank ${c.rank}): ${mpe.recommended_fence_distance_m} < ${mpe.near_field_boundary_m}`);
+  }
+});
+
+test('mpe_rf_exposure_summary fence distance increases with higher TPO', async () => {
+  const low  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, candidate_limit: 1 });
+  const high = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  assert.equal(low.available, true);
+  assert.equal(high.available, true);
+  const fenceLow  = low.candidates[0].mpe_rf_exposure_summary.recommended_fence_distance_m;
+  const fenceHigh = high.candidates[0].mpe_rf_exposure_summary.recommended_fence_distance_m;
+  assert.ok(fenceHigh > fenceLow,
+    `higher TPO should produce larger fence distance: ${fenceHigh} not > ${fenceLow}`);
+});

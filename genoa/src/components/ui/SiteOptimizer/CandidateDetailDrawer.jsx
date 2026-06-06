@@ -475,11 +475,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               {candidate.ground_sigma_source && (
                 <div className="text-textDim text-[9px] mt-0.5 leading-tight">{candidate.ground_sigma_source}</div>
               )}
-              {candidate.ground_radial_advisory && (
-                <div className="font-mono text-[9px] text-amber mt-1 leading-snug max-w-xs">
-                  ⚠ {candidate.ground_radial_advisory}
-                </div>
-              )}
+              {candidate.ground_radial_advisory && (() => {
+                const gra = candidate.ground_radial_advisory;
+                const levelColor = gra.advisory_level === 'REQUIRED' ? '#ff9b5a'
+                  : gra.advisory_level === 'ADVISORY' ? '#f6c90e'
+                  : '#4ec9b0';
+                return (
+                  <div className="font-mono text-[9px] mt-1.5 leading-snug border-t border-rule/30 pt-1.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <span className="uppercase text-[8px] tracking-rack px-1 py-0.5 rounded-sm"
+                        style={{ background: levelColor + '22', color: levelColor }}>
+                        ground system — {gra.advisory_level}
+                      </span>
+                    </div>
+                    <div className="text-textDim leading-snug">{gra.note}</div>
+                    <div className="grid grid-cols-2 gap-x-2 mt-1 text-textDim/70">
+                      <span>Radials: <span className="text-cream">{gra.recommended_radial_count}</span></span>
+                      <span>Length: <span className="text-cream">{gra.recommended_radial_length_m != null ? `${gra.recommended_radial_length_m} m` : '—'}</span></span>
+                      {gra.estimated_copper_kg != null && (
+                        <span className="col-span-2">Copper: ~<span className="text-cream">{gra.estimated_copper_kg} kg</span></span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               {candidate.sigma_sensitivity_analysis?.upgrade_possible && (() => {
                 const ssa = candidate.sigma_sensitivity_analysis;
                 const recColor = ssa.survey_recommendation?.startsWith('HIGH') ? '#63d471'

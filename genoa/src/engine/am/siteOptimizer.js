@@ -1700,10 +1700,43 @@ async function scoreCandidate(pt, ctx, warnings){
     })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
-    // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically
-    // required to perform an RF exposure evaluation (MPE study).  True for all
-    // licensed AM stations regardless of power level.
+    // OET Bulletin 65 / 47 CFR §1.1307 RF exposure summary.
+    // All licensed AM stations must perform an MPE evaluation.
+    // Near-field boundary = λ/(2π); general public exclusion zone derived from
+    // OET-65 §3.B maximum permissible exposure limits for uncontrolled environments.
+    // These are SCREENING estimates; actual exclusion distances require a full
+    // near-field study with the specific antenna and ground system design.
     mpe_evaluation_required: true,
+    mpe_rf_exposure_summary: (() => {
+      const lambdaM_mpe = 300000 / frequency_khz;
+      // Near-field boundary (reactive near-field): r < λ/(2π)
+      const near_field_boundary_m = round2(lambdaM_mpe / (2 * Math.PI));
+      // Far-field MPE limit for general public (uncontrolled environment):
+      // 47 CFR §1.1310 Table 1: 0.3–3 MHz → S = f²/300 mW/cm² where f in MHz.
+      // For AM broadcast (0.53–1.7 MHz): f² / 300 mW/cm²
+      const freq_mhz = frequency_khz / 1000;
+      // Round to 4 decimal places so small values at lower AM frequencies are non-zero.
+      const mpe_limit_mw_cm2 = Math.round((freq_mhz * freq_mhz) / 300 * 10000) / 10000;
+      // Power density at distance r (far-field, free-space):
+      // S = P_ERP / (4π r²) × unit_conversions
+      // Exclusion distance where S = MPE_LIMIT:
+      // r = sqrt(P_W / (4π × MPE_W_m2)) where MPE_W_m2 = mpe_limit_mw_cm2 × 10
+      const erp_w    = tpo_kw * 1000;  // assume ERP ≈ TPO for vertical monopole (screening)
+      const mpe_w_m2 = mpe_limit_mw_cm2 * 10;  // convert mW/cm² → W/m²
+      const exclusion_m = round2(Math.sqrt(erp_w / (4 * Math.PI * mpe_w_m2)));
+      // Practical minimum fence distance: max of near-field boundary and exclusion radius.
+      const fence_distance_m = round2(Math.max(near_field_boundary_m, exclusion_m));
+      return {
+        evaluation_required: true,
+        rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
+        frequency_mhz: round2(freq_mhz),
+        near_field_boundary_m,
+        mpe_limit_mw_cm2,
+        far_field_exclusion_m: exclusion_m,
+        recommended_fence_distance_m: fence_distance_m,
+        note: `AM stations require an RF exposure evaluation at every new/modified site. Near-field boundary: ${near_field_boundary_m} m (λ/(2π) at ${frequency_khz} kHz). Estimated public exclusion zone: ${exclusion_m} m at ${tpo_kw} kW TPO. Minimum fence distance: ${fence_distance_m} m. Actual exclusion zone must be computed with the filed antenna pattern — this is a free-space screening estimate.`
+      };
+    })(),
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
     minimum_tpo_for_col_coverage_kw,
