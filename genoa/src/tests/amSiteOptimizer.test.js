@@ -3266,3 +3266,45 @@ test('candidate_comparison_table has land_use_class and density_factor columns',
     assert.ok('density_factor' in row, `comparison table missing density_factor (rank ${row.rank})`);
   }
 });
+
+// ---------- signal_environment_advisory ----------
+
+test('signal_environment_advisory is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.signal_environment_advisory != null,
+      `signal_environment_advisory must be present (rank ${c.rank})`);
+  }
+});
+
+test('signal_environment_advisory.proximity_tier is NEAR/MID/FAR', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['NEAR', 'MID', 'FAR']);
+  for (const c of out.candidates){
+    const tier = c.signal_environment_advisory?.proximity_tier;
+    assert.ok(VALID.has(tier),
+      `proximity_tier "${tier}" must be NEAR/MID/FAR (rank ${c.rank})`);
+  }
+});
+
+test('signal_environment_advisory.notes is a non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const notes = c.signal_environment_advisory?.notes;
+    assert.ok(Array.isArray(notes) && notes.length > 0,
+      `signal_environment_advisory.notes must be a non-empty array (rank ${c.rank})`);
+  }
+});
+
+test('current-site candidate (dist=0) has NEAR proximity_tier', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const currentSite = out.candidates.find(c => c.distance_from_current_km === 0);
+  if (currentSite){
+    assert.equal(currentSite.signal_environment_advisory?.proximity_tier, 'NEAR',
+      `Current site should have NEAR proximity_tier`);
+  }
+});

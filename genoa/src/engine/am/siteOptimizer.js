@@ -2209,6 +2209,54 @@ async function scoreCandidate(pt, ctx, warnings){
         rule: '47 CFR §73.150 / §73.24(j)'
       };
     })(),
+    // Signal environment advisory — characterizes the directional interference
+    // environment for this candidate based on bearing and distance context.
+    // Complements co_channel_spacing_estimate with geographic framing.
+    signal_environment_advisory: (() => {
+      const bearing = pt.bearing_deg ?? null;
+      const dist = pt.distance_from_current_km ?? 0;
+
+      // Bearing quadrant label — used for geographic framing.
+      const quadrant = bearing == null ? null
+        : bearing < 45  ? 'NORTH_SECTOR'
+        : bearing < 135 ? 'EAST_SECTOR'
+        : bearing < 225 ? 'SOUTH_SECTOR'
+        : bearing < 315 ? 'WEST_SECTOR'
+        : 'NORTH_SECTOR';
+
+      // Near (<25 km): within the primary service area of the current site —
+      // relocation here means the new and old towers are likely to mutually
+      // interfere on-channel during construction overlap.  Coordination required.
+      // Mid (25–80 km): regional; co-channel risk depends on class separation rules.
+      // Far (>80 km): likely in a different propagation region; full §73.37 study needed.
+      const proximity_tier = dist < 25 ? 'NEAR'
+        : dist < 80 ? 'MID'
+        : 'FAR';
+
+      const notes = [];
+      if (proximity_tier === 'NEAR'){
+        notes.push(`At ${round2(dist)} km from current site, temporary co-channel interference with current tower during construction overlap is a practical concern — coordinate with FCC on STA (Special Temporary Authorization) and signal shutdown protocol.`);
+      }
+      if (treaty_zone){
+        notes.push(`Treaty zone ${treaty_zone} at this bearing imposes directional power or pattern constraints on the ${quadrant?.replace('_', ' ') ?? ''} lobe.`);
+      }
+      const isClear = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      if (isClear && proximity_tier !== 'FAR'){
+        notes.push(`${frequency_khz} kHz is a §73.25 clear channel. Dominant Class A stations at this frequency may project skywave interference across this ${quadrant?.replace('_', ' ') ?? ''} bearing; NIF study must include full §73.182 azimuthal analysis.`);
+      }
+      if (sigma_msm < 2){
+        notes.push(`POOR ground conductivity (σ=${sigma_msm} mS/m) reduces groundwave propagation — signal environment may be more benign than high-σ sites but limits both service coverage AND useful co-channel analysis distance.`);
+      }
+
+      return {
+        bearing_deg: bearing != null ? round2(bearing) : null,
+        quadrant,
+        proximity_tier,
+        distance_km: round2(dist),
+        notes: notes.length > 0 ? notes : [`No specific signal environment alerts for this candidate location.`],
+        caution: `This is a screening-grade directional assessment only. Full §73.37 co-channel/adjacent-channel separation must be measured to all licensed stations in the region before filing.`
+      };
+    })(),
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),

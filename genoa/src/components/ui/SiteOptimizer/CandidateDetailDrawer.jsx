@@ -1045,6 +1045,45 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Signal environment advisory */}
+        {candidate.signal_environment_advisory && (() => {
+          const sea = candidate.signal_environment_advisory;
+          const tierColor = sea.proximity_tier === 'NEAR' ? '#ffb347'
+            : sea.proximity_tier === 'MID' ? '#7ec8e3'
+            : '#4ec9b0';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Signal environment</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: tierColor + '22', color: tierColor }}>
+                    {sea.proximity_tier}
+                  </span>
+                  {sea.quadrant && (
+                    <span className="text-textDim text-[9px]">{sea.quadrant.replace(/_/g, ' ')}</span>
+                  )}
+                  {sea.distance_km != null && (
+                    <span className="text-textDim/60 text-[9px]">{sea.distance_km} km</span>
+                  )}
+                </div>
+                {sea.notes?.length > 0 && (
+                  <div className="space-y-0.5">
+                    {sea.notes.map((note, i) => (
+                      <div key={i} className="text-textDim/75 leading-snug text-[9px] border-l border-rule/30 pl-1.5">
+                        {note}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {sea.caution && (
+                  <div className="text-textDim/40 text-[9px] leading-tight mt-0.5">{sea.caution}</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Co-channel spacing estimate */}
         {candidate.co_channel_spacing_estimate && (() => {
           const ccs = candidate.co_channel_spacing_estimate;
