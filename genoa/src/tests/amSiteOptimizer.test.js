@@ -1755,6 +1755,26 @@ test('tpo_to_coverage_table present on every candidate with correct structure', 
   }
 });
 
+test('score_components_raw present in explanation with correct 0-100 bounds', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true,
+      minimize_blanket_population: true, prefer_high_conductivity: true }
+  });
+  assert.equal(out.available, true);
+  const EXPECTED_KEYS = ['col_coverage', 'population', 'blanket', 'conductivity', 'wildfire', 'treaty_zone'];
+  for (const c of out.candidates){
+    const raw = c.explanation?.score_components_raw;
+    assert.ok(raw != null, `score_components_raw must be present (rank ${c.rank})`);
+    for (const k of EXPECTED_KEYS){
+      assert.ok(k in raw, `score_components_raw must have key '${k}' (rank ${c.rank})`);
+      if (raw[k] != null){
+        assert.ok(raw[k] >= 0 && raw[k] <= 100,
+          `score_components_raw.${k} must be in [0, 100]; got ${raw[k]} (rank ${c.rank})`);
+      }
+    }
+  }
+});
+
 test('tpo_to_coverage_table: TPO increases monotonically with distance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);

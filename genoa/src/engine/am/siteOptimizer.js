@@ -1167,6 +1167,16 @@ async function scoreCandidate(pt, ctx, warnings){
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),
     explanation: {
       score_breakdown: roundBreakdown(score_breakdown),
+      // Raw (unweighted) sub-scores: each on 0–100 scale before goal weighting.
+      // These show the underlying physical metric regardless of which goals are enabled.
+      score_components_raw: {
+        col_coverage:    sub.col_coverage    == null ? null : round2(sub.col_coverage),
+        population:      sub.population      == null ? null : round2(sub.population),
+        blanket:         sub.blanket         == null ? null : round2(sub.blanket),
+        conductivity:    round2(sub.conductivity),
+        wildfire:        sub.wildfire,
+        treaty_zone:     sub.treaty_zone     == null ? null : round2(sub.treaty_zone)
+      },
       ranking_rationale: rationale,
       weights_pool: weightPool,
       coverage_computed_from
