@@ -886,6 +886,7 @@ async function scoreCandidate(pt, ctx, warnings){
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
     principal_community_5mvm_km, field_at_col_centroid_mvm,
+    minimum_tpo_for_col_coverage_kw, minimum_tpo_for_compliance_kw,
     sigma_msm, distance_from_current_km: pt.distance_from_current_km,
     bearing_deg: pt.bearing_deg ?? null,
     treaty_zone, flags, score, score_breakdown
@@ -1251,19 +1252,29 @@ function cardinalDir(deg){
 }
 
 function buildRationale({ coverage_pct, daytime_reach_km, blanket_population_pct,
-                          principal_community_5mvm_km, field_at_col_centroid_mvm, sigma_msm,
-                          distance_from_current_km, bearing_deg, treaty_zone, flags, score, score_breakdown }){
+                          principal_community_5mvm_km, field_at_col_centroid_mvm,
+                          minimum_tpo_for_col_coverage_kw, minimum_tpo_for_compliance_kw,
+                          sigma_msm, distance_from_current_km, bearing_deg,
+                          treaty_zone, flags, score, score_breakdown }){
   if (flags.length){
     // More specific NON_COMPLIANT message: distinguish which hard limit failed.
     const colFail = flags.some(f => /COL/i.test(f));
     const blanketFail = flags.some(f => /Blanket/i.test(f));
     const failDesc = [];
-    if (colFail && field_at_col_centroid_mvm != null)
-      failDesc.push(`§73.24(j): field at COL centroid ${field_at_col_centroid_mvm.toFixed(2)} mV/m is below the 5 mV/m floor`);
-    else if (colFail && principal_community_5mvm_km != null)
+    if (colFail && field_at_col_centroid_mvm != null){
+      const colNote = minimum_tpo_for_col_coverage_kw != null
+        ? ` (increase TPO to ≥${minimum_tpo_for_col_coverage_kw} kW to fix)`
+        : ' (even at 50 kW, COL coverage cannot be achieved from this location)';
+      failDesc.push(`§73.24(j): field at COL centroid ${field_at_col_centroid_mvm.toFixed(2)} mV/m is below the 5 mV/m floor${colNote}`);
+    } else if (colFail && principal_community_5mvm_km != null)
       failDesc.push(`§73.24(j): 5 mV/m radius ${principal_community_5mvm_km.toFixed(1)} km does not cover the COL`);
     else if (colFail) failDesc.push(`§73.24(j): COL coverage below 80% floor`);
-    if (blanketFail) failDesc.push(`§73.24(g): blanket pop >1%`);
+    if (blanketFail){
+      const blankNote = minimum_tpo_for_compliance_kw != null
+        ? ` (reduce to ≤${minimum_tpo_for_compliance_kw} kW to fix)`
+        : '';
+      failDesc.push(`§73.24(g): blanket pop >1%${blankNote}`);
+    }
     if (!failDesc.length) failDesc.push(...flags);
     return `Non-compliant on screening: ${failDesc.join('; ')}.  Engineer-grade analysis required before filing.`;
   }

@@ -1221,3 +1221,24 @@ test('status_category: NON_COMPLIANT candidates have HARD CHECK FAIL in limitati
     }
   }
 });
+
+test('ranking_rationale for non-compliant candidates includes fix hint when minimum_tpo values are present', async () => {
+  // Use 50 kW near-border to force blanket pop failures with minimum_tpo_for_compliance_kw set.
+  const out = await runSiteOptimizer({
+    ...KAZM, tpo_kw: 50, fcc_class: 'A',
+    search_radius_km: 2, grid_spacing_km: 10, candidate_limit: 20,
+    optimization_goals: { maximize_col_coverage: true, minimize_blanket_population: true }
+  });
+  assert.equal(out.available, true);
+  // For candidates with minimum_tpo_for_compliance_kw set, the rationale should mention the fix.
+  const fixable = out.candidates.filter(c =>
+    c.minimum_tpo_for_compliance_kw != null &&
+    (c.status_category === 'NON_COMPLIANT' || c.status_category === 'RECOVERABLE_WITH_REDUCED_POWER')
+  );
+  for (const c of fixable){
+    const rationale = c.explanation?.ranking_rationale || '';
+    const kw = c.minimum_tpo_for_compliance_kw;
+    assert.ok(rationale.includes(String(kw)),
+      `rationale should include the blanket fix TPO (${kw} kW) for rank ${c.rank}: "${rationale}"`);
+  }
+});
