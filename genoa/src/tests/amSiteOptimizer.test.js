@@ -5683,6 +5683,55 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- transmitter_redundancy_guide ----
+
+test('transmitter_redundancy_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.transmitter_redundancy_guide != null, 'transmitter_redundancy_guide missing');
+  const g = c.transmitter_redundancy_guide;
+  assert.ok('backup_required_by_fcc' in g, 'backup_required_by_fcc missing');
+  assert.ok('emergency_operation' in g, 'emergency_operation missing');
+  assert.ok(Array.isArray(g.backup_sizing_options), 'backup_sizing_options must be array');
+  assert.ok('generator_guidance' in g, 'generator_guidance missing');
+  assert.ok('full_redundancy_cost' in g, 'full_redundancy_cost missing');
+});
+
+test('transmitter_redundancy_guide FCC does not mandate backup transmitter', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_redundancy_guide;
+  assert.strictEqual(g.backup_required_by_fcc, false, 'FCC does not require backup transmitter per §73.1680');
+  assert.strictEqual(g.backup_strongly_recommended, true, 'backup is strongly recommended');
+  assert.strictEqual(g.tpo_kw, 5, 'tpo_kw must be 5');
+});
+
+test('transmitter_redundancy_guide emergency operation allows 10 days without notification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_redundancy_guide;
+  assert.strictEqual(g.emergency_operation.max_days_no_notification, 10, 'emergency reduced power must be allowed ≤10 days without FCC notification');
+  assert.strictEqual(g.emergency_operation.sta_required_after_days, 30, 'STA required after 30 days on backup');
+  assert.strictEqual(g.emergency_operation.reduced_power_ok_without_pta, true, 'reduced power must be OK without PTA');
+});
+
+test('transmitter_redundancy_guide backup sizing options include full and half power', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_redundancy_guide;
+  assert.ok(g.backup_sizing_options.length >= 2, 'must have at least 2 sizing options');
+  const fullBackup = g.backup_sizing_options.find(o => o.option === 'FULL_BACKUP');
+  assert.ok(fullBackup != null, 'FULL_BACKUP option missing');
+  assert.ok(fullBackup.power_kw > 0, 'FULL_BACKUP power must be positive');
+  assert.ok(g.input_power_kva_estimate > g.tpo_kw, 'input power estimate must exceed TPO (efficiency <100%)');
+});
+
+test('transmitter_redundancy_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('trg_backup_req_fcc' in row, 'trg_backup_req_fcc missing from comparison table');
+    assert.ok('trg_input_kva' in row, 'trg_input_kva missing from comparison table');
+    assert.ok('trg_gen_kva' in row, 'trg_gen_kva missing from comparison table');
+  }
+});
+
 // ---- frequency_monitoring_plan_guide ----
 
 test('frequency_monitoring_plan_guide presence and structure', async () => {

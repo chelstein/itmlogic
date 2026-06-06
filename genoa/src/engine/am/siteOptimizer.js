@@ -966,7 +966,10 @@ export async function runSiteOptimizer(body = {}){
     asr_faa_notify:         c.asr_registration_update_guide?.faa_notification_likely ?? null,
     fmpg_freq_tolerance_hz: c.frequency_monitoring_plan_guide?.carrier_frequency_monitoring?.max_deviation_hz ?? null,
     fmpg_is_directional:    c.frequency_monitoring_plan_guide?.is_directional ?? null,
-    fmpg_da_curr_required:  c.frequency_monitoring_plan_guide?.da_base_current_monitoring?.required ?? null
+    fmpg_da_curr_required:  c.frequency_monitoring_plan_guide?.da_base_current_monitoring?.required ?? null,
+    trg_backup_req_fcc:     c.transmitter_redundancy_guide?.backup_required_by_fcc ?? null,
+    trg_input_kva:          c.transmitter_redundancy_guide?.input_power_kva_estimate ?? null,
+    trg_gen_kva:            c.transmitter_redundancy_guide?.generator_guidance?.recommended_kva ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6701,6 +6704,89 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    transmitter_redundancy_guide: (() => {
+      // §73.1680: Auxiliary transmitters — FCC does NOT require AM stations to have backup transmitters,
+      // but industry best practice strongly recommends it, especially for:
+      //   - Stations in rural areas with long repair lead times
+      //   - Emergency Alert System (EAS) participants (§11.35: EAS participants must maintain equipment)
+      //   - Stations with critical local service obligations
+      //
+      // When relocating, the backup transmitter plan may need to change:
+      //   - New site may require different power service (generator sizing)
+      //   - Transmission line routing changes; backup transmitter may need re-cabling
+      //   - If new site has a different tower (new antenna + feedline), backup transmitter must be compatible
+      //
+      // §73.1680: Auxiliary (backup) transmitter must meet the same technical standards as the main;
+      //   if used during primary outage, no separate notification to FCC required for < 30 days.
+      //   Beyond 30 days on backup: must file STA (§73.1635) if operating below licensed power.
+
+      const tpo_w_trg = (tpo_kw ?? 1) * 1000;
+
+      // Recommended backup transmitter power level
+      // FCC allows operation at reduced power during emergencies without prior approval
+      // §73.1615(a): Emergency operation — if main transmitter fails, may operate at reduced power
+      //   without FCC notification for up to 10 days; notify FCC within 24 hours if extended
+      const EMERGENCY_OPERATION = {
+        reduced_power_ok_without_pta: true,
+        max_days_no_notification: 10,
+        cfr: '§73.1615(a)',
+        notification_cfr: '§73.1615(b)',
+        sta_required_after_days: 30
+      };
+
+      // Backup transmitter sizing guidance
+      // Common practice: backup at 50–100% of licensed TPO
+      const backup_50pct_kw = round2(tpo_kw * 0.5);
+      const backup_100pct_kw = round2(tpo_kw);
+      const SIZING_OPTIONS = [
+        { option: 'FULL_BACKUP',   power_kw: backup_100pct_kw,  cost_est_usd: { low: 15000, high: 60000 }, note: 'Full-power backup; no STA required for short-term outages' },
+        { option: 'HALF_BACKUP',   power_kw: backup_50pct_kw,   cost_est_usd: { low: 8000,  high: 30000 }, note: 'Half-power backup; may need STA if main down >30 days' },
+        { option: 'SOLID_STATE',   power_kw: backup_100pct_kw,  cost_est_usd: { low: 20000, high: 80000 }, note: 'Solid-state backup; lower maintenance, higher upfront cost' }
+      ];
+
+      // EAS obligation
+      // §11.35(a): EAS participants must have EAS equipment in operational condition at all times
+      // Backup transmitter is strongly implied for EAS compliance in rural markets
+      const eas_participant_redundancy_note = 'EAS participants (§11.35) should maintain backup transmitter capability to ensure continuous EAS message relay, especially in rural areas with long repair timelines.';
+
+      // Generator / power backup
+      // At new transmitter site, standby generator is critical
+      // Typical AM transmitter load: 3–5× TPO for input power (efficiency ~20–33%)
+      const input_power_kva_estimate = round2(tpo_kw * 4); // rough estimate: 4:1 input/output
+      const GENERATOR_GUIDANCE = {
+        recommended_kva: round2(input_power_kva_estimate * 1.25), // 25% headroom
+        fuel_type: 'Diesel (preferred for extended outage reliability)',
+        run_time_hours_per_tank: 24,
+        automatic_transfer_switch: true,
+        cfr_reference: '§73.1680; NFPA 110 (emergency power systems)'
+      };
+
+      // Cost estimate for full redundancy
+      const FULL_REDUNDANCY_COST = {
+        backup_transmitter_usd: SIZING_OPTIONS[0].cost_est_usd,
+        transmission_line_switching_usd: { low: 2000, high: 8000 },
+        generator_usd: { low: 10000, high: 40000 },
+        automatic_transfer_switch_usd: { low: 2000, high: 6000 },
+        total_estimated_usd: { low: 29000, high: 114000 }
+      };
+
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        backup_required_by_fcc: false, // §73.1680 does not mandate backup transmitter
+        backup_strongly_recommended: true,
+        emergency_operation: EMERGENCY_OPERATION,
+        backup_sizing_options: SIZING_OPTIONS,
+        n_sizing_options: SIZING_OPTIONS.length,
+        input_power_kva_estimate,
+        generator_guidance: GENERATOR_GUIDANCE,
+        full_redundancy_cost: FULL_REDUNDANCY_COST,
+        eas_participant_redundancy_note,
+        relocation_note: 'New transmitter site requires reassessment of backup transmitter compatibility (antenna system, feedline, power supply). Generator sizing should match new transmitter power requirements.',
+        reference: '47 CFR §73.1615; §73.1635; §73.1680; §11.35 (EAS equipment); NFPA 110 (emergency power); NAB Engineering Handbook Chapter 7 (transmitter redundancy)',
+        note: `Backup transmitter NOT required by FCC but strongly recommended. Emergency reduced-power operation allowed ≤10 days without notification (§73.1615). Full redundancy estimate: \$29k–\$114k.`
       };
     })(),
 

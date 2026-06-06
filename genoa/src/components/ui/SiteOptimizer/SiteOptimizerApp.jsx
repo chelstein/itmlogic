@@ -1717,6 +1717,35 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      transmitter_redundancy_guide: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+        backup_required_by_fcc: false, backup_strongly_recommended: true,
+        emergency_operation: {
+          reduced_power_ok_without_pta: true, max_days_no_notification: 10,
+          cfr: '§73.1615(a)', notification_cfr: '§73.1615(b)', sta_required_after_days: 30
+        },
+        backup_sizing_options: [
+          { option: 'FULL_BACKUP',  power_kw: 5,   cost_est_usd: { low: 15000, high: 60000 }, note: 'Full-power backup; no STA required for short-term outages' },
+          { option: 'HALF_BACKUP',  power_kw: 2.5, cost_est_usd: { low: 8000,  high: 30000 }, note: 'Half-power backup; may need STA if main down >30 days' },
+          { option: 'SOLID_STATE',  power_kw: 5,   cost_est_usd: { low: 20000, high: 80000 }, note: 'Solid-state backup; lower maintenance, higher upfront cost' }
+        ],
+        n_sizing_options: 3,
+        input_power_kva_estimate: 20,
+        generator_guidance: {
+          recommended_kva: 25, fuel_type: 'Diesel', run_time_hours_per_tank: 24,
+          automatic_transfer_switch: true, cfr_reference: '§73.1680; NFPA 110'
+        },
+        full_redundancy_cost: {
+          backup_transmitter_usd: { low: 15000, high: 60000 },
+          transmission_line_switching_usd: { low: 2000, high: 8000 },
+          generator_usd: { low: 10000, high: 40000 },
+          automatic_transfer_switch_usd: { low: 2000, high: 6000 },
+          total_estimated_usd: { low: 29000, high: 114000 }
+        },
+        eas_participant_redundancy_note: 'EAS participants (§11.35) should maintain backup transmitter capability to ensure continuous EAS message relay.',
+        reference: '47 CFR §73.1615; §73.1635; §73.1680; §11.35; NFPA 110; NAB Engineering Handbook Chapter 7',
+        note: 'Backup transmitter NOT required by FCC but strongly recommended. Emergency reduced-power ≤10 days without notification. Full redundancy: $29k–$114k.'
+      },
       frequency_monitoring_plan_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', is_directional: false,
         carrier_frequency_monitoring: {

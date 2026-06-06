@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Redundancy Guide */}
+        {candidate.transmitter_redundancy_guide && (() => {
+          const g = candidate.transmitter_redundancy_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Transmitter Redundancy Guide <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1680</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>FCC Mandate</div>
+                  <div style={{ color: g.backup_required_by_fcc ? '#f87171' : '#34d399', fontSize: 13, fontWeight: 700 }}>{g.backup_required_by_fcc ? 'REQUIRED' : 'NOT REQUIRED'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Input Power</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>~{g.input_power_kva_estimate ?? '—'} kVA</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Generator</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 600 }}>{g.generator_guidance?.recommended_kva ?? '—'} kVA</div>
+                </div>
+              </div>
+              {g.backup_sizing_options && g.backup_sizing_options.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Backup Sizing Options</div>
+                  {g.backup_sizing_options.map((o, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#818cf8', fontSize: 11, fontWeight: 600, width: 100, flexShrink: 0, marginTop: 1 }}>{o.option.replace('_', ' ')}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{o.power_kw} kW — ${o.cost_est_usd?.low?.toLocaleString()}–${o.cost_est_usd?.high?.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.emergency_operation && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Emergency Operation</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>
+                    Reduced power OK ≤{g.emergency_operation.max_days_no_notification} days without FCC notification ({g.emergency_operation.cfr})
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+                    STA required after {g.emergency_operation.sta_required_after_days} days
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Frequency Monitoring Plan Guide */}
         {candidate.frequency_monitoring_plan_guide && (() => {
           const g = candidate.frequency_monitoring_plan_guide;
