@@ -505,6 +505,9 @@ export async function runSiteOptimizer(body = {}){
     protection_class_advisory,
     recommended_actions,
     form_301_checklist,
+    protection_requirements: buildProtectionRequirements({
+      fcc_class, frequency_khz, channel_class: chanClass
+    }),
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -1291,6 +1294,105 @@ function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, patt
       `inter-station interference.  ` +
       (isDa ? `DA pattern (§73.150) required at filing. ` : '') +
       `Candidate sites close to the US/MX or US/CA border may also require treaty consultation.`
+  };
+}
+
+// Protection requirements summary — §73.182 co-channel / adjacent-channel rules.
+// Returns a structured object describing what protection the station receives
+// and what it must demonstrate before filing.
+function buildProtectionRequirements({ fcc_class, frequency_khz, channel_class }){
+  const isLocal = channel_class === 'local';
+  const isClear = channel_class === 'clear_channel';
+  const isRegional = channel_class === 'regional';
+  const isClassA = fcc_class === 'A';
+
+  // Co-channel protection the station receives from others.
+  let receives_co_channel;
+  if (isLocal){
+    receives_co_channel = {
+      type: 'MINIMAL',
+      description: 'Local channel (§73.27) — no exclusive skywave protection; field-intensity protection only.',
+      protected_contour_mvm: null,
+      rule: '47 CFR §73.27'
+    };
+  } else if (isClear && isClassA){
+    receives_co_channel = {
+      type: 'DOMINANT_EXCLUSIVE',
+      description: 'Class A dominant on clear channel — exclusive 0.5 mV/m skywave contour is protected from all other stations.',
+      protected_contour_mvm: 0.5,
+      rule: '47 CFR §73.25 / §73.182'
+    };
+  } else if (isClear){
+    receives_co_channel = {
+      type: 'SECONDARY',
+      description: `Class ${fcc_class} secondary on clear channel — must not interfere with dominant Class A; 0.5 mV/m and 25 µV/m Class A contours are absolute constraints.`,
+      protected_contour_mvm: null,
+      rule: '47 CFR §73.25 / §73.182'
+    };
+  } else {
+    receives_co_channel = {
+      type: 'REGIONAL_SHARING',
+      description: `Class ${fcc_class} regional station — standard §73.182 D/U ratio protection from co-channel stations; sharing with other same-class stations common.`,
+      protected_contour_mvm: null,
+      rule: '47 CFR §73.26 / §73.182'
+    };
+  }
+
+  // Interference the station must not cause.
+  const must_protect = [];
+  if (isClear && !isClassA){
+    must_protect.push({
+      constraint: 'Must not increase interference to dominant Class A 0.5 mV/m skywave contour',
+      threshold: '0 additional interference persons (NIF standard)',
+      rule: '47 CFR §73.182(k)'
+    });
+    must_protect.push({
+      constraint: 'Must not increase interference to Class A 25 µV/m skywave contour',
+      threshold: 'No new interference at this contour',
+      rule: '47 CFR §73.182(k)'
+    });
+  }
+  must_protect.push({
+    constraint: 'Must maintain §73.37 minimum distance separations from co-channel and adjacent-channel stations',
+    threshold: isLocal ? 'Local channel: refer to §73.37 Table B-2' : isClear ? '§73.25 clear-channel separations' : '§73.37 Table B-1 regional separations',
+    rule: '47 CFR §73.37'
+  });
+  if (!isLocal){
+    must_protect.push({
+      constraint: 'Demonstrate no objectionable interference to other stations via §73.182 field-intensity method',
+      threshold: 'D/U ratio per §73.182 Table 1 at receiving station 0.5 mV/m (skywave) or 5 mV/m (groundwave) contour',
+      rule: '47 CFR §73.182'
+    });
+  }
+
+  // NIF study requirement.
+  const nif_study_required = !isLocal;
+  const nif_study_notes = isLocal
+    ? 'Local channel stations do not typically require a §73.182 NIF study.'
+    : isClear && isClassA
+    ? 'Full §73.182 NIF contour study required at new site to demonstrate dominant 0.5 mV/m skywave coverage is maintained.'
+    : isClear
+    ? 'Full §73.182 NIF study required — new site must not increase nighttime interference to Class A dominant station contours.'
+    : 'Standard §73.182 nighttime interference screening required; NIF study format recommended.';
+
+  // Adjacent-channel protection ratios (§73.182 Table 1 typical values).
+  const adjacent_channel_advisory = {
+    minus_10khz: { protection_db: 6, note: '1st adjacent lower: 6 dB D/U (§73.182 Table 1)' },
+    plus_10khz:  { protection_db: 6, note: '1st adjacent upper: 6 dB D/U' },
+    minus_20khz: { protection_db: 14, note: '2nd adjacent lower: 14 dB D/U' },
+    plus_20khz:  { protection_db: 14, note: '2nd adjacent upper: 14 dB D/U' },
+    note: 'D/U ratios are at the undesired station\'s 0.5 mV/m skywave or 5 mV/m groundwave contour (§73.182 Table 1). Exact values depend on class and time of operation.'
+  };
+
+  return {
+    station_class: fcc_class,
+    channel_class,
+    frequency_khz,
+    receives_co_channel_protection: receives_co_channel,
+    must_protect_against_interference: must_protect,
+    nif_study_required,
+    nif_study_notes,
+    adjacent_channel_advisory
   };
 }
 

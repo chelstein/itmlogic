@@ -1726,6 +1726,42 @@ test('antenna_system_summary.effective_service_area_km2 ≈ π×daytime_reach²'
   }
 });
 
+test('protection_requirements present in response with correct structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const pr = out.protection_requirements;
+  assert.ok(pr != null, 'protection_requirements must be present in response');
+  assert.ok(pr.station_class, 'protection_requirements.station_class must be set');
+  assert.ok(pr.channel_class, 'protection_requirements.channel_class must be set');
+  assert.ok(typeof pr.nif_study_required === 'boolean',
+    'protection_requirements.nif_study_required must be boolean');
+  assert.ok(Array.isArray(pr.must_protect_against_interference),
+    'protection_requirements.must_protect_against_interference must be an array');
+  assert.ok(pr.receives_co_channel_protection?.type,
+    'protection_requirements.receives_co_channel_protection.type must be set');
+  assert.ok(pr.adjacent_channel_advisory?.minus_10khz?.protection_db != null,
+    'adjacent_channel_advisory must include 1st adjacent lower protection_db');
+});
+
+test('protection_requirements.nif_study_required is false for local channel stations', async () => {
+  // Local channel (e.g., 1230 kHz).
+  const localInputs = { ...KAZM, frequency_khz: 1230 };
+  const out = await runSiteOptimizer({ ...localInputs, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.strictEqual(out.protection_requirements.nif_study_required, false,
+    'Local channel stations should not require NIF study');
+  assert.equal(out.protection_requirements.channel_class, 'local');
+});
+
+test('protection_requirements.nif_study_required is true for clear channel stations', async () => {
+  const clearInputs = { ...KAZM, frequency_khz: 640 };
+  const out = await runSiteOptimizer({ ...clearInputs, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.strictEqual(out.protection_requirements.nif_study_required, true,
+    'Clear channel stations must require NIF study');
+  assert.equal(out.protection_requirements.channel_class, 'clear_channel');
+});
+
 test('groundwave_contour_table: 0.5 mV/m distance matches daytime_reach_km', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);
