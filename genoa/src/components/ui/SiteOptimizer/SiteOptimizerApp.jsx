@@ -469,7 +469,24 @@ const DEMO_RESULT = {
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
-      limitations: ['Wildfire scoring not yet wired', 'Parcel availability not checked', 'NIF status is SCREENING-grade only']
+      limitations: ['Wildfire scoring not yet wired', 'Parcel availability not checked', 'NIF status is SCREENING-grade only'],
+      coverage_feasibility_assessment: {
+        verdict: 'MEETS_ALL_FLOORS',
+        col_coverage_pct: 0.97,
+        col_coverage_meets_floor: true,
+        tpo_needed_for_col_floor_kw: null,
+        tpo_needed_within_class_ceiling: null,
+        class_power_ceiling_kw: 50,
+        blanket_pop_pct: 0.40,
+        blanket_pop_meets_limit: true,
+        da_pattern_may_resolve: false,
+        summary: 'COL coverage 97% (floor 80%)'
+      },
+      per_candidate_engineering_checklist: [
+        { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=8 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
+        { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
+        { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' }
+      ]
     },
     {
       rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
@@ -524,7 +541,25 @@ const DEMO_RESULT = {
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
-      limitations: ['Moderate wildfire exposure — manual review of fuel maps required']
+      limitations: ['Moderate wildfire exposure — manual review of fuel maps required'],
+      coverage_feasibility_assessment: {
+        verdict: 'FEASIBLE_WITH_POWER_INCREASE',
+        col_coverage_pct: 0.78,
+        col_coverage_meets_floor: false,
+        tpo_needed_for_col_floor_kw: 8.5,
+        tpo_needed_within_class_ceiling: true,
+        class_power_ceiling_kw: 50,
+        blanket_pop_pct: 0.30,
+        blanket_pop_meets_limit: true,
+        da_pattern_may_resolve: true,
+        summary: 'COL coverage 78% (floor 80%); 8.5 kW achieves floor (class ceiling 50 kW); DA pattern shaping may close coverage gap'
+      },
+      per_candidate_engineering_checklist: [
+        { id: 'SOIL_RESISTIVITY_SURVEY', priority: 'REQUIRED', label: 'Soil resistivity survey', note: 'Zone-table σ=10 mS/m used for screening. Commission a 4-electrode Wenner array survey.' },
+        { id: 'ASR_REGISTRATION', priority: 'REQUIRED', label: 'ASR registration (47 CFR §17.7)', note: 'λ/4 ≈ 96 m at 780 kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854.' },
+        { id: 'MPE_STUDY', priority: 'REQUIRED', label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz.' },
+        { id: 'COL_COVERAGE_REMEDY', priority: 'REQUIRED', label: 'COL coverage remedy engineering', note: '78% COL coverage < §73.24(j) 80% floor. Increase TPO to ≥8.5 kW or design DA pattern (§73.150) to push coverage above floor.' }
+      ]
     },
     {
       rank: 4, rank_percentile: 24.8, lat: 34.78, lon: -111.95,
