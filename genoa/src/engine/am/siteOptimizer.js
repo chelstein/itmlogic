@@ -477,6 +477,15 @@ export async function runSiteOptimizer(body = {}){
     community_of_license_polygon
   });
 
+  // ---- 12. FCC Form 301-AM pre-filing checklist ----
+  const form_301_checklist = buildForm301Checklist({
+    fcc_class, tpo_kw, pattern_mode, frequency_khz,
+    channel_class: chanClass, skywave_risk_level,
+    asr_registration_required: quarter_wave_m > ASR_THRESHOLD_M,
+    community_of_license_polygon: !!community_of_license_polygon,
+    col_centroid: col_centroid || null
+  });
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -495,6 +504,7 @@ export async function runSiteOptimizer(body = {}){
     skywave_risk_level,
     protection_class_advisory,
     recommended_actions,
+    form_301_checklist,
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -1391,6 +1401,137 @@ function buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_
   if (blanket_population_pct != null) parts.push(`${blanket_population_pct.toFixed(1)}% blanket pop`);
   parts.push(`${distance_from_current_km.toFixed(0)} km from current`);
   return parts.join(', ') + '.';
+}
+
+// FCC Form 301-AM pre-filing checklist.
+// Returns an array of { id, description, status, rule, note } items.
+// status: 'REQUIRED' | 'CONDITIONAL' | 'ADVISORY'
+function buildForm301Checklist({ fcc_class, tpo_kw, pattern_mode, frequency_khz,
+  channel_class, skywave_risk_level, asr_registration_required,
+  community_of_license_polygon, col_centroid }){
+  const items = [];
+  const isDa = /DA/i.test(pattern_mode);
+
+  items.push({
+    id: 'SITE_SURVEY',
+    description: 'Conduct professional site survey (zoning, lease availability, setbacks)',
+    status: 'REQUIRED',
+    rule: 'General engineering practice; FCC Form 301 §I',
+    note: null
+  });
+
+  items.push({
+    id: 'ANTENNA_STUDY',
+    description: `Design and model AM vertical antenna system for ${frequency_khz} kHz`,
+    status: 'REQUIRED',
+    rule: '47 CFR §73.316 / §73.45',
+    note: isDa
+      ? 'DA pattern specified — §73.316 directional antenna measurements required (24 radials, theoretical and measured patterns)'
+      : 'Non-directional antenna — standard §73.45 field intensity / efficiency certification required'
+  });
+
+  const asrNote = asr_registration_required
+    ? 'ASR REGISTRATION REQUIRED: typical antenna height at this frequency exceeds the 200-ft (60.96 m) §17.7 threshold'
+    : 'Verify final antenna height; register with FCC ASR if height > 200 ft (60.96 m) AGL per §17.7';
+  items.push({
+    id: 'ASR_REGISTRATION',
+    description: 'Verify tower height; file FCC ASR registration if > 200 ft (60.96 m)',
+    status: asr_registration_required ? 'REQUIRED' : 'CONDITIONAL',
+    rule: '47 CFR §17.7',
+    note: asrNote
+  });
+
+  items.push({
+    id: 'RF_EXPOSURE_MPE',
+    description: 'Prepare RF exposure (MPE) evaluation per OET Bulletin 65',
+    status: 'REQUIRED',
+    rule: '47 CFR §1.1307 / OET Bulletin 65',
+    note: `AM broadcast stations must demonstrate compliance with general population MPE limits. ERP = ${tpo_kw} kW.`
+  });
+
+  items.push({
+    id: 'COL_COVERAGE',
+    description: 'Document ≥ 80% community-of-license coverage by the 5 mV/m daytime contour',
+    status: 'REQUIRED',
+    rule: '47 CFR §73.24(j)',
+    note: community_of_license_polygon
+      ? 'COL polygon provided — coverage computation is polygon-based (filing-grade)'
+      : 'No COL polygon provided — coverage proxy used; polygon-based analysis required for filing'
+  });
+
+  items.push({
+    id: 'COL_CENTROID_FIELD',
+    description: 'Verify predicted field strength at COL centroid meets 5 mV/m floor',
+    status: 'REQUIRED',
+    rule: '47 CFR §73.24(j)',
+    note: col_centroid
+      ? `COL centroid provided (${col_centroid.lat.toFixed(4)}, ${col_centroid.lon.toFixed(4)})`
+      : 'Use geographic center of COL boundary if centroid not separately specified'
+  });
+
+  items.push({
+    id: 'BLANKET_POPULATION',
+    description: 'Demonstrate blanket-area population does not exceed 1% of total service population',
+    status: 'REQUIRED',
+    rule: '47 CFR §73.24(g)',
+    note: `Station TPO = ${tpo_kw} kW; engineer must compute 1000 mV/m contour area and census population.`
+  });
+
+  items.push({
+    id: 'PROTECTION_STUDIES',
+    description: 'Submit co-channel and adjacent-channel interference protection studies',
+    status: 'REQUIRED',
+    rule: '47 CFR §73.182 / §73.37',
+    note: null
+  });
+
+  if (channel_class === 'clear_channel' || skywave_risk_level === 'HIGH'){
+    items.push({
+      id: 'SKYWAVE_NIF',
+      description: 'Prepare skywave interference analysis (NIF study) for nighttime operations',
+      status: 'REQUIRED',
+      rule: '47 CFR §73.182',
+      note: channel_class === 'clear_channel'
+        ? `Clear channel (${frequency_khz} kHz) — full §73.182 NIF study required before nighttime authorization`
+        : `Class ${fcc_class} on regional/local channel — HIGH skywave risk; NIF study strongly advised`
+    });
+  } else if (skywave_risk_level === 'MODERATE'){
+    items.push({
+      id: 'SKYWAVE_NIF',
+      description: 'Evaluate skywave interference potential (NIF study may be required)',
+      status: 'CONDITIONAL',
+      rule: '47 CFR §73.182',
+      note: `MODERATE skywave risk for Class ${fcc_class} on ${channel_class} channel — consult §73.182 protection ratios`
+    });
+  }
+
+  if (isDa){
+    items.push({
+      id: 'DA_PATTERN',
+      description: 'File theoretical and measured horizontal radiation pattern per §73.316',
+      status: 'REQUIRED',
+      rule: '47 CFR §73.316',
+      note: 'DA pattern: 25 spaced radials at 15° increments required for measured patterns; suppression ratios must satisfy §73.207/§73.215 D/U spacing'
+    });
+  }
+
+  items.push({
+    id: 'NEPA_ENVIRONMENTAL',
+    description: 'Complete NEPA environmental checklist (§1.1306); file EA if any triggers apply',
+    status: 'REQUIRED',
+    rule: '47 CFR §1.1306 / §1.1307',
+    note: 'Check for protected species, historic properties (NHPA §106), floodplains, wetlands, wilderness areas'
+  });
+
+  items.push({
+    id: 'FAA_AERONAUTICAL',
+    description: 'File FAA Form 7460-1 (aeronautical study) for any structure > 200 ft or near airports',
+    status: 'CONDITIONAL',
+    rule: '47 CFR §17.7; 14 CFR Part 77',
+    note: 'Required if tower height > 200 ft AGL or if within obstacle free zone of an airport'
+  });
+
+  return items;
 }
 
 function cardinalDir(deg){

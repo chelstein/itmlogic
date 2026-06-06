@@ -1608,3 +1608,58 @@ test('score_delta_explanation.components values are non-zero (zero deltas are om
     }
   }
 });
+
+test('form_301_checklist is present and contains required FCC filing items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.form_301_checklist) && out.form_301_checklist.length > 0,
+    'form_301_checklist must be a non-empty array');
+  const VALID_STATUS = new Set(['REQUIRED', 'CONDITIONAL', 'ADVISORY']);
+  const REQUIRED_IDS = ['SITE_SURVEY', 'ANTENNA_STUDY', 'ASR_REGISTRATION',
+    'RF_EXPOSURE_MPE', 'COL_COVERAGE', 'BLANKET_POPULATION', 'PROTECTION_STUDIES', 'NEPA_ENVIRONMENTAL'];
+  const ids = out.form_301_checklist.map(item => item.id);
+  for (const reqId of REQUIRED_IDS){
+    assert.ok(ids.includes(reqId), `form_301_checklist must include item '${reqId}'`);
+  }
+  for (const item of out.form_301_checklist){
+    assert.ok(typeof item.id === 'string' && item.id.length > 0,
+      `every checklist item must have a non-empty id`);
+    assert.ok(VALID_STATUS.has(item.status),
+      `checklist item '${item.id}' status must be REQUIRED/CONDITIONAL/ADVISORY; got '${item.status}'`);
+    assert.ok(typeof item.description === 'string' && item.description.length > 0,
+      `checklist item '${item.id}' must have a description`);
+    assert.ok(typeof item.rule === 'string' && item.rule.length > 0,
+      `checklist item '${item.id}' must have a rule citation`);
+  }
+});
+
+test('form_301_checklist includes SKYWAVE_NIF for clear_channel or HIGH skywave stations', async () => {
+  // KAZM (1490 kHz) is a regional channel, Class B — skywave risk depends on the
+  // buildProtectionAdvisory logic.  Clear channel stations always include it.
+  // We test that a clear channel station (e.g. 640 kHz — KFI clear) gets the item.
+  const clearChannelInputs = { ...KAZM, frequency_khz: 640 };
+  const out = await runSiteOptimizer({ ...clearChannelInputs, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const ids = out.form_301_checklist.map(i => i.id);
+  assert.ok(ids.includes('SKYWAVE_NIF'),
+    'form_301_checklist must include SKYWAVE_NIF for clear channel frequency (640 kHz)');
+  const nifItem = out.form_301_checklist.find(i => i.id === 'SKYWAVE_NIF');
+  assert.equal(nifItem.status, 'REQUIRED', 'SKYWAVE_NIF must be REQUIRED for clear channel');
+});
+
+test('form_301_checklist includes DA_PATTERN item when pattern_mode is DA', async () => {
+  const daInputs = { ...KAZM, pattern_mode: 'DA-N' };
+  const out = await runSiteOptimizer({ ...daInputs, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const ids = out.form_301_checklist.map(i => i.id);
+  assert.ok(ids.includes('DA_PATTERN'),
+    'form_301_checklist must include DA_PATTERN item when pattern_mode is DA-N');
+});
+
+test('form_301_checklist omits DA_PATTERN for non-directional stations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'ND', candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const ids = out.form_301_checklist.map(i => i.id);
+  assert.ok(!ids.includes('DA_PATTERN'),
+    'form_301_checklist must NOT include DA_PATTERN for ND stations');
+});

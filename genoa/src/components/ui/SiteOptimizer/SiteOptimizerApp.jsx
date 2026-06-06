@@ -14,6 +14,7 @@ import OptimizationConfidencePanel from './OptimizationConfidencePanel.jsx';
 import LimitationsGlobalPanel from './LimitationsGlobalPanel.jsx';
 import TowerReferencePanel from './TowerReferencePanel.jsx';
 import RecommendedActionsPanel from './RecommendedActionsPanel.jsx';
+import Form301ChecklistPanel from './Form301ChecklistPanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -239,6 +240,9 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
             {result?.recommended_actions?.length > 0 && (
               <RecommendedActionsPanel recommended_actions={result.recommended_actions} />
             )}
+            {result?.form_301_checklist?.length > 0 && (
+              <Form301ChecklistPanel checklist={result.form_301_checklist} />
+            )}
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
             ) : (
@@ -357,6 +361,18 @@ const DEMO_RESULT = {
       action: 'Commission soil resistivity survey at POOR/FAIR conductivity candidate sites.',
       rationale: 'Rank 4 candidate has POOR ground conductivity (σ = 1.5 mS/m). The §73.190 ground radial system requirements and achievable antenna efficiency are highly sensitive to soil resistivity at these levels. A resistivity survey before site commitment can avoid costly ground system overruns.'
     }
+  ],
+  form_301_checklist: [
+    { id: 'SITE_SURVEY',       status: 'REQUIRED',    description: 'Conduct professional site survey (zoning, lease availability, setbacks)', rule: 'General engineering practice; FCC Form 301 §I', note: null },
+    { id: 'ANTENNA_STUDY',     status: 'REQUIRED',    description: 'Design and model AM vertical antenna system for 780 kHz', rule: '47 CFR §73.316 / §73.45', note: 'Non-directional antenna — standard §73.45 field intensity / efficiency certification required' },
+    { id: 'ASR_REGISTRATION',  status: 'REQUIRED',    description: 'Verify tower height; file FCC ASR registration if > 200 ft (60.96 m)', rule: '47 CFR §17.7', note: 'ASR REGISTRATION REQUIRED: typical λ/4 antenna height at 780 kHz (96.15 m) exceeds the 200-ft §17.7 threshold' },
+    { id: 'RF_EXPOSURE_MPE',   status: 'REQUIRED',    description: 'Prepare RF exposure (MPE) evaluation per OET Bulletin 65', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'ERP = 5 kW. All AM broadcast stations must demonstrate general population MPE compliance.' },
+    { id: 'COL_COVERAGE',      status: 'REQUIRED',    description: 'Document ≥ 80% community-of-license coverage by the 5 mV/m daytime contour', rule: '47 CFR §73.24(j)', note: 'No COL polygon provided — polygon-based analysis required for filing' },
+    { id: 'BLANKET_POPULATION',status: 'REQUIRED',    description: 'Demonstrate blanket-area population does not exceed 1% of total service population', rule: '47 CFR §73.24(g)', note: 'Compute 1000 mV/m contour area and census population at proposed TPO.' },
+    { id: 'PROTECTION_STUDIES',status: 'REQUIRED',    description: 'Submit co-channel and adjacent-channel interference protection studies', rule: '47 CFR §73.182 / §73.37', note: null },
+    { id: 'SKYWAVE_NIF',       status: 'REQUIRED',    description: 'Prepare skywave interference analysis (NIF study) for nighttime operations', rule: '47 CFR §73.182', note: 'Clear channel (780 kHz) — full §73.182 NIF study required before nighttime authorization' },
+    { id: 'NEPA_ENVIRONMENTAL',status: 'REQUIRED',    description: 'Complete NEPA environmental checklist (§1.1306); file EA if any triggers apply', rule: '47 CFR §1.1306 / §1.1307', note: 'Check for protected species, historic properties (NHPA §106), floodplains, wetlands, wilderness areas' },
+    { id: 'FAA_AERONAUTICAL',  status: 'CONDITIONAL', description: 'File FAA Form 7460-1 (aeronautical study) for any structure > 200 ft or near airports', rule: '47 CFR §17.7; 14 CFR Part 77', note: 'Required if tower height > 200 ft AGL or if within obstacle free zone of an airport' }
   ],
   warnings: [
     {
