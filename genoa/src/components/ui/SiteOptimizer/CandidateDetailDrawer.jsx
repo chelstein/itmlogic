@@ -2226,6 +2226,110 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* DA Array Design Guide */}
+        {candidate.da_array_design_guide && (() => {
+          const da = candidate.da_array_design_guide;
+          if (!da.applicable) {
+            return (
+              <div>
+                <div className="rack-eyebrow mb-1">§73.316 DA Array Design Guide</div>
+                <div className="font-mono text-[9px] text-textDim italic">{da.reason}</div>
+              </div>
+            );
+          }
+          const modeColor = m => m === 'DA-D' ? 'text-blue-300' : m === 'DA-N' ? 'text-indigo-300' : 'text-violet-300';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.316 DA Array Design Guide</div>
+              {/* Mode badge row */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${modeColor(da.da_mode_type)}`}>
+                  {da.da_mode_type}
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  λ = {da.wavelength_m} m · λ/4 = {da.quarter_wave_m} m ({da.quarter_wave_ft} ft)
+                </span>
+                {da.is_clear_channel && (
+                  <span className="font-mono text-[8px] text-amber-400 px-1 py-0.5 border border-amber-700/50 rounded">CLEAR CHANNEL</span>
+                )}
+              </div>
+              {/* Recommended config */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Recommended Configuration (min {da.recommended_min_elements} elements)</div>
+              <div className="grid grid-cols-2 gap-1 mb-2">
+                {[
+                  { label: 'Config',        value: da.recommended_config?.config_label ?? '—' },
+                  { label: 'Elements',      value: da.recommended_config?.n_elements ?? '—' },
+                  { label: 'Spacing',       value: da.recommended_config ? `${da.recommended_config.spacing_m} m / ${da.recommended_config.spacing_ft} ft` : '—' },
+                  { label: 'Footprint',     value: da.recommended_config ? `${da.recommended_config.property_footprint_m} m (${da.recommended_config.property_footprint_ft} ft)` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 border border-rule">
+                    <div className="font-mono text-[8px] text-textDim">{m.label}</div>
+                    <div className="font-mono text-[9px] text-textBright font-bold leading-tight">{m.value}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Array configurations table */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Array Configurations</div>
+              <div className="overflow-x-auto mb-2">
+                <table className="w-full text-[8px] font-mono border-collapse">
+                  <thead>
+                    <tr className="border-b border-rule text-textDim">
+                      <th className="text-left py-0.5 pr-2">Config</th>
+                      <th className="text-right pr-2">N</th>
+                      <th className="text-right pr-2">Spacing</th>
+                      <th className="text-right pr-2">Gain dBd</th>
+                      <th className="text-right">Supp dB</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {da.array_configurations?.map((cfg, i) => (
+                      <tr key={i} className="border-b border-rule/30 hover:bg-surface/30">
+                        <td className="py-0.5 pr-2 text-textBright">{cfg.config_label}</td>
+                        <td className="text-right pr-2 text-blue-300">{cfg.n_elements}</td>
+                        <td className="text-right pr-2 text-textDim">{cfg.spacing_m} m</td>
+                        <td className="text-right pr-2 text-emerald-400">{cfg.max_gain_dbd}</td>
+                        <td className="text-right text-amber-400">{cfg.suppression_achievable_db}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Base current monitoring tolerances */}
+              <div className="font-mono text-[9px] text-textDim mb-1">§73.61 Base Current Monitoring Tolerances</div>
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Current ratio ±', value: `${da.base_current_monitoring?.current_ratio_tolerance_pct ?? '—'}%` },
+                  { label: 'Phase ±',          value: `${da.base_current_monitoring?.phase_tolerance_deg ?? '—'}°` },
+                  { label: 'Check interval',   value: da.base_current_monitoring?.check_interval_hours != null ? `${da.base_current_monitoring.check_interval_hours}h` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* HRP spec */}
+              <div className="font-mono text-[9px] text-textDim mb-1">
+                §73.316 HRP: {da.n_hrp_radials} radials at {da.hrp_increment_deg}° increments · Suppression req: ≥{da.suppression_requirement_db} dB
+              </div>
+              {/* Exhibits required */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Form 301-AM Required Exhibits</div>
+              <div className="space-y-0.5 mb-2">
+                {da.form_301am_exhibits?.filter(e => e.required).map((ex, i) => (
+                  <div key={i} className="flex gap-1.5 items-start">
+                    <span className="text-emerald-400 font-mono text-[8px] shrink-0">✓</span>
+                    <div>
+                      <span className="font-mono text-[8px] text-textBright font-bold">{ex.exhibit}: </span>
+                      <span className="font-mono text-[8px] text-textDim">{ex.description}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{da.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Atmospheric Noise Analysis */}
         {candidate.atmospheric_noise_analysis && (() => {
           const an = candidate.atmospheric_noise_analysis;

@@ -958,3 +958,18 @@ test('colocation GRID candidates have operational_monitoring_requirements', asyn
     assert.strictEqual(c.operational_monitoring_requirements.monitoring_items.length, 6, `rank ${c.rank} must have 6 monitoring items`);
   }
 });
+
+test('colocation GRID candidates have da_array_design_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'DA-D',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.da_array_design_guide != null, `rank ${c.rank} missing da_array_design_guide`);
+    assert.strictEqual(c.da_array_design_guide.applicable, true, `rank ${c.rank} DA-D must have applicable=true`);
+    assert.strictEqual(c.da_array_design_guide.n_hrp_radials, 36, `rank ${c.rank} must have 36 HRP radials`);
+  }
+});

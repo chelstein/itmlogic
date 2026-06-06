@@ -1385,6 +1385,36 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.1560; §73.1350; §73.61; Part 11; §1.1307; §73.3539; §73.99',
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
+      da_array_design_guide: {
+        applicable: true, pattern_mode: 'DA-D', da_mode_type: 'DA-D',
+        has_daytime_pattern: true, has_nighttime_pattern: false,
+        frequency_khz: 780, wavelength_m: 384.62, quarter_wave_m: 96.15, quarter_wave_ft: 315.5,
+        is_clear_channel: false, is_local_channel: false,
+        recommended_min_elements: 2,
+        recommended_config: { config_label: '2-Element End-Fire (Cardioid)', n_elements: 2, spacing_m: 96.15, spacing_ft: 315.5, property_footprint_m: 126.15, property_footprint_ft: 413.9 },
+        array_configurations: [
+          { n_elements: 2, config_label: '2-Element End-Fire (Cardioid)', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [1.0, 1.0], phase_deg: [0, -90], max_gain_dbd: 3.0, null_depth_theoretical_db: '>40', null_depth_practical_db: '20–35', suppression_achievable_db: '20–35', property_footprint_m: 126.15, property_footprint_ft: 413.9, use_case: 'Single interference bearing. Simplest 2-tower array; deep null opposite maximum.', mutual_coupling_note: 'Z_12 ≈ 15–35 Ω for λ/4 spacing; phasing network must compensate to achieve null depth' },
+          { n_elements: 2, config_label: '2-Element Broadside (Figure-8)', spacing_lambdas: 0.5, spacing_m: 192.31, spacing_ft: 630.9, amplitude_ratios: [1.0, 1.0], phase_deg: [0, 0], max_gain_dbd: 4.8, null_depth_theoretical_db: '>40', null_depth_practical_db: '25–40', suppression_achievable_db: '25–40', property_footprint_m: 222.31, property_footprint_ft: 729.4, use_case: 'Two nulls at 90°/270° to array axis; maximum gain along axis.', mutual_coupling_note: 'Z_12 ≈ 0–10 Ω for λ/2 spacing' },
+          { n_elements: 3, config_label: '3-Element Linear Array', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [0.5, 1.0, 0.5], phase_deg: [90, 0, -90], max_gain_dbd: 4.8, null_depth_theoretical_db: '30–40', null_depth_practical_db: '25–38', suppression_achievable_db: '25–38', property_footprint_m: 232.3, property_footprint_ft: 762.1, use_case: 'Multiple interference threats at different bearings; more flexible pattern shaping.', mutual_coupling_note: 'Full 3×3 mutual impedance matrix required' },
+          { n_elements: 4, config_label: '4-Element T or L Array', spacing_lambdas: 0.25, spacing_m: 96.15, spacing_ft: 315.5, amplitude_ratios: [0.5, 1.0, 1.0, 0.5], phase_deg: [90, 0, 0, -90], max_gain_dbd: 5.5, null_depth_theoretical_db: '30–45', null_depth_practical_db: '25–42', suppression_achievable_db: '25–42', property_footprint_m: 338.45, property_footprint_ft: 1110.4, use_case: 'Co-channel threats at 2+ azimuths simultaneously.', mutual_coupling_note: 'Full 4×4 mutual impedance matrix; professional design required' }
+        ],
+        suppression_requirement_db: 28.3,
+        suppression_note: '§73.316/§73.207: suppression ratio of ≥28.3 dB toward interfered-with co-channel protected contours.',
+        n_hrp_radials: 36, hrp_increment_deg: 10,
+        form_301am_exhibits: [
+          { exhibit: 'Schedule B (Antenna)', description: 'Tower heights (degrees electrical), self-impedance values', required: true },
+          { exhibit: 'Schedule C (Transmitter)', description: 'Transmitter make/model, authorized TPO', required: true },
+          { exhibit: 'Exhibit E (Pattern Plots)', description: 'Theoretical HRP and NDA pattern plots (0°–360°, linear field scale)', required: true },
+          { exhibit: 'Exhibit F (HRP Table)', description: 'HRP table at 10° increments, EF at 1 km', required: true },
+          { exhibit: 'Exhibit G (Phasing Data)', description: 'Base current ratios (I_n/I_1), phase angles, and monitor parameters', required: true },
+          { exhibit: 'Exhibit H (Suppression)', description: 'Suppression ratios toward co-channel protected stations', required: true },
+          { exhibit: 'Exhibit I (Mutual Z)', description: 'Self- and mutual-impedance matrix (2-element: not required)', required: false },
+          { exhibit: 'Form 302-AM (License)', description: 'License to cover: proof-of-performance measurements per §73.154', required: true }
+        ],
+        base_current_monitoring: { check_interval_hours: 3, current_ratio_tolerance_pct: 5, phase_tolerance_deg: 3, monitor_method: 'Antenna monitor with base current sample loops on each element', fcc_specified_monitor_points: false, reference: '§73.61' },
+        reference: '47 CFR §73.150; §73.152; §73.316; §73.207; §73.61; §73.182',
+        note: 'DA array element positions, amplitude ratios, and phase angles are screening-grade estimates. Actual design requires a licensed broadcast engineer and full §73.182 NIF analysis.'
+      },
       proof_of_performance_requirements: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'DA-D',
         traversal_spec: {

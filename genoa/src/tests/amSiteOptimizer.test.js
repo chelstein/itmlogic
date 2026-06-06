@@ -5717,3 +5717,51 @@ test('operational_monitoring_requirements comparison table columns present', asy
     assert.ok('ops_eas_required' in row, 'ops_eas_required missing');
   }
 });
+
+// ---- da_array_design_guide ----
+
+test('da_array_design_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.da_array_design_guide != null, `rank ${c.rank} missing da_array_design_guide`);
+  }
+});
+
+test('da_array_design_guide applicable=false for NDA station', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const d = out.candidates[0].da_array_design_guide;
+  assert.strictEqual(d.applicable, false, 'NDA station should have applicable=false');
+  assert.ok(typeof d.reason === 'string', 'NDA block must include a reason string');
+});
+
+test('da_array_design_guide applicable=true for DA-D station with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const d = out.candidates[0].da_array_design_guide;
+  assert.strictEqual(d.applicable, true, 'DA-D station should have applicable=true');
+  assert.strictEqual(d.has_daytime_pattern, true, 'DA-D must have daytime pattern');
+  assert.strictEqual(d.has_nighttime_pattern, false, 'DA-D must not have nighttime pattern');
+  assert.strictEqual(d.array_configurations.length, 4, 'must have 4 array configurations');
+  assert.strictEqual(d.n_hrp_radials, 36, 'must have 36 HRP radials');
+  assert.strictEqual(d.hrp_increment_deg, 10, 'HRP increment must be 10°');
+});
+
+test('da_array_design_guide DA-2 has both day and nighttime patterns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const d = out.candidates[0].da_array_design_guide;
+  assert.strictEqual(d.applicable, true);
+  assert.strictEqual(d.has_daytime_pattern, true);
+  assert.strictEqual(d.has_nighttime_pattern, true);
+  assert.strictEqual(d.suppression_requirement_db, 28.3, 'suppression requirement must be 28.3 dB');
+  assert.strictEqual(d.form_301am_exhibits.length, 8, 'must have 8 Form 301-AM exhibits');
+  assert.ok(d.base_current_monitoring.current_ratio_tolerance_pct === 5, '§73.61 5% current ratio tolerance');
+  assert.ok(d.base_current_monitoring.phase_tolerance_deg === 3, '§73.61 3° phase tolerance');
+});
+
+test('da_array_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('da_array_applicable' in row, 'da_array_applicable missing from comparison table');
+    assert.ok('da_array_min_elements' in row, 'da_array_min_elements missing from comparison table');
+    assert.ok('da_array_footprint_m' in row, 'da_array_footprint_m missing from comparison table');
+  }
+});

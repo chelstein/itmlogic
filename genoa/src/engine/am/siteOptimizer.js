@@ -813,7 +813,10 @@ export async function runSiteOptimizer(body = {}){
     proof_mpe_required:     c.proof_of_performance_requirements?.mpe_requirements?.required ?? null,
     ops_nighttime_limit_kw: c.operational_monitoring_requirements?.nighttime_power?.nighttime_tpo_limit_kw ?? null,
     ops_renewal_cycle_yrs:  8,  // fixed 8-year cycle per §73.3539
-    ops_eas_required:       c.operational_monitoring_requirements?.eas_requirements != null
+    ops_eas_required:       c.operational_monitoring_requirements?.eas_requirements != null,
+    da_array_applicable:    c.da_array_design_guide?.applicable ?? null,
+    da_array_min_elements:  c.da_array_design_guide?.recommended_min_elements ?? null,
+    da_array_footprint_m:   c.da_array_design_guide?.recommended_config?.property_footprint_m ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6690,6 +6693,173 @@ async function scoreCandidate(pt, ctx, warnings){
         monitoring_items,
         reference: '47 CFR §73.1560 (power tolerance); §73.1350 (operating log); §73.61 (base current); Part 11 (EAS); §1.1307 (environmental); §73.3539 (renewal); §73.99 (nighttime power)',
         note: 'Operational monitoring requirements are a post-licensing compliance reference for the transmitter site operator. Actual obligations depend on the specific license conditions granted by the FCC. Consult FCC rules and a licensed broadcast consultant for the definitive list of obligations applicable to this station.'
+      };
+    })(),
+
+    // DA array physical design guide.
+    // Covers multi-element array configurations, element spacing, amplitude/phase ratios,
+    // mutual coupling correction, suppression ratio mechanics (§73.316/§73.207),
+    // Form 301-AM engineering exhibits, and base current monitoring tolerances (§73.61).
+    // Distinct from antenna_pattern_optimization_guide (COL bearing / whether DA is needed).
+    da_array_design_guide: (() => {
+      const isDA_da  = /^DA/i.test(pattern_mode);
+
+      if (!isDA_da) {
+        return {
+          applicable: false,
+          pattern_mode,
+          reason: 'Station operates non-directional (NDA). No DA array design required. Consult antenna_pattern_optimization_guide if DA operation is being considered.',
+          reference: '47 CFR §73.150; §73.316',
+          note: null
+        };
+      }
+
+      const lambda_da   = round2(300000 / frequency_khz);   // full wavelength, m
+      const qwave_da    = round2(lambda_da / 4);             // λ/4, m
+      const qwave_ft_da = round2(qwave_da * 3.28084);
+
+      const daMode       = pattern_mode.toUpperCase();
+      const hasDaytime_da  = daMode === 'DA-D' || daMode === 'DA-2';
+      const hasNighttime_da = daMode === 'DA-N' || daMode === 'DA-2';
+      const isClear_da   = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_da   = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Physical array configurations.
+      // Amplitude ratios are relative (element 1 = 1.0 reference).
+      // Phase angles are absolute (element 1 = 0° reference, positive = advance).
+      // Property footprint = total span of towers + minimum guy wire clearance buffer.
+      const arrayConfigs = [
+        {
+          n_elements: 2,
+          config_label: '2-Element End-Fire (Cardioid)',
+          spacing_lambdas: 0.25,
+          spacing_m: qwave_da,
+          spacing_ft: qwave_ft_da,
+          amplitude_ratios: [1.0, 1.0],
+          phase_deg: [0, -90],
+          max_gain_dbd: 3.0,
+          null_depth_theoretical_db: '>40',
+          null_depth_practical_db: '20–35',
+          suppression_achievable_db: '20–35',
+          property_footprint_m: round2(qwave_da + 30),
+          property_footprint_ft: round2((qwave_da + 30) * 3.28084),
+          use_case: 'Single interference bearing. Simplest 2-tower array; deep null opposite maximum.',
+          mutual_coupling_note: 'Z_12 ≈ 15–35 Ω for λ/4 spacing; phasing network must compensate to achieve null depth'
+        },
+        {
+          n_elements: 2,
+          config_label: '2-Element Broadside (Figure-8)',
+          spacing_lambdas: 0.5,
+          spacing_m: round2(lambda_da / 2),
+          spacing_ft: round2((lambda_da / 2) * 3.28084),
+          amplitude_ratios: [1.0, 1.0],
+          phase_deg: [0, 0],
+          max_gain_dbd: 4.8,
+          null_depth_theoretical_db: '>40',
+          null_depth_practical_db: '25–40',
+          suppression_achievable_db: '25–40',
+          property_footprint_m: round2(lambda_da / 2 + 30),
+          property_footprint_ft: round2((lambda_da / 2 + 30) * 3.28084),
+          use_case: 'Two nulls at 90°/270° to array axis; maximum gain along axis. Protects stations on both sides of the null.',
+          mutual_coupling_note: 'Z_12 ≈ 0–10 Ω for λ/2 spacing; lower mutual coupling than λ/4 end-fire'
+        },
+        {
+          n_elements: 3,
+          config_label: '3-Element Linear Array',
+          spacing_lambdas: 0.25,
+          spacing_m: qwave_da,
+          spacing_ft: qwave_ft_da,
+          amplitude_ratios: [0.5, 1.0, 0.5],
+          phase_deg: [90, 0, -90],
+          max_gain_dbd: 4.8,
+          null_depth_theoretical_db: '30–40',
+          null_depth_practical_db: '25–38',
+          suppression_achievable_db: '25–38',
+          property_footprint_m: round2(qwave_da * 2 + 40),
+          property_footprint_ft: round2((qwave_da * 2 + 40) * 3.28084),
+          use_case: 'Multiple interference threats at different bearings; more flexible pattern shaping than 2-element.',
+          mutual_coupling_note: 'Outer element self-impedance correction differs from center element; full 3×3 mutual impedance matrix required for accurate phasing'
+        },
+        {
+          n_elements: 4,
+          config_label: '4-Element T or L Array',
+          spacing_lambdas: 0.25,
+          spacing_m: qwave_da,
+          spacing_ft: qwave_ft_da,
+          amplitude_ratios: [0.5, 1.0, 1.0, 0.5],
+          phase_deg: [90, 0, 0, -90],
+          max_gain_dbd: 5.5,
+          null_depth_theoretical_db: '30–45',
+          null_depth_practical_db: '25–42',
+          suppression_achievable_db: '25–42',
+          property_footprint_m: round2(qwave_da * 3 + 50),
+          property_footprint_ft: round2((qwave_da * 3 + 50) * 3.28084),
+          use_case: 'Heavily contested frequency with co-channel threats at 2+ azimuths simultaneously.',
+          mutual_coupling_note: 'Full 4×4 mutual impedance matrix; professional design and simulation software required'
+        }
+      ];
+
+      const minElements_da  = isClear_da ? 3 : 2;
+      const recConfig_da    = arrayConfigs.find(c => c.n_elements === minElements_da) ?? arrayConfigs[0];
+
+      // §73.207 co-channel D/U protection implies a suppression ratio requirement.
+      // The ratio 1/26 ≈ −28.3 dB is the minimum separation between the interfering
+      // station's EF at the victim's protected contour and the victim's own field.
+      // Actual required suppression from NIF analysis (§73.182) will vary by case.
+      const SUPP_REQ_DB_da = 28.3;
+
+      // §73.316 pattern measurements — horizontal radiation pattern exhibits
+      const formExhibits = [
+        { exhibit: 'Schedule B (Antenna)',      description: 'Tower heights (degrees electrical), self-impedance values', required: true },
+        { exhibit: 'Schedule C (Transmitter)',  description: 'Transmitter make/model, authorized TPO', required: true },
+        { exhibit: 'Exhibit E (Pattern Plots)', description: 'Theoretical HRP and NDA pattern plots (0°–360°, linear field scale)', required: true },
+        { exhibit: 'Exhibit F (HRP Table)',     description: 'Horizontal radiation pattern table at 10° increments, EF at 1 km, normalized to RMS or dominant radial', required: true },
+        { exhibit: 'Exhibit G (Phasing Data)',  description: 'Base current ratios (I_n/I_1), phase angles, and antenna monitor reference parameters', required: true },
+        { exhibit: 'Exhibit H (Suppression)',   description: 'Suppression ratios toward each co-channel protected station within the §73.207 D/U analysis area', required: true },
+        { exhibit: 'Exhibit I (Mutual Z)',      description: 'Self- and mutual-impedance matrix for all element pairs at operating frequency', required: recConfig_da.n_elements > 2 },
+        { exhibit: 'Form 302-AM (License)',     description: 'License to cover: proof-of-performance measurements per §73.154 filed after construction', required: true }
+      ];
+
+      // §73.61 base current monitoring tolerances
+      const baseCurrentMonitoring_da = {
+        check_interval_hours: 3,
+        current_ratio_tolerance_pct: 5,
+        phase_tolerance_deg: 3,
+        monitor_method: 'Antenna monitor with base current sample loops on each element',
+        fcc_specified_monitor_points: isClear_da,
+        reference: isClear_da ? '§73.61; §73.62 (clear channel monitor points)' : '§73.61'
+      };
+
+      return {
+        applicable: true,
+        pattern_mode,
+        da_mode_type: daMode,
+        has_daytime_pattern: hasDaytime_da,
+        has_nighttime_pattern: hasNighttime_da,
+        frequency_khz,
+        wavelength_m: lambda_da,
+        quarter_wave_m: qwave_da,
+        quarter_wave_ft: qwave_ft_da,
+        is_clear_channel: isClear_da,
+        is_local_channel: isLocal_da,
+        recommended_min_elements: minElements_da,
+        recommended_config: {
+          config_label: recConfig_da.config_label,
+          n_elements: recConfig_da.n_elements,
+          spacing_m: recConfig_da.spacing_m,
+          spacing_ft: recConfig_da.spacing_ft,
+          property_footprint_m: recConfig_da.property_footprint_m,
+          property_footprint_ft: recConfig_da.property_footprint_ft
+        },
+        array_configurations: arrayConfigs,
+        suppression_requirement_db: SUPP_REQ_DB_da,
+        suppression_note: `§73.316/§73.207: suppression ratio of ≥${SUPP_REQ_DB_da} dB toward interfered-with co-channel protected contours. Actual required suppression from §73.182 NIF analysis may be higher.`,
+        n_hrp_radials: 36,
+        hrp_increment_deg: 10,
+        form_301am_exhibits: formExhibits,
+        base_current_monitoring: baseCurrentMonitoring_da,
+        reference: '47 CFR §73.150 (DA authorization); §73.152 (DA-D/DA-N); §73.316 (pattern measurements/HRP); §73.207 (co-channel D/U protection); §73.61 (base current monitoring); §73.182 (NIF analysis)',
+        note: 'DA array element positions, amplitude ratios, and phase angles are engineering estimates for screening purposes. Actual design requires a licensed broadcast engineer, full mutual impedance matrix computation, and §73.182 NIF analysis. Proof-of-performance field measurements per §73.154 required before FCC issues license to cover (Form 302-AM).'
       };
     })(),
 
