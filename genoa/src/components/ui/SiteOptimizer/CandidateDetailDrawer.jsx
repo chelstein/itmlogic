@@ -415,6 +415,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   ⚠ {candidate.ground_radial_advisory}
                 </div>
               )}
+              {candidate.antenna_system_summary && (
+                <div className="font-mono text-[9px] text-textDim mt-1 leading-tight space-y-0.5">
+                  <div>
+                    <span className="opacity-60">Efficiency: </span>
+                    <span className="text-cream">
+                      {candidate.antenna_system_summary.efficiency_range_db.min_db > 0 ? '+' : ''}
+                      {candidate.antenna_system_summary.efficiency_range_db.min_db} to {candidate.antenna_system_summary.efficiency_range_db.max_db > 0 ? '+' : ''}{candidate.antenna_system_summary.efficiency_range_db.max_db} dB
+                    </span>
+                    {' '}<span className="opacity-60">— {candidate.antenna_system_summary.efficiency_range_db.label}</span>
+                  </div>
+                  {candidate.antenna_system_summary.tpo_headroom_to_class_max_kw != null && (
+                    <div>
+                      <span className="opacity-60">TPO headroom: </span>
+                      <span className="text-cream">+{candidate.antenna_system_summary.tpo_headroom_to_class_max_kw} kW to class max</span>
+                    </div>
+                  )}
+                  {candidate.antenna_system_summary.effective_service_area_km2 != null && (
+                    <div>
+                      <span className="opacity-60">Service area (0.5 mV/m): </span>
+                      <span className="text-cream">{candidate.antenna_system_summary.effective_service_area_km2.toLocaleString()} km²</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="col-span-2">
               <span className="text-textDim">NIF status</span>{' '}

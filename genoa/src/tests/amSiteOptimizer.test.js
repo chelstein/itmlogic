@@ -1697,6 +1697,35 @@ test('groundwave_contour_table: 5 mV/m distance matches principal_community_5mvm
   }
 });
 
+test('antenna_system_summary present on every candidate with correct structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const s = c.antenna_system_summary;
+    assert.ok(s != null, `antenna_system_summary must be present (rank ${c.rank})`);
+    assert.ok(typeof s.efficiency_range_db.min_db === 'number', `efficiency_range_db.min_db must be a number (rank ${c.rank})`);
+    assert.ok(typeof s.efficiency_range_db.max_db === 'number', `efficiency_range_db.max_db must be a number (rank ${c.rank})`);
+    assert.ok(s.efficiency_range_db.min_db <= s.efficiency_range_db.max_db,
+      `efficiency min_db must be ≤ max_db (rank ${c.rank})`);
+    assert.ok(typeof s.efficiency_range_db.label === 'string', `efficiency_range_db.label must be a string (rank ${c.rank})`);
+    // KAZM is Class B ceiling 50 kW; headroom = 50 - tpo_kw >= 0
+    assert.ok(s.tpo_headroom_to_class_max_kw != null && s.tpo_headroom_to_class_max_kw >= 0,
+      `tpo_headroom must be non-negative for Class B station (rank ${c.rank})`);
+  }
+});
+
+test('antenna_system_summary.effective_service_area_km2 ≈ π×daytime_reach²', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (c.daytime_reach_km == null) continue;
+    const expected = Math.round(Math.PI * c.daytime_reach_km * c.daytime_reach_km * 100) / 100;
+    const got = c.antenna_system_summary.effective_service_area_km2;
+    assert.ok(Math.abs(got - expected) < 1,
+      `effective_service_area_km2 (${got}) should match π×daytime_reach² (${expected}); rank ${c.rank}`);
+  }
+});
+
 test('groundwave_contour_table: 0.5 mV/m distance matches daytime_reach_km', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);

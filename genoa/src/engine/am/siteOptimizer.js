@@ -1059,6 +1059,26 @@ async function scoreCandidate(pt, ctx, warnings){
       }
     },
     groundwave_contour_table,
+    // Antenna system summary — efficiency estimate, power headroom, service area proxy.
+    antenna_system_summary: (() => {
+      // Antenna efficiency range: based on empirical M3 conductivity correlations.
+      // Excellent soil (σ ≥ 8): standard 120-radial system nearly ideal, ~0 dB loss.
+      // Good (σ ≥ 4): minor ground losses, ~-0.5 dB.
+      // Fair (σ ≥ 2): noticeable losses without extended ground system, ~-1.5 dB.
+      // Poor (σ < 2): significant losses even with deep-driven rods, ~-3.5 dB.
+      const effRange = sigma_msm >= 8 ? { min_db: 0.0, max_db:  0.5, label: 'minimal loss' }
+        : sigma_msm >= 4 ? { min_db: -0.5, max_db: 0.0, label: 'low loss' }
+        : sigma_msm >= 2 ? { min_db: -2.0, max_db: -0.5, label: 'moderate loss — extended ground system advisable' }
+        : { min_db: -4.0, max_db: -2.0, label: 'high loss — deep-driven rods + extended radials required' };
+      const classMax = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
+      const service_area_km2 = daytime_reach_km != null ? round2(Math.PI * daytime_reach_km * daytime_reach_km) : null;
+      return {
+        efficiency_range_db: effRange,
+        tpo_headroom_to_class_max_kw: classMax != null ? round2(classMax - tpo_kw) : null,
+        effective_service_area_km2: service_area_km2,
+        note: `Based on M3 zone σ=${sigma_msm} mS/m (${sigmaQuality(sigma_msm)}). Actual efficiency depends on tower design and installed ground system.`
+      };
+    })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
     // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically
