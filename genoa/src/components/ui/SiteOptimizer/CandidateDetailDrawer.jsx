@@ -2129,6 +2129,79 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Per-candidate Scoring Audit */}
+        {candidate.candidate_scoring_audit && (() => {
+          const a = candidate.candidate_scoring_audit;
+          const tierColor = t => t === 'HIGH' ? 'text-emerald-400' : t === 'MEDIUM' ? 'text-blue-300' : 'text-amber-400';
+          const tierBg    = t => t === 'HIGH' ? 'bg-emerald-400/15 border-emerald-400/40' : t === 'MEDIUM' ? 'bg-blue-300/15 border-blue-300/40' : 'bg-amber-400/15 border-amber-400/40';
+          const GOAL_LABELS = {
+            maximize_col_coverage:       'COL Coverage',
+            maximize_population:         'Population Reach',
+            minimize_blanket_population: 'Blanket Pop.',
+            prefer_high_conductivity:    'Conductivity',
+            avoid_wildfire_risk:         'Wildfire Risk',
+            minimize_int_treaty_zone:    'Treaty Zone'
+          };
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Score Explainability Audit</div>
+              {/* Summary chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${tierBg(a.confidence_tier)} ${tierColor(a.confidence_tier)}`}>
+                  {a.confidence_tier} CONF ×{a.confidence_factor}
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  Pre-conf: {a.score_pre_confidence} → Final: {a.score_final}
+                </span>
+                {a.confidence_penalty_pts !== 0 && (
+                  <span className="font-mono text-[9px] text-amber-400 px-1 py-0.5">
+                    Penalty: {a.confidence_penalty_pts} pts
+                  </span>
+                )}
+              </div>
+              {/* Key metrics row */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Active goals', value: a.active_goals_count },
+                  { label: 'Weight sum', value: a.weight_sum },
+                  { label: 'Norm factor', value: a.normalization_factor != null ? `×${a.normalization_factor.toFixed(2)}` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Per-goal breakdown */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Goal Breakdown</div>
+              <div className="space-y-0.5 mb-2">
+                {a.goal_details.map(g => (
+                  <div key={g.goal} className={`border rounded px-1.5 py-1 ${g.enabled ? 'border-rule bg-surface/60' : 'border-rule/40 bg-surface/20 opacity-50'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[8px] text-textBright font-semibold">{GOAL_LABELS[g.goal] ?? g.goal}</span>
+                      <div className="flex gap-1.5 items-center">
+                        {g.enabled ? (
+                          <>
+                            <span className="font-mono text-[8px] text-textDim">sub={g.sub_score ?? '—'}</span>
+                            <span className="font-mono text-[8px] text-textDim">w={g.weight}</span>
+                            <span className="font-mono text-[8px] text-blue-300 font-bold">{g.weighted_pts} pts</span>
+                          </>
+                        ) : (
+                          <span className="font-mono text-[8px] text-textDim">disabled</span>
+                        )}
+                      </div>
+                    </div>
+                    {g.limiting_factor && (
+                      <div className="font-mono text-[8px] text-amber-400 leading-snug mt-0.5">⚠ {g.limiting_factor}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{a.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Licensing Timeline Estimate */}
         {candidate.licensing_timeline_estimate && (() => {
           const lt = candidate.licensing_timeline_estimate;

@@ -789,7 +789,10 @@ export async function runSiteOptimizer(body = {}){
     tx_recommended_feedline: c.transmission_system_design_guide?.recommended_feedline ?? null,
     lic_risk_tier:          c.licensing_timeline_estimate?.licensing_risk_tier ?? null,
     lic_total_yrs_opt:      c.licensing_timeline_estimate?.total_years_optimistic ?? null,
-    lic_total_yrs_cons:     c.licensing_timeline_estimate?.total_years_conservative ?? null
+    lic_total_yrs_cons:     c.licensing_timeline_estimate?.total_years_conservative ?? null,
+    audit_active_goals:     c.candidate_scoring_audit?.active_goals_count ?? null,
+    audit_conf_tier:        c.candidate_scoring_audit?.confidence_tier ?? null,
+    audit_score_pre_conf:   c.candidate_scoring_audit?.score_pre_confidence ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5651,6 +5654,127 @@ async function scoreCandidate(pt, ctx, warnings){
         asr_required:              asrReq_lt,
         reference: '47 CFR §73.3520 (application fee); §73.3533 (construction completion); §73.3534 (license to cover deadline); 47 CFR §1.47 (public notice); FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. Contested applications, environmental appeals, or treaty complications can add years. All phase estimates are calendar weeks.'
+      };
+    })(),
+
+    // Per-candidate scoring audit — full score explainability panel.
+    // Shows each active goal's sub-score, weight, normalization, weighted
+    // contribution, and the confidence dampening that produced score_final.
+    // Intended to let engineers verify the optimizer's reasoning end-to-end.
+    candidate_scoring_audit: (() => {
+      // Re-expose confidence tier/factor from scoreCandidate scope.
+      const confTier_a   = _confTier;
+      const confFactor_a = _confFactor;
+      const confPenalty_a = _confPenalty;  // negative or zero
+
+      // Build per-goal detail rows using existing sub/weightPool/normFactor vars.
+      const goalMeta = [
+        {
+          goal:       'maximize_col_coverage',
+          label:      'COL coverage (§73.24j)',
+          raw_metric: coverage_pct,
+          raw_unit:   'fraction 0–1',
+          formula:    'coverage_pct × 100 → clamp 0–100',
+          data_source: community_of_license_polygon
+            ? 'GeoJSON polygon intersection'
+            : '10-km disc proxy (no polygon supplied)'
+        },
+        {
+          goal:       'maximize_population',
+          label:      'Population reach',
+          raw_metric: daytime_reach_km,
+          raw_unit:   'km (0.5 mV/m radius)',
+          formula:    '(reach / reach_scale)² × 100 → clamp 0–100',
+          data_source: 'FCC groundwave curve (σ, ERP, freq)'
+        },
+        {
+          goal:       'minimize_blanket_population',
+          label:      'Minimize blanket population (§73.24g)',
+          raw_metric: blanket_population_pct,
+          raw_unit:   '% of metro within 1 mV/m',
+          formula:    '100 − 50×blanket_pct → clamp 0–100  (0%→100, 1%→50, 2%→0)',
+          data_source: 'FCC groundwave curve (1 mV/m contour)'
+        },
+        {
+          goal:       'prefer_high_conductivity',
+          label:      'Ground conductivity',
+          raw_metric: sigma_msm,
+          raw_unit:   'mS/m',
+          formula:    'sqrt(σ / 8) × 100 → clamp 0–100',
+          data_source: ground_sigma_source ?? 'FCC conductivity zone map'
+        },
+        {
+          goal:       'avoid_wildfire_risk',
+          label:      'Wildfire risk avoidance',
+          raw_metric: null,
+          raw_unit:   'N/A',
+          formula:    'NOT EVALUATED (placeholder)',
+          data_source: 'USFS/NIFC risk layer (not yet integrated)'
+        },
+        {
+          goal:       'minimize_int_treaty_zone',
+          label:      'Border treaty zone margin',
+          raw_metric: treaty_min_border_km,
+          raw_unit:   'km to nearest border',
+          formula:    '(dist / 320 km) × 100 → clamp 0–100',
+          data_source: 'FCC/ISED treaty zone geometry'
+        }
+      ];
+
+      const goal_details = goalMeta.map(m => {
+        const enabled_g = !!(goals[m.goal]);
+        const w         = weightPool[m.goal] ?? 0;
+        const sk        = {
+          maximize_col_coverage:       'col_coverage',
+          maximize_population:         'population',
+          minimize_blanket_population: 'blanket',
+          prefer_high_conductivity:    'conductivity',
+          avoid_wildfire_risk:         'wildfire',
+          minimize_int_treaty_zone:    'treaty_zone'
+        }[m.goal];
+        const raw_sub = sub[sk];
+        const sub_score = raw_sub == null ? null : round2(raw_sub);
+        // Contribution from score_breakdown is already normalized
+        const weighted_pts = round2(score_breakdown[sk] ?? 0);
+        const limiting_factor = (() => {
+          if (!enabled_g) return 'Goal not enabled — weight = 0';
+          if (sub_score == null) return 'Sub-score not evaluated — metric unavailable';
+          if (m.goal === 'maximize_col_coverage' && coverage_pct != null && coverage_pct < 0.80)
+            return `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(j) 80% floor — NON-COMPLIANT`;
+          if (m.goal === 'minimize_blanket_population' && blanket_population_pct != null && blanket_population_pct > 1)
+            return `Blanket population ${blanket_population_pct.toFixed(2)}% > §73.24(g) 1% ceiling — NON-COMPLIANT`;
+          return null;
+        })();
+        return {
+          goal: m.goal,
+          label: m.label,
+          enabled: enabled_g,
+          weight: w,
+          raw_metric: m.raw_metric == null ? null : round2(m.raw_metric),
+          raw_unit: m.raw_unit,
+          formula: m.formula,
+          sub_score,
+          weighted_pts,
+          data_source: m.data_source,
+          limiting_factor
+        };
+      });
+
+      const active_goals_count = goal_details.filter(g => g.enabled).length;
+      const total_weighted_pts = round2(goal_details.reduce((s, g) => s + (g.weighted_pts ?? 0), 0));
+
+      return {
+        score_pre_confidence:   score,
+        confidence_tier:        confTier_a,
+        confidence_factor:      confFactor_a,
+        confidence_penalty_pts: confPenalty_a,
+        score_final,
+        normalization_factor:   round2(normFactor),
+        weight_sum:             weightSum,
+        active_goals_count,
+        total_weighted_pts,
+        goal_details,
+        note: 'candidate_scoring_audit exposes every step of the scoring pipeline — sub-score per goal, weight, normalization factor, weighted contribution, and confidence dampening — for full explainability. Weights are from the weight pool (COL coverage 35, population 28, blanket 14, conductivity 10, wildfire 4, treaty 4); normalization factor = 100 / sum(active_weights). Confidence tier: HIGH = filing-grade σ AND CoL polygon; MEDIUM = one of the two; LOW = neither.'
       };
     })(),
 

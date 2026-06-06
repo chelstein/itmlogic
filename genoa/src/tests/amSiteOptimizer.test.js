@@ -5346,3 +5346,57 @@ test('licensing_timeline_estimate comparison table columns populated', async () 
     assert.ok('lic_total_yrs_cons' in row);
   }
 });
+
+// ---- candidate_scoring_audit (per-candidate) ----
+
+test('per-candidate candidate_scoring_audit is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.candidate_scoring_audit != null, `rank ${c.rank} missing candidate_scoring_audit`);
+  }
+});
+
+test('per-candidate candidate_scoring_audit has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const a = out.candidates[0].candidate_scoring_audit;
+  assert.ok('score_pre_confidence' in a, 'score_pre_confidence missing');
+  assert.ok('confidence_tier' in a, 'confidence_tier missing');
+  assert.ok('confidence_factor' in a, 'confidence_factor missing');
+  assert.ok('confidence_penalty_pts' in a, 'confidence_penalty_pts missing');
+  assert.ok('score_final' in a, 'score_final missing');
+  assert.ok('normalization_factor' in a, 'normalization_factor missing');
+  assert.ok('weight_sum' in a, 'weight_sum missing');
+  assert.ok('active_goals_count' in a, 'active_goals_count missing');
+  assert.ok('total_weighted_pts' in a, 'total_weighted_pts missing');
+  assert.ok(Array.isArray(a.goal_details), 'goal_details must be an array');
+});
+
+test('per-candidate candidate_scoring_audit goal_details has 6 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const a = out.candidates[0].candidate_scoring_audit;
+  assert.strictEqual(a.goal_details.length, 6, 'goal_details must have exactly 6 entries');
+  const goals = a.goal_details.map(g => g.goal);
+  assert.ok(goals.includes('maximize_col_coverage'), 'missing maximize_col_coverage');
+  assert.ok(goals.includes('maximize_population'), 'missing maximize_population');
+  assert.ok(goals.includes('prefer_high_conductivity'), 'missing prefer_high_conductivity');
+});
+
+test('per-candidate candidate_scoring_audit score_pre_confidence >= 0 and score_final <= 100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const a = c.candidate_scoring_audit;
+    assert.ok(a.score_pre_confidence >= 0 && a.score_pre_confidence <= 100, `score_pre_confidence out of range: ${a.score_pre_confidence}`);
+    assert.ok(a.score_final >= 0 && a.score_final <= 100, `score_final out of range: ${a.score_final}`);
+    assert.ok(a.score_final <= a.score_pre_confidence + 0.01, 'score_final should not exceed score_pre_confidence (confidence dampening only reduces score)');
+  }
+});
+
+test('per-candidate candidate_scoring_audit comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('audit_active_goals' in row, 'audit_active_goals missing from comparison table');
+    assert.ok('audit_conf_tier' in row, 'audit_conf_tier missing from comparison table');
+    assert.ok('audit_score_pre_conf' in row, 'audit_score_pre_conf missing from comparison table');
+  }
+});

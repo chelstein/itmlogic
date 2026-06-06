@@ -845,3 +845,18 @@ test('colocation GRID candidates have financial_feasibility_summary', async () =
     assert.ok(Array.isArray(c.financial_feasibility_summary.line_items), `rank ${c.rank} line_items must be array`);
   }
 });
+
+test('colocation GRID candidates have candidate_scoring_audit', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.candidate_scoring_audit != null, `rank ${c.rank} missing candidate_scoring_audit`);
+    assert.ok(Array.isArray(c.candidate_scoring_audit.goal_details), `rank ${c.rank} goal_details must be array`);
+    assert.strictEqual(c.candidate_scoring_audit.goal_details.length, 6, `rank ${c.rank} must have 6 goal detail entries`);
+  }
+});
