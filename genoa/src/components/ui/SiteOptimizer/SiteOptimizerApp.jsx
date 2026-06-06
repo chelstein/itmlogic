@@ -1717,6 +1717,51 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      nighttime_pattern_switching_guide: {
+        fcc_class: 'D', frequency_khz: 780, pattern_mode: 'NDA',
+        is_clear_channel: true, is_da_pattern: false,
+        nighttime_obligation: { power_reduction_required: true, pattern_switch_required: false, night_operation: 'Secondary to Class A; nighttime power reduced or DA-N required to protect dominant station', cfr: '§73.24' },
+        power_reduction_required: true, pattern_switch_required: false,
+        operating_schedule: [
+          { id: 'SUNRISE_TRANSITION', label: 'Sunrise pattern switch (NDA → DA-D or power increase)', cfr: '§73.99(a)', trigger: 'Local sunrise at transmitter site ± 30 min', automation: 'ASID timer or automatic transmission system' },
+          { id: 'SUNSET_TRANSITION', label: 'Sunset pattern switch (DA-D → DA-N or power reduction)', cfr: '§73.99(b)', trigger: 'Local sunset at transmitter site ± 30 min', automation: 'ASID timer or automatic transmission system' },
+          { id: 'NIGHT_OPERATION', label: 'Nighttime operation (reduced power or DA-N)', cfr: '§73.99(c)', trigger: 'Sunset to sunrise', automation: 'Automatic current monitoring; alarms for excessive base current' },
+          { id: 'LOG_ENTRY', label: 'Station log entry at each pattern change', cfr: '47 CFR §73.1820', trigger: 'Each transition', automation: 'Automatic logging system; EAS encoder records; operator signature required if attended' }
+        ],
+        n_operating_schedule_items: 4,
+        asid_requirements: {
+          required: true, cfr: '47 CFR §73.1745; §73.1820',
+          functions: ['Trigger pattern switch at correct sunrise/sunset time (within ± 15 minutes per §73.99)', 'Reduce transmitter output to licensed nighttime ERP', 'Log each transition with time, current ratios, and any alarms', 'Alert operator if transition fails (current alarm threshold ± 5% of licensed value)', 'Maintain operating schedule within ± 30 minutes of published SR/SS times'],
+          cost_est_usd: 3500,
+          vendors: ['Burk Technology AutoPilot', 'Broadcastify RCS', 'Axia Livewire+', 'Harris BroadLynx']
+        },
+        sr_ss_variation: { max_seasonal_diff_hours: 2.9, schedule_update_freq: 'Monthly update to ASID timer recommended; FCC sunrise/sunset tables used', cfr: '§73.99; FCC Sunrise/Sunset Table (Media Bureau)' },
+        reference: '47 CFR §73.99; §73.21–§73.24; §73.1745; §73.1820; FCC Sunrise/Sunset Table (Media Bureau)',
+        note: 'Class D on clear channel. Night power reduction: required. Pattern switch: not required. ASID: required.'
+      },
+      property_acquisition_guide: {
+        tower_height_m: 144.23, guy_radius_m: 72.12, min_site_radius_m: 87.12,
+        min_site_area_m2: 23845.77, min_site_area_acres: 5.89,
+        site_options: [
+          { id: 'PURCHASE', label: 'Fee Simple Purchase', pros: ['Full control; no landlord risk', 'No annual payments after purchase', 'Simpler FCC application (no lease terms)'], cons: ['Highest upfront cost', 'Illiquid capital', 'Property tax obligation'], cost_usd: 50065, annual_cost_usd: 751, recommended_tenure: 'Permanent', fcc_exhibit: 'Deed or purchase agreement as Exhibit A to Form 301-AM' },
+          { id: 'LONG_TERM_LEASE', label: 'Long-Term Lease (≥ 20 years)', pros: ['Lower upfront cost', 'Preserves capital', 'FCC-acceptable with long initial + renewal terms'], cons: ['Landlord approval required for modifications', 'Lease expiry risk at license renewal', 'Annual payments'], cost_usd: 1001, annual_cost_usd: 3004, recommended_tenure: '≥ 20-year initial term with 10-year renewals', fcc_exhibit: 'Signed lease (≥ 20 yr) as Exhibit A; FCC requires copy of lease with Form 301-AM' },
+          { id: 'SHORT_TERM_LEASE', label: 'Short-Term Lease (< 20 years)', pros: ['Lowest upfront cost', 'Flexibility if site proves unsuitable'], cons: ['FCC may require justification for short lease', 'License grant may be conditioned on lease renewal', 'High risk at license renewal'], cost_usd: 501, annual_cost_usd: 3004, recommended_tenure: 'Not recommended — FCC prefers ≥ 20-year term', fcc_exhibit: 'Lease with option to renew; FCC will condition grant on maintaining site rights' }
+        ],
+        n_site_options: 3, recommended_option: 'LONG_TERM_LEASE',
+        due_diligence: [
+          { id: 'TITLE_SEARCH', label: 'Title search and title insurance', required: true, cost_est_usd: 800, notes: 'Clear title required; check for easements, covenants, or prior encumbrances affecting tower construction' },
+          { id: 'SURVEY', label: 'ALTA/NSPS land survey', required: true, cost_est_usd: 3500, notes: 'Required for FCC legal description exhibit; includes monumentation of tower base location' },
+          { id: 'ENVIRONMENTAL_REVIEW', label: 'Phase I Environmental Site Assessment', required: true, cost_est_usd: 2800, notes: 'ASTM E1527-21 Phase I ESA required before closing; identifies recognized environmental conditions' },
+          { id: 'ZONING_CONFIRM', label: 'Zoning confirmation letter', required: true, cost_est_usd: 350, notes: 'Confirm tower is permitted use or obtain variance before executing purchase agreement' },
+          { id: 'ACCESS_EASEMENT', label: 'Access road easement', required: false, cost_est_usd: 1500, notes: 'If site not road-accessible, negotiate easement for permanent access before closing' },
+          { id: 'POWER_EASEMENT', label: 'Utility easement (power service)', required: false, cost_est_usd: 1200, notes: 'Confirm utility easement to property line; utility extension may add $5k–$50k depending on distance' }
+        ],
+        n_required_due_diligence: 4, due_diligence_cost_usd: 7450,
+        fcc_form_301_requirement: 'Legal description of transmitter site required as Exhibit A; lease or deed must be attached',
+        site_control_required_by: 'FCC requires demonstrated site control before CP grant (47 CFR §1.65)',
+        reference: '47 CFR §1.65; 47 CFR §73.3533; FCC Form 301-AM Instructions; ASTM E1527-21; ALTA/NSPS Survey Standards',
+        note: 'Min site area: 5.89 acres (23845.77 m²) at 87.12m radius. DD cost est. $7,450. Long-term lease recommended.'
+      },
       rf_exposure_compliance_guide: {
         frequency_mhz: 0.78, tpo_kw: 5, mpe_evaluation_required: true, mpe_threshold_kw: 5,
         mpe_limit_gp_mwcm2: 100, mpe_limit_occ_mwcm2: 500,

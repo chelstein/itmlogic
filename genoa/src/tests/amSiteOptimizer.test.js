@@ -6789,6 +6789,100 @@ test('rf_exposure_compliance_guide comparison table columns present', async () =
   }
 });
 
+test('property_acquisition_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].property_acquisition_guide;
+  assert.ok(p != null, 'property_acquisition_guide must be present');
+  assert.ok(p.min_site_area_acres > 0, 'min_site_area_acres must be positive');
+  assert.ok(p.min_site_area_m2 > 0, 'min_site_area_m2 must be positive');
+  assert.ok(Array.isArray(p.site_options), 'site_options must be an array');
+  assert.ok(p.n_site_options === p.site_options.length, 'n_site_options must match array length');
+});
+
+test('property_acquisition_guide site options include PURCHASE and LONG_TERM_LEASE', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].property_acquisition_guide;
+  const purchase = p.site_options.find(o => o.id === 'PURCHASE');
+  const ltLease  = p.site_options.find(o => o.id === 'LONG_TERM_LEASE');
+  assert.ok(purchase != null, 'PURCHASE option must be present');
+  assert.ok(ltLease != null, 'LONG_TERM_LEASE option must be present');
+  assert.ok(purchase.cost_usd > 0, 'PURCHASE cost must be positive');
+  assert.ok(ltLease.annual_cost_usd > 0, 'LONG_TERM_LEASE annual cost must be positive');
+  assert.ok(purchase.cost_usd > ltLease.annual_cost_usd, 'purchase cost must exceed annual lease payment');
+});
+
+test('property_acquisition_guide due diligence has required items with costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].property_acquisition_guide;
+  assert.ok(Array.isArray(p.due_diligence), 'due_diligence must be an array');
+  assert.ok(p.n_required_due_diligence > 0, 'must have required due diligence items');
+  assert.ok(p.due_diligence_cost_usd > 0, 'due_diligence_cost_usd must be positive');
+  const titleSearch = p.due_diligence.find(d => d.id === 'TITLE_SEARCH');
+  assert.ok(titleSearch != null, 'TITLE_SEARCH must be in due diligence');
+  assert.strictEqual(titleSearch.required, true, 'TITLE_SEARCH must be required');
+});
+
+test('property_acquisition_guide min site area scales with tower height', async () => {
+  const out780 = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const out540 = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 1 });
+  const p780 = out780.candidates[0].property_acquisition_guide;
+  const p540 = out540.candidates[0].property_acquisition_guide;
+  // 540 kHz has longer wavelength → taller tower → larger site area
+  assert.ok(p540.tower_height_m > p780.tower_height_m, '540 kHz tower must be taller than 780 kHz tower');
+  assert.ok(p540.min_site_area_acres > p780.min_site_area_acres, '540 kHz min site area must be larger');
+});
+
+test('property_acquisition_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pag_min_area_acres'     in row, 'pag_min_area_acres missing from comparison table');
+    assert.ok('pag_recommended_option' in row, 'pag_recommended_option missing from comparison table');
+    assert.ok('pag_dd_cost_usd'        in row, 'pag_dd_cost_usd missing from comparison table');
+  }
+});
+
+test('nighttime_pattern_switching_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const n = out.candidates[0].nighttime_pattern_switching_guide;
+  assert.ok(n != null, 'nighttime_pattern_switching_guide must be present');
+  assert.ok(typeof n.power_reduction_required === 'boolean', 'power_reduction_required must be boolean');
+  assert.ok(typeof n.pattern_switch_required === 'boolean', 'pattern_switch_required must be boolean');
+  assert.ok(Array.isArray(n.operating_schedule), 'operating_schedule must be an array');
+  assert.ok(n.asid_requirements != null, 'asid_requirements must be present');
+});
+
+test('nighttime_pattern_switching_guide Class D on clear channel requires power reduction', async () => {
+  // KAZM is Class D at 780 kHz (clear channel) → power reduction required
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const n = out.candidates[0].nighttime_pattern_switching_guide;
+  assert.strictEqual(n.is_clear_channel, true, '780 kHz must be a clear channel');
+  assert.strictEqual(n.power_reduction_required, true, 'Class D on clear channel must require nighttime power reduction');
+});
+
+test('nighttime_pattern_switching_guide NDA pattern does not require pattern switch', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const n = out.candidates[0].nighttime_pattern_switching_guide;
+  assert.strictEqual(n.is_da_pattern, false, 'NDA must set is_da_pattern=false');
+  assert.strictEqual(n.pattern_switch_required, false, 'NDA pattern does not require DA-N switch');
+});
+
+test('nighttime_pattern_switching_guide DA-D pattern on clear channel requires switch', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', fcc_class: 'D', candidate_limit: 1 });
+  const n = out.candidates[0].nighttime_pattern_switching_guide;
+  assert.strictEqual(n.is_da_pattern, true, 'DA-D must set is_da_pattern=true');
+  assert.strictEqual(n.pattern_switch_required, true, 'DA-D on clear channel Class D must require DA-N switch');
+  assert.strictEqual(n.asid_requirements.required, true, 'ASID required when pattern switch required');
+});
+
+test('nighttime_pattern_switching_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ntps_power_reduction' in row, 'ntps_power_reduction missing from comparison table');
+    assert.ok('ntps_pattern_switch'  in row, 'ntps_pattern_switch missing from comparison table');
+    assert.ok('ntps_asid_required'   in row, 'ntps_asid_required missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;

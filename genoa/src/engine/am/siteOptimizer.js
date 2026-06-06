@@ -915,7 +915,13 @@ export async function runSiteOptimizer(body = {}){
     tsa_total_cost_usd:     c.tower_structural_analysis_guide?.total_structural_cost_usd ?? null,
     rfe_eval_required:      c.rf_exposure_compliance_guide?.mpe_evaluation_required ?? null,
     rfe_excl_radius_gp_m:   c.rf_exposure_compliance_guide?.exclusion_radius_gp_m ?? null,
-    rfe_excl_radius_occ_m:  c.rf_exposure_compliance_guide?.exclusion_radius_occ_m ?? null
+    rfe_excl_radius_occ_m:  c.rf_exposure_compliance_guide?.exclusion_radius_occ_m ?? null,
+    pag_min_area_acres:     c.property_acquisition_guide?.min_site_area_acres ?? null,
+    pag_recommended_option: c.property_acquisition_guide?.recommended_option ?? null,
+    pag_dd_cost_usd:        c.property_acquisition_guide?.due_diligence_cost_usd ?? null,
+    ntps_power_reduction:   c.nighttime_pattern_switching_guide?.power_reduction_required ?? null,
+    ntps_pattern_switch:    c.nighttime_pattern_switching_guide?.pattern_switch_required ?? null,
+    ntps_asid_required:     c.nighttime_pattern_switching_guide?.asid_requirements?.required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -10144,6 +10150,157 @@ async function scoreCandidate(pt, ctx, warnings){
         applicable_bulletin: 'OET Bulletin 65, Edition 97-01 (August 1997)',
         reference: '47 CFR §1.1310; 47 CFR §1.1307; OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2005; ANSI Z535.2',
         note: `AM ${freq_mhz} MHz, ${tpo_kw} kW ERP. MPE eval ${mpe_eval_required ? 'required' : 'not required'}. Uncontrolled exclusion zone: ${r_gp_m}m; controlled: ${r_occ_m}m.`
+      };
+    })(),
+
+    property_acquisition_guide: (() => {
+      // Land acquisition guidance for AM transmitter site relocation
+      // §1.65 requires notification of changes in circumstances during pending applications
+      // FCC Form 301-AM requires legal description of transmitter site; clean title is essential
+      const towerH_pag = round2(0.375 * 300000 / frequency_khz); // 3/8λ estimate
+
+      // Minimum site area: tower height + guy wire span + buffer
+      // For a guyed tower: guy radius ≈ 0.5 × tower height; buffer 15m for fence + access
+      const guyRadius_m  = round2(towerH_pag * 0.5);
+      const minSiteR_m   = round2(guyRadius_m + 15);
+      const minSiteArea_m2 = round2(Math.PI * Math.pow(minSiteR_m, 2));
+      const minSiteArea_acres = round2(minSiteArea_m2 / 4046.86);
+
+      // Cost comparison: purchase vs. lease
+      const LAND_VALUE_PER_ACRE = 8500; // rural land baseline (varies by region)
+      const PURCHASE_COST        = Math.round(minSiteArea_acres * LAND_VALUE_PER_ACRE);
+      const ANNUAL_LEASE_RATE    = Math.round(PURCHASE_COST * 0.06); // 6% of land value
+      const LEASE_5YR_COST       = ANNUAL_LEASE_RATE * 5;
+      const LEASE_20YR_COST      = ANNUAL_LEASE_RATE * 20;
+
+      const SITE_OPTIONS = [
+        {
+          id: 'PURCHASE',
+          label: 'Fee Simple Purchase',
+          pros: ['Full control; no landlord risk', 'No annual payments after purchase', 'Simpler FCC application (no lease terms)'],
+          cons: ['Highest upfront cost', 'Illiquid capital', 'Property tax obligation'],
+          cost_usd: PURCHASE_COST,
+          annual_cost_usd: Math.round(PURCHASE_COST * 0.015), // property tax + carrying
+          recommended_tenure: 'Permanent',
+          fcc_exhibit: 'Deed or purchase agreement as Exhibit A to Form 301-AM'
+        },
+        {
+          id: 'LONG_TERM_LEASE',
+          label: 'Long-Term Lease (≥ 20 years)',
+          pros: ['Lower upfront cost', 'Preserves capital', 'FCC-acceptable with long initial + renewal terms'],
+          cons: ['Landlord approval required for modifications', 'Lease expiry risk at license renewal', 'Annual payments'],
+          cost_usd: Math.round(PURCHASE_COST * 0.02), // transaction cost
+          annual_cost_usd: ANNUAL_LEASE_RATE,
+          recommended_tenure: '≥ 20-year initial term with 10-year renewals',
+          fcc_exhibit: 'Signed lease (≥ 20 yr) as Exhibit A; FCC requires copy of lease with Form 301-AM'
+        },
+        {
+          id: 'SHORT_TERM_LEASE',
+          label: 'Short-Term Lease (< 20 years)',
+          pros: ['Lowest upfront cost', 'Flexibility if site proves unsuitable'],
+          cons: ['FCC may require justification for short lease', 'License grant may be conditioned on lease renewal', 'High risk at license renewal'],
+          cost_usd: Math.round(PURCHASE_COST * 0.01),
+          annual_cost_usd: ANNUAL_LEASE_RATE,
+          recommended_tenure: 'Not recommended — FCC prefers ≥ 20-year term',
+          fcc_exhibit: 'Lease with option to renew; FCC will condition grant on maintaining site rights'
+        }
+      ];
+
+      // Due diligence checklist
+      const DUE_DILIGENCE = [
+        { id: 'TITLE_SEARCH', label: 'Title search and title insurance', required: true, cost_est_usd: 800, notes: 'Clear title required; check for easements, covenants, or prior encumbrances affecting tower construction' },
+        { id: 'SURVEY', label: 'ALTA/NSPS land survey', required: true, cost_est_usd: 3500, notes: 'Required for FCC legal description exhibit; includes monumentation of tower base location' },
+        { id: 'ENVIRONMENTAL_REVIEW', label: 'Phase I Environmental Site Assessment', required: true, cost_est_usd: 2800, notes: 'ASTM E1527-21 Phase I ESA required before closing; identifies recognized environmental conditions' },
+        { id: 'ZONING_CONFIRM', label: 'Zoning confirmation letter', required: true, cost_est_usd: 350, notes: 'Confirm tower is permitted use or obtain variance before executing purchase agreement' },
+        { id: 'ACCESS_EASEMENT', label: 'Access road easement', required: false, cost_est_usd: 1500, notes: 'If site not road-accessible, negotiate easement for permanent access before closing' },
+        { id: 'POWER_EASEMENT', label: 'Utility easement (power service)', required: false, cost_est_usd: 1200, notes: 'Confirm utility easement to property line; utility extension may add $5k–$50k depending on distance' }
+      ];
+
+      const n_required_dd = DUE_DILIGENCE.filter(d => d.required).length;
+      const dd_cost_total  = Math.round(DUE_DILIGENCE.filter(d => d.required).reduce((s, d) => s + d.cost_est_usd, 0));
+
+      return {
+        tower_height_m: towerH_pag,
+        guy_radius_m: guyRadius_m,
+        min_site_radius_m: minSiteR_m,
+        min_site_area_m2: minSiteArea_m2,
+        min_site_area_acres: minSiteArea_acres,
+        site_options: SITE_OPTIONS,
+        n_site_options: SITE_OPTIONS.length,
+        recommended_option: 'LONG_TERM_LEASE',
+        due_diligence: DUE_DILIGENCE,
+        n_required_due_diligence: n_required_dd,
+        due_diligence_cost_usd: dd_cost_total,
+        fcc_form_301_requirement: 'Legal description of transmitter site required as Exhibit A; lease or deed must be attached',
+        site_control_required_by: 'FCC requires demonstrated site control before CP grant (47 CFR §1.65)',
+        reference: '47 CFR §1.65; 47 CFR §73.3533; FCC Form 301-AM Instructions; ASTM E1527-21; ALTA/NSPS Survey Standards',
+        note: `Min site area: ${minSiteArea_acres} acres (${minSiteArea_m2} m²) at ${minSiteR_m}m radius. DD cost est. $${dd_cost_total.toLocaleString()}. Long-term lease recommended.`
+      };
+    })(),
+
+    nighttime_pattern_switching_guide: (() => {
+      // §73.99: Nighttime power reduction / pattern change requirements for Class B and D stations
+      // Class D on clear channel must reduce power at local sunrise/sunset OR use DA-N directional pattern
+      // Class B regional channel: nighttime DA-N pattern required (if authorized)
+      // The operating schedule is tied to sunrise/sunset at the transmitter site
+
+      const isDA_ntps    = /^DA/i.test(pattern_mode);
+      const isClearCh    = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // Determine nighttime obligations by class
+      const NIGHTTIME_OBLIGATIONS = {
+        A: { power_reduction_required: false, pattern_switch_required: false, night_operation: 'Full power; nighttime skywave protection as dominant Class A station', cfr: '§73.21' },
+        B: { power_reduction_required: true, pattern_switch_required: isDA_ntps, night_operation: 'Must reduce power and/or switch to DA-N; see licensed nighttime ERP in CP', cfr: '§73.22' },
+        C: { power_reduction_required: false, pattern_switch_required: false, night_operation: 'Local channel; full power at all times; no nighttime protection required', cfr: '§73.23' },
+        D: { power_reduction_required: isClearCh, pattern_switch_required: isDA_ntps && isClearCh, night_operation: isClearCh ? 'Secondary to Class A; nighttime power reduced or DA-N required to protect dominant station' : 'Regional operation; check licensed night authorization', cfr: '§73.24' }
+      };
+
+      const myObligation = NIGHTTIME_OBLIGATIONS[fcc_class.toUpperCase()] ?? NIGHTTIME_OBLIGATIONS['D'];
+
+      // Operating schedule requirements (§73.99)
+      // ASID: Auto Station Identification Device — unmanned stations switching pattern must log it
+      const OPERATING_SCHEDULE = [
+        { id: 'SUNRISE_TRANSITION', label: 'Sunrise pattern switch (NDA → DA-D or power increase)', cfr: '§73.99(a)', trigger: 'Local sunrise at transmitter site ± 30 min', automation: 'ASID timer or automatic transmission system' },
+        { id: 'SUNSET_TRANSITION', label: 'Sunset pattern switch (DA-D → DA-N or power reduction)', cfr: '§73.99(b)', trigger: 'Local sunset at transmitter site ± 30 min', automation: 'ASID timer or automatic transmission system' },
+        { id: 'NIGHT_OPERATION', label: 'Nighttime operation (reduced power or DA-N)', cfr: '§73.99(c)', trigger: 'Sunset to sunrise', automation: 'Automatic current monitoring; alarms for excessive base current' },
+        { id: 'LOG_ENTRY', label: 'Station log entry at each pattern change', cfr: '47 CFR §73.1820', trigger: 'Each transition', automation: 'Automatic logging system; EAS encoder records; operator signature required if attended' }
+      ];
+
+      // ASID requirements (§73.1745)
+      const ASID_REQUIREMENTS = {
+        required: myObligation.power_reduction_required || myObligation.pattern_switch_required,
+        cfr: '47 CFR §73.1745; §73.1820',
+        functions: [
+          'Trigger pattern switch at correct sunrise/sunset time (within ± 15 minutes per §73.99)',
+          'Reduce transmitter output to licensed nighttime ERP',
+          'Log each transition with time, current ratios, and any alarms',
+          'Alert operator if transition fails (current alarm threshold ± 5% of licensed value)',
+          'Maintain operating schedule within ± 30 minutes of published SR/SS times'
+        ],
+        cost_est_usd: 3500,
+        vendors: ['Burk Technology AutoPilot', 'Broadcastify RCS', 'Axia Livewire+', 'Harris BroadLynx']
+      };
+
+      // Seasonal SR/SS variation
+      const SR_SS_VARIATION = {
+        max_seasonal_diff_hours: round2(Math.abs(Math.cos(Math.PI / 180 * 34.86)) * 3.5), // approx for KAZM lat
+        schedule_update_freq: 'Monthly update to ASID timer recommended; FCC sunrise/sunset tables used',
+        cfr: '§73.99; FCC Sunrise/Sunset Table (Media Bureau)'
+      };
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        is_clear_channel: isClearCh,
+        is_da_pattern: isDA_ntps,
+        nighttime_obligation: myObligation,
+        power_reduction_required: myObligation.power_reduction_required,
+        pattern_switch_required: myObligation.pattern_switch_required,
+        operating_schedule: OPERATING_SCHEDULE,
+        n_operating_schedule_items: OPERATING_SCHEDULE.length,
+        asid_requirements: ASID_REQUIREMENTS,
+        sr_ss_variation: SR_SS_VARIATION,
+        reference: '47 CFR §73.99; §73.21–§73.24; §73.1745; §73.1820; FCC Sunrise/Sunset Table (Media Bureau)',
+        note: `Class ${fcc_class} on ${isClearCh ? 'clear' : 'regional/local'} channel. Night power reduction: ${myObligation.power_reduction_required ? 'required' : 'not required'}. Pattern switch: ${myObligation.pattern_switch_required ? 'required (DA-N)' : 'not required'}. ASID: ${ASID_REQUIREMENTS.required ? 'required' : 'optional'}.`
       };
     })(),
 

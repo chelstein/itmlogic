@@ -2226,6 +2226,85 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Nighttime Pattern Switching Guide */}
+        {candidate.nighttime_pattern_switching_guide && (() => {
+          const n = candidate.nighttime_pattern_switching_guide;
+          const asid = n.asid_requirements;
+          return (
+            <div>
+              <h4 style={{ color: '#c4b5fd', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Nighttime Pattern Switching (§73.99)
+              </h4>
+              <div style={{ background: '#0d0a1a', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>FCC class:</span> <strong style={{ color: '#c4b5fd' }}>{n.fcc_class || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Clear channel:</span> <strong style={{ color: n.is_clear_channel ? '#fbbf24' : '#22c55e' }}>{n.is_clear_channel ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>DA pattern:</span> <strong>{n.is_da_pattern ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Night power reduction:</span> <strong style={{ color: n.power_reduction_required ? '#ef4444' : '#22c55e' }}>{n.power_reduction_required ? 'Required' : 'Not required'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Pattern switch req'd:</span> <strong style={{ color: n.pattern_switch_required ? '#ef4444' : '#22c55e' }}>{n.pattern_switch_required ? 'Yes (DA-N)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASID required:</span> <strong style={{ color: asid?.required ? '#ef4444' : '#22c55e' }}>{asid?.required ? 'Yes' : 'No'}</strong></div>
+                  <div style={{ gridColumn: '1 / -1' }}><span style={{ color: '#9ca3af' }}>Night operation:</span> <span style={{ color: '#d1d5db', fontSize: 10 }}>{n.nighttime_obligation?.night_operation}</span></div>
+                </div>
+              </div>
+              {asid?.required && (
+                <div style={{ background: '#080614', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#c4b5fd', fontWeight: 700 }}>ASID (§73.1745): </span>
+                  <span style={{ color: '#d1d5db' }}>Auto Station ID Device required — triggers pattern switch at correct SR/SS, logs transitions, and alarms on current deviation. Est. ${asid.cost_est_usd?.toLocaleString()}.</span>
+                </div>
+              )}
+              <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 3 }}>Operating Schedule</div>
+              {(n.operating_schedule || []).slice(0, 3).map((item, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                  <span style={{ color: '#c4b5fd', minWidth: 8 }}>●</span>
+                  <div><span style={{ color: '#d1d5db', fontWeight: 600 }}>{item.label}</span> <span style={{ color: '#6b7280' }}>({item.cfr})</span></div>
+                </div>
+              ))}
+              <div style={{ color: '#4b5563', fontSize: 10, marginTop: 4 }}>{n.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Property Acquisition Guide */}
+        {candidate.property_acquisition_guide && (() => {
+          const p = candidate.property_acquisition_guide;
+          const purchase  = (p.site_options || []).find(o => o.id === 'PURCHASE');
+          const ltLease   = (p.site_options || []).find(o => o.id === 'LONG_TERM_LEASE');
+          const reqDD     = (p.due_diligence || []).filter(d => d.required);
+          return (
+            <div>
+              <h4 style={{ color: '#86efac', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Property Acquisition Guide (§1.65)
+              </h4>
+              <div style={{ background: '#031a0a', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Tower height est.:</span> <strong>{p.tower_height_m != null ? `${p.tower_height_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Guy wire radius:</span> <strong>{p.guy_radius_m != null ? `${p.guy_radius_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Min site radius:</span> <strong>{p.min_site_radius_m != null ? `${p.min_site_radius_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Min site area:</span> <strong style={{ color: '#86efac' }}>{p.min_site_area_acres != null ? `${p.min_site_area_acres} acres` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Purchase est.:</span> <strong>{purchase?.cost_usd != null ? `$${purchase.cost_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Annual lease est.:</span> <strong>{ltLease?.annual_cost_usd != null ? `$${ltLease.annual_cost_usd.toLocaleString()}/yr` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Recommended:</span> <strong style={{ color: '#22c55e' }}>{p.recommended_option?.replace(/_/g, ' ') || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>DD cost est.:</span> <strong style={{ color: '#f59e0b' }}>{p.due_diligence_cost_usd != null ? `$${p.due_diligence_cost_usd.toLocaleString()}` : '—'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Required Due Diligence</div>
+                {reqDD.map((d, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: '#86efac', minWidth: 8, marginTop: 1 }}>●</span>
+                    <div>
+                      <span style={{ color: '#d1d5db', fontWeight: 600 }}>{d.label}</span>
+                      <span style={{ color: '#6b7280' }}> — est. ${d.cost_est_usd?.toLocaleString()}</span>
+                      <div style={{ color: '#9ca3af' }}>{d.notes?.substring(0, 110)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{p.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* RF Exposure Compliance Guide */}
         {candidate.rf_exposure_compliance_guide && (() => {
           const r = candidate.rf_exposure_compliance_guide;
