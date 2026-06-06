@@ -1717,6 +1717,23 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      rf_exposure_mpe_analysis: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
+        evaluation_required: true, evaluation_threshold_kw: 5,
+        compliance_status: 'EVALUATION_REQUIRED',
+        mpe_general_population_mw_cm2: 100, mpe_general_population_e_vm: 614, mpe_general_population_h_am: 163,
+        mpe_occupational_mw_cm2: 500,
+        eirp_w: 8200, exclusion_radius_m: 8.1, exclusion_radius_ft: 26.6, occupational_exclusion_m: 3.6,
+        filing_exhibits: [
+          { id: 'mpe_calc',  exhibit: 'MPE calculation worksheet',             rule: '§1.1310',     note: 'Show EIRP, distance, and power density at fence line vs MPE limit.' },
+          { id: 'excl_zone', exhibit: 'Exclusion zone diagram (in site plan)', rule: 'OET Bul 65 §3.3', note: 'Identify controlled/uncontrolled exposure zones on scaled site plan.' },
+          { id: 'fencing',   exhibit: 'Fencing plan (§73.49)',                 rule: '§73.49',      note: 'Fence must enclose exclusion zone; prevent unauthorized access.' }
+        ],
+        n_filing_exhibits: 3,
+        monitoring_requirement: 'RF monitor at fence perimeter recommended; portable RF survey at commissioning',
+        reference: '47 CFR §1.1310; §1.1307(b); §73.49; FCC OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2019',
+        note: 'RF exposure: EVALUATION_REQUIRED. ERP 5 kW ≥ 5 kW threshold. Exclusion zone: ≥ 8.1 m radius.'
+      },
       tower_lighting_marking_guide: {
         fcc_class: 'D', frequency_khz: 780,
         tower_height_estimate_m: 144.23, tower_height_estimate_ft: 473.15,

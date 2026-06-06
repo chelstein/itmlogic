@@ -2226,6 +2226,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* RF Exposure / MPE Analysis */}
+        {candidate.rf_exposure_mpe_analysis && (() => {
+          const r = candidate.rf_exposure_mpe_analysis;
+          const statusColor = r.compliance_status === 'CATEGORICALLY_EXCLUDED' ? 'text-green-300' : 'text-amber-300';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">RF Exposure / MPE Analysis (§1.1310 · OET Bul 65)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="flex items-center gap-3 mb-2 text-xs">
+                  <span className="text-gray-400">Status:</span>
+                  <span className={`font-bold ${statusColor}`}>{r.compliance_status?.replace(/_/g,' ')}</span>
+                  <span className="text-gray-500">({r.tpo_kw} kW {r.evaluation_required ? '≥' : '<'} {r.evaluation_threshold_kw} kW threshold)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">MPE Limit (gen. pop.)</div>
+                    <div className="text-white font-mono">{r.mpe_general_population_mw_cm2} mW/cm²</div>
+                    <div className="text-gray-500">{r.mpe_general_population_e_vm} V/m · {r.mpe_general_population_h_am} A/m</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Exclusion Zone</div>
+                    <div className="text-amber-300 font-mono">{r.exclusion_radius_m} m ({r.exclusion_radius_ft} ft)</div>
+                    <div className="text-gray-500">Occupational: {r.occupational_exclusion_m} m</div>
+                  </div>
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Filing Exhibits Required</div>
+                <div className="space-y-1 mb-2">
+                  {r.filing_exhibits?.map(e => (
+                    <div key={e.id} className="text-xs bg-gray-800 rounded px-2 py-1 flex items-start gap-2">
+                      <span className="text-gray-500 flex-shrink-0">{e.rule}</span>
+                      <span className="text-gray-300">{e.exhibit}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-400 italic mb-1">{r.monitoring_requirement}</div>
+                <div className="text-xs text-gray-500">{r.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Tower Lighting & Marking Guide */}
         {candidate.tower_lighting_marking_guide && (() => {
           const t = candidate.tower_lighting_marking_guide;

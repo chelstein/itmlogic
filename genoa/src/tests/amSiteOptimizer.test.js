@@ -6362,3 +6362,49 @@ test('tower_lighting_marking_guide comparison table columns present', async () =
     assert.ok('tower_faa_tier' in row,     'tower_faa_tier missing from comparison table');
   }
 });
+
+test('rf_exposure_mpe_analysis presence and compliance status', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].rf_exposure_mpe_analysis;
+  assert.ok(r != null, 'rf_exposure_mpe_analysis must be present');
+  assert.ok(typeof r.compliance_status === 'string', 'compliance_status must be a string');
+  assert.ok(r.exclusion_radius_m > 0, 'exclusion_radius_m must be positive');
+  // KAZM TPO = 5 kW = threshold → EVALUATION_REQUIRED
+  assert.strictEqual(r.evaluation_required, true, 'KAZM TPO 5 kW must require evaluation (≥ 5 kW threshold)');
+});
+
+test('rf_exposure_mpe_analysis MPE limits per §1.1310', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].rf_exposure_mpe_analysis;
+  assert.strictEqual(r.mpe_general_population_mw_cm2, 100, 'MPE must be 100 mW/cm² for 0.3–3 MHz general population');
+  assert.strictEqual(r.mpe_general_population_e_vm, 614, 'E-field MPE must be 614 V/m');
+  assert.strictEqual(r.mpe_occupational_mw_cm2, 500, 'occupational MPE must be 500 mW/cm²');
+});
+
+test('rf_exposure_mpe_analysis exclusion zone and EIRP', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].rf_exposure_mpe_analysis;
+  assert.ok(r.eirp_w > r.tpo_kw * 1000, 'EIRP must be greater than TPO (dipole gain factor)');
+  assert.ok(r.exclusion_radius_ft > r.exclusion_radius_m, 'exclusion radius ft must exceed m');
+  assert.ok(r.occupational_exclusion_m > 0, 'occupational exclusion zone must be positive');
+  assert.ok(r.occupational_exclusion_m < r.exclusion_radius_m, 'occupational zone must be smaller than general population zone');
+});
+
+test('rf_exposure_mpe_analysis filing exhibits present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const r = out.candidates[0].rf_exposure_mpe_analysis;
+  assert.ok(r.filing_exhibits.length > 0, 'must have filing exhibits');
+  assert.ok(r.n_filing_exhibits > 0, 'n_filing_exhibits must be positive');
+  // 5 kW requires evaluation — should have MPE calc exhibit
+  const mpeCalc = r.filing_exhibits.find(e => e.id === 'mpe_calc');
+  assert.ok(mpeCalc != null, 'must include MPE calculation exhibit for 5 kW station');
+});
+
+test('rf_exposure_mpe_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mpe_compliance_status' in row, 'mpe_compliance_status missing from comparison table');
+    assert.ok('mpe_excl_radius_m' in row,     'mpe_excl_radius_m missing from comparison table');
+    assert.ok('mpe_eval_required' in row,      'mpe_eval_required missing from comparison table');
+  }
+});

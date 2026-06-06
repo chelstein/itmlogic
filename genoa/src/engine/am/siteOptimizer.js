@@ -855,7 +855,10 @@ export async function runSiteOptimizer(body = {}){
     eas_ipaws_required:     c.eas_acp_compliance_guide?.ipaws_required ?? null,
     tower_height_est_m:     c.tower_lighting_marking_guide?.tower_height_estimate_m ?? null,
     tower_asr_required:     c.tower_lighting_marking_guide?.asr_required ?? null,
-    tower_faa_tier:         c.tower_lighting_marking_guide?.faa_lighting_tier ?? null
+    tower_faa_tier:         c.tower_lighting_marking_guide?.faa_lighting_tier ?? null,
+    mpe_compliance_status:  c.rf_exposure_mpe_analysis?.compliance_status ?? null,
+    mpe_excl_radius_m:      c.rf_exposure_mpe_analysis?.exclusion_radius_m ?? null,
+    mpe_eval_required:      c.rf_exposure_mpe_analysis?.evaluation_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8157,6 +8160,77 @@ async function scoreCandidate(pt, ctx, warnings){
         n_maintenance_items:       maintenanceObs.length,
         reference: '47 CFR §17.7; §17.21; §17.23; §17.47; §17.56; §73.1213; FAA AC 70/7460-1M',
         note: `Estimated tower height: ${towerHeightEst_m} m (${towerHeightEst_ft} ft) at 3/8λ. ASR ${asrRequired_tl ? 'REQUIRED' : 'not required (< 61m)'}. FAA tier: ${tier.label}.`
+      };
+    })(),
+
+    rf_exposure_mpe_analysis: (() => {
+      // RF Human Exposure evaluation per §1.1310, OET Bulletin 65 (Ed. 97-01), §73.1 (definitions)
+      // FCC §1.1310: all stations must evaluate RF exposure compliance
+      // OET Bulletin 65: provides MPE limits and evaluation methods for broadcast stations
+      // MPE limits (general population / uncontrolled) at AM frequencies:
+      //   §1.1310 Table 1: For 0.3–3 MHz (MF/LF): E = 614 V/m, H = 163 A/m, Power density = 100 mW/cm²
+      // Evaluation threshold for AM: ERP ≥ 5 kW daytime requires routine evaluation per OET Bulletin 65 §4.1
+
+      const MPE_POWER_DENSITY_MW_CM2 = 100.0;  // mW/cm² for 0.3–3 MHz general population
+      const MPE_E_FIELD_VM = 614;               // V/m general population
+      const MPE_H_FIELD_AM = 163;               // A/m general population
+
+      // FCC ERP threshold for AM evaluation: OET Bul 65 Table 1 footnote
+      // AM (535–1705 kHz): routine evaluation required if ERP ≥ 5 kW
+      const EVAL_THRESHOLD_KW_mpe = 5;
+      const evaluationRequired_mpe = tpo_kw >= EVAL_THRESHOLD_KW_mpe;
+
+      // Near-field exclusion zone calculation
+      // Power density at distance r from antenna (simplified far-field): S = EIRP / (4π r²)
+      // For AM: EIRP ≈ ERP × 1.64 (dipole correction)
+      // Solve for r where S = MPE: r = sqrt(EIRP / (4π × MPE))
+      const eirp_w = tpo_kw * 1000 * 1.64;
+      const mpe_w_m2 = MPE_POWER_DENSITY_MW_CM2 * 10; // convert mW/cm² to W/m²
+      const exclusionRadius_m_calc = round2(Math.sqrt(eirp_w / (4 * Math.PI * mpe_w_m2)));
+      // Practical minimum: §73.49 fence must be outside exclusion zone
+      const exclusionRadius_m = Math.max(exclusionRadius_m_calc, 3); // minimum 3m per engineering practice
+
+      // Occupational (controlled) exposure limit is 5× less restrictive than general population
+      const occupationalMPE_mw_cm2 = MPE_POWER_DENSITY_MW_CM2 * 5; // 500 mW/cm² for MF
+      const occupationalExclusionM = round2(exclusionRadius_m / Math.sqrt(5)); // ~sqrt(5) factor
+
+      // Compliance status
+      const complianceStatus = evaluationRequired_mpe ? 'EVALUATION_REQUIRED' : 'CATEGORICALLY_EXCLUDED';
+
+      // Required exhibits for FCC filing
+      const filingExhibits = evaluationRequired_mpe ? [
+        { id: 'mpe_calc',   exhibit: 'MPE calculation worksheet',              rule: '§1.1310', note: 'Show EIRP, distance, and power density at fence line vs MPE limit.' },
+        { id: 'excl_zone',  exhibit: 'Exclusion zone diagram (in site plan)',  rule: 'OET Bul 65 §3.3', note: 'Identify controlled/uncontrolled exposure zones on scaled site plan.' },
+        { id: 'fencing',    exhibit: 'Fencing plan (§73.49)',                  rule: '§73.49', note: 'Fence must enclose exclusion zone; prevent unauthorized access.' }
+      ] : [
+        { id: 'cat_exclusion', exhibit: 'Categorical exclusion statement', rule: '§1.1307(b)', note: `TPO ${tpo_kw} kW < ${EVAL_THRESHOLD_KW_mpe} kW threshold. Routine evaluation not required.` }
+      ];
+
+      // Monitoring requirements
+      const monitoringReq = evaluationRequired_mpe
+        ? 'RF monitor at fence perimeter recommended; portable RF survey at commissioning'
+        : 'No routine monitoring required (categorically excluded)';
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        evaluation_required:            evaluationRequired_mpe,
+        evaluation_threshold_kw:        EVAL_THRESHOLD_KW_mpe,
+        compliance_status:              complianceStatus,
+        mpe_general_population_mw_cm2:  MPE_POWER_DENSITY_MW_CM2,
+        mpe_general_population_e_vm:    MPE_E_FIELD_VM,
+        mpe_general_population_h_am:    MPE_H_FIELD_AM,
+        mpe_occupational_mw_cm2:        occupationalMPE_mw_cm2,
+        eirp_w:                         round2(eirp_w),
+        exclusion_radius_m:             exclusionRadius_m,
+        exclusion_radius_ft:            round2(exclusionRadius_m * 3.28084),
+        occupational_exclusion_m:       Math.max(occupationalExclusionM, 1),
+        filing_exhibits:                filingExhibits,
+        n_filing_exhibits:              filingExhibits.length,
+        monitoring_requirement:         monitoringReq,
+        reference: '47 CFR §1.1310; §1.1307(b); §73.49; FCC OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2019',
+        note: `RF exposure: ${complianceStatus}. ERP ${tpo_kw} kW ${evaluationRequired_mpe ? '≥' : '<'} ${EVAL_THRESHOLD_KW_mpe} kW threshold. Exclusion zone: ≥ ${exclusionRadius_m} m radius.`
       };
     })(),
 
