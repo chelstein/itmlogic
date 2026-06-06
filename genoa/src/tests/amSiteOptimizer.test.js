@@ -4171,3 +4171,65 @@ test('antenna_base_impedance.base_reactance_table has 3 entries', async () => {
       `base_reactance_table must have 3 entries for rank ${c.rank}`);
   }
 });
+
+// ---------- permit_and_engineering_cost_estimate ----------
+
+test('permit_and_engineering_cost_estimate is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.permit_and_engineering_cost_estimate != null,
+      `permit_and_engineering_cost_estimate must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('permit_and_engineering_cost_estimate total_soft_cost_low <= high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const pe = c.permit_and_engineering_cost_estimate;
+    assert.ok(pe.total_soft_cost_low_usd <= pe.total_soft_cost_high_usd,
+      `soft cost low must be <= high for rank ${c.rank}`);
+    assert.ok(pe.total_soft_cost_low_usd > 0, `soft cost low must be positive for rank ${c.rank}`);
+  }
+});
+
+test('permit_and_engineering_cost_estimate cost_tier is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const validTiers = new Set(['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
+  for (const c of out.candidates) {
+    assert.ok(validTiers.has(c.permit_and_engineering_cost_estimate.cost_tier),
+      `cost_tier must be valid for rank ${c.rank}`);
+  }
+});
+
+test('permit_and_engineering_cost_estimate line_items is non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const items = c.permit_and_engineering_cost_estimate.line_items;
+    assert.ok(Array.isArray(items) && items.length > 0,
+      `line_items must be non-empty array for rank ${c.rank}`);
+  }
+});
+
+test('permit_and_engineering_cost_estimate always includes FCC_FORM_301 and FCC_COUNSEL', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const ids = c.permit_and_engineering_cost_estimate.line_items.map(i => i.id);
+    assert.ok(ids.includes('FCC_FORM_301'), `FCC_FORM_301 must be in line_items for rank ${c.rank}`);
+    assert.ok(ids.includes('FCC_COUNSEL'),  `FCC_COUNSEL must be in line_items for rank ${c.rank}`);
+  }
+});
+
+test('permit_and_engineering_cost_estimate soft_cost columns in comparison table', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('soft_cost_low_usd' in row, 'soft_cost_low_usd must be in comparison table');
+    assert.ok('soft_cost_high_usd' in row, 'soft_cost_high_usd must be in comparison table');
+    assert.ok('soft_cost_tier' in row, 'soft_cost_tier must be in comparison table');
+  }
+});

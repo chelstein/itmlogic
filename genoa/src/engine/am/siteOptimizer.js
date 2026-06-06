@@ -736,7 +736,10 @@ export async function runSiteOptimizer(body = {}){
     da_study_type:          c.directional_antenna_study_guide?.study_type ?? null,
     skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null,
     feedline_loss_db:       c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.total_loss_db_at_60m ?? null,
-    erp_at_antenna_kw:      c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.erp_at_antenna_kw ?? null
+    erp_at_antenna_kw:      c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.erp_at_antenna_kw ?? null,
+    soft_cost_low_usd:      c.permit_and_engineering_cost_estimate?.total_soft_cost_low_usd ?? null,
+    soft_cost_high_usd:     c.permit_and_engineering_cost_estimate?.total_soft_cost_high_usd ?? null,
+    soft_cost_tier:         c.permit_and_engineering_cost_estimate?.cost_tier ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -2146,6 +2149,144 @@ async function scoreCandidate(pt, ctx, warnings){
         matching_network_complexity: mismatch_note,
         design_note: `Ground loss R_g estimated from Terman formula: ρ=${Math.round(rho_ohm_m)} Ω·m (σ=${sigma_msm} mS/m), ${N_radials} radials at ${round2(L_radial_m)} m. ${efficiency_qw < 80 ? 'POOR efficiency — extended ground system strongly recommended.' : efficiency_qw < 90 ? 'FAIR efficiency — soil resistivity survey and ground system optimization recommended.' : 'GOOD efficiency — standard 120-radial system adequate.'}`,
         rule: 'IEEE Std 802.11 AM antenna impedance / FCC Form 302-AM Part III'
+      };
+    })(),
+    // Permit and engineering cost estimate — soft-cost budget for FCC filing,
+    // engineering studies, and legal review.  Does NOT include construction/hardware
+    // costs (see tower_cost_estimate for those).  All figures are 2024 USD screening
+    // estimates; actual costs depend on consultant selection and filing complexity.
+    permit_and_engineering_cost_estimate: (() => {
+      const lambdaM_pe = 300000 / frequency_khz;
+      const qwM_pe     = lambdaM_pe / 4;
+      const asrRequired = qwM_pe > 60.96;
+      const daRecommended = coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR
+        || blanket_population_pct != null && blanket_population_pct >= 0.8
+        || !!treaty_zone
+        || (CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A');
+      const isClearCh = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      const line_items = [];
+
+      // 1. FCC Form 301-AM (construction permit application)
+      const fcc_301_fee = fcc_class === 'A' ? 660 : fcc_class === 'C' ? 330 : 490;
+      line_items.push({
+        id: 'FCC_FORM_301',
+        label: 'FCC Form 301-AM construction permit',
+        low_usd: fcc_301_fee, high_usd: fcc_301_fee,
+        note: `FCC Schedule of Regulatory Fees (2024). Class ${fcc_class} AM station.`
+      });
+
+      // 2. FCC Form 302-AM (license to cover)
+      line_items.push({
+        id: 'FCC_FORM_302',
+        label: 'FCC Form 302-AM license to cover',
+        low_usd: 330, high_usd: 330,
+        note: 'Filed after construction completion; flat fee regardless of class.'
+      });
+
+      // 3. ASR registration (Form 854)
+      if (asrRequired){
+        line_items.push({
+          id: 'FCC_FORM_854_ASR',
+          label: 'FCC Form 854 ASR registration',
+          low_usd: 175, high_usd: 175,
+          note: `λ/4 ≈ ${Math.round(qwM_pe)} m > §17.7 60.96 m — tower registration required.`
+        });
+      }
+
+      // 4. FAA aeronautical study (7460-1) — consultant cost (no gov fee)
+      if (asrRequired){
+        line_items.push({
+          id: 'FAA_AERO_STUDY',
+          label: 'FAA 7460-1 aeronautical study (consultant)',
+          low_usd: 2000, high_usd: 6000,
+          note: 'No government fee; consultant prepares filing. Time-critical: start before site lease.'
+        });
+      }
+
+      // 5. Soil resistivity survey (always required for §73.190 certification)
+      line_items.push({
+        id: 'SOIL_RESISTIVITY_SURVEY',
+        label: 'Soil resistivity survey (Wenner array)',
+        low_usd: sigma_msm < 2 ? 3000 : 2000,
+        high_usd: sigma_msm < 2 ? 10000 : 6000,
+        note: sigma_msm < 2
+          ? `POOR σ=${sigma_msm} mS/m — extended investigation and multiple measurement points required.`
+          : `Required for FCC Form 302-AM §73.190 certification regardless of conductivity quality.`
+      });
+
+      // 6. NIF study (§73.182)
+      const isLocalCh = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      if (!isLocalCh && fcc_class !== 'C'){
+        const nif_low  = isClearCh ? 25000 : 10000;
+        const nif_high = isClearCh ? 60000 : 25000;
+        line_items.push({
+          id: 'NIF_STUDY',
+          label: `§73.182 NIF study (${isClearCh ? 'clear channel — azimuthal' : 'regional'})`,
+          low_usd: nif_low, high_usd: nif_high,
+          note: isClearCh
+            ? 'Clear-channel azimuthal NIF study with 1° resolution — specialist required; expect higher-end cost.'
+            : 'Regional channel NIF study; cost scales with number of co-channel stations in region.'
+        });
+      }
+
+      // 7. DA engineering study (if recommended)
+      if (daRecommended){
+        const isFull = treaty_zone || (CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A'
+          && (coverage_pct == null || coverage_pct < COL_COVERAGE_HARD_FLOOR));
+        const da_low  = isFull ? 30000 : 15000;
+        const da_high = isFull ? 80000 : 35000;
+        line_items.push({
+          id: 'DA_ENGINEERING',
+          label: `§73.150 DA ${isFull ? 'day+night' : 'daytime'} pattern study`,
+          low_usd: da_low, high_usd: da_high,
+          note: `Includes antenna array design, NEC modeling, pattern iteration, and §73.316 radial table. ${isFull ? 'Full day+night DA significantly increases engineering hours.' : ''}`
+        });
+      }
+
+      // 8. RF exposure (MPE) study — required for all AM stations
+      line_items.push({
+        id: 'RF_EXPOSURE_STUDY',
+        label: 'RF exposure / MPE study (OET-65 / §1.1307)',
+        low_usd: 500, high_usd: 2500,
+        note: 'Near-field boundary calculation and field strength survey of the fenced exclusion zone.'
+      });
+
+      // 9. Treaty coordination (FCC IB)
+      if (treaty_zone){
+        line_items.push({
+          id: 'TREATY_COORDINATION',
+          label: `FCC IB treaty coordination (${treaty_zone})`,
+          low_usd: 5000, high_usd: 25000,
+          note: 'FCC IB filing preparation + binational review cost (engineering and legal). Timeline: 12–52 weeks.'
+        });
+      }
+
+      // 10. FCC broadcast counsel (legal review + filing preparation)
+      const counsel_low = 8000;
+      const counsel_high = treaty_zone ? 40000 : daRecommended ? 22000 : 15000;
+      line_items.push({
+        id: 'FCC_COUNSEL',
+        label: 'FCC broadcast counsel (legal + filing)',
+        low_usd: counsel_low, high_usd: counsel_high,
+        note: 'Covers application preparation, FCC staff communications, STA if needed, and license grant tracking.'
+      });
+
+      const total_low  = Math.round(line_items.reduce((s, l) => s + l.low_usd, 0));
+      const total_high = Math.round(line_items.reduce((s, l) => s + l.high_usd, 0));
+      const cost_tier  = total_high > 150000 ? 'VERY_HIGH'
+        : total_high > 75000 ? 'HIGH'
+        : total_high > 35000 ? 'MODERATE'
+        : 'LOW';
+
+      return {
+        total_soft_cost_low_usd:  total_low,
+        total_soft_cost_high_usd: total_high,
+        cost_tier,
+        range_label: `$${(total_low / 1000).toFixed(0)}k–$${(total_high / 1000).toFixed(0)}k (2024 USD, screening)`,
+        line_items,
+        note: 'Soft-cost budget only (filing fees, engineering studies, legal). Does NOT include tower, ground system, transmitter, or site work. See tower_cost_estimate for construction costs.',
+        rule: 'FCC Schedule of Regulatory Fees (2024) + industry engineering cost data'
       };
     })(),
     // Per-candidate engineering checklist — what studies must be done if this site
