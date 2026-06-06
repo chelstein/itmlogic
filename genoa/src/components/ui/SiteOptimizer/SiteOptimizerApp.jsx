@@ -239,6 +239,44 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 protectionClassAdvisory={result.protection_class_advisory}
               />
             )}
+            {result?.engineering_summary && (
+              <RackPanel eyebrow="Engineering Summary" title="Executive screening synthesis" dense>
+                {(() => {
+                  const es = result.engineering_summary;
+                  const feasColor = es.overall_feasibility === 'SITES_AVAILABLE' ? '#63d471'
+                    : es.overall_feasibility === 'SITES_RECOVERABLE' ? '#f6c90e'
+                    : '#ff9b5a';
+                  return (
+                    <div className="font-mono text-[10px] space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                          style={{ background: feasColor + '22', color: feasColor }}>
+                          {es.overall_feasibility.replace(/_/g, ' ')}
+                        </span>
+                        <span className="text-textDim">
+                          {es.n_promising} PROMISING · {es.n_review_required} REVIEW · {es.n_non_compliant} NON-COMPLIANT of {es.n_candidates_evaluated} evaluated
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {es.statements.map((s, i) => (
+                          <div key={i} className="text-textDim/85 leading-snug border-l-2 border-rule/40 pl-2">
+                            {s}
+                          </div>
+                        ))}
+                      </div>
+                      {es.caveats?.length > 0 && (
+                        <div className="border-t border-rule/30 pt-1.5">
+                          <div className="text-[9px] uppercase tracking-rack text-textDim/50 mb-1">Caveats</div>
+                          {es.caveats.map((c, i) => (
+                            <div key={i} className="text-textDim/50 text-[9px] leading-snug">{c}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </RackPanel>
+            )}
             {result?.candidate_shortlist?.length > 0 && (
               <RackPanel eyebrow="Shortlist" title="Top candidate picks" dense>
                 <div className="space-y-2">
@@ -397,6 +435,23 @@ const DEMO_RESULT = {
     score_range: 29.2,
     distance_range_km: 19.0,
     recommendation: 'ADEQUATE: candidate set shows reasonable geographic spread for screening.'
+  },
+  engineering_summary: {
+    callsign: 'KAZM', frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+    n_candidates_evaluated: 234, n_promising: 58, n_review_required: 142, n_non_compliant: 34,
+    overall_feasibility: 'SITES_AVAILABLE',
+    statements: [
+      "Screening of 234 grid candidates within 50 km of KAZM's current site (34.8600°N, 111.8200°W) identified 58 PROMISING candidate(s) and 142 candidates requiring engineering review.",
+      "The top-ranked site (6.2 km NE) achieves 97% COL coverage, 34 km daytime reach at 5 kW TPO on 780 kHz. Regulatory risk: MODERATE.",
+      "Conductivity data uses the FCC M3 zone table (15-zone fallback). Deploying the AM_m3.tif GeoTIFF raster will improve ranking precision and bring conductivity sub-scores to filing-grade accuracy.",
+      "At 780 kHz, all standard antenna heights (λ/4 = 96.2 m) exceed the §17.7 200-ft (60.96 m) ASR threshold — every candidate requires FCC Form 854 registration and FAA aeronautical study before construction.",
+      "As a clear_channel channel station (780 kHz Class D), a §73.182 nighttime NIF study is required at any selected site before Form 301-AM can be filed. Clear-channel NIF is complex — budget 4–12 weeks of consulting time."
+    ],
+    caveats: [
+      'This is a SCREENING-GRADE analysis only — field measurements, §73.182 NIF study, and full engineering design are required before filing.',
+      'Candidate scores use FCC M3 groundwave curves and population proxies; actual coverage contours must be computed per §73.183/§73.184.',
+      'Parcel availability, lease feasibility, zoning, and environmental review are outside the scope of this analysis.'
+    ]
   },
   score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
   score_histogram: [
