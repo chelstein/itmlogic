@@ -148,7 +148,32 @@ function ColocationAnalysisSection({ analysis, infra }){
           <span className="text-textDim">Diplexing required</span>{' '}
           <YesNoChip value={analysis.diplexing_required} yesTone="amber" />
         </div>
+        {analysis.co_siting_complexity != null && (
+          <div className="col-span-2 flex items-baseline gap-2">
+            <span className="text-textDim shrink-0">Co-siting complexity</span>{' '}
+            <span
+              className="font-mono text-[11px] font-semibold"
+              style={{
+                color: analysis.co_siting_complexity.score <= 2
+                  ? '#63d471'
+                  : analysis.co_siting_complexity.score <= 5
+                  ? '#ffb347'
+                  : '#ff7a7a'
+              }}
+            >
+              {analysis.co_siting_complexity.score}/10
+            </span>
+            <span className="font-mono text-[10px] text-textDim">{analysis.co_siting_complexity.label}</span>
+          </div>
+        )}
       </div>
+
+      {analysis.lease_synergy_advisory && (
+        <div className="mt-2">
+          <div className="rack-eyebrow mb-0.5">Lease synergy</div>
+          <p className="font-mono text-[10px] text-text leading-relaxed">{analysis.lease_synergy_advisory}</p>
+        </div>
+      )}
 
       {Array.isArray(analysis.regulatory_notes) && analysis.regulatory_notes.length > 0 && (
         <div className="mt-3">

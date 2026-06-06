@@ -409,3 +409,79 @@ test('nif_status includes skywave risk suffix in INFRASTRUCTURE response for cle
     }
   }
 });
+
+// ---------- Test 21 — co_siting_complexity present on INFRASTRUCTURE candidates ----------
+test('INFRASTRUCTURE candidates carry co_siting_complexity with score and label', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  assert.equal(out.available, true);
+  assert.ok(out.candidates.length >= 1, 'need at least one INFRASTRUCTURE candidate');
+  for (const c of out.candidates){
+    assert.ok(c.colocation_analysis, `candidate rank ${c.rank} missing colocation_analysis`);
+    const csc = c.colocation_analysis.co_siting_complexity;
+    assert.ok(csc, `candidate rank ${c.rank} missing co_siting_complexity`);
+    assert.ok(typeof csc.score === 'number', `co_siting_complexity.score must be a number; got: ${typeof csc.score}`);
+    assert.ok(csc.score >= 0 && csc.score <= 10,
+      `co_siting_complexity.score must be in [0,10]; got: ${csc.score}`);
+    assert.ok(typeof csc.label === 'string' && csc.label.length > 0,
+      `co_siting_complexity.label must be non-empty string; got: ${JSON.stringify(csc.label)}`);
+    assert.ok(/LOW|MODERATE|HIGH/i.test(csc.label),
+      `co_siting_complexity.label must start with LOW/MODERATE/HIGH; got: "${csc.label}"`);
+  }
+});
+
+// ---------- Test 22 — co_siting_complexity score increases with complexity drivers ----------
+test('co_siting_complexity.score is higher for diplexing+interference than for clean host', () => {
+  // KZED is same-band AM within diplex radius → high complexity
+  const outKazm = runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  return outKazm.then(out => {
+    const kzed = out.candidates.find(c => c.infrastructure_ref?.station_call === 'KZED');
+    assert.ok(kzed, 'KZED seed must be present in INFRASTRUCTURE results');
+    const kzedScore = kzed.colocation_analysis.co_siting_complexity.score;
+    // diplexing(+3) + HIGH interference(+3) = at least 6
+    assert.ok(kzedScore >= 6,
+      `KZED same-band AM co_siting_complexity.score should be >= 6; got ${kzedScore}`);
+    assert.ok(/HIGH/i.test(kzed.colocation_analysis.co_siting_complexity.label),
+      `KZED label should be HIGH; got: "${kzed.colocation_analysis.co_siting_complexity.label}"`);
+  });
+});
+
+// ---------- Test 23 — lease_synergy_advisory present on INFRASTRUCTURE candidates ----------
+test('INFRASTRUCTURE candidates carry lease_synergy_advisory string', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const lsa = c.colocation_analysis?.lease_synergy_advisory;
+    assert.ok(typeof lsa === 'string' && lsa.length > 10,
+      `lease_synergy_advisory must be non-empty string on rank ${c.rank}; got: ${JSON.stringify(lsa)}`);
+  }
+});
+
+// ---------- Test 24 — AM_SITE host gets STRONG lease_synergy_advisory ----------
+test('AM_SITE host gets STRONG lease_synergy_advisory', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  const amSites = out.candidates.filter(c => c.infrastructure_ref?.kind === 'AM_SITE');
+  assert.ok(amSites.length >= 1, 'need at least one AM_SITE host in the seed inventory');
+  for (const c of amSites){
+    assert.ok(/STRONG/i.test(c.colocation_analysis.lease_synergy_advisory),
+      `AM_SITE host should have STRONG lease_synergy_advisory; got: "${c.colocation_analysis.lease_synergy_advisory}"`);
+  }
+});
+
+// ---------- Test 25 — GRID candidates do NOT carry co_siting_complexity ----------
+test('GRID candidates do not have co_siting_complexity (only INFRASTRUCTURE sources get it)', async () => {
+  const out = await runColocationOpportunities(baseBody({
+    search_mode: 'HYBRID',
+    grid_spacing_km: 25,
+    search_radius_km: 40,
+    candidate_limit: 50
+  }));
+  assert.equal(out.available, true);
+  const gridCandidates = out.candidates.filter(c => c.source === 'GRID');
+  assert.ok(gridCandidates.length >= 1, 'need at least one GRID candidate in HYBRID mode');
+  for (const c of gridCandidates){
+    assert.ok(!c.colocation_analysis?.co_siting_complexity,
+      `GRID candidate rank ${c.rank} should not have co_siting_complexity; got: ${JSON.stringify(c.colocation_analysis?.co_siting_complexity)}`);
+    assert.ok(!c.colocation_analysis?.lease_synergy_advisory,
+      `GRID candidate rank ${c.rank} should not have lease_synergy_advisory`);
+  }
+});

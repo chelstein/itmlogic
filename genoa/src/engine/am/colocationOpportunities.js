@@ -563,6 +563,33 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
     }
   } catch (_){ /* skip if OET-65 lookup fails */ }
 
+  // Co-siting complexity score: 0 (trivial) to 10 (highly complex).
+  const loadingAdvisory = site.tower_loading_advisory || 'UNKNOWN';
+  const structEngRequired = loadingAdvisory !== 'OK_PER_INVENTORY';
+  let complexityScore = 0;
+  if (diplex) complexityScore += 3;
+  if (interferenceRisk === 'HIGH') complexityScore += 3;
+  else if (interferenceRisk === 'MODERATE') complexityScore += 1;
+  if (structEngRequired) complexityScore += 2;
+  if (loadingAdvisory === 'UNKNOWN') complexityScore += 1;
+  complexityScore = Math.min(10, complexityScore);
+
+  const complexityLabel = complexityScore <= 2 ? 'LOW — straightforward co-location'
+    : complexityScore <= 5 ? 'MODERATE — engineering coordination required'
+    : 'HIGH — significant regulatory and structural work expected';
+
+  // Lease synergy advisory — qualitative guidance on the host-sharing advantage.
+  let leaseSynergyAdvisory;
+  if (site.kind === 'AM_SITE'){
+    leaseSynergyAdvisory = 'STRONG: existing AM vertical antenna tower — most physical infrastructure already licensed for AM use; land-use coordination straightforward.';
+  } else if (site.kind === 'FM_SITE' || site.kind === 'TV_SITE'){
+    leaseSynergyAdvisory = `MODERATE: existing ${site.kind} tower — structural assessment and RF compatibility study required; shared lease reduces site acquisition risk.`;
+  } else if (site.kind === 'CELL_TOWER' || site.kind === 'UTILITY_TOWER'){
+    leaseSynergyAdvisory = 'MODERATE: non-broadcast tower — land-use and structural approval likely required; existing lease infrastructure reduces permitting timeline.';
+  } else {
+    leaseSynergyAdvisory = 'UNKNOWN: host tower kind unspecified — verify lease terms and structural capacity before proceeding.';
+  }
+
   const decorated = {
     ...scored,
     source: 'INFRASTRUCTURE',
@@ -584,11 +611,13 @@ async function scoreInfrastructureCandidate(site, ctx, warnings){
       host_kind: hostKind,
       host_owner: site.owner ?? null,
       host_height_m: site.height_m ?? null,
-      tower_loading_advisory: site.tower_loading_advisory || 'UNKNOWN',
+      tower_loading_advisory: loadingAdvisory,
       same_band_interference_risk: interferenceRisk,
-      structural_engineering_required: site.tower_loading_advisory !== 'OK_PER_INVENTORY',
+      structural_engineering_required: structEngRequired,
       shared_lease_advantage: true,
       diplexing_required: !!diplex,
+      co_siting_complexity: { score: complexityScore, label: complexityLabel },
+      lease_synergy_advisory: leaseSynergyAdvisory,
       regulatory_notes
     }
   };
