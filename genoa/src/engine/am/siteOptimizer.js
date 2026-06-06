@@ -1011,7 +1011,31 @@ export async function runSiteOptimizer(body = {}){
     tig_tower_coverage:      c.transmitter_insurance_guide?.tower_covered ?? null,
     nlng_n_notification_methods: c.neighboring_landowner_notification_guide?.n_notification_methods ?? null,
     nlng_fcc_notice_required: c.neighboring_landowner_notification_guide?.fcc_public_notice_required ?? null,
-    nlng_notice_radius_km:   c.neighboring_landowner_notification_guide?.recommended_notice_radius_km ?? null
+    nlng_notice_radius_km:   c.neighboring_landowner_notification_guide?.recommended_notice_radius_km ?? null,
+    rfig_frequency_sensitivity: c.antenna_rfi_from_nearby_equipment_guide?.frequency_sensitivity ?? null,
+    rfig_n_source_categories:   c.antenna_rfi_from_nearby_equipment_guide?.n_rfi_source_categories ?? null,
+    rfig_survey_required:       c.antenna_rfi_from_nearby_equipment_guide?.pre_construction_survey_required ?? null,
+    ssag_silence_days_typ:      c.fcc_silent_station_authorization_guide?.silence_estimate_days_typ ?? null,
+    ssag_sta_required:          c.fcc_silent_station_authorization_guide?.sta_required ?? null,
+    ssag_forfeiture_risk:       c.fcc_silent_station_authorization_guide?.forfeiture_risk ?? null,
+    rcag_n_required_components: c.remote_control_authority_guide?.n_required_components ?? null,
+    rcag_required_cost_usd:     c.remote_control_authority_guide?.required_equipment_cost_usd ?? null,
+    rcag_ats_authorized:        c.remote_control_authority_guide?.ats_authorized ?? null,
+    fcag_channel_type:          c.frequency_coordination_with_adjacent_stations_guide?.channel_type ?? null,
+    fcag_is_secondary_clear:    c.frequency_coordination_with_adjacent_stations_guide?.is_secondary_on_clear ?? null,
+    fcag_n_coord_steps:         c.frequency_coordination_with_adjacent_stations_guide?.n_coordination_steps ?? null,
+    gric_total_wire_m:          c.ground_radial_installation_cost_guide?.total_wire_length_m ?? null,
+    gric_cost_typ_usd:          c.ground_radial_installation_cost_guide?.total_estimated_cost_usd?.typical ?? null,
+    gric_upgrade_cost_usd:      c.ground_radial_installation_cost_guide?.half_wave_upgrade_cost_usd ?? null,
+    tccg_tower_height_ft:       c.tower_construction_contract_guide?.tower_height_ft ?? null,
+    tccg_cost_typ_usd:          c.tower_construction_contract_guide?.total_estimated_cost_usd?.typical ?? null,
+    tccg_timeline_weeks_typ:    c.tower_construction_contract_guide?.timeline_weeks_typ ?? null,
+    atug_base_resistance_ohm:   c.antenna_tuning_unit_commissioning_guide?.base_resistance_ohm_typical ?? null,
+    atug_efficiency_pct:        c.antenna_tuning_unit_commissioning_guide?.antenna_efficiency_pct ?? null,
+    atug_cost_typ_usd:          c.antenna_tuning_unit_commissioning_guide?.total_atu_cost_usd?.typical ?? null,
+    fomg_tower_height_ft:       c.faa_obstruction_marking_guide?.tower_height_ft ?? null,
+    fomg_lighting_tier:         c.faa_obstruction_marking_guide?.faa_lighting_tier ?? null,
+    fomg_marking_cost_usd:      c.faa_obstruction_marking_guide?.total_marking_cost_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6746,6 +6770,888 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    faa_obstruction_marking_guide: (() => {
+      // FAA obstruction marking and lighting requirements for AM broadcast towers:
+      //
+      // 47 CFR §17.7: FCC registration (ASR) required for any structure > 60.96m (200ft) AGL
+      //   or any structure regardless of height if in proximity to airports
+      //
+      // FAA Advisory Circular 70/7460-1M: Obstruction Marking and Lighting
+      //   Painting: aviation orange and white bands; band width = 1/7 of structure height
+      //   Lighting: red obstruction lights at top and intermediate levels
+      //
+      // 47 CFR §17.23: Painting requirements (towers requiring FAA study):
+      //   - Orange and white aviation paint in alternating bands
+      //   - Number of bands: based on structure height (typically 7 bands for most towers)
+      //   - Top band: always aviation orange
+      //
+      // 47 CFR §17.47: Lighting and monitoring requirements:
+      //   - Red obstruction lights at top of structure
+      //   - Intermediate lights at 1/3 and 2/3 height if tower >150m
+      //   - Intensity: FAA AC 70/7460-1M specifies candela levels by classification
+      //   - Monitoring: automatic monitoring system required for compliance
+      //
+      // FAA lighting classifications (from AC 70/7460-1M):
+      //   L-810: Low-intensity red steady/flashing (< 200ft AGL)
+      //   L-864/L-865: Medium-intensity red flashing (200–499ft)
+      //   L-860/L-861: High-intensity white flashing (500+ft; used near airports)
+      //
+      // Night dimming: medium/high intensity lights must dim to 5% at night
+      // (FAA AC 70/7460-1M Section 5)
+      //
+      // AM tower-specific issues:
+      //   - Tower IS the antenna: painting must not affect RF performance
+      //   - Aviation paint has specific electrical conductivity → can affect antenna Q
+      //   - Some engineers specify silicone-based non-conductive primer under paint
+      //   - Lighting conductor must be RF-decoupled (choke coil) to prevent
+      //     current from flowing on lighting cable into the RF ground system
+
+      const wavelength_m     = 300000 / frequency_khz;
+      const tower_height_m   = Math.round(wavelength_m * 0.25);   // λ/4
+      const tower_height_ft  = Math.round(tower_height_m * 3.281);
+
+      // ASR requirement: structures > 60.96m (200ft) require registration
+      const ASR_HEIGHT_M     = 60.96;
+      const ASR_HEIGHT_FT    = 200;
+      const asr_required_by_height = tower_height_m > ASR_HEIGHT_M;
+
+      // FAA lighting tier based on height
+      const faa_lighting_tier =
+        tower_height_ft < 200 ? 'NONE'              :  // < 200ft AGL: no lighting req (unless near airport)
+        tower_height_ft < 500 ? 'L-810_RED_STEADY'  :  // 200–499ft: low-intensity red
+        tower_height_ft < 800 ? 'L-864_MED_RED_FLASH' : // 500–799ft: medium-intensity red
+                                'L-860_HIGH_WHITE';      // 800+ft: high-intensity white
+
+      // Number of paint bands (FAA AC 70/7460-1M: 1/7 of structure height per band)
+      // Standard: 7 bands for most towers; top band is always aviation orange
+      const n_paint_bands = tower_height_m > 60 ? 7 : 0;  // 0 if below ASR height (no painting req)
+
+      // Paint cost: aviation orange + white alkyd enamel; labor intensive
+      // ~$3–$8/ft for professional painting crew with swing stage
+      const paint_cost_per_ft_typ = 5.50;
+      const painting_cost_usd    = n_paint_bands > 0 ? Math.round(tower_height_ft * paint_cost_per_ft_typ) : 0;
+
+      // Lighting cost estimate
+      const LIGHTING_COST_USD = {
+        'NONE':                 0,
+        'L-810_RED_STEADY':     8000,
+        'L-864_MED_RED_FLASH': 15000,
+        'L-860_HIGH_WHITE':    40000
+      };
+      const lighting_cost_usd = LIGHTING_COST_USD[faa_lighting_tier] ?? 0;
+
+      // RF decoupling requirement for lighting cables
+      const rf_decoupling_required = tower_height_m > ASR_HEIGHT_M;
+
+      // Annual inspection requirement (§17.47)
+      const annual_inspection_required = asr_required_by_height;
+
+      // Night-time monitoring: §17.48 requires automatic monitoring of lighting
+      const monitoring_required = faa_lighting_tier !== 'NONE';
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tower_height_m,
+        tower_height_ft,
+        asr_required_by_height,
+        asr_height_threshold_m:     ASR_HEIGHT_M,
+        asr_height_threshold_ft:    ASR_HEIGHT_FT,
+        faa_lighting_tier,
+        n_paint_bands,
+        painting_required:          n_paint_bands > 0,
+        painting_cost_usd,
+        lighting_cost_usd,
+        total_marking_cost_usd:     painting_cost_usd + lighting_cost_usd,
+        rf_decoupling_required,
+        monitoring_required,
+        annual_inspection_required,
+        asr_cfr:                    '47 CFR §17.7',
+        painting_cfr:               '47 CFR §17.23',
+        lighting_cfr:               '47 CFR §17.47',
+        monitoring_cfr:             '47 CFR §17.48',
+        faa_ac:                     'FAA AC 70/7460-1M',
+        reference: '47 CFR §17.7 (ASR registration); §17.23 (painting); §17.47 (lighting); §17.48 (monitoring); FAA Advisory Circular 70/7460-1M; FCC Form 854 (ASR update)',
+        note: `Tower: ${tower_height_ft}ft (${tower_height_m}m, λ/4 at ${frequency_khz} kHz). ${asr_required_by_height ? `ASR required (>200ft). ` : 'Below 200ft — ASR not required by height. '}FAA tier: ${faa_lighting_tier}. ${n_paint_bands > 0 ? `${n_paint_bands} paint bands (§17.23), cost ~$${painting_cost_usd.toLocaleString()}. ` : 'No painting required. '}Lighting cost: ~$${lighting_cost_usd.toLocaleString()}. ${rf_decoupling_required ? 'RF decoupling required on lighting cables.' : ''}`
+      };
+    })(),
+
+    antenna_tuning_unit_commissioning_guide: (() => {
+      // When an AM station installs a new antenna (transmitter relocation), the Antenna Tuning
+      // Unit (ATU) must be properly designed, installed, and tuned to match the transmitter
+      // output impedance to the base impedance of the antenna tower element.
+      //
+      // ATU function: The tower base impedance (R + jX ohms, resistive + reactive) must be
+      // transformed to the transmitter's nominal output impedance (typically 50Ω resistive).
+      // The ATU contains an L-network, T-network, or pi-network of series/parallel inductors
+      // and capacitors to accomplish this impedance transformation.
+      //
+      // For a guyed vertical radiator at λ/4:
+      //   Base resistance (Ra): typically 30–40Ω for a well-grounded λ/4 vertical over good earth
+      //   Base reactance: theoretically 0Ω at exact λ/4, but varies with soil, tower series resistance
+      //   Antenna efficiency: η = Ra / (Ra + Rs) where Rs is series ground system resistance
+      //
+      // ATU design specs (for new site):
+      //   1. Tower base impedance measurement with antenna analyzer (before ATU installation)
+      //   2. ATU design for measured base impedance → 50Ω match
+      //   3. Component ratings: capacitors rated for reactive current; inductors rated for RF
+      //   4. Adjustable components: typically variable capacitors (vacuum variables or fixed+trim)
+      //   5. Protective housing: weather-tight, ventilated; RF safety fence per §73.49
+      //
+      // For DA arrays: each tower has its own ATU; phasor network distributes power
+      // and controls current ratios and phases to the individual ATUs.
+      //
+      // Commissioning procedure:
+      //   Step 1: Install ATU with component values from design calculation
+      //   Step 2: Low-power (10W) lab transmitter test for coarse tune
+      //   Step 3: Progressively increase power while monitoring reflected power (SWR)
+      //   Step 4: Fine-tune ATU for minimum SWR at full licensed power
+      //   Step 5: Record ATU component values (L and C settings) as baseline for FCC
+      //   Step 6: For DA: adjust phasor for correct current ratio and phase at full power
+      //   Step 7: Conduct proof-of-performance measurements (separate from ATU commissioning)
+      //
+      // FCC §73.155: Transmitter output and antenna operating tolerances:
+      //   - Base current must stay within ±5% of licensed value (§73.155(a))
+      //   - Carrier frequency within ±20 Hz (§73.1215)
+      //   - For DA: current ratios within ±5%, phases within ±3° (§73.155(d))
+
+      const isDA_atu   = /^DA/i.test(pattern_mode);
+      const n_towers   = isDA_atu ? 2 : 1;
+      const wavelength_m = 300000 / frequency_khz;
+      const lambda_quarter_m = Math.round(wavelength_m / 4);
+
+      // ATU component cost model (2024 US market)
+      // NDA single ATU: $8,000–$20,000 installed
+      // DA phasor system: $25,000–$60,000 for full 2-tower system
+      const atu_cost_per_tower_typ = isDA_atu ? 18000 : 12000;
+      const phasor_cost            = isDA_atu ? 35000 : 0;
+      const total_atu_cost_typ     = Math.round(atu_cost_per_tower_typ * n_towers + phasor_cost);
+      const total_atu_cost_low     = Math.round(total_atu_cost_typ * 0.65);
+      const total_atu_cost_high    = Math.round(total_atu_cost_typ * 1.60);
+
+      // ATU commissioning time
+      const commissioning_days_low  = isDA_atu ? 5  : 2;
+      const commissioning_days_high = isDA_atu ? 14 : 5;
+
+      // Theoretical base resistance estimate for λ/4 vertical over average earth
+      const base_resistance_ohm_typical = 36;  // Ω — standard λ/4 vertical over average earth
+
+      // ATU current rating (based on power and resistance)
+      // I = sqrt(P/R); P in watts, R in ohms → I in amperes
+      const power_w           = (tpo_kw ?? 5) * 1000;
+      const base_current_rms  = round2(Math.sqrt(power_w / base_resistance_ohm_typical));
+
+      // Series resistance from ground system determines antenna efficiency
+      // Typical: Rs = 2–5Ω for 120-radial system; antenna efficiency η = Ra/(Ra+Rs)
+      const ground_series_r_typical_ohm = 3;   // Ω — 120 radials over avg earth
+      const antenna_efficiency_pct = Math.round(
+        100 * base_resistance_ohm_typical / (base_resistance_ohm_typical + ground_series_r_typical_ohm)
+      );
+
+      // FCC tolerances
+      const current_tolerance_pct   = 5;     // §73.155(a): ±5% of licensed base current
+      const phase_tolerance_deg     = isDA_atu ? 3 : null;     // §73.155(d): ±3° for DA
+      const ratio_tolerance_pct     = isDA_atu ? 5 : null;     // §73.155(d): ±5% for DA
+
+      const COMMISSIONING_STEPS = [
+        { step: 1, action: 'Pre-installation base impedance measurement', detail: `Measure tower base impedance (R + jX) with calibrated antenna analyzer at ${frequency_khz} kHz; record measured Ra and Xa; compare to theoretical (${base_resistance_ohm_typical}Ω + j0 at λ/4)`, equipment: 'Antenna analyzer (e.g., RigExpert AA-2000 or AIM 4170)' },
+        { step: 2, action: 'ATU design and fabrication', detail: 'Design L/T/π network to transform measured base impedance to 50Ω; specify component L and C values; use RF-rated components with adequate current/voltage rating', equipment: 'ATU fabrication (commercial or custom)' },
+        { step: 3, action: 'Low-power coarse tune (10W test transmitter)', detail: `Inject 10W at ${frequency_khz} kHz; adjust ATU for minimum reflected power; verify SWR < 1.5:1 before increasing power`, equipment: 'Lab transmitter or signal generator + RF amplifier' },
+        { step: 4, action: 'Full-power fine tune and SWR verification', detail: `Increase to licensed power (${tpo_kw ?? 5} kW TPO); fine-tune for minimum SWR; target SWR < 1.1:1; record final L and C settings`, equipment: 'Directional wattmeter (e.g., Bird 43 or equivalent)' },
+        { step: 5, action: isDA_atu ? 'DA phasor adjustment for current ratios and phases' : 'Base current calibration and documentation', detail: isDA_atu ? `Adjust phasor for correct tower current ratios (±5% tolerance) and phases (±3° tolerance) per §73.155(d); verify with calibrated base current meters on all ${n_towers} towers` : `Calibrate base current meter to read licensed current value; verify within ±5% tolerance per §73.155(a); document settings for FCC records`, equipment: isDA_atu ? 'Calibrated base current meters on all towers; phasor control panel' : 'Base current meter (e.g., Deltec or Potomac Instruments)' }
+      ];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                        isDA_atu,
+        n_towers,
+        lambda_quarter_m,
+        base_resistance_ohm_typical,
+        ground_series_r_typical_ohm,
+        antenna_efficiency_pct,
+        base_current_rms_a:           base_current_rms,
+        tpo_kw:                       tpo_kw ?? 5,
+        atu_cost_per_tower_usd_typ:   atu_cost_per_tower_typ,
+        phasor_cost_usd:              phasor_cost,
+        total_atu_cost_usd:           { low: total_atu_cost_low, typical: total_atu_cost_typ, high: total_atu_cost_high },
+        commissioning_days_low,
+        commissioning_days_high,
+        n_commissioning_steps:        COMMISSIONING_STEPS.length,
+        commissioning_steps:          COMMISSIONING_STEPS,
+        current_tolerance_pct,
+        phase_tolerance_deg,
+        ratio_tolerance_pct,
+        current_tolerance_cfr:        '47 CFR §73.155(a)',
+        da_tolerance_cfr:             isDA_atu ? '47 CFR §73.155(d)' : null,
+        frequency_tolerance_hz:       20,
+        frequency_tolerance_cfr:      '47 CFR §73.1215',
+        reference: '47 CFR §73.155 (operating tolerances); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.49 (RF fencing); ARRL Antenna Handbook (ATU design); Terman (1943) antenna impedance',
+        note: `${isDA_atu ? 'DA' : 'NDA'} ${frequency_khz} kHz, λ/4=${lambda_quarter_m}m. Base resistance ~${base_resistance_ohm_typical}Ω; base current ~${base_current_rms}A rms at ${tpo_kw ?? 5} kW. ATU cost: $${total_atu_cost_low.toLocaleString()}–$${total_atu_cost_high.toLocaleString()} (typ. $${total_atu_cost_typ.toLocaleString()}). Commissioning: ${commissioning_days_low}–${commissioning_days_high} days. Antenna efficiency: ~${antenna_efficiency_pct}% with 120-radial system.`
+      };
+    })(),
+
+    tower_construction_contract_guide: (() => {
+      // AM tower erection is a specialized construction discipline requiring:
+      //   1. OSHA 1926 Subpart R (steel erection) compliance
+      //   2. ANSI/TIA-222-H structural compliance documentation
+      //   3. FAA/FCC awareness (ASR coordination, lighting/marking requirements)
+      //   4. AM tower-specific: guyed vs. self-supporting; vertical radiator requirements
+      //
+      // Key contractor qualifications for AM tower work:
+      //   - NATE (National Association of Tower Erectors) member preferred
+      //   - EIA/TIA-222-H compliance experience
+      //   - Experience with AM guyed-wire vertical radiators (different from cell towers)
+      //   - FAA painting/lighting compliance experience (§17.23/§17.47)
+      //   - Ground system installation expertise (bonding, burial, radial trenching)
+      //
+      // Contract structure for AM tower relocation:
+      //   Phase 1: Site preparation (clearing, grading, road if needed)
+      //   Phase 2: Foundation (concrete pier for self-supporting; anchor piers for guyed)
+      //   Phase 3: Tower erection and guying
+      //   Phase 4: ATU/phasor building and shelter installation
+      //   Phase 5: Ground radial system installation
+      //   Phase 6: FAA marking and lighting installation and commissioning
+      //   Phase 7: Antenna tuning unit installation and RF tuning
+      //   Phase 8: Proof-of-performance (separate engineering contract typically)
+      //
+      // Pricing structure (2024 US market; rural/semi-rural sites):
+      //   Tower erection labor: ~$15–$30/ft of tower height
+      //   Foundation: ~$30,000–$80,000 depending on soil and tower load
+      //   Guying (guyed tower): ~$5,000–$15,000 per guy level (typ. 3 levels)
+      //   Painting (FAA orange/white): ~$3–$6/ft
+      //   Lighting system: ~$8,000–$25,000 depending on FAA tier
+      //   Site prep: $5,000–$30,000 depending on clearing and access road
+      //
+      // Typical single-tower AM build-out (NDA, Class D, λ/4 ≈ 100m tower):
+      //   Foundation: $50,000; Erection: $60,000; Guying: $25,000;
+      //   Painting+lighting: $25,000; ATU building: $40,000; Site prep: $15,000
+      //   Subtotal tower: ~$215,000 (excludes ground radials, which are separate)
+
+      const wavelength_m     = 300000 / frequency_khz;
+      const tower_height_m   = Math.round(wavelength_m * 0.25);  // λ/4 nominal
+      const tower_height_ft  = Math.round(tower_height_m * 3.281);
+
+      const isDA_cc  = /^DA/i.test(pattern_mode);
+      const n_towers = isDA_cc ? 2 : 1;
+
+      // Power determines tower structural requirements (transmitter building size, ATU rating)
+      const power_kw = tpo_kw ?? 5;
+
+      // Tower erection cost model
+      const erection_per_ft_low = 15;
+      const erection_per_ft_high= 30;
+      const erection_per_ft_typ = Math.round((erection_per_ft_low + erection_per_ft_high) / 2);
+
+      const erection_cost_typ  = Math.round(tower_height_ft * erection_per_ft_typ);
+      const foundation_cost    = tower_height_m > 100 ? 70000 : tower_height_m > 60 ? 50000 : 35000;
+      const guying_cost        = 25000;          // 3 guy levels × ~$8,000
+      const painting_cost      = Math.round(tower_height_ft * 4.5);
+      const lighting_cost      = 15000;          // FAA Tier 1–2 typical
+      const site_prep_cost     = 15000;
+      const atu_building_cost  = power_kw > 50 ? 75000 : power_kw > 5 ? 50000 : 40000;
+
+      const per_tower_cost_typ = erection_cost_typ + foundation_cost + guying_cost + painting_cost + lighting_cost + site_prep_cost + atu_building_cost;
+
+      // Multi-tower: foundation and erection scale, shared site prep
+      const total_cost_typ  = isDA_cc
+        ? Math.round(per_tower_cost_typ + (erection_cost_typ + foundation_cost + guying_cost + painting_cost + lighting_cost) * 0.90)
+        : per_tower_cost_typ;
+      const total_cost_low  = Math.round(total_cost_typ * 0.70);
+      const total_cost_high = Math.round(total_cost_typ * 1.45);
+
+      // Contract clauses important for AM tower projects
+      const KEY_CONTRACT_CLAUSES = [
+        { id: 'PERFORMANCE_BOND', label: 'Performance bond (10% of contract value)', required: true, note: 'Protects licensee if contractor defaults during CP construction period; CP has finite term and delays can cause permit expiration' },
+        { id: 'OSHA_COMPLIANCE', label: 'OSHA 1926 Subpart R compliance certification', required: true, note: 'Tower erection is high-hazard work; contractor must certify competent person designation, fall protection plan, and daily pre-task planning' },
+        { id: 'TIA222_CERT', label: 'TIA-222-H structural compliance documentation', required: true, note: 'Tower manufacturer\'s structural analysis letter for proposed height, loading, and soil class; required for building permit and FCC filing' },
+        { id: 'FAA_COORD', label: 'FAA ASR coordination and lighting commissioning', required: true, note: 'Contractor must coordinate FAA painting/lighting installation and commissioning; aviation orange/white marking per §17.23; lighting per FAA AC 70/7460-1' },
+        { id: 'LIQUIDATED_DAMAGES', label: 'Liquidated damages clause (CP deadline protection)', required: true, note: 'CP expires 3 years from grant; specify per-day damages for delays that put CP expiration at risk; AM construction timelines frequently slip' },
+        { id: 'CHANGE_ORDER_CONTROL', label: 'Change order approval threshold ($500)', required: false, note: 'Require written station engineer approval for any change order >$500; AM towers accumulate significant change orders during erection' },
+        { id: 'RADIO_FREQ_AWARENESS', label: 'RF awareness clause for ground radial installation', required: false, note: 'Ground radial contractor must not use metallic equipment across radials until radial system is complete and detuned; RF burns can occur during testing' }
+      ];
+
+      const n_required_clauses = KEY_CONTRACT_CLAUSES.filter(c => c.required).length;
+
+      // Typical construction timeline
+      const timeline_weeks_low  = tower_height_m > 100 ? 20 : 12;
+      const timeline_weeks_high = tower_height_m > 100 ? 40 : 28;
+      const timeline_weeks_typ  = Math.round((timeline_weeks_low + timeline_weeks_high) / 2);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                      isDA_cc,
+        n_towers,
+        tower_height_m,
+        tower_height_ft,
+        tpo_kw:                     power_kw,
+        per_tower_erection_cost_usd: erection_cost_typ,
+        per_tower_foundation_cost_usd: foundation_cost,
+        per_tower_guying_cost_usd:  guying_cost,
+        per_tower_painting_cost_usd: painting_cost,
+        per_tower_lighting_cost_usd: lighting_cost,
+        per_tower_site_prep_cost_usd: site_prep_cost,
+        per_tower_atu_building_cost_usd: atu_building_cost,
+        per_tower_total_cost_usd:   per_tower_cost_typ,
+        total_estimated_cost_usd:   { low: total_cost_low, typical: total_cost_typ, high: total_cost_high },
+        excludes_ground_radials:    true,
+        excludes_proof_engineering: true,
+        n_key_contract_clauses:     KEY_CONTRACT_CLAUSES.length,
+        n_required_clauses,
+        key_contract_clauses:       KEY_CONTRACT_CLAUSES,
+        timeline_weeks_low,
+        timeline_weeks_high,
+        timeline_weeks_typ,
+        nate_certification_preferred: true,
+        reference: 'OSHA 1926 Subpart R; ANSI/TIA-222-H; 47 CFR §17.23; FAA AC 70/7460-1; NATE tower industry standards; FCC Form 301-AM / CP requirements (§73.3533)',
+        note: `${isDA_cc ? 'DA' : 'NDA'} ${frequency_khz} kHz, tower height ~${tower_height_ft}ft (λ/4). Construction cost estimate: $${total_cost_low.toLocaleString()}–$${total_cost_high.toLocaleString()} (typ. $${total_cost_typ.toLocaleString()}) excluding ground radials (~$${Math.round(120*tower_height_m*0.25*4.45).toLocaleString()}) and proof engineering. Timeline: ${timeline_weeks_low}–${timeline_weeks_high} weeks (typ. ${timeline_weeks_typ}).`
+      };
+    })(),
+
+    ground_radial_installation_cost_guide: (() => {
+      // The AM ground radial system is the single most expensive and labor-intensive element
+      // of an AM transmitter site. FCC §73.190 requires a minimum of 120 radials of λ/4 length
+      // for a standard AM ground system. In practice, 120 × λ/4 radials is the engineering
+      // minimum; optimal efficiency is achieved with more radials or longer radials.
+      //
+      // Standard ground system specifications (FCC §73.190 / Terman formula):
+      //   - Minimum: 120 radials × λ/4 length
+      //   - Recommended: 120 radials × λ/2 length (for better efficiency)
+      //   - Wire: #10 AWG solid bare copper (most common); some engineers prefer #12 AWG
+      //   - Burial depth: typically 2–6 inches; not deep-buried but lightly covered
+      //   - Connection: all radials bonded to common ground ring at tower base
+      //   - Total wire length for 120 × λ/4: 120 × λ/4 meters
+      //
+      // Cost components (2024 US market estimates):
+      //   1. Copper wire material: ~$0.60–$1.20/m for #10 AWG bare copper
+      //   2. Trenching/burial: $2–$6/m depending on soil/terrain ($3.50/m typical)
+      //   3. Ground ring conductor and connections at tower base: ~$2,000–$5,000
+      //   4. Bonding and testing: ~$1,500–$3,000
+      //   5. Engineering supervision: ~$2,000–$5,000
+      //   6. Equipment rental (trencher, spool holders): ~$1,500–$3,000/day × estimated days
+      //
+      // DA array ground system:
+      //   - Each tower requires its own radial system
+      //   - Shared ground between DA towers is possible if towers are close enough
+      //   - Cost roughly scales with number of towers (n_towers × single-tower cost × 0.7 overlap)
+
+      const wavelength_m       = 300000 / frequency_khz;
+      const lambda_quarter_m   = Math.round(wavelength_m / 4);
+      const lambda_half_m      = Math.round(wavelength_m / 2);
+
+      const isDA_gr   = /^DA/i.test(pattern_mode);
+      const n_towers  = isDA_gr ? 2 : 1;
+
+      // Ground system specifications (standard: 120 radials × λ/4)
+      const n_radials            = 120;
+      const radial_length_m      = lambda_quarter_m;
+      const total_wire_length_m  = n_radials * radial_length_m;
+
+      // Per-meter costs (2024 US market estimates)
+      const copper_cost_per_m    = 0.95;   // #10 AWG bare copper, per meter
+      const trench_cost_per_m    = 3.50;   // trenching and burial
+      const total_per_m          = copper_cost_per_m + trench_cost_per_m;
+
+      // Fixed costs per tower
+      const ground_ring_cost     = 3500;   // ground ring and tower base connections
+      const bonding_testing_cost = 2000;   // bonding, continuity testing, documentation
+      const engineering_cost     = 3500;   // on-site engineering supervision
+      const equipment_rental     = 4000;   // trencher, spool holder, equipment for ~2 days
+
+      // Per-tower radial system cost
+      const wire_cost_usd        = Math.round(total_wire_length_m * copper_cost_per_m);
+      const trench_cost_usd      = Math.round(total_wire_length_m * trench_cost_per_m);
+      const fixed_cost_usd       = ground_ring_cost + bonding_testing_cost + engineering_cost + equipment_rental;
+      const per_tower_cost_usd   = wire_cost_usd + trench_cost_usd + fixed_cost_usd;
+
+      // Multi-tower cost (DA: shared trenching reduces cost by ~30%)
+      const multi_tower_factor   = isDA_gr ? (1 + (n_towers - 1) * 0.70) : 1;
+      const total_cost_typ       = Math.round(per_tower_cost_usd * multi_tower_factor);
+      const total_cost_low       = Math.round(total_cost_typ * 0.75);
+      const total_cost_high      = Math.round(total_cost_typ * 1.50);
+
+      // Half-wave upgrade cost (extends all radials to λ/2)
+      const upgrade_wire_m       = n_radials * (lambda_half_m - radial_length_m);
+      const upgrade_cost_usd     = Math.round(upgrade_wire_m * total_per_m * n_towers * (isDA_gr ? 0.70 : 1));
+
+      // Copper price sensitivity note
+      const copper_lbs_total     = Math.round(total_wire_length_m * n_towers * 0.0099); // #10 AWG: 9.9 g/m → lbs
+      // 9.9 g/m × tower count × meter length
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                          isDA_gr,
+        n_towers,
+        wavelength_m:                   Math.round(wavelength_m),
+        lambda_quarter_m,
+        lambda_half_m,
+        n_radials,
+        radial_length_m,
+        total_wire_length_m,
+        copper_cost_per_m,
+        trench_cost_per_m,
+        ground_ring_cost_usd:           ground_ring_cost,
+        bonding_testing_cost_usd:       bonding_testing_cost,
+        engineering_supervision_cost_usd: engineering_cost,
+        equipment_rental_cost_usd:      equipment_rental,
+        per_tower_wire_cost_usd:        wire_cost_usd,
+        per_tower_trench_cost_usd:      trench_cost_usd,
+        per_tower_fixed_cost_usd:       fixed_cost_usd,
+        per_tower_total_cost_usd:       per_tower_cost_usd,
+        total_estimated_cost_usd:       { low: total_cost_low, typical: total_cost_typ, high: total_cost_high },
+        half_wave_upgrade_cost_usd:     upgrade_cost_usd,
+        copper_lbs_total:               copper_lbs_total,
+        fcc_minimum_radials:            120,
+        radial_cfr:                     '47 CFR §73.190',
+        reference: '47 CFR §73.190 (AM ground system); FCC AM Engineering Handbook; Terman (1943) radial ground system efficiency; ARRL Antenna Book (copper wire specifications)',
+        note: `${frequency_khz} kHz, λ/4=${lambda_quarter_m}m. Standard ground system: ${n_radials} radials × ${radial_length_m}m = ${total_wire_length_m}m total wire${n_towers > 1 ? ` × ${n_towers} towers` : ''}. Estimated cost: $${total_cost_low.toLocaleString()}–$${total_cost_high.toLocaleString()} (typ. $${total_cost_typ.toLocaleString()}). Half-wave upgrade adds ~$${upgrade_cost_usd.toLocaleString()}.`
+      };
+    })(),
+
+    frequency_coordination_with_adjacent_stations_guide: (() => {
+      // When an AM station relocates its transmitter, the new site geometry relative to
+      // co-channel and adjacent-channel stations changes. The FCC rules in §73.182 (co-channel
+      // Class IV / secondary stations) and §73.183–§73.190 (power/pattern coordination) govern
+      // the minimum D/U (desired-to-undesired) ratios required for AM station separation.
+      //
+      // Key separation rules for AM broadcast (47 CFR Part 73, Subpart A):
+      //
+      // §73.182 Dominant station protection (co-channel):
+      //   Class A stations: protected to 0.5 mV/m daytime contour
+      //   Class B/C: protected to 2 mV/m daytime contour
+      //   Class D: may not cause interference to Class A/B/C co-channel stations
+      //
+      // §73.207 Minimum distance separation requirements (adjacent/second-adj channel):
+      //   Provides lookup table of minimum km separation by class pair
+      //   First-adjacent (±10 kHz): ~50% of co-channel separation
+      //   Second-adjacent (±20 kHz): ~25% of co-channel separation
+      //
+      // §73.209 Protection of dominant stations from short-spaced applications:
+      //   Short-spaced stations may coexist if: new station does not increase interference to
+      //   protected contours of dominant stations; requires detailed interference analysis
+      //
+      // D/U protection ratios for AM (engineering practice; ITU-R BS.560):
+      //   Co-channel (0 kHz offset):    D/U ≥ 20 dB at protected contour (10:1 field ratio)
+      //   First adjacent (±10 kHz):     D/U ≥ 6 dB at protected contour
+      //   Second adjacent (±20 kHz):    D/U ≥ 0 dB at protected contour
+      //
+      // Night-time skywave coordination:
+      //   §73.182(a): Clear channel Class A stations have DOMINANT skywave status
+      //   §73.24(b): Clear channels are designated in FCC rules (§73.25–§73.28)
+      //   Class D stations on clear channels (like 780 kHz) are secondary and must protect
+      //   the clear-channel dominant station (e.g., WBBM on 780 kHz) both day and night
+
+      const isClearChannel = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocalChannel  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_fc         = /^DA/i.test(pattern_mode);
+
+      // Channel type determines protection regime
+      const channel_type = isClearChannel ? 'CLEAR' :
+                           isLocalChannel  ? 'LOCAL' : 'REGIONAL';
+
+      // Daytime D/U protection ratios (engineering practice)
+      const DU_RATIOS = [
+        { offset_khz: 0,   label: 'Co-channel',        du_ratio_db: 20, field_ratio: 10.0, cfr: '§73.182' },
+        { offset_khz: 10,  label: 'First adjacent',    du_ratio_db: 6,  field_ratio: 2.0,  cfr: '§73.207' },
+        { offset_khz: 20,  label: 'Second adjacent',   du_ratio_db: 0,  field_ratio: 1.0,  cfr: '§73.207' },
+        { offset_khz: 30,  label: 'Third adjacent',    du_ratio_db: -6, field_ratio: 0.5,  cfr: 'Engineering practice' }
+      ];
+
+      // Night-time skywave protection for clear-channel stations
+      const skywave_protection_required = isClearChannel && fcc_class === 'A';
+      const is_secondary_on_clear = isClearChannel && fcc_class !== 'A';
+
+      // Frequency coordination analysis steps required for relocation CP filing
+      const COORD_STEPS = [
+        { step: 1, action: 'Co-channel station inventory within 1500 km', detail: 'Pull all co-channel AM stations from FCC LMS; compute daytime 0.5 mV/m and 2 mV/m contour intersections with proposed site coordinates', tool: 'FCC LMS / AM Query tool', cfr: '§73.182' },
+        { step: 2, action: 'Adjacent-channel station inventory within 500 km', detail: 'Pull all ±10 kHz and ±20 kHz channel stations from LMS; apply §73.207 minimum separation table; flag any potential short-spacing', tool: 'FCC LMS', cfr: '§73.207' },
+        { step: 3, action: 'D/U interference analysis for short-spaced stations', detail: 'For any station within §73.207 minimum separation distance, compute ITM/Longley-Rice predicted field strengths and D/U ratios at protected contours; document compliance or interference', tool: 'FCC AM interference calculator / ITM', cfr: '§73.209; §73.182' },
+        { step: 4, action: 'Night-time skywave analysis (if applicable)', detail: isClearChannel ? `780 kHz is a CLEAR CHANNEL; night-time skywave from Class A dominant (e.g., WBBM/Chicago) must be protected; Class D secondary stations must not increase interference to dominant station's 0.5 mV/m contour` : 'N/A for regional/local channel', tool: 'FCC skywave prediction model', cfr: '§73.182(a); §73.24(b)' },
+        { step: 5, action: 'Coordination agreement with affected stations (if needed)', detail: 'If interference analysis shows potential impact, negotiate engineering agreement with affected station; document agreement as exhibit to FCC Form 301-AM', tool: 'Direct station-to-station contact', cfr: '§73.209; §73.525' }
+      ];
+
+      // Minimum separation requirements for Class D (approx. from §73.207 table)
+      // These are illustrative engineering values; actual values depend on class pairing
+      const SEPARATION_MINIMUMS_KM = {
+        co_channel_class_a:      800,
+        co_channel_class_b:      640,
+        co_channel_class_c:      480,
+        co_channel_class_d:      320,
+        first_adj_class_a:       400,
+        first_adj_class_b:       320,
+        second_adj_class_a:      200,
+        second_adj_class_b:      160
+      };
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                       isDA_fc,
+        channel_type,
+        is_clear_channel:            isClearChannel,
+        is_local_channel:            isLocalChannel,
+        is_secondary_on_clear,
+        skywave_protection_required,
+        n_du_ratio_pairs:            DU_RATIOS.length,
+        du_protection_ratios:        DU_RATIOS,
+        co_channel_du_ratio_db:      20,
+        first_adj_du_ratio_db:       6,
+        second_adj_du_ratio_db:      0,
+        separation_minimums_km:      SEPARATION_MINIMUMS_KM,
+        n_coordination_steps:        COORD_STEPS.length,
+        coordination_steps:          COORD_STEPS,
+        interference_analysis_required: true,
+        form_exhibit_required:       true,
+        reference: '47 CFR §73.182 (dominant station protection); §73.207 (minimum separation); §73.209 (short-spacing); §73.24(b) (clear channels); §73.525 (engineering agreements); ITU-R BS.560',
+        note: `${frequency_khz} kHz ${channel_type} channel, Class ${fcc_class}${is_secondary_on_clear ? ' (SECONDARY on clear channel — must protect Class A dominant)' : ''}. D/U ratios: co-channel ≥20 dB, 1st-adj ≥6 dB, 2nd-adj ≥0 dB. ${COORD_STEPS.length} coordination steps required. ${skywave_protection_required ? 'Night-time skywave protection required (Class A dominant).' : is_secondary_on_clear ? 'Night-time skywave: secondary status; must not increase Class A interference.' : 'Night-time: not a clear channel dominant.'}`
+      };
+    })(),
+
+    remote_control_authority_guide: (() => {
+      // FCC §73.1350 authorizes AM broadcast stations to operate by remote control,
+      // meaning an operator at a location other than the transmitter site can control
+      // and monitor the transmitter. This is essential for AM transmitter relocation
+      // because the new remote transmitter site is rarely co-located with the studio.
+      //
+      // §73.1350(a): A station may be operated by remote control only if the transmitter
+      //   can be activated, deactivated, and adjusted from the remote point, and the
+      //   control system provides for monitoring specified transmitter parameters.
+      //
+      // §73.1350(b): Remote control requirements:
+      //   (1) Transmitter ON/OFF control
+      //   (2) Antenna input power monitoring
+      //   (3) Base antenna current monitoring (for DA: all element currents)
+      //   (4) Modulation monitoring capability
+      //   (5) Metering of plate voltage and plate current
+      //   (6) Control point must have a copy of the station license
+      //
+      // §73.1350(c): Monitoring equipment at transmitter:
+      //   - Base current meters for each tower (§73.61)
+      //   - Frequency monitor (§73.1215) — must read within ±20 Hz for AM
+      //   - Modulation monitor §73.1570
+      //
+      // §73.1400: Automatic transmission system (ATS) — allows unattended operation
+      //   when automatic equipment can detect and respond to off-normal conditions
+      //   - ATS must automatically reduce power or take station off-air if:
+      //     (a) Excessive modulation (§73.1570: >125% negative, >100% positive)
+      //     (b) Loss of modulation for more than 3 hours
+      //     (c) Carrier frequency deviation beyond tolerance
+      //
+      // DA array remote control adds complexity:
+      //   - All tower base currents must be individually monitored (§73.61)
+      //   - Current ratio and phase monitoring for each driven element
+      //   - Remote phasor control (for DA-D: switching between patterns)
+      //
+      // Typical remote control system components for AM relocation:
+      //   1. IP-based remote control interface (e.g., Burk ARC-16, Davicom)
+      //   2. Base current metering at each tower
+      //   3. Plate voltage/current telemetry from transmitter
+      //   4. Audio presence/modulation monitoring
+      //   5. Internet/cellular data connection to transmitter building
+      //   6. Emergency OFF capability from control point
+
+      const isDA_rc  = /^DA/i.test(pattern_mode);
+      const n_towers = isDA_rc ? 2 : 1; // minimum tower count; actual depends on CP design
+
+      // Remote control system components
+      const RC_COMPONENTS = [
+        { id: 'IP_REMOTE', label: 'IP-based remote control unit (RCU)', required: true, examples: 'Burk ARC-16, Davicom DV216, WorldCast Plexus', typical_cost_usd: 3500, cfr: '§73.1350(a)' },
+        { id: 'BASE_CURRENT_METERS', label: `Base current meter${n_towers > 1 ? 's' : ''} (${n_towers} tower${n_towers > 1 ? 's' : ''})`, required: true, examples: 'Deltec, Potomac Instruments, Bird', typical_cost_usd: n_towers * 1200, cfr: '§73.1350(b)(3); §73.61' },
+        { id: 'PLATE_TELEMETRY', label: 'Plate voltage/current telemetry', required: true, examples: 'Transmitter built-in metering or external transducer', typical_cost_usd: 500, cfr: '§73.1350(b)(5)' },
+        { id: 'MOD_MONITOR', label: 'Modulation monitor', required: true, examples: 'Orban 9200AM, CRL Systems, Inovonics 531', typical_cost_usd: 2500, cfr: '§73.1570; §73.1350(b)(4)' },
+        { id: 'FREQ_MONITOR', label: 'Frequency monitor', required: true, examples: 'Belar FMS-1, ERI Model 100', typical_cost_usd: 2000, cfr: '§73.1215; ±20 Hz tolerance' },
+        { id: 'CELLULAR_DATA', label: 'Cellular data backup for remote control link', required: false, examples: 'LTE/4G cellular modem; redundant to primary internet', typical_cost_usd: 150, cfr: 'Engineering best practice' },
+        { id: 'ATS', label: 'Automatic Transmission System (ATS) for unattended operation', required: false, examples: 'Built into Burk ARC or standalone ATS controller', typical_cost_usd: 2000, cfr: '§73.1400' }
+      ];
+
+      const n_required_components = RC_COMPONENTS.filter(c => c.required).length;
+      const total_equipment_cost = RC_COMPONENTS.reduce((sum, c) => sum + c.typical_cost_usd, 0);
+      const required_equipment_cost = RC_COMPONENTS.filter(c => c.required).reduce((sum, c) => sum + c.typical_cost_usd, 0);
+
+      // ATS unattended operation thresholds (§73.1400)
+      const ATS_THRESHOLDS = [
+        { parameter: 'Modulation (positive)', limit: '100%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
+        { parameter: 'Modulation (negative)', limit: '125%', action: 'Reduce modulation; alert operator', cfr: '§73.1570' },
+        { parameter: 'Loss of modulation', limit: '3 hours continuous', action: 'Alert operator; automatic off-air after timeout', cfr: '§73.1400(b)' },
+        { parameter: 'Carrier frequency', limit: '±20 Hz (AM)', action: 'Alert operator; FCC §73.1215', cfr: '§73.1215' },
+        { parameter: 'Power reduction', limit: 'Any fault condition', action: 'Reduce to 10% TPO or off-air per §73.1350', cfr: '§73.1350(e)' }
+      ];
+
+      // DA adds phasor monitoring requirements
+      const da_phasor_monitoring = isDA_rc ? {
+        required: true,
+        parameters: ['Tower base current ratios', 'Tower base current phases', 'ATU tuning indicators', 'Pattern switching confirmation'],
+        note: 'DA stations must monitor all driven element currents and phases via remote (§73.61). Pattern switching (DA-D) requires confirmation of correct pattern state before logging.'
+      } : null;
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                    isDA_rc,
+        n_towers_monitored:       n_towers,
+        remote_control_authorized: true,
+        remote_control_cfr:       '47 CFR §73.1350',
+        ats_authorized:           true,
+        ats_cfr:                  '47 CFR §73.1400',
+        n_rc_components:          RC_COMPONENTS.length,
+        n_required_components,
+        rc_components:            RC_COMPONENTS,
+        total_equipment_cost_usd: total_equipment_cost,
+        required_equipment_cost_usd: required_equipment_cost,
+        ats_thresholds:           ATS_THRESHOLDS,
+        n_ats_thresholds:         ATS_THRESHOLDS.length,
+        da_phasor_monitoring,
+        frequency_tolerance_hz:   20,
+        modulation_limit_positive_pct: 100,
+        modulation_limit_negative_pct: 125,
+        control_point_license_copy_required: true,
+        reference: '47 CFR §73.1350 (remote control); §73.1400 (ATS); §73.61 (base current monitoring); §73.1215 (frequency tolerance); §73.1570 (modulation monitor)',
+        note: `${isDA_rc ? 'DA' : 'NDA'} ${frequency_khz} kHz: remote control authorized §73.1350. ATS (unattended) authorized §73.1400. ${n_required_components} required RC components, $${required_equipment_cost.toLocaleString()} estimated cost. ${n_towers} tower${n_towers > 1 ? 's' : ''} monitored. Frequency tolerance ±20 Hz (§73.1215).`
+      };
+    })(),
+
+    fcc_silent_station_authorization_guide: (() => {
+      // During AM transmitter relocation, the station will go silent while:
+      //   1. The old transmitter is decommissioned and removed
+      //   2. The new transmitter site is under construction
+      //   3. The new transmitter is being tested and proof-of-performance is being conducted
+      //
+      // FCC §73.1740 governs silent station operations:
+      //   - Stations may go silent without prior FCC authorization for up to 10 days
+      //   - Beyond 10 days: must notify FCC (or request prior authorization for longer silences)
+      //   - §73.1740(a)(1): a station that fails to operate for 12 months forfeits its license
+      //   - §73.1740(a)(4): FCC may waive for good cause (e.g., CP construction)
+      //   - §73.1740(b): notification requirement — written notification to FCC within 10 days
+      //
+      // Special authorization pathway for CP-related silence:
+      //   - File FCC Form 399 (Emergency Authorization) if forced silence due to casualty
+      //   - For planned relocation silence: notify Media Bureau by letter or submit STA request
+      //   - Special Temporary Authority (STA) from §73.1635 if silence exceeds 30 days
+      //   - AM translator waiver: if station has AM-to-FM translator, translator may continue
+      //     broadcasting during main station silence (FCC MB Docket 13-249)
+      //
+      // Silent station during construction permit:
+      //   - CP allows construction of NEW facility; station may remain on-air at OLD site
+      //     until new facility proof-of-performance is completed and Form 302-AM filed
+      //   - Preferred approach: keep operating at old site until new site is ready to go on-air
+      //   - This minimizes silence duration and avoids §73.1740 issues
+      //   - Physical impossibility: if old tower must be demolished before new one ready → silence
+      //
+      // License forfeiture risk:
+      //   - 12-month silence = automatic license forfeiture under §73.1740(a)(1)
+      //   - FCC has waived this for CP holders who demonstrate good-faith construction
+      //   - Waiver must be requested proactively — not automatically granted
+      //   - Document all construction milestones to support waiver request
+
+      const silent_days_auto_allowed  = 10;     // §73.1740: no authorization needed up to 10 days
+      const silent_months_sta_trigger  = 1;      // STA recommended if silence will exceed 30 days
+      const silent_months_forfeiture   = 12;     // §73.1740(a)(1): forfeiture after 12 months silent
+
+      // Estimate construction silence duration based on DA/NDA and class
+      // DA stations take longer because array phasing and proof are complex
+      const isDA_sil = /^DA/i.test(pattern_mode);
+      const silence_estimate_days_min = isDA_sil ? 90  : 30;   // DA proof is slower
+      const silence_estimate_days_max = isDA_sil ? 270 : 120;
+      const silence_estimate_days_typ = isDA_sil ? 150 : 60;
+
+      const sta_required = silence_estimate_days_typ > (silent_days_auto_allowed);
+      const forfeiture_risk = silence_estimate_days_max > (silent_months_forfeiture * 30);
+
+      // STA filing requirements (§73.1635)
+      const STA_REQUIREMENTS = [
+        { id: 'FILING_FEE', label: 'FCC STA filing fee', detail: 'No fee for STA if related to CP construction', cost_usd: 0 },
+        { id: 'LETTER_REQUEST', label: 'Written STA request to FCC Media Bureau', detail: 'Describe reason for silence, expected duration, and steps being taken to return to air; cite §73.1635 and §73.1740', cost_usd: 0 },
+        { id: 'CP_REFERENCE', label: 'Reference Construction Permit number', detail: 'Include CP file number in STA request to establish nexus between silence and authorized construction', cost_usd: 0 },
+        { id: 'MILESTONE_REPORT', label: 'Quarterly progress reports if silence > 90 days', detail: 'FCC Media Bureau may request periodic construction progress updates; document tower erection, ground radial installation, transmitter installation milestones', cost_usd: 0 }
+      ];
+
+      // Translator opportunity during silence
+      const translator_continuity_available = true; // AM-to-FM translators may continue per MB 13-249
+
+      // Strategies to minimize silence duration
+      const SILENCE_MINIMIZATION = [
+        { strategy: 'PARALLEL_OPERATION', label: 'Operate old site until new site ready', detail: 'Do not demolish old tower until Form 302-AM filed at new site; this may require temporary dual-site operation costs but avoids prolonged silence', risk_reduction: 'ELIMINATES silence beyond transition day' },
+        { strategy: 'TEMP_TRANSMITTER', label: 'Temporary low-power operation at new site', detail: 'Commission FCC STA to operate temporary low-power (e.g., 10W) transmitter at new site for testing before proof; not a substitute for final proof but enables equipment commissioning', risk_reduction: 'REDUCES proof timeline by 2–4 weeks' },
+        { strategy: 'TRANSLATOR_BACKUP', label: 'AM-to-FM translator maintains service continuity', detail: 'If station has authorized AM-to-FM translator, translator continues operating during main station silence; listeners maintain FM service; FCC MB 13-249', risk_reduction: 'MAINTAINS listener service during silence' },
+        { strategy: 'EXPEDITED_PROOF', label: 'Expedited proof-of-performance contractor', detail: 'Hire experienced AM proof contractor who can mobilize quickly; some contractors can complete NDA proof in 2–3 weeks vs. 8–12 weeks for less experienced teams', risk_reduction: 'REDUCES proof timeline by 50%' }
+      ];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        is_da:                           isDA_sil,
+        silent_days_auto_allowed,
+        silent_months_forfeiture,
+        silence_estimate_days_min,
+        silence_estimate_days_max,
+        silence_estimate_days_typ,
+        sta_required,
+        sta_cfr:                         '47 CFR §73.1635',
+        forfeiture_risk,
+        forfeiture_cfr:                  '47 CFR §73.1740(a)(1)',
+        notification_cfr:                '47 CFR §73.1740(b)',
+        n_sta_requirements:              STA_REQUIREMENTS.length,
+        sta_requirements:                STA_REQUIREMENTS,
+        translator_continuity_available,
+        translator_cfr:                  'FCC MB Docket 13-249',
+        n_silence_minimization_strategies: SILENCE_MINIMIZATION.length,
+        silence_minimization_strategies: SILENCE_MINIMIZATION,
+        preferred_strategy:              'PARALLEL_OPERATION',
+        reference: '47 CFR §73.1635 (STA); §73.1740 (silent station); §73.1635(a)(1); FCC MB Docket 13-249 (AM translators); FCC Form 399 (emergency authorization)',
+        note: `${isDA_sil ? 'DA' : 'NDA'} station relocation silence estimate: ${silence_estimate_days_min}–${silence_estimate_days_max} days (typ. ${silence_estimate_days_typ}). STA ${sta_required ? 'REQUIRED' : 'not required'} (§73.1635). Forfeiture risk at 12 months (§73.1740). Best strategy: maintain old site until new site proof complete. Translator continuity available per MB 13-249.`
+      };
+    })(),
+
+    antenna_rfi_from_nearby_equipment_guide: (() => {
+      // AM broadcast bands (535–1705 kHz) are unusually susceptible to RFI from nearby sources
+      // because unintentional radiators (Part 15), power line noise (Part 15 §15.109), switching
+      // power supplies, solar inverters, and LED drivers all generate wideband noise that
+      // is strongest at low frequencies. The candidate site evaluation must assess the local
+      // electromagnetic environment before the station commits to relocation.
+      //
+      // FCC Part 15 field strength limits at 30m for unintentional radiators (AM band):
+      //   §15.109(a): 30 µV/m at 30m (Subpart B Class B digital devices)
+      //   §15.109(b): 100 µV/m at 30m (Class A devices)
+      //   §15.209: 30–300 kHz = 1000/f µV/m; 0.535–1.705 MHz = 30 µV/m at 30m
+      // A single Part 15 violator can destroy AM reception within hundreds of meters.
+      //
+      // Power line noise sources: corona discharge from degraded insulators, loose hardware,
+      // arcing from damaged conductors. Most prevalent near 69kV+ transmission lines.
+      // FCC §15.109(f) provides limited exemption for power lines — utilities have obligations
+      // under §15.5(b) but enforcement requires documented interference complaints.
+      //
+      // Key site selection criteria for RFI:
+      //   1. Avoid industrial zones, data centers, solar farms, LED street lighting corridors
+      //   2. Prefer rural/agricultural sites with low density of electronic equipment
+      //   3. 500m clearance from high-voltage transmission lines (69kV+) recommended
+      //   4. 200m clearance from industrial facilities with large variable-frequency drives
+      //   5. Evaluate power line quality via utility distribution maps
+
+      const wavelength_m      = 300000 / frequency_khz;
+      const lambda_quarter_m  = Math.round(wavelength_m / 4);
+
+      // RFI sensitivity scale: lower frequency = more susceptible (longer wavelength catches more)
+      // AM band is uniquely problematic: wavelength ~200–560m means the antenna IS the building
+      const frequency_sensitivity = frequency_khz <= 700  ? 'VERY_HIGH' :
+                                    frequency_khz <= 1000 ? 'HIGH' :
+                                    frequency_khz <= 1400 ? 'MEDIUM' : 'LOW';
+
+      // Part 15 field strength limit at 30m for AM band (535–1705 kHz): 30 µV/m
+      const part15_limit_uv_m    = 30;
+      const part15_test_distance = 30; // meters
+
+      // Recommended clearance distances for known RFI source categories
+      // Based on engineering practice; not FCC-mandated minimum distances
+      const RFI_SOURCES = [
+        {
+          id: 'POWER_LINE_HV',
+          label: 'High-voltage transmission lines (69kV+)',
+          recommended_clearance_m: 500,
+          noise_floor_impact_db: 20,
+          severity: 'HIGH',
+          cfr: '§15.5(b); §15.109(f)',
+          mitigation: 'Choose site ≥500m from 69kV+ lines; request utility "corona audit" of nearest spans; document pre-construction noise floor via spectrum analyzer sweep'
+        },
+        {
+          id: 'SOLAR_INVERTER',
+          label: 'Grid-tied solar inverter farms',
+          recommended_clearance_m: 300,
+          noise_floor_impact_db: 15,
+          severity: 'HIGH',
+          cfr: '§15.109; §15.5(b)',
+          mitigation: 'Modern string inverters generate broadband switching noise 50 kHz–30 MHz; identify solar installations within 500m via satellite imagery; measure noise floor before site selection'
+        },
+        {
+          id: 'LED_STREET_LIGHT',
+          label: 'LED street lighting with switching drivers',
+          recommended_clearance_m: 150,
+          noise_floor_impact_db: 10,
+          severity: 'MEDIUM',
+          cfr: '§15.109; §15.107',
+          mitigation: 'LED retrofit programs in municipal lighting often create widespread LF RFI; measure noise floor at candidate site during night-time LED operation; prefer sites outside LED lighting corridors'
+        },
+        {
+          id: 'DATA_CENTER',
+          label: 'Data centers and large UPS systems',
+          recommended_clearance_m: 400,
+          noise_floor_impact_db: 18,
+          severity: 'HIGH',
+          cfr: '§15.109; §15.107',
+          mitigation: 'UPS systems, server PDUs, and cooling VFDs generate pervasive switching noise; avoid industrial parks with known data center presence within 400m of proposed antenna'
+        },
+        {
+          id: 'INDUSTRIAL_VFD',
+          label: 'Industrial variable-frequency drives (VFDs)',
+          recommended_clearance_m: 200,
+          noise_floor_impact_db: 12,
+          severity: 'MEDIUM',
+          cfr: '§15.109; §15.107',
+          mitigation: 'Manufacturing facilities with large HVAC or motor-drive VFDs are significant LF noise sources; review land use maps for industrial zoning within 300m of candidate site'
+        },
+        {
+          id: 'SWITCHING_PS',
+          label: 'Residential switching power supplies (aggregate)',
+          recommended_clearance_m: 50,
+          noise_floor_impact_db: 5,
+          severity: 'LOW',
+          cfr: '§15.109',
+          mitigation: 'Individual residential SMPS are low-impact but dense residential areas create aggregate noise floor elevation; prefer rural sites over dense residential subdivisions immediately adjacent'
+        }
+      ];
+
+      const n_rfi_sources = RFI_SOURCES.length;
+      const high_severity_sources = RFI_SOURCES.filter(s => s.severity === 'HIGH').length;
+
+      // Pre-construction RFI survey protocol
+      const SURVEY_PROTOCOL = [
+        { step: 1, action: 'Wideband spectrum sweep', detail: `Conduct 100 kHz–2 MHz spectrum sweep at proposed antenna base location using calibrated field strength meter; record noise floor at ${frequency_khz} kHz ±10 kHz passband`, equipment: 'Calibrated EMI receiver or spectrum analyzer with whip antenna', timing: 'Before site commitment' },
+        { step: 2, action: 'Power line noise survey', detail: 'Walk transmission line right-of-way within 1km of site using AM receiver; listen for buzzing, crackling, or hash noise; note utility pole numbers for reporting', equipment: 'Portable AM receiver (e.g., Icom IC-R75)', timing: 'Before site commitment' },
+        { step: 3, action: 'Nighttime LED lighting check', detail: 'Survey site at night with AM receiver; note degradation when street lights are active vs. off; identify luminaire locations on municipal map', equipment: 'Portable AM receiver', timing: 'Before site commitment' },
+        { step: 4, action: 'Noise floor documentation', detail: 'Record 24-hour noise floor measurement at candidate site; note diurnal variation; compare to ITU-R P.372 ambient noise curves for rural/residential/industrial environments', equipment: 'Calibrated field strength meter with data logger', timing: 'Before site commitment' },
+        { step: 5, action: 'FCC complaint pathway', detail: `If harmful interference from Part 15 device confirmed post-construction, file complaint with FCC Enforcement Bureau per §15.5(b); utility power line noise may require separate coordination under §15.109(f)`, equipment: 'Documentation of interference measurements', timing: 'Post-construction if needed' }
+      ];
+
+      // Estimated cost of pre-construction RFI survey
+      const survey_cost_usd = { low: 800, typical: 1500, high: 3500 };
+
+      // Recommended minimum noise floor headroom above thermal noise for AM broadcast
+      // ITU-R P.372-15: rural AM atmospheric noise ~40 dB above thermal at 1 MHz
+      // Anthropogenic noise in suburban environments can be 20–30 dB higher than rural
+      const noise_headroom_db_min = 20; // dB above thermal for acceptable reception
+
+      return {
+        frequency_khz,
+        fcc_class,
+        frequency_sensitivity,
+        wavelength_m:                    Math.round(wavelength_m),
+        lambda_quarter_m,
+        part15_limit_uv_m,
+        part15_test_distance_m:          part15_test_distance,
+        n_rfi_source_categories:         n_rfi_sources,
+        n_high_severity_sources:         high_severity_sources,
+        rfi_source_categories:           RFI_SOURCES,
+        pre_construction_survey_required: true,
+        survey_protocol:                 SURVEY_PROTOCOL,
+        n_survey_steps:                  SURVEY_PROTOCOL.length,
+        estimated_survey_cost_usd:       survey_cost_usd,
+        noise_headroom_db_min,
+        power_line_clearance_m:          500,
+        solar_inverter_clearance_m:      300,
+        data_center_clearance_m:         400,
+        fcc_enforcement_pathway:         '§15.5(b) harmful interference complaint to FCC Enforcement Bureau',
+        reference: '47 CFR §15.5(b); §15.107; §15.109; §15.109(f); ITU-R P.372-15 (radio noise); FCC Enforcement Advisory EA-2016-01',
+        note: `AM ${frequency_khz} kHz (${frequency_sensitivity} RFI sensitivity, λ/4=${lambda_quarter_m}m). Part 15 limit: ${part15_limit_uv_m} µV/m at ${part15_test_distance}m. ${n_rfi_sources} RFI source categories assessed (${high_severity_sources} HIGH severity). Pre-construction spectrum survey required. Power line clearance ≥500m; solar inverter clearance ≥300m.`
       };
     })(),
 
