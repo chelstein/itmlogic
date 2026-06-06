@@ -2226,6 +2226,53 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* ASR Registration Update Guide */}
+        {candidate.asr_registration_update_guide && (() => {
+          const g = candidate.asr_registration_update_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                ASR Registration Update <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§17.7</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>ASR Required</div>
+                  <div style={{ color: g.asr_required_by_height ? '#f87171' : '#34d399', fontSize: 14, fontWeight: 700 }}>{g.asr_required_by_height ? 'YES' : 'EVALUATE'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Tower Height</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{g.estimated_tower_height_m ?? '—'} m</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>FAA 7460-1</div>
+                  <div style={{ color: g.faa_notification_likely ? '#fbbf24' : '#34d399', fontSize: 14, fontWeight: 600 }}>{g.faa_notification_likely ? 'LIKELY' : 'EVALUATE'}</div>
+                </div>
+              </div>
+              {g.timeline && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>ASR Filing Timeline</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>
+                    FAA 7460-1: {g.timeline.faa_form_7460_days?.min}–{g.timeline.faa_form_7460_days?.max} days →
+                    FCC Form 854: {g.timeline.fcc_form_854_days?.min}–{g.timeline.fcc_form_854_days?.max} days
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 4 }}>
+                    Total: {g.timeline.total_asr_days?.min}–{g.timeline.total_asr_days?.max} days
+                  </div>
+                </div>
+              )}
+              {g.cost_estimate && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Cost Estimate</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>
+                    ${g.cost_estimate.total_estimated_usd?.low?.toLocaleString()} – ${g.cost_estimate.total_estimated_usd?.high?.toLocaleString()} (engineering + lighting)
+                  </div>
+                  <div style={{ color: '#34d399', fontSize: 11, marginTop: 4 }}>Filing fees: Free (FAA Form 7460-1 and FCC Form 854)</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Tower Climbing Safety Plan Guide */}
         {candidate.tower_climbing_safety_plan_guide && (() => {
           const g = candidate.tower_climbing_safety_plan_guide;

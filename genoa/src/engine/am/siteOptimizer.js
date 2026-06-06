@@ -960,7 +960,10 @@ export async function runSiteOptimizer(body = {}){
     rpu_significant_impacts: c.remote_pickup_unit_guide?.significant_impacts ?? null,
     tcsg_tower_height_m:    c.tower_climbing_safety_plan_guide?.estimated_tower_height_m ?? null,
     tcsg_rf_ppe_required:   c.tower_climbing_safety_plan_guide?.rf_ppe_required ?? null,
-    tcsg_n_rf_required:     c.tower_climbing_safety_plan_guide?.n_required_rf_measures ?? null
+    tcsg_n_rf_required:     c.tower_climbing_safety_plan_guide?.n_required_rf_measures ?? null,
+    asr_required_height:    c.asr_registration_update_guide?.asr_required_by_height ?? null,
+    asr_tower_height_m:     c.asr_registration_update_guide?.estimated_tower_height_m ?? null,
+    asr_faa_notify:         c.asr_registration_update_guide?.faa_notification_likely ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6695,6 +6698,87 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    asr_registration_update_guide: (() => {
+      // §17.7: FCC Antenna Structure Registration (ASR) — mandatory for towers that meet height/location thresholds
+      // §17.7(a): Any tower that exceeds 60.96 m (200 ft) AMSL OR is within a 3-mile radius of an airport
+      //   must be registered with the FCC's ASR database before construction.
+      // §17.7(b): Towers in certain sensitive areas (near airports) have lower registration thresholds.
+      // §73.816(a): AM stations must have a valid ASR number for any tower registered under §17.7.
+      // When relocating, the NEW tower at the candidate site may require ASR registration if:
+      //   (a) the tower height exceeds 60.96 m, OR
+      //   (b) the site is within 3 nautical miles of a civilian airport or 1 nautical mile of a heliport
+      // Existing ASR for the current site does NOT transfer — a new ASR filing (FCC Form 854) is required.
+      // FAA coordination under 14 CFR §77 is typically required before ASR can be granted.
+
+      // Tower height estimate (3/8λ at candidate frequency is most common AM tower height)
+      const c_mps_asr = 299792458;
+      const wavelength_m_asr = c_mps_asr / (frequency_khz * 1000);
+      const three_eights_m_asr = round2(wavelength_m_asr * 0.375);
+      const quarter_wave_m_asr = round2(wavelength_m_asr * 0.25);
+
+      // ASR registration threshold: 60.96 m (200 ft) AMSL
+      const ASR_HEIGHT_THRESHOLD_M = 60.96;
+      const asr_required_by_height = three_eights_m_asr > ASR_HEIGHT_THRESHOLD_M;
+      // Airport proximity: would need actual airport database lookup; flag as "evaluate"
+      const asr_airport_check_required = true; // always evaluate for any new tower site
+
+      // FAA Form 7460-1 notification is required for:
+      //   - Any new antenna structure > 200 ft AGL
+      //   - Any antenna within 20,000 ft of a public airport if height > 100:1 slope
+      const faa_notification_likely = asr_required_by_height;
+
+      // Filing process
+      const FILING_STEPS = [
+        { step: 1, action: 'FAA Form 7460-1 filing', detail: 'File Notice of Proposed Construction with FAA via OEAAA online portal; required before FCC ASR filing if tower > 200 ft AGL or near airport', cfr: '14 CFR §77.9; FCC §17.7' },
+        { step: 2, action: 'Await FAA determination', detail: 'FAA issues "no hazard to air navigation" finding (typically 45 days) or "objection" requiring design change', cfr: '14 CFR §77.17' },
+        { step: 3, action: 'File FCC Form 854 (ASR)', detail: 'Submit ASR application to FCC with FAA study reference number; include tower coordinates, height, owner/contact information', cfr: '47 CFR §17.4; §17.7' },
+        { step: 4, action: 'Install lighting per FAA order', detail: 'FAA Determination Letter specifies lighting type (white strobes day/medium-intensity red night, etc.) per 14 CFR Part 77', cfr: '47 CFR §17.21; §17.23' },
+        { step: 5, action: 'Update FCC station license', detail: 'Include ASR number on CP application (FCC Form 301-AM); LMS validates ASR number exists for towers meeting threshold', cfr: '47 CFR §73.816(a); §73.3533' },
+        { step: 6, action: 'Report lighting outages', detail: 'Any lighting outage exceeding 30 minutes must be reported to FAA (§17.48) and FCC within 24 hours', cfr: '47 CFR §17.48' }
+      ];
+
+      // Timeline and cost
+      const TIMELINE = {
+        faa_form_7460_days: { min: 45, typical: 60, max: 120 },
+        fcc_form_854_days: { min: 7, typical: 30, max: 60 },
+        total_asr_days: { min: 52, typical: 90, max: 180 }
+      };
+      const COST_ESTIMATE = {
+        faa_filing_usd: { low: 0, high: 0 }, // FAA Form 7460-1 is free
+        fcc_asr_fee_usd: { low: 0, high: 0 }, // ASR registration is free
+        engineering_study_usd: { low: 1500, high: 5000 }, // tower height/lighting study
+        faa_light_install_usd: { low: 5000, high: 30000 }, // depends on light type required
+        total_estimated_usd: { low: 6500, high: 35000 }
+      };
+
+      // Key obligations after registration
+      const POST_REGISTRATION_OBLIGATIONS = [
+        { id: 'MARK_PAINT',     label: 'Tower must be painted (orange/white bands) if required by FAA', cfr: '§17.21(c)', trigger: 'FAA Determination Letter' },
+        { id: 'LIGHT_MAINTAIN', label: 'Lighting must be maintained and outages reported within 30 min', cfr: '§17.48', trigger: 'Continuous' },
+        { id: 'ASR_ACCURACY',   label: 'ASR record must be updated within 5 days of any ownership or height change', cfr: '§17.57', trigger: 'Any change' },
+        { id: 'DECOMMISSION',   label: 'ASR must be cancelled if tower demolished; FCC Form 854 (decommission)', cfr: '§17.7(f)', trigger: 'Tower removal' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        estimated_tower_height_m: three_eights_m_asr,
+        quarter_wave_height_m: quarter_wave_m_asr,
+        asr_height_threshold_m: ASR_HEIGHT_THRESHOLD_M,
+        asr_required_by_height,
+        asr_airport_check_required,
+        faa_notification_likely,
+        filing_steps: FILING_STEPS,
+        n_filing_steps: FILING_STEPS.length,
+        timeline: TIMELINE,
+        cost_estimate: COST_ESTIMATE,
+        post_registration_obligations: POST_REGISTRATION_OBLIGATIONS,
+        n_obligations: POST_REGISTRATION_OBLIGATIONS.length,
+        relocation_note: `New tower at this candidate site (est. ${three_eights_m_asr}m) ${asr_required_by_height ? 'REQUIRES FCC ASR registration (exceeds 60.96m threshold). FAA Form 7460-1 must be filed first.' : 'may not require ASR registration by height, but airport proximity check is still required.'}`,
+        reference: '47 CFR §17.4; §17.7; §17.21; §17.23; §17.48; §17.57; §73.816(a); §73.3533; 14 CFR §77; FAA Form 7460-1 (OEAAA portal); FCC Form 854',
+        note: `ASR required by height: ${asr_required_by_height} (tower ${three_eights_m_asr}m vs ${ASR_HEIGHT_THRESHOLD_M}m threshold). FAA 7460-1 notification: ${faa_notification_likely ? 'LIKELY' : 'EVALUATE'}. ASR filing is free; engineering/lighting: \$6.5k–\$35k.`
       };
     })(),
 

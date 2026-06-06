@@ -5683,6 +5683,58 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- asr_registration_update_guide ----
+
+test('asr_registration_update_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.asr_registration_update_guide != null, 'asr_registration_update_guide missing');
+  const g = c.asr_registration_update_guide;
+  assert.ok('asr_required_by_height' in g, 'asr_required_by_height missing');
+  assert.ok('estimated_tower_height_m' in g, 'estimated_tower_height_m missing');
+  assert.ok(Array.isArray(g.filing_steps), 'filing_steps must be array');
+  assert.ok(Array.isArray(g.post_registration_obligations), 'post_registration_obligations must be array');
+  assert.ok('timeline' in g, 'timeline missing');
+});
+
+test('asr_registration_update_guide KAZM 780 kHz tower requires ASR registration (>60.96m)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].asr_registration_update_guide;
+  assert.strictEqual(g.asr_required_by_height, true, 'KAZM 780 kHz 3/8λ tower (144m) must require ASR');
+  assert.ok(g.estimated_tower_height_m > g.asr_height_threshold_m, 'tower height must exceed ASR threshold');
+  assert.strictEqual(g.asr_height_threshold_m, 60.96, 'ASR threshold must be 60.96m (200 ft)');
+  assert.strictEqual(g.faa_notification_likely, true, 'FAA 7460-1 notification must be likely for 144m tower');
+});
+
+test('asr_registration_update_guide filing steps include FAA and FCC steps', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].asr_registration_update_guide;
+  assert.ok(g.filing_steps.length >= 4, 'must have at least 4 filing steps');
+  assert.strictEqual(g.n_filing_steps, g.filing_steps.length, 'n_filing_steps must match array length');
+  const faaStep = g.filing_steps.find(s => s.action.includes('7460'));
+  assert.ok(faaStep != null, 'FAA Form 7460-1 step must be present');
+  const asrStep = g.filing_steps.find(s => s.action.includes('854'));
+  assert.ok(asrStep != null, 'FCC Form 854 ASR step must be present');
+});
+
+test('asr_registration_update_guide post-registration obligations include lighting maintenance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].asr_registration_update_guide;
+  assert.ok(g.post_registration_obligations.length >= 3, 'at least 3 post-registration obligations');
+  assert.strictEqual(g.n_obligations, g.post_registration_obligations.length, 'n_obligations must match array length');
+  const lightObl = g.post_registration_obligations.find(o => o.id === 'LIGHT_MAINTAIN');
+  assert.ok(lightObl != null, 'LIGHT_MAINTAIN obligation missing');
+});
+
+test('asr_registration_update_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('asr_required_height' in row, 'asr_required_height missing from comparison table');
+    assert.ok('asr_tower_height_m' in row, 'asr_tower_height_m missing from comparison table');
+    assert.ok('asr_faa_notify' in row, 'asr_faa_notify missing from comparison table');
+  }
+});
+
 // ---- tower_climbing_safety_plan_guide ----
 
 test('tower_climbing_safety_plan_guide presence and structure', async () => {

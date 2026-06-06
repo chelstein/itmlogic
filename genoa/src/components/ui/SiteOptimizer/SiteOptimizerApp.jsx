@@ -1717,6 +1717,42 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      asr_registration_update_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        estimated_tower_height_m: 144.23, quarter_wave_height_m: 96.15,
+        asr_height_threshold_m: 60.96, asr_required_by_height: true,
+        asr_airport_check_required: true, faa_notification_likely: true,
+        filing_steps: [
+          { step: 1, action: 'FAA Form 7460-1 filing', detail: 'File Notice of Proposed Construction with FAA via OEAAA online portal', cfr: '14 CFR §77.9; FCC §17.7' },
+          { step: 2, action: 'Await FAA determination', detail: 'FAA issues "no hazard" finding (typically 45 days)', cfr: '14 CFR §77.17' },
+          { step: 3, action: 'File FCC Form 854 (ASR)', detail: 'Submit ASR application with FAA study reference number', cfr: '47 CFR §17.4; §17.7' },
+          { step: 4, action: 'Install lighting per FAA order', detail: 'FAA Determination Letter specifies lighting type', cfr: '47 CFR §17.21; §17.23' },
+          { step: 5, action: 'Update FCC station license', detail: 'Include ASR number on CP application (Form 301-AM)', cfr: '47 CFR §73.816(a); §73.3533' },
+          { step: 6, action: 'Report lighting outages', detail: 'Outages >30 min must be reported to FAA (§17.48) within 24 hours', cfr: '47 CFR §17.48' }
+        ],
+        n_filing_steps: 6,
+        timeline: {
+          faa_form_7460_days: { min: 45, typical: 60, max: 120 },
+          fcc_form_854_days: { min: 7, typical: 30, max: 60 },
+          total_asr_days: { min: 52, typical: 90, max: 180 }
+        },
+        cost_estimate: {
+          faa_filing_usd: { low: 0, high: 0 },
+          fcc_asr_fee_usd: { low: 0, high: 0 },
+          engineering_study_usd: { low: 1500, high: 5000 },
+          faa_light_install_usd: { low: 5000, high: 30000 },
+          total_estimated_usd: { low: 6500, high: 35000 }
+        },
+        post_registration_obligations: [
+          { id: 'MARK_PAINT',     label: 'Tower must be painted (orange/white bands) if required by FAA', cfr: '§17.21(c)', trigger: 'FAA Determination Letter' },
+          { id: 'LIGHT_MAINTAIN', label: 'Lighting must be maintained and outages reported within 30 min', cfr: '§17.48', trigger: 'Continuous' },
+          { id: 'ASR_ACCURACY',   label: 'ASR record must be updated within 5 days of any ownership or height change', cfr: '§17.57', trigger: 'Any change' },
+          { id: 'DECOMMISSION',   label: 'ASR must be cancelled if tower demolished; FCC Form 854 (decommission)', cfr: '§17.7(f)', trigger: 'Tower removal' }
+        ],
+        n_obligations: 4,
+        reference: '47 CFR §17.4; §17.7; §17.21; §17.23; §17.48; §17.57; §73.816(a); §73.3533; 14 CFR §77; FAA Form 7460-1; FCC Form 854',
+        note: 'ASR required by height: true (tower 144.23m vs 60.96m threshold). FAA 7460-1: LIKELY. Filing is free; engineering/lighting: $6.5k–$35k.'
+      },
       tower_climbing_safety_plan_guide: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
         rf_ppe_required: true, safe_work_power_threshold_kw: 0.05,
