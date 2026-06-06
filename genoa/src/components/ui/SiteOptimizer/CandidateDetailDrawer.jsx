@@ -603,6 +603,84 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Coverage feasibility assessment */}
+        {candidate.coverage_feasibility_assessment && (() => {
+          const fa = candidate.coverage_feasibility_assessment;
+          const verdictColor = {
+            MEETS_ALL_FLOORS:             '#63d471',
+            COL_OK_BLANKET_FAILS:         '#ffb347',
+            FEASIBLE_WITH_POWER_INCREASE: '#7ec8e3',
+            POTENTIALLY_DA_RESCUABLE:     '#c3b1e1',
+            INFEASIBLE_AT_CLASS_CEILING:  '#ff5a5a',
+            REQUIRES_ENGINEERING_REVIEW:  '#a89c84',
+            NOT_EVALUATED:                '#444'
+          }[fa.verdict] || '#a89c84';
+          const verdictLabel = {
+            MEETS_ALL_FLOORS:             'Meets all floors',
+            COL_OK_BLANKET_FAILS:         'COL OK — blanket pop exceeds limit',
+            FEASIBLE_WITH_POWER_INCREASE: 'Feasible with power increase',
+            POTENTIALLY_DA_RESCUABLE:     'DA pattern may resolve',
+            INFEASIBLE_AT_CLASS_CEILING:  'Infeasible at class ceiling',
+            REQUIRES_ENGINEERING_REVIEW:  'Requires engineering review',
+            NOT_EVALUATED:                'Not evaluated'
+          }[fa.verdict] || fa.verdict;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Coverage feasibility (§73.24(j))</div>
+              <div className="flex items-center gap-2 mb-1.5">
+                <span
+                  className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded-sm"
+                  style={{ color: verdictColor, background: verdictColor + '22', border: `1px solid ${verdictColor}55` }}
+                >
+                  {verdictLabel}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-[10px]">
+                {fa.col_coverage_pct != null && (
+                  <div>
+                    <span className="text-textDim">COL coverage</span>{' '}
+                    <span style={{ color: fa.col_coverage_meets_floor ? '#63d471' : '#ff5a5a' }}>
+                      {(fa.col_coverage_pct * 100).toFixed(0)}%
+                    </span>
+                    <span className="text-textDim opacity-50"> (floor 80%)</span>
+                  </div>
+                )}
+                {fa.class_power_ceiling_kw != null && (
+                  <div>
+                    <span className="text-textDim">Class ceiling</span>{' '}
+                    <span className="text-cream">{fa.class_power_ceiling_kw} kW</span>
+                  </div>
+                )}
+                {fa.tpo_needed_for_col_floor_kw != null && (
+                  <div>
+                    <span className="text-textDim">TPO for 80% floor</span>{' '}
+                    <span style={{ color: fa.tpo_needed_within_class_ceiling ? '#63d471' : '#ff5a5a' }}>
+                      {fa.tpo_needed_for_col_floor_kw} kW
+                    </span>
+                    {fa.tpo_needed_within_class_ceiling != null && (
+                      <span className="text-[9px] ml-1" style={{ color: fa.tpo_needed_within_class_ceiling ? '#63d471' : '#ff5a5a' }}>
+                        {fa.tpo_needed_within_class_ceiling ? '✓' : '✕ exceeds §73.21'}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {fa.blanket_pop_pct != null && (
+                  <div>
+                    <span className="text-textDim">Blanket pop</span>{' '}
+                    <span style={{ color: fa.blanket_pop_meets_limit ? '#63d471' : '#ff5a5a' }}>
+                      {fa.blanket_pop_pct.toFixed(2)}%
+                    </span>
+                    <span className="text-textDim opacity-50"> (limit 1%)</span>
+                  </div>
+                )}
+              </div>
+              {fa.summary && (
+                <p className="font-mono text-[9px] text-textDim mt-1 leading-relaxed">{fa.summary}</p>
+              )}
+            </div>
+          );
+        })()}
+
         {/* TPO-to-coverage table */}
         {candidate.tpo_to_coverage_table?.length > 0 && (
           <div>

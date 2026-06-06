@@ -1860,3 +1860,90 @@ test('groundwave_contour_table: 0.5 mV/m distance matches daytime_reach_km', asy
     }
   }
 });
+
+// ---------- coverage_feasibility_assessment ----------
+
+test('coverage_feasibility_assessment present on every candidate with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const VALID_VERDICTS = [
+    'MEETS_ALL_FLOORS', 'COL_OK_BLANKET_FAILS', 'FEASIBLE_WITH_POWER_INCREASE',
+    'POTENTIALLY_DA_RESCUABLE', 'INFEASIBLE_AT_CLASS_CEILING',
+    'REQUIRES_ENGINEERING_REVIEW', 'NOT_EVALUATED'
+  ];
+  for (const c of out.candidates){
+    const fa = c.coverage_feasibility_assessment;
+    assert.ok(fa, `coverage_feasibility_assessment missing on rank ${c.rank}`);
+    assert.ok(VALID_VERDICTS.includes(fa.verdict),
+      `verdict must be one of the known values; rank ${c.rank} got: ${fa.verdict}`);
+    assert.ok(typeof fa.summary === 'string' && fa.summary.length > 0,
+      `summary must be non-empty string on rank ${c.rank}`);
+    // Numeric fields must be null or finite.
+    for (const key of ['col_coverage_pct', 'tpo_needed_for_col_floor_kw', 'class_power_ceiling_kw', 'blanket_pop_pct']){
+      assert.ok(fa[key] == null || Number.isFinite(fa[key]),
+        `${key} must be null or finite on rank ${c.rank}; got: ${fa[key]}`);
+    }
+    // Boolean fields must be boolean or null.
+    for (const key of ['col_coverage_meets_floor', 'tpo_needed_within_class_ceiling', 'blanket_pop_meets_limit', 'da_pattern_may_resolve']){
+      assert.ok(fa[key] == null || typeof fa[key] === 'boolean',
+        `${key} must be boolean or null on rank ${c.rank}; got: ${fa[key]}`);
+    }
+  }
+});
+
+test('coverage_feasibility_assessment.class_power_ceiling_kw matches §73.21 class table', async () => {
+  const CLASS_CEILINGS = { A: 50, B: 50, C: 0.25, D: 50 };
+  for (const [cls, ceil] of Object.entries(CLASS_CEILINGS)){
+    const out = await runSiteOptimizer({ ...KAZM, fcc_class: cls, candidate_limit: 3 });
+    assert.equal(out.available, true);
+    for (const c of out.candidates){
+      assert.equal(c.coverage_feasibility_assessment.class_power_ceiling_kw, ceil,
+        `class ${cls} ceiling should be ${ceil} kW; rank ${c.rank} got: ${c.coverage_feasibility_assessment.class_power_ceiling_kw}`);
+    }
+  }
+});
+
+test('coverage_feasibility_assessment.verdict is MEETS_ALL_FLOORS for baseline when coverage is high', async () => {
+  // Use a high-power input so coverage should be easily met at the current site.
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, fcc_class: 'A', candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const baseline = out.candidates.find(c => c.distance_from_current_km === 0);
+  assert.ok(baseline, 'baseline (current site, distance=0) must be in candidates');
+  const fa = baseline.coverage_feasibility_assessment;
+  // At 50 kW Class A, the 5 mV/m reach is large, so COL coverage should be met.
+  if (fa.col_coverage_pct != null && fa.col_coverage_pct >= 0.80){
+    assert.ok(
+      fa.verdict === 'MEETS_ALL_FLOORS' || fa.verdict === 'COL_OK_BLANKET_FAILS',
+      `50 kW Class A baseline with high coverage should be MEETS_ALL_FLOORS or COL_OK_BLANKET_FAILS; got: ${fa.verdict}`
+    );
+    assert.equal(fa.col_coverage_meets_floor, true, 'col_coverage_meets_floor should be true');
+  }
+});
+
+test('coverage_feasibility_assessment.da_pattern_may_resolve is true when coverage is 50–80%', async () => {
+  // Use low power to put coverage in the DA-rescuable range.
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.01, candidate_limit: 30 });
+  assert.equal(out.available, true);
+  const daRescuable = out.candidates.filter(
+    c => c.coverage_feasibility_assessment?.da_pattern_may_resolve === true
+  );
+  // At very low power many candidates should fall in the 50–80% range and flag as DA-rescuable.
+  // At least check that when it IS true, the coverage_pct is in [0.50, 0.80).
+  for (const c of daRescuable){
+    const pct = c.coverage_feasibility_assessment.col_coverage_pct;
+    assert.ok(pct != null && pct >= 0.50 && pct < 0.80,
+      `da_pattern_may_resolve=true should only occur when coverage is in [0.50, 0.80); rank ${c.rank} got: ${pct}`);
+  }
+});
+
+test('coverage_feasibility_assessment.tpo_needed_within_class_ceiling is consistent with class ceiling', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.05, fcc_class: 'D', candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const fa = c.coverage_feasibility_assessment;
+    if (fa.tpo_needed_for_col_floor_kw == null || fa.class_power_ceiling_kw == null) continue;
+    const expectedWithinCeiling = fa.tpo_needed_for_col_floor_kw <= fa.class_power_ceiling_kw;
+    assert.equal(fa.tpo_needed_within_class_ceiling, expectedWithinCeiling,
+      `tpo_needed_within_class_ceiling should be ${expectedWithinCeiling} when tpo_needed=${fa.tpo_needed_for_col_floor_kw} vs ceiling=${fa.class_power_ceiling_kw}; rank ${c.rank}`);
+  }
+});

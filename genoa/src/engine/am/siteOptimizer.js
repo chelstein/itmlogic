@@ -1140,6 +1140,75 @@ async function scoreCandidate(pt, ctx, warnings){
         note: `Based on M3 zone σ=${sigma_msm} mS/m (${sigmaQuality(sigma_msm)}). Actual efficiency depends on tower design and installed ground system.`
       };
     })(),
+    // Coverage feasibility assessment — synthesizes coverage, power, and class limits
+    // into a single engineer-facing verdict.  Tells the operator whether this site can
+    // satisfy §73.24(j) 80% COL coverage at any power within class limits.
+    coverage_feasibility_assessment: (() => {
+      const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
+      const colMet    = coverage_pct == null ? null : coverage_pct >= COL_COVERAGE_HARD_FLOOR;
+      const blankMet  = blanket_population_pct == null ? null : blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT;
+
+      // Can a power increase within the class ceiling fix coverage?
+      const powerFixFeasible = minimum_tpo_for_col_coverage_kw != null
+        && classCeil != null
+        && minimum_tpo_for_col_coverage_kw <= classCeil;
+
+      // DA reshaping potential: coverage between 50–80% is a strong DA candidate;
+      // below 50% is unlikely to be rescued by DA alone.
+      const daPotential = coverage_pct != null && coverage_pct >= 0.50 && coverage_pct < COL_COVERAGE_HARD_FLOOR;
+
+      // Site is infeasible when: coverage fails AND the 5 mV/m field at the COL
+      // is below 0.5 mV/m even at 50 kW, and site is not DA-rescuable.
+      const infeasible = !colMet
+        && field_at_col_centroid_mvm != null
+        && field_at_col_centroid_mvm < 0.5
+        && !daPotential
+        && !powerFixFeasible;
+
+      let verdict;
+      if (coverage_pct == null) {
+        verdict = 'NOT_EVALUATED';
+      } else if (colMet && blankMet !== false) {
+        verdict = 'MEETS_ALL_FLOORS';
+      } else if (colMet && blankMet === false) {
+        verdict = 'COL_OK_BLANKET_FAILS';
+      } else if (powerFixFeasible && blankMet !== false) {
+        verdict = 'FEASIBLE_WITH_POWER_INCREASE';
+      } else if (daPotential) {
+        verdict = 'POTENTIALLY_DA_RESCUABLE';
+      } else if (infeasible) {
+        verdict = 'INFEASIBLE_AT_CLASS_CEILING';
+      } else {
+        verdict = 'REQUIRES_ENGINEERING_REVIEW';
+      }
+
+      const summaryParts = [];
+      if (coverage_pct != null){
+        summaryParts.push(`COL coverage ${(coverage_pct * 100).toFixed(0)}% (floor 80%)`);
+      }
+      if (minimum_tpo_for_col_coverage_kw != null && !colMet){
+        summaryParts.push(
+          powerFixFeasible
+            ? `${minimum_tpo_for_col_coverage_kw} kW achieves floor (class ceiling ${classCeil} kW)`
+            : `${minimum_tpo_for_col_coverage_kw} kW needed but exceeds class ceiling ${classCeil} kW`
+        );
+      }
+      if (daPotential) summaryParts.push('DA pattern shaping may close coverage gap');
+      if (blankMet === false) summaryParts.push(`blanket pop ${round2(blanket_population_pct)}% exceeds §73.24(g) 1% limit`);
+
+      return {
+        verdict,
+        col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
+        col_coverage_meets_floor: colMet,
+        tpo_needed_for_col_floor_kw: minimum_tpo_for_col_coverage_kw,
+        tpo_needed_within_class_ceiling: minimum_tpo_for_col_coverage_kw == null ? null : powerFixFeasible,
+        class_power_ceiling_kw:  classCeil,
+        blanket_pop_pct:         blanket_population_pct == null ? null : round2(blanket_population_pct),
+        blanket_pop_meets_limit: blankMet,
+        da_pattern_may_resolve:  daPotential,
+        summary: summaryParts.join('; ') || 'Insufficient data for feasibility assessment'
+      };
+    })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
     // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically
