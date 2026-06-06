@@ -219,6 +219,21 @@ export async function runColocationOpportunities(body = {}){
   // Baseline = score row for the current site, if it's in the pool.
   const baseline = pool.find((c) => coordsEqual(c, current_site));
 
+  // Stamp baseline-relative deltas and coverage gap on every pool candidate.
+  for (const c of pool){
+    c.col_coverage_gap_pct = (c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR)
+      ? round2(COL_COVERAGE_HARD_FLOOR - c.col_coverage_pct)
+      : null;
+    if (baseline){
+      c.score_delta_vs_baseline = round2(c.score - baseline.score);
+      if (c.estimated_daytime_population_served != null && baseline.estimated_daytime_population_served != null){
+        c.population_delta_vs_baseline = Math.round(
+          c.estimated_daytime_population_served - baseline.estimated_daytime_population_served
+        );
+      }
+    }
+  }
+
   const returned = pool.slice(0, candidate_limit);
 
   // Score distribution stats over the full pool.
@@ -277,11 +292,12 @@ export async function runColocationOpportunities(body = {}){
 
   // Build score histogram for INFRASTRUCTURE/HYBRID pool.
   const score_histogram = Array.from({ length: 10 }, (_, i) => ({
-    bucket: `${i * 10}–${i * 10 + 9}`, min: i * 10, max: i * 10 + 9, count: 0
+    bucket: `${i * 10}–${i * 10 + 9}`, min: i * 10, max: i * 10 + 9, count: 0, promising_count: 0
   }));
   for (const c of pool){
     const idx = Math.min(9, Math.floor(c.score / 10));
     score_histogram[idx].count += 1;
+    if (c.status_category === 'PROMISING') score_histogram[idx].promising_count += 1;
   }
 
   const chanClass = frequencyChannelClass(frequency_khz);

@@ -392,15 +392,19 @@ export async function runSiteOptimizer(body = {}){
   // ---- 8a. Score histogram ----
   // 10-bucket histogram over [0, 100], 10 points wide each.
   // Lets the UI visualize the candidate distribution without scanning all scores.
+  // promising_count: PROMISING candidates in each bucket (helps identify
+  // which score range holds actionable sites).
   const score_histogram = Array.from({ length: 10 }, (_, i) => ({
     bucket: `${i * 10}–${i * 10 + 9}`,
     min: i * 10,
     max: i * 10 + 9,
-    count: 0
+    count: 0,
+    promising_count: 0
   }));
   for (const c of scored){
     const idx = Math.min(9, Math.floor(c.score / 10));
     score_histogram[idx].count += 1;
+    if (c.status_category === 'PROMISING') score_histogram[idx].promising_count += 1;
   }
 
   // ---- 8b. Tower sizing reference ----
