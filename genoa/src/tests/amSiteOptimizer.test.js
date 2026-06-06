@@ -3021,3 +3021,95 @@ test('nighttime_classification: clear channel (660 kHz) Class A has VERY_HIGH NI
       `Class A clear channel should have nif_study_required=true`);
   }
 });
+
+// ---------- power_efficiency_metrics ----------
+
+test('power_efficiency_metrics is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.power_efficiency_metrics != null,
+      `power_efficiency_metrics must be present (rank ${c.rank})`);
+  }
+});
+
+test('power_efficiency_metrics has required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const pem = out.candidates[0].power_efficiency_metrics;
+  assert.ok(pem != null, 'power_efficiency_metrics must not be null');
+  for (const field of ['tpo_kw', 'people_per_kw', 'km2_per_kw', 'efficiency_tier', 'note']){
+    assert.ok(field in pem, `power_efficiency_metrics missing field '${field}'`);
+  }
+});
+
+test('power_efficiency_metrics.tpo_kw matches request tpo_kw', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.equal(c.power_efficiency_metrics.tpo_kw, 10,
+      `power_efficiency_metrics.tpo_kw should be 10 (rank ${c.rank})`);
+  }
+});
+
+test('power_efficiency_metrics.efficiency_tier is a valid value', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['HIGH', 'MODERATE', 'LOW', 'UNKNOWN']);
+  for (const c of out.candidates){
+    const tier = c.power_efficiency_metrics?.efficiency_tier;
+    assert.ok(VALID.has(tier),
+      `efficiency_tier "${tier}" must be HIGH/MODERATE/LOW/UNKNOWN (rank ${c.rank})`);
+  }
+});
+
+test('power_efficiency_metrics comparison table fields are populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table){
+    assert.ok('people_per_kw' in row, `comparison table row missing people_per_kw (rank ${row.rank})`);
+    assert.ok('km2_per_kw' in row, `comparison table row missing km2_per_kw (rank ${row.rank})`);
+    assert.ok('efficiency_tier' in row, `comparison table row missing efficiency_tier (rank ${row.rank})`);
+  }
+});
+
+// ---------- da_gain_potential ----------
+
+test('da_gain_potential is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok('da_gain_potential' in c,
+      `da_gain_potential must be present (rank ${c.rank})`);
+  }
+});
+
+test('da_gain_potential returns null for DA pattern_mode inputs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.equal(c.da_gain_potential, null,
+      `da_gain_potential must be null when pattern_mode is DA (rank ${c.rank})`);
+  }
+});
+
+test('da_gain_potential.applicable is a boolean when present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (c.da_gain_potential != null){
+      assert.equal(typeof c.da_gain_potential.applicable, 'boolean',
+        `da_gain_potential.applicable must be boolean (rank ${c.rank})`);
+    }
+  }
+});
+
+test('da_gain_potential comparison table fields are present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table){
+    assert.ok('da_applicable' in row, `comparison table row missing da_applicable (rank ${row.rank})`);
+    assert.ok('da_col_pct_estimate' in row, `comparison table row missing da_col_pct_estimate (rank ${row.rank})`);
+    assert.ok('da_would_recover' in row, `comparison table row missing da_would_recover (rank ${row.rank})`);
+  }
+});

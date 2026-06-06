@@ -986,6 +986,139 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Co-channel spacing estimate */}
+        {candidate.co_channel_spacing_estimate && (() => {
+          const ccs = candidate.co_channel_spacing_estimate;
+          const verdictColor = ccs.screening_verdict === 'CO_CHANNEL_ELIGIBLE' ? '#63d471'
+            : ccs.screening_verdict === 'FIRST_ADJACENT_ELIGIBLE' ? '#a8d46a'
+            : ccs.screening_verdict === 'SECOND_ADJACENT_ELIGIBLE' ? '#ffb347'
+            : '#ff5a5a';
+          const rows = [
+            { label: 'Co-channel', data: ccs.co_channel },
+            { label: '±10 kHz adj', data: ccs.adjacent_10khz },
+            { label: '±20 kHz adj', data: ccs.adjacent_20khz }
+          ];
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.37 Co-channel spacing screen</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: verdictColor + '22', color: verdictColor }}>
+                    {ccs.screening_verdict?.replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-textDim text-[9px]">
+                    {ccs.candidate_distance_km != null ? `${ccs.candidate_distance_km} km from current site` : ''}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-x-2 text-[9px]">
+                  {rows.map(({ label, data }) => data && (
+                    <div key={label} className="space-y-0.5">
+                      <div className="text-textDim">{label}</div>
+                      <div style={{ color: data.meets_separation ? '#63d471' : '#ff7a7a' }}>
+                        {data.meets_separation ? '✓' : '✕'} {data.min_separation_km} km min
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-textDim/60 text-[9px] leading-tight">{ccs.caveat}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* MPE RF exposure summary */}
+        {candidate.mpe_rf_exposure_summary && (() => {
+          const mpe = candidate.mpe_rf_exposure_summary;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">RF exposure / MPE</div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[10px]">
+                <div>
+                  <span className="text-textDim">Near-field boundary</span>{' '}
+                  <span className="text-cream">{mpe.near_field_boundary_m != null ? `${mpe.near_field_boundary_m} m` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-textDim">Far-field exclusion</span>{' '}
+                  <span className="text-cream">{mpe.far_field_exclusion_m != null ? `${mpe.far_field_exclusion_m} m` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-textDim">MPE limit</span>{' '}
+                  <span className="text-cream">{mpe.mpe_limit_mw_cm2 != null ? `${mpe.mpe_limit_mw_cm2} mW/cm²` : '—'}</span>
+                </div>
+                <div>
+                  <span className="text-textDim">Fence distance</span>{' '}
+                  <span className="text-amber font-semibold">{mpe.recommended_fence_distance_m != null ? `${mpe.recommended_fence_distance_m} m` : '—'}</span>
+                </div>
+                <div className="col-span-2 text-textDim/60 text-[9px] leading-tight mt-0.5">
+                  {mpe.rule}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* DA gain potential */}
+        {candidate.da_gain_potential?.applicable && (() => {
+          const dg = candidate.da_gain_potential;
+          const recColor = dg.would_recover_col_compliance ? '#63d471' : '#ffb347';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">DA gain potential</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-textDim">NDA coverage:</span>
+                  <span className="text-cream">{dg.nda_col_coverage_pct != null ? `${dg.nda_col_coverage_pct.toFixed(0)}%` : '—'}</span>
+                  <span className="text-textDim">→ DA est:</span>
+                  <span style={{ color: recColor }}>
+                    {dg.da_col_coverage_estimate_pct != null ? `~${dg.da_col_coverage_estimate_pct.toFixed(0)}%` : '?'}
+                  </span>
+                  {dg.would_recover_col_compliance != null && (
+                    <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                      style={{ background: recColor + '22', color: recColor }}>
+                      {dg.would_recover_col_compliance ? 'RECOVERABLE' : 'PARTIAL'}
+                    </span>
+                  )}
+                </div>
+                <div className="text-textDim/80 leading-snug">{dg.recommendation}</div>
+                <div className="text-textDim/60 text-[9px]">{dg.da_erp_boost_modeled} · {dg.rule}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Power efficiency metrics */}
+        {candidate.power_efficiency_metrics && (() => {
+          const pem = candidate.power_efficiency_metrics;
+          const tierColor = pem.efficiency_tier === 'HIGH' ? '#63d471'
+            : pem.efficiency_tier === 'MODERATE' ? '#ffb347'
+            : '#ff9b5a';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Power efficiency</div>
+              <div className="grid grid-cols-3 gap-x-3 font-mono text-[10px]">
+                <div>
+                  <div className="text-textDim text-[9px]">People / kW</div>
+                  <div className="text-cream">{pem.people_per_kw != null ? pem.people_per_kw.toLocaleString() : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-textDim text-[9px]">km² / kW</div>
+                  <div className="text-cream">{pem.km2_per_kw != null ? pem.km2_per_kw.toLocaleString() : '—'}</div>
+                </div>
+                <div>
+                  <div className="text-textDim text-[9px]">Tier</div>
+                  <div className="uppercase text-[9px] tracking-rack" style={{ color: tierColor }}>
+                    {pem.efficiency_tier}
+                  </div>
+                </div>
+              </div>
+              <div className="text-textDim/60 text-[9px] mt-0.5 leading-tight">
+                National avg density proxy · {pem.tpo_kw} kW TPO
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Per-candidate engineering checklist */}
         {Array.isArray(candidate.per_candidate_engineering_checklist) && candidate.per_candidate_engineering_checklist.length > 0 && (() => {
           const priorityColor = { REQUIRED: '#ff9b5a', HIGH: '#ffb347', MEDIUM: '#7ec8e3', ADVISORY: '#9b9b9b' };

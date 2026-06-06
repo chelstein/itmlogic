@@ -611,7 +611,13 @@ export async function runSiteOptimizer(body = {}){
     spacing_verdict:        c.co_channel_spacing_estimate?.screening_verdict ?? null,
     fence_m:                c.mpe_rf_exposure_summary?.recommended_fence_distance_m ?? null,
     blanket_km:             c.blanket_1000mvm_km ?? null,
-    field_at_col_mvm:       c.field_at_col_centroid_mvm ?? null
+    field_at_col_mvm:       c.field_at_col_centroid_mvm ?? null,
+    people_per_kw:          c.power_efficiency_metrics?.people_per_kw ?? null,
+    km2_per_kw:             c.power_efficiency_metrics?.km2_per_kw ?? null,
+    efficiency_tier:        c.power_efficiency_metrics?.efficiency_tier ?? null,
+    da_applicable:          c.da_gain_potential?.applicable ?? null,
+    da_col_pct_estimate:    c.da_gain_potential?.da_col_coverage_estimate_pct ?? null,
+    da_would_recover:       c.da_gain_potential?.would_recover_col_compliance ?? null
   }));
 
   // ---- 16. Engineering summary (executive-level synthesis) ----
@@ -2079,6 +2085,84 @@ async function scoreCandidate(pt, ctx, warnings){
       };
     })(),
     field_at_col_centroid_mvm,
+    // Power-efficiency metrics — people served and service-area km² per kW of TPO.
+    // Useful for comparing cost-effectiveness across sites at identical TPO.
+    // Both are screening-grade proxies using the national average density.
+    power_efficiency_metrics: (() => {
+      if (tpo_kw == null || tpo_kw <= 0) return null;
+      const ppl_per_kw = estimated_daytime_population_served != null
+        ? Math.round(estimated_daytime_population_served / tpo_kw)
+        : null;
+      const service_area_km2 = daytime_reach_km != null
+        ? round2(Math.PI * daytime_reach_km * daytime_reach_km)
+        : null;
+      const km2_per_kw = service_area_km2 != null
+        ? round2(service_area_km2 / tpo_kw)
+        : null;
+      const col_pct_per_kw = coverage_pct != null
+        ? round2((coverage_pct * 100) / tpo_kw)
+        : null;
+      let efficiency_tier;
+      if (ppl_per_kw == null) efficiency_tier = 'UNKNOWN';
+      else if (ppl_per_kw > 5000) efficiency_tier = 'HIGH';
+      else if (ppl_per_kw > 1500) efficiency_tier = 'MODERATE';
+      else efficiency_tier = 'LOW';
+      return {
+        tpo_kw,
+        people_per_kw: ppl_per_kw,
+        km2_per_kw,
+        col_coverage_pct_per_kw: col_pct_per_kw,
+        efficiency_tier,
+        note: `At ${tpo_kw} kW TPO: ~${ppl_per_kw != null ? ppl_per_kw.toLocaleString() : '?'} people/kW, ${km2_per_kw != null ? km2_per_kw.toLocaleString() : '?'} km²/kW service area (national avg density proxy)`
+      };
+    })(),
+    // DA gain potential — assessed when COL coverage is below 100% but not catastrophically low.
+    // Identifies candidates where a directional antenna study could push the 5 mV/m contour
+    // toward the community of license to recover or improve compliance.
+    da_gain_potential: (() => {
+      if (coverage_pct == null || /DA/i.test(pattern_mode)) return null;
+      // DA is most useful when NDA coverage is between 40–95%: too low means DA can't
+      // bridge the gap; at ≥100% it's already compliant.
+      const pct = coverage_pct * 100;
+      if (pct >= 100) return { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' };
+      if (pct < 40)   return { applicable: false, reason: `NDA coverage ${pct.toFixed(0)}% is too low for DA to recover §73.24(j) compliance at current TPO — power increase required first` };
+
+      // A DA pattern can redistribute ERP asymmetrically toward the COL centroid.
+      // Typical DA gain toward the target bearing: +3 to +6 dB relative to NDA.
+      // In groundwave terms, +3 dB ERP roughly scales field by √2 (≈+41% at a given distance).
+      // We model the best-case DA recovery as a 4× ERP boost in the preferred direction
+      // (equivalent to doubling the ERP in kW — i.e., TPO × 4 directional weighting),
+      // which translates to roughly +1.4–2× in km on the FCC groundwave curves.
+      const DA_ERP_BOOST_FACTOR = 4; // conservative upper-bound for a well-optimized pattern
+      let da_col_pct_estimate = null;
+      try {
+        const erp_da = tpo_kw * DA_ERP_BOOST_FACTOR;
+        const r5_da = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: sigma_msm, erp_kw: erp_da });
+        const r5_nda = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        if (r5_da != null && r5_nda != null && r5_nda > 0){
+          // Scale coverage_pct by (r5_da/r5_nda)² (area scales as radius²)
+          const area_scale = Math.min(4.0, (r5_da / r5_nda) ** 2);
+          da_col_pct_estimate = round2(Math.min(100, pct * area_scale));
+        }
+      } catch (_) { /* ignore curve errors */ }
+
+      const gap_pct = round2(80 - pct); // gap to §73.24(j) 80% floor
+      const would_recover = da_col_pct_estimate != null && da_col_pct_estimate >= 80;
+      return {
+        applicable: true,
+        nda_col_coverage_pct: round2(pct),
+        col_gap_to_floor_pct: Math.max(0, gap_pct),
+        da_col_coverage_estimate_pct: da_col_pct_estimate,
+        would_recover_col_compliance: would_recover,
+        da_erp_boost_modeled: `${DA_ERP_BOOST_FACTOR}× NDA ERP toward COL bearing (best-case pattern)`,
+        recommendation: would_recover
+          ? `DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing`
+          : da_col_pct_estimate != null && da_col_pct_estimate > pct
+          ? `DA pattern improves coverage to ~${da_col_pct_estimate.toFixed(0)}% but may not reach §73.24(j) floor; consider DA + TPO increase`
+          : `DA pattern analysis inconclusive — full §73.150 study required before ruling out`,
+        rule: '47 CFR §73.150 / §73.24(j)'
+      };
+    })(),
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),

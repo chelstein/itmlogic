@@ -677,7 +677,44 @@ const DEMO_RESULT = {
           { factor: 'DA_PATTERN_REQUIRED', points: 5, note: 'NDA operation reviewed; DA may be needed if sky-wave NIF fails' }
         ],
         interpretation: 'MODERATE risk — routine but non-trivial filing requirements; plan for soil survey, ASR, or NIF as applicable.'
-      }
+      },
+      co_channel_spacing_estimate: {
+        candidate_distance_km: 7.2,
+        co_channel: { min_separation_km: 953, meets_separation: false, note: 'Class D co-channel minimum 953 km' },
+        adjacent_10khz: { min_separation_km: 724, meets_separation: false, note: 'Class D ±10 kHz minimum 724 km' },
+        adjacent_20khz: { min_separation_km: 354, meets_separation: false, note: 'Class D ±20 kHz minimum 354 km' },
+        screening_verdict: 'BELOW_ALL_SPACING_MINIMUMS',
+        rule: '47 CFR §73.37 (daytime, proposed station vs. same class)',
+        caveat: 'Spacing screen uses distance from current site as proxy. Actual §73.37 separation must be measured to nearest co-channel and adjacent-channel stations.'
+      },
+      mpe_rf_exposure_summary: {
+        evaluation_required: true,
+        rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
+        frequency_mhz: 0.78,
+        near_field_boundary_m: 61.12,
+        mpe_limit_mw_cm2: 0.0020,
+        far_field_exclusion_m: 44.7,
+        recommended_fence_distance_m: 61.12,
+        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+      },
+      power_efficiency_metrics: {
+        tpo_kw: 5,
+        people_per_kw: 23100,
+        km2_per_kw: 733,
+        col_coverage_pct_per_kw: 19.4,
+        efficiency_tier: 'HIGH',
+        note: 'At 5 kW TPO: ~23,100 people/kW, 733 km²/kW service area (national avg density proxy)'
+      },
+      nighttime_classification: {
+        eligibility: 'RESTRICTED',
+        nif_complexity: 'VERY_HIGH',
+        protection_class: 'Clear channel — Class A dominant (§73.25)',
+        key_constraint: '780 kHz is a §73.25 clear channel. Class D secondaries restricted at night; skywave interference to WJR (Class A) dominates NIF analysis.',
+        nighttime_power_max_kw: 0.5,
+        nif_study_required: true,
+        rule: '47 CFR §73.182 / §73.25'
+      },
+      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' }
     },
     {
       rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
@@ -717,7 +754,44 @@ const DEMO_RESULT = {
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required for all non-local-channel stations at a new transmitter site' }
         ],
         interpretation: 'MODERATE risk — routine but non-trivial filing requirements; plan for ASR and NIF study.'
-      }
+      },
+      co_channel_spacing_estimate: {
+        candidate_distance_km: 7.8,
+        co_channel: { min_separation_km: 953, meets_separation: false, note: 'Class D co-channel minimum 953 km' },
+        adjacent_10khz: { min_separation_km: 724, meets_separation: false, note: 'Class D ±10 kHz minimum 724 km' },
+        adjacent_20khz: { min_separation_km: 354, meets_separation: false, note: 'Class D ±20 kHz minimum 354 km' },
+        screening_verdict: 'BELOW_ALL_SPACING_MINIMUMS',
+        rule: '47 CFR §73.37 (daytime, proposed station vs. same class)',
+        caveat: 'Spacing screen uses distance from current site as proxy. Actual §73.37 separation must be measured to nearest co-channel and adjacent-channel stations.'
+      },
+      mpe_rf_exposure_summary: {
+        evaluation_required: true,
+        rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
+        frequency_mhz: 0.78,
+        near_field_boundary_m: 61.12,
+        mpe_limit_mw_cm2: 0.0020,
+        far_field_exclusion_m: 44.7,
+        recommended_fence_distance_m: 61.12,
+        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+      },
+      power_efficiency_metrics: {
+        tpo_kw: 5,
+        people_per_kw: 20780,
+        km2_per_kw: 611,
+        col_coverage_pct_per_kw: 18.2,
+        efficiency_tier: 'HIGH',
+        note: 'At 5 kW TPO: ~20,780 people/kW, 611 km²/kW service area (national avg density proxy)'
+      },
+      nighttime_classification: {
+        eligibility: 'RESTRICTED',
+        nif_complexity: 'VERY_HIGH',
+        protection_class: 'Clear channel — Class A dominant (§73.25)',
+        key_constraint: '780 kHz is a §73.25 clear channel. Class D secondary operation at night limited by WJR skywave protection zone.',
+        nighttime_power_max_kw: 0.5,
+        nif_study_required: true,
+        rule: '47 CFR §73.182 / §73.25'
+      },
+      da_gain_potential: { applicable: false, reason: 'Already ≥100% NDA COL coverage — DA not needed for §73.24(j)' }
     },
     {
       rank: 3, rank_percentile: 72.6, lat: 34.95, lon: -111.92,
@@ -784,6 +858,52 @@ const DEMO_RESULT = {
           { factor: 'DA_PATTERN_REQUIRED', points: 5, note: 'DA pattern shaping may close coverage gap — §73.150 pattern design may be needed' }
         ],
         interpretation: 'HIGH regulatory risk — at least one major filing barrier present (COL coverage gap); budget additional engineering resources.'
+      },
+      co_channel_spacing_estimate: {
+        candidate_distance_km: 12.5,
+        co_channel: { min_separation_km: 953, meets_separation: false, note: 'Class D co-channel minimum 953 km' },
+        adjacent_10khz: { min_separation_km: 724, meets_separation: false, note: 'Class D ±10 kHz minimum 724 km' },
+        adjacent_20khz: { min_separation_km: 354, meets_separation: false, note: 'Class D ±20 kHz minimum 354 km' },
+        screening_verdict: 'BELOW_ALL_SPACING_MINIMUMS',
+        rule: '47 CFR §73.37 (daytime, proposed station vs. same class)',
+        caveat: 'Spacing screen uses distance from current site as proxy. Actual §73.37 separation must be measured to nearest co-channel and adjacent-channel stations.'
+      },
+      mpe_rf_exposure_summary: {
+        evaluation_required: true,
+        rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
+        frequency_mhz: 0.78,
+        near_field_boundary_m: 61.12,
+        mpe_limit_mw_cm2: 0.0020,
+        far_field_exclusion_m: 44.7,
+        recommended_fence_distance_m: 61.12,
+        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+      },
+      power_efficiency_metrics: {
+        tpo_kw: 5,
+        people_per_kw: 17120,
+        km2_per_kw: 504,
+        col_coverage_pct_per_kw: 15.6,
+        efficiency_tier: 'HIGH',
+        note: 'At 5 kW TPO: ~17,120 people/kW, 504 km²/kW service area (national avg density proxy)'
+      },
+      nighttime_classification: {
+        eligibility: 'RESTRICTED',
+        nif_complexity: 'VERY_HIGH',
+        protection_class: 'Clear channel — Class A dominant (§73.25)',
+        key_constraint: '780 kHz is a §73.25 clear channel. Increasing TPO from 5→8.5 kW increases skywave NIF complexity significantly.',
+        nighttime_power_max_kw: 0.5,
+        nif_study_required: true,
+        rule: '47 CFR §73.182 / §73.25'
+      },
+      da_gain_potential: {
+        applicable: true,
+        nda_col_coverage_pct: 78,
+        col_gap_to_floor_pct: 2,
+        da_col_coverage_estimate_pct: 97.4,
+        would_recover_col_compliance: true,
+        da_erp_boost_modeled: '4× NDA ERP toward COL bearing (best-case pattern)',
+        recommendation: 'DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing',
+        rule: '47 CFR §73.150 / §73.24(j)'
       }
     },
     {
@@ -822,6 +942,52 @@ const DEMO_RESULT = {
           { factor: 'NIF_STUDY_REQUIRED', points: 10, note: '§73.182 NIF study required; failure likely due to coverage constraints' }
         ],
         interpretation: 'VERY HIGH regulatory complexity — multiple blocking issues; recommend deprioritizing unless site has exceptional propagation advantages.'
+      },
+      co_channel_spacing_estimate: {
+        candidate_distance_km: 15.0,
+        co_channel: { min_separation_km: 953, meets_separation: false, note: 'Class D co-channel minimum 953 km' },
+        adjacent_10khz: { min_separation_km: 724, meets_separation: false, note: 'Class D ±10 kHz minimum 724 km' },
+        adjacent_20khz: { min_separation_km: 354, meets_separation: false, note: 'Class D ±20 kHz minimum 354 km' },
+        screening_verdict: 'BELOW_ALL_SPACING_MINIMUMS',
+        rule: '47 CFR §73.37 (daytime, proposed station vs. same class)',
+        caveat: 'Spacing screen uses distance from current site as proxy. Actual §73.37 separation must be measured to nearest co-channel and adjacent-channel stations.'
+      },
+      mpe_rf_exposure_summary: {
+        evaluation_required: true,
+        rule: '47 CFR §1.1307 / OET Bulletin 65 §3.B',
+        frequency_mhz: 0.78,
+        near_field_boundary_m: 61.12,
+        mpe_limit_mw_cm2: 0.0020,
+        far_field_exclusion_m: 44.7,
+        recommended_fence_distance_m: 61.12,
+        note: 'At 5 kW, near-field boundary (λ/2π) dominates. Fence at ≥62 m from base of antenna.'
+      },
+      power_efficiency_metrics: {
+        tpo_kw: 5,
+        people_per_kw: 10800,
+        km2_per_kw: 318,
+        col_coverage_pct_per_kw: 12.4,
+        efficiency_tier: 'MODERATE',
+        note: 'At 5 kW TPO: ~10,800 people/kW, 318 km²/kW service area (national avg density proxy)'
+      },
+      nighttime_classification: {
+        eligibility: 'RESTRICTED',
+        nif_complexity: 'VERY_HIGH',
+        protection_class: 'Clear channel — Class A dominant (§73.25)',
+        key_constraint: '780 kHz clear channel + US-MX treaty zone: FCC IB pre-coordination required before any nighttime operation.',
+        nighttime_power_max_kw: 0.25,
+        nif_study_required: true,
+        rule: '47 CFR §73.182 / §73.25'
+      },
+      da_gain_potential: {
+        applicable: true,
+        nda_col_coverage_pct: 62,
+        col_gap_to_floor_pct: 18,
+        da_col_coverage_estimate_pct: 83.1,
+        would_recover_col_compliance: true,
+        da_erp_boost_modeled: '4× NDA ERP toward COL bearing (best-case pattern)',
+        recommendation: 'DA pattern likely recovers §73.24(j) compliance — commission §73.150 DA study toward COL bearing',
+        rule: '47 CFR §73.150 / §73.24(j)'
       }
     }
   ]
