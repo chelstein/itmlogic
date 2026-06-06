@@ -2226,6 +2226,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Frequency Monitoring Plan Guide */}
+        {candidate.frequency_monitoring_plan_guide && (() => {
+          const g = candidate.frequency_monitoring_plan_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Frequency Monitoring Plan <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1215</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Carrier Tolerance</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 700 }}>±{g.carrier_frequency_monitoring?.max_deviation_hz ?? '—'} Hz</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Max Modulation</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 14, fontWeight: 700 }}>{g.modulation_monitoring?.max_negative_mod_pct ?? '—'}%/+{g.modulation_monitoring?.max_positive_mod_pct ?? '—'}%</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>DA Base Current</div>
+                  <div style={{ color: g.da_base_current_monitoring?.required ? '#fbbf24' : '#34d399', fontSize: 13, fontWeight: 600 }}>
+                    {g.da_base_current_monitoring?.required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, flex: '1 1 200px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Spurious Limit</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>
+                    {g.spurious_monitoring?.spurious_limit_dbc_below_2nd_harmonic ?? '—'} dBc (&lt;2nd harmonic)
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
+                    {g.spurious_monitoring?.spurious_limit_dbc_above_10mhz ?? '—'} dBc (&gt;10 MHz)
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, flex: '1 1 200px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Remote Control</div>
+                  <div style={{ color: g.remote_monitoring?.permitted ? '#34d399' : '#f87171', fontSize: 12, fontWeight: 600 }}>
+                    {g.remote_monitoring?.permitted ? 'Permitted §73.1350(c)' : 'Not permitted'}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ASR Registration Update Guide */}
         {candidate.asr_registration_update_guide && (() => {
           const g = candidate.asr_registration_update_guide;

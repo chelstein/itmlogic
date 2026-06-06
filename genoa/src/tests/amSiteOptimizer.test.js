@@ -5683,6 +5683,51 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- frequency_monitoring_plan_guide ----
+
+test('frequency_monitoring_plan_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.frequency_monitoring_plan_guide != null, 'frequency_monitoring_plan_guide missing');
+  const g = c.frequency_monitoring_plan_guide;
+  assert.ok('carrier_frequency_monitoring' in g, 'carrier_frequency_monitoring missing');
+  assert.ok('modulation_monitoring' in g, 'modulation_monitoring missing');
+  assert.ok('da_base_current_monitoring' in g, 'da_base_current_monitoring missing');
+  assert.ok('spurious_monitoring' in g, 'spurious_monitoring missing');
+  assert.ok('remote_monitoring' in g, 'remote_monitoring missing');
+});
+
+test('frequency_monitoring_plan_guide KAZM carrier frequency tolerance is ±20 Hz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].frequency_monitoring_plan_guide;
+  assert.strictEqual(g.carrier_frequency_monitoring.max_deviation_hz, 20, 'AM carrier tolerance must be ±20 Hz per §73.1215(b)');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz must be 780');
+});
+
+test('frequency_monitoring_plan_guide modulation limits correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].frequency_monitoring_plan_guide;
+  assert.strictEqual(g.modulation_monitoring.max_negative_mod_pct, 100, 'max negative modulation must be 100%');
+  assert.strictEqual(g.modulation_monitoring.max_positive_mod_pct, 125, 'max positive modulation must be 125%');
+  assert.strictEqual(g.modulation_monitoring.log_required, true, 'modulation log must be required');
+});
+
+test('frequency_monitoring_plan_guide KAZM NDA has no base current monitoring required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].frequency_monitoring_plan_guide;
+  assert.strictEqual(g.is_directional, false, 'KAZM NDA pattern must not be directional');
+  assert.strictEqual(g.da_base_current_monitoring.required, false, 'NDA station must not require base current monitoring');
+});
+
+test('frequency_monitoring_plan_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fmpg_freq_tolerance_hz' in row, 'fmpg_freq_tolerance_hz missing from comparison table');
+    assert.ok('fmpg_is_directional' in row, 'fmpg_is_directional missing from comparison table');
+    assert.ok('fmpg_da_curr_required' in row, 'fmpg_da_curr_required missing from comparison table');
+  }
+});
+
 // ---- asr_registration_update_guide ----
 
 test('asr_registration_update_guide presence and structure', async () => {

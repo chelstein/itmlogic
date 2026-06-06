@@ -1717,6 +1717,39 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      frequency_monitoring_plan_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', is_directional: false,
+        carrier_frequency_monitoring: {
+          max_deviation_hz: 20, cfr: '§73.1215(b)',
+          monitoring_method: 'GPS-locked frequency reference or calibrated frequency counter',
+          check_frequency: 'Weekly minimum; continuous with automatic monitoring system preferred'
+        },
+        modulation_monitoring: {
+          max_negative_mod_pct: 100, max_positive_mod_pct: 125,
+          cfr: '§73.1570; §73.1215(a)', equipment_required: 'Calibrated modulation monitor',
+          log_required: true, log_cfr: '§73.1820'
+        },
+        da_base_current_monitoring: {
+          required: false, note: 'NDA station — no base current monitoring required', cfr: '§73.61 (not applicable to NDA)'
+        },
+        spurious_monitoring: {
+          nrsc_2b_compliant: true, spurious_limit_dbc_below_2nd_harmonic: -60, spurious_limit_dbc_above_10mhz: -80,
+          cfr: '§73.44', check_method: 'Spectrum analyzer measurement at transmitter output; annual check recommended',
+          transmitter_filter_recommended: false
+        },
+        remote_monitoring: {
+          permitted: true, cfr: '§73.1350(c)',
+          required_alarms: ['carrier level', 'modulation overload', 'VSWR/SWR high', 'antenna current deviation'],
+          response_time_minutes: 10, nda_vs_da: 'NDA station: carrier and modulation alarms sufficient'
+        },
+        equipment_cost_estimate: {
+          frequency_monitor_usd: { low: 500, high: 3000 }, modulation_monitor_usd: { low: 800, high: 4000 },
+          base_current_monitors_usd: { low: 0, high: 0 }, remote_control_system_usd: { low: 3000, high: 15000 },
+          total_estimated_usd: { low: 4300, high: 22000 }
+        },
+        reference: '47 CFR §73.44; §73.61; §73.62; §73.1215; §73.1350; §73.1570; §73.1820; NRSC-2-B',
+        note: 'Monitoring: carrier ±20 Hz (§73.1215), modulation 100%/125% (§73.1570). Remote control permitted (§73.1350(c)).'
+      },
       asr_registration_update_guide: {
         frequency_khz: 780, fcc_class: 'D',
         estimated_tower_height_m: 144.23, quarter_wave_height_m: 96.15,

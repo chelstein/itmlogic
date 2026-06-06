@@ -963,7 +963,10 @@ export async function runSiteOptimizer(body = {}){
     tcsg_n_rf_required:     c.tower_climbing_safety_plan_guide?.n_required_rf_measures ?? null,
     asr_required_height:    c.asr_registration_update_guide?.asr_required_by_height ?? null,
     asr_tower_height_m:     c.asr_registration_update_guide?.estimated_tower_height_m ?? null,
-    asr_faa_notify:         c.asr_registration_update_guide?.faa_notification_likely ?? null
+    asr_faa_notify:         c.asr_registration_update_guide?.faa_notification_likely ?? null,
+    fmpg_freq_tolerance_hz: c.frequency_monitoring_plan_guide?.carrier_frequency_monitoring?.max_deviation_hz ?? null,
+    fmpg_is_directional:    c.frequency_monitoring_plan_guide?.is_directional ?? null,
+    fmpg_da_curr_required:  c.frequency_monitoring_plan_guide?.da_base_current_monitoring?.required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6698,6 +6701,108 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    frequency_monitoring_plan_guide: (() => {
+      // §73.1215: AM carrier frequency and modulation monitoring requirements
+      // §73.1350: Transmitter control and monitoring
+      // §73.61 / §73.62: AM directional antenna base current monitoring
+      // NRSC-2-B: Emission mask standard (AM modulation bandwidth and spurious emissions)
+      // §73.44: Spurious and harmonic emissions limits for AM broadcast stations
+      //
+      // When an AM station relocates:
+      //   - Base current monitoring points change (new tower, new ground system)
+      //   - Carrier frequency reference may need re-calibration at new site
+      //   - Directional antenna (DA) stations must re-establish base current ratios
+      //   - New transmitter site may have different local noise environment (impacts monitoring accuracy)
+      // §73.1215(b): Frequency must be kept within ±20 Hz of licensed frequency (AM stations)
+      // §73.1350(a): Operator must be able to operate the transmitter (on-site or by remote means)
+
+      const isDA_fmpg = /^DA/i.test(pattern_mode);
+
+      // Carrier frequency tolerance
+      const CARRIER_FREQ_TOLERANCE = {
+        max_deviation_hz: 20,
+        cfr: '§73.1215(b)',
+        monitoring_method: 'GPS-locked frequency reference or calibrated frequency counter',
+        check_frequency: 'Weekly minimum; continuous with automatic monitoring system preferred'
+      };
+
+      // Modulation monitoring
+      // §73.1570: Modulation levels — AM must not exceed 100% negative / 125% positive momentarily
+      // §73.1215(a): Modulation monitoring required at all times during operation
+      const MODULATION_MONITORING = {
+        max_negative_mod_pct: 100,
+        max_positive_mod_pct: 125,
+        cfr: '§73.1570; §73.1215(a)',
+        equipment_required: 'Calibrated modulation monitor meeting §73.1215 requirements',
+        log_required: true,
+        log_cfr: '§73.1820'
+      };
+
+      // Base current monitoring for DA stations
+      // §73.61: Each base of a directional array must have a base current monitor
+      // §73.62: Base current ratios must be maintained within ±5% of licensed ratios
+      const DA_BASE_CURRENT = isDA_fmpg ? {
+        required: true,
+        monitor_per_tower: true,
+        ratio_tolerance_pct: 5,
+        cfr: '§73.61; §73.62',
+        log_frequency: 'Every 3 hours during operation',
+        log_cfr: '§73.1820',
+        relocation_note: 'New tower array requires new base current calibration; must be re-established during proof-of-performance measurement'
+      } : {
+        required: false,
+        note: 'NDA station — no base current monitoring required',
+        cfr: '§73.61 (not applicable to NDA)'
+      };
+
+      // NRSC-2-B spurious emission monitoring
+      // §73.44: AM spurious emissions must not exceed -60 dBc (below 2nd harmonic) or -80 dBc (above 10 MHz)
+      // NRSC-2-B: AM modulation bandwidth — 10 kHz emission mask
+      const SPURIOUS_MONITORING = {
+        nrsc_2b_compliant: true, // assume compliant; actual depends on transmitter
+        spurious_limit_dbc_below_2nd_harmonic: -60,
+        spurious_limit_dbc_above_10mhz: -80,
+        cfr: '§73.44',
+        check_method: 'Spectrum analyzer measurement at transmitter output; annual check recommended',
+        transmitter_filter_recommended: tpo_kw > 5
+      };
+
+      // Remote monitoring options
+      // §73.1350(c): Remote control permitted with automatic fault alarm
+      const REMOTE_MONITORING = {
+        permitted: true,
+        cfr: '§73.1350(c)',
+        required_alarms: ['carrier level', 'modulation overload', 'VSWR/SWR high', 'antenna current deviation'],
+        response_time_minutes: 10, // FCC expects operator response within 10 min of alarm
+        nda_vs_da: isDA_fmpg ? 'DA station: antenna current and ratio alarms are required' : 'NDA station: carrier and modulation alarms sufficient'
+      };
+
+      // Monitoring equipment cost estimate
+      const EQUIPMENT_COST = {
+        frequency_monitor_usd: { low: 500, high: 3000 },
+        modulation_monitor_usd: { low: 800, high: 4000 },
+        base_current_monitors_usd: isDA_fmpg ? { low: 2000, high: 8000 } : { low: 0, high: 0 },
+        remote_control_system_usd: { low: 3000, high: 15000 },
+        total_estimated_usd: isDA_fmpg
+          ? { low: 6300, high: 30000 }
+          : { low: 4300, high: 22000 }
+      };
+
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        is_directional: isDA_fmpg,
+        carrier_frequency_monitoring: CARRIER_FREQ_TOLERANCE,
+        modulation_monitoring: MODULATION_MONITORING,
+        da_base_current_monitoring: DA_BASE_CURRENT,
+        spurious_monitoring: SPURIOUS_MONITORING,
+        remote_monitoring: REMOTE_MONITORING,
+        equipment_cost_estimate: EQUIPMENT_COST,
+        relocation_note: `Transmitter relocation requires re-calibration of all monitoring equipment at the new site. ${isDA_fmpg ? 'Directional array base current ratios must be re-established during proof-of-performance. ' : ''}Carrier frequency reference must be re-established with GPS-locked standard at new transmitter location.`,
+        reference: '47 CFR §73.44; §73.61; §73.62; §73.1215; §73.1350; §73.1570; §73.1820; NRSC-2-B (AM emission mask standard)',
+        note: `Monitoring requirements: carrier ±20 Hz (§73.1215), modulation 100%/125% (§73.1570)${isDA_fmpg ? ', base current ratios ±5% (§73.62)' : ''}. Remote control permitted (§73.1350(c)).`
       };
     })(),
 
