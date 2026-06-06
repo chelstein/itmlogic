@@ -525,3 +525,23 @@ test('candidate_shortlist is present in HYBRID mode and entries have source fiel
       `shortlist entry.source must be INFRASTRUCTURE or GRID; got '${entry.source}'`);
   }
 });
+
+// ---------- Test 29 — new optimizer fields propagate through colocation ----------
+
+test('colocation candidates have land_use_classification and estimated_erp_kw', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.land_use_classification != null,
+      `colocation candidate rank ${c.rank} missing land_use_classification`);
+    assert.ok(c.antenna_system_summary?.estimated_erp_kw != null,
+      `colocation candidate rank ${c.rank} missing estimated_erp_kw`);
+    assert.ok(c.nighttime_classification != null,
+      `colocation candidate rank ${c.rank} missing nighttime_classification`);
+  }
+});
