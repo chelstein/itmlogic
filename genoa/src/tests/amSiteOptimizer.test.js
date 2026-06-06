@@ -4953,3 +4953,56 @@ test('engineering_confidence_matrix col_polygon_supplied reflects input', async 
   assert.equal(outNo.engineering_confidence_matrix.col_polygon_supplied,  false, 'no polygon → col_polygon_supplied must be false');
   assert.equal(outYes.engineering_confidence_matrix.col_polygon_supplied, true,  'with polygon → col_polygon_supplied must be true');
 });
+
+// ---- spectrum_interference_summary ----
+
+test('spectrum_interference_summary is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.spectrum_interference_summary != null, `rank ${c.rank} missing spectrum_interference_summary`);
+  }
+});
+
+test('spectrum_interference_summary has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const si = out.candidates[0].spectrum_interference_summary;
+  assert.ok(typeof si.frequency_khz === 'number');
+  assert.ok(typeof si.fcc_class === 'string');
+  assert.ok(typeof si.channel_class === 'string');
+  assert.ok(typeof si.is_clear_channel === 'boolean');
+  assert.ok(typeof si.is_local_channel === 'boolean');
+  assert.ok(typeof si.interference_risk_tier === 'string');
+  assert.ok(typeof si.risk_note === 'string');
+  assert.ok(Array.isArray(si.separation_rules));
+  assert.ok(typeof si.full_study_required === 'boolean');
+  assert.ok(typeof si.nighttime_nif_required === 'boolean');
+});
+
+test('spectrum_interference_summary separation_rules has 3 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const si = out.candidates[0].spectrum_interference_summary;
+  assert.equal(si.separation_rules.length, 3);
+  const ids = si.separation_rules.map(r => r.relationship);
+  assert.ok(ids.includes('CO_CHANNEL'));
+  assert.ok(ids.includes('FIRST_ADJACENT'));
+  assert.ok(ids.includes('SECOND_ADJACENT'));
+});
+
+test('spectrum_interference_summary local channel has LOW risk', async () => {
+  // 1490 kHz is a local channel
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1490, candidate_limit: 2 });
+  const si = out.candidates[0].spectrum_interference_summary;
+  assert.equal(si.is_local_channel, true);
+  assert.equal(si.interference_risk_tier, 'LOW');
+  assert.equal(si.full_study_required, false);
+});
+
+test('spectrum_interference_summary comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('int_risk_tier' in row);
+    assert.ok('int_protected_radius_km' in row);
+    assert.ok('int_nighttime_nif' in row);
+  }
+});

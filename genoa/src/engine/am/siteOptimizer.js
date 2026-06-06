@@ -763,7 +763,10 @@ export async function runSiteOptimizer(body = {}){
     proof_field_days_min:   c.technical_proof_guide?.estimated_field_days?.[0] ?? null,
     acq_critical_items:     c.site_acquisition_checklist?.critical_count ?? null,
     acq_min_parcel_ha:      c.site_acquisition_checklist?.min_parcel_area_ha ?? null,
-    acq_asr_required:       c.site_acquisition_checklist?.asr_required ?? null
+    acq_asr_required:       c.site_acquisition_checklist?.asr_required ?? null,
+    int_risk_tier:          c.spectrum_interference_summary?.interference_risk_tier ?? null,
+    int_protected_radius_km: c.spectrum_interference_summary?.protected_contour_radius_km ?? null,
+    int_nighttime_nif:      c.spectrum_interference_summary?.nighttime_nif_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -4581,6 +4584,118 @@ async function scoreCandidate(pt, ctx, warnings){
         note: 'Site acquisition checklist is a screening-grade planning guide only. Consult real estate attorney, licensed broadcast engineer, and FCC counsel before executing any land agreement. Regulatory timelines are estimates based on typical FCC processing — actual timelines vary.'
       };
     })(),
+
+    // §73.182 spectrum interference self-profile.
+    // Provides per-candidate co-channel / adjacent-channel separation parameters
+    // and risk tier — no actual station database lookup performed at screening stage.
+    spectrum_interference_summary: (() => {
+      // §73.182 protected contour field strengths by class (daytime, mV/m)
+      const PROTECTED_MVM = { A: 5.0, B: 5.0, C: 25.0, D: 5.0 };
+      const protected_mvm = PROTECTED_MVM[fcc_class] ?? 5.0;
+
+      const isClear_si  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_si  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const chanClass_si = frequencyChannelClass(frequency_khz);
+
+      // Helper: call fccAmDistanceKm, return null on error
+      const distKm = (mvm) => {
+        try {
+          const r = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+          return r?.distance_km != null ? round2(r.distance_km) : null;
+        } catch { return null; }
+      };
+
+      const protected_radius_km = distKm(protected_mvm);
+      const reach_05_km         = distKm(0.5);
+      const reach_1_km          = distKm(1.0);
+      const reach_5_km          = distKm(5.0);
+
+      // Separation rules per §73.182 Table of Dominant Station Protection
+      // For screening: first-adjacent protected field = 2× co-channel (less stringent).
+      // Second-adjacent = 6× (far less stringent; primarily near-field blanket concern).
+      const firstAdjRadius_km  = distKm(protected_mvm * 2);
+      const secondAdjRadius_km = distKm(protected_mvm * 6);
+
+      const separationRules = [
+        {
+          relationship:                   'CO_CHANNEL',
+          offset_khz:                     0,
+          description:                    'Same frequency (0 kHz offset)',
+          protected_field_mvm:            protected_mvm,
+          this_station_protected_radius_km: protected_radius_km,
+          screening_note:                 `Any co-channel station whose protected contour overlaps this site must be evaluated. ` +
+                                          `Typical co-channel separation: ${protected_radius_km != null ? round2(protected_radius_km * 2) : 'N/A'}–` +
+                                          `${protected_radius_km != null ? round2(protected_radius_km * 4) : 'N/A'} km from Class B/D secondaries.`
+        },
+        {
+          relationship:                   'FIRST_ADJACENT',
+          offset_khz:                     10,
+          description:                    'Adjacent channel (±10 kHz offset)',
+          protected_field_mvm:            protected_mvm * 2,
+          this_station_protected_radius_km: firstAdjRadius_km,
+          screening_note:                 '§73.182 1st-adjacent: interfering station field must not exceed 50% of the ' +
+                                          'protected station protected-contour field at that boundary. ' +
+                                          'Separation 30–60% of co-channel requirement.'
+        },
+        {
+          relationship:                   'SECOND_ADJACENT',
+          offset_khz:                     20,
+          description:                    'Second adjacent channel (±20 kHz offset)',
+          protected_field_mvm:            protected_mvm * 6,
+          this_station_protected_radius_km: secondAdjRadius_km,
+          screening_note:                 '§73.182 2nd-adjacent: less restrictive; I/D field ratio limits apply. ' +
+                                          'Typically 15–25 km separation from Class A/B at standard power.'
+        }
+      ];
+
+      // Adjacent channels that are §73.25 clear channels (elevated risk)
+      const adjClearKhz = [-10, 10].map(d => frequency_khz + d).filter(f => CLEAR_CHANNEL_KHZ.has(f));
+
+      const risk_tier = isClear_si        ? 'HIGH'
+                      : adjClearKhz.length > 0 ? 'ELEVATED'
+                      : isLocal_si         ? 'LOW'
+                      :                        'MODERATE';
+
+      const risk_note = isClear_si
+        ? `${frequency_khz} kHz is a §73.25 clear channel. Dominant Class A protection rights ` +
+          `create the largest interference footprint; §73.182 skywave NIF study required.`
+        : adjClearKhz.length > 0
+        ? `Adjacent to clear channel(s) ${adjClearKhz.join(', ')} kHz: §73.182 1st-adjacent rules ` +
+          `apply to dominant station protection on those frequencies.`
+        : isLocal_si
+        ? `${frequency_khz} kHz is a §73.27 local channel. Unlimited co-channel sharing permitted; ` +
+          `primary risk is 1st-adjacent interference with regional channel stations.`
+        : `${frequency_khz} kHz is a §73.26 regional channel. Co-channel and 1st-adjacent ` +
+          `§73.182 analysis required from all stations within interfering range.`;
+
+      // Nighttime NIF requirement flag
+      const nighttime_nif_required = isClear_si || (!isLocal_si && fcc_class !== 'C');
+
+      return {
+        frequency_khz,
+        fcc_class,
+        channel_class:              chanClass_si,
+        is_clear_channel:           isClear_si,
+        is_local_channel:           isLocal_si,
+        tpo_kw,
+        sigma_msm,
+        protected_contour_mvm:      protected_mvm,
+        protected_contour_radius_km: protected_radius_km,
+        daytime_secondary_reach_km: reach_05_km,
+        reach_1_mvm_km:             reach_1_km,
+        reach_5_mvm_km:             reach_5_km,
+        interference_risk_tier:     risk_tier,
+        risk_note,
+        adjacent_clear_channels_khz: adjClearKhz,
+        separation_rules:           separationRules,
+        full_study_required:        !isLocal_si,
+        nighttime_nif_required,
+        study_database:             'FCC AM Query — pull all co-channel and ±10/20 kHz stations within 2× protected contour radius from candidate coordinates',
+        reference:                  '47 CFR §73.182; §73.25–73.27; §73.21; OET Bulletin 73',
+        note:                       'Screening-grade interference self-profile. No actual station database lookup performed. Full §73.182 analysis by licensed broadcast engineer required using FCC LMS/AM Query data before any CP filing.'
+      };
+    })(),
+
     treaty_zone,
     fuel_risk:               LABEL_NOT_EVALUATED,
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),

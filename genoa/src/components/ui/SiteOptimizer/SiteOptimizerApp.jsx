@@ -1209,6 +1209,25 @@ const DEMO_RESULT = {
           { id: 'TREATY_SETBACK', category: 'Regulatory', priority: 'INFORMATIONAL', action: 'Verify site is outside international treaty coordination zone', what_to_check: 'No treaty zone detected at screening. Verify final coordinates.', timeline_weeks: [1, 2], notes: null }
         ],
         note: 'Site acquisition checklist is a screening-grade planning guide only. Consult real estate attorney, licensed broadcast engineer, and FCC counsel before executing any land agreement.'
+      },
+      spectrum_interference_summary: {
+        frequency_khz: 780, fcc_class: 'D', channel_class: 'clear_channel',
+        is_clear_channel: true, is_local_channel: false,
+        tpo_kw: 5, sigma_msm: 8,
+        protected_contour_mvm: 5.0, protected_contour_radius_km: 14.3,
+        daytime_secondary_reach_km: 38.7, reach_1_mvm_km: 22.1, reach_5_mvm_km: 14.3,
+        interference_risk_tier: 'HIGH',
+        risk_note: '780 kHz is a §73.25 clear channel. Dominant Class A protection rights create the largest interference footprint; §73.182 skywave NIF study required.',
+        adjacent_clear_channels_khz: [],
+        separation_rules: [
+          { relationship: 'CO_CHANNEL', offset_khz: 0, description: 'Same frequency (0 kHz offset)', protected_field_mvm: 5.0, this_station_protected_radius_km: 14.3, screening_note: 'Any co-channel station whose protected contour overlaps this site must be evaluated. Typical co-channel separation: 28.6–57.2 km from Class B/D secondaries.' },
+          { relationship: 'FIRST_ADJACENT', offset_khz: 10, description: 'Adjacent channel (±10 kHz offset)', protected_field_mvm: 10.0, this_station_protected_radius_km: 8.9, screening_note: '§73.182 1st-adjacent: interfering station field must not exceed 50% of the protected station protected-contour field at that boundary. Separation 30–60% of co-channel requirement.' },
+          { relationship: 'SECOND_ADJACENT', offset_khz: 20, description: 'Second adjacent channel (±20 kHz offset)', protected_field_mvm: 30.0, this_station_protected_radius_km: 3.2, screening_note: '§73.182 2nd-adjacent: less restrictive; I/D field ratio limits apply. Typically 15–25 km separation from Class A/B at standard power.' }
+        ],
+        full_study_required: true, nighttime_nif_required: true,
+        study_database: 'FCC AM Query — pull all co-channel and ±10/20 kHz stations within 2× protected contour radius from candidate coordinates',
+        reference: '47 CFR §73.182; §73.25–73.27; §73.21; OET Bulletin 73',
+        note: 'Screening-grade interference self-profile. No actual station database lookup performed. Full §73.182 analysis by licensed broadcast engineer required using FCC LMS/AM Query data before any CP filing.'
       }
     },
     {

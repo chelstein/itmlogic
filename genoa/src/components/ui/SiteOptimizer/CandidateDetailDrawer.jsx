@@ -2160,6 +2160,66 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Spectrum Interference Summary */}
+        {candidate.spectrum_interference_summary && (() => {
+          const si = candidate.spectrum_interference_summary;
+          const tierColor = t => t === 'HIGH' ? 'text-red-400' : t === 'ELEVATED' ? 'text-amber-400' : t === 'MODERATE' ? 'text-blue-300' : 'text-emerald-400';
+          const tierBg    = t => t === 'HIGH' ? 'bg-red-400/15 border-red-400/40' : t === 'ELEVATED' ? 'bg-amber-400/15 border-amber-400/40' : t === 'MODERATE' ? 'bg-blue-300/15 border-blue-300/40' : 'bg-emerald-400/15 border-emerald-400/40';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.182 Spectrum Interference Profile</div>
+              {/* Risk tier + NIF flag */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${tierBg(si.interference_risk_tier)} ${tierColor(si.interference_risk_tier)}`}>
+                  {si.interference_risk_tier} RISK
+                </span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${si.nighttime_nif_required ? 'bg-amber-400/10 border-amber-400/40 text-amber-400' : 'bg-surface border-rule text-textDim'}`}>
+                  {si.nighttime_nif_required ? 'NIF STUDY REQUIRED' : 'NIF: NOT REQUIRED'}
+                </span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${si.is_clear_channel ? 'bg-red-400/10 border-red-400/40 text-red-400' : si.is_local_channel ? 'bg-emerald-400/10 border-emerald-400/40 text-emerald-400' : 'bg-blue-300/10 border-blue-300/40 text-blue-300'}`}>
+                  {si.channel_class?.replace('_', ' ').toUpperCase() ?? si.channel_class}
+                </span>
+              </div>
+              <div className="font-mono text-[9px] text-textDim mb-2 leading-snug">{si.risk_note}</div>
+              {/* Protected contour + reach metrics */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Protected contour', value: si.protected_contour_mvm != null ? `${si.protected_contour_mvm} mV/m` : '—' },
+                  { label: 'Protected radius', value: si.protected_contour_radius_km != null ? `${si.protected_contour_radius_km} km` : '—' },
+                  { label: '0.5 mV/m reach', value: si.daytime_secondary_reach_km != null ? `${si.daytime_secondary_reach_km} km` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Separation rules table */}
+              <div className="font-mono text-[9px] text-textDim mb-1">§73.182 Separation Rules</div>
+              <div className="space-y-1 mb-2">
+                {si.separation_rules.map(r => (
+                  <div key={r.relationship} className="border border-rule rounded p-1.5 bg-surface/60">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-mono text-[9px] text-textBright font-semibold">{r.relationship.replace(/_/g, ' ')}</span>
+                      <span className="font-mono text-[9px] text-textDim">
+                        protected @ {r.protected_field_mvm} mV/m
+                        {r.this_station_protected_radius_km != null ? ` · ${r.this_station_protected_radius_km} km radius` : ''}
+                      </span>
+                    </div>
+                    <div className="font-mono text-[8px] text-textDim leading-snug">{r.screening_note}</div>
+                  </div>
+                ))}
+              </div>
+              {si.adjacent_clear_channels_khz?.length > 0 && (
+                <div className="font-mono text-[9px] text-amber-400 mb-1">
+                  Adjacent clear channels: {si.adjacent_clear_channels_khz.join(', ')} kHz — §73.182 1st-adjacent rules apply
+                </div>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug">{si.note}</div>
+            </div>
+          );
+        })()}
+
         {/* FCC LMS Filing Checklist */}
         {candidate.fcc_lms_filing_checklist && (() => {
           const fl = candidate.fcc_lms_filing_checklist;

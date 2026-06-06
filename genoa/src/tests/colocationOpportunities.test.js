@@ -784,3 +784,19 @@ test('colocation GRID candidates have site_acquisition_checklist', async () => {
     assert.ok(c.site_acquisition_checklist.critical_count > 0, `rank ${c.rank} critical_count must be > 0`);
   }
 });
+
+test('colocation GRID candidates have spectrum_interference_summary', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.spectrum_interference_summary != null, `rank ${c.rank} missing spectrum_interference_summary`);
+    assert.ok(['HIGH','ELEVATED','MODERATE','LOW'].includes(c.spectrum_interference_summary.interference_risk_tier),
+              `rank ${c.rank} invalid interference_risk_tier`);
+    assert.equal(c.spectrum_interference_summary.separation_rules.length, 3, `rank ${c.rank} must have 3 separation rules`);
+  }
+});
