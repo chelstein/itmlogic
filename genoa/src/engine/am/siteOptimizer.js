@@ -931,6 +931,9 @@ export async function runSiteOptimizer(body = {}){
     apvg_seasonal_var_pct:  c.am_propagation_variability_guide?.seasonal_variation?.worst_case_change_pct ?? null,
     apvg_skip_zone_km:      c.am_propagation_variability_guide?.ionospheric_skip?.min_skip_distance_km ?? null,
     apvg_night_boost_db:    c.am_propagation_variability_guide?.ionospheric_skip?.typical_night_boost_db ?? null,
+    ssc_silent_weeks_max:   c.silent_station_consideration?.silent_authorization?.max_silent_weeks ?? null,
+    ssc_cp_construction_wks: c.silent_station_consideration?.construction_timeline?.construction_weeks_typical ?? null,
+    ssc_license_risk:       c.silent_station_consideration?.license_risk_level ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6665,6 +6668,77 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    silent_station_consideration: (() => {
+      // §73.1740: FCC rules on silent stations and authorizations
+      // §73.1750: Discontinuance of operation (voluntary or involuntary)
+      // §73.3534: Silent STA (Special Temporary Authorization) procedures
+      // §1.65: Disclosure obligation for changed circumstances in pending applications
+      //
+      // AM relocation projects typically require the station to go silent for
+      // 4–16 weeks during tower removal, site preparation, and new tower construction.
+      // Stations may not remain silent more than 12 months without CP cancellation risk.
+
+      // Initial silent STA: 30-day authority, renewable up to 12 months total
+      // Stations silent > 30 days must file STA request FCC Form 319/2100
+      // If silent > 12 months: FCC may cancel license or CP per §73.1740(a)
+      const MAX_SILENT_WEEKS = 52; // 12 months
+
+      // Construction timeline for AM relocation (estimates based on CP history)
+      const CONSTRUCTION_STEPS = [
+        { id: 'ZONING_AND_PERMITS', label: 'Zoning approval and building permits', weeks_low: 4, weeks_high: 26, required: true, notes: 'Varies widely by jurisdiction; tower > 200 ft may require conditional use permit' },
+        { id: 'SITE_PREP',          label: 'Site preparation (clearing, access, ground system)', weeks_low: 2, weeks_high: 6, required: true, notes: 'Ground radial installation is critical path item; 120 radials minimum' },
+        { id: 'FOUNDATION',         label: 'Tower foundation and anchor construction', weeks_low: 2, weeks_high: 5, required: true, notes: 'Concrete cure time 28 days minimum before tower erection' },
+        { id: 'TOWER_ERECT',        label: 'Tower erection and climbing crew', weeks_low: 1, weeks_high: 3, required: true, notes: 'Crane required for towers > 200 ft; FAA NOTAM required during erection' },
+        { id: 'TUNE_AND_PROOF',     label: 'Antenna tuning, base impedance, DA proof if required', weeks_low: 2, weeks_high: 6, required: true, notes: 'DA proof: 72-radial field intensity traversals per §73.154; 2-4 weeks for pattern verification' },
+        { id: 'LIC_TO_COVER',       label: 'FCC license to cover review (Form 302-AM)', weeks_low: 4, weeks_high: 16, required: true, notes: 'FCC processing; applicant may begin operation upon filing if CP conditions met' }
+      ];
+      const construction_weeks_typical = CONSTRUCTION_STEPS.reduce((s, step) => s + Math.round((step.weeks_low + step.weeks_high) / 2), 0);
+      const construction_weeks_min     = CONSTRUCTION_STEPS.reduce((s, step) => s + step.weeks_low, 0);
+      const construction_weeks_max     = CONSTRUCTION_STEPS.reduce((s, step) => s + step.weeks_high, 0);
+
+      // Risk assessment: does typical construction exceed the 12-month silent limit?
+      const exceeds_silent_limit = construction_weeks_typical > MAX_SILENT_WEEKS;
+      const license_risk_level = exceeds_silent_limit ? 'HIGH' : construction_weeks_max > MAX_SILENT_WEEKS ? 'MODERATE' : 'LOW';
+
+      // STA (Special Temporary Authority) options
+      const STA_OPTIONS = [
+        { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.3534(b))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
+        { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 290, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
+        { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 290, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
+      ];
+
+      // Risk mitigation strategies
+      const MITIGATIONS = [
+        { id: 'OVERLAP_WINDOW', label: 'Overlap construction with existing site operation', notes: 'Build new tower while operating at old site; file CP for new site, operate old until LTC granted. Avoids silent period entirely.' },
+        { id: 'STAGGER_PERMITS', label: 'Accelerate zoning/permit phase before CP filing', notes: 'Begin local permitting and land work before or concurrent with FCC CP application. Reduces critical-path duration.' },
+        { id: 'PREFAB_TOWER',   label: 'Pre-fabricated guyed tower for faster erection', notes: 'Reduces erection phase from 3 to 1-2 weeks. Useful for standard heights < 300 ft.' },
+        { id: 'INTERIM_CP',     label: 'File for interim CP on existing site as backup', notes: 'If new site falls through, interim authority to modify existing site preserves continuity. Dual-track approach.' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        silent_authorization: {
+          max_silent_weeks: MAX_SILENT_WEEKS,
+          initial_sta_form: 'FCC Form 2100',
+          sta_options: STA_OPTIONS,
+          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.3534(b)',
+          cancellation_risk: 'CP or license may be cancelled after 12 months of silence per §73.1740(a)'
+        },
+        construction_timeline: {
+          steps: CONSTRUCTION_STEPS,
+          construction_weeks_min,
+          construction_weeks_typical,
+          construction_weeks_max
+        },
+        license_risk_level,
+        exceeds_silent_limit,
+        mitigation_strategies: MITIGATIONS,
+        n_mitigation_strategies: MITIGATIONS.length,
+        reference: '47 CFR §73.1740; §73.1750; §73.3534; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
+        note: `Construction: ${construction_weeks_min}–${construction_weeks_max} wks (typical ${construction_weeks_typical} wks). Max silent: ${MAX_SILENT_WEEKS} wks. License risk: ${license_risk_level}.`
       };
     })(),
 

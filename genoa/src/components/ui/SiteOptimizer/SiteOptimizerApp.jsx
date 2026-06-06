@@ -1717,6 +1717,42 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      silent_station_consideration: {
+        frequency_khz: 780, fcc_class: 'D',
+        silent_authorization: {
+          max_silent_weeks: 52,
+          initial_sta_form: 'FCC Form 2100',
+          sta_options: [
+            { id: 'INITIAL_STA', label: 'Initial 30-day STA (§73.3534(b))', form: 'FCC Form 2100 / FCC Form 319 (legacy)', fee_usd: 290, duration_weeks: 4, notes: 'Must demonstrate good cause; file before going silent or within 10 days' },
+            { id: 'RENEWAL_STA', label: 'STA renewal (each 6-month extension)', form: 'STA renewal request (informal letter acceptable)', fee_usd: 290, duration_weeks: 26, notes: 'FCC will grant up to 12 months total absent extraordinary circumstances' },
+            { id: 'REDUCED_POWER', label: 'Reduced power STA (interim operation during construction)', form: 'FCC Form 2100', fee_usd: 290, duration_weeks: null, notes: 'Allows partial operation during construction; must protect co-channel/adjacent allocations' }
+          ],
+          filing_requirement: 'STA required for silent period > 30 days; file FCC Form 2100 citing §73.3534(b)',
+          cancellation_risk: 'CP or license may be cancelled after 12 months of silence per §73.1740(a)'
+        },
+        construction_timeline: {
+          steps: [
+            { id: 'ZONING_AND_PERMITS', label: 'Zoning approval and building permits', weeks_low: 4, weeks_high: 26, required: true, notes: 'Varies widely by jurisdiction; tower > 200 ft may require conditional use permit' },
+            { id: 'SITE_PREP', label: 'Site preparation (clearing, access, ground system)', weeks_low: 2, weeks_high: 6, required: true, notes: 'Ground radial installation is critical path item; 120 radials minimum' },
+            { id: 'FOUNDATION', label: 'Tower foundation and anchor construction', weeks_low: 2, weeks_high: 5, required: true, notes: 'Concrete cure time 28 days minimum before tower erection' },
+            { id: 'TOWER_ERECT', label: 'Tower erection and climbing crew', weeks_low: 1, weeks_high: 3, required: true, notes: 'Crane required for towers > 200 ft; FAA NOTAM required during erection' },
+            { id: 'TUNE_AND_PROOF', label: 'Antenna tuning, base impedance, DA proof if required', weeks_low: 2, weeks_high: 6, required: true, notes: 'DA proof: 72-radial field intensity traversals per §73.154; 2-4 weeks for pattern verification' },
+            { id: 'LIC_TO_COVER', label: 'FCC license to cover review (Form 302-AM)', weeks_low: 4, weeks_high: 16, required: true, notes: 'FCC processing; applicant may begin operation upon filing if CP conditions met' }
+          ],
+          construction_weeks_min: 15, construction_weeks_typical: 32, construction_weeks_max: 62
+        },
+        license_risk_level: 'MODERATE',
+        exceeds_silent_limit: false,
+        mitigation_strategies: [
+          { id: 'OVERLAP_WINDOW', label: 'Overlap construction with existing site operation', notes: 'Build new tower while operating at old site; file CP for new site, operate old until LTC granted. Avoids silent period entirely.' },
+          { id: 'STAGGER_PERMITS', label: 'Accelerate zoning/permit phase before CP filing', notes: 'Begin local permitting and land work before or concurrent with FCC CP application. Reduces critical-path duration.' },
+          { id: 'PREFAB_TOWER', label: 'Pre-fabricated guyed tower for faster erection', notes: 'Reduces erection phase from 3 to 1-2 weeks. Useful for standard heights < 300 ft.' },
+          { id: 'INTERIM_CP', label: 'File for interim CP on existing site as backup', notes: 'If new site falls through, interim authority to modify existing site preserves continuity. Dual-track approach.' }
+        ],
+        n_mitigation_strategies: 4,
+        reference: '47 CFR §73.1740; §73.1750; §73.3534; §1.65; FCC Form 2100; FCC Form 319 (legacy); §73.154',
+        note: 'Construction: 15–62 wks (typical 32 wks). Max silent: 52 wks. License risk: MODERATE.'
+      },
       am_propagation_variability_guide: {
         frequency_khz: 780, fcc_class: 'D', sigma_msm: 8,
         channel_type: 'CLEAR',

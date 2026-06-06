@@ -5683,6 +5683,58 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- silent_station_consideration ----
+
+test('silent_station_consideration presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.silent_station_consideration != null, 'silent_station_consideration missing');
+  const s = c.silent_station_consideration;
+  assert.ok(s.silent_authorization != null, 'silent_authorization block missing');
+  assert.ok(s.construction_timeline != null, 'construction_timeline block missing');
+  assert.ok(Array.isArray(s.mitigation_strategies), 'mitigation_strategies must be array');
+  assert.ok(s.mitigation_strategies.length >= 3, 'at least 3 mitigation strategies expected');
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(s.license_risk_level), 'license_risk_level must be LOW/MODERATE/HIGH');
+});
+
+test('silent_station_consideration max silent period is 52 weeks', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].silent_station_consideration;
+  assert.strictEqual(s.silent_authorization.max_silent_weeks, 52, 'max silent must be 52 weeks (12 months per §73.1740)');
+  assert.ok(typeof s.silent_authorization.cancellation_risk === 'string', 'cancellation_risk must be string');
+});
+
+test('silent_station_consideration construction timeline has required steps', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ct = out.candidates[0].silent_station_consideration.construction_timeline;
+  assert.ok(Array.isArray(ct.steps) && ct.steps.length >= 4, 'must have at least 4 construction steps');
+  assert.ok(ct.construction_weeks_min > 0, 'construction_weeks_min must be positive');
+  assert.ok(ct.construction_weeks_max >= ct.construction_weeks_min, 'max must be >= min');
+  assert.ok(ct.construction_weeks_typical > 0, 'construction_weeks_typical must be positive');
+  const hasTuneStep = ct.steps.some(s => s.id === 'TUNE_AND_PROOF');
+  assert.ok(hasTuneStep, 'must include TUNE_AND_PROOF step for DA proof');
+});
+
+test('silent_station_consideration STA options include initial and renewal', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const sa = out.candidates[0].silent_station_consideration.silent_authorization;
+  assert.ok(Array.isArray(sa.sta_options) && sa.sta_options.length >= 2, 'must have at least 2 STA options');
+  const hasInitial = sa.sta_options.some(o => o.id === 'INITIAL_STA');
+  const hasRenewal = sa.sta_options.some(o => o.id === 'RENEWAL_STA');
+  assert.ok(hasInitial, 'must include INITIAL_STA option');
+  assert.ok(hasRenewal, 'must include RENEWAL_STA option');
+  assert.ok(sa.sta_options.every(o => o.fee_usd > 0 || o.fee_usd === null), 'STA fees must be positive or null');
+});
+
+test('silent_station_consideration comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ssc_silent_weeks_max' in row, 'ssc_silent_weeks_max missing from comparison table');
+    assert.ok('ssc_cp_construction_wks' in row, 'ssc_cp_construction_wks missing from comparison table');
+    assert.ok('ssc_license_risk' in row, 'ssc_license_risk missing from comparison table');
+  }
+});
+
 // ---- operational_monitoring_requirements ----
 
 test('operational_monitoring_requirements is present on each candidate', async () => {

@@ -2226,6 +2226,65 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Silent Station Consideration */}
+        {candidate.silent_station_consideration && (() => {
+          const s = candidate.silent_station_consideration;
+          const ct = s.construction_timeline || {};
+          const sa = s.silent_authorization || {};
+          const riskColors = { LOW: '#34d399', MODERATE: '#fbbf24', HIGH: '#f87171' };
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Silent Station & Construction (§73.1740 / §73.3534)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>License Risk</span>
+                  <span style={{ color: riskColors[s.license_risk_level] || '#e2e8f0', fontWeight: 700 }}>{s.license_risk_level}</span>
+                  <span style={{ color: '#94a3b8' }}>Max Silent</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{sa.max_silent_weeks} weeks (§73.1740)</span>
+                  <span style={{ color: '#94a3b8' }}>Build: Typical</span>
+                  <span style={{ color: ct.construction_weeks_typical > 52 ? '#f87171' : '#34d399', fontWeight: 700 }}>{ct.construction_weeks_typical} weeks</span>
+                  <span style={{ color: '#94a3b8' }}>Build: Range</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{ct.construction_weeks_min}–{ct.construction_weeks_max} weeks</span>
+                  <span style={{ color: '#94a3b8' }}>STA Form</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{sa.initial_sta_form}</span>
+                </div>
+                {s.exceeds_silent_limit && (
+                  <div style={{ color: '#f87171', fontSize: 11, marginTop: 6, fontWeight: 600 }}>
+                    ⚠ Typical construction may exceed 12-month silent limit — mitigation required
+                  </div>
+                )}
+              </div>
+              {/* Construction Steps */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>CONSTRUCTION PHASES</div>
+                {(ct.steps || []).map(step => (
+                  <div key={step.id} style={{ background: '#020c18', borderRadius: 4, padding: '5px 10px', marginBottom: 4, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{step.label}</span>
+                      <span style={{ color: '#fbbf24', fontSize: 11, fontWeight: 700 }}>{step.weeks_low}–{step.weeks_high} wks</span>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: 10, marginTop: 2 }}>{step.notes}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Mitigation Strategies */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>MITIGATION STRATEGIES</div>
+                {(s.mitigation_strategies || []).slice(0, 3).map(m => (
+                  <div key={m.id} style={{ background: '#020c18', borderRadius: 4, padding: '5px 10px', marginBottom: 4, fontSize: 12 }}>
+                    <div style={{ color: '#34d399', fontWeight: 600, marginBottom: 2 }}>{m.label}</div>
+                    <div style={{ color: '#64748b', fontSize: 11 }}>{m.notes}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{s.reference}</div>
+              {s.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{s.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Propagation Variability Guide */}
         {candidate.am_propagation_variability_guide && (() => {
           const g = candidate.am_propagation_variability_guide;
