@@ -5006,3 +5006,58 @@ test('spectrum_interference_summary comparison table columns populated', async (
     assert.ok('int_nighttime_nif' in row);
   }
 });
+
+// ---- colocation_compatibility_score ----
+
+test('colocation_compatibility_score is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.colocation_compatibility_score != null, `rank ${c.rank} missing colocation_compatibility_score`);
+  }
+});
+
+test('colocation_compatibility_score has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const cc = out.candidates[0].colocation_compatibility_score;
+  assert.ok(typeof cc.frequency_khz === 'number');
+  assert.ok(typeof cc.tpo_kw === 'number');
+  assert.ok(typeof cc.quarter_wave_m === 'number');
+  assert.ok(Array.isArray(cc.host_scores));
+  assert.ok(typeof cc.best_host_type === 'string');
+  assert.ok(typeof cc.best_host_score === 'number');
+  assert.ok(typeof cc.best_host_tier === 'string');
+  assert.equal(typeof cc.diplexing_always_required, 'boolean');
+});
+
+test('colocation_compatibility_score has 5 host types', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cc = out.candidates[0].colocation_compatibility_score;
+  assert.equal(cc.host_scores.length, 5);
+  const ids = cc.host_scores.map(h => h.host_type);
+  assert.ok(ids.includes('AM_SITE'));
+  assert.ok(ids.includes('FM_TX'));
+  assert.ok(ids.includes('CELLULAR'));
+  assert.ok(ids.includes('WATER_TOWER'));
+  assert.ok(ids.includes('BUILDING_ROOFTOP'));
+});
+
+test('colocation_compatibility_score each host has score, tier, risks, benefits', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cc = out.candidates[0].colocation_compatibility_score;
+  for (const h of cc.host_scores) {
+    assert.ok(typeof h.score === 'number', `${h.host_type} score must be number`);
+    assert.ok(['GOOD', 'FAIR', 'POOR'].includes(h.compatibility_tier), `${h.host_type} invalid tier`);
+    assert.ok(Array.isArray(h.risks), `${h.host_type} missing risks`);
+    assert.ok(Array.isArray(h.benefits), `${h.host_type} missing benefits`);
+  }
+});
+
+test('colocation_compatibility_score comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('coloc_best_host' in row);
+    assert.ok('coloc_best_score' in row);
+    assert.ok('coloc_best_tier' in row);
+  }
+});

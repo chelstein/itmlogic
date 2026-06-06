@@ -800,3 +800,19 @@ test('colocation GRID candidates have spectrum_interference_summary', async () =
     assert.equal(c.spectrum_interference_summary.separation_rules.length, 3, `rank ${c.rank} must have 3 separation rules`);
   }
 });
+
+test('colocation GRID candidates have colocation_compatibility_score', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.colocation_compatibility_score != null, `rank ${c.rank} missing colocation_compatibility_score`);
+    assert.equal(c.colocation_compatibility_score.host_scores.length, 5, `rank ${c.rank} must have 5 host scores`);
+    assert.ok(['GOOD','FAIR','POOR'].includes(c.colocation_compatibility_score.best_host_tier),
+              `rank ${c.rank} invalid best_host_tier`);
+  }
+});

@@ -2129,6 +2129,52 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Co-location Compatibility Score */}
+        {candidate.colocation_compatibility_score && (() => {
+          const cc = candidate.colocation_compatibility_score;
+          const tierColor = t => t === 'GOOD' ? 'text-emerald-400' : t === 'FAIR' ? 'text-amber-400' : 'text-red-400';
+          const tierBg    = t => t === 'GOOD' ? 'bg-emerald-400/15 border-emerald-400/40' : t === 'FAIR' ? 'bg-amber-400/15 border-amber-400/40' : 'bg-red-400/15 border-red-400/40';
+          const scoreBar  = (score) => {
+            const pct = Math.min(100, Math.max(0, score));
+            const col  = score >= 75 ? '#34d399' : score >= 55 ? '#fbbf24' : '#f87171';
+            return <div className="h-1 rounded-full bg-rule mt-0.5"><div className="h-1 rounded-full" style={{ width: `${pct}%`, backgroundColor: col }} /></div>;
+          };
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Co-location Compatibility</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="font-mono text-[9px] text-textDim">Best host:</span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${tierBg(cc.best_host_tier)} ${tierColor(cc.best_host_tier)}`}>
+                  {cc.best_host_type?.replace(/_/g, ' ')} — {cc.best_host_score}/100
+                </span>
+                <span className="font-mono text-[9px] text-amber-400 px-1 py-0.5 bg-amber-400/10 border border-amber-400/30 rounded">
+                  DIPLEXER REQUIRED
+                </span>
+              </div>
+              <div className="space-y-1.5 mb-2">
+                {cc.host_scores.map(h => (
+                  <div key={h.host_type} className="border border-rule rounded p-1.5 bg-surface/60">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-mono text-[9px] text-textBright font-semibold">{h.label}</span>
+                      <span className={`font-mono text-[9px] font-bold ${tierColor(h.compatibility_tier)}`}>{h.score}/100 {h.compatibility_tier}</span>
+                    </div>
+                    {scoreBar(h.score)}
+                    <div className="mt-1 space-y-0.5">
+                      {h.benefits.slice(0, 1).map((b, i) => (
+                        <div key={i} className="font-mono text-[8px] text-emerald-400 leading-snug">✓ {b}</div>
+                      ))}
+                      {h.risks.slice(0, 2).map((r, i) => (
+                        <div key={i} className="font-mono text-[8px] text-amber-400/80 leading-snug">⚠ {r}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{cc.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Site Acquisition Checklist */}
         {candidate.site_acquisition_checklist && (() => {
           const sa = candidate.site_acquisition_checklist;

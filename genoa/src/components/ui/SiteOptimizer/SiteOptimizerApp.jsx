@@ -1228,6 +1228,30 @@ const DEMO_RESULT = {
         study_database: 'FCC AM Query — pull all co-channel and ±10/20 kHz stations within 2× protected contour radius from candidate coordinates',
         reference: '47 CFR §73.182; §73.25–73.27; §73.21; OET Bulletin 73',
         note: 'Screening-grade interference self-profile. No actual station database lookup performed. Full §73.182 analysis by licensed broadcast engineer required using FCC LMS/AM Query data before any CP filing.'
+      },
+      colocation_compatibility_score: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, quarter_wave_m: 96.2, blanket_1000mvm_km: 0.31,
+        best_host_type: 'AM_SITE', best_host_score: 85, best_host_tier: 'GOOD',
+        diplexing_always_required: true,
+        host_scores: [
+          { host_type: 'AM_SITE', label: 'Existing AM Tower Farm', score: 85, compatibility_tier: 'GOOD',
+            benefits: ['Existing radial ground system may be shareable (§73.190 engineering review required)', 'Experienced AM site operator; FCC ASR likely already registered'],
+            risks: ['Diplexing filter required (§73.1675) — adds $15–60k to project; potential intermodulation products', 'Clear channel: nighttime skywave from host station may complicate §73.182 NIF analysis'] },
+          { host_type: 'FM_TX', label: 'FM Transmitter Site', score: 70, compatibility_tier: 'FAIR',
+            benefits: ['FM transmitter sites often have large parcels with ground system space', 'AM and FM bands have large separation — minimal direct RF coupling'],
+            risks: ['FM antenna tower may not be suitable for AM base-fed monopole — structural review required', 'FM transmitters generate harmonics — AM front-end must be verified clean of FM IIs'] },
+          { host_type: 'CELLULAR', label: 'Cellular Tower', score: 55, compatibility_tier: 'FAIR',
+            benefits: ['FAA lighting and marking often already in place; ASR typically registered', 'Site lease infrastructure exists; power and access road available'],
+            risks: ['Structural analysis required — AM antenna + guy wires incompatible with self-supporting lattice towers', 'Cellular band RF from BTS equipment may couple into AM ground system (shield/filter required)'] },
+          { host_type: 'WATER_TOWER', label: 'Water Tower / Tank', score: 45, compatibility_tier: 'POOR',
+            benefits: ['Elevated AM antenna on water tank can improve coverage without full λ/4 tower'],
+            risks: ['Water tank structure not designed for AM antenna loads — detailed structural engineering required', 'Ground radial system cannot be buried under paved/concrete municipal facility areas'] },
+          { host_type: 'BUILDING_ROOFTOP', label: 'Building Rooftop', score: 20, compatibility_tier: 'POOR',
+            benefits: [],
+            risks: ['No buried ground radial system possible — counterpoise required with efficiency penalty', 'Building RF re-radiation and structural coupling requires extensive near-field measurements'] }
+        ],
+        reference: '47 CFR §73.1675; §73.182; §73.190; FCC Form 854; OET Bulletin 65',
+        note: 'Compatibility scores are site-parameter-driven screening estimates. No actual infrastructure inventory lookup performed. Engage a licensed broadcast engineer for structural, RF, and lease compatibility verification before co-location commitment.'
       }
     },
     {

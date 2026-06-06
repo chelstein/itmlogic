@@ -766,7 +766,10 @@ export async function runSiteOptimizer(body = {}){
     acq_asr_required:       c.site_acquisition_checklist?.asr_required ?? null,
     int_risk_tier:          c.spectrum_interference_summary?.interference_risk_tier ?? null,
     int_protected_radius_km: c.spectrum_interference_summary?.protected_contour_radius_km ?? null,
-    int_nighttime_nif:      c.spectrum_interference_summary?.nighttime_nif_required ?? null
+    int_nighttime_nif:      c.spectrum_interference_summary?.nighttime_nif_required ?? null,
+    coloc_best_host:        c.colocation_compatibility_score?.best_host_type ?? null,
+    coloc_best_score:       c.colocation_compatibility_score?.best_host_score ?? null,
+    coloc_best_tier:        c.colocation_compatibility_score?.best_host_tier ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -4693,6 +4696,135 @@ async function scoreCandidate(pt, ctx, warnings){
         study_database:             'FCC AM Query — pull all co-channel and ±10/20 kHz stations within 2× protected contour radius from candidate coordinates',
         reference:                  '47 CFR §73.182; §73.25–73.27; §73.21; OET Bulletin 73',
         note:                       'Screening-grade interference self-profile. No actual station database lookup performed. Full §73.182 analysis by licensed broadcast engineer required using FCC LMS/AM Query data before any CP filing.'
+      };
+    })(),
+
+    // Co-location compatibility scoring for this candidate site.
+    // Scores the site against 5 common infrastructure host types per FCC §73.1675,
+    // structural engineering practice, and AM broadcast co-site RF considerations.
+    // No actual infrastructure database lookup — this is a site-parameter-driven assessment.
+    colocation_compatibility_score: (() => {
+      const isClear_cc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_cc  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const qwM_cc      = round2((300000 / frequency_khz) / 4);   // λ/4 in meters
+      const isHighPow   = tpo_kw >= 25;
+      const isMedPow    = tpo_kw >= 5 && tpo_kw < 25;
+      const isLowPow    = tpo_kw < 5;
+
+      // Blanket zone radius — 1000 mV/m contour at proposed power.
+      // Used to assess RF isolation requirements for co-located equipment.
+      let blanket1000_km_cc = null;
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        blanket1000_km_cc = r?.distance_km != null ? round2(r.distance_km) : null;
+      } catch { /* ok */ }
+
+      // AM_SITE (existing AM tower farm): best ground system sharing, worst RF isolation
+      const amSiteScore = (() => {
+        let score = 85;
+        let risks = [];
+        let benefits = [];
+        benefits.push('Existing radial ground system may be shareable (§73.190 engineering review required)');
+        benefits.push('Experienced AM site operator; FCC ASR likely already registered');
+        // Diplexing required when frequencies are within ±20 kHz (same-band)
+        // Risk scales with power ratio and frequency offset
+        const deltaNeeded = 20; // kHz minimum offset for diplexer feasibility
+        risks.push('Diplexing filter required (§73.1675) — adds $15–60k to project; potential intermodulation products');
+        if (isHighPow) { score -= 10; risks.push('High TPO (≥25 kW) limits diplexer options — custom filter likely required'); }
+        if (isClear_cc) { score -= 8; risks.push('Clear channel: nighttime skywave from host station may complicate §73.182 NIF analysis'); }
+        return { score: Math.max(0, Math.min(100, score)), benefits, risks };
+      })();
+
+      // CELLULAR (cell tower): common host; structural concerns; RF isolation critical
+      const cellularScore = (() => {
+        let score = 65;
+        let risks = [];
+        let benefits = [];
+        benefits.push('FAA lighting and marking often already in place; ASR typically registered');
+        benefits.push('Site lease infrastructure exists; power and access road available');
+        risks.push('Structural analysis required — AM antenna + guy wires incompatible with self-supporting lattice towers');
+        risks.push('Cellular band RF from BTS equipment may couple into AM ground system (shield/filter required)');
+        risks.push('AM ground system radials cannot share same footprint as cellular equipment foundations');
+        if (!isLowPow) {
+          score -= 10;
+          risks.push(`AM transmitter ${tpo_kw} kW may create interference to cellular equipment within ${blanket1000_km_cc ?? '?'} km`);
+        }
+        if (qwM_cc > 80) { score -= 5; risks.push(`λ/4 tower (${qwM_cc} m) may not be practical on cellular mast — structural upgrade likely`); }
+        return { score: Math.max(0, Math.min(100, score)), benefits, risks };
+      })();
+
+      // FM_TX (FM transmitter site): most compatible non-AM host; different band
+      const fmTxScore = (() => {
+        let score = 75;
+        let risks = [];
+        let benefits = [];
+        benefits.push('FM transmitter sites often have large parcels with ground system space');
+        benefits.push('Power infrastructure (3-phase) already in place; broadcast-experienced operators');
+        benefits.push('AM and FM bands have large separation (530–1700 kHz vs 87.9–107.9 MHz) — minimal direct RF coupling');
+        risks.push('FM antenna tower may not be suitable for AM base-fed monopole — structural review required');
+        risks.push('FM transmitters generate harmonics — AM front-end must be verified clean of FM IIs');
+        if (isHighPow) { risks.push('High-power AM transmitter heat and physical footprint may conflict with existing FM equipment room'); }
+        if (isClear_cc) { score -= 5; risks.push('Skywave coverage pattern may conflict with FM tower shadow in nighttime NIF study'); }
+        return { score: Math.max(0, Math.min(100, score)), benefits, risks };
+      })();
+
+      // WATER_TOWER: elevated AM antenna option; structural limits on antenna weight
+      const waterTowerScore = (() => {
+        let score = 55;
+        let risks = [];
+        let benefits = [];
+        benefits.push('Elevated AM antenna on water tank can improve coverage without full λ/4 tower');
+        benefits.push('Municipalities often receptive to leasing — steady income; existing access road/utilities');
+        risks.push('Water tank structure not designed for AM antenna loads — detailed structural engineering required');
+        risks.push('Ground radial system cannot be buried under paved/concrete municipal facility areas');
+        risks.push('AM antenna on water tank is a "top-loaded" shortened monopole — efficiency penalty vs full λ/4');
+        risks.push('Public water facility — NEPA / environmental coordination with water authority required');
+        if (isHighPow) { score -= 15; risks.push('High TPO (≥25 kW) rarely compatible with water tower structural and RF safety constraints'); }
+        if (qwM_cc > 100) { score -= 10; risks.push(`Full λ/4 at ${frequency_khz} kHz (${qwM_cc} m) is impractical on most water towers — shortened antenna with loading coil required`); }
+        return { score: Math.max(0, Math.min(100, score)), benefits, risks };
+      })();
+
+      // BUILDING_ROOFTOP: highest RF coupling risk; ground system impossible; low power only
+      const rooftopScore = (() => {
+        let score = isLowPow ? 45 : 20;
+        let risks = [];
+        let benefits = [];
+        if (isLowPow) {
+          benefits.push('Low-power AM on rooftop is technically feasible with base-insulated whip and counterpoise');
+          benefits.push('Avoids new tower construction — advantageous in urban markets');
+        }
+        risks.push('No buried ground radial system possible — counterpoise or elevated radials required with efficiency penalty');
+        risks.push('Building RF re-radiation and structural coupling requires extensive near-field measurements');
+        risks.push('§73.182 groundwave curves assume a flat, unobstructed earth — building-mounted predictions unreliable');
+        risks.push('Structural loading, lightning protection, and lease access constraints significant');
+        if (!isLowPow) { risks.push(`TPO ${tpo_kw} kW from rooftop antenna creates §73.24(g) blanket zone inside building — MPE compliance and RF safety study essential`); }
+        if (isClear_cc) { score -= 15; risks.push('Clear channel skywave analysis with building-mounted antenna is non-standard — FCC may require alternative site study'); }
+        return { score: Math.max(0, Math.min(100, score)), benefits, risks };
+      })();
+
+      const hosts = [
+        { host_type: 'AM_SITE',          label: 'Existing AM Tower Farm',       ...amSiteScore },
+        { host_type: 'FM_TX',            label: 'FM Transmitter Site',          ...fmTxScore   },
+        { host_type: 'CELLULAR',         label: 'Cellular Tower',               ...cellularScore },
+        { host_type: 'WATER_TOWER',      label: 'Water Tower / Tank',           ...waterTowerScore },
+        { host_type: 'BUILDING_ROOFTOP', label: 'Building Rooftop',             ...rooftopScore }
+      ].map(h => ({ ...h, compatibility_tier: h.score >= 75 ? 'GOOD' : h.score >= 55 ? 'FAIR' : 'POOR' }));
+
+      const best = hosts.reduce((a, b) => b.score > a.score ? b : a);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        quarter_wave_m: qwM_cc,
+        blanket_1000mvm_km: blanket1000_km_cc,
+        host_scores: hosts,
+        best_host_type: best.host_type,
+        best_host_score: best.score,
+        best_host_tier: best.compatibility_tier,
+        diplexing_always_required: true,
+        reference: '47 CFR §73.1675 (AM directional antenna systems); §73.182; §73.190; FCC Form 854 (ASR); OET Bulletin 65',
+        note: 'Compatibility scores are site-parameter-driven screening estimates. No actual infrastructure inventory lookup performed. Engage a licensed broadcast engineer for structural, RF, and lease compatibility verification before co-location commitment.'
       };
     })(),
 
