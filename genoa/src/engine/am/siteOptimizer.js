@@ -858,7 +858,10 @@ export async function runSiteOptimizer(body = {}){
     tower_faa_tier:         c.tower_lighting_marking_guide?.faa_lighting_tier ?? null,
     mpe_compliance_status:  c.rf_exposure_mpe_analysis?.compliance_status ?? null,
     mpe_excl_radius_m:      c.rf_exposure_mpe_analysis?.exclusion_radius_m ?? null,
-    mpe_eval_required:      c.rf_exposure_mpe_analysis?.evaluation_required ?? null
+    mpe_eval_required:      c.rf_exposure_mpe_analysis?.evaluation_required ?? null,
+    reloc_cost_low:         c.station_relocation_cost_estimator?.total_low ?? null,
+    reloc_cost_high:        c.station_relocation_cost_estimator?.total_high ?? null,
+    reloc_cost_midpoint:    c.station_relocation_cost_estimator?.total_midpoint ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8231,6 +8234,96 @@ async function scoreCandidate(pt, ctx, warnings){
         monitoring_requirement:         monitoringReq,
         reference: '47 CFR §1.1310; §1.1307(b); §73.49; FCC OET Bulletin 65 (Ed. 97-01); IEEE C95.1-2019',
         note: `RF exposure: ${complianceStatus}. ERP ${tpo_kw} kW ${evaluationRequired_mpe ? '≥' : '<'} ${EVAL_THRESHOLD_KW_mpe} kW threshold. Exclusion zone: ≥ ${exclusionRadius_m} m radius.`
+      };
+    })(),
+
+    station_relocation_cost_estimator: (() => {
+      // Comprehensive pre-move budget for AM station relocation
+      // Costs scale with TPO and class; Class A/B have larger towers and more radials
+      const isDA_cost  = /^DA/i.test(pattern_mode);
+      const isClear_cost= CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const lambda_cost = round2(300000 / frequency_khz);
+
+      // 1. Land / site costs
+      const landCostLow  = 50000;
+      const landCostHigh = 250000; // wide range: rural vs suburban
+
+      // 2. Tower costs: scales with height (≈ 3/8λ) and class
+      const towerH_m = round2(0.375 * lambda_cost);
+      const baseTowerCostPerM = 2200; // USD/m installed (guy-wire self-supporting)
+      const towerCostLow  = round2(towerH_m * baseTowerCostPerM * 0.8);
+      const towerCostHigh = round2(towerH_m * baseTowerCostPerM * 1.6);
+
+      // 3. Ground radial system: 120 radials at 0.4λ, #8 AWG copper
+      const optLen_cost = round2(0.4 * lambda_cost);
+      const radialTotalLen_cost = round2(120 * optLen_cost);
+      const radialMaterial_cost = round2(radialTotalLen_cost * 1.85); // #8 AWG USD/m
+      const radialInstall_cost  = round2(radialTotalLen_cost * 1.50); // labor USD/m
+      const radialCostLow  = radialMaterial_cost;
+      const radialCostHigh = round2(radialMaterial_cost + radialInstall_cost);
+
+      // 4. Transmitter building (new or modular)
+      const buildingCostLow  = 60000;
+      const buildingCostHigh = 200000;
+
+      // 5. Transmitter equipment (new vs reuse existing)
+      const txCostLow  = tpo_kw <= 1 ? 8000  : tpo_kw <= 5 ? 20000 : tpo_kw <= 25 ? 45000 : 80000;
+      const txCostHigh = tpo_kw <= 1 ? 20000 : tpo_kw <= 5 ? 55000 : tpo_kw <= 25 ? 100000: 200000;
+
+      // 6. Phasor/ATU for DA; ATU only for NDA
+      const phasorCostLow  = isDA_cost ? 15000 : 5000;
+      const phasorCostHigh = isDA_cost ? 40000 : 12000;
+
+      // 7. EAS encoder/decoder + studio equipment
+      const easCost = 8000; // IPAWS-compatible EAS unit
+
+      // 8. FCC fees and engineering
+      const fccFilingFee = 6465;  // §73.3525 major change filing fee
+      const engineeringLow  = 25000;
+      const engineeringHigh = 75000; // includes NIF study, spacing, DA pattern, proof of performance
+
+      // 9. Environmental + legal + zoning
+      const envLegalLow  = 15000;
+      const envLegalHigh = 60000;
+
+      // 10. Contingency (15–20%)
+      const subtotalLow  = landCostLow + towerCostLow + radialCostLow + buildingCostLow + txCostLow + phasorCostLow + easCost + fccFilingFee + engineeringLow + envLegalLow;
+      const subtotalHigh = landCostHigh + towerCostHigh + radialCostHigh + buildingCostHigh + txCostHigh + phasorCostHigh + easCost + fccFilingFee + engineeringHigh + envLegalHigh;
+      const contingencyLow  = round2(subtotalLow  * 0.15);
+      const contingencyHigh = round2(subtotalHigh * 0.20);
+      const totalLow  = round2(subtotalLow  + contingencyLow);
+      const totalHigh = round2(subtotalHigh + contingencyHigh);
+
+      const lineItems = [
+        { id: 'land',         category: 'Land / site acquisition',     low: landCostLow,     high: landCostHigh,     note: 'Highly variable; rural site option may be as low as $25K; suburban can exceed $500K.' },
+        { id: 'tower',        category: 'Tower (new self-supporting)',  low: towerCostLow,    high: towerCostHigh,    note: `Estimate for ${towerH_m}m tower at 3/8λ (${round2(towerH_m * 3.28084)} ft). Guy-wired towers may be 30% less.` },
+        { id: 'radials',      category: 'Ground radial system (120 × 0.4λ)', low: radialCostLow, high: radialCostHigh, note: `${radialTotalLen_cost} m #8 AWG copper + installation labor.` },
+        { id: 'building',     category: 'Transmitter building',         low: buildingCostLow, high: buildingCostHigh, note: 'Modular pre-fab low end; custom masonry/concrete block high end.' },
+        { id: 'transmitter',  category: 'Transmitter equipment',        low: txCostLow,       high: txCostHigh,       note: `${tpo_kw} kW ${isDA_cost ? 'DA-capable' : 'NDA'} AM transmitter; cost assumes new unit.` },
+        { id: 'phasor_atu',   category: isDA_cost ? 'Phasor + ATU' : 'Antenna tuning unit (ATU)', low: phasorCostLow, high: phasorCostHigh, note: isDA_cost ? 'DA phasor and ATU for directional antenna.' : 'Non-directional ATU.' },
+        { id: 'eas',          category: 'EAS encoder/decoder (IPAWS)', low: easCost,          high: easCost,          note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
+        { id: 'fcc_fees',     category: 'FCC filing fees',             low: fccFilingFee,     high: fccFilingFee,     note: '§73.3525 major change CP application fee.' },
+        { id: 'engineering',  category: 'Engineering + proof-of-performance', low: engineeringLow, high: engineeringHigh, note: 'Spacing study, NIF study, DA pattern, §73.154 proof, FCC forms.' },
+        { id: 'env_legal',    category: 'Environmental + legal + zoning', low: envLegalLow,   high: envLegalHigh,     note: 'NEPA §106, zoning CUP, FCC counsel.' },
+        { id: 'contingency',  category: 'Contingency (15–20%)',         low: contingencyLow,  high: contingencyHigh,  note: 'Reserve for scope changes, cost escalation, permit delays.' }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        is_directional:   isDA_cost,
+        is_clear_channel: isClear_cost,
+        tower_height_est_m: towerH_m,
+        line_items:        lineItems,
+        n_line_items:      lineItems.length,
+        subtotal_low:      subtotalLow,
+        subtotal_high:     subtotalHigh,
+        total_low:         totalLow,
+        total_high:        totalHigh,
+        total_midpoint:    round2((totalLow + totalHigh) / 2),
+        reference: 'Budget model based on FCC filing fees (§73.3525), engineering industry cost data, and RSMeans construction cost indices (2024).',
+        note: `Total estimated relocation cost: $${totalLow.toLocaleString()} – $${totalHigh.toLocaleString()} (midpoint ~$${Math.round((totalLow + totalHigh) / 2).toLocaleString()}). Estimates are screening-grade; actual costs vary significantly with site conditions.`
       };
     })(),
 

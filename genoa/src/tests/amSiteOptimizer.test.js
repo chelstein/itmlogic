@@ -6408,3 +6408,52 @@ test('rf_exposure_mpe_analysis comparison table columns present', async () => {
     assert.ok('mpe_eval_required' in row,      'mpe_eval_required missing from comparison table');
   }
 });
+
+test('station_relocation_cost_estimator presence and cost range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0].station_relocation_cost_estimator;
+  assert.ok(c != null, 'station_relocation_cost_estimator must be present');
+  assert.ok(c.total_low > 0, 'total_low must be positive');
+  assert.ok(c.total_high > c.total_low, 'total_high must exceed total_low');
+  assert.ok(c.total_midpoint > c.total_low && c.total_midpoint < c.total_high, 'midpoint must be between low and high');
+});
+
+test('station_relocation_cost_estimator line items cover all categories', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0].station_relocation_cost_estimator;
+  assert.ok(c.n_line_items >= 10, 'must have at least 10 line items');
+  const ids = c.line_items.map(li => li.id);
+  assert.ok(ids.includes('land'),        'must include land cost');
+  assert.ok(ids.includes('tower'),       'must include tower cost');
+  assert.ok(ids.includes('radials'),     'must include radial system cost');
+  assert.ok(ids.includes('fcc_fees'),    'must include FCC filing fees');
+  assert.ok(ids.includes('contingency'), 'must include contingency');
+});
+
+test('station_relocation_cost_estimator each line item has low ≤ high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0].station_relocation_cost_estimator;
+  for (const li of c.line_items) {
+    assert.ok(li.low >= 0, `line item ${li.id} low must be non-negative`);
+    assert.ok(li.high >= li.low, `line item ${li.id} high must be >= low`);
+  }
+});
+
+test('station_relocation_cost_estimator subtotal + contingency = total', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0].station_relocation_cost_estimator;
+  const contingency = c.line_items.find(li => li.id === 'contingency');
+  assert.ok(contingency != null, 'must have contingency line item');
+  const otherItems = c.line_items.filter(li => li.id !== 'contingency');
+  const subtotalLow = otherItems.reduce((s, li) => s + li.low, 0);
+  assert.ok(Math.abs(c.subtotal_low - subtotalLow) < 1, 'subtotal_low must equal sum of non-contingency low items');
+});
+
+test('station_relocation_cost_estimator comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('reloc_cost_low' in row,      'reloc_cost_low missing from comparison table');
+    assert.ok('reloc_cost_high' in row,     'reloc_cost_high missing from comparison table');
+    assert.ok('reloc_cost_midpoint' in row, 'reloc_cost_midpoint missing from comparison table');
+  }
+});

@@ -2226,6 +2226,44 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Station Relocation Cost Estimator */}
+        {candidate.station_relocation_cost_estimator && (() => {
+          const c = candidate.station_relocation_cost_estimator;
+          const fmt = v => `$${v?.toLocaleString()}`;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Station Relocation Cost Estimator</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="grid grid-cols-3 gap-2 text-xs text-center mb-3">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Low Estimate</div>
+                    <div className="text-green-300 font-mono font-bold">{fmt(c.total_low)}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2 border border-blue-700">
+                    <div className="text-gray-400">Midpoint</div>
+                    <div className="text-blue-300 font-mono font-bold">{fmt(c.total_midpoint)}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">High Estimate</div>
+                    <div className="text-amber-300 font-mono font-bold">{fmt(c.total_high)}</div>
+                  </div>
+                </div>
+                <div className="space-y-0.5 mb-2">
+                  {c.line_items?.map(li => (
+                    <div key={li.id} className="flex items-center gap-2 text-xs rounded px-2 py-0.5 hover:bg-gray-800">
+                      <span className="text-gray-400 flex-1">{li.category}</span>
+                      <span className="text-gray-300 font-mono">{fmt(li.low)}</span>
+                      <span className="text-gray-500">–</span>
+                      <span className="text-gray-300 font-mono">{fmt(li.high)}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500 italic">{c.note}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* RF Exposure / MPE Analysis */}
         {candidate.rf_exposure_mpe_analysis && (() => {
           const r = candidate.rf_exposure_mpe_analysis;

@@ -1717,6 +1717,28 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      station_relocation_cost_estimator: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5, is_directional: false, is_clear_channel: true,
+        tower_height_est_m: 144.23,
+        line_items: [
+          { id: 'land',        category: 'Land / site acquisition',              low: 50000,  high: 250000, note: 'Highly variable; rural option ~$25K; suburban can exceed $500K.' },
+          { id: 'tower',       category: 'Tower (new self-supporting)',           low: 253684, high: 507369, note: '144m tower at 3/8λ (473 ft). Guy-wired 30% less.' },
+          { id: 'radials',     category: 'Ground radial system (120 × 0.4λ)',    low: 34155,  high: 62388,  note: '18,462 m #8 AWG copper + installation labor.' },
+          { id: 'building',    category: 'Transmitter building',                  low: 60000,  high: 200000, note: 'Modular pre-fab low; custom masonry high.' },
+          { id: 'transmitter', category: 'Transmitter equipment',                 low: 20000,  high: 55000,  note: '5 kW NDA AM transmitter; new unit.' },
+          { id: 'phasor_atu',  category: 'Antenna tuning unit (ATU)',             low: 5000,   high: 12000,  note: 'Non-directional ATU.' },
+          { id: 'eas',         category: 'EAS encoder/decoder (IPAWS)',           low: 8000,   high: 8000,   note: 'IPAWS-compatible EAS unit per §11.35/§11.56.' },
+          { id: 'fcc_fees',    category: 'FCC filing fees',                       low: 6465,   high: 6465,   note: '§73.3525 major change CP application fee.' },
+          { id: 'engineering', category: 'Engineering + proof-of-performance',    low: 25000,  high: 75000,  note: 'Spacing, NIF, §73.154 proof, FCC forms.' },
+          { id: 'env_legal',   category: 'Environmental + legal + zoning',        low: 15000,  high: 60000,  note: 'NEPA §106, zoning CUP, FCC counsel.' },
+          { id: 'contingency', category: 'Contingency (15–20%)',                  low: 71913,  high: 247234, note: 'Reserve for scope changes, cost escalation, permit delays.' }
+        ],
+        n_line_items: 11,
+        subtotal_low: 477304, subtotal_high: 1236222,
+        total_low: 549217, total_high: 1483456, total_midpoint: 1016337,
+        reference: 'Budget model based on FCC filing fees (§73.3525), engineering industry cost data, and RSMeans construction cost indices (2024).',
+        note: 'Total estimated relocation cost: $549,217 – $1,483,456 (midpoint ~$1,016,337). Estimates are screening-grade; actual costs vary significantly with site conditions.'
+      },
       rf_exposure_mpe_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         evaluation_required: true, evaluation_threshold_kw: 5,
