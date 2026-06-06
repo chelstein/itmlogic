@@ -4540,3 +4540,107 @@ test('ground_system_design_specification comparison table columns present', asyn
     assert.ok('ground_design_grade' in row, 'ground_design_grade must be in comparison table');
   }
 });
+
+// ---------- noise_floor_estimate ----------
+
+test('noise_floor_estimate is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.noise_floor_estimate != null,
+      `noise_floor_estimate must be present on rank ${c.rank}`);
+  }
+});
+
+test('noise_floor_estimate has correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const nf = c.noise_floor_estimate;
+    assert.equal(nf.frequency_khz, KAZM.frequency_khz, `frequency_khz must match input on rank ${c.rank}`);
+    assert.ok(typeof nf.atmospheric_noise_fa_db === 'number', `atmospheric_noise_fa_db must be a number on rank ${c.rank}`);
+    assert.ok(typeof nf.man_made_noise_fa_db?.residential === 'number', `man_made_noise_fa_db.residential must be a number on rank ${c.rank}`);
+    assert.ok(['HIGH_NOISE','MODERATE_NOISE','LOW_NOISE'].includes(nf.noise_tier), `noise_tier must be valid on rank ${c.rank}`);
+  }
+});
+
+test('noise_floor_estimate atmospheric noise positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const fa = c.noise_floor_estimate.atmospheric_noise_fa_db;
+    assert.ok(fa > 0, `atmospheric_noise_fa_db ${fa} must be positive on rank ${c.rank}`);
+  }
+});
+
+test('noise_floor_estimate man_made noise urban > residential > rural', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const c of out.candidates) {
+    const mm = c.noise_floor_estimate.man_made_noise_fa_db;
+    assert.ok(mm.urban > mm.residential, `urban noise must be > residential on rank ${c.rank}`);
+    assert.ok(mm.residential > mm.rural, `residential noise must be > rural on rank ${c.rank}`);
+  }
+});
+
+test('noise_floor_estimate required_field_for_30db_snr_mvm is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const rf = c.noise_floor_estimate.required_field_for_30db_snr_mvm;
+    assert.ok(typeof rf === 'number' && rf > 0, `required_field must be positive on rank ${c.rank}`);
+  }
+});
+
+test('noise_floor_estimate comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('noise_tier' in row, 'noise_tier must be in comparison table');
+    assert.ok('atm_noise_fa_db' in row, 'atm_noise_fa_db must be in comparison table');
+    assert.ok('req_field_30snr_mvm' in row, 'req_field_30snr_mvm must be in comparison table');
+  }
+});
+
+// ---------- candidate_set_recommendation ----------
+
+test('candidate_set_recommendation is present on optimizer response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  assert.equal(out.available, true);
+  assert.ok(out.candidate_set_recommendation != null, 'candidate_set_recommendation must be present');
+});
+
+test('candidate_set_recommendation has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const csr = out.candidate_set_recommendation;
+  assert.ok(typeof csr.overall_guidance === 'string', 'overall_guidance must be a string');
+  assert.ok(typeof csr.n_advance_ready === 'number', 'n_advance_ready must be a number');
+  assert.ok(typeof csr.n_need_remedy === 'number', 'n_need_remedy must be a number');
+  assert.ok(typeof csr.n_hold === 'number', 'n_hold must be a number');
+  assert.ok(Array.isArray(csr.candidates), 'candidates must be an array');
+});
+
+test('candidate_set_recommendation.candidates covers all returned', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const csr = out.candidate_set_recommendation;
+  assert.ok(csr.candidates.length <= 5, 'candidates must cover top 5');
+  const ranks = csr.candidates.map(e => e.rank);
+  for (const c of out.candidates.slice(0, Math.min(5, out.candidates.length))) {
+    assert.ok(ranks.includes(c.rank), `candidate rank ${c.rank} must appear in recommendation`);
+  }
+});
+
+test('candidate_set_recommendation each entry has priority and action', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const VALID_PRIORITIES = ['ADVANCE_IMMEDIATELY','ADVANCE_AFTER_REMEDY','HOLD','MONITOR'];
+  for (const e of out.candidate_set_recommendation.candidates) {
+    assert.ok(VALID_PRIORITIES.includes(e.priority),
+      `priority "${e.priority}" must be valid for rank ${e.rank}`);
+    assert.ok(typeof e.action === 'string' && e.action.length > 0,
+      `action must be a non-empty string for rank ${e.rank}`);
+  }
+});
+
+test('candidate_set_recommendation n_advance_ready + n_need_remedy + n_hold <= candidates.length', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  const csr = out.candidate_set_recommendation;
+  const total = csr.n_advance_ready + csr.n_need_remedy + csr.n_hold
+    + (csr.candidates.filter(e => e.priority === 'MONITOR').length);
+  assert.equal(total, csr.candidates.length,
+    `priority counts must sum to candidates.length`);
+});

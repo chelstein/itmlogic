@@ -1966,6 +1966,40 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Noise Floor Estimate */}
+        {candidate.noise_floor_estimate && (() => {
+          const nf = candidate.noise_floor_estimate;
+          const tierColor = nf.noise_tier === 'LOW_NOISE' ? '#63d471' : nf.noise_tier === 'MODERATE_NOISE' ? '#f6c90e' : '#ff9b5a';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Noise Floor Estimate (ITU-R P.372)</div>
+              <div className="bg-surface/30 rounded p-2 space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[9px] uppercase tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: tierColor + '22', color: tierColor }}>
+                    {nf.noise_tier?.replace(/_/g, ' ')}
+                  </span>
+                  <span className="font-mono text-[9px] text-textDim">Fa(atm)={nf.atmospheric_noise_fa_db} dB · dominant: {nf.dominant_source}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-[9px]">
+                  <div className="text-textDim/60">Atmospheric noise Fa</div>
+                  <div className="text-textPrimary text-right">{nf.atmospheric_noise_fa_db} dB</div>
+                  <div className="text-textDim/60">Man-made: rural / res. / urban</div>
+                  <div className="text-textPrimary text-right">
+                    {nf.man_made_noise_fa_db?.rural} / {nf.man_made_noise_fa_db?.residential} / {nf.man_made_noise_fa_db?.urban} dB
+                  </div>
+                  <div className="text-textDim/60">Galactic noise Fa</div>
+                  <div className="text-textPrimary text-right">{nf.galactic_noise_fa_db} dB</div>
+                  <div className="text-textDim/60">Required field (30 dB S/N)</div>
+                  <div className="text-amber text-right">{nf.required_field_for_30db_snr_mvm} mV/m</div>
+                </div>
+                {nf.reference && <p className="text-[8px] text-textDim/40 leading-snug">{nf.reference}</p>}
+                {nf.note && <p className="text-[8px] text-textDim/40 leading-snug italic">{nf.note}</p>}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>

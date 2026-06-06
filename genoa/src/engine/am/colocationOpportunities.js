@@ -147,8 +147,9 @@ export async function runColocationOpportunities(body = {}){
       regulatory_timeline_estimate: so.regulatory_timeline_estimate ?? null,
       frequency_allocation_context: so.frequency_allocation_context ?? null,
       candidate_set_statistics:     so.candidate_set_statistics ?? null,
-      filing_complexity_score:      so.filing_complexity_score ?? null,
-      geographic_diversity_analysis: so.geographic_diversity_analysis ?? null
+      filing_complexity_score:       so.filing_complexity_score ?? null,
+      geographic_diversity_analysis: so.geographic_diversity_analysis ?? null,
+      candidate_set_recommendation:  so.candidate_set_recommendation ?? null
     });
   }
 
@@ -383,6 +384,33 @@ export async function runColocationOpportunities(body = {}){
         uncovered_quadrants: Object.entries(qm).filter(([, r]) => r.length === 0).map(([q]) => q),
         median_distance_km: (() => { if (!top5.length) return null; const d = top5.map(c => c.distance_from_current_km ?? 0).sort((a, b) => a - b); const m = Math.floor(d.length / 2); return Math.round((d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2) * 100) / 100; })()
       };
+    })(),
+    candidate_set_recommendation: (() => {
+      const top5 = returned.slice(0, 5);
+      if (!top5.length) return null;
+      const bearingToQ = b => { const n = ((b % 360) + 360) % 360; return n < 90 ? 'NE' : n < 180 ? 'SE' : n < 270 ? 'SW' : 'NW'; };
+      const entries = top5.map(c => {
+        const gateFails = c.regulatory_gate_summary?.fail_count ?? 0;
+        const isProm = c.status_category === 'PROMISING';
+        const isRec = c.status_category?.startsWith('RECOVERABLE');
+        const isNonComp = c.status_category === 'NON_COMPLIANT';
+        let priority, action;
+        if (gateFails > 0 || isNonComp) {
+          priority = 'HOLD'; action = `Hold — ${gateFails} gate failure(s) require engineering remediation.`;
+        } else if (isProm) {
+          priority = 'ADVANCE_IMMEDIATELY'; action = 'Advance to full §73.182 NIF study + parcel investigation.';
+        } else if (isRec) {
+          priority = 'ADVANCE_AFTER_REMEDY'; action = `Advance after resolving recovery path — see compliance_pathway.`;
+        } else {
+          priority = 'MONITOR'; action = 'Monitor — viable fallback site.';
+        }
+        return { rank: c.rank, status: c.status_category, score: c.score, gate_verdict: c.regulatory_gate_summary?.overall_verdict ?? null, gate_fail_count: gateFails, quadrant: bearingToQ(c.bearing_deg ?? 0), action, priority };
+      });
+      const n_advance_ready = entries.filter(e => e.priority === 'ADVANCE_IMMEDIATELY').length;
+      const n_need_remedy   = entries.filter(e => e.priority === 'ADVANCE_AFTER_REMEDY').length;
+      const n_hold          = entries.filter(e => e.priority === 'HOLD').length;
+      const primary = entries.find(e => e.priority === 'ADVANCE_IMMEDIATELY') ?? entries[0];
+      return { overall_guidance: n_advance_ready >= 1 ? `${n_advance_ready} candidate(s) ready to advance to NIF study + parcel investigation.` : 'No immediately advanceable candidates — resolve remediation items first.', primary_recommended_rank: primary?.rank ?? null, n_advance_ready, n_need_remedy, n_hold, candidates: entries, note: 'Screening-grade advisory — qualified broadcast engineer and FCC counsel must review before site commitment or filing.' };
     })()
   });
 }
@@ -771,6 +799,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             candidate_set_statistics = null,
                             filing_complexity_score = null,
                             geographic_diversity_analysis = null,
+                            candidate_set_recommendation = null,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
@@ -876,6 +905,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     candidate_set_statistics:     candidate_set_statistics ?? null,
     filing_complexity_score:       filing_complexity_score ?? null,
     geographic_diversity_analysis: geographic_diversity_analysis ?? null,
+    candidate_set_recommendation:  candidate_set_recommendation ?? null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,

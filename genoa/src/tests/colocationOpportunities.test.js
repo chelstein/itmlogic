@@ -688,3 +688,24 @@ test('colocation comparison table has da_study_recommended and skywave_advisory_
     assert.ok('skywave_advisory_level' in row, 'skywave_advisory_level must be in comparison table');
   }
 });
+
+// ---------- Test 38 — candidate_set_recommendation in colocation response ----------
+
+test('colocation response has candidate_set_recommendation', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const csr = out.candidate_set_recommendation;
+  assert.ok(csr != null, 'candidate_set_recommendation must be present on colocation response');
+  assert.ok(typeof csr.overall_guidance === 'string', 'overall_guidance must be a string');
+  assert.ok(typeof csr.n_advance_ready === 'number', 'n_advance_ready must be a number');
+  assert.ok(Array.isArray(csr.candidates), 'candidates must be an array');
+  for (const e of csr.candidates) {
+    assert.ok(['ADVANCE_IMMEDIATELY','ADVANCE_AFTER_REMEDY','HOLD','MONITOR'].includes(e.priority),
+      `priority "${e.priority}" must be valid for rank ${e.rank}`);
+  }
+});

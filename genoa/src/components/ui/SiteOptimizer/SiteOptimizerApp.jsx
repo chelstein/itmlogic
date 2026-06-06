@@ -374,6 +374,43 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 </div>
               </RackPanel>
             )}
+            {result?.candidate_set_recommendation && (
+              <RackPanel eyebrow="Site Recommendation" title="Which candidates to advance" dense>
+                {(() => {
+                  const csr = result.candidate_set_recommendation;
+                  const priorityColor = p => p === 'ADVANCE_IMMEDIATELY' ? '#63d471'
+                    : p === 'ADVANCE_AFTER_REMEDY' ? '#f6c90e'
+                    : p === 'HOLD' ? '#ff9b5a'
+                    : '#a89c84';
+                  return (
+                    <div className="font-mono text-[10px] space-y-2">
+                      <div className="text-textDim/80 leading-snug">{csr.overall_guidance}</div>
+                      <div className="flex gap-3 text-[9px] text-textDim/60">
+                        <span className="text-emerald-400">{csr.n_advance_ready} advance-ready</span>
+                        <span className="text-amber">{csr.n_need_remedy} need remedy</span>
+                        <span className="text-red-400/70">{csr.n_hold} hold</span>
+                      </div>
+                      {csr.candidates?.slice(0, 4).map(e => (
+                        <div key={e.rank} className="border border-rule/30 rounded p-1.5 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-cream font-semibold">#{e.rank}</span>
+                            <span className="text-[8px] uppercase tracking-rack px-1 py-0.5 rounded-sm border"
+                              style={{ color: priorityColor(e.priority), borderColor: `${priorityColor(e.priority)}44` }}>
+                              {e.priority?.replace(/_/g, ' ')}
+                            </span>
+                            {e.gate_verdict && (
+                              <span className="text-[8px] text-textDim/50">{e.gate_verdict?.replace(/_/g, ' ')}</span>
+                            )}
+                          </div>
+                          <div className="text-[9px] text-textDim/70 leading-snug">{e.action}</div>
+                        </div>
+                      ))}
+                      <p className="text-[8px] text-textDim/40 leading-snug">{csr.note}</p>
+                    </div>
+                  );
+                })()}
+              </RackPanel>
+            )}
             {result?.recommended_actions?.length > 0 && (
               <RecommendedActionsPanel recommended_actions={result.recommended_actions} />
             )}
@@ -486,6 +523,18 @@ const DEMO_RESULT = {
     uncovered_quadrants: [],
     median_distance_km: 10.0,
     note: 'Quadrant analysis based on bearing from current site.'
+  },
+  candidate_set_recommendation: {
+    overall_guidance: '3 candidates are ready to advance. Initiate NIF studies at Rank 1 and Rank 2 in parallel to minimize timeline.',
+    primary_recommended_rank: 1,
+    n_advance_ready: 3, n_need_remedy: 0, n_hold: 1,
+    candidates: [
+      { rank: 1, status: 'PROMISING', score: 91.3, col_pct: 97, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NE', action: 'Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. DA-N study required for nighttime operation.', priority: 'ADVANCE_IMMEDIATELY' },
+      { rank: 2, status: 'PROMISING', score: 84.0, col_pct: 91, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'SE', action: 'Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. DA-N study required for nighttime operation.', priority: 'ADVANCE_IMMEDIATELY' },
+      { rank: 3, status: 'PROMISING', score: 78.2, col_pct: 78, gate_verdict: 'CONDITIONAL', gate_fail_count: 0, cost_tier: 'HIGH', skywave_advisory: 'HIGH', quadrant: 'NW', action: 'Advance to NIF study + parcel investigation.', priority: 'ADVANCE_IMMEDIATELY' },
+      { rank: 4, status: 'NON_COMPLIANT', score: 58.5, col_pct: 62, gate_verdict: 'NON_VIABLE_AS_IS', gate_fail_count: 1, cost_tier: 'VERY_HIGH', skywave_advisory: 'CRITICAL', quadrant: 'SW', action: 'Hold — 1 gate failure(s) require engineering remediation before advancing. Commission DA or power-increase study.', priority: 'HOLD' }
+    ],
+    note: 'This recommendation is a SCREENING-GRADE advisory based on automated scoring. A licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
   },
   candidate_set_diversity: {
     n_candidates: 4,
@@ -891,6 +940,17 @@ const DEMO_RESULT = {
         },
         recommended_design: 'standard', soil_quality_tier: 'GOOD',
         note: 'Ground system design per NBS Technical Note 24 (Terman formula for R_g) and FCC §73.190 efficiency certification guidelines.'
+      },
+      noise_floor_estimate: {
+        frequency_khz: 780,
+        atmospheric_noise_fa_db: 71.1,
+        man_made_noise_fa_db: { rural: 51.4, residential: 61.4, urban: 71.4 },
+        galactic_noise_fa_db: 48.7,
+        dominant_source: 'ATMOSPHERIC',
+        noise_tier: 'HIGH_NOISE',
+        required_field_for_30db_snr_mvm: 0.04,
+        reference: 'ITU-R P.372-15 (2021) Table I / Figure 4 — median noise figure for continental mid-latitude, summer daytime. Actual noise floor varies ±15–20 dB seasonally and by local EMI environment.',
+        note: 'Noise floor estimate is a screening-grade planning tool. Commission a site noise survey (spectrum analyzer, directional null antenna) to characterize actual ambient noise before final site selection.'
       },
       regulatory_gate_summary: {
         overall_verdict: 'CONDITIONAL', overall_note: '4 gate(s) require additional studies — site is viable pending engineering work.',

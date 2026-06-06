@@ -745,7 +745,10 @@ export async function runSiteOptimizer(body = {}){
     gate_warn_count:        c.regulatory_gate_summary?.warn_count ?? null,
     ground_eff_pct:         c.ground_system_design_specification?.standard_design?.efficiency_pct ?? null,
     ground_rg_ohm:          c.ground_system_design_specification?.standard_design?.R_g_estimated_ohm ?? null,
-    ground_design_grade:    c.ground_system_design_specification?.recommended_design ?? null
+    ground_design_grade:    c.ground_system_design_specification?.recommended_design ?? null,
+    noise_tier:             c.noise_floor_estimate?.noise_tier ?? null,
+    atm_noise_fa_db:        c.noise_floor_estimate?.atmospheric_noise_fa_db ?? null,
+    req_field_30snr_mvm:    c.noise_floor_estimate?.required_field_for_30db_snr_mvm ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -953,7 +956,92 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
-  // ---- 20. Total project cost estimate ----
+  // ---- 20. Candidate set recommendation ----
+  // Response-level synthesized advisory on which candidates to advance and in what order.
+  // Weighs score, gate verdict, cost tier, geographic diversity, and skywave risk.
+  const candidate_set_recommendation = (() => {
+    const top5 = returned.slice(0, 5);
+    if (!top5.length) return null;
+
+    // Build per-candidate recommendation entries.
+    const entries = top5.map(c => {
+      const gateVerdict  = c.regulatory_gate_summary?.overall_verdict ?? 'UNKNOWN';
+      const gateFails    = c.regulatory_gate_summary?.fail_count ?? 0;
+      const costTier     = c.permit_and_engineering_cost_estimate?.cost_tier ?? null;
+      const skyAdvisory  = c.skywave_protection_advisory?.advisory_level ?? 'UNKNOWN';
+      const geoQ         = c.bearing_deg != null ? (['NE','SE','SW','NW'][Math.floor((((c.bearing_deg % 360) + 360) % 360) / 90)]) : null;
+      const colPct       = c.col_coverage_pct != null ? Math.round(c.col_coverage_pct * 100) : null;
+      const isProm       = c.status_category === 'PROMISING';
+      const isRec        = c.status_category?.startsWith('RECOVERABLE');
+      const isNonComp    = c.status_category === 'NON_COMPLIANT';
+
+      let action;
+      let priority;
+      if (gateFails > 0 || isNonComp) {
+        action   = `Hold — ${gateFails} gate failure(s) require engineering remediation before advancing. ${c.compliance_pathway?.recommended_action ?? 'Commission DA or power-increase study.'}`;
+        priority = 'HOLD';
+      } else if (isProm && gateVerdict === 'CONDITIONAL') {
+        action   = `Advance to full §73.182 NIF study + parcel investigation. Commission soil resistivity survey. ${skyAdvisory === 'CRITICAL' || skyAdvisory === 'HIGH' ? 'DA-N study required for nighttime operation.' : ''}`;
+        priority = 'ADVANCE_IMMEDIATELY';
+      } else if (isProm) {
+        action   = `Advance to NIF study + parcel investigation.`;
+        priority = 'ADVANCE_IMMEDIATELY';
+      } else if (isRec) {
+        action   = `Advance after resolving recovery path: ${c.compliance_pathway?.recommended_action ?? 'see compliance_pathway'}. Then commission NIF study.`;
+        priority = 'ADVANCE_AFTER_REMEDY';
+      } else {
+        action   = `Monitor — viable fallback site. Keep in reserve pending outcomes at higher-priority candidates.`;
+        priority = 'MONITOR';
+      }
+
+      return {
+        rank: c.rank,
+        status: c.status_category,
+        score: c.score,
+        col_pct: colPct,
+        gate_verdict: gateVerdict,
+        gate_fail_count: gateFails,
+        cost_tier: costTier,
+        skywave_advisory: skyAdvisory,
+        quadrant: geoQ,
+        action,
+        priority
+      };
+    });
+
+    // Identify the primary recommended site.
+    const primary = entries.find(e => e.priority === 'ADVANCE_IMMEDIATELY') ?? entries[0];
+
+    // Count by priority tier.
+    const countByPriority = {};
+    for (const e of entries) {
+      countByPriority[e.priority] = (countByPriority[e.priority] ?? 0) + 1;
+    }
+
+    const n_advance_ready = countByPriority.ADVANCE_IMMEDIATELY ?? 0;
+    const n_need_remedy   = countByPriority.ADVANCE_AFTER_REMEDY ?? 0;
+    const n_hold          = countByPriority.HOLD ?? 0;
+
+    const overall_guidance = n_advance_ready >= 2
+      ? `${n_advance_ready} candidates are ready to advance. Initiate NIF studies at Rank ${entries.filter(e => e.priority === 'ADVANCE_IMMEDIATELY').map(e => e.rank).join(' and ')} in parallel to minimize timeline.`
+      : n_advance_ready === 1
+      ? `1 candidate (Rank ${primary.rank}) is ready to advance. Initiate NIF study and parcel investigation immediately.`
+      : n_need_remedy > 0
+      ? `No candidates are immediately advanceable. ${n_need_remedy} require engineering remediation first — prioritize Rank 1 remedy.`
+      : 'No viable candidates identified at this search radius and power level — expand radius or increase TPO.';
+
+    return {
+      overall_guidance,
+      primary_recommended_rank: primary?.rank ?? null,
+      n_advance_ready,
+      n_need_remedy,
+      n_hold,
+      candidates: entries,
+      note: 'This recommendation is a SCREENING-GRADE advisory based on automated scoring. A licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
+    };
+  })();
+
+  // ---- 21. Total project cost estimate ----
   // Response-level summary combining soft costs (filing + engineering) and
   // hard costs (tower + ground + construction) for each top candidate.
   // Enables stakeholder budget conversations before committing to site selection.
@@ -1013,6 +1101,7 @@ export async function runSiteOptimizer(body = {}){
     candidate_scoring_audit,
     filing_complexity_score,
     geographic_diversity_analysis,
+    candidate_set_recommendation,
     total_project_cost_estimate,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
@@ -3703,6 +3792,63 @@ async function scoreCandidate(pt, ctx, warnings){
         recommended_design: design_grade,
         soil_quality_tier: sigma_tier,
         note: 'Ground system design per NBS Technical Note 24 (Terman formula for R_g) and FCC §73.190 efficiency certification guidelines. All figures are pre-construction estimates — a field soil resistivity survey (4-electrode Wenner array) is required before final design.'
+      };
+    })(),
+    noise_floor_estimate: (() => {
+      // AM noise environment estimate per ITU-R P.372-15 (2021) and FCC engineering guidance.
+      // Reports noise figure (dB) for atmospheric, man-made, and galactic noise sources
+      // at AM broadcast frequencies.  These are screening-grade values — actual noise
+      // measurements require a spectrum analyzer at the candidate site.
+      const f_mhz = frequency_khz / 1000;
+      const f_khz = frequency_khz;
+
+      // ITU-R P.372-15 Fig. 4/Table I atmospheric noise Fa (dB above kTB, 0°C) for MF.
+      // Summer daytime noise in continental mid-latitude US (roughly zone D).
+      // Values extrapolated from ITU-R P.372 median curves at 0.5–1.7 MHz:
+      // ~65–70 dBμV/m for low MF, decreasing toward 3 MHz.
+      // For AM broadcast (530–1700 kHz): Fa ≈ 67 - 30*log10(f_mhz) (rough fit zone D summer day)
+      const fa_atm_db = round2(Math.max(20, 67 - 30 * Math.log10(f_mhz)));
+
+      // Man-made noise (ITU-R P.372-15 Table I, residential environment):
+      // Fa_mm ≈ 76.8 - 27.7*log10(f_mhz) for residential; +10 dB urban, -10 dB rural.
+      const fa_mm_residential_db = round2(76.8 - 27.7 * Math.log10(f_mhz));
+      const fa_mm_urban_db       = round2(fa_mm_residential_db + 10);
+      const fa_mm_rural_db       = round2(fa_mm_residential_db - 10);
+
+      // Galactic noise: significant only below ~30 MHz but minor vs. atmospheric at MF.
+      // Fa_gal ≈ 52 - 23*log10(f_mhz) (ITU-R P.372 eq. 6)
+      const fa_gal_db = round2(52 - 23 * Math.log10(f_mhz));
+
+      // Effective noise figure at receiver (dominant source wins):
+      // At AM MF, atmospheric + man-made dominate; galactic is below both.
+      const dominant_source = fa_atm_db >= fa_mm_residential_db ? 'ATMOSPHERIC' : 'MAN_MADE_RESIDENTIAL';
+
+      // Practical SNR margin: for 30 dB S/N at receiver (broadcast quality),
+      // required field strength E_min ≈ Noise_floor + 30 dB (receiver-referenced).
+      // ITU-R P.372: E_noise_floor_mVm ≈ -1.05 + Fa_atm/20 (rough approximation at MF)
+      // Cleaner: use NBS/FCC rule of thumb: min usable field = noise figure + thermal + SNR
+      const snr_target_db = 30; // ITU broadcasting standard
+      const thermal_kTB_dbuvM = round2(-10);  // approximate thermal noise floor at MF for 10 kHz BW
+      const required_field_dbuvM = round2(thermal_kTB_dbuvM + fa_atm_db + snr_target_db);
+      // Convert to mV/m: E_mvm = 10^((required_field_dbuvM - 120) / 20)
+      const required_field_mvm  = round2(Math.pow(10, (required_field_dbuvM - 120) / 20));
+
+      const noise_tier = fa_atm_db >= 75 ? 'HIGH_NOISE' : fa_atm_db >= 60 ? 'MODERATE_NOISE' : 'LOW_NOISE';
+
+      return {
+        frequency_khz: f_khz,
+        atmospheric_noise_fa_db: fa_atm_db,
+        man_made_noise_fa_db: {
+          rural: fa_mm_rural_db,
+          residential: fa_mm_residential_db,
+          urban: fa_mm_urban_db
+        },
+        galactic_noise_fa_db: fa_gal_db,
+        dominant_source,
+        noise_tier,
+        required_field_for_30db_snr_mvm: required_field_mvm,
+        reference: 'ITU-R P.372-15 (2021) Table I / Figure 4 — median noise figure for continental mid-latitude, summer daytime. Actual noise floor varies ±15–20 dB seasonally and by local EMI environment.',
+        note: 'Noise floor estimate is a screening-grade planning tool. Commission a site noise survey (spectrum analyzer, directional null antenna) to characterize actual ambient noise before final site selection.'
       };
     })(),
     treaty_zone,
