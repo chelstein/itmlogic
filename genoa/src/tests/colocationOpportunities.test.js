@@ -1085,3 +1085,17 @@ test('colocation GRID candidates have co_channel_interference_budget', async () 
     assert.ok(c.co_channel_interference_budget.required_cc_spacing_km > 0, `rank ${c.rank} cc spacing must be positive`);
   }
 });
+
+test('colocation GRID candidates have construction_permit_timeline_optimizer', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.construction_permit_timeline_optimizer != null, `rank ${c.rank} missing construction_permit_timeline_optimizer`);
+    assert.strictEqual(c.construction_permit_timeline_optimizer.n_phases, 6, `rank ${c.rank} must have 6 phases`);
+  }
+});

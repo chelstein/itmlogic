@@ -1717,6 +1717,59 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      construction_permit_timeline_optimizer: {
+        fcc_class: 'D', frequency_khz: 780, pattern_mode: 'NDA',
+        is_major_change: true, is_directional: false, is_clear_channel: true,
+        total_optimistic_weeks: 94, total_conservative_weeks: 228,
+        total_optimistic_months: 21.71, total_conservative_months: 52.65,
+        total_milestones: 22, n_phases: 6,
+        critical_path_milestone_ids: ['spacing_study','nif_study','da_pattern','asr_filing','fcc_review','cp_grant'],
+        n_critical_path: 6,
+        filing_fee_major_change_usd: 6465,
+        phases: [
+          { id: 'pre_engineering',  label: 'Pre-Engineering & Site Control',  weeks_optimistic: 4,  weeks_conservative: 12,  milestones: [
+            { id: 'site_option',    task: 'Execute site option or purchase agreement', days: 30, rule: null },
+            { id: 'title_survey',   task: 'Title search + ALTA/NSPS land survey', days: 21, rule: null },
+            { id: 'soil_survey',    task: 'Soil conductivity survey (Wenner 4-point)', days: 14, rule: '§73.190' },
+            { id: 'topo_survey',    task: 'Topographic survey for tower foundation & radial field', days: 14, rule: null }
+          ]},
+          { id: 'fcc_engineering',  label: 'FCC Engineering Study',           weeks_optimistic: 6,  weeks_conservative: 16,  milestones: [
+            { id: 'spacing_study',  task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37' },
+            { id: 'nif_study',      task: '§73.182 NIF study (clear channel)',       days: 30, rule: '§73.182' },
+            { id: 'da_pattern',     task: 'Non-directional antenna design',           days: 7,  rule: '§73.316' },
+            { id: 'coverage_map',   task: '§73.183 coverage map',                     days: 7,  rule: '§73.183' },
+            { id: 'env_assessment', task: 'Environmental assessment (§1.1301)',        days: 14, rule: '§1.1301' },
+            { id: 'asr_filing',     task: 'ASR registration (FCC Form 854)',           days: 7,  rule: '§17.7' }
+          ]},
+          { id: 'form_301_prep',    label: 'Form 301-AM Preparation & Filing', weeks_optimistic: 2,  weeks_conservative: 6,   milestones: [
+            { id: 'schedule_a',     task: 'Schedule A: Legal/ownership', days: 7, rule: '§73.3533' },
+            { id: 'schedule_b',     task: 'Schedule B: Technical (antenna, pattern, ERP)', days: 7, rule: '§73.3533' },
+            { id: 'schedule_c',     task: 'Schedule C: Transmitter', days: 3, rule: '§73.3533' },
+            { id: 'schedule_d',     task: 'Schedule D: Coverage map + §73.183 contour', days: 5, rule: '§73.183' },
+            { id: 'schedule_e',     task: 'Schedule E: Environmental compliance', days: 5, rule: '§1.1301' },
+            { id: 'fcc_filing',     task: 'LMS filing + fee payment', days: 1, rule: '§73.3525' }
+          ]},
+          { id: 'fcc_processing',   label: 'FCC Processing (CP Issuance)',     weeks_optimistic: 52, weeks_conservative: 130, milestones: [
+            { id: 'fcc_review',     task: 'FCC staff review (Audio Division)', days: 180, rule: '§73.3561' },
+            { id: 'public_notice',  task: 'Public notice / petitions to deny period', days: 30, rule: '§73.3584' },
+            { id: 'cp_grant',       task: 'CP grant', days: 30, rule: '§73.3598' }
+          ]},
+          { id: 'construction',     label: 'Construction Phase',               weeks_optimistic: 26, weeks_conservative: 52,  milestones: [
+            { id: 'zoning',         task: 'Local zoning / conditional use permit', days: 90, rule: null },
+            { id: 'tower_permit',   task: 'Building / tower erection permit',      days: 30, rule: null },
+            { id: 'radial_install', task: 'Ground radial system installation',     days: 21, rule: '§73.190' },
+            { id: 'tower_erect',    task: 'Tower erection + FAA painting/lighting', days: 30, rule: '§17.21' },
+            { id: 'tx_install',     task: 'Transmitter installation + RF plumbing', days: 14, rule: null },
+            { id: 'proof_of_perf',  task: 'Proof of performance (§73.154)',        days: 14, rule: '§73.154' }
+          ]},
+          { id: 'license_grant',    label: 'License Grant Phase',              weeks_optimistic: 4,  weeks_conservative: 12,  milestones: [
+            { id: 'form_302',       task: 'Form 302-AM: License application', days: 7,  rule: '§73.3536' },
+            { id: 'fcc_license',    task: 'FCC license grant',                 days: 45, rule: '§73.3536' }
+          ]}
+        ],
+        reference: '47 CFR §73.3533; §73.3598; §73.3561; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
+        note: 'CP timeline for Class D non-directional AM relocation. Optimistic: 94 weeks (~21.71 months). Conservative: 228 weeks (~52.65 months).'
+      },
       co_channel_interference_budget: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5, is_clear_channel: true, is_directional: false,
         du_daytime_min_db: 20, du_nighttime_min_db: 0,

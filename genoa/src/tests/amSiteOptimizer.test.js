@@ -6134,3 +6134,49 @@ test('co_channel_interference_budget comparison table columns present', async ()
     assert.ok('du_n_mitigations' in row,  'du_n_mitigations missing from comparison table');
   }
 });
+
+test('construction_permit_timeline_optimizer presence and phase count', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].construction_permit_timeline_optimizer;
+  assert.ok(t != null, 'construction_permit_timeline_optimizer must be present');
+  assert.strictEqual(t.n_phases, 6, 'must have 6 phases (pre-engineering through license grant)');
+  assert.ok(t.total_milestones > 0, 'total_milestones must be positive');
+  assert.strictEqual(t.is_major_change, true, 'relocation must always be major change');
+});
+
+test('construction_permit_timeline_optimizer timeline bounds', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].construction_permit_timeline_optimizer;
+  assert.ok(t.total_optimistic_weeks > 0, 'optimistic timeline must be positive');
+  assert.ok(t.total_conservative_weeks > t.total_optimistic_weeks, 'conservative must be longer than optimistic');
+  assert.ok(t.total_optimistic_months > 0, 'optimistic months must be positive');
+  assert.ok(t.total_conservative_months > t.total_optimistic_months, 'conservative months must exceed optimistic');
+});
+
+test('construction_permit_timeline_optimizer phases have milestones', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].construction_permit_timeline_optimizer;
+  for (const phase of t.phases) {
+    assert.ok(phase.milestones.length > 0, `phase ${phase.id} must have milestones`);
+    assert.ok(phase.weeks_optimistic > 0, `phase ${phase.id} optimistic weeks must be positive`);
+    assert.ok(phase.weeks_conservative >= phase.weeks_optimistic, `phase ${phase.id} conservative must be >= optimistic`);
+  }
+});
+
+test('construction_permit_timeline_optimizer critical path present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].construction_permit_timeline_optimizer;
+  assert.ok(Array.isArray(t.critical_path_milestone_ids), 'critical_path_milestone_ids must be an array');
+  assert.ok(t.n_critical_path > 0, 'n_critical_path must be positive');
+  assert.ok(t.critical_path_milestone_ids.includes('cp_grant'), 'critical path must include cp_grant');
+  assert.ok(t.critical_path_milestone_ids.includes('asr_filing'), 'critical path must include asr_filing');
+});
+
+test('construction_permit_timeline_optimizer comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cpt_optimistic_months' in row,  'cpt_optimistic_months missing from comparison table');
+    assert.ok('cpt_conservative_months' in row,'cpt_conservative_months missing from comparison table');
+    assert.ok('cpt_n_milestones' in row,        'cpt_n_milestones missing from comparison table');
+  }
+});

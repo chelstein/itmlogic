@@ -2226,6 +2226,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Construction Permit Timeline Optimizer */}
+        {candidate.construction_permit_timeline_optimizer && (() => {
+          const t = candidate.construction_permit_timeline_optimizer;
+          const phaseColors = ['text-blue-400','text-indigo-400','text-purple-400','text-amber-400','text-green-400','text-emerald-400'];
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">CP Timeline Optimizer (§73.3533 · §73.3598)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  {t.fcc_class} class {t.is_directional ? 'directional' : 'non-directional'} AM relocation.
+                  Optimistic: <span className="text-green-300 font-mono">{t.total_optimistic_months} mo</span> ·
+                  Conservative: <span className="text-amber-300 font-mono">{t.total_conservative_months} mo</span> ·
+                  <span className="text-white font-mono"> {t.total_milestones} milestones</span> across {t.n_phases} phases.
+                </div>
+                <div className="space-y-2 mb-2">
+                  {t.phases?.map((phase, idx) => (
+                    <div key={phase.id} className="bg-gray-800 rounded p-2">
+                      <div className={`text-xs font-bold mb-1 ${phaseColors[idx % phaseColors.length]}`}>
+                        Phase {idx + 1}: {phase.label}
+                        <span className="text-gray-400 font-normal ml-2">
+                          {phase.weeks_optimistic}–{phase.weeks_conservative} wk
+                        </span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {phase.milestones.map(m => (
+                          <div key={m.id} className="flex items-start gap-1 text-xs">
+                            <span className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${t.critical_path_milestone_ids?.includes(m.id) ? 'bg-red-400' : 'bg-gray-600'}`} />
+                            <span className="text-gray-300">{m.task}</span>
+                            {m.rule && <span className="text-gray-500 flex-shrink-0">({m.rule})</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-400 mb-1">
+                  <span className="inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400 inline-block" /> Critical path milestone</span>
+                  <span className="ml-3 inline-flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-600 inline-block" /> Standard milestone</span>
+                </div>
+                <div className="text-xs text-gray-500">{t.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Co-Channel Interference Budget */}
         {candidate.co_channel_interference_budget && (() => {
           const d = candidate.co_channel_interference_budget;

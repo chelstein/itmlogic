@@ -840,7 +840,10 @@ export async function runSiteOptimizer(body = {}){
     iboc_night_risk:        c.iboc_hd_radio_analysis?.nighttime_interference_risk ?? null,
     du_cc_spacing_km:       c.co_channel_interference_budget?.required_cc_spacing_km ?? null,
     du_nif_required:        c.co_channel_interference_budget?.nif_study_required ?? null,
-    du_n_mitigations:       c.co_channel_interference_budget?.n_applicable_mitigations ?? null
+    du_n_mitigations:       c.co_channel_interference_budget?.n_applicable_mitigations ?? null,
+    cpt_optimistic_months:  c.construction_permit_timeline_optimizer?.total_optimistic_months ?? null,
+    cpt_conservative_months:c.construction_permit_timeline_optimizer?.total_conservative_months ?? null,
+    cpt_n_milestones:       c.construction_permit_timeline_optimizer?.total_milestones ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7733,6 +7736,115 @@ async function scoreCandidate(pt, ctx, warnings){
         n_applicable_mitigations: mitigationStrategies.filter(m => m.applicable).length,
         reference: '47 CFR §73.182; §73.207; §73.37; §73.404(c); FCC OET Bulletin 69',
         note: `D/U budget framework for co-channel interference assessment at ${frequency_khz} kHz. Required co-channel spacing: ${requiredCcSpacingKm} km for Class ${fcc_class}. NIF study: ${nifRequired ? nifStudyType : 'NOT REQUIRED'}.`
+      };
+    })(),
+
+    construction_permit_timeline_optimizer: (() => {
+      // Detailed CP milestone scheduling per §73.3533, §73.3598, §73.3561, §73.3580
+      // From site selection to license grant for AM relocation
+      const isDA_cpt = /^DA/i.test(pattern_mode);
+      const isClear_cpt = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isMajorChange_cpt = true; // relocation is always a major change
+
+      // Phase durations in calendar weeks
+      const phases = [
+        {
+          id: 'pre_engineering',
+          label: 'Pre-Engineering & Site Control',
+          weeks_optimistic: 4, weeks_conservative: 12,
+          milestones: [
+            { id: 'site_option',      task: 'Execute site option or purchase agreement', days: 30, rule: null, note: 'Option should cover 18–36 months (full FCC processing period).' },
+            { id: 'title_survey',     task: 'Title search + ALTA/NSPS land survey', days: 21, rule: null, note: 'Required before zoning application.' },
+            { id: 'soil_survey',      task: 'Soil conductivity survey (Wenner 4-point)', days: 14, rule: '§73.190', note: 'FCC measured σ required if claiming conductivity different from FCC M3 zone.' },
+            { id: 'topo_survey',      task: 'Topographic survey for tower foundation & radial field', days: 14, rule: null, note: 'Required for PE-stamped structural drawings.' }
+          ]
+        },
+        {
+          id: 'fcc_engineering',
+          label: 'FCC Engineering Study',
+          weeks_optimistic: 6, weeks_conservative: 16,
+          milestones: [
+            { id: 'spacing_study',    task: '§73.37 spacing analysis (all channels)', days: 10, rule: '§73.37', note: 'Must clear co-channel, first-adjacent, and second-adjacent for all class pairs.' },
+            { id: 'nif_study',        task: `§73.182 NIF study (${isClear_cpt ? 'clear channel' : 'regional'})`, days: isClear_cpt ? 30 : 15, rule: '§73.182', note: 'Skywave NIF must cover all domestic and international stations within protection distance.' },
+            { id: 'da_pattern',       task: isDA_cpt ? 'Directional antenna pattern design + §73.316 HRP' : 'Non-directional antenna design', days: isDA_cpt ? 21 : 7, rule: '§73.316', note: isDA_cpt ? '36-radial HRP at 10° increments; suppression ≥ 28.3 dB per §73.207.' : 'Non-DA antenna design simpler but confirm vertical radiation pattern.' },
+            { id: 'coverage_map',     task: '§73.183 coverage map (groundwave contour)', days: 7, rule: '§73.183', note: 'Required Schedule D exhibit for Form 301-AM.' },
+            { id: 'env_assessment',   task: 'Environmental assessment (§1.1301–§1.1319)', days: 14, rule: '§1.1301', note: 'Required for towers > 450 ft AGL or in environmentally sensitive areas.' },
+            { id: 'asr_filing',       task: 'ASR registration (FCC Form 854)', days: 7, rule: '§17.7', note: 'Required for structures ≥ 61m AGL. Must be registered before CP issuance.' }
+          ]
+        },
+        {
+          id: 'form_301_prep',
+          label: 'Form 301-AM Preparation & Filing',
+          weeks_optimistic: 2, weeks_conservative: 6,
+          milestones: [
+            { id: 'schedule_a',       task: 'Schedule A: Legal/ownership', days: 7, rule: '§73.3533', note: 'Legal certifications; ownership disclosure.' },
+            { id: 'schedule_b',       task: 'Schedule B: Technical (antenna, pattern, ERP)', days: 7, rule: '§73.3533', note: isDA_cpt ? 'DA pattern data: HRP table, field ratio, phase, monitoring points.' : 'NDA antenna: height, radiation pattern, TPO.' },
+            { id: 'schedule_c',       task: 'Schedule C: Transmitter', days: 3, rule: '§73.3533', note: 'FCC-certified transmitter model. Must match TPO.' },
+            { id: 'schedule_d',       task: 'Schedule D: Coverage map + §73.183 contour', days: 5, rule: '§73.183', note: 'Exhibit: daytime groundwave service contour map.' },
+            { id: 'schedule_e',       task: 'Schedule E: Environmental compliance', days: 5, rule: '§1.1301', note: 'NEPA, NHPA §106, migratory bird assessment.' },
+            { id: 'fcc_filing',       task: 'LMS filing + fee payment', days: 1, rule: '§73.3525', note: 'Major change filing fee (§73.3525); submit via LMS.' }
+          ]
+        },
+        {
+          id: 'fcc_processing',
+          label: 'FCC Processing (CP Issuance)',
+          weeks_optimistic: 52, weeks_conservative: 130,
+          milestones: [
+            { id: 'fcc_review',       task: 'FCC staff review (Audio Division)', days: 180, rule: '§73.3561', note: 'Typical processing 6–18 months for major AM modifications. Clear-channel NIF cases take longer.' },
+            { id: 'public_notice',    task: 'Public notice / petitions to deny period', days: 30, rule: '§73.3584', note: '30-day petition window after acceptance public notice.' },
+            { id: 'cp_grant',         task: 'CP grant', days: 30, rule: '§73.3598', note: 'CP must be granted before construction may begin. 3-year build period from CP date.' }
+          ]
+        },
+        {
+          id: 'construction',
+          label: 'Construction Phase',
+          weeks_optimistic: 26, weeks_conservative: 52,
+          milestones: [
+            { id: 'zoning',           task: 'Local zoning / conditional use permit', days: 90, rule: null, note: 'Often the longest local process; start as early as possible (parallel with FCC).' },
+            { id: 'tower_permit',     task: 'Building / tower erection permit', days: 30, rule: null, note: 'State/local structural permit.' },
+            { id: 'radial_install',   task: 'Ground radial system installation', days: 21, rule: '§73.190', note: '120 buried radials, 0.4λ length minimum per §73.190 guidance.' },
+            { id: 'tower_erect',      task: 'Tower erection + FAA painting/lighting', days: 30, rule: '§17.21', note: 'FAA Form 7460-2 completion notice within 5 days of completion.' },
+            { id: 'tx_install',       task: 'Transmitter installation + RF plumbing', days: 14, rule: null, note: 'Install and align transmission line, antenna tuning unit, phasor (if DA).' },
+            { id: 'proof_of_perf',    task: 'Proof of performance (§73.154)', days: 14, rule: '§73.154', note: isDA_cpt ? 'DA proof: base current ratios, phases, monitor point field strengths, 36+ HRP radials.' : 'NDA proof: operating power measurement and base current/input power.' }
+          ]
+        },
+        {
+          id: 'license_grant',
+          label: 'License Grant Phase',
+          weeks_optimistic: 4, weeks_conservative: 12,
+          milestones: [
+            { id: 'form_302',         task: 'Form 302-AM: License application', days: 7, rule: '§73.3536', note: 'File within 10 days of commencing program test authority (§73.1620).' },
+            { id: 'fcc_license',      task: 'FCC license grant', days: 45, rule: '§73.3536', note: 'Typically 30–90 days. Interim authority under §73.1620 while application pending.' }
+          ]
+        }
+      ];
+
+      const totalOptimisticWeeks  = phases.reduce((s, p) => s + p.weeks_optimistic, 0);
+      const totalConservativeWeeks= phases.reduce((s, p) => s + p.weeks_conservative, 0);
+      const totalMilestones = phases.reduce((s, p) => s + p.milestones.length, 0);
+
+      // Critical path items (items that directly gate FCC CP issuance)
+      const criticalPath = ['spacing_study', 'nif_study', 'da_pattern', 'asr_filing', 'fcc_review', 'cp_grant'];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        pattern_mode,
+        is_major_change:           isMajorChange_cpt,
+        is_directional:            isDA_cpt,
+        is_clear_channel:          isClear_cpt,
+        total_optimistic_weeks:    totalOptimisticWeeks,
+        total_conservative_weeks:  totalConservativeWeeks,
+        total_optimistic_months:   round2(totalOptimisticWeeks / 4.33),
+        total_conservative_months: round2(totalConservativeWeeks / 4.33),
+        total_milestones:          totalMilestones,
+        n_phases:                  phases.length,
+        phases,
+        critical_path_milestone_ids: criticalPath,
+        n_critical_path:           criticalPath.length,
+        filing_fee_major_change_usd: 6465,
+        reference: '47 CFR §73.3533; §73.3598; §73.3561; §73.3584; §73.3536; §73.1620; §17.7; §73.154',
+        note: `CP timeline for ${fcc_class} class ${isDA_cpt ? 'directional' : 'non-directional'} AM relocation. Optimistic: ${totalOptimisticWeeks} weeks (~${round2(totalOptimisticWeeks / 4.33)} months). Conservative: ${totalConservativeWeeks} weeks (~${round2(totalConservativeWeeks / 4.33)} months).`
       };
     })(),
 
