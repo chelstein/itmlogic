@@ -334,6 +334,11 @@ const DEMO_RESULT = {
     },
     {
       priority: 'MEDIUM',
+      action: 'Evaluate TPO increase for §73.24(j) COL coverage on 2 candidate(s) (Rank 3: increase to ≥8.5 kW).',
+      rationale: 'Ranks 3 and 4 fail the §73.24(j) 5 mV/m principal-community floor at current TPO. The engine has pre-computed the minimum TPO at which the 5 mV/m groundwave contour reaches the community-of-license centroid distance. Verify the increased power is within the licensed class ceiling (§73.21) and does not create new §73.24(g) blanket population problems.'
+    },
+    {
+      priority: 'MEDIUM',
       action: 'Commission §73.182 nighttime skywave NIF study before selecting any candidate site.',
       rationale: 'The operating frequency (780 kHz) is a §73.25 clear channel with HIGH skywave risk. A complete NIF analysis is mandatory for any change of community or transmitter site; this should precede site acquisition to avoid committing to a site that fails nighttime skywave protection.'
     },

@@ -147,13 +147,28 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
           {countByStatus && (
             <div className="flex items-center gap-1.5 font-mono text-[9px]">
               {countByStatus.PROMISING > 0 && (
-                <span style={{ color: '#63d471' }} title="PROMISING candidates (all evaluated)">
+                <span style={{ color: '#63d471' }} title="PROMISING candidates">
                   ● {countByStatus.PROMISING} P
                 </span>
               )}
               {countByStatus.REVIEW_REQUIRED > 0 && (
                 <span style={{ color: '#ffb347' }} title="REVIEW REQUIRED candidates">
                   ! {countByStatus.REVIEW_REQUIRED} R
+                </span>
+              )}
+              {(() => {
+                const recCount = (countByStatus.RECOVERABLE_WITH_DA || 0)
+                  + (countByStatus.RECOVERABLE_WITH_REDUCED_POWER || 0)
+                  + (countByStatus.RECOVERABLE_WITH_COL_CHANGE || 0);
+                return recCount > 0 ? (
+                  <span style={{ color: '#6fd3ff' }} title="RECOVERABLE candidates (DA / power / COL change)">
+                    ↻ {recCount} REC
+                  </span>
+                ) : null;
+              })()}
+              {countByStatus.TREATY_REVIEW > 0 && (
+                <span style={{ color: '#c79bff' }} title="TREATY REVIEW candidates">
+                  § {countByStatus.TREATY_REVIEW} TR
                 </span>
               )}
               {countByStatus.NON_COMPLIANT > 0 && (
@@ -188,7 +203,9 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     'col_coverage_pct','blanket_population_pct','daytime_reach_km',
                     'principal_community_5mvm_km','blanket_1000mvm_km','ground_sigma_mS_m',
                     'ground_sigma_quality','ground_sigma_filing_grade','ground_radial_advisory',
-                    'lat','lon','treaty_zone','minimum_tpo_for_compliance_kw'];
+                    'field_at_col_centroid_mvm','estimated_daytime_population_served','score_confidence',
+                    'lat','lon','treaty_zone',
+                    'minimum_tpo_for_compliance_kw','minimum_tpo_for_col_coverage_kw'];
                   const esc = v => v == null ? '' : (String(v).includes(',') ? `"${String(v).replace(/"/g,'""')}"` : String(v));
                   const lines = [CSV_COLS.join(','),
                     ...candidates.map(c => CSV_COLS.map(k => esc(c[k])).join(','))];
