@@ -1460,6 +1460,70 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Antenna height options */}
+        {candidate.antenna_height_options && (() => {
+          const aho = candidate.antenna_height_options;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Antenna height options <span className="normal-case text-textDim/60">(FCC R-4 efficiency table)</span></div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="grid gap-1">
+                  {aho.options.map(opt => (
+                    <div key={opt.id} className="border border-rule/40 rounded-sm px-2 py-1.5">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-cream text-[10px] font-bold">{opt.label}</span>
+                        <div className="flex gap-2 items-center text-[9px]">
+                          <span className="text-textDim">{opt.height_m} m / {opt.height_ft} ft</span>
+                          <span style={{ color: opt.gain_vs_qw_db >= 0 ? '#63d471' : '#ffb347' }}>
+                            {opt.gain_vs_qw_db >= 0 ? '+' : ''}{opt.gain_vs_qw_db} dB vs λ/4
+                          </span>
+                          <span className="text-cream">{opt.estimated_erp_kw} kW ERP</span>
+                          {opt.asr_required && (
+                            <span className="text-[8px] px-1 py-0.5 rounded-sm" style={{ background: 'rgba(224,82,82,0.15)', color: '#e05252' }}>ASR</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {aho.note && (
+                  <div className="text-textDim/40 text-[9px] leading-tight">{aho.note}</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Seasonal conductivity note */}
+        {candidate.seasonal_conductivity_note && (() => {
+          const scn = candidate.seasonal_conductivity_note;
+          const riskColor = scn.risk_level === 'MINIMAL' ? '#63d471'
+            : scn.risk_level === 'LOW' ? '#a8d46a'
+            : scn.risk_level === 'ELEVATED' ? '#ffb347'
+            : '#e05252';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Seasonal conductivity risk</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: riskColor + '22', color: riskColor }}>
+                    {scn.risk_level}
+                  </span>
+                  <span className="text-textDim text-[9px]">{scn.seasonal_variability?.replace(/_/g, ' ')} variability · σ={scn.sigma_msm} mS/m</span>
+                </div>
+                <div className="space-y-0.5">
+                  {scn.notes?.slice(0, 2).map((note, i) => (
+                    <div key={i} className="text-textDim/75 leading-snug text-[9px] border-l border-rule/30 pl-1.5">
+                      {note}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>
