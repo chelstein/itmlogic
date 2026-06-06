@@ -2226,6 +2226,55 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Community of License Change Guide */}
+        {candidate.community_of_license_change_guide && (() => {
+          const g = candidate.community_of_license_change_guide;
+          const riskColors = { LOW: '#34d399', MEDIUM: '#fbbf24', HIGH: '#f97316', VERY_HIGH: '#f87171', 'NOT-EVALUATED': '#94a3b8' };
+          const sevColors = { CRITICAL: '#f87171', HIGH: '#f97316', MEDIUM: '#fbbf24' };
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Community of License (COL) Change <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3573 / §73.24(h)</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>COL Change Risk</div>
+                  <div style={{ color: riskColors[g.col_change_risk] || '#94a3b8', fontSize: 13, fontWeight: 600 }}>{g.col_change_risk}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Distance from COL</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.distance_from_col_km != null ? `${g.distance_from_col_km} km` : 'Unknown'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>COL Change Triggered</div>
+                  <div style={{ color: g.triggers_col_change ? '#f87171' : '#34d399', fontSize: 12, fontWeight: 600 }}>
+                    {g.triggers_col_change == null ? 'Unknown' : g.triggers_col_change ? 'YES — formal application required' : 'No — COL service likely preserved'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Auction Exposure</div>
+                  <div style={{ color: g.auction_required === 'POSSIBLE' ? '#f87171' : '#34d399', fontSize: 12 }}>{g.auction_required}</div>
+                </div>
+              </div>
+              {g.col_change_risks && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>COL Change Risks</div>
+                  {g.col_change_risks.map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: sevColors[r.severity] || '#475569', color: '#0f172a', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, minWidth: 48, textAlign: 'center', marginTop: 1 }}>{r.severity}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{r.risk}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{r.cfr}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>COL contour: {g.col_contour_threshold_mv_m} mV/m daytime ({g.col_service_cfr})</div>
+            </div>
+          );
+        })()}
+
         {/* FCC License Modification Guide */}
         {candidate.fcc_license_modification_guide && (() => {
           const g = candidate.fcc_license_modification_guide;

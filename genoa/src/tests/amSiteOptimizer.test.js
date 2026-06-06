@@ -5683,6 +5683,55 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- community_of_license_change_guide ----
+
+test('community_of_license_change_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.community_of_license_change_guide != null, 'community_of_license_change_guide missing');
+  const g = c.community_of_license_change_guide;
+  assert.ok('triggers_col_change' in g, 'triggers_col_change missing');
+  assert.ok('col_change_risk' in g, 'col_change_risk missing');
+  assert.ok('col_change_risks' in g, 'col_change_risks missing');
+  assert.ok('col_preservation_strategies' in g, 'col_preservation_strategies missing');
+});
+
+test('community_of_license_change_guide COL contour threshold is 0.5 mV/m', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_change_guide;
+  assert.strictEqual(g.col_contour_threshold_mv_m, 0.5, 'COL contour threshold must be 0.5 mV/m per §73.24(h)');
+  assert.ok(g.col_service_cfr.includes('73.24'), 'COL service CFR must reference §73.24');
+});
+
+test('community_of_license_change_guide risk model is ordered LOW/MEDIUM/HIGH based on distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_change_guide;
+  assert.ok(['LOW', 'MEDIUM', 'HIGH', 'VERY_HIGH', 'NOT-EVALUATED'].includes(g.col_change_risk),
+    `col_change_risk must be a recognized risk level, got: ${g.col_change_risk}`);
+  if (g.distance_from_col_km != null) {
+    if (g.distance_from_col_km <= 15) assert.strictEqual(g.col_change_risk, 'LOW', 'distance ≤15km must be LOW risk');
+    if (g.distance_from_col_km > 40)  assert.strictEqual(g.triggers_col_change, true, 'distance >40km must trigger COL change flag');
+  }
+});
+
+test('community_of_license_change_guide has CRITICAL risk for principal community contour failure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_change_guide;
+  assert.ok(Array.isArray(g.col_change_risks), 'col_change_risks must be array');
+  const criticalRisk = g.col_change_risks.find(r => r.severity === 'CRITICAL');
+  assert.ok(criticalRisk != null, 'must have at least one CRITICAL risk');
+  assert.ok(criticalRisk.cfr.includes('73.24') || criticalRisk.cfr.includes('73.3573'), 'CRITICAL risk must reference §73.24 or §73.3573');
+});
+
+test('community_of_license_change_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('colcg_triggers_col_change' in row, 'colcg_triggers_col_change missing from comparison table');
+    assert.ok('colcg_dist_from_col_km' in row, 'colcg_dist_from_col_km missing from comparison table');
+    assert.ok('colcg_auction_required' in row, 'colcg_auction_required missing from comparison table');
+  }
+});
+
 // ---- fcc_license_modification_guide ----
 
 test('fcc_license_modification_guide presence and structure', async () => {
