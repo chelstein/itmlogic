@@ -2129,6 +2129,49 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Propagation Confidence Interval */}
+        {candidate.propagation_confidence_interval && (() => {
+          const pci = candidate.propagation_confidence_interval;
+          const confColor = c => c === 'HIGH' ? 'text-emerald-400' : c === 'MEDIUM' ? 'text-blue-300' : 'text-amber-400';
+          const confBg    = c => c === 'HIGH' ? 'bg-emerald-400/15 border-emerald-400/40' : c === 'MEDIUM' ? 'bg-blue-300/15 border-blue-300/40' : 'bg-amber-400/15 border-amber-400/40';
+          const fmtBounds = (b) => b?.low != null ? `${b.low}–${b.high}` : '—';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Propagation Confidence Interval</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${confBg(pci.confidence_level)} ${confColor(pci.confidence_level)}`}>
+                  {pci.confidence_level} CONFIDENCE
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  σ ±{pci.field_uncertainty_pct}% field / ±{pci.reach_uncertainty_pct}% reach
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-1 mb-2">
+                {[
+                  { label: 'Reach range (km)', value: fmtBounds(pci.daytime_reach_bounds_km) },
+                  { label: 'COL field range (mV/m)', value: fmtBounds(pci.col_field_bounds_mvm) },
+                  { label: 'Blanket 1000 mV/m (km)', value: fmtBounds(pci.blanket_1000mvm_bounds_km) },
+                  { label: 'COL coverage range', value: pci.col_coverage_bounds?.low != null ? `${(pci.col_coverage_bounds.low*100).toFixed(0)}–${(pci.col_coverage_bounds.high*100).toFixed(0)}%` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {pci.recommended_data_upgrade && pci.recommended_data_upgrade.action !== 'NONE' && (
+                <div className="border border-amber-400/30 rounded p-1.5 bg-amber-400/5 mb-1">
+                  <div className="font-mono text-[9px] text-amber-400 font-semibold mb-0.5">
+                    Upgrade: {pci.recommended_data_upgrade.label}
+                  </div>
+                  <div className="font-mono text-[8px] text-textDim leading-snug">{pci.recommended_data_upgrade.note}</div>
+                </div>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug">{pci.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Antenna Pattern Optimization Guide */}
         {candidate.antenna_pattern_optimization_guide && (() => {
           const ap = candidate.antenna_pattern_optimization_guide;

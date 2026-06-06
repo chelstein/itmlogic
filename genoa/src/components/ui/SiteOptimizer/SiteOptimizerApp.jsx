@@ -1328,6 +1328,22 @@ const DEMO_RESULT = {
         n_checklist_required: 7,
         reference: '47 CFR §73.150; §73.152; §73.316; §73.24(j); §73.207/§73.215',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
+      },
+      propagation_confidence_interval: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+        sigma_msm: 8, sigma_source: 'FCC M3 zone table', sigma_filing_grade: 'screening',
+        field_uncertainty_pct: 35, reach_uncertainty_pct: 24.5, confidence_level: 'LOW',
+        daytime_reach_bounds_km: { nominal: 38.7, low: 29.2, high: 48.2 },
+        blanket_1000mvm_bounds_km: { nominal: 0.31, low: 0.23, high: 0.39 },
+        col_field_bounds_mvm: { nominal: 4.1, low: 2.7, high: 5.5 },
+        col_coverage_bounds: { nominal: 0.88, low: 0.66, high: 1.0 },
+        recommended_data_upgrade: {
+          action: 'RASTER',
+          label: 'Load AM_m3.tif GeoTIFF for filing-grade σ',
+          note: 'Zone-table σ is the primary source of uncertainty. Installing the AM_m3.tif conductivity raster cuts uncertainty from ±35% to ±18% on field strength. This is the highest-impact single upgrade for this candidate.'
+        },
+        reference: 'ITU-R P.527-5; FCC M3 zone table (§73.184); §73.190; OET Tech. Note 101',
+        note: 'Confidence intervals are statistical estimates based on known σ source accuracy. Actual propagation may differ due to terrain, vegetation, moisture content, and near-field coupling.'
       }
     },
     {

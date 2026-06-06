@@ -779,7 +779,11 @@ export async function runSiteOptimizer(body = {}){
     fin_payback_optimistic: c.financial_feasibility_summary?.payback_years_optimistic ?? null,
     ap_col_bearing_deg:     c.antenna_pattern_optimization_guide?.col_bearing_deg ?? null,
     ap_col_field_nda_mvm:   c.antenna_pattern_optimization_guide?.field_at_col_nda_mvm ?? null,
-    ap_da_recommended:      c.antenna_pattern_optimization_guide?.da_recommended ?? null
+    ap_da_recommended:      c.antenna_pattern_optimization_guide?.da_recommended ?? null,
+    prop_confidence:        c.propagation_confidence_interval?.confidence_level ?? null,
+    prop_reach_unc_pct:     c.propagation_confidence_interval?.reach_uncertainty_pct ?? null,
+    prop_reach_low_km:      c.propagation_confidence_interval?.daytime_reach_bounds_km?.low ?? null,
+    prop_reach_high_km:     c.propagation_confidence_interval?.daytime_reach_bounds_km?.high ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5292,6 +5296,90 @@ async function scoreCandidate(pt, ctx, warnings){
         n_checklist_required: hrpChecklist.filter(i => i.required).length,
         reference: '47 CFR §73.150 (DA operation); §73.152 (DA-D/DA-N); §73.316 (pattern measurements); §73.24(j) (COL field); §73.207/§73.215 (protection)',
         note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
+      };
+    })(),
+
+    // Propagation confidence interval.
+    // All groundwave estimates carry uncertainty from σ source quality, terrain,
+    // and the FCC M3 curve approximation.  This block quantifies the uncertainty
+    // on daytime reach, COL field, and blanket contour as ±% bounds, gives an
+    // effective confidence level, and recommends the data upgrade most likely to
+    // reduce the uncertainty.
+    propagation_confidence_interval: (() => {
+      // σ source quality → base uncertainty
+      // Zone-table: ±30–40% on field strength (ITU-R P.527, M3 accuracy study)
+      // Raster GeoTIFF: ±15–20% (still no terrain correction)
+      // Measured (§73.190): ±5–10%
+      const isRaster  = ground_sigma_filing_grade === 'filing';
+      const isMeasured = ground_sigma_filing_grade === 'measured';
+      const sigmaUncPct = isMeasured ? 8 : isRaster ? 18 : 35;   // % on field strength
+
+      // Terrain variation factor: flat (high σ) has less variation than hilly.
+      // Proxy: σ < 5 mS/m often correlates with rocky/hilly terrain (high uncertainty);
+      //        σ ≥ 10 mS/m often indicates flat agricultural land (lower uncertainty).
+      const terrainExtraPct = sigma_msm < 5 ? 10 : sigma_msm < 8 ? 5 : 0;
+
+      // Total field uncertainty (percentage on field strength mV/m)
+      const fieldUncPct = sigmaUncPct + terrainExtraPct;
+
+      // Reach uncertainty: FCC gwave curves are monotonically decreasing with distance.
+      // A ±P% error on field → roughly ±R% on reach distance (varies by slope, ~0.5–0.8 ratio).
+      // Conservative: use 0.7× the field uncertainty as reach uncertainty.
+      const reachUncPct = round2(fieldUncPct * 0.70);
+
+      // Confidence level
+      const confidence_level = fieldUncPct <= 12 ? 'HIGH'
+                              : fieldUncPct <= 22 ? 'MEDIUM'
+                              : 'LOW';
+
+      // Apply bounds to key outputs
+      const applyBounds = (val, pct) => {
+        if (val == null) return { nominal: null, low: null, high: null };
+        return {
+          nominal: val,
+          low:  round2(val * (1 - pct / 100)),
+          high: round2(val * (1 + pct / 100))
+        };
+      };
+
+      const reach_bounds    = applyBounds(daytime_reach_km, reachUncPct);
+      const blanket_bounds  = applyBounds(blanket_1000mvm_km, reachUncPct);
+
+      // COL field uncertainty — apply to field_at_col_centroid_mvm if available,
+      // else to coverage_pct as a proxy
+      const colFieldNominal = field_at_col_centroid_mvm ?? null;
+      const col_field_bounds = applyBounds(colFieldNominal, fieldUncPct);
+
+      // Coverage pct bounds — if field uncertainty causes the 5 mV/m boundary to
+      // shift inward/outward by ±reachUncPct, coverage_pct swings by a similar fraction
+      const coverage_bounds = coverage_pct != null
+        ? { nominal: round2(coverage_pct), low: round2(Math.max(0, coverage_pct * (1 - reachUncPct/100))), high: round2(Math.min(1, coverage_pct * (1 + reachUncPct/100))) }
+        : { nominal: null, low: null, high: null };
+
+      // Recommended data upgrade
+      const upgrade = isMeasured
+        ? { action: 'NONE', label: 'Measured conductivity on file', note: 'σ from §73.190 field measurements — highest available accuracy. No upgrade needed.' }
+        : isRaster
+        ? { action: 'MEASURE', label: 'Commission §73.190 conductivity measurement', note: 'GeoTIFF raster reduces uncertainty but measured conductivity at the specific site further tightens confidence. Consider §73.190 soil probe before filing.' }
+        : { action: 'RASTER', label: 'Load AM_m3.tif GeoTIFF for filing-grade σ', note: 'Zone-table σ is the primary source of uncertainty. Installing the AM_m3.tif conductivity raster cuts uncertainty from ±35% to ±18% on field strength. This is the highest-impact single upgrade for this candidate.' };
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        sigma_msm,
+        sigma_source: ground_sigma_source,
+        sigma_filing_grade: ground_sigma_filing_grade,
+        field_uncertainty_pct: fieldUncPct,
+        reach_uncertainty_pct: reachUncPct,
+        confidence_level,
+        daytime_reach_bounds_km: reach_bounds,
+        blanket_1000mvm_bounds_km: blanket_bounds,
+        col_field_bounds_mvm: col_field_bounds,
+        col_coverage_bounds: coverage_bounds,
+        recommended_data_upgrade: upgrade,
+        reference: 'ITU-R P.527-5 (ground conductivity accuracy); FCC M3 zone table (§73.184); §73.190 (conductivity measurement); OET Tech. Note 101',
+        note: 'Confidence intervals are statistical estimates based on known σ source accuracy. Actual propagation may differ due to terrain, vegetation, moisture content, and near-field coupling. These bounds are for screening purposes only — filing-grade predictions require a §73.190 soil conductivity measurement at each candidate site.'
       };
     })(),
 

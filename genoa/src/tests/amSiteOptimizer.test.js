@@ -5205,3 +5205,52 @@ test('antenna_pattern_optimization_guide comparison table columns populated', as
     assert.ok('ap_da_recommended' in row);
   }
 });
+
+// ---- propagation_confidence_interval ----
+
+test('propagation_confidence_interval is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.propagation_confidence_interval != null, `rank ${c.rank} missing propagation_confidence_interval`);
+  }
+});
+
+test('propagation_confidence_interval has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const pci = out.candidates[0].propagation_confidence_interval;
+  assert.ok(typeof pci.field_uncertainty_pct === 'number');
+  assert.ok(typeof pci.reach_uncertainty_pct === 'number');
+  assert.ok(['HIGH','MEDIUM','LOW'].includes(pci.confidence_level));
+  assert.ok(pci.daytime_reach_bounds_km != null);
+  assert.ok(typeof pci.daytime_reach_bounds_km.low === 'number');
+  assert.ok(typeof pci.daytime_reach_bounds_km.high === 'number');
+});
+
+test('propagation_confidence_interval zone-table source yields LOW confidence', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const pci = out.candidates[0].propagation_confidence_interval;
+  // zone-table σ → field_uncertainty_pct >= 30 → LOW
+  assert.equal(pci.confidence_level, 'LOW');
+  assert.ok(pci.field_uncertainty_pct >= 30);
+});
+
+test('propagation_confidence_interval bounds are ordered low < nominal < high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const pci = out.candidates[0].propagation_confidence_interval;
+  const b = pci.daytime_reach_bounds_km;
+  if (b.nominal != null) {
+    assert.ok(b.low < b.nominal, 'low must be < nominal');
+    assert.ok(b.nominal < b.high, 'nominal must be < high');
+  }
+});
+
+test('propagation_confidence_interval comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('prop_confidence' in row);
+    assert.ok('prop_reach_unc_pct' in row);
+    assert.ok('prop_reach_low_km' in row);
+    assert.ok('prop_reach_high_km' in row);
+  }
+});
