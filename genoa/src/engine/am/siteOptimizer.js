@@ -579,6 +579,48 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
+  // ---- 14a. Candidate scoring audit ----
+  // Transparency report on how many candidates were scored vs. returned, with
+  // distribution of truncated-out candidates by status.  Helps engineers
+  // understand what they might be missing above the candidate_limit cutoff.
+  const candidate_scoring_audit = (() => {
+    const truncated = scored.length - returned.length;
+    const truncatedByStatus = {};
+    for (const c of scored.slice(returned.length)) {
+      const s = c.status_category ?? 'UNKNOWN';
+      truncatedByStatus[s] = (truncatedByStatus[s] ?? 0) + 1;
+    }
+    const returnedScores = returned.map(c => c.score);
+    const lowestReturnedScore = returnedScores.length ? Math.min(...returnedScores) : null;
+    const truncatedScores = scored.slice(returned.length).map(c => c.score);
+    const highestTruncatedScore = truncatedScores.length ? Math.max(...truncatedScores) : null;
+
+    // Tie detection: are any truncated candidates within 1 point of the last returned?
+    const tiedCandidates = truncatedScores.filter(s => s != null && lowestReturnedScore != null
+      && Math.abs(s - lowestReturnedScore) < 1.0).length;
+
+    const warnings_out = [];
+    if (tiedCandidates > 0) {
+      warnings_out.push(`${tiedCandidates} truncated candidate(s) within 1 score point of the cutoff — consider increasing candidate_limit to resolve the tie.`);
+    }
+    if (truncated > 0 && (truncatedByStatus.PROMISING ?? 0) > 0) {
+      warnings_out.push(`${truncatedByStatus.PROMISING} PROMISING candidate(s) were truncated due to candidate_limit. Increase limit to see all PROMISING sites.`);
+    }
+
+    return {
+      total_scored: scored.length,
+      total_returned: returned.length,
+      total_truncated: truncated,
+      truncated_by_status: truncated > 0 ? truncatedByStatus : null,
+      lowest_returned_score: lowestReturnedScore,
+      highest_truncated_score: highestTruncatedScore,
+      score_gap_at_cutoff: (lowestReturnedScore != null && highestTruncatedScore != null)
+        ? round2(lowestReturnedScore - highestTruncatedScore) : null,
+      tied_at_cutoff: tiedCandidates > 0,
+      audit_warnings: warnings_out.length > 0 ? warnings_out : null
+    };
+  })();
+
   // ---- 14b. Candidate set statistics ----
   // Aggregate numeric statistics across returned candidates for UI charts/summaries.
   const candidate_set_statistics = (() => {
@@ -853,6 +895,7 @@ export async function runSiteOptimizer(body = {}){
     engineering_summary,
     frequency_allocation_context,
     candidate_set_statistics,
+    candidate_scoring_audit,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,

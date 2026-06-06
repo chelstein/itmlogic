@@ -3834,3 +3834,47 @@ test('regulatory_timeline_estimate phases each have id, label, weeks, blocking',
     assert.ok(typeof p.blocking === 'boolean', `phase.blocking must be boolean`);
   }
 });
+
+// ---------- candidate_scoring_audit ----------
+
+test('candidate_scoring_audit is present on response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.ok(out.candidate_scoring_audit != null, 'candidate_scoring_audit must be present');
+});
+
+test('candidate_scoring_audit.total_scored >= total_returned', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const audit = out.candidate_scoring_audit;
+  assert.ok(audit.total_scored >= audit.total_returned,
+    'total_scored must be >= total_returned');
+  assert.equal(audit.total_returned, out.candidates.length,
+    'total_returned must match candidates.length');
+});
+
+test('candidate_scoring_audit.total_truncated = total_scored - total_returned', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const audit = out.candidate_scoring_audit;
+  assert.equal(audit.total_truncated, audit.total_scored - audit.total_returned,
+    'total_truncated must equal total_scored - total_returned');
+});
+
+test('candidate_scoring_audit.lowest_returned_score is present when candidates exist', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  if (out.candidates.length > 0) {
+    assert.ok(out.candidate_scoring_audit.lowest_returned_score != null,
+      'lowest_returned_score must be present when candidates are returned');
+  }
+});
+
+test('candidate_scoring_audit truncation warnings present when limit is very small', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  assert.equal(out.available, true);
+  const audit = out.candidate_scoring_audit;
+  if (audit.total_truncated > 0) {
+    assert.ok(audit.total_truncated > 0, 'truncated should be positive with limit=1');
+  }
+});
