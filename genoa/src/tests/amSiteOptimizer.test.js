@@ -1365,3 +1365,73 @@ test('nif_status does NOT include skywave suffix for LOW-risk station (local cha
       `nif_status for local channel should NOT mention HIGH/MODERATE skywave risk; rank ${c.rank} got: "${c.nif_status}"`);
   }
 });
+
+test('col_coverage_gap_pct is positive for candidates below 80% COL floor, null otherwise', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, fcc_class: 'D',
+    search_radius_km: 30, grid_spacing_km: 10, candidate_limit: 20,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (c.col_coverage_pct != null && c.col_coverage_pct < 0.80){
+      assert.ok(c.col_coverage_gap_pct != null && c.col_coverage_gap_pct > 0,
+        `col_coverage_gap_pct should be positive when coverage < 80%; rank ${c.rank} got ${c.col_coverage_gap_pct}`);
+      // gap should equal 0.80 - coverage (within 0.01 rounding)
+      assert.ok(Math.abs(c.col_coverage_gap_pct - (0.80 - c.col_coverage_pct)) < 0.01,
+        `col_coverage_gap_pct ${c.col_coverage_gap_pct} should equal 0.80 - ${c.col_coverage_pct} (rank ${c.rank})`);
+    } else if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.80){
+      assert.equal(c.col_coverage_gap_pct, null,
+        `col_coverage_gap_pct should be null when coverage ≥ 80%; rank ${c.rank} got ${c.col_coverage_gap_pct}`);
+    }
+  }
+});
+
+test('population_delta_vs_baseline is stamped after a run with a baseline', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_population: true }
+  });
+  assert.equal(out.available, true);
+  // Every candidate should have the field (null or integer).
+  for (const c of out.candidates){
+    assert.ok('population_delta_vs_baseline' in c,
+      `population_delta_vs_baseline must be present on every candidate (rank ${c.rank})`);
+    if (c.population_delta_vs_baseline != null){
+      assert.ok(Number.isFinite(c.population_delta_vs_baseline) && Number.isInteger(c.population_delta_vs_baseline),
+        `population_delta_vs_baseline must be an integer; rank ${c.rank} got ${c.population_delta_vs_baseline}`);
+    }
+  }
+  // Baseline itself should have delta = 0.
+  const baseline = out.candidates.find(c => c.distance_from_current_km < 0.5);
+  if (baseline && baseline.population_delta_vs_baseline != null){
+    assert.equal(baseline.population_delta_vs_baseline, 0,
+      `baseline candidate should have population_delta_vs_baseline = 0`);
+  }
+});
+
+test('optimization_confidence includes per_candidate_confidence distribution', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const pcc = out.optimization_confidence?.per_candidate_confidence;
+  assert.ok(pcc != null, 'optimization_confidence.per_candidate_confidence must be present');
+  assert.ok('LOW' in pcc, 'per_candidate_confidence must have a LOW key');
+  assert.ok('MEDIUM' in pcc, 'per_candidate_confidence must have a MEDIUM key');
+  assert.ok('HIGH' in pcc, 'per_candidate_confidence must have a HIGH key');
+  // Without raster or polygon, all candidates should be LOW.
+  assert.equal(pcc.MEDIUM, 0, 'MEDIUM should be 0 without raster or polygon');
+  assert.equal(pcc.HIGH, 0, 'HIGH should be 0 without raster or polygon');
+  assert.ok(pcc.LOW > 0, 'LOW should be > 0');
+});
+
+test('optimization_confidence notes include all-LOW advisory when no filing-grade inputs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10,
+    optimization_goals: { maximize_col_coverage: true, prefer_high_conductivity: true }
+  });
+  assert.equal(out.available, true);
+  const notes = out.optimization_confidence?.notes ?? [];
+  // All candidates are LOW → advisory note should be present.
+  const hasAdvisory = notes.some(n => /LOW confidence/i.test(n) || /zone-table/i.test(n));
+  assert.ok(hasAdvisory,
+    `optimization_confidence.notes should include a LOW-confidence advisory; got: ${JSON.stringify(notes)}`);
+});

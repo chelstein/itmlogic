@@ -330,23 +330,51 @@ export async function runSiteOptimizer(body = {}){
     confidenceLayers.push('col_polygon_provided');
   }
   const nLayers = confidenceLayers.length;
+
+  // Per-candidate confidence distribution (computed over all scored candidates).
+  // Used to surface a data-quality advisory when all candidates are LOW confidence.
+  const confDist = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+  for (const c of scored) confDist[c.score_confidence] = (confDist[c.score_confidence] || 0) + 1;
+  const nScoredTotal = scored.length || 1;
+  const pctLow = ((confDist.LOW / nScoredTotal) * 100).toFixed(0);
+  const confidenceNotes = [
+    ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
+    ...(goals.avoid_wildfire_risk ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
+    ...(!community_of_license_polygon ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
+    ...(confDist.LOW === nScoredTotal ? [`All ${nScoredTotal} candidates scored at LOW confidence (zone-table σ + disc-proxy COL) — provide AM_m3.tif and community_of_license_polygon to raise ranking reliability.`]
+      : confDist.LOW > nScoredTotal * 0.7 ? [`${pctLow}% of candidates scored at LOW confidence — upgrade conductivity raster and/or COL polygon for more reliable ranking.`]
+      : [])
+  ];
   const optimization_confidence = {
     level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
     contributing_layers: confidenceLayers,
-    notes: [
-      ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
-      ...(goals.avoid_wildfire_risk ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
-      ...(!community_of_license_polygon ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : [])
-    ]
+    per_candidate_confidence: confDist,
+    notes: confidenceNotes
   };
 
   // Baseline = the score row for the current site (search by coord match).
   const baseline = scored.find((c) => coordsEqual(c, current_site)) || null;
 
-  // Stamp score_delta_vs_baseline on every candidate (null if baseline unknown).
+  // Stamp deltas vs baseline on every candidate (null if baseline unknown).
   if (baseline){
     for (const c of scored){
       c.score_delta_vs_baseline = round2(c.score - baseline.score);
+      // Population delta: how many more (or fewer) people does this site serve vs current?
+      if (c.estimated_daytime_population_served != null && baseline.estimated_daytime_population_served != null){
+        c.population_delta_vs_baseline = Math.round(
+          c.estimated_daytime_population_served - baseline.estimated_daytime_population_served
+        );
+      }
+    }
+  }
+
+  // Stamp col_coverage_gap_pct on candidates that fall below the 80% hard floor.
+  // Tells the engineer how much additional coverage is needed to clear §73.24(j).
+  for (const c of scored){
+    if (c.col_coverage_pct != null && c.col_coverage_pct < COL_COVERAGE_HARD_FLOOR){
+      c.col_coverage_gap_pct = round2(COL_COVERAGE_HARD_FLOOR - c.col_coverage_pct);
+    } else {
+      c.col_coverage_gap_pct = null;
     }
   }
 
@@ -1057,6 +1085,7 @@ function baselineSummary(b){
     minimum_tpo_for_col_coverage_kw: b.minimum_tpo_for_col_coverage_kw ?? null,
     field_at_col_centroid_mvm:       b.field_at_col_centroid_mvm ?? null,
     estimated_daytime_population_served: b.estimated_daytime_population_served ?? null,
+    col_coverage_gap_pct:    b.col_coverage_gap_pct ?? null,
     score_confidence: b.score_confidence ?? null,
     ground_sigma_mS_m:         b.ground_sigma_mS_m,
     ground_sigma_quality:      b.ground_sigma_quality,

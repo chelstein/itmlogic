@@ -332,7 +332,20 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 );
               })() : <span className="text-textDim">—</span>}
             </div>
-            <div><span className="text-textDim">COL coverage</span>           <span className="text-cream">{fmtPct(candidate.col_coverage_pct)}</span></div>
+            <div>
+              <span className="text-textDim">COL coverage</span>{' '}
+              <span
+                className="text-cream"
+                style={candidate.col_coverage_gap_pct > 0 ? { color: '#ff7a7a' } : undefined}
+              >
+                {fmtPct(candidate.col_coverage_pct)}
+              </span>
+              {candidate.col_coverage_gap_pct > 0 && (
+                <span className="text-[9px] ml-1.5" style={{ color: '#ff7a7a' }}>
+                  (gap: +{(candidate.col_coverage_gap_pct * 100).toFixed(0)}% needed for §73.24(j))
+                </span>
+              )}
+            </div>
             <div className="col-span-2">
               <span className="text-textDim">Blanket pop</span>{' '}
               <span
@@ -392,7 +405,17 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
               )}
             </div>
-            <div><span className="text-textDim">NIF status</span>              <span className="text-cream">{candidate.nif_status || '—'}</span></div>
+            <div className="col-span-2">
+              <span className="text-textDim">NIF status</span>{' '}
+              {(() => {
+                const ns = candidate.nif_status || '';
+                const color = /HIGH skywave/i.test(ns) ? '#ff9b5a'
+                            : /MODERATE skywave/i.test(ns) ? '#ffb347'
+                            : /TREATY/i.test(ns) ? '#c79bff'
+                            : '#b8d0cc';
+                return <span className="font-mono text-[10px] leading-snug" style={{ color }}>{ns || '—'}</span>;
+              })()}
+            </div>
             <div><span className="text-textDim">Fuel / wildfire</span>         <span className="text-cream">{candidate.fuel_risk || '—'}</span></div>
             <div><span className="text-textDim">Treaty zone</span>             <span className="text-cream">{candidate.treaty_zone ?? '—'}</span></div>
             <div><span className="text-textDim">Parcel / zoning</span>         <span className="text-cream">UNKNOWN — verify before site survey</span></div>
