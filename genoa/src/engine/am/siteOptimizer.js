@@ -942,7 +942,10 @@ export async function runSiteOptimizer(body = {}){
     acpg_n_adj_stations:    c.adjacent_channel_protection_guide?.n_adjacent_channels_checked ?? null,
     omrg_local_am_limit:    c.ownership_multiple_rules_guide?.local_am_limit ?? null,
     omrg_radio_combo_limit: c.ownership_multiple_rules_guide?.local_radio_combo_limit ?? null,
-    omrg_attribution_risk:  c.ownership_multiple_rules_guide?.attribution_risk_level ?? null
+    omrg_attribution_risk:  c.ownership_multiple_rules_guide?.attribution_risk_level ?? null,
+    dtog_is_daytime_only:   c.daytime_only_operation_guide?.is_daytime_only ?? null,
+    dtog_hours_per_day:     c.daytime_only_operation_guide?.operating_hours?.estimated_hours_per_day ?? null,
+    dtog_fulltime_eligible: c.daytime_only_operation_guide?.fulltime_upgrade?.eligible ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6677,6 +6680,95 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    daytime_only_operation_guide: (() => {
+      // §73.99: AM daytime-only operation — stations restricted to sunrise-to-sunset hours
+      // Many Class D (and some Class C/B) AM stations are licensed as "daytime only" (D/O)
+      // because their nighttime operation would interfere with Class A (clear channel) dominant station.
+      // §73.1745: Unauthorized transmissions — operating after sunset without authority is a §503 violation.
+      //
+      // Daytime-only status is indicated on the station license.
+      // Stations may seek expanded operation (post-sunset/pre-sunrise) via §73.99 procedures.
+      // Key: relocation may change the station's ability to operate at night.
+
+      // Determine if this station is likely daytime-only
+      // Proxy: Class D on a clear channel is almost always daytime-only (secondary to Class A dominant)
+      // Class D on a regional channel may have nighttime authority with reduced power/DA
+      const isClearCh_dto = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_daytime_only = isClearCh_dto && fcc_class.toUpperCase() === 'D';
+
+      // Average daylight hours by latitude (using candidate site latitude)
+      // Phoenix AZ area (KAZM reference): latitude ~34.9°N
+      // Summer: ~14 hrs; Winter: ~10 hrs; Average: ~12 hrs/day
+      const lat = pt.lat ?? 34.9;
+      const lat_factor = Math.max(0.7, Math.min(1.3, 1 - (lat - 35) * 0.01));
+      const estimated_hours_summer = round2(Math.min(16, 12 + lat_factor * 2));
+      const estimated_hours_winter = round2(Math.max(8, 12 - lat_factor * 2));
+      const estimated_hours_per_day = round2((estimated_hours_summer + estimated_hours_winter) / 2);
+
+      // Post-sunset authority (PSA) and pre-sunrise authority (PRA):
+      // §73.99(b)(1): PSA — 15 min post-sunset at reduced power (up to 500W)
+      // §73.99(c): PRA — may operate up to 2 hours pre-sunrise
+      // These are automatic for Class D stations unless excluded by license
+      const PSA_PRA = {
+        psa_available: is_daytime_only,
+        psa_duration_min: 15,
+        psa_max_power_w: 500,
+        psa_cfr: '§73.99(b)',
+        pra_available: is_daytime_only,
+        pra_max_hours_before_sunrise: 2,
+        pra_cfr: '§73.99(c)',
+        note: 'PSA and PRA authorizations are automatic per §73.99; no separate filing required unless license restricts'
+      };
+
+      // Full-time upgrade path:
+      // Class D stations may petition for Class D full-time authority if they can demonstrate
+      // they will not create objectionable interference to the Class A dominant station
+      // at the dominant station's 0.5 mV/m contour. This typically requires moving the site
+      // OR reducing TPO dramatically.
+      const fulltime_eligible = is_daytime_only; // may apply; actual eligibility depends on interference analysis
+      const FULLTIME_PATH = {
+        eligible: fulltime_eligible,
+        method: 'Section 73.99 petition with interference analysis showing no objectionable interference to Class A',
+        cfr: '§73.99(a); §73.182',
+        typical_requirements: [
+          'Night propagation study to the dominant station using FCC groundwave curves',
+          'Show that 0.5 mV/m nighttime contour of proposed operation does not overlap dominant Class A service area',
+          'For directional antenna: submit new proof-of-performance showing nighttime pattern',
+          'Engineering certification by licensed broadcast engineer'
+        ],
+        processing_weeks: { min: 12, typical: 24, max: 52 }
+      };
+
+      // Operational constraints for daytime-only stations
+      const OPERATING_CONSTRAINTS = [
+        { id: 'SUNRISE_BEGIN', label: 'Operations begin at official local sunrise', cfr: '§73.99(a)', notes: 'FCC provides sunrise/sunset table (§73.99 App. A); must use transmitter site coordinates' },
+        { id: 'SUNSET_END',    label: 'Operations cease at official local sunset', cfr: '§73.99(a)', notes: 'Except during PSA window (15 min post-sunset, reduced power)' },
+        { id: 'NO_NIGHT_OPS',  label: 'No nighttime transmissions without authority', cfr: '§73.1745', notes: 'Unauthorized transmission is a §503(b) forfeiture offense; $15,000 base forfeiture per day' },
+        { id: 'LOG_TIMES',     label: 'Log station sign-on and sign-off times', cfr: '§73.1820', notes: 'Operating log must record sign-on, sign-off, and any interruptions with times' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        is_daytime_only,
+        is_clear_channel: isClearCh_dto,
+        operating_hours: {
+          estimated_hours_summer,
+          estimated_hours_winter,
+          estimated_hours_per_day,
+          latitude_used: round2(lat)
+        },
+        psa_pra: PSA_PRA,
+        fulltime_upgrade: FULLTIME_PATH,
+        operating_constraints: OPERATING_CONSTRAINTS,
+        n_operating_constraints: OPERATING_CONSTRAINTS.length,
+        relocation_note: is_daytime_only
+          ? 'Daytime-only station: relocation to a site with better nighttime conductivity improves PSA/PRA coverage and may enable full-time upgrade petition'
+          : 'Station not restricted to daytime-only operation; nighttime operation authority retained subject to §73.99 power/pattern requirements',
+        reference: '47 CFR §73.99; §73.1745; §73.1820; §73.182; §503(b) forfeiture; FCC §73.99 App. A (Sunrise/Sunset Table)',
+        note: `${is_daytime_only ? 'DAYTIME ONLY' : 'FULL TIME'}: ${frequency_khz} kHz Class ${fcc_class}. ~${estimated_hours_per_day} hrs/day average. PSA: ${PSA_PRA.psa_available ? '15 min/500W' : 'N/A'}. Full-time upgrade: ${fulltime_eligible ? 'eligible to petition' : 'not applicable'}.`
       };
     })(),
 

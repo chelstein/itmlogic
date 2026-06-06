@@ -1717,6 +1717,37 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      daytime_only_operation_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        is_daytime_only: true, is_clear_channel: true,
+        operating_hours: { estimated_hours_summer: 14, estimated_hours_winter: 10, estimated_hours_per_day: 12, latitude_used: 34.9 },
+        psa_pra: {
+          psa_available: true, psa_duration_min: 15, psa_max_power_w: 500, psa_cfr: '§73.99(b)',
+          pra_available: true, pra_max_hours_before_sunrise: 2, pra_cfr: '§73.99(c)',
+          note: 'PSA and PRA authorizations are automatic per §73.99; no separate filing required unless license restricts'
+        },
+        fulltime_upgrade: {
+          eligible: true,
+          method: 'Section 73.99 petition with interference analysis showing no objectionable interference to Class A',
+          cfr: '§73.99(a); §73.182',
+          typical_requirements: [
+            'Night propagation study to the dominant station using FCC groundwave curves',
+            'Show that 0.5 mV/m nighttime contour of proposed operation does not overlap dominant Class A service area',
+            'For directional antenna: submit new proof-of-performance showing nighttime pattern',
+            'Engineering certification by licensed broadcast engineer'
+          ],
+          processing_weeks: { min: 12, typical: 24, max: 52 }
+        },
+        operating_constraints: [
+          { id: 'SUNRISE_BEGIN', label: 'Operations begin at official local sunrise', cfr: '§73.99(a)', notes: 'FCC provides sunrise/sunset table; must use transmitter site coordinates' },
+          { id: 'SUNSET_END',    label: 'Operations cease at official local sunset', cfr: '§73.99(a)', notes: 'Except during PSA window (15 min post-sunset, reduced power)' },
+          { id: 'NO_NIGHT_OPS',  label: 'No nighttime transmissions without authority', cfr: '§73.1745', notes: 'Unauthorized transmission is a §503(b) forfeiture offense; $15,000 base forfeiture per day' },
+          { id: 'LOG_TIMES',     label: 'Log station sign-on and sign-off times', cfr: '§73.1820', notes: 'Operating log must record sign-on, sign-off, and any interruptions with times' }
+        ],
+        n_operating_constraints: 4,
+        reference: '47 CFR §73.99; §73.1745; §73.1820; §73.182; §503(b) forfeiture; FCC §73.99 App. A',
+        note: 'DAYTIME ONLY: Station is restricted to sunrise-to-sunset operation. Relocation may open path to full-time authority.'
+      },
       ownership_multiple_rules_guide: {
         frequency_khz: 780, fcc_class: 'D',
         local_am_limit: 5, local_radio_combo_limit: 8,

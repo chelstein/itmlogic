@@ -5683,6 +5683,61 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- daytime_only_operation_guide ----
+
+test('daytime_only_operation_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.daytime_only_operation_guide != null, 'daytime_only_operation_guide missing');
+  const d = c.daytime_only_operation_guide;
+  assert.ok('is_daytime_only' in d, 'is_daytime_only missing');
+  assert.ok('operating_hours' in d, 'operating_hours missing');
+  assert.ok('psa_pra' in d, 'psa_pra missing');
+  assert.ok('fulltime_upgrade' in d, 'fulltime_upgrade missing');
+  assert.ok(Array.isArray(d.operating_constraints), 'operating_constraints must be array');
+  assert.ok(d.operating_constraints.length >= 4, 'at least 4 operating constraints');
+});
+
+test('daytime_only_operation_guide KAZM 780 kHz is daytime only (clear channel Class D)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].daytime_only_operation_guide;
+  assert.strictEqual(d.is_daytime_only, true, 'KAZM 780 kHz Class D must be daytime only');
+  assert.strictEqual(d.is_clear_channel, true, '780 kHz is a clear channel');
+  assert.strictEqual(d.frequency_khz, 780, 'frequency_khz must be 780');
+  assert.strictEqual(d.fcc_class, 'D', 'fcc_class must be D');
+});
+
+test('daytime_only_operation_guide PSA and PRA blocks present with valid values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].daytime_only_operation_guide;
+  const p = d.psa_pra;
+  assert.strictEqual(p.psa_available, true, 'PSA must be available for daytime-only station');
+  assert.strictEqual(p.psa_duration_min, 15, 'PSA duration must be 15 min');
+  assert.ok(p.psa_max_power_w <= 500, 'PSA max power must not exceed 500W');
+  assert.strictEqual(p.pra_available, true, 'PRA must be available for daytime-only station');
+  assert.ok(p.pra_max_hours_before_sunrise >= 1, 'PRA must allow at least 1 hr pre-sunrise');
+});
+
+test('daytime_only_operation_guide fulltime upgrade path eligible for daytime-only station', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const d = out.candidates[0].daytime_only_operation_guide;
+  const f = d.fulltime_upgrade;
+  assert.strictEqual(f.eligible, true, 'fulltime upgrade eligible must be true for daytime-only station');
+  assert.ok(typeof f.method === 'string' && f.method.length > 10, 'method must be a description string');
+  assert.ok(Array.isArray(f.typical_requirements) && f.typical_requirements.length >= 2, 'typical_requirements must have entries');
+  assert.ok(f.processing_weeks.min > 0, 'processing_weeks.min must be positive');
+  assert.ok(f.processing_weeks.max > f.processing_weeks.min, 'processing_weeks.max must exceed min');
+});
+
+test('daytime_only_operation_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('dtog_is_daytime_only' in row, 'dtog_is_daytime_only missing from comparison table');
+    assert.ok('dtog_hours_per_day' in row, 'dtog_hours_per_day missing from comparison table');
+    assert.ok('dtog_fulltime_eligible' in row, 'dtog_fulltime_eligible missing from comparison table');
+  }
+});
+
 // ---- ownership_multiple_rules_guide ----
 
 test('ownership_multiple_rules_guide presence and structure', async () => {

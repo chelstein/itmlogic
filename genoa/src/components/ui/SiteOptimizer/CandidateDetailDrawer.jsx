@@ -2226,6 +2226,82 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Daytime Only Operation Guide */}
+        {candidate.daytime_only_operation_guide && (() => {
+          const d = candidate.daytime_only_operation_guide;
+          const statusColor = d.is_daytime_only ? '#fbbf24' : '#34d399';
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Daytime-Only Operation Guide <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.99</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 140px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Operating Status</div>
+                  <div style={{ color: statusColor, fontSize: 15, fontWeight: 700 }}>
+                    {d.is_daytime_only ? 'DAYTIME ONLY' : 'FULL TIME'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Est. Hrs/Day</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{d.operating_hours?.estimated_hours_per_day ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Summer Hrs</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{d.operating_hours?.estimated_hours_summer ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Winter Hrs</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{d.operating_hours?.estimated_hours_winter ?? '—'}</div>
+                </div>
+              </div>
+              {d.psa_pra && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Post-Sunset / Pre-Sunrise Authority</div>
+                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    <div>
+                      <span style={{ color: '#818cf8', fontSize: 12, fontWeight: 600 }}>PSA </span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>
+                        {d.psa_pra.psa_available ? `${d.psa_pra.psa_duration_min} min post-sunset, max ${d.psa_pra.psa_max_power_w}W` : 'Not available'} ({d.psa_pra.psa_cfr})
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ color: '#818cf8', fontSize: 12, fontWeight: 600 }}>PRA </span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>
+                        {d.psa_pra.pra_available ? `Up to ${d.psa_pra.pra_max_hours_before_sunrise} hr pre-sunrise` : 'Not available'} ({d.psa_pra.pra_cfr})
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {d.fulltime_upgrade && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Full-Time Upgrade Path</div>
+                  <div style={{ color: d.fulltime_upgrade.eligible ? '#34d399' : '#f87171', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                    {d.fulltime_upgrade.eligible ? 'Eligible to Apply' : 'Not Eligible'}
+                  </div>
+                  {d.fulltime_upgrade.eligible && (
+                    <div style={{ color: '#94a3b8', fontSize: 11 }}>
+                      Timeline: {d.fulltime_upgrade.processing_weeks?.min}–{d.fulltime_upgrade.processing_weeks?.max} weeks typical
+                    </div>
+                  )}
+                </div>
+              )}
+              {d.operating_constraints && d.operating_constraints.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Operating Constraints</div>
+                  {d.operating_constraints.map((oc, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#fbbf24', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>{oc.cfr}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{oc.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Ownership Multiple Rules Guide */}
         {candidate.ownership_multiple_rules_guide && (() => {
           const o = candidate.ownership_multiple_rules_guide;
