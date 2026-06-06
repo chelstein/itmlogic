@@ -6270,3 +6270,52 @@ test('skywave_coverage_analysis comparison table columns present', async () => {
     assert.ok('sky_nif_required' in row,'sky_nif_required missing from comparison table');
   }
 });
+
+test('eas_acp_compliance_guide presence and mandatory participation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].eas_acp_compliance_guide;
+  assert.ok(e != null, 'eas_acp_compliance_guide must be present');
+  assert.strictEqual(e.eas_participation, 'MANDATORY', 'EAS participation must be MANDATORY for AM stations');
+  assert.ok(e.n_required_equipment > 0, 'must have required equipment');
+  assert.strictEqual(e.monitoring_sources_required, 2, 'must monitor 2 EAS sources');
+});
+
+test('eas_acp_compliance_guide equipment includes encoder/decoder and IPAWS', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].eas_acp_compliance_guide;
+  const ids = e.equipment_requirements.map(r => r.id);
+  assert.ok(ids.includes('encoder'), 'must include encoder requirement');
+  assert.ok(ids.includes('decoder'), 'must include decoder requirement');
+  assert.ok(ids.includes('ipaws'),   'must include IPAWS requirement');
+  assert.strictEqual(e.ipaws_required, true, 'IPAWS must be required');
+});
+
+test('eas_acp_compliance_guide test schedule has RWT, RMT, NAT', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].eas_acp_compliance_guide;
+  const testIds = e.test_schedule.map(t => t.id);
+  assert.ok(testIds.includes('rwt'), 'must include Required Weekly Test');
+  assert.ok(testIds.includes('rmt'), 'must include Required Monthly Test');
+  assert.ok(testIds.includes('nat'), 'must include National Periodic Test');
+  assert.ok(e.n_tests >= 3, 'must have at least 3 tests in schedule');
+});
+
+test('eas_acp_compliance_guide prohibited codes and recordkeeping', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].eas_acp_compliance_guide;
+  const codes = e.prohibited_codes.map(c => c.code);
+  assert.ok(codes.includes('EAN'), 'prohibited codes must include EAN');
+  assert.ok(e.n_recordkeeping_items > 0, 'must have recordkeeping items');
+  const msgLog = e.recordkeeping.find(r => r.id === 'msg_log');
+  assert.ok(msgLog != null, 'must have message log recordkeeping item');
+  assert.strictEqual(msgLog.retention_days, 60, 'message log retention must be 60 days per §11.35(c)');
+});
+
+test('eas_acp_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('eas_participation' in row,  'eas_participation missing from comparison table');
+    assert.ok('eas_n_equipment' in row,    'eas_n_equipment missing from comparison table');
+    assert.ok('eas_ipaws_required' in row, 'eas_ipaws_required missing from comparison table');
+  }
+});

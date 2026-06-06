@@ -2226,6 +2226,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* EAS / ACP Compliance Guide */}
+        {candidate.eas_acp_compliance_guide && (() => {
+          const e = candidate.eas_acp_compliance_guide;
+          const statusBadgeEas = req => req ? <span className="text-red-300 font-bold">REQ</span> : <span className="text-gray-500">OPT</span>;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">EAS / ACP Compliance Guide (47 CFR Part 11)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  EAS participation: <span className="text-amber-300 font-bold">{e.eas_participation}</span> for all AM stations.
+                  Monitor <span className="text-white font-mono">{e.monitoring_sources_required}</span> LP sources.
+                  IPAWS: <span className={e.ipaws_required ? 'text-red-300 font-bold' : 'text-green-300'}>{e.ipaws_required ? 'REQUIRED' : 'NOT REQUIRED'}</span>.
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Equipment Requirements</div>
+                <div className="space-y-1 mb-2">
+                  {e.equipment_requirements?.map(r => (
+                    <div key={r.id} className="flex items-start gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="min-w-[32px]">{statusBadgeEas(r.required)}</span>
+                      <span className="text-gray-300 font-semibold min-w-[120px]">{r.device}</span>
+                      <span className="text-gray-500 text-xs">{r.note}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Test Schedule</div>
+                <div className="space-y-1 mb-2">
+                  {e.test_schedule?.map(t => (
+                    <div key={t.id} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="text-blue-300 font-mono font-bold w-8">{t.id.toUpperCase()}</span>
+                      <span className="text-gray-300 flex-1">{t.test}</span>
+                      <span className="text-gray-500">{t.freq}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-400 mb-1">{e.monitoring_note}</div>
+                <div className="text-xs text-gray-500">{e.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Skywave Coverage Analysis */}
         {candidate.skywave_coverage_analysis && (() => {
           const s = candidate.skywave_coverage_analysis;

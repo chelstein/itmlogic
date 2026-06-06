@@ -849,7 +849,10 @@ export async function runSiteOptimizer(body = {}){
     radial_cost_usd:        c.radial_system_engineering_guide?.material_cost_usd_estimate ?? null,
     sky_50pct_km:           c.skywave_coverage_analysis?.skywave_dist_50pct_km ?? null,
     sky_1pct_km:            c.skywave_coverage_analysis?.skywave_dist_1pct_km ?? null,
-    sky_nif_required:       c.skywave_coverage_analysis?.nif_required ?? null
+    sky_nif_required:       c.skywave_coverage_analysis?.nif_required ?? null,
+    eas_participation:      c.eas_acp_compliance_guide?.eas_participation ?? null,
+    eas_n_equipment:        c.eas_acp_compliance_guide?.n_required_equipment ?? null,
+    eas_ipaws_required:     c.eas_acp_compliance_guide?.ipaws_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8009,6 +8012,74 @@ async function scoreCandidate(pt, ctx, warnings){
         n_protection_levels:    protectionLevels.length,
         reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (M3/M3a); ITU-R P.1147',
         note: `Nighttime skywave at ${actualNightPower_kw} kW: 50% time ≈ ${sky50pct_km} km; 10% ≈ ${sky10pct_km} km; NIF 1% ≈ ${sky1pct_km} km. NIF study: ${nifRequiredSw ? nifStudyType_sw : 'NOT REQUIRED'}.`
+      };
+    })(),
+
+    eas_acp_compliance_guide: (() => {
+      // Emergency Alert System (EAS) compliance for AM broadcast stations
+      // §11.15: EAS participation; all AM/FM/TV stations must participate
+      // §11.52: monitoring assignment (LP1/LP2 sources); EAS Participants must monitor 2 sources
+      // §11.35: equipment requirements; EAS encoder/decoder must be installed
+      // §11.61: required weekly/monthly/annual tests
+      // §11.45: prohibited uses of EAS codes
+      // FEMA IPAWS integration for national alerts (EAN code)
+
+      const isLPStation_eas = tpo_kw < 0.1; // LP = very low power; full AM stations always participate
+      const stationType_eas = isLPStation_eas ? 'LP' : 'FULL_PARTICIPANT';
+
+      // EAS equipment requirements per §11.35
+      const equipmentReqs = [
+        { id: 'encoder',      device: 'EAS encoder', rule: '§11.35', required: true,  note: 'Must encode and transmit EAS messages from LP1/LP2 sources.' },
+        { id: 'decoder',      device: 'EAS decoder', rule: '§11.35', required: true,  note: 'Must decode EAS messages from monitored LP1/LP2 sources.' },
+        { id: 'audio_out',    device: 'Audio output relay', rule: '§11.35', required: true, note: 'Must interrupt normal programming automatically on EAN/EAS activation.' },
+        { id: 'logging',      device: 'EAS message log', rule: '§11.35(c)', required: true, note: 'Log of received/sent EAS messages; retain 60 days.' },
+        { id: 'fips_decode',  device: 'FIPS code decoder (state/county)', rule: '§11.31', required: true, note: 'Must decode FIPS location codes for state/county-specific alerts.' },
+        { id: 'ipaws',        device: 'IPAWS compatibility', rule: '§11.56', required: true, note: 'CAP-to-EAS gateway required; encoder must be IPAWS-compatible for national alerts.' }
+      ];
+
+      // LP1/LP2 monitoring assignments (per State EAS Plan)
+      const monitoringNote = 'LP1 and LP2 sources are designated by State EAS Plan. AM stations must monitor 2 sources simultaneously. Sources typically include NWS Weather Radio, State EAS primary, and local LP stations.';
+
+      // Test schedule per §11.61
+      const testSchedule = [
+        { id: 'rwt',  test: 'Required Weekly Test (RWT)',           freq: 'Weekly',   rule: '§11.61(a)(1)', origin_by_us: false, pass_through: true,  note: 'LP1/LP2 originates; station must retransmit within 60 min of receipt. NOT originated by this station.' },
+        { id: 'rmt',  test: 'Required Monthly Test (RMT)',          freq: 'Monthly',  rule: '§11.61(a)(2)', origin_by_us: false, pass_through: true,  note: 'Originated by State EAS; must be relayed. Time: first Wed or designated by State Plan.' },
+        { id: 'nat',  test: 'National Periodic Test (NPT)',         freq: 'Annual',   rule: '§11.61(a)(3)', origin_by_us: false, pass_through: true,  note: 'FEMA/IPAWS originates. Most recent: 2023. Station must relay within 60 min.' },
+        { id: 'acp',  test: 'Annual Communications Plan review',    freq: 'Annual',   rule: '§11.15(e)',    origin_by_us: true,  pass_through: false, note: 'Station must participate in State EAS plan update meetings annually.' }
+      ];
+
+      // Prohibited codes under §11.45
+      const prohibitedCodes = [
+        { code: 'EAN',  description: 'Emergency Action Notification', note: '§11.45: May only be originated by the President/FEMA for national emergency. Misuse is a serious FCC violation.' },
+        { code: 'EAT',  description: 'Emergency Action Termination', note: '§11.45: Only FEMA/President may terminate EAN.' },
+        { code: 'NPT',  description: 'National Periodic Test',        note: '§11.45: Only FEMA may originate NPT.' }
+      ];
+
+      // Recordkeeping
+      const recordkeeping = [
+        { id: 'msg_log',   record: 'EAS message log (received and sent)', retention_days: 60,  rule: '§11.35(c)' },
+        { id: 'test_log',  record: 'RWT/RMT test log',                   retention_days: 365, rule: '§11.61(b)' },
+        { id: 'equip_log', record: 'Equipment maintenance log',           retention_days: 365, rule: '§11.35(d)' }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        station_type:           stationType_eas,
+        eas_participation:      'MANDATORY',
+        equipment_requirements: equipmentReqs,
+        n_required_equipment:   equipmentReqs.filter(e => e.required).length,
+        monitoring_sources_required: 2,
+        monitoring_note:        monitoringNote,
+        test_schedule:          testSchedule,
+        n_tests:                testSchedule.length,
+        prohibited_codes:       prohibitedCodes,
+        recordkeeping:          recordkeeping,
+        n_recordkeeping_items:  recordkeeping.length,
+        ipaws_required:         true,
+        reference: '47 CFR Part 11 (§11.15; §11.31; §11.35; §11.45; §11.52; §11.56; §11.61); FEMA IPAWS; NRSC EAS Standards',
+        note: 'All AM broadcast stations must participate in EAS. IPAWS-compatible encoder/decoder required. Monitor 2 LP sources; relay RWT weekly, RMT monthly. Log all messages for 60 days.'
       };
     })(),
 

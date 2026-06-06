@@ -1717,6 +1717,42 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      eas_acp_compliance_guide: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
+        station_type: 'FULL_PARTICIPANT', eas_participation: 'MANDATORY',
+        monitoring_sources_required: 2,
+        monitoring_note: 'LP1 and LP2 sources designated by State EAS Plan. Must monitor 2 sources simultaneously. Sources typically include NWS Weather Radio, State EAS primary, and local LP stations.',
+        equipment_requirements: [
+          { id: 'encoder',     device: 'EAS encoder',              rule: '§11.35',     required: true,  note: 'Must encode and transmit EAS messages from LP1/LP2 sources.' },
+          { id: 'decoder',     device: 'EAS decoder',              rule: '§11.35',     required: true,  note: 'Must decode EAS messages from monitored LP1/LP2 sources.' },
+          { id: 'audio_out',   device: 'Audio output relay',       rule: '§11.35',     required: true,  note: 'Must interrupt normal programming automatically on EAN/EAS activation.' },
+          { id: 'logging',     device: 'EAS message log',          rule: '§11.35(c)',  required: true,  note: 'Log of received/sent EAS messages; retain 60 days.' },
+          { id: 'fips_decode', device: 'FIPS code decoder',        rule: '§11.31',     required: true,  note: 'Must decode FIPS location codes for state/county-specific alerts.' },
+          { id: 'ipaws',       device: 'IPAWS compatibility',      rule: '§11.56',     required: true,  note: 'CAP-to-EAS gateway required; encoder must be IPAWS-compatible for national alerts.' }
+        ],
+        n_required_equipment: 6,
+        test_schedule: [
+          { id: 'rwt', test: 'Required Weekly Test (RWT)',          freq: 'Weekly',  rule: '§11.61(a)(1)', origin_by_us: false, pass_through: true,  note: 'LP1/LP2 originates; relay within 60 min.' },
+          { id: 'rmt', test: 'Required Monthly Test (RMT)',          freq: 'Monthly', rule: '§11.61(a)(2)', origin_by_us: false, pass_through: true,  note: 'State EAS originates; relay required.' },
+          { id: 'nat', test: 'National Periodic Test (NPT)',         freq: 'Annual',  rule: '§11.61(a)(3)', origin_by_us: false, pass_through: true,  note: 'FEMA/IPAWS originates; relay within 60 min.' },
+          { id: 'acp', test: 'Annual Communications Plan review',   freq: 'Annual',  rule: '§11.15(e)',    origin_by_us: true,  pass_through: false, note: 'Participate in State EAS plan update meetings.' }
+        ],
+        n_tests: 4,
+        prohibited_codes: [
+          { code: 'EAN', description: 'Emergency Action Notification', note: 'May only be originated by President/FEMA.' },
+          { code: 'EAT', description: 'Emergency Action Termination',  note: 'Only FEMA/President may terminate EAN.' },
+          { code: 'NPT', description: 'National Periodic Test',        note: 'Only FEMA may originate NPT.' }
+        ],
+        recordkeeping: [
+          { id: 'msg_log',   record: 'EAS message log (received and sent)', retention_days: 60,  rule: '§11.35(c)' },
+          { id: 'test_log',  record: 'RWT/RMT test log',                   retention_days: 365, rule: '§11.61(b)' },
+          { id: 'equip_log', record: 'Equipment maintenance log',           retention_days: 365, rule: '§11.35(d)' }
+        ],
+        n_recordkeeping_items: 3,
+        ipaws_required: true,
+        reference: '47 CFR Part 11 (§11.15; §11.31; §11.35; §11.45; §11.52; §11.56; §11.61); FEMA IPAWS; NRSC EAS Standards',
+        note: 'All AM broadcast stations must participate in EAS. IPAWS-compatible encoder/decoder required. Monitor 2 LP sources; relay RWT weekly, RMT monthly. Log all messages for 60 days.'
+      },
       skywave_coverage_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         is_clear_channel: true, is_directional: false,
