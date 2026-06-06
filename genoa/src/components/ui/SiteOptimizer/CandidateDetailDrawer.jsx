@@ -2226,6 +2226,55 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Emergency Alert System Equipment Guide */}
+        {candidate.emergency_alert_system_equipment_guide && (() => {
+          const g = candidate.emergency_alert_system_equipment_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Emergency Alert System (EAS) <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>47 CFR Part 11</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>EAS Equipment</div>
+                  <div style={{ color: g.eas_equipment_required ? '#f87171' : '#34d399', fontSize: 12, fontWeight: 600 }}>
+                    {g.eas_equipment_required ? 'Required (§11.35)' : 'Not required'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>CAP Sources Required</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.n_required_cap_sources} (IPAWS + 2 analog)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Weekly RWT</div>
+                  <div style={{ color: g.weekly_test_required ? '#fbbf24' : '#94a3b8', fontSize: 12 }}>
+                    {g.weekly_test_required ? 'Required — any day 8:30 AM–sunset' : 'Not required'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Monthly RMT Relay</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>Within {g.monthly_relay_window_minutes} min of LP-1</div>
+                </div>
+              </div>
+              {g.relocation_checklist && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Relocation EAS Checklist</div>
+                  {g.relocation_checklist.slice(0, 3).map((r, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: '#334155', color: '#f1f5f9', borderRadius: 4, padding: '1px 6px', fontSize: 10, minWidth: 20, textAlign: 'center', marginTop: 1 }}>{r.priority}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{r.action}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{r.cfr}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Public Inspection File Guide */}
         {candidate.public_inspection_file_guide && (() => {
           const g = candidate.public_inspection_file_guide;

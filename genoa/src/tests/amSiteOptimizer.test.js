@@ -5683,6 +5683,56 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- emergency_alert_system_equipment_guide ----
+
+test('emergency_alert_system_equipment_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.emergency_alert_system_equipment_guide != null, 'emergency_alert_system_equipment_guide missing');
+  const g = c.emergency_alert_system_equipment_guide;
+  assert.ok('eas_equipment_required' in g, 'eas_equipment_required missing');
+  assert.ok('test_schedule' in g, 'test_schedule missing');
+  assert.ok('relocation_checklist' in g, 'relocation_checklist missing');
+  assert.ok('required_cap_sources' in g, 'required_cap_sources missing');
+});
+
+test('emergency_alert_system_equipment_guide EAS is required and CAP sources are correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].emergency_alert_system_equipment_guide;
+  assert.strictEqual(g.eas_equipment_required, true, 'EAS equipment must be required for AM stations');
+  assert.strictEqual(g.n_required_cap_sources, 3, 'must require IPAWS + 2 analog = 3 CAP sources');
+  const capIds = g.required_cap_sources.map(s => s.id);
+  assert.ok(capIds.includes('IPAWS'), 'FEMA IPAWS must be a required CAP source');
+});
+
+test('emergency_alert_system_equipment_guide weekly test is required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].emergency_alert_system_equipment_guide;
+  assert.strictEqual(g.weekly_test_required, true, 'weekly RWT must be required');
+  assert.strictEqual(g.monthly_relay_window_minutes, 60, 'monthly RMT relay window must be 60 minutes');
+  assert.ok(g.test_schedule.weekly_test != null, 'weekly_test schedule must be present');
+  assert.ok(g.test_schedule.monthly_test != null, 'monthly_test schedule must be present');
+});
+
+test('emergency_alert_system_equipment_guide relocation checklist is priority-ordered', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].emergency_alert_system_equipment_guide;
+  assert.ok(Array.isArray(g.relocation_checklist), 'relocation_checklist must be array');
+  assert.ok(g.n_relocation_steps >= 5, 'must have at least 5 relocation steps');
+  const priorities = g.relocation_checklist.map(r => r.priority);
+  assert.strictEqual(priorities[0], 1, 'first relocation step must be priority 1');
+  assert.ok(g.relocation_checklist[0].action.toLowerCase().includes('eas') || g.relocation_checklist[0].action.toLowerCase().includes('monitoring'), 'priority 1 must be about EAS monitoring continuity');
+});
+
+test('emergency_alert_system_equipment_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('easg_equipment_req' in row, 'easg_equipment_req missing from comparison table');
+    assert.ok('easg_n_caps_sources' in row, 'easg_n_caps_sources missing from comparison table');
+    assert.ok('easg_test_weekly' in row, 'easg_test_weekly missing from comparison table');
+  }
+});
+
 // ---- public_inspection_file_guide ----
 
 test('public_inspection_file_guide presence and structure', async () => {

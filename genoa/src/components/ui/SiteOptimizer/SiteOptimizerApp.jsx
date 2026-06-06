@@ -1717,6 +1717,41 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      emergency_alert_system_equipment_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        eas_equipment_required: true,
+        eas_cfr_basis: '47 CFR Part 11',
+        n_required_cap_sources: 3,
+        weekly_test_required: true,
+        monthly_relay_window_minutes: 60,
+        equipment_list: [
+          { id: 'ENCODER_DECODER', label: 'EAS Encoder/Decoder', cfr: '§11.35(a)', requirement: 'Must receive, generate, and retransmit EAS alerts; CAP-capable if manufactured after Dec 2007', relocation_action: 'Move with transmitter or re-establish at studio' },
+          { id: 'MONITORING_RADIO', label: 'Two EAS monitoring assignments (LP-1, LP-2)', cfr: '§11.52(d)', requirement: 'Monitor two local EAS sources continuously; at least one must be LP-1', relocation_action: 'Re-tune monitoring receivers at new site; verify signal quality' },
+          { id: 'CAP_RECEIVER', label: 'FEMA IPAWS CAP feed', cfr: '§11.56; §11.52', requirement: 'Broadband connection to IPAWS CAP feed required since June 2012', relocation_action: 'Ensure broadband at new transmitter site or tunnel via STL IP link' },
+          { id: 'OPERATING_HANDBOOK', label: 'EAS Operating Handbook', cfr: '§11.15', requirement: 'FCC EAS Operating Handbook must be posted at EAS control point', relocation_action: 'Post handbook at new EAS control point' },
+          { id: 'BACKUP_POWER', label: 'Backup power for EAS equipment', cfr: '§11.35(a)', requirement: 'EAS equipment must remain operational during commercial power outages (generator or UPS)', relocation_action: 'Verify generator or UPS at new site covers EAS equipment runtime' }
+        ],
+        required_cap_sources: [
+          { id: 'IPAWS', label: 'FEMA IPAWS CAP feed', cfr: '§11.56', required: true, note: 'Primary CAP source; must be monitored by all EAS participants' },
+          { id: 'LP1_A', label: 'Local LP-1 primary EAS source (analog)', cfr: '§11.52(d)', required: true, note: 'Typically the local NWS or state EAS LP-1 entry point station' },
+          { id: 'LP1_B', label: 'Second monitoring assignment (LP-1 or LP-2)', cfr: '§11.52(d)', required: true, note: 'Second analog monitoring assignment per state EAS plan' }
+        ],
+        test_schedule: {
+          weekly_test: { name: 'Required Weekly Test (RWT)', cfr: '§11.61(a)(1)', frequency: 'Weekly', window: 'Any day, 8:30 AM to local sunset', originated_by: 'Station', duration_seconds: 8, weekly_test_required: true },
+          monthly_test: { name: 'Required Monthly Test (RMT)', cfr: '§11.61(a)(2)', frequency: 'Monthly', window: 'As scheduled by LP-1; must relay within 60 minutes of receipt', originated_by: 'State/LP-1 EAS', max_relay_delay_minutes: 60, duration_max_seconds: 120 }
+        },
+        relocation_checklist: [
+          { priority: 1, action: 'Maintain EAS monitoring continuity', detail: 'Do not go dark on EAS between old and new site; use emergency authorization or brief silent period if needed', cfr: '§11.35(a)' },
+          { priority: 2, action: 'Re-establish monitoring assignments at new site', detail: 'Verify LP-1 and LP-2 signal quality at new transmitter location; re-tune if needed', cfr: '§11.52(d)' },
+          { priority: 3, action: 'Verify IPAWS CAP broadband at new site', detail: 'EAS equipment needs internet/IP connectivity for CAP monitoring; arrange with new site landlord', cfr: '§11.56' },
+          { priority: 4, action: 'Notify State EAS Chair', detail: 'Inform state EAS coordinator of new transmitter site address and updated monitoring assignments', cfr: '§11.52(d)' },
+          { priority: 5, action: 'Post EAS Operating Handbook at new control point', detail: 'FCC EAS handbook must be accessible at the EAS control point at new location', cfr: '§11.15' }
+        ],
+        n_relocation_steps: 5,
+        relocation_note: 'EAS monitoring must remain continuous through the relocation. Establish broadband for IPAWS CAP at new site before moving. Notify State EAS Chair of new site address and updated monitoring assignments.',
+        reference: '47 CFR Part 11; §11.15; §11.35; §11.52; §11.56; §11.61; FCC IPAWS integration guidance; state EAS plan',
+        note: 'EAS: 5 equipment items. 3 CAP sources required (IPAWS + 2 analog). Weekly test at station discretion; monthly test originated by LP-1 and must be relayed within 60 minutes.'
+      },
       public_inspection_file_guide: {
         frequency_khz: 780, fcc_class: 'D',
         opif_system: 'FCC Online OPIF (publicfiles.fcc.gov)',
