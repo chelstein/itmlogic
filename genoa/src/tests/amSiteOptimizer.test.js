@@ -5683,6 +5683,53 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- utility_power_service_guide ----
+
+test('utility_power_service_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.utility_power_service_guide != null, 'utility_power_service_guide missing');
+  const g = c.utility_power_service_guide;
+  assert.ok('total_site_load_kw' in g, 'total_site_load_kw missing');
+  assert.ok('required_service_amps' in g, 'required_service_amps missing');
+  assert.ok('generator_kw_recommended' in g, 'generator_kw_recommended missing');
+  assert.ok('utility_extension_costs' in g, 'utility_extension_costs missing');
+});
+
+test('utility_power_service_guide power model is consistent with KAZM 5kW TPO', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].utility_power_service_guide;
+  assert.strictEqual(g.tpo_kw, 5, 'tpo_kw must be 5 for KAZM');
+  // At 5 kW TPO and ~36% efficiency, transmitter draw ≈ 14 kW
+  assert.ok(g.transmitter_draw_kw >= 10 && g.transmitter_draw_kw <= 20, `transmitter draw must be 10–20 kW for 5 kW TPO, got: ${g.transmitter_draw_kw}`);
+  assert.ok(g.total_site_load_kw > g.transmitter_draw_kw, 'total site load must exceed transmitter draw alone');
+});
+
+test('utility_power_service_guide required service amps is a standard size', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].utility_power_service_guide;
+  assert.ok([200, 400, 600].includes(g.required_service_amps), `service amps must be standard size (200/400/600), got: ${g.required_service_amps}`);
+  assert.strictEqual(g.generator_recommended, true, 'generator must be recommended for EAS continuity');
+  assert.ok(g.generator_kw_recommended >= 20, 'generator must be at least 20 kW for a 5 kW TPO station');
+});
+
+test('utility_power_service_guide utility extension costs are positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].utility_power_service_guide;
+  assert.ok(g.estimated_utility_extension_cost_usd.typical > 0, 'utility extension cost must be positive');
+  assert.ok(g.estimated_utility_extension_cost_usd.high > g.estimated_utility_extension_cost_usd.typical, 'high cost must exceed typical');
+  assert.ok(g.generator_costs != null, 'generator_costs must be present');
+});
+
+test('utility_power_service_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('upsg_power_kw' in row, 'upsg_power_kw missing from comparison table');
+    assert.ok('upsg_generator_req' in row, 'upsg_generator_req missing from comparison table');
+    assert.ok('upsg_service_cost_usd' in row, 'upsg_service_cost_usd missing from comparison table');
+  }
+});
+
 // ---- antenna_deicing_guide ----
 
 test('antenna_deicing_guide presence and structure', async () => {

@@ -987,7 +987,10 @@ export async function runSiteOptimizer(body = {}){
     glng_option_to_buy:     c.ground_lease_negotiation_guide?.option_to_purchase_recommended ?? null,
     adg_ice_zone:           c.antenna_deicing_guide?.ice_zone ?? null,
     adg_deicing_required:   c.antenna_deicing_guide?.deicing_recommended ?? null,
-    adg_annual_cost_usd:    c.antenna_deicing_guide?.estimated_annual_deicing_cost_usd?.typical ?? null
+    adg_annual_cost_usd:    c.antenna_deicing_guide?.estimated_annual_deicing_cost_usd?.typical ?? null,
+    upsg_power_kw:          c.utility_power_service_guide?.required_utility_service_kw ?? null,
+    upsg_generator_req:     c.utility_power_service_guide?.generator_recommended ?? null,
+    upsg_service_cost_usd:  c.utility_power_service_guide?.estimated_utility_extension_cost_usd?.typical ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6722,6 +6725,94 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    utility_power_service_guide: (() => {
+      // AM transmitter sites require reliable commercial power. When relocating to a new site,
+      // the broadcaster must plan for utility power extension, load sizing, and backup power.
+      //
+      // Power load estimation:
+      //   - AM transmitter power consumption ≈ 2.5–3× TPO in kW (efficiency ~33–40%)
+      //   - 5 kW TPO → ~12–15 kW transmitter draw; add ATU losses, HVAC, lighting ≈ 18–22 kW total
+      //   - Utility service sizing: use next standard NEMA/utility service size above peak load
+      //   - Standard rural utility service sizes: 200A/240V (48 kW), 400A/240V (96 kW), 3-phase available
+      //   - AM sites typically need 200A 240V single-phase minimum (for ≤25 kW TPO stations)
+      //
+      // §11.35(a): EAS equipment must remain operational during commercial power outages
+      // §73.1680: Backup transmitter obligation (FCC encourages but doesn't mandate backup power for >10 days silence)
+      // §73.1215: Carrier frequency and modulation monitoring must continue — requires continuous power
+      //
+      // Utility extension costs (rural AM sites far from utility lines):
+      //   - Overhead power line extension: $5,000–$15,000/mile (utility-owned line) or $15,000–$35,000/mile (private)
+      //   - Underground extension: $30,000–$80,000/mile (trenching and conduit)
+      //   - Service entrance panel and metering: $3,000–$8,000
+      //   - Transformer pad and transformer (utility-furnished, but easement and grounding by broadcaster): $2,000–$5,000
+      //
+      // Generator sizing for AM transmitter sites:
+      //   - Size to cover: full transmitter load + HVAC + lighting + EAS + control systems
+      //   - For 5 kW TPO (KAZM class D): 25–35 kW generator adequate
+      //   - Automatic Transfer Switch (ATS): required for unattended generator start
+      //   - Fuel capacity: enough for 72 hours minimum without refueling (NFPA 110 Level 2)
+      //   - FCC prefers stations stay on-air during power outages to provide EAS alerting capability
+
+      // Power consumption model
+      const transmitter_efficiency = 0.36; // typical solid-state AM transmitter (Nautel, GatesAir)
+      const tpo_kw_num = Number(tpo_kw) || 5;
+      const transmitter_draw_kw = Math.round(tpo_kw_num / transmitter_efficiency);
+      const hvac_kw = Math.max(2, Math.round(transmitter_draw_kw * 0.15)); // 15% of tx heat as HVAC load
+      const ancillary_kw = 3; // ATU, lighting, EAS, control systems
+      const total_site_kw = transmitter_draw_kw + hvac_kw + ancillary_kw;
+
+      // Utility service sizing
+      const service_amp_240v = Math.ceil((total_site_kw * 1000) / 240);
+      let required_service_amps;
+      if (service_amp_240v <= 200)      required_service_amps = 200;
+      else if (service_amp_240v <= 400) required_service_amps = 400;
+      else                              required_service_amps = 600;
+
+      const required_utility_service_kw = Math.round((required_service_amps * 240) / 1000);
+
+      // Generator sizing
+      const generator_kw_recommended = Math.ceil(total_site_kw * 1.25 / 5) * 5; // 25% headroom, round to 5 kW
+
+      // Utility cost estimates (rural vs. suburban proximity)
+      const UTILITY_EXTENSION_COSTS = {
+        overhead_line_per_mile_usd: { low: 5000, typical: 10000, high: 15000 },
+        underground_per_mile_usd: { low: 30000, typical: 55000, high: 80000 },
+        service_entrance_usd: { low: 3000, typical: 5500, high: 8000 },
+        transformer_grounding_usd: { low: 2000, typical: 3500, high: 5000 },
+        total_typical_rural_usd: 19000 // assume 1 mile overhead + service entrance + transformer
+      };
+
+      const GENERATOR_COSTS = {
+        generator_purchase_usd: { low: 8000, typical: 15000, high: 28000, note: `${generator_kw_recommended} kW diesel generator` },
+        ats_installation_usd: { low: 2500, typical: 4000, high: 6000 },
+        annual_fuel_maintenance_usd: { low: 800, typical: 1500, high: 3000 }
+      };
+
+      return {
+        frequency_khz, fcc_class,
+        tpo_kw: tpo_kw_num,
+        transmitter_draw_kw,
+        hvac_kw,
+        ancillary_kw,
+        total_site_load_kw: total_site_kw,
+        required_service_amps,
+        required_utility_service_kw,
+        generator_recommended: true,
+        generator_kw_recommended,
+        utility_extension_costs: UTILITY_EXTENSION_COSTS,
+        estimated_utility_extension_cost_usd: {
+          low: UTILITY_EXTENSION_COSTS.service_entrance_usd.low + UTILITY_EXTENSION_COSTS.transformer_grounding_usd.low,
+          typical: UTILITY_EXTENSION_COSTS.total_typical_rural_usd,
+          high: UTILITY_EXTENSION_COSTS.underground_per_mile_usd.high + UTILITY_EXTENSION_COSTS.service_entrance_usd.high + UTILITY_EXTENSION_COSTS.transformer_grounding_usd.high
+        },
+        generator_costs: GENERATOR_COSTS,
+        backup_power_cfr: '§11.35(a) (EAS); §73.1680 (backup transmitter); §73.1215 (monitoring)',
+        relocation_note: `${tpo_kw_num} kW TPO → ${transmitter_draw_kw} kW transmitter draw + ${hvac_kw} kW HVAC + ${ancillary_kw} kW ancillary = ${total_site_kw} kW total. Requires ${required_service_amps}A / 240V utility service (${required_utility_service_kw} kW). Recommend ${generator_kw_recommended} kW diesel generator with ATS for EAS continuity.`,
+        reference: '47 CFR §11.35(a); §73.1680; §73.1215; NFPA 110; NEC Article 700/702; utility service handbook',
+        note: `Utility power: ${total_site_kw} kW total load → ${required_service_amps}A / ${required_utility_service_kw} kW service. Generator: ${generator_kw_recommended} kW recommended. Estimated utility extension cost: $${UTILITY_EXTENSION_COSTS.total_typical_rural_usd.toLocaleString()} typical.`
       };
     })(),
 

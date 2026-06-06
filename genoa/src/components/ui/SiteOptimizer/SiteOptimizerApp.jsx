@@ -1717,6 +1717,35 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      utility_power_service_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        tpo_kw: 5,
+        transmitter_draw_kw: 14,
+        hvac_kw: 2,
+        ancillary_kw: 3,
+        total_site_load_kw: 19,
+        required_service_amps: 200,
+        required_utility_service_kw: 48,
+        generator_recommended: true,
+        generator_kw_recommended: 25,
+        utility_extension_costs: {
+          overhead_line_per_mile_usd: { low: 5000, typical: 10000, high: 15000 },
+          underground_per_mile_usd: { low: 30000, typical: 55000, high: 80000 },
+          service_entrance_usd: { low: 3000, typical: 5500, high: 8000 },
+          transformer_grounding_usd: { low: 2000, typical: 3500, high: 5000 },
+          total_typical_rural_usd: 19000
+        },
+        estimated_utility_extension_cost_usd: { low: 5000, typical: 19000, high: 93000 },
+        generator_costs: {
+          generator_purchase_usd: { low: 8000, typical: 15000, high: 28000, note: '25 kW diesel generator' },
+          ats_installation_usd: { low: 2500, typical: 4000, high: 6000 },
+          annual_fuel_maintenance_usd: { low: 800, typical: 1500, high: 3000 }
+        },
+        backup_power_cfr: '§11.35(a) (EAS); §73.1680 (backup transmitter); §73.1215 (monitoring)',
+        relocation_note: '5 kW TPO → 14 kW transmitter draw + 2 kW HVAC + 3 kW ancillary = 19 kW total. Requires 200A / 240V utility service (48 kW). Recommend 25 kW diesel generator with ATS for EAS continuity.',
+        reference: '47 CFR §11.35(a); §73.1680; §73.1215; NFPA 110; NEC Article 700/702; utility service handbook',
+        note: 'Utility power: 19 kW total load → 200A / 48 kW service. Generator: 25 kW recommended. Estimated utility extension cost: $19,000 typical.'
+      },
       antenna_deicing_guide: {
         frequency_khz: 780, fcc_class: 'D',
         candidate_lat: 34.86,

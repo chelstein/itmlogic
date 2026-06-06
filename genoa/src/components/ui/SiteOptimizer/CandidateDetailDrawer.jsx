@@ -2226,6 +2226,59 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Utility Power Service Guide */}
+        {candidate.utility_power_service_guide && (() => {
+          const g = candidate.utility_power_service_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Utility Power Service <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§11.35 / NFPA 110</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Total Site Load</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.total_site_load_kw} kW</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>Tx {g.transmitter_draw_kw}kW + HVAC {g.hvac_kw}kW + other {g.ancillary_kw}kW</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Utility Service Required</div>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 600 }}>{g.required_service_amps}A / {g.required_utility_service_kw} kW</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Backup Generator</div>
+                  <div style={{ color: g.generator_recommended ? '#f87171' : '#34d399', fontSize: 12, fontWeight: 600 }}>
+                    {g.generator_recommended ? `${g.generator_kw_recommended} kW recommended` : 'Optional'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Utility Extension (rural)</div>
+                  <div style={{ color: '#fbbf24', fontSize: 12 }}>${g.estimated_utility_extension_cost_usd?.typical?.toLocaleString()} typical</div>
+                </div>
+              </div>
+              {g.generator_costs && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Generator Cost Estimate</div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 10 }}>Generator purchase</div>
+                      <div style={{ color: '#f1f5f9', fontSize: 12 }}>${g.generator_costs.generator_purchase_usd?.low?.toLocaleString()}–${g.generator_costs.generator_purchase_usd?.high?.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 10 }}>ATS install</div>
+                      <div style={{ color: '#f1f5f9', fontSize: 12 }}>${g.generator_costs.ats_installation_usd?.low?.toLocaleString()}–${g.generator_costs.ats_installation_usd?.high?.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 10 }}>Annual fuel/maint</div>
+                      <div style={{ color: '#f1f5f9', fontSize: 12 }}>${g.generator_costs.annual_fuel_maintenance_usd?.typical?.toLocaleString()}/yr</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.backup_power_cfr}</div>
+            </div>
+          );
+        })()}
+
         {/* Antenna Deicing Guide */}
         {candidate.antenna_deicing_guide && (() => {
           const g = candidate.antenna_deicing_guide;
