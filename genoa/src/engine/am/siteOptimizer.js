@@ -825,7 +825,10 @@ export async function runSiteOptimizer(body = {}){
     spacing_chan_class:      c.spacing_rule_compliance_guide?.channel_class ?? null,
     class_upg_feasibility:  c.license_class_upgrade_analysis?.primary_feasibility ?? null,
     class_upg_n_paths:      c.license_class_upgrade_analysis?.n_upgrade_paths ?? null,
-    class_upg_to_class:     c.license_class_upgrade_analysis?.upgrade_paths?.[0]?.to_class ?? null
+    class_upg_to_class:     c.license_class_upgrade_analysis?.upgrade_paths?.[0]?.to_class ?? null,
+    soil_class:             c.soil_conductivity_improvement_guide?.soil_class_current ?? null,
+    soil_improv_needed:     c.soil_conductivity_improvement_guide?.improvement_needed ?? null,
+    soil_reach_gain_km:     c.soil_conductivity_improvement_guide?.reach_gain_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7233,6 +7236,129 @@ async function scoreCandidate(pt, ctx, warnings){
         primary_feasibility: upgradePaths[0]?.feasibility ?? 'UNKNOWN',
         reference: '47 CFR §73.21 (power limits by class); §73.37 (minimum spacing); §73.25 (clear channels); §1.401 (rulemaking petition); §73.3525 (major changes)',
         note: 'License class upgrade analysis is a regulatory screening guide. Consult a licensed FCC communications attorney before initiating a class upgrade proceeding. Class upgrade timelines are highly variable and depend on FCC workload and contested filings.'
+      };
+    })(),
+
+    // Soil conductivity improvement guide.
+    // Distinct from ground_system_design_guide (radial count/spacing/efficiency model).
+    // This block covers PHYSICAL SOIL AMENDMENT strategies to raise effective σ:
+    // copper sulfate injection, deep-driven ground rods, bentonite backfill, Ufer
+    // grounding, and the resulting improvement in FCC-measurable conductivity.
+    // Most relevant for candidates with σ < 4 mS/m (FAIR/POOR).
+    soil_conductivity_improvement_guide: (() => {
+      const soilClass_sc = sigma_msm >= 8 ? 'EXCELLENT'
+        : sigma_msm >= 4 ? 'GOOD'
+        : sigma_msm >= 2 ? 'FAIR'
+        : 'POOR';
+
+      const improvementNeeded = sigma_msm < SIGMA_PREFERRED_MIN_MSM;  // SIGMA_PREFERRED_MIN_MSM = 8
+
+      // Soil resistivity ρ = 1000/σ (Ω·m)
+      const rho_ohm_m = round2(1000 / Math.max(sigma_msm, 0.1));
+
+      // Soil amendment techniques
+      const techniques = [
+        {
+          id: 'copper_sulfate',
+          name: 'Copper Sulfate (CuSO₄) Solution Injection',
+          applicable: sigma_msm < 4,
+          description: 'Inject 2% CuSO₄ solution into soil around radial field. Improves effective conductivity by increasing ionic concentration in soil water. Temporary — may need annual retreatment.',
+          sigma_improvement_msm_estimate: round2(Math.min(sigma_msm * 2.5, 8) - sigma_msm),
+          cost_usd_per_acre_approx: 800,
+          longevity_years: 2,
+          fcc_measurable: true,
+          note: '§73.190 allows conductivity to be measured by Wenner 4-point method or FCC AM ground conductivity program. Treatment effects must be field-measured before claiming improved σ in FCC filings.'
+        },
+        {
+          id: 'bentonite_backfill',
+          name: 'Bentonite Clay Backfill in Radial Trenches',
+          applicable: sigma_msm < 6,
+          description: 'Line radial trenches with sodium bentonite slurry before laying copper. Bentonite swells when wet, creating intimate contact with radials and improving ground coupling.',
+          sigma_improvement_msm_estimate: round2(Math.min(sigma_msm * 1.5, 6) - sigma_msm),
+          cost_usd_per_acre_approx: 1200,
+          longevity_years: 20,
+          fcc_measurable: true,
+          note: 'Most effective in dry or rocky soils where air gaps reduce radial coupling. Permanent improvement once installed.'
+        },
+        {
+          id: 'ground_rods',
+          name: 'Deep-Driven Ground Rods at Radial Tips',
+          applicable: sigma_msm < 5,
+          description: 'Drive 8–20 ft copper-bonded rods at radial tips to reach moister, higher-conductivity subsoil. Bond rods to radial copper via exothermic weld. Most effective where water table is shallow.',
+          sigma_improvement_msm_estimate: round2(Math.min(sigma_msm * 1.8, 7) - sigma_msm),
+          cost_usd_per_rod_approx: 150,
+          typical_rods_for_120_radials: 120,
+          cost_total_approx: 18000,
+          longevity_years: 30,
+          fcc_measurable: true,
+          note: 'Most cost-effective in areas with a water table within 10 ft of surface. Diminishing returns in deep arid soils.'
+        },
+        {
+          id: 'ufer_grounding',
+          name: 'Ufer (Concrete-Encased Electrode) System',
+          applicable: true,  // Always applicable but most valuable for foundations
+          description: 'Install bare copper conductor in tower foundation concrete. Concrete\'s high moisture content and alkalinity create excellent ionic path. Provides low-impedance ground at base of tower.',
+          sigma_improvement_msm_estimate: 0,   // Improves base impedance, not bulk conductivity
+          cost_usd_approx: 2000,
+          longevity_years: 50,
+          fcc_measurable: false,
+          note: 'Ufer electrodes improve base impedance and lightning protection but do not raise the FCC-measurable bulk soil conductivity. Requires NEC §250.52(A)(3) compliance.'
+        },
+        {
+          id: 'soil_amendment_chemical',
+          name: 'Soil Amendment: Ground Enhancement Material (GEM)',
+          applicable: sigma_msm < 4,
+          description: 'Install proprietary carbon-based GEM (e.g., ERICO GELCORE) in radial trenches. Permanently lowers resistivity by providing a stable ionic conductive medium around buried copper.',
+          sigma_improvement_msm_estimate: round2(Math.min(sigma_msm * 2, 6) - sigma_msm),
+          cost_usd_per_lb_approx: 3,
+          typical_lbs_per_installation: 2000,
+          cost_total_approx: 6000,
+          longevity_years: 30,
+          fcc_measurable: true,
+          note: 'GEM products are manufactured by ERICO, Lyncole, and others. Must verify that FCC-measured σ improvement is documented per §73.190 before claiming in filings.'
+        }
+      ];
+
+      // Estimated reach improvement if σ improves from current to target
+      const targetSigma = Math.min(sigma_msm >= 8 ? sigma_msm : 8, 30);  // target: ≥8 mS/m if possible
+      let reach_current_km = null, reach_improved_km = null;
+      try {
+        const rCur = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        reach_current_km = rCur?.distance_km != null ? round2(rCur.distance_km) : null;
+        const rImp = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: targetSigma, erp_kw: tpo_kw });
+        reach_improved_km = rImp?.distance_km != null ? round2(rImp.distance_km) : null;
+      } catch { /* ok */ }
+
+      const reach_gain_km = (reach_current_km != null && reach_improved_km != null)
+        ? round2(reach_improved_km - reach_current_km)
+        : null;
+
+      // Wenner 4-point survey (§73.190 methodology)
+      const wennerSurvey = {
+        method: 'Wenner 4-electrode method (ASTM G57)',
+        purpose: 'Measure effective soil conductivity before and after amendments for FCC §73.190 documentation',
+        electrodes: 4,
+        electrode_spacing_m: [5, 10, 20, 30],
+        rule: '§73.190 (ground conductivity measurement for AM stations)',
+        filing_note: 'Measured conductivity may be substituted for FCC M3 zone-table value in engineering calculations when documented per §73.190.'
+      };
+
+      return {
+        sigma_msm_current: sigma_msm,
+        soil_class_current: soilClass_sc,
+        soil_resistivity_ohm_m: rho_ohm_m,
+        improvement_needed: improvementNeeded,
+        sigma_target_msm: targetSigma,
+        reach_current_km,
+        reach_improved_km,
+        reach_gain_km,
+        techniques: techniques.filter(t => t.applicable),
+        n_applicable_techniques: techniques.filter(t => t.applicable).length,
+        wenner_survey_protocol: wennerSurvey,
+        reference: '47 CFR §73.190 (ground conductivity measurement); IEEE Std 81-2012 (Wenner method); NEC §250.52 (Ufer electrode); ASTM G57 (soil resistivity test)',
+        note: improvementNeeded
+          ? `Current soil conductivity (${sigma_msm} mS/m, ${soilClass_sc}) is below the preferred minimum (${SIGMA_PREFERRED_MIN_MSM} mS/m). Implementing soil amendment techniques could extend daytime reach by up to ${reach_gain_km ?? '?'} km. Conduct Wenner survey before and after amendments to document improvement for §73.190 filing credit.`
+          : `Current soil conductivity (${sigma_msm} mS/m, ${soilClass_sc}) meets the preferred minimum (${SIGMA_PREFERRED_MIN_MSM} mS/m). Soil amendments have limited additional benefit at this site. Standard 120-radial ground system is recommended.`
       };
     })(),
 

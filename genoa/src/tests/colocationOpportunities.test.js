@@ -1015,3 +1015,17 @@ test('colocation GRID candidates have license_class_upgrade_analysis', async () 
     assert.ok(c.license_class_upgrade_analysis.upgrade_paths.length > 0, `rank ${c.rank} must have upgrade paths`);
   }
 });
+
+test('colocation GRID candidates have soil_conductivity_improvement_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.soil_conductivity_improvement_guide != null, `rank ${c.rank} missing soil_conductivity_improvement_guide`);
+    assert.ok(c.soil_conductivity_improvement_guide.techniques.length > 0, `rank ${c.rank} must have applicable techniques`);
+  }
+});

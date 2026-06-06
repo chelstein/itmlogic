@@ -1385,6 +1385,22 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.1560; §73.1350; §73.61; Part 11; §1.1307; §73.3539; §73.99',
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
+      soil_conductivity_improvement_guide: {
+        sigma_msm_current: 2, soil_class_current: 'FAIR', soil_resistivity_ohm_m: 500,
+        improvement_needed: true, sigma_target_msm: 8,
+        reach_current_km: 18.4, reach_improved_km: 65.96, reach_gain_km: 47.56,
+        techniques: [
+          { id: 'copper_sulfate', name: 'Copper Sulfate (CuSO₄) Solution Injection', applicable: true, description: 'Inject 2% CuSO₄ solution into soil around radial field. Improves conductivity by increasing ionic concentration.', sigma_improvement_msm_estimate: 3, cost_usd_per_acre_approx: 800, longevity_years: 2, fcc_measurable: true, note: '§73.190 allows conductivity to be measured by Wenner 4-point method. Treatment effects must be field-measured before claiming improved σ in FCC filings.' },
+          { id: 'bentonite_backfill', name: 'Bentonite Clay Backfill in Radial Trenches', applicable: true, description: 'Line radial trenches with sodium bentonite slurry before laying copper.', sigma_improvement_msm_estimate: 1, cost_usd_per_acre_approx: 1200, longevity_years: 20, fcc_measurable: true, note: 'Most effective in dry or rocky soils. Permanent improvement once installed.' },
+          { id: 'ground_rods', name: 'Deep-Driven Ground Rods at Radial Tips', applicable: true, description: 'Drive 8–20 ft copper-bonded rods at radial tips to reach moister subsoil.', sigma_improvement_msm_estimate: 1.6, cost_usd_per_rod_approx: 150, typical_rods_for_120_radials: 120, cost_total_approx: 18000, longevity_years: 30, fcc_measurable: true, note: 'Most cost-effective where water table is within 10 ft of surface.' },
+          { id: 'ufer_grounding', name: 'Ufer (Concrete-Encased Electrode) System', applicable: true, description: "Install bare copper conductor in tower foundation concrete. Provides low-impedance ground at base of tower.", sigma_improvement_msm_estimate: 0, cost_usd_approx: 2000, longevity_years: 50, fcc_measurable: false, note: 'Improves base impedance and lightning protection but does not raise bulk soil conductivity.' },
+          { id: 'soil_amendment_chemical', name: 'Ground Enhancement Material (GEM)', applicable: true, description: 'Install carbon-based GEM in radial trenches. Permanently lowers resistivity.', sigma_improvement_msm_estimate: 2, cost_usd_per_lb_approx: 3, typical_lbs_per_installation: 2000, cost_total_approx: 6000, longevity_years: 30, fcc_measurable: true, note: 'Must verify FCC-measured σ improvement per §73.190 before claiming in filings.' }
+        ],
+        n_applicable_techniques: 5,
+        wenner_survey_protocol: { method: 'Wenner 4-electrode method (ASTM G57)', purpose: 'Measure effective soil conductivity before and after amendments for FCC §73.190 documentation', electrodes: 4, electrode_spacing_m: [5, 10, 20, 30], rule: '§73.190', filing_note: 'Measured conductivity may substitute for FCC M3 zone-table value when documented per §73.190.' },
+        reference: '47 CFR §73.190; IEEE Std 81-2012; NEC §250.52; ASTM G57',
+        note: 'Current soil conductivity (2 mS/m, FAIR) is below the preferred minimum (8 mS/m). Implementing soil amendment techniques could extend daytime reach by up to 47.56 km.'
+      },
       license_class_upgrade_analysis: {
         fcc_class: 'D', is_clear_channel: true, is_local_channel: false,
         primary_feasibility: 'DIFFICULT', n_upgrade_paths: 1,

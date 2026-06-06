@@ -2226,6 +2226,69 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Soil Conductivity Improvement Guide */}
+        {candidate.soil_conductivity_improvement_guide && (() => {
+          const sc = candidate.soil_conductivity_improvement_guide;
+          const classColor = c => c === 'EXCELLENT' ? 'text-emerald-400' : c === 'GOOD' ? 'text-blue-300' : c === 'FAIR' ? 'text-amber-400' : 'text-rose-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Soil Conductivity Improvement Guide (§73.190)</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${classColor(sc.soil_class_current)}`}>
+                  {sc.soil_class_current} · σ = {sc.sigma_msm_current} mS/m
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  ρ = {sc.soil_resistivity_ohm_m} Ω·m
+                </span>
+                {sc.improvement_needed && (
+                  <span className="font-mono text-[8px] text-amber-400 px-1 py-0.5 border border-amber-700/50 rounded">IMPROVEMENT RECOMMENDED</span>
+                )}
+              </div>
+              {sc.reach_gain_km != null && (
+                <div className="grid grid-cols-3 gap-1 mb-2">
+                  {[
+                    { label: 'Current reach (0.5 mV/m)', value: sc.reach_current_km != null ? `${sc.reach_current_km} km` : '—' },
+                    { label: 'Improved reach (est.)',     value: sc.reach_improved_km != null ? `${sc.reach_improved_km} km` : '—' },
+                    { label: 'Potential gain',            value: sc.reach_gain_km != null ? `+${sc.reach_gain_km} km` : '—' }
+                  ].map(m => (
+                    <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                      <div className={`font-mono text-[10px] font-bold ${m.label === 'Potential gain' ? 'text-emerald-400' : 'text-textBright'}`}>{m.value}</div>
+                      <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Amendment techniques */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Applicable Soil Amendment Techniques ({sc.n_applicable_techniques})</div>
+              <div className="space-y-1 mb-2">
+                {sc.techniques?.map((tech, i) => (
+                  <div key={i} className="bg-surface rounded p-1.5 border border-rule">
+                    <div className="flex justify-between items-start mb-0.5">
+                      <span className="font-mono text-[8px] text-textBright font-bold">{tech.name}</span>
+                      <span className="font-mono text-[7px] text-textDim">{tech.longevity_years}yr lifespan</span>
+                    </div>
+                    <div className="font-mono text-[7px] text-textDim leading-snug mb-0.5">{tech.description}</div>
+                    <div className="flex gap-3">
+                      {tech.sigma_improvement_msm_estimate > 0 && (
+                        <span className="font-mono text-[7px] text-emerald-400">σ +{tech.sigma_improvement_msm_estimate} mS/m est.</span>
+                      )}
+                      {tech.fcc_measurable && (
+                        <span className="font-mono text-[7px] text-blue-300">§73.190 measurable</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Wenner survey */}
+              <div className="font-mono text-[9px] text-textDim mb-0.5">Wenner 4-Point Survey Protocol</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">
+                {sc.wenner_survey_protocol?.method} — electrode spacings: {sc.wenner_survey_protocol?.electrode_spacing_m?.join(', ')} m. {sc.wenner_survey_protocol?.filing_note}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{sc.note}</div>
+            </div>
+          );
+        })()}
+
         {/* License Class Upgrade Analysis */}
         {candidate.license_class_upgrade_analysis && (() => {
           const u = candidate.license_class_upgrade_analysis;

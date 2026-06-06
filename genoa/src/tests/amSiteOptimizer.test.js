@@ -5900,3 +5900,51 @@ test('license_class_upgrade_analysis comparison table columns present', async ()
     assert.ok('class_upg_to_class' in row, 'class_upg_to_class missing from comparison table');
   }
 });
+
+// ---- soil_conductivity_improvement_guide ----
+
+test('soil_conductivity_improvement_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.soil_conductivity_improvement_guide != null, `rank ${c.rank} missing soil_conductivity_improvement_guide`);
+  }
+});
+
+test('soil_conductivity_improvement_guide has correct shape and key fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].soil_conductivity_improvement_guide;
+  assert.ok(s.sigma_msm_current != null, 'sigma_msm_current must be present');
+  assert.ok(['EXCELLENT', 'GOOD', 'FAIR', 'POOR'].includes(s.soil_class_current), 'soil_class must be valid');
+  assert.ok(typeof s.improvement_needed === 'boolean', 'improvement_needed must be boolean');
+  assert.ok(Array.isArray(s.techniques), 'techniques must be an array');
+  assert.ok(s.techniques.length > 0, 'must have at least 1 technique');
+});
+
+test('soil_conductivity_improvement_guide reach_gain_km is positive when sigma < 8', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].soil_conductivity_improvement_guide;
+  if (s.sigma_msm_current < 8) {
+    assert.ok(s.reach_gain_km > 0, 'reach_gain_km must be positive when sigma < target (8 mS/m)');
+    assert.strictEqual(s.improvement_needed, true, 'improvement_needed must be true when sigma < 8 mS/m');
+  }
+});
+
+test('soil_conductivity_improvement_guide techniques have required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].soil_conductivity_improvement_guide;
+  for (const tech of s.techniques) {
+    assert.ok(tech.id != null, 'technique must have id');
+    assert.ok(tech.name != null, 'technique must have name');
+    assert.ok(tech.longevity_years > 0, 'technique must have longevity_years > 0');
+    assert.ok(typeof tech.fcc_measurable === 'boolean', 'fcc_measurable must be boolean');
+  }
+});
+
+test('soil_conductivity_improvement_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('soil_class' in row, 'soil_class missing from comparison table');
+    assert.ok('soil_improv_needed' in row, 'soil_improv_needed missing from comparison table');
+    assert.ok('soil_reach_gain_km' in row, 'soil_reach_gain_km missing from comparison table');
+  }
+});
