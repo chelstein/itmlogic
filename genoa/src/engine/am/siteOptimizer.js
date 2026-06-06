@@ -605,7 +605,13 @@ export async function runSiteOptimizer(body = {}){
     risk_category:          c.regulatory_risk_score?.risk_category ?? null,
     score_delta:            c.score_delta_vs_baseline ?? null,
     col_coverage_gap_pct:   c.col_coverage_gap_pct ?? null,
-    min_tpo_for_col_kw:     c.minimum_tpo_for_col_coverage_kw ?? null
+    min_tpo_for_col_kw:     c.minimum_tpo_for_col_coverage_kw ?? null,
+    nighttime_eligibility:  c.nighttime_classification?.eligibility ?? null,
+    nif_complexity:         c.nighttime_classification?.nif_complexity ?? null,
+    spacing_verdict:        c.co_channel_spacing_estimate?.screening_verdict ?? null,
+    fence_m:                c.mpe_rf_exposure_summary?.recommended_fence_distance_m ?? null,
+    blanket_km:             c.blanket_1000mvm_km ?? null,
+    field_at_col_mvm:       c.field_at_col_centroid_mvm ?? null
   }));
 
   // ---- 16. Engineering summary (executive-level synthesis) ----

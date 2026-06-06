@@ -951,6 +951,41 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
         {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}
 
+        {/* Nighttime classification */}
+        {candidate.nighttime_classification && (() => {
+          const nc = candidate.nighttime_classification;
+          const eligColor = nc.eligibility === 'YES' ? '#4ec9b0'
+            : nc.eligibility === 'LIMITED' ? '#f6c90e'
+            : nc.eligibility === 'RESTRICTED' ? '#ff9b5a'
+            : '#ff4d4d';
+          const nifColor = nc.nif_complexity === 'LOW' ? '#4ec9b0'
+            : nc.nif_complexity === 'MODERATE' ? '#f6c90e'
+            : nc.nif_complexity === 'HIGH' ? '#ff9b5a'
+            : '#ff4d4d';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Nighttime service classification</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: eligColor + '22', color: eligColor }}>
+                    {nc.eligibility}
+                  </span>
+                  <span className="text-textDim">NIF complexity:</span>
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: nifColor + '22', color: nifColor }}>
+                    {nc.nif_complexity}
+                  </span>
+                </div>
+                <div className="text-textDim/80 leading-snug">{nc.key_constraint}</div>
+                <div className="text-textDim/60 text-[9px]">
+                  NIF study required: {nc.nif_study_required ? 'YES' : 'NO'} · {nc.rule}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Per-candidate engineering checklist */}
         {Array.isArray(candidate.per_candidate_engineering_checklist) && candidate.per_candidate_engineering_checklist.length > 0 && (() => {
           const priorityColor = { REQUIRED: '#ff9b5a', HIGH: '#ffb347', MEDIUM: '#7ec8e3', ADVISORY: '#9b9b9b' };
