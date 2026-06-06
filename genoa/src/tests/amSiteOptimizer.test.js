@@ -3518,3 +3518,54 @@ test('PROMISING candidates have go_no_go of GO or CONDITIONAL', async () => {
     }
   }
 });
+
+// ---------- tower_cost_estimate ----------
+
+test('tower_cost_estimate is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.tower_cost_estimate != null,
+      `tower_cost_estimate must be present (rank ${c.rank})`);
+  }
+});
+
+test('tower_cost_estimate.total_low_usd < total_high_usd', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const tce = c.tower_cost_estimate;
+    assert.ok(tce.total_low_usd <= tce.total_high_usd,
+      `total_low_usd must be <= total_high_usd (rank ${c.rank})`);
+    assert.ok(tce.total_low_usd > 0, `total_low_usd must be positive (rank ${c.rank})`);
+  }
+});
+
+test('tower_cost_estimate.cost_tier is a valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
+  for (const c of out.candidates) {
+    const tier = c.tower_cost_estimate?.cost_tier;
+    assert.ok(VALID.has(tier), `cost_tier "${tier}" not valid (rank ${c.rank})`);
+  }
+});
+
+test('tower_cost_estimate.tower_height_m matches lambda/4 for frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  const expectedQw = Math.round((300000 / KAZM.frequency_khz / 4) * 100) / 100;
+  for (const c of out.candidates) {
+    assert.ok(Math.abs(c.tower_cost_estimate.tower_height_m - expectedQw) < 0.1,
+      `tower_height_m ${c.tower_cost_estimate.tower_height_m} should be near λ/4 = ${expectedQw} m`);
+  }
+});
+
+test('candidate_comparison_table has cost_tier and cost_low_usd columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cost_tier' in row, `missing cost_tier in comparison table (rank ${row.rank})`);
+    assert.ok('cost_low_usd' in row, `missing cost_low_usd in comparison table (rank ${row.rank})`);
+  }
+});

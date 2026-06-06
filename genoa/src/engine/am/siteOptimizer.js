@@ -682,7 +682,10 @@ export async function runSiteOptimizer(body = {}){
     land_use_class:         c.land_use_classification?.class ?? null,
     density_factor:         c.land_use_classification?.density_factor ?? null,
     overlap_fraction:       c.coverage_overlap_analysis?.overlap_fraction ?? null,
-    coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null
+    coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null,
+    cost_tier:              c.tower_cost_estimate?.cost_tier ?? null,
+    cost_low_usd:           c.tower_cost_estimate?.total_low_usd ?? null,
+    cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -1634,6 +1637,65 @@ async function scoreCandidate(pt, ctx, warnings){
       }
 
       return { go_no_go, confidence, one_line, evaluated_at_tpo_kw: tpo_kw };
+    })(),
+    // Tower cost estimate — screening-grade construction cost model for a new λ/4
+    // self-supporting or guyed monopole.  Based on industry rule-of-thumb ranges:
+    //   AM monopole: $50–150/m of tower height for guyed stick
+    //   Ground system: 120 standard radials ≈ $80–120k; poor σ adds 30-60% for
+    //     extended copper system.
+    //   FAA lighting (if ASR required): $20–60k fixed.
+    //   Site work / civil: $50–150k depending on terrain.
+    // All ranges are 2024 USD SCREENING ESTIMATES — not for budgeting.
+    tower_cost_estimate: (() => {
+      const lambdaM    = 300000 / frequency_khz;
+      const qwM        = lambdaM / 4;
+      const asrNeeded  = qwM > 60.96;
+
+      // Tower steel — guyed monopole rule of thumb (lower for shorter towers)
+      const towerLow  = Math.round(qwM * 50  / 1000) * 1000;
+      const towerHigh = Math.round(qwM * 150 / 1000) * 1000;
+
+      // Ground system copper — standard 120 radials; σ penalty for poor soil
+      const gndBase = sigma_msm < 2 ? 120000 : sigma_msm < 4 ? 100000 : 80000;
+      const gndPenalty = sigma_msm < 2 ? 0.60 : sigma_msm < 4 ? 0.30 : 0;
+      const gndLow  = Math.round(gndBase / 1000) * 1000;
+      const gndHigh = Math.round(gndBase * (1 + gndPenalty) / 1000) * 1000;
+
+      // FAA lighting if ASR threshold exceeded
+      const faaLow  = asrNeeded ? 20000 : 0;
+      const faaHigh = asrNeeded ? 60000 : 0;
+
+      // Site work / civil
+      const civilLow  = 50000;
+      const civilHigh = 150000;
+
+      const totalLow  = towerLow  + gndLow  + faaLow  + civilLow;
+      const totalHigh = towerHigh + gndHigh + faaHigh + civilHigh;
+
+      // Order-of-magnitude tier
+      const midCost = (totalLow + totalHigh) / 2;
+      const cost_tier = midCost < 300000 ? 'LOW'
+        : midCost < 600000 ? 'MODERATE'
+        : midCost < 1200000 ? 'HIGH'
+        : 'VERY_HIGH';
+
+      const fmtK = (n) => `$${Math.round(n / 1000)}k`;
+
+      return {
+        tower_height_m:        round2(qwM),
+        asr_lighting_required: asrNeeded,
+        cost_tier,
+        total_low_usd:         totalLow,
+        total_high_usd:        totalHigh,
+        range_label:           `${fmtK(totalLow)}–${fmtK(totalHigh)} (2024 USD, screening only)`,
+        breakdown: {
+          tower_steel:  { low: towerLow,  high: towerHigh,  note: `Guyed λ/4 monopole at ${Math.round(qwM)} m` },
+          ground_system:{ low: gndLow,    high: gndHigh,    note: `120-radial copper; σ=${sigma_msm} mS/m soil factor` },
+          faa_lighting: { low: faaLow,    high: faaHigh,    note: asrNeeded ? 'ASR threshold exceeded (47 CFR §17.7)' : 'Below ASR threshold — no lighting required' },
+          civil_work:   { low: civilLow,  high: civilHigh,  note: 'Grading, access road, fence, foundation' }
+        },
+        disclaimer: 'SCREENING ESTIMATE ONLY. Actual costs depend on tower supplier quotes, soil borings, utility access, local labor market, and environmental permitting. Commission a civil/RF engineering feasibility study before budgeting.'
+      };
     })(),
     // Per-candidate engineering checklist — what studies must be done if this site
     // is selected for detailed engineering evaluation.  Derived from the candidate's
