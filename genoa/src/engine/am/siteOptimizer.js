@@ -783,6 +783,30 @@ async function scoreCandidate(pt, ctx, warnings){
     }
   } catch (_){ /* leave null */ }
 
+  // 3a-c. Groundwave contour table — distances to the four key FCC service contours.
+  // 25 mV/m = §73.24(j) "principal community" service for dominant stations;
+  //  5 mV/m = §73.24(j) standard COL floor;
+  //  2 mV/m = §73.24 secondary service;
+  //  0.5 mV/m = protected daytime contour.
+  // Reuses the same M3 conductivity already computed above.
+  // Returns null for a contour if the curve lookup throws.
+  const groundwave_contour_table = (() => {
+    const levels = [
+      { mvm: 25,  label: '25 mV/m', note: '§73.24(j) dominant principal-community contour' },
+      { mvm: 5,   label: '5 mV/m',  note: '§73.24(j) COL service floor' },
+      { mvm: 2,   label: '2 mV/m',  note: 'Secondary service area' },
+      { mvm: 0.5, label: '0.5 mV/m', note: 'Protected daytime contour' }
+    ];
+    return levels.map(({ mvm, label, note }) => {
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        return { mvm, label, distance_km: round2(r.distance_km), note };
+      } catch (_){
+        return { mvm, label, distance_km: null, note };
+      }
+    });
+  })();
+
   // 3b. Minimum-TPO for §73.24(g) compliance — only computed when blanket
   //     pop fails (blanket_population_pct > 1%).  Binary search on TPO to
   //     find the highest power where the proxy blanket pop stays ≤ 1%.
@@ -1034,6 +1058,7 @@ async function scoreCandidate(pt, ctx, warnings){
         rule: 'US/MX 1986 Agreement; US/CA 1991 LOU'
       }
     },
+    groundwave_contour_table,
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
     // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically

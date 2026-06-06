@@ -553,6 +553,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Groundwave contour table */}
+        {candidate.groundwave_contour_table?.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">Groundwave contours</div>
+            <table className="w-full font-mono text-[10px] border-collapse">
+              <thead>
+                <tr className="text-textDim text-left">
+                  <th className="pb-0.5 pr-3 font-normal">Contour</th>
+                  <th className="pb-0.5 pr-3 font-normal">Distance</th>
+                  <th className="pb-0.5 font-normal">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidate.groundwave_contour_table.map(row => (
+                  <tr key={row.mvm} className="border-t border-white/5">
+                    <td className="py-0.5 pr-3 text-cream">{row.label}</td>
+                    <td className="py-0.5 pr-3" style={{ color: row.distance_km != null ? '#b8d0cc' : '#666' }}>
+                      {row.distance_km != null ? `${row.distance_km.toFixed(1)} km` : '—'}
+                    </td>
+                    <td className="py-0.5 text-textDim text-[9px]">{row.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="font-mono text-[9px] text-textDim mt-1">
+              Screening-grade — based on M3 zone conductivity, not field-measured values.
+            </div>
+          </div>
+        )}
+
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
         {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}
 

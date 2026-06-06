@@ -1663,3 +1663,50 @@ test('form_301_checklist omits DA_PATTERN for non-directional stations', async (
   assert.ok(!ids.includes('DA_PATTERN'),
     'form_301_checklist must NOT include DA_PATTERN for ND stations');
 });
+
+test('groundwave_contour_table present on every candidate with 4 standard FCC contours', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const EXPECTED_LEVELS = [25, 5, 2, 0.5];
+  for (const c of out.candidates){
+    assert.ok(Array.isArray(c.groundwave_contour_table),
+      `groundwave_contour_table must be an array (rank ${c.rank})`);
+    assert.equal(c.groundwave_contour_table.length, 4,
+      `groundwave_contour_table must have exactly 4 entries (rank ${c.rank})`);
+    for (let i = 0; i < 4; i++){
+      const row = c.groundwave_contour_table[i];
+      assert.equal(row.mvm, EXPECTED_LEVELS[i],
+        `contour table row ${i} mvm must be ${EXPECTED_LEVELS[i]}; got ${row.mvm} (rank ${c.rank})`);
+      assert.ok(typeof row.label === 'string', `row.label must be a string (rank ${c.rank})`);
+      assert.ok(typeof row.note === 'string', `row.note must be a string (rank ${c.rank})`);
+    }
+  }
+});
+
+test('groundwave_contour_table: 5 mV/m distance matches principal_community_5mvm_km', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (c.principal_community_5mvm_km == null) continue;
+    const fiveMvm = c.groundwave_contour_table.find(r => r.mvm === 5);
+    assert.ok(fiveMvm != null, `groundwave_contour_table must include 5 mV/m row (rank ${c.rank})`);
+    if (fiveMvm.distance_km != null){
+      assert.ok(Math.abs(fiveMvm.distance_km - c.principal_community_5mvm_km) < 0.1,
+        `5 mV/m contour distance (${fiveMvm.distance_km}) must match principal_community_5mvm_km (${c.principal_community_5mvm_km}); rank ${c.rank}`);
+    }
+  }
+});
+
+test('groundwave_contour_table: 0.5 mV/m distance matches daytime_reach_km', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (c.daytime_reach_km == null) continue;
+    const halfMvm = c.groundwave_contour_table.find(r => r.mvm === 0.5);
+    assert.ok(halfMvm != null, `groundwave_contour_table must include 0.5 mV/m row (rank ${c.rank})`);
+    if (halfMvm.distance_km != null){
+      assert.ok(Math.abs(halfMvm.distance_km - c.daytime_reach_km) < 0.1,
+        `0.5 mV/m contour distance (${halfMvm.distance_km}) must match daytime_reach_km (${c.daytime_reach_km}); rank ${c.rank}`);
+    }
+  }
+});
