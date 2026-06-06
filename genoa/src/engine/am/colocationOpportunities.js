@@ -29,7 +29,7 @@
 //   No IO except for the manual JSON inventory load (delegated to
 //   manualInfrastructureClient).  All scoring is deterministic.
 
-import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, __test__ as SO } from './siteOptimizer.js';
+import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline, __test__ as SO } from './siteOptimizer.js';
 const { buildProtectionAdvisory, buildMinimumSpacingReference, buildRecommendedActions } = SO;
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
@@ -143,7 +143,10 @@ export async function runColocationOpportunities(body = {}){
       scoring_time_ms: so.scoring_time_ms ?? null,
       score_histogram: so.score_histogram ?? null,
       top_candidates_summary: so.top_candidates_summary ?? null,
-      minimum_spacing_reference: so.minimum_spacing_reference ?? null
+      minimum_spacing_reference:    so.minimum_spacing_reference ?? null,
+      regulatory_timeline_estimate: so.regulatory_timeline_estimate ?? null,
+      frequency_allocation_context: so.frequency_allocation_context ?? null,
+      candidate_set_statistics:     so.candidate_set_statistics ?? null
     });
   }
 
@@ -348,6 +351,14 @@ export async function runColocationOpportunities(body = {}){
     protection_class_advisory,
     recommended_actions,
     minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
+    regulatory_timeline_estimate: buildRegulatoryTimeline({
+      fcc_class, channel_class: chanClass, skywave_risk_level,
+      asr_required: (300000 / frequency_khz / 4) > 60.96,
+      has_treaty_candidates: returned.some(c => !!c.treaty_zone),
+      any_poor_sigma: returned.some(c => (c.ground_sigma_mS_m ?? 4) < 2),
+      n_promising: Object.keys(candidate_count_by_status || {}).includes('PROMISING')
+        ? (candidate_count_by_status.PROMISING ?? 0) : 0
+    }),
     candidate_count_by_status,
     n_infrastructure_sites: infraSites.length,
     scoring_time_ms,
@@ -735,6 +746,9 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             skywave_risk_level, protection_class_advisory,
                             recommended_actions,
                             minimum_spacing_reference,
+                            regulatory_timeline_estimate = null,
+                            frequency_allocation_context = null,
+                            candidate_set_statistics = null,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
@@ -799,7 +813,10 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     skywave_risk_level: skywave_risk_level ?? null,
     protection_class_advisory: protection_class_advisory ?? null,
     recommended_actions: recommended_actions ?? [],
-    minimum_spacing_reference: minimum_spacing_reference ?? null,
+    minimum_spacing_reference:    minimum_spacing_reference ?? null,
+    regulatory_timeline_estimate: regulatory_timeline_estimate ?? null,
+    frequency_allocation_context: frequency_allocation_context ?? null,
+    candidate_set_statistics:     candidate_set_statistics ?? null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,

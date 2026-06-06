@@ -3915,7 +3915,7 @@ function roundBreakdown(b){
 
 // ---------- public test-only export ----------
 // Exposed for unit tests.  Not part of the public API contract.
-export { buildTopSummary, frequencyChannelClass };
+export { buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline };
 
 export const __test__ = {
   buildGridCandidates,

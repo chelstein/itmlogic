@@ -545,3 +545,55 @@ test('colocation candidates have land_use_classification and estimated_erp_kw', 
       `colocation candidate rank ${c.rank} missing nighttime_classification`);
   }
 });
+
+// ---------- Test 30 — session optimizer enrichments in colocation ----------
+
+test('colocation candidates have site_viability_summary and tower_cost_estimate', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true, maximize_population: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.site_viability_summary != null,
+      `colocation candidate rank ${c.rank} missing site_viability_summary`);
+    assert.ok(c.tower_cost_estimate != null,
+      `colocation candidate rank ${c.rank} missing tower_cost_estimate`);
+    assert.ok(c.power_upgrade_analysis != null,
+      `colocation candidate rank ${c.rank} missing power_upgrade_analysis`);
+  }
+});
+
+// ---------- Test 31 — colocation response has regulatory_timeline_estimate ----------
+
+test('colocation response has regulatory_timeline_estimate', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  assert.ok(out.regulatory_timeline_estimate != null,
+    'colocation response must have regulatory_timeline_estimate');
+  assert.ok(Array.isArray(out.regulatory_timeline_estimate.phases),
+    'regulatory_timeline_estimate.phases must be an array');
+});
+
+// ---------- Test 32 — population_reach_bands in colocation candidates ----------
+
+test('colocation candidates have population_reach_bands with 5 entries', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.population_reach_bands?.bands?.length === 5,
+      `colocation candidate rank ${c.rank} should have 5 population_reach_bands`);
+  }
+});
