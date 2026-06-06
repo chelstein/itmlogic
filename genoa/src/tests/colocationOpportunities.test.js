@@ -1183,3 +1183,17 @@ test('colocation GRID candidates have station_relocation_cost_estimator', async 
     assert.ok(c.station_relocation_cost_estimator.total_low > 0, `rank ${c.rank} relocation cost must be positive`);
   }
 });
+
+test('colocation GRID candidates have power_line_interference_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.power_line_interference_analysis != null, `rank ${c.rank} missing power_line_interference_analysis`);
+    assert.ok(c.power_line_interference_analysis.recommended_min_distance_m > 0, `rank ${c.rank} min distance must be positive`);
+  }
+});

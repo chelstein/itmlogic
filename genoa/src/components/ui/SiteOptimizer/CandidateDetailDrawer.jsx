@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Power Line Interference Analysis */}
+        {candidate.power_line_interference_analysis && (() => {
+          const p = candidate.power_line_interference_analysis;
+          const riskColor = r => r === 'HIGH' ? 'text-red-400' : r === 'MODERATE' ? 'text-amber-400' : r === 'LOW' ? 'text-yellow-300' : 'text-green-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Power Line Interference Analysis (§73.184 · §15.615)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  Recommended minimum distance from power lines: <span className="text-white font-mono">{p.recommended_min_distance_m} m</span>.
+                  BPL exclusion zone: <span className={p.bpl_exclusion_applicable ? 'text-amber-300 font-bold' : 'text-gray-400'}>{p.bpl_exclusion_applicable ? `${p.bpl_exclusion_zone_km} km (§15.615)` : 'N/A'}</span>.
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Distance Risk Tiers</div>
+                <div className="space-y-0.5 mb-2">
+                  {p.risk_tiers?.map(t => (
+                    <div key={t.label} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-0.5">
+                      <span className={`font-bold w-16 ${riskColor(t.risk)}`}>{t.label}</span>
+                      <span className="text-gray-500 font-mono w-24">{t.min_m}–{t.max_m === Infinity ? '∞' : t.max_m}m</span>
+                      <span className="text-gray-400 text-xs flex-1">{t.note?.slice(0, 60)}…</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Mitigation Options</div>
+                <div className="space-y-0.5 mb-2">
+                  {p.mitigation_options?.map(m => (
+                    <div key={m.id} className="text-xs bg-gray-800 rounded px-2 py-0.5 flex items-center gap-2">
+                      <span className="text-blue-300 flex-1">{m.strategy}</span>
+                      <span className={`font-bold text-xs ${riskColor(m.effectiveness === 'HIGH' ? 'MINIMAL' : m.effectiveness === 'MODERATE' ? 'MODERATE' : 'HIGH')}`}>{m.effectiveness}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500">{p.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Station Relocation Cost Estimator */}
         {candidate.station_relocation_cost_estimator && (() => {
           const c = candidate.station_relocation_cost_estimator;

@@ -861,7 +861,10 @@ export async function runSiteOptimizer(body = {}){
     mpe_eval_required:      c.rf_exposure_mpe_analysis?.evaluation_required ?? null,
     reloc_cost_low:         c.station_relocation_cost_estimator?.total_low ?? null,
     reloc_cost_high:        c.station_relocation_cost_estimator?.total_high ?? null,
-    reloc_cost_midpoint:    c.station_relocation_cost_estimator?.total_midpoint ?? null
+    reloc_cost_midpoint:    c.station_relocation_cost_estimator?.total_midpoint ?? null,
+    pline_min_dist_m:       c.power_line_interference_analysis?.recommended_min_distance_m ?? null,
+    pline_bpl_applicable:   c.power_line_interference_analysis?.bpl_exclusion_applicable ?? null,
+    pline_n_mitigations:    c.power_line_interference_analysis?.n_applicable_mitigations ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8324,6 +8327,76 @@ async function scoreCandidate(pt, ctx, warnings){
         total_midpoint:    round2((totalLow + totalHigh) / 2),
         reference: 'Budget model based on FCC filing fees (§73.3525), engineering industry cost data, and RSMeans construction cost indices (2024).',
         note: `Total estimated relocation cost: $${totalLow.toLocaleString()} – $${totalHigh.toLocaleString()} (midpoint ~$${Math.round((totalLow + totalHigh) / 2).toLocaleString()}). Estimates are screening-grade; actual costs vary significantly with site conditions.`
+      };
+    })(),
+
+    power_line_interference_analysis: (() => {
+      // AM power line interference assessment
+      // Sources: corona discharge, BPL (§15.615), arcing insulators, switching transients
+      // FCC §73.184: AM stations may file interference complaint with FCC
+      // §15.5: unlicensed devices must not cause harmful interference to licensed AM stations
+      // §15.615: BPL systems must protect AM broadcast bands (535–1705 kHz)
+
+      // Distance-based risk tiers for power lines near transmitter site
+      // FCC and ARRL guidance: power line noise floor degrades AM reception
+      const POWER_LINE_RISK_TIERS = [
+        { min_m: 0,   max_m: 30,   label: 'CRITICAL',  risk: 'HIGH',    note: '< 30m from power line: unacceptable noise floor for AM transmission antenna. Relocate or bury line.' },
+        { min_m: 30,  max_m: 100,  label: 'HIGH',       risk: 'HIGH',    note: '30–100m: elevated risk of corona noise coupling. Request utility noise audit before site commitment.' },
+        { min_m: 100, max_m: 300,  label: 'MODERATE',   risk: 'MODERATE',note: '100–300m: moderate risk; BPL systems or old equipment at this range can cause S/N degradation.' },
+        { min_m: 300, max_m: 1000, label: 'LOW',        risk: 'LOW',     note: '300m–1 km: low risk for modern infrastructure; verify BPL is not active on line.' },
+        { min_m: 1000,max_m: Infinity, label: 'MINIMAL',risk: 'MINIMAL', note: '> 1 km: minimal risk. Background noise floor likely dominated by atmospheric and other sources.' }
+      ];
+
+      // BPL interference band (§15.615 exclusion zones)
+      // §15.615(c): AM stations may require BPL to terminate operation within 1 km on same frequency
+      const BPL_EXCLUSION_KM = 1;
+      const BPL_FREQ_BAND = { low_khz: 535, high_khz: 1705 };
+      const in_BPL_band_pline = frequency_khz >= BPL_FREQ_BAND.low_khz && frequency_khz <= BPL_FREQ_BAND.high_khz;
+
+      // Noise measurement per IEEE 1560 / ITU-R CISPR 22
+      const noiseMeasurementProtocol = {
+        standard: 'IEEE Std 1560 / ITU-R CISPR 22',
+        method: 'Spectrum analyzer sweep at candidate site, 1 MHz bandwidth centered on station frequency',
+        reference_level_dbuv_m: 34, // §73.184 threshold for acceptable noise floor
+        measurement_points: ['Tower base', '30m from nearest power line', '100m from power line', 'Quiet reference site'],
+        time_of_day: ['Night (lower atmospheric noise floor)', 'Business hours (peak BPL and industrial load)'],
+        acceptance_criterion: 'S/N ≥ 50 dB for acceptable AM service; noise floor ≤ −40 dBm/Hz at operating frequency'
+      };
+
+      // FCC complaint process per §73.184
+      const fccComplaintProcess = [
+        { step: 1, action: 'Document interference with spectrum analyzer screenshots and field strength measurements', rule: '§73.184(a)' },
+        { step: 2, action: 'Notify power company / BPL operator in writing; allow 30 days to resolve', rule: '§73.184(b)', note: 'FCC requires good-faith effort before complaint.' },
+        { step: 3, action: 'File FCC Form 2000D (Part 15 interference complaint) if unresolved', rule: '§15.5(c)', note: 'Include measurement data, correspondence, and site coordinates.' },
+        { step: 4, action: 'FCC investigates; may issue Notice of Apparent Liability to Part 15 operator', rule: '§15.5(c)' }
+      ];
+
+      // Mitigation options
+      const mitigations = [
+        { id: 'site_distance',   strategy: 'Select site > 300m from transmission lines', applicable: true, cost_est: 'Site-dependent', effectiveness: 'HIGH', note: 'Most reliable solution; distance attenuates noise exponentially.' },
+        { id: 'shield_cable',    strategy: 'Request utility to use shielded/twisted pair in critical span', applicable: true, cost_est: '$2,000–$20,000', effectiveness: 'HIGH', note: 'Utility cooperation required; reduces corona and BPL egress.' },
+        { id: 'noise_blanker',   strategy: 'Noise blanker circuit at transmitter RF input', applicable: false, cost_est: '$500–$2,000', effectiveness: 'MODERATE', note: 'Effective only for impulsive (arcing) noise; not corona.' },
+        { id: 'bpl_exclusion',   strategy: `Invoke §15.615 BPL exclusion (${BPL_EXCLUSION_KM} km) if active BPL`, applicable: in_BPL_band_pline, cost_est: 'FCC enforcement (no cost)', effectiveness: 'HIGH', note: 'AM stations within 1 km of BPL system can require termination per §15.615(c).' },
+        { id: 'site_survey',     strategy: 'Pre-purchase noise floor survey (IEEE 1560)', applicable: true, cost_est: '$1,500–$5,000', effectiveness: 'DIAGNOSTIC', note: 'Essential due-diligence before site commitment.' }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        in_am_broadcast_band:        in_BPL_band_pline,
+        bpl_exclusion_zone_km:       BPL_EXCLUSION_KM,
+        bpl_exclusion_applicable:    in_BPL_band_pline,
+        risk_tiers:                  POWER_LINE_RISK_TIERS,
+        n_risk_tiers:                POWER_LINE_RISK_TIERS.length,
+        recommended_min_distance_m:  300,
+        noise_measurement_protocol:  noiseMeasurementProtocol,
+        fcc_complaint_process:       fccComplaintProcess,
+        n_complaint_steps:           fccComplaintProcess.length,
+        mitigation_options:          mitigations.filter(m => m.applicable),
+        n_applicable_mitigations:    mitigations.filter(m => m.applicable).length,
+        reference: '47 CFR §73.184; §15.5; §15.615; IEEE Std 1560; ITU-R CISPR 22; FCC BPL Order (ET Docket 03-104)',
+        note: `AM ${frequency_khz} kHz in AM broadcast band (${BPL_FREQ_BAND.low_khz}–${BPL_FREQ_BAND.high_khz} kHz). BPL exclusion zone: ${BPL_EXCLUSION_KM} km per §15.615(c). Minimum recommended distance from power lines: 300m.`
       };
     })(),
 

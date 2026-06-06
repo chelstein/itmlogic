@@ -6457,3 +6457,49 @@ test('station_relocation_cost_estimator comparison table columns present', async
     assert.ok('reloc_cost_midpoint' in row, 'reloc_cost_midpoint missing from comparison table');
   }
 });
+
+test('power_line_interference_analysis presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].power_line_interference_analysis;
+  assert.ok(p != null, 'power_line_interference_analysis must be present');
+  assert.ok(Array.isArray(p.risk_tiers), 'risk_tiers must be an array');
+  assert.ok(p.n_risk_tiers >= 4, 'must have at least 4 risk tiers');
+  assert.ok(p.recommended_min_distance_m > 0, 'recommended_min_distance_m must be positive');
+});
+
+test('power_line_interference_analysis BPL exclusion in AM band', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].power_line_interference_analysis;
+  // KAZM at 780 kHz is in 535–1705 kHz band
+  assert.strictEqual(p.in_am_broadcast_band, true, 'KAZM 780 kHz must be in AM broadcast band');
+  assert.strictEqual(p.bpl_exclusion_applicable, true, 'BPL exclusion must apply in AM band');
+  assert.strictEqual(p.bpl_exclusion_zone_km, 1, 'BPL exclusion zone must be 1 km per §15.615');
+});
+
+test('power_line_interference_analysis risk tiers are ordered by distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].power_line_interference_analysis;
+  const sorted = [...p.risk_tiers].sort((a, b) => a.min_m - b.min_m);
+  for (let i = 1; i < sorted.length; i++) {
+    assert.ok(sorted[i].min_m >= sorted[i-1].max_m || sorted[i].min_m === sorted[i-1].min_m,
+      'risk tiers must be ordered by increasing distance');
+  }
+});
+
+test('power_line_interference_analysis mitigation options and complaint process', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].power_line_interference_analysis;
+  assert.ok(p.mitigation_options.length > 0, 'must have applicable mitigation options');
+  assert.ok(p.n_applicable_mitigations > 0, 'n_applicable_mitigations must be positive');
+  assert.ok(Array.isArray(p.fcc_complaint_process), 'fcc_complaint_process must be an array');
+  assert.ok(p.n_complaint_steps >= 3, 'must have at least 3 FCC complaint steps');
+});
+
+test('power_line_interference_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pline_min_dist_m' in row,    'pline_min_dist_m missing from comparison table');
+    assert.ok('pline_bpl_applicable' in row,'pline_bpl_applicable missing from comparison table');
+    assert.ok('pline_n_mitigations' in row, 'pline_n_mitigations missing from comparison table');
+  }
+});
