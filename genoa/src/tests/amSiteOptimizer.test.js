@@ -5683,6 +5683,54 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- ownership_multiple_rules_guide ----
+
+test('ownership_multiple_rules_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.ownership_multiple_rules_guide != null, 'ownership_multiple_rules_guide missing');
+  const o = c.ownership_multiple_rules_guide;
+  assert.ok(Array.isArray(o.market_size_tiers), 'market_size_tiers must be array');
+  assert.ok(Array.isArray(o.attributable_interests), 'attributable_interests must be array');
+  assert.ok(o.attributable_interests.length >= 4, 'at least 4 attributable interest types');
+  assert.ok(Array.isArray(o.practical_steps), 'practical_steps must be array');
+});
+
+test('ownership_multiple_rules_guide local AM limit is 5 (large market)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const o = out.candidates[0].ownership_multiple_rules_guide;
+  assert.strictEqual(o.local_am_limit, 5, 'large market AM limit must be 5 per §73.3555(a)');
+  assert.strictEqual(o.local_radio_combo_limit, 8, 'large market combo limit must be 8');
+  assert.ok(o.n_attributable_types > 0, 'n_attributable_types must be positive');
+});
+
+test('ownership_multiple_rules_guide attributable interests include LMA and JSA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const o = out.candidates[0].ownership_multiple_rules_guide;
+  const hasLma = o.attributable_interests.some(i => i.id === 'LMA_BROKER');
+  const hasJsa = o.attributable_interests.some(i => i.id === 'JSA');
+  assert.ok(hasLma, 'must include LMA_BROKER attributable interest');
+  assert.ok(hasJsa, 'must include JSA attributable interest');
+  const nonAttrib = o.attributable_interests.find(i => i.id === 'SILENT_PARTNER');
+  assert.ok(nonAttrib != null && nonAttrib.attributable === false, 'SILENT_PARTNER must be non-attributable');
+});
+
+test('ownership_multiple_rules_guide attribution_risk_level is valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const o = out.candidates[0].ownership_multiple_rules_guide;
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(o.attribution_risk_level), 'attribution_risk_level must be LOW/MODERATE/HIGH');
+  assert.ok(typeof o.relocation_impact_note === 'string', 'relocation_impact_note must be string');
+});
+
+test('ownership_multiple_rules_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('omrg_local_am_limit' in row, 'omrg_local_am_limit missing from comparison table');
+    assert.ok('omrg_radio_combo_limit' in row, 'omrg_radio_combo_limit missing from comparison table');
+    assert.ok('omrg_attribution_risk' in row, 'omrg_attribution_risk missing from comparison table');
+  }
+});
+
 // ---- adjacent_channel_protection_guide ----
 
 test('adjacent_channel_protection_guide presence and structure', async () => {

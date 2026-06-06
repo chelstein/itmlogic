@@ -2226,6 +2226,68 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Ownership Multiple Rules Guide */}
+        {candidate.ownership_multiple_rules_guide && (() => {
+          const o = candidate.ownership_multiple_rules_guide;
+          const riskColors = { LOW: '#34d399', MODERATE: '#fbbf24', HIGH: '#f87171' };
+          const attrib = (o.attributable_interests || []).filter(i => i.attributable);
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Ownership / Multiple Rules (§73.3555)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Local AM Limit</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{o.local_am_limit} stations (large market)</span>
+                  <span style={{ color: '#94a3b8' }}>AM+FM Combo Limit</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{o.local_radio_combo_limit} total (large market)</span>
+                  <span style={{ color: '#94a3b8' }}>Attribution Risk</span>
+                  <span style={{ color: riskColors[o.attribution_risk_level] || '#e2e8f0', fontWeight: 700 }}>{o.attribution_risk_level}</span>
+                  <span style={{ color: '#94a3b8' }}>Attributable Types</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{o.n_attributable_types}</span>
+                </div>
+                {o.relocation_impact_note && (
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>{o.relocation_impact_note}</div>
+                )}
+              </div>
+              {/* Market size tiers */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>MARKET SIZE LIMITS (§73.3555(a))</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+                  {(o.market_size_tiers || []).map(t => (
+                    <div key={t.market_size} style={{ background: '#020c18', borderRadius: 4, padding: '5px 6px', fontSize: 11 }}>
+                      <div style={{ color: '#94a3b8', fontSize: 10, marginBottom: 2 }}>{t.market_size.split(' ')[0]}</div>
+                      <div style={{ color: '#e2e8f0' }}>AM: <span style={{ color: '#fbbf24', fontWeight: 700 }}>{t.max_am}</span></div>
+                      <div style={{ color: '#e2e8f0' }}>Total: <span style={{ color: '#34d399', fontWeight: 700 }}>{t.max_total}</span></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Attributable interests */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>ATTRIBUTABLE INTERESTS</div>
+                {attrib.map(i => (
+                  <div key={i.id} style={{ background: '#020c18', borderRadius: 4, padding: '5px 10px', marginBottom: 3, fontSize: 12, display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#e2e8f0' }}>{i.label}</span>
+                    <span style={{ color: '#38bdf8', fontSize: 11 }}>{i.cfr}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Practical steps */}
+              {(o.practical_steps || []).length > 0 && (
+                <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, marginBottom: 4 }}>ACTION STEPS</div>
+                  {(o.practical_steps || []).map((step, i) => (
+                    <div key={i} style={{ color: '#e2e8f0', fontSize: 11, marginBottom: 3, paddingLeft: 8 }}>• {step}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{o.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Adjacent Channel Protection Guide */}
         {candidate.adjacent_channel_protection_guide && (() => {
           const g = candidate.adjacent_channel_protection_guide;

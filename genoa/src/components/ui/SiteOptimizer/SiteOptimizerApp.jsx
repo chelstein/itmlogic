@@ -1717,6 +1717,40 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      ownership_multiple_rules_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        local_am_limit: 5, local_radio_combo_limit: 8,
+        market_size_tiers: [
+          { market_size: 'LARGE (15+ stations)', max_am: 5, max_fm: 5, max_total: 8 },
+          { market_size: 'MEDIUM (10–14)',       max_am: 3, max_fm: 3, max_total: 4 },
+          { market_size: 'SMALL (5–9)',          max_am: 2, max_fm: 2, max_total: 3 },
+          { market_size: 'TINY (< 5)',           max_am: 2, max_fm: 2, max_total: 2 }
+        ],
+        attributable_interests: [
+          { id: 'DIRECT_OWNERSHIP',   label: 'Direct equity ownership ≥ 25%',          cfr: '§73.3555 Note 2(b)', attributable: true  },
+          { id: 'INDIRECT_OWNERSHIP', label: 'Indirect ownership ≥ 25% through chain',  cfr: '§73.3555 Note 2(c)', attributable: true  },
+          { id: 'OFFICER_DIRECTOR',   label: 'Officer or director of corporate licensee',cfr: '§73.3555 Note 2(a)', attributable: true  },
+          { id: 'LMA_BROKER',         label: 'LMA: programs ≥ 15% of broadcast hours',  cfr: '§73.3555 Note 2(j)', attributable: true  },
+          { id: 'JSA',                label: 'JSA (Joint Sales Agreement)',              cfr: '§73.3555 Note 2(k)', attributable: true  },
+          { id: 'SILENT_PARTNER',     label: 'Silent partner / passive investor < 25%', cfr: '§73.3555 Note 2(i)', attributable: false }
+        ],
+        n_attributable_types: 5,
+        contour_shift_risk: 'LOW', attribution_risk_level: 'LOW',
+        relocation_impact_note: 'Site is within ~30 km of current; metro market attribution likely unchanged — routine §73.3555 review sufficient',
+        waiver_standards: [
+          { id: 'FINANCIALLY_TROUBLED', label: 'Financially troubled station (failing station defense)', cfr: '§73.3555(f)', notes: 'Allows temporary waivers for stations that would otherwise fail; time-limited' },
+          { id: 'NEW_ENTRANT', label: 'Eligible entity / new entrant preference', cfr: '§73.3555 Note 5', notes: 'FCC may grant waiver where eligible entity (small/diverse owner) would benefit market' }
+        ],
+        practical_steps: [
+          'Identify all attributable interests in licensee entity per §73.3555 Notes',
+          'Determine Nielsen Audio market (or FCC-defined market if no Arbitron rating)',
+          'Count all AM stations with attributable ownership in same market',
+          'Verify relocation does not shift station into a new Nielsen market where limits are exceeded',
+          'File FCC Form 323 Ownership Report within 30 days of any ownership change (§73.3615)'
+        ],
+        reference: '47 CFR §73.3555; §73.3615; FCC Form 323; FCC 2018 Quadrennial Review (MB Docket 18-227); 2014 JSA attribution rule',
+        note: 'Class D at 780 kHz. Local AM limit: 5. Combo limit: 8. Attribution risk from relocation: LOW.'
+      },
       adjacent_channel_protection_guide: {
         frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
         adjacent_10khz: { required_du_db: 20, lower_channel_khz: 770, upper_channel_khz: 790, sideband_rolloff_db: 20, cfr: '§73.182(b) Table 1' },

@@ -939,7 +939,10 @@ export async function runSiteOptimizer(body = {}){
     msr_waiver_eligible:    c.main_studio_rule_guide?.waiver_eligible ?? null,
     acpg_adj10_du_db:       c.adjacent_channel_protection_guide?.adjacent_10khz?.required_du_db ?? null,
     acpg_adj20_du_db:       c.adjacent_channel_protection_guide?.adjacent_20khz?.required_du_db ?? null,
-    acpg_n_adj_stations:    c.adjacent_channel_protection_guide?.n_adjacent_channels_checked ?? null
+    acpg_n_adj_stations:    c.adjacent_channel_protection_guide?.n_adjacent_channels_checked ?? null,
+    omrg_local_am_limit:    c.ownership_multiple_rules_guide?.local_am_limit ?? null,
+    omrg_radio_combo_limit: c.ownership_multiple_rules_guide?.local_radio_combo_limit ?? null,
+    omrg_attribution_risk:  c.ownership_multiple_rules_guide?.attribution_risk_level ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6674,6 +6677,84 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    ownership_multiple_rules_guide: (() => {
+      // §73.3555: FCC local radio ownership rules (multiple ownership limits)
+      // These rules govern how many AM/FM/combo stations one entity can own in a market.
+      // Relevant to AM relocation because: (1) changing service area may shift the station into a
+      // new local market; (2) new site may reduce/increase contour overlap with co-owned stations.
+      // FCC uses Arbitron (Nielsen Audio) metro areas to define local radio markets.
+
+      // Local AM ownership limits per §73.3555(a) (post-2003 rules, Prometheus Radio):
+      //   Markets with 15+ AM/FM stations: max 5 AM + 5 FM (combo: 8 total)
+      //   Markets with 10–14 stations: max 4 total, no more than 3 per service (AM or FM)
+      //   Markets with 5–9 stations: max 3 total, no more than 2 per service
+      //   Markets with < 5 stations: max 2 total (both AM if desired)
+      //   National limit: no ownership cap (eliminated in 1996 Telecom Act)
+      // Note: FCC 2018 Quadrennial Review modified rules; AM-only markets largely unaffected
+
+      const LOCAL_AM_LIMIT = 5;  // max AM stations in large markets (15+ total stations)
+      const LOCAL_COMBO_LIMIT = 8; // max total radio stations (AM+FM) in large markets
+      const LOCAL_RADIO_COMBOS = [
+        { market_size: 'LARGE (15+ stations)',  max_am: 5, max_fm: 5, max_total: 8  },
+        { market_size: 'MEDIUM (10–14)',        max_am: 3, max_fm: 3, max_total: 4  },
+        { market_size: 'SMALL (5–9)',           max_am: 2, max_fm: 2, max_total: 3  },
+        { market_size: 'TINY (< 5)',            max_am: 2, max_fm: 2, max_total: 2  }
+      ];
+
+      // Attributable interest definition per §73.3555 Notes:
+      //   - Direct or indirect ownership ≥ 25% (voting): attributable
+      //   - Officership/directorship (at corporation): attributable
+      //   - LMA (Local Marketing Agreement) with > 15% of station hours: attributable
+      //   - JSA (Joint Sales Agreement): attributable per FCC 2014 JSA attribution rule
+      //   - TBA (Time Brokerage Agreement): attributable if > 15% of broadcast hours
+      const ATTRIBUTABLE_INTERESTS = [
+        { id: 'DIRECT_OWNERSHIP',   label: 'Direct equity ownership ≥ 25%',         cfr: '§73.3555 Note 2(b)', attributable: true  },
+        { id: 'INDIRECT_OWNERSHIP', label: 'Indirect ownership ≥ 25% through chain', cfr: '§73.3555 Note 2(c)', attributable: true  },
+        { id: 'OFFICER_DIRECTOR',   label: 'Officer or director of corporate licensee', cfr: '§73.3555 Note 2(a)', attributable: true  },
+        { id: 'LMA_BROKER',         label: 'LMA: programs ≥ 15% of broadcast hours', cfr: '§73.3555 Note 2(j)', attributable: true  },
+        { id: 'JSA',                label: 'JSA (Joint Sales Agreement)',             cfr: '§73.3555 Note 2(k)', attributable: true  },
+        { id: 'SILENT_PARTNER',     label: 'Silent partner / passive investor < 25%', cfr: '§73.3555 Note 2(i)', attributable: false }
+      ];
+
+      // Relocation impact analysis:
+      // When a station moves its transmitter site, its primary 0.5 mV/m contour may:
+      //   1. Expand into a new metro area → may create new ownership conflicts
+      //   2. Contract out of current metro → may reduce attribution count (beneficial)
+      //   3. Remain in same metro (most common) → no ownership change impact
+      const contour_shift_risk = pt.distance_from_current_km > 30 ? 'MODERATE' : 'LOW';
+      const attribution_risk_level = contour_shift_risk;
+
+      // Waiver process: §73.3555(f) allows waiver showing public interest benefit
+      const WAIVER_STANDARDS = [
+        { id: 'FINANCIALLY_TROUBLED', label: 'Financially troubled station (failing station defense)', cfr: '§73.3555(f)', notes: 'Allows temporary waivers for stations that would otherwise fail; time-limited' },
+        { id: 'NEW_ENTRANT',          label: 'Eligible entity / new entrant preference', cfr: '§73.3555 Note 5', notes: 'FCC may grant waiver where eligible entity (small/diverse owner) would benefit market' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        local_am_limit: LOCAL_AM_LIMIT,
+        local_radio_combo_limit: LOCAL_COMBO_LIMIT,
+        market_size_tiers: LOCAL_RADIO_COMBOS,
+        attributable_interests: ATTRIBUTABLE_INTERESTS,
+        n_attributable_types: ATTRIBUTABLE_INTERESTS.filter(i => i.attributable).length,
+        contour_shift_risk,
+        attribution_risk_level,
+        relocation_impact_note: contour_shift_risk === 'MODERATE'
+          ? `Site is ${round2(pt.distance_from_current_km ?? 0)} km from current — contour shift may affect metro market attribution; review §73.3555 with communications counsel before CP filing`
+          : `Site is within ~30 km of current; metro market attribution likely unchanged — routine §73.3555 review sufficient`,
+        waiver_standards: WAIVER_STANDARDS,
+        practical_steps: [
+          'Identify all attributable interests in licensee entity per §73.3555 Notes',
+          'Determine Nielsen Audio market (or FCC-defined market if no Arbitron rating)',
+          'Count all AM stations with attributable ownership in same market',
+          'Verify relocation does not shift station into a new Nielsen market where limits are exceeded',
+          'File FCC Form 323 Ownership Report within 30 days of any ownership change (§73.3615)'
+        ],
+        reference: '47 CFR §73.3555; §73.3615; FCC Form 323; FCC 2018 Quadrennial Review (MB Docket 18-227); 2014 JSA attribution rule',
+        note: `Class ${fcc_class} at ${frequency_khz} kHz. Local AM limit: ${LOCAL_AM_LIMIT}. Combo limit: ${LOCAL_COMBO_LIMIT}. Attribution risk from relocation: ${attribution_risk_level}.`
       };
     })(),
 
