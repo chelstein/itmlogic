@@ -3421,3 +3421,44 @@ test('frequency_allocation_context.implications is a non-empty array', async () 
   assert.ok(out.frequency_allocation_context.implications.length > 0,
     'implications must have at least one entry');
 });
+
+// ---------- candidate_set_statistics ----------
+
+test('candidate_set_statistics is present on response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.ok(out.candidate_set_statistics != null, 'candidate_set_statistics must be present');
+});
+
+test('candidate_set_statistics.n matches number of returned candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  assert.equal(out.candidate_set_statistics.n, out.candidates.length,
+    'n should equal candidates.length');
+});
+
+test('candidate_set_statistics.score has mean/min/max fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const s = out.candidate_set_statistics.score;
+  assert.ok('mean' in s && 'min' in s && 'max' in s, 'score must have mean/min/max');
+  assert.ok(s.min <= s.max, 'score.min should be <= score.max');
+});
+
+test('candidate_set_statistics.status_distribution covers all returned statuses', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const dist = out.candidate_set_statistics.status_distribution;
+  const totalInDist = Object.values(dist).reduce((a, b) => a + b, 0);
+  assert.equal(totalInDist, out.candidates.length,
+    'status_distribution counts should sum to candidate count');
+});
+
+test('candidate_set_statistics.overlap_fraction has mean in [0,1] when present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const ov = out.candidate_set_statistics.overlap_fraction;
+  if (ov.mean != null) {
+    assert.ok(ov.mean >= 0 && ov.mean <= 1, `overlap_fraction.mean ${ov.mean} out of [0,1]`);
+  }
+});

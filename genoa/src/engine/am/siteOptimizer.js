@@ -579,6 +579,60 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
+  // ---- 14b. Candidate set statistics ----
+  // Aggregate numeric statistics across returned candidates for UI charts/summaries.
+  const candidate_set_statistics = (() => {
+    if (returned.length === 0) return null;
+    const nums = (arr) => arr.filter(v => v != null && isFinite(v));
+    const mean = (arr) => { const n = nums(arr); return n.length ? round2(n.reduce((a, b) => a + b, 0) / n.length) : null; };
+    const minOf = (arr) => { const n = nums(arr); return n.length ? round2(Math.min(...n)) : null; };
+    const maxOf = (arr) => { const n = nums(arr); return n.length ? round2(Math.max(...n)) : null; };
+    const median = (arr) => {
+      const n = nums(arr).sort((a, b) => a - b);
+      if (!n.length) return null;
+      const m = Math.floor(n.length / 2);
+      return n.length % 2 === 0 ? round2((n[m - 1] + n[m]) / 2) : n[m];
+    };
+
+    const scores = returned.map(c => c.score);
+    const reaches = returned.map(c => c.daytime_reach_km);
+    const cols = returned.map(c => c.col_coverage_pct != null ? round2(c.col_coverage_pct * 100) : null);
+    const sigmas = returned.map(c => c.ground_sigma_mS_m);
+    const risks = returned.map(c => c.regulatory_risk_score?.risk_score ?? null);
+    const overlaps = returned.map(c => c.coverage_overlap_analysis?.overlap_fraction ?? null);
+    const dists = returned.map(c => c.distance_from_current_km ?? null);
+
+    const continuity_distribution = {};
+    for (const c of returned) {
+      const cc = c.coverage_overlap_analysis?.coverage_continuity ?? 'UNKNOWN';
+      continuity_distribution[cc] = (continuity_distribution[cc] ?? 0) + 1;
+    }
+    const status_distribution = {};
+    for (const c of returned) {
+      const s = c.status_category ?? 'UNKNOWN';
+      status_distribution[s] = (status_distribution[s] ?? 0) + 1;
+    }
+    const risk_distribution = {};
+    for (const c of returned) {
+      const r = c.regulatory_risk_score?.risk_category ?? 'UNKNOWN';
+      risk_distribution[r] = (risk_distribution[r] ?? 0) + 1;
+    }
+
+    return {
+      n: returned.length,
+      score:         { mean: mean(scores),  min: minOf(scores),  max: maxOf(scores),  median: median(scores) },
+      daytime_reach: { mean: mean(reaches), min: minOf(reaches), max: maxOf(reaches), median: median(reaches), unit: 'km' },
+      col_coverage:  { mean: mean(cols),    min: minOf(cols),    max: maxOf(cols),    median: median(cols),   unit: 'pct' },
+      sigma:         { mean: mean(sigmas),  min: minOf(sigmas),  max: maxOf(sigmas),  unit: 'mS/m' },
+      risk_score:    { mean: mean(risks),   min: minOf(risks),   max: maxOf(risks),   median: median(risks) },
+      overlap_fraction: { mean: mean(overlaps), min: minOf(overlaps), max: maxOf(overlaps), median: median(overlaps) },
+      distance_km:   { mean: mean(dists),   min: minOf(dists),   max: maxOf(dists),   median: median(dists) },
+      status_distribution,
+      risk_distribution,
+      continuity_distribution
+    };
+  })();
+
   // ---- 15. Candidate comparison table ----
   // Compact tabular view of all returned candidates on the 7 key screening metrics.
   // Useful for UI comparison tables and quick-scan decision making.
@@ -789,6 +843,7 @@ export async function runSiteOptimizer(body = {}){
     candidate_comparison_table,
     engineering_summary,
     frequency_allocation_context,
+    candidate_set_statistics,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,
