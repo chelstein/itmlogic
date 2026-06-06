@@ -831,7 +831,10 @@ export async function runSiteOptimizer(body = {}){
     soil_reach_gain_km:     c.soil_conductivity_improvement_guide?.reach_gain_km ?? null,
     fac_service_a:          c.transmitter_facility_design_guide?.recommended_service_size_a ?? null,
     fac_hvac_tons:          c.transmitter_facility_design_guide?.hvac_required_tons ?? null,
-    fac_fence_required:     c.transmitter_facility_design_guide?.fencing?.required ?? null
+    fac_fence_required:     c.transmitter_facility_design_guide?.fencing?.required ?? null,
+    map_col_radius_km:      c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'col_min')?.radius_km ?? null,
+    map_primary_radius_km:  c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'primary')?.radius_km ?? null,
+    map_blanket_radius_km:  c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'blanket')?.radius_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7467,6 +7470,81 @@ async function scoreCandidate(pt, ctx, warnings){
         construction_cost_estimate_usd: { low: buildCostLow, high: buildCostHigh },
         reference: '47 CFR §73.49 (transmitter enclosure); §11.35 (EAS); NEC Article 250 (grounding); IEEE 1100 (single-point ground); NFPA 110 (emergency power)',
         note: 'Facility design guide is a screening-grade estimate. Actual electrical service requirements depend on the specific transmitter model efficiency, local utility voltage, and HVAC heat load. Hire a licensed electrical contractor and broadcast facility designer for detailed plans.'
+      };
+    })(),
+
+    // Coverage service area map specification.
+    // Provides GeoJSON-compatible circle specifications for rendering the station's
+    // groundwave contours on a map. Covers the four standard FCC contours:
+    // 5 mV/m (COL minimum service), 2 mV/m (standard service), 0.5 mV/m (primary
+    // service), and 1000 mV/m (blanket). Each contour includes radius_km, color, and
+    // regulatory meaning for direct use by the Maplibre/Deck.gl UI layer.
+    coverage_service_area_map_spec: (() => {
+      // Compute groundwave contour distances using the FCC M3 propagation curves.
+      const contourDefs = [
+        { id: 'col_min',    mvm: 5.0,    label: 'COL Minimum Service (§73.24j)',       color: '#22c55e', fill_opacity: 0.12, stroke_width: 2,   priority: 1 },
+        { id: 'standard',   mvm: 2.0,    label: 'Standard Service (2 mV/m)',           color: '#3b82f6', fill_opacity: 0.08, stroke_width: 1.5, priority: 2 },
+        { id: 'primary',    mvm: 0.5,    label: 'Primary Service / Protection (§73.182)', color: '#6366f1', fill_opacity: 0.05, stroke_width: 1,   priority: 3 },
+        { id: 'blanket',    mvm: 1000.0, label: 'Blanket (§73.24g / 1000 mV/m)',        color: '#ef4444', fill_opacity: 0.20, stroke_width: 2,   priority: 0 }
+      ];
+
+      const contours = contourDefs.map(def => {
+        let radius_km = null;
+        try {
+          const r = fccAmDistanceKm({ frequency_khz, target_mvm: def.mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+          radius_km = r?.distance_km != null ? round2(r.distance_km) : null;
+        } catch { /* ok */ }
+
+        return {
+          ...def,
+          center_lat: pt.lat,
+          center_lon: pt.lon,
+          radius_km,
+          radius_m: radius_km != null ? round2(radius_km * 1000) : null,
+          // GeoJSON circle approximation: a regular polygon with N sides
+          geojson_type: 'circle',
+          n_sides: 64,       // sufficient for smooth circle at typical zoom levels
+          regulatory_note: def.id === 'col_min'  ? '§73.24(j): 5 mV/m required at community of license'
+            : def.id === 'standard'  ? 'Standard service contour; used in coverage reporting'
+            : def.id === 'primary'   ? '§73.182 protected groundwave contour for NIF analysis'
+            : '§73.24(g) blanket interference zone — may require mitigation measures'
+        };
+      });
+
+      // Coverage statistics
+      const colContour    = contours.find(c => c.id === 'col_min');
+      const primaryContour = contours.find(c => c.id === 'primary');
+      const blanketContour = contours.find(c => c.id === 'blanket');
+
+      const colAreaKm2     = colContour?.radius_km    != null ? round2(Math.PI * colContour.radius_km ** 2)    : null;
+      const primaryAreaKm2 = primaryContour?.radius_km != null ? round2(Math.PI * primaryContour.radius_km ** 2) : null;
+      const blanketAreaKm2 = blanketContour?.radius_km != null ? round2(Math.PI * blanketContour.radius_km ** 2) : null;
+
+      // Render layer spec for Maplibre GL / Deck.gl
+      const renderSpec = {
+        layer_type:   'ScatterplotLayer',
+        coordinate_system: 'LNGLAT',
+        center:       [pt.lon, pt.lat],
+        unit:         'km',
+        contours:     contours.map(c => ({ id: c.id, radius_km: c.radius_km, color: c.color, fill_opacity: c.fill_opacity, stroke_width: c.stroke_width })),
+        legend: contours.map(c => ({ label: c.label, color: c.color, radius_km: c.radius_km })),
+        note: 'Use Deck.gl ScatterplotLayer or MapLibre GL circle layer with radius in meters. Set radiusUnits="meters" and radius = radius_m.'
+      };
+
+      return {
+        candidate_lat:        pt.lat,
+        candidate_lon:        pt.lon,
+        frequency_khz,
+        tpo_kw,
+        sigma_msm,
+        contours,
+        n_contours:           contours.length,
+        col_service_area_km2: colAreaKm2,
+        primary_area_km2:     primaryAreaKm2,
+        blanket_area_km2:     blanketAreaKm2,
+        render_spec:          renderSpec,
+        reference: '47 CFR §73.24(j) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); FCC M3 groundwave propagation curves',
+        note: 'Contour radii are FCC groundwave screening estimates assuming flat terrain and uniform soil conductivity. Actual contour shapes vary with terrain and σ variation. Use §73.183 contour computation software for filing-grade coverage maps.'
       };
     })(),
 

@@ -5991,3 +5991,52 @@ test('transmitter_facility_design_guide comparison table columns present', async
     assert.ok('fac_fence_required' in row, 'fac_fence_required missing from comparison table');
   }
 });
+
+test('coverage_service_area_map_spec presence and contour count', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].coverage_service_area_map_spec;
+  assert.ok(m != null, 'coverage_service_area_map_spec must be present');
+  assert.strictEqual(m.n_contours, 4, 'must have 4 contours (col_min, standard, primary, blanket)');
+  assert.ok(Array.isArray(m.contours), 'contours must be an array');
+});
+
+test('coverage_service_area_map_spec contour IDs and mV/m thresholds', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const { contours } = out.candidates[0].coverage_service_area_map_spec;
+  const ids = contours.map(c => c.id);
+  assert.ok(ids.includes('col_min'),  'must include col_min contour');
+  assert.ok(ids.includes('standard'), 'must include standard contour');
+  assert.ok(ids.includes('primary'),  'must include primary contour');
+  assert.ok(ids.includes('blanket'),  'must include blanket contour');
+  const col = contours.find(c => c.id === 'col_min');
+  assert.strictEqual(col.mvm, 5.0, 'col_min contour must be 5 mV/m');
+});
+
+test('coverage_service_area_map_spec radius ordering and render_spec', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].coverage_service_area_map_spec;
+  const col     = m.contours.find(c => c.id === 'col_min');
+  const primary = m.contours.find(c => c.id === 'primary');
+  assert.ok(col.radius_km != null && col.radius_km > 0, 'col_min radius must be positive');
+  assert.ok(primary.radius_km != null && primary.radius_km > 0, 'primary radius must be positive');
+  assert.ok(primary.radius_km > col.radius_km, 'primary (0.5 mV/m) must reach farther than col_min (5 mV/m)');
+  assert.ok(m.render_spec != null, 'render_spec must be present');
+  assert.ok(typeof m.render_spec.layer_type === 'string', 'render_spec.layer_type must be a string');
+});
+
+test('coverage_service_area_map_spec area fields are non-negative numbers', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].coverage_service_area_map_spec;
+  assert.ok(typeof m.col_service_area_km2 === 'number' && m.col_service_area_km2 >= 0, 'col_service_area_km2 must be non-negative');
+  assert.ok(typeof m.primary_area_km2 === 'number' && m.primary_area_km2 >= 0, 'primary_area_km2 must be non-negative');
+  assert.ok(m.primary_area_km2 > m.col_service_area_km2, 'primary area must be larger than col area');
+});
+
+test('coverage_service_area_map_spec comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('map_col_radius_km' in row,     'map_col_radius_km missing from comparison table');
+    assert.ok('map_primary_radius_km' in row, 'map_primary_radius_km missing from comparison table');
+    assert.ok('map_blanket_radius_km' in row, 'map_blanket_radius_km missing from comparison table');
+  }
+});

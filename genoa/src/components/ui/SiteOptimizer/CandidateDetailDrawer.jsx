@@ -2226,6 +2226,61 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Coverage Service Area Map Spec */}
+        {candidate.coverage_service_area_map_spec && (() => {
+          const m = candidate.coverage_service_area_map_spec;
+          const colContour     = m.contours?.find(c => c.id === 'col_min');
+          const standardContour= m.contours?.find(c => c.id === 'standard');
+          const primaryContour = m.contours?.find(c => c.id === 'primary');
+          const blanketContour = m.contours?.find(c => c.id === 'blanket');
+          const fmt = v => v != null ? `${v} km` : '—';
+          const fmtKm2 = v => v != null ? `${v.toLocaleString()} km²` : '—';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Coverage Service Area Map Spec (§73.24)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  Four regulatory contours for deck.gl/MapLibre rendering centered at candidate site
+                  ({m.candidate_lat?.toFixed(4)}, {m.candidate_lon?.toFixed(4)}).
+                  Radii computed via FCC groundwave curves at {m.frequency_khz} kHz, {m.tpo_kw} kW TPO,
+                  σ = {m.sigma_msm} mS/m.
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {m.contours?.map(c => (
+                    <div key={c.id} className="bg-gray-800 rounded p-2 border-l-2" style={{ borderColor: c.color }}>
+                      <div className="text-xs font-bold" style={{ color: c.color }}>{c.label}</div>
+                      <div className="text-xs text-gray-300">{c.mvm} mV/m threshold</div>
+                      <div className="text-xs text-white font-mono">{fmt(c.radius_km)}</div>
+                      <div className="text-xs text-gray-400">Priority {c.priority} · {c.n_sides}-sided</div>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs text-center mb-2">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">COL Area</div>
+                    <div className="text-green-300 font-mono">{fmtKm2(m.col_service_area_km2)}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Primary Area</div>
+                    <div className="text-indigo-300 font-mono">{fmtKm2(m.primary_area_km2)}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Blanket Area</div>
+                    <div className="text-red-300 font-mono">{fmtKm2(m.blanket_area_km2)}</div>
+                  </div>
+                </div>
+                {m.render_spec && (
+                  <div className="bg-gray-900 rounded p-2 text-xs text-gray-400">
+                    <span className="text-gray-300 font-semibold">Render: </span>
+                    {m.render_spec.layer_type} · {m.render_spec.coordinate_system} ·
+                    center [{m.candidate_lon?.toFixed(4)}, {m.candidate_lat?.toFixed(4)}]
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Transmitter Facility Design Guide */}
         {candidate.transmitter_facility_design_guide && (() => {
           const f = candidate.transmitter_facility_design_guide;
