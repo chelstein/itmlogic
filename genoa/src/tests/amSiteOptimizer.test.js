@@ -4644,3 +4644,44 @@ test('candidate_set_recommendation n_advance_ready + n_need_remedy + n_hold <= c
   assert.equal(total, csr.candidates.length,
     `priority counts must sum to candidates.length`);
 });
+
+// ---------- tower_construction_timeline ----------
+
+test('tower_construction_timeline is present on optimizer response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  assert.ok(out.tower_construction_timeline != null, 'tower_construction_timeline must be present');
+});
+
+test('tower_construction_timeline has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const tct = out.tower_construction_timeline;
+  assert.ok(Array.isArray(tct.phases) && tct.phases.length >= 5, 'phases must have ≥5 entries');
+  assert.ok(typeof tct.total_weeks_min === 'number', 'total_weeks_min must be a number');
+  assert.ok(typeof tct.total_weeks_max === 'number', 'total_weeks_max must be a number');
+  assert.ok(typeof tct.range_label === 'string', 'range_label must be a string');
+  assert.ok(tct.total_weeks_min > 0, 'total_weeks_min must be positive');
+  assert.ok(tct.total_weeks_max >= tct.total_weeks_min, 'total_weeks_max must be >= total_weeks_min');
+});
+
+test('tower_construction_timeline each phase has id, label, weeks_min, weeks_max', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const p of out.tower_construction_timeline.phases) {
+    assert.ok(typeof p.id === 'string' && p.id.length > 0, 'phase must have id');
+    assert.ok(typeof p.label === 'string' && p.label.length > 0, 'phase must have label');
+    assert.ok(typeof p.weeks_min === 'number' && p.weeks_min > 0, 'weeks_min must be positive');
+    assert.ok(typeof p.weeks_max === 'number' && p.weeks_max >= p.weeks_min, 'weeks_max must be >= weeks_min');
+  }
+});
+
+test('tower_construction_timeline total_months are positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const tct = out.tower_construction_timeline;
+  assert.ok(tct.total_months_min > 0, 'total_months_min must be positive');
+  assert.ok(tct.total_months_max >= tct.total_months_min, 'total_months_max must be >= min');
+});
+
+test('tower_construction_timeline critical_path_notes is array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.ok(Array.isArray(out.tower_construction_timeline.critical_path_notes), 'critical_path_notes must be an array');
+});

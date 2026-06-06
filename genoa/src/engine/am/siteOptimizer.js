@@ -1041,7 +1041,84 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
-  // ---- 21. Total project cost estimate ----
+  // ---- 21. Tower construction timeline ----
+  // Response-level project schedule estimate from site selection to on-air.
+  // Breaks construction into discrete phases with week-range estimates.
+  // Complements regulatory_timeline_estimate (which covers only FCC filing phases).
+  const tower_construction_timeline = (() => {
+    const isClear    = chanClass === 'clear_channel';
+    const isRegional = chanClass === 'regional';
+    const qwM_tct   = (300000 / frequency_khz) / 4;
+    const asrReqd   = qwM_tct > ASR_THRESHOLD_M;
+    const hasTreaty  = returned.some(c => !!c.treaty_zone);
+    const needsDA    = returned.some(c => c.directional_antenna_study_guide?.recommended === true);
+    const needsFullDA = returned.some(c => c.directional_antenna_study_guide?.study_type === 'FULL_DA_STUDY_DAY_NIGHT');
+    const isHighTPO  = tpo_kw > 25;
+
+    // Phase 1: Site selection, parcel, zoning — concurrent with early engineering
+    const p1_weeks = [4, 12];
+    // Phase 2: Engineering studies (NIF, DA, soil, MPE)
+    const p2_min = isClear ? 16 : isRegional ? 10 : 6;
+    const p2_max = needsFullDA ? 36 : needsDA ? 24 : isClear ? 24 : 14;
+    const p2_weeks = [p2_min, p2_max];
+    // Phase 3: FCC application + processing (Form 301-AM → CP)
+    const p3_min = hasTreaty ? 52 : isClear ? 16 : 12;
+    const p3_max = hasTreaty ? 104 : isClear ? 32 : 24;
+    const p3_weeks = [p3_min, p3_max];
+    // Phase 4: Tower procurement + site prep (ground clearing, foundation, radial field install)
+    const p4_weeks = asrReqd ? [12, 20] : [8, 14];
+    // Phase 5: Tower erection (guyed vs. self-support affects schedule)
+    const p5_weeks = qwM_tct > 100 ? [6, 12] : [4, 8];
+    // Phase 6: Antenna system installation + ATU/phasor (DA adds time)
+    const p6_min = needsDA ? 6 : 3;
+    const p6_max = needsDA ? 12 : 6;
+    const p6_weeks = [p6_min, p6_max];
+    // Phase 7: Proof of performance + license to cover + license
+    const p7_weeks = [4, 8];
+
+    // Total (assume phases 1+2 can overlap; phases 3-7 are mostly sequential after CP)
+    const total_min = Math.max(p1_weeks[0], p2_weeks[0]) + p3_weeks[0] + p4_weeks[0] + p5_weeks[0] + p6_weeks[0] + p7_weeks[0];
+    const total_max = Math.max(p1_weeks[1], p2_weeks[1]) + p3_weeks[1] + p4_weeks[1] + p5_weeks[1] + p6_weeks[1] + p7_weeks[1];
+    const total_months_min = Math.round(total_min / 4.3);
+    const total_months_max = Math.round(total_max / 4.3);
+
+    const phases = [
+      { id: 'SITE_PARCEL', label: 'Site selection, parcel & zoning', weeks_min: p1_weeks[0], weeks_max: p1_weeks[1], notes: 'Concurrent with Phase 2. Includes option-to-purchase/lease negotiation, zoning review, environmental Phase I.' },
+      { id: 'ENGINEERING_STUDIES', label: 'Pre-filing engineering studies', weeks_min: p2_weeks[0], weeks_max: p2_weeks[1], notes: `Soil survey, ${isClear ? 'NIF skywave study, ' : ''}${needsDA ? 'DA pattern engineering, ' : ''}MPE evaluation. Concurrent with Phase 1.` },
+      { id: 'FCC_APPLICATION', label: 'FCC Form 301-AM filing & CP processing', weeks_min: p3_weeks[0], weeks_max: p3_weeks[1], notes: `${hasTreaty ? 'Includes FCC IB treaty coordination (12–52 wk). ' : ''}FCC processing target 6–12 months after complete application.` },
+      { id: 'SITE_PREP_PROCUREMENT', label: 'Tower procurement & site preparation', weeks_min: p4_weeks[0], weeks_max: p4_weeks[1], notes: `Concurrent with late Phase 3. Includes radial field installation (${Math.round(qwM_tct)} m × 120 radials), grounding, access road.` },
+      { id: 'TOWER_ERECTION', label: 'Tower erection', weeks_min: p5_weeks[0], weeks_max: p5_weeks[1], notes: `Weather-dependent. ${asrReqd ? 'FAA lighting system installation required.' : ''}` },
+      { id: 'ANTENNA_INSTALL', label: 'Antenna system & ATU/phasor installation', weeks_min: p6_weeks[0], weeks_max: p6_weeks[1], notes: needsDA ? 'DA array phasing and ATU adjustment add time — 2–4 engineer site visits expected.' : 'Single-tower NDA: standard ATU matching, base current measurement.' },
+      { id: 'PROOF_LICENSE', label: 'Proof of performance & license', weeks_min: p7_weeks[0], weeks_max: p7_weeks[1], notes: 'FCC Form 302-AM filed after proof. License typically issued within 4–6 weeks of complete proof.' }
+    ];
+
+    const critical_path_notes = [];
+    if (hasTreaty) critical_path_notes.push('TREATY COORDINATION is on the critical path — FCC IB review dominates the schedule.');
+    if (needsFullDA) critical_path_notes.push('FULL DA STUDY (day+night) adds 16–32 weeks to Phase 2 — commission immediately after site selection.');
+    if (isClear) critical_path_notes.push('CLEAR-CHANNEL NIF study (§73.182) requires OET-72 skywave software modeling — allow 8–16 weeks.');
+    if (asrReqd) critical_path_notes.push('ASR REGISTRATION: file FCC Form 854 and FAA 7460-1 early — aeronautical study adds 60–90 days.');
+    critical_path_notes.push('TRANSMITTER PROCUREMENT (not in timeline): allow 16–24 weeks lead time for solid-state AM transmitters (>5 kW) ordered after CP grant.');
+
+    return {
+      frequency_khz,
+      fcc_class,
+      channel_class: chanClass,
+      tpo_kw,
+      asr_required: asrReqd,
+      da_required: needsDA,
+      treaty_factor: hasTreaty,
+      phases,
+      total_weeks_min: total_min,
+      total_weeks_max: total_max,
+      total_months_min,
+      total_months_max,
+      range_label: `${total_months_min}–${total_months_max} months`,
+      critical_path_notes,
+      note: 'Timeline is a screening-grade planning estimate. Actual schedule depends on local zoning, FCC queue depth, contractor availability, weather, and permitting complexity. Consult a broadcast engineer for project-specific schedule.'
+    };
+  })();
+
+  // ---- 22. Total project cost estimate ----
   // Response-level summary combining soft costs (filing + engineering) and
   // hard costs (tower + ground + construction) for each top candidate.
   // Enables stakeholder budget conversations before committing to site selection.
@@ -1102,6 +1179,7 @@ export async function runSiteOptimizer(body = {}){
     filing_complexity_score,
     geographic_diversity_analysis,
     candidate_set_recommendation,
+    tower_construction_timeline,
     total_project_cost_estimate,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,

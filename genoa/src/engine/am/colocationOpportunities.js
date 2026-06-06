@@ -149,7 +149,8 @@ export async function runColocationOpportunities(body = {}){
       candidate_set_statistics:     so.candidate_set_statistics ?? null,
       filing_complexity_score:       so.filing_complexity_score ?? null,
       geographic_diversity_analysis: so.geographic_diversity_analysis ?? null,
-      candidate_set_recommendation:  so.candidate_set_recommendation ?? null
+      candidate_set_recommendation:  so.candidate_set_recommendation ?? null,
+      tower_construction_timeline:   so.tower_construction_timeline ?? null
     });
   }
 
@@ -800,6 +801,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             filing_complexity_score = null,
                             geographic_diversity_analysis = null,
                             candidate_set_recommendation = null,
+                            tower_construction_timeline = null,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
@@ -904,8 +906,9 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     frequency_allocation_context: frequency_allocation_context ?? null,
     candidate_set_statistics:     candidate_set_statistics ?? null,
     filing_complexity_score:       filing_complexity_score ?? null,
-    geographic_diversity_analysis: geographic_diversity_analysis ?? null,
-    candidate_set_recommendation:  candidate_set_recommendation ?? null,
+    geographic_diversity_analysis:  geographic_diversity_analysis ?? null,
+    candidate_set_recommendation:   candidate_set_recommendation ?? null,
+    tower_construction_timeline:    tower_construction_timeline ?? null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,

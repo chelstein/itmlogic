@@ -411,6 +411,44 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 })()}
               </RackPanel>
             )}
+            {result?.tower_construction_timeline && (
+              <RackPanel eyebrow="Construction Timeline" title="Site-to-on-air schedule estimate" dense>
+                {(() => {
+                  const tct = result.tower_construction_timeline;
+                  return (
+                    <div className="font-mono text-[10px] space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-cream font-semibold">{tct.range_label}</span>
+                        <span className="text-textDim/60 text-[9px]">total from site selection to on-air</span>
+                      </div>
+                      <div className="space-y-1">
+                        {tct.phases?.map((p, i) => (
+                          <div key={p.id} className="flex items-start gap-2">
+                            <span className="text-textDim/40 text-[8px] shrink-0 w-4 text-right">{i + 1}.</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-textDim text-[9px] leading-snug">{p.label}</span>
+                                <span className="text-amber text-[8px] shrink-0">{p.weeks_min}–{p.weeks_max} wk</span>
+                              </div>
+                              {p.notes && <div className="text-[8px] text-textDim/40 leading-snug">{p.notes}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {tct.critical_path_notes?.length > 0 && (
+                        <div className="border-t border-rule/30 pt-1.5 space-y-1">
+                          <div className="text-[9px] uppercase tracking-rack text-textDim/50">Critical path</div>
+                          {tct.critical_path_notes.map((n, i) => (
+                            <div key={i} className="text-[8px] text-amber/70 leading-snug border-l border-amber/30 pl-1.5">{n}</div>
+                          ))}
+                        </div>
+                      )}
+                      <p className="text-[8px] text-textDim/40 leading-snug">{tct.note}</p>
+                    </div>
+                  );
+                })()}
+              </RackPanel>
+            )}
             {result?.recommended_actions?.length > 0 && (
               <RecommendedActionsPanel recommended_actions={result.recommended_actions} />
             )}
