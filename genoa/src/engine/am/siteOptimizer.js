@@ -930,7 +930,7 @@ export async function runSiteOptimizer(body = {}){
     amca_translator_ok:     c.adjacent_market_coverage_analysis?.translator_opportunity?.authorized ?? null,
     apvg_seasonal_var_pct:  c.am_propagation_variability_guide?.seasonal_variation?.worst_case_change_pct ?? null,
     apvg_skip_zone_km:      c.am_propagation_variability_guide?.ionospheric_skip?.min_skip_distance_km ?? null,
-    apvg_night_boost_db:    c.am_propagation_variability_guide?.ionospheric_skip?.typical_night_boost_db ?? null
+    apvg_night_boost_db:    c.am_propagation_variability_guide?.ionospheric_skip?.typical_night_boost_db ?? null,
   }));
 
   // ---- 16a. Frequency allocation context ----
