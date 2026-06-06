@@ -5857,3 +5857,46 @@ test('spacing_rule_compliance_guide comparison table columns present', async () 
     assert.ok('spacing_chan_class' in row, 'spacing_chan_class missing from comparison table');
   }
 });
+
+// ---- license_class_upgrade_analysis ----
+
+test('license_class_upgrade_analysis present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.license_class_upgrade_analysis != null, `rank ${c.rank} missing license_class_upgrade_analysis`);
+  }
+});
+
+test('license_class_upgrade_analysis Class D has D->B upgrade path', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', frequency_khz: 1230, candidate_limit: 1 });
+  const u = out.candidates[0].license_class_upgrade_analysis;
+  assert.strictEqual(u.fcc_class, 'D');
+  assert.strictEqual(u.upgrade_paths.length, 1, 'Class D should have 1 upgrade path');
+  assert.strictEqual(u.upgrade_paths[0].from_class, 'D');
+  assert.strictEqual(u.upgrade_paths[0].to_class, 'B');
+});
+
+test('license_class_upgrade_analysis Class D on clear channel has DIFFICULT feasibility', async () => {
+  // KAZM: 780 kHz clear channel, Class D
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const u = out.candidates[0].license_class_upgrade_analysis;
+  assert.strictEqual(u.primary_feasibility, 'DIFFICULT', 'clear channel D->B upgrade should be DIFFICULT');
+  assert.ok(u.upgrade_filing_steps.length > 0, 'should have upgrade filing steps');
+  assert.strictEqual(u.upgrade_filing_steps.length, 6, 'should have exactly 6 filing steps');
+});
+
+test('license_class_upgrade_analysis Class A is AT_TOP_CLASS', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const u = out.candidates[0].license_class_upgrade_analysis;
+  assert.strictEqual(u.primary_feasibility, 'AT_TOP_CLASS', 'Class A has no upgrade path');
+  assert.strictEqual(u.upgrade_filing_steps.length, 0, 'Class A has no filing steps');
+});
+
+test('license_class_upgrade_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('class_upg_feasibility' in row, 'class_upg_feasibility missing from comparison table');
+    assert.ok('class_upg_n_paths' in row, 'class_upg_n_paths missing from comparison table');
+    assert.ok('class_upg_to_class' in row, 'class_upg_to_class missing from comparison table');
+  }
+});

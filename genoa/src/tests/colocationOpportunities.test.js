@@ -1001,3 +1001,17 @@ test('colocation GRID candidates have spacing_rule_compliance_guide', async () =
     assert.ok(c.spacing_rule_compliance_guide.spacing_table.length === 4, `rank ${c.rank} spacing table must have 4 rows`);
   }
 });
+
+test('colocation GRID candidates have license_class_upgrade_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.license_class_upgrade_analysis != null, `rank ${c.rank} missing license_class_upgrade_analysis`);
+    assert.ok(c.license_class_upgrade_analysis.upgrade_paths.length > 0, `rank ${c.rank} must have upgrade paths`);
+  }
+});

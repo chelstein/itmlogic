@@ -2226,6 +2226,67 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* License Class Upgrade Analysis */}
+        {candidate.license_class_upgrade_analysis && (() => {
+          const u = candidate.license_class_upgrade_analysis;
+          const feasColor = f => f === 'POSSIBLE' ? 'text-emerald-400' : f === 'DIFFICULT' ? 'text-amber-400' : f === 'EXTREMELY_DIFFICULT' || f === 'NOT_FEASIBLE' ? 'text-rose-400' : f === 'AT_TOP_CLASS' ? 'text-blue-300' : 'text-textDim';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">License Class Upgrade Analysis (§73.21/§73.37)</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule text-textDim">
+                  Class {u.fcc_class}
+                </span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${feasColor(u.primary_feasibility)}`}>
+                  {u.primary_feasibility}
+                </span>
+              </div>
+              {/* Upgrade paths */}
+              {u.upgrade_paths?.map((path, i) => (
+                <div key={i} className="bg-surface rounded p-2 border border-rule mb-2">
+                  <div className="flex gap-2 items-center mb-1">
+                    <span className="font-mono text-[9px] text-textBright font-bold">
+                      Class {path.from_class} → {path.to_class ?? 'N/A'}
+                    </span>
+                    <span className={`font-mono text-[8px] font-bold ${feasColor(path.feasibility)}`}>
+                      {path.feasibility}
+                    </span>
+                  </div>
+                  <div className="font-mono text-[8px] text-textDim leading-snug mb-1">{path.key_requirement}</div>
+                  {path.new_power_max_kw && (
+                    <div className="font-mono text-[8px] text-blue-300">
+                      New max: {path.new_power_max_kw} kW · Timeline: {path.timeline_months_optimistic}–{path.timeline_months_conservative} months
+                    </div>
+                  )}
+                  {path.filing_fee_usd_approx && (
+                    <div className="font-mono text-[8px] text-textDim">
+                      Filing fee: ~${path.filing_fee_usd_approx?.toLocaleString()} · Eng: ${path.engineering_cost_usd_approx_low?.toLocaleString()}–${path.engineering_cost_usd_approx_high?.toLocaleString()}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Filing steps */}
+              {u.upgrade_filing_steps?.length > 0 && (
+                <>
+                  <div className="font-mono text-[9px] text-textDim mb-1">Filing Process ({u.upgrade_filing_steps.length} steps)</div>
+                  <div className="space-y-0.5 mb-2">
+                    {u.upgrade_filing_steps.map((step, i) => (
+                      <div key={i} className="flex gap-1.5 items-start">
+                        <span className="font-mono text-[8px] text-blue-400 shrink-0 font-bold">{step.step}.</span>
+                        <div>
+                          <span className="font-mono text-[8px] text-textBright font-bold">{step.action}: </span>
+                          <span className="font-mono text-[8px] text-textDim">{step.detail}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug">{u.note}</div>
+            </div>
+          );
+        })()}
+
         {/* §73.37 Spacing Rule Compliance Guide */}
         {candidate.spacing_rule_compliance_guide && (() => {
           const s = candidate.spacing_rule_compliance_guide;

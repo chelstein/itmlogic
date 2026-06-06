@@ -1385,6 +1385,29 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.1560; §73.1350; §73.61; Part 11; §1.1307; §73.3539; §73.99',
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
+      license_class_upgrade_analysis: {
+        fcc_class: 'D', is_clear_channel: true, is_local_channel: false,
+        primary_feasibility: 'DIFFICULT', n_upgrade_paths: 1,
+        upgrade_paths: [
+          { from_class: 'D', to_class: 'B', feasibility: 'DIFFICULT',
+            key_requirement: 'Must demonstrate Class B §73.37 spacing compliance (402 km co-channel to other Class B stations). NIF study at Class B protection level required.',
+            new_power_max_kw: 50, new_protected_contour_mvm: 0.5, new_nif_study_required: true,
+            nif_study_type: 'FULL_CLEAR_CHANNEL_NIF', form: 'FCC Form 301-AM (Major Change)',
+            timeline_months_optimistic: 18, timeline_months_conservative: 36,
+            filing_fee_usd_approx: 6465, engineering_cost_usd_approx_low: 15000, engineering_cost_usd_approx_high: 50000,
+            note: 'Class D→B upgrade is a major modification. Must demonstrate Class B §73.37 spacing in all directions.' }
+        ],
+        upgrade_filing_steps: [
+          { step: 1, action: 'Engineering study', detail: 'Full §73.37 spacing analysis at the TARGET class. Spacing failure ends the process.', estimated_days: 15 },
+          { step: 2, action: 'NIF study', detail: '§73.182 skywave NIF at the new class protection level.', estimated_days: 30 },
+          { step: 3, action: 'Form 301-AM preparation', detail: 'Major change application: Schedule A (legal), B (antenna), C (transmitter), D (coverage), E (environmental).', estimated_days: 20 },
+          { step: 4, action: 'FCC filing', detail: 'File via LMS. Pay filing fee (§73.3525). Assigned to Audio Division.', estimated_days: 1 },
+          { step: 5, action: 'FCC processing', detail: 'Typically 12–24 months. Staff may issue letter of inquiry.', estimated_days: 365 },
+          { step: 6, action: 'Construction permit', detail: 'CP issued; 3-year build period. File Form 302-AM after proof of performance.', estimated_days: 90 }
+        ],
+        reference: '47 CFR §73.21; §73.37; §73.25; §1.401; §73.3525',
+        note: 'License class upgrade analysis is a regulatory screening guide. Consult an FCC communications attorney before initiating proceedings.'
+      },
       spacing_rule_compliance_guide: {
         fcc_class: 'D', frequency_khz: 780, channel_class: 'clear_channel',
         spacing_risk_tier: 'VERY_HIGH',

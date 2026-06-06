@@ -822,7 +822,10 @@ export async function runSiteOptimizer(body = {}){
     trans_am_2mvm_km:       c.am_fm_translator_opportunity?.am_2mvm_contour_km ?? null,
     spacing_risk_tier:      c.spacing_rule_compliance_guide?.spacing_risk_tier ?? null,
     spacing_n_required:     c.spacing_rule_compliance_guide?.n_checklist_required ?? null,
-    spacing_chan_class:      c.spacing_rule_compliance_guide?.channel_class ?? null
+    spacing_chan_class:      c.spacing_rule_compliance_guide?.channel_class ?? null,
+    class_upg_feasibility:  c.license_class_upgrade_analysis?.primary_feasibility ?? null,
+    class_upg_n_paths:      c.license_class_upgrade_analysis?.n_upgrade_paths ?? null,
+    class_upg_to_class:     c.license_class_upgrade_analysis?.upgrade_paths?.[0]?.to_class ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7122,6 +7125,114 @@ async function scoreCandidate(pt, ctx, warnings){
         candidate_lon: pt.lon,
         note: 'This is a screening-grade §73.37 framework — no actual station database query has been performed. A licensed broadcast engineer must query the current FCC LMS database and run the full §73.37 spacing analysis before any filing. Spacing failures are absolute filing bars with no waiver process.',
         reference: '47 CFR §73.37 (minimum spacing); §73.182 (NIF); §73.24(g) (blanket); FCC LMS database'
+      };
+    })(),
+
+    // License class upgrade analysis.
+    // Distinct from fcc_class_power_ceiling_analysis (power-within-class):
+    // this block covers upgrading the station's FCC license CLASS — e.g., D→B or B→A.
+    // Class upgrades require different §73.37 spacing compliance, new engineering exhibits,
+    // and in most cases a new NIF study at the higher class's protected contour.
+    // Class A upgrades are essentially infeasible for new applicants — included for completeness.
+    license_class_upgrade_analysis: (() => {
+      // Class hierarchy for AM: A > B > C > D (by protection rights)
+      // D→B: the most common upgrade path for low-power regional stations.
+      // B→A: possible only on clear channels; effectively no new Class A designations.
+      // A→(none): already at top.
+      // C is a local-channel class; upgrades typically mean moving to a regional channel.
+
+      const CLASS_ORDER = ['D', 'C', 'B', 'A'];
+      const classIdx = CLASS_ORDER.indexOf(fcc_class);
+      const isClear_cu = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_cu = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // What upgrade paths exist?
+      const upgradePaths = [];
+
+      if (fcc_class === 'D' && !isLocal_cu) {
+        // D→B: feasible on regional channels; requires meeting Class B §73.37 spacings
+        upgradePaths.push({
+          from_class: 'D', to_class: 'B',
+          feasibility: isClear_cu ? 'DIFFICULT' : 'POSSIBLE',
+          key_requirement: 'Must demonstrate Class B §73.37 spacing compliance (402 km co-channel to other Class B stations). NIF study at Class B protection level required. FCC Form 301-AM with class change engineering exhibits.',
+          new_power_max_kw: 50,
+          new_protected_contour_mvm: 0.5,
+          new_nif_study_required: true,
+          nif_study_type: isClear_cu ? 'FULL_CLEAR_CHANNEL_NIF' : 'REGIONAL_NIF',
+          form: 'FCC Form 301-AM (Major Change)',
+          timeline_months_optimistic: 18,
+          timeline_months_conservative: 36,
+          filing_fee_usd_approx: 6465,   // FCC Form 301-AM major change fee (2023 schedule)
+          engineering_cost_usd_approx_low: 15000,
+          engineering_cost_usd_approx_high: 50000,
+          note: 'Class D→B upgrade is a major modification. The station must demonstrate it meets Class B minimum power (≥0.25 kW) and the new Class B §73.37 spacing table in all directions. FCC staff review typically takes 12–24 months after filing.'
+        });
+      }
+
+      if (fcc_class === 'D' && isLocal_cu) {
+        // D on a local channel: unusual; local channels don't have a clear upgrade path.
+        upgradePaths.push({
+          from_class: 'D', to_class: 'B',
+          feasibility: 'NOT_APPLICABLE',
+          key_requirement: 'Local channel (§73.27 sharing framework): class upgrade not available on local channels. To operate at higher power or with more protection, a frequency change to a regional channel is required.',
+          note: 'Class upgrade not available on local channels. Consult §73.27 and FCC counsel for options.'
+        });
+      }
+
+      if (fcc_class === 'B' && !isClear_cu) {
+        // B→A: only possible on clear channels; not applicable on regional channels.
+        upgradePaths.push({
+          from_class: 'B', to_class: 'A',
+          feasibility: 'NOT_FEASIBLE',
+          key_requirement: 'Class A status is only available on clear channels (§73.25). This station operates on a regional channel. Class A designation on a regional channel is not authorized under current FCC rules.',
+          note: 'Class A upgrade not available on regional channels. Consider petitioning for a clear-channel allotment (extraordinary process; essentially no new allotments since 1945).'
+        });
+      }
+
+      if (fcc_class === 'B' && isClear_cu) {
+        // B secondary on clear channel → A dominant: extremely difficult.
+        upgradePaths.push({
+          from_class: 'B', to_class: 'A',
+          feasibility: 'EXTREMELY_DIFFICULT',
+          key_requirement: 'Clear-channel Class A dominant status is tightly controlled. No new Class A dominant assignments have been made since the 1930s–1940s. The FCC would require a rulemaking proceeding (§1.401 petition) demonstrating need and no interference to existing Class A dominants.',
+          form: 'FCC §1.401 Petition for Rulemaking',
+          timeline_months_optimistic: 60,
+          timeline_months_conservative: 120,
+          note: 'Effectively infeasible for practical purposes. Focus engineering resources on maximizing current Class B performance.'
+        });
+      }
+
+      if (fcc_class === 'A') {
+        upgradePaths.push({
+          from_class: 'A', to_class: null,
+          feasibility: 'AT_TOP_CLASS',
+          key_requirement: 'Class A is the highest AM license class. No further upgrade available. Focus on maximizing TPO within the §73.21 50 kW ceiling and optimizing the ground system.',
+          note: 'Maintain Class A dominant status by meeting all operating obligations and §73.182 NIF protections.'
+        });
+      }
+
+      // Common class upgrade filing steps (regardless of from/to path)
+      const upgradeFiling = upgradePaths[0]?.feasibility !== 'AT_TOP_CLASS' && upgradePaths[0]?.feasibility !== 'NOT_APPLICABLE'
+        ? [
+            { step: 1, action: 'Engineering study', detail: 'Full §73.37 spacing analysis at the TARGET class. Commission immediately — spacing failure ends the process.', estimated_days: 15 },
+            { step: 2, action: 'NIF study', detail: 'Skywave NIF analysis at the new class protection level (§73.182). Required for all non-local classes.', estimated_days: 30 },
+            { step: 3, action: 'Form 301-AM preparation', detail: 'Major change application: Schedule A (legal), B (antenna), C (transmitter), D (coverage), E (environmental).', estimated_days: 20 },
+            { step: 4, action: 'FCC filing', detail: 'File via LMS. Pay filing fee (§73.3525). Application assigned to Audio Division for review.', estimated_days: 1 },
+            { step: 5, action: 'FCC processing', detail: 'Typically 12–24 months. Staff may issue letter of inquiry (LOI) requesting additional information.', estimated_days: 365 },
+            { step: 6, action: 'Construction permit', detail: 'CP issued; 3-year period to construct. File Form 302-AM (license to cover) after proof of performance.', estimated_days: 90 }
+          ]
+        : [];
+
+      return {
+        fcc_class,
+        is_clear_channel: isClear_cu,
+        is_local_channel: isLocal_cu,
+        upgrade_paths: upgradePaths,
+        n_upgrade_paths: upgradePaths.length,
+        upgrade_filing_steps: upgradeFiling,
+        primary_feasibility: upgradePaths[0]?.feasibility ?? 'UNKNOWN',
+        reference: '47 CFR §73.21 (power limits by class); §73.37 (minimum spacing); §73.25 (clear channels); §1.401 (rulemaking petition); §73.3525 (major changes)',
+        note: 'License class upgrade analysis is a regulatory screening guide. Consult a licensed FCC communications attorney before initiating a class upgrade proceeding. Class upgrade timelines are highly variable and depend on FCC workload and contested filings.'
       };
     })(),
 
