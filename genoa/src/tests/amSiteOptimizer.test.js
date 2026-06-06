@@ -3717,3 +3717,47 @@ test('population_reach_bands 5 mV/m distance_km <= 0.5 mV/m distance_km (farther
     }
   }
 });
+
+// ---------- power_upgrade_analysis ----------
+
+test('power_upgrade_analysis is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.power_upgrade_analysis != null,
+      `power_upgrade_analysis must be present (rank ${c.rank})`);
+  }
+});
+
+test('power_upgrade_analysis.verdict is a valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['UPGRADE_RESOLVES_COL', 'UPGRADE_CAUSES_BLANKET_VIOLATION',
+    'UPGRADE_INSUFFICIENT_FOR_COL', 'REVIEW_REQUIRED', undefined]);
+  for (const c of out.candidates) {
+    const verdict = c.power_upgrade_analysis?.verdict;
+    assert.ok(VALID.has(verdict),
+      `verdict "${verdict}" not valid (rank ${c.rank})`);
+  }
+});
+
+test('power_upgrade_analysis.headroom_kw is non-negative when applicable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const pua = c.power_upgrade_analysis;
+    if (pua.applicable) {
+      assert.ok(pua.headroom_kw >= 0, `headroom_kw must be >= 0 (rank ${c.rank})`);
+      assert.ok(pua.max_class_power_kw > KAZM.tpo_kw,
+        `max_class_power_kw must exceed current TPO when applicable (rank ${c.rank})`);
+    }
+  }
+});
+
+test('power_upgrade_analysis comparison table column exists (via candidate)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok('power_upgrade_analysis' in c, `power_upgrade_analysis must be in candidate (rank ${c.rank})`);
+  }
+});

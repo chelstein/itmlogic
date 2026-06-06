@@ -1847,6 +1847,76 @@ async function scoreCandidate(pt, ctx, warnings){
         note: 'Efficiency figures are engineering approximations from FCC R-4 table for σ-independent electrical height comparison. Actual efficiency depends on soil conductivity, ground system design, and base impedance matching.'
       };
     })(),
+    // Power upgrade analysis — models coverage at the FCC class maximum power.
+    // Many operators run significantly below their ceiling; upgrading TPO is often
+    // the fastest (though most expensive) path to COL coverage compliance.
+    // Also checks whether max power would cause §73.24(g) blanket population violations.
+    power_upgrade_analysis: (() => {
+      const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
+      if (classCeil == null || classCeil <= tpo_kw + 0.01) {
+        return {
+          applicable: false,
+          reason: tpo_kw >= (classCeil ?? 50) ? `Already at Class ${fcc_class} ceiling (${tpo_kw} kW).` : 'Class ceiling unavailable.',
+          max_class_power_kw: classCeil
+        };
+      }
+      const headroom_kw = round2(classCeil - tpo_kw);
+      const headroom_pct = round2(((classCeil - tpo_kw) / tpo_kw) * 100);
+
+      // Estimate COL coverage at max class power using the same binary-search approach.
+      let col_coverage_at_max_pct = null;
+      let reach_at_max_km = null;
+      try {
+        const rMax = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0, conductivity_msm: sigma_msm, erp_kw: classCeil });
+        reach_at_max_km = round2(rMax.distance_km);
+        // Use colDist proxy for COL coverage estimate
+        if (colDist != null && reach_at_max_km != null) {
+          col_coverage_at_max_pct = colDist <= reach_at_max_km ? 1.0 : round2(reach_at_max_km / colDist);
+        }
+      } catch (_) { /* leave null */ }
+
+      // Blanket pop at max power — estimate 1000 mV/m contour radius at class ceiling.
+      let blanket_concern_at_max = null;
+      try {
+        const rBlanket = fccAmDistanceKm({ frequency_khz, target_mvm: 1000, conductivity_msm: sigma_msm, erp_kw: classCeil });
+        const blanketArea = Math.PI * rBlanket.distance_km * rBlanket.distance_km;
+        const blanketPop = blanketArea * regional_density_per_km2;
+        const blanketPct = round2((blanketPop / (US_POPULATION_M * 1_000_000)) * 100);
+        blanket_concern_at_max = {
+          blanket_1000mvm_km: round2(rBlanket.distance_km),
+          estimated_blanket_pop_pct: blanketPct,
+          would_exceed_limit: blanketPct > BLANKET_POP_HARD_CEIL_PCT
+        };
+      } catch (_) { /* leave null */ }
+
+      const col_would_comply = col_coverage_at_max_pct != null && col_coverage_at_max_pct >= COL_COVERAGE_HARD_FLOOR;
+      const blanket_ok = blanket_concern_at_max?.would_exceed_limit === false;
+
+      let verdict;
+      if (col_would_comply && blanket_ok) {
+        verdict = 'UPGRADE_RESOLVES_COL';
+      } else if (col_would_comply && blanket_concern_at_max?.would_exceed_limit) {
+        verdict = 'UPGRADE_CAUSES_BLANKET_VIOLATION';
+      } else if (!col_would_comply) {
+        verdict = 'UPGRADE_INSUFFICIENT_FOR_COL';
+      } else {
+        verdict = 'REVIEW_REQUIRED';
+      }
+
+      return {
+        applicable: true,
+        current_tpo_kw: tpo_kw,
+        max_class_power_kw: classCeil,
+        headroom_kw,
+        headroom_pct,
+        col_coverage_estimate_at_max_pct: col_coverage_at_max_pct == null ? null : round2(col_coverage_at_max_pct * 100),
+        reach_at_max_class_power_km: reach_at_max_km,
+        col_would_comply_at_max: col_would_comply,
+        blanket_concern_at_max,
+        verdict,
+        note: `Class ${fcc_class} ceiling is ${classCeil} kW (+${headroom_kw} kW / +${headroom_pct}% over current TPO).`
+      };
+    })(),
     // Per-candidate engineering checklist — what studies must be done if this site
     // is selected for detailed engineering evaluation.  Derived from the candidate's
     // physical characteristics; complements the station-level form_301_checklist.
