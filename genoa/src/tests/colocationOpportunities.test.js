@@ -485,3 +485,43 @@ test('GRID candidates do not have co_siting_complexity (only INFRASTRUCTURE sour
       `GRID candidate rank ${c.rank} should not have lease_synergy_advisory`);
   }
 });
+
+// ---------- Test 26 — candidate_shortlist ----------
+test('candidate_shortlist is present in INFRASTRUCTURE mode response', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.candidate_shortlist),
+    'candidate_shortlist must be an array');
+  assert.ok(out.candidate_shortlist.length <= 3,
+    `candidate_shortlist must have ≤3 entries; got ${out.candidate_shortlist.length}`);
+  for (const entry of out.candidate_shortlist){
+    assert.ok(typeof entry.rank === 'number', 'shortlist entry must have numeric rank');
+    assert.ok(typeof entry.status_category === 'string', 'shortlist entry must have status_category');
+    assert.ok(typeof entry.summary === 'string' && entry.summary.length > 5, 'shortlist entry must have summary');
+    assert.ok(typeof entry.recommended_next_step === 'string', 'shortlist entry must have recommended_next_step');
+    assert.ok(typeof entry.source === 'string', 'shortlist entry must have source field');
+  }
+});
+
+// ---------- Test 27 — minimum_spacing_reference in INFRASTRUCTURE mode ----------
+test('minimum_spacing_reference is present in INFRASTRUCTURE mode response', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'INFRASTRUCTURE' }));
+  assert.equal(out.available, true);
+  assert.ok(out.minimum_spacing_reference != null,
+    'minimum_spacing_reference must be present in colocation INFRASTRUCTURE response');
+  assert.ok(typeof out.minimum_spacing_reference.rule === 'string',
+    'minimum_spacing_reference.rule must be a string');
+  assert.ok(Array.isArray(out.minimum_spacing_reference.co_channel),
+    'minimum_spacing_reference.co_channel must be an array');
+});
+
+// ---------- Test 28 — candidate_shortlist in HYBRID mode ----------
+test('candidate_shortlist is present in HYBRID mode and entries have source field', async () => {
+  const out = await runColocationOpportunities(baseBody({ search_mode: 'HYBRID' }));
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.candidate_shortlist), 'candidate_shortlist must be array in HYBRID mode');
+  for (const entry of out.candidate_shortlist){
+    assert.ok(['INFRASTRUCTURE', 'GRID'].includes(entry.source),
+      `shortlist entry.source must be INFRASTRUCTURE or GRID; got '${entry.source}'`);
+  }
+});

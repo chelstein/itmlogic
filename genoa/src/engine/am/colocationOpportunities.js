@@ -142,7 +142,8 @@ export async function runColocationOpportunities(body = {}){
       n_infrastructure_sites: 0,
       scoring_time_ms: so.scoring_time_ms ?? null,
       score_histogram: so.score_histogram ?? null,
-      top_candidates_summary: so.top_candidates_summary ?? null
+      top_candidates_summary: so.top_candidates_summary ?? null,
+      minimum_spacing_reference: so.minimum_spacing_reference ?? null
     });
   }
 
@@ -733,6 +734,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             conductivity_mode, frequency_channel_class,
                             skywave_risk_level, protection_class_advisory,
                             recommended_actions,
+                            minimum_spacing_reference,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
@@ -746,6 +748,38 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
       c.nif_status += ' — MODERATE skywave risk';
     }
   }
+  // Candidate shortlist — top 3 promising picks (mirrors siteOptimizer).
+  const candidate_shortlist = (() => {
+    const promising = candidates.filter(c => c.status_category === 'PROMISING');
+    const pool = promising.length > 0 ? promising : candidates.filter(c => c.status_category !== 'NON_COMPLIANT');
+    return pool.slice(0, 3).map(c => {
+      const dist = c.distance_from_current_km != null ? `${c.distance_from_current_km.toFixed(1)} km ${c.cardinal_direction ?? ''}` : 'unknown distance';
+      const col  = c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}%` : '?%';
+      const sigma = c.ground_sigma_quality ?? 'unknown';
+      const band = c.score_confidence_band;
+      const bandStr = band ? `score ${c.score.toFixed(1)} [${band.score_low}–${band.score_high}]` : `score ${c.score?.toFixed(1) ?? '?'}`;
+      const isInfra = c.source === 'INFRASTRUCTURE';
+      const infra = isInfra ? ` (${c.infrastructure_ref?.kind ?? 'host tower'}: ${c.infrastructure_ref?.name ?? 'unnamed'})` : '';
+      const action = c.status_category === 'PROMISING'
+        ? `Advance to full §73.182 NIF study and parcel investigation.`
+        : c.status_category === 'RECOVERABLE_WITH_POWER_INCREASE'
+        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(j) compliance, then advance to NIF study.`
+        : c.status_category === 'RECOVERABLE_WITH_DA'
+        ? `Commission §73.150 directional antenna study to push 5 mV/m contour toward community of license.`
+        : c.status_category === 'TREATY_REVIEW'
+        ? `Initiate FCC International Bureau treaty coordination before any other action.`
+        : `Engineering review required before advancing — see per_candidate_engineering_checklist.`;
+      return {
+        rank: c.rank, lat: c.lat, lon: c.lon,
+        status_category: c.status_category,
+        source: c.source,
+        score_with_band: bandStr,
+        summary: `Rank ${c.rank}${infra} @ ${dist}: COL coverage ${col}, σ=${c.ground_sigma_mS_m ?? '?'} mS/m (${sigma}), reach ${c.daytime_reach_km?.toFixed(0) ?? '?'} km. ${action}`,
+        recommended_next_step: action
+      };
+    });
+  })();
+
   return {
     available: true,
     method,
@@ -754,6 +788,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     n_infrastructure_sites: n_infrastructure_sites ?? 0,
     candidate_count_by_status: candidate_count_by_status || null,
     top_candidates_summary: top_candidates_summary ?? null,
+    candidate_shortlist,
     current_site_baseline: baseline,
     candidates,
     score_stats,
@@ -764,6 +799,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     skywave_risk_level: skywave_risk_level ?? null,
     protection_class_advisory: protection_class_advisory ?? null,
     recommended_actions: recommended_actions ?? [],
+    minimum_spacing_reference: minimum_spacing_reference ?? null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,
