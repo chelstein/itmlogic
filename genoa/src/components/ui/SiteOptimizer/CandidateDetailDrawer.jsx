@@ -2129,6 +2129,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Environmental Risk Matrix */}
+        {candidate.environmental_risk_matrix && (() => {
+          const env = candidate.environmental_risk_matrix;
+          const riskColor = r => r === 'HIGH' ? 'text-red-400' : r === 'ELEVATED' ? 'text-amber-400' : r === 'MODERATE' ? 'text-blue-300' : r === 'LOW' ? 'text-emerald-400' : 'text-textDim';
+          const riskBg    = r => r === 'HIGH' ? 'bg-red-400/15 border-red-400/40' : r === 'ELEVATED' ? 'bg-amber-400/15 border-amber-400/40' : r === 'MODERATE' ? 'bg-blue-300/15 border-blue-300/40' : r === 'LOW' ? 'bg-emerald-400/15 border-emerald-400/40' : 'bg-surface border-rule';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">NEPA §1.1306 Environmental Matrix</div>
+              {/* Summary tier */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${riskBg(env.overall_nepa_risk)} ${riskColor(env.overall_nepa_risk)}`}>
+                  {env.overall_nepa_risk} NEPA RISK
+                </span>
+                {env.high_risk_count > 0 && (
+                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border bg-red-400/10 border-red-400/40 text-red-400">
+                    {env.high_risk_count} HIGH trigger{env.high_risk_count > 1 ? 's' : ''}
+                  </span>
+                )}
+                {env.elevated_risk_count > 0 && (
+                  <span className="font-mono text-[9px] px-1.5 py-0.5 rounded border bg-amber-400/10 border-amber-400/40 text-amber-400">
+                    {env.elevated_risk_count} ELEVATED
+                  </span>
+                )}
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  EA worst-case: {env.ea_timeline_weeks_worst_case} wks
+                </span>
+              </div>
+              <div className="font-mono text-[9px] text-textDim mb-2 leading-snug">{env.ea_eligibility_note}</div>
+              {/* Items grid */}
+              <div className="space-y-0.5 mb-2">
+                {env.items.map(item => (
+                  <div key={item.id} className={`flex items-start gap-1.5 px-1.5 py-1 rounded border ${riskBg(item.risk_level)}`}>
+                    <span className={`font-mono text-[8px] font-bold min-w-[52px] ${riskColor(item.risk_level)}`}>{item.risk_level}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-mono text-[9px] text-textBright font-semibold leading-snug">{item.category}</div>
+                      <div className="font-mono text-[8px] text-textDim leading-snug">{item.cfr}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{env.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Co-location Compatibility Score */}
         {candidate.colocation_compatibility_score && (() => {
           const cc = candidate.colocation_compatibility_score;

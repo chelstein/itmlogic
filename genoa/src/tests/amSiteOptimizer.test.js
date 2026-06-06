@@ -5061,3 +5061,51 @@ test('colocation_compatibility_score comparison table columns populated', async 
     assert.ok('coloc_best_tier' in row);
   }
 });
+
+// ---- environmental_risk_matrix ----
+
+test('environmental_risk_matrix is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.environmental_risk_matrix != null, `rank ${c.rank} missing environmental_risk_matrix`);
+  }
+});
+
+test('environmental_risk_matrix has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const env = out.candidates[0].environmental_risk_matrix;
+  assert.ok(typeof env.overall_nepa_risk === 'string');
+  assert.ok(typeof env.high_risk_count === 'number');
+  assert.ok(typeof env.elevated_risk_count === 'number');
+  assert.ok(Array.isArray(env.items));
+  assert.ok(typeof env.ea_timeline_weeks_worst_case === 'number');
+  assert.ok(typeof env.ea_eligibility_note === 'string');
+});
+
+test('environmental_risk_matrix has 13 NEPA categories', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const env = out.candidates[0].environmental_risk_matrix;
+  assert.equal(env.items.length, 13);
+});
+
+test('environmental_risk_matrix each item has id, cfr, risk_level, verification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const env = out.candidates[0].environmental_risk_matrix;
+  const VALID_RISK = ['HIGH', 'ELEVATED', 'MODERATE', 'LOW', 'UNKNOWN'];
+  for (const item of env.items) {
+    assert.ok(typeof item.id === 'string', `item missing id`);
+    assert.ok(typeof item.cfr === 'string', `${item.id} missing cfr`);
+    assert.ok(VALID_RISK.includes(item.risk_level), `${item.id} invalid risk_level: ${item.risk_level}`);
+    assert.ok(typeof item.verification === 'string', `${item.id} missing verification`);
+  }
+});
+
+test('environmental_risk_matrix comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('nepa_risk' in row);
+    assert.ok('nepa_high_count' in row);
+    assert.ok('nepa_ea_weeks_worst' in row);
+  }
+});

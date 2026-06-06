@@ -769,7 +769,10 @@ export async function runSiteOptimizer(body = {}){
     int_nighttime_nif:      c.spectrum_interference_summary?.nighttime_nif_required ?? null,
     coloc_best_host:        c.colocation_compatibility_score?.best_host_type ?? null,
     coloc_best_score:       c.colocation_compatibility_score?.best_host_score ?? null,
-    coloc_best_tier:        c.colocation_compatibility_score?.best_host_tier ?? null
+    coloc_best_tier:        c.colocation_compatibility_score?.best_host_tier ?? null,
+    nepa_risk:              c.environmental_risk_matrix?.overall_nepa_risk ?? null,
+    nepa_high_count:        c.environmental_risk_matrix?.high_risk_count ?? null,
+    nepa_ea_weeks_worst:    c.environmental_risk_matrix?.ea_timeline_weeks_worst_case ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -4825,6 +4828,216 @@ async function scoreCandidate(pt, ctx, warnings){
         diplexing_always_required: true,
         reference: '47 CFR §73.1675 (AM directional antenna systems); §73.182; §73.190; FCC Form 854 (ASR); OET Bulletin 65',
         note: 'Compatibility scores are site-parameter-driven screening estimates. No actual infrastructure inventory lookup performed. Engage a licensed broadcast engineer for structural, RF, and lease compatibility verification before co-location commitment.'
+      };
+    })(),
+
+    // NEPA §1.1306 environmental desktop screening matrix.
+    // The FCC requires a 13-category environmental desktop check before issuing a CP.
+    // Failing any category may require an Environmental Assessment (EA) or Categorical
+    // Exclusion (CE) memo.  This screening estimates the most likely risk categories
+    // based on site parameters (border proximity, tower height, power) and expresses
+    // each as a risk level with a data-verification action and timeline estimate.
+    // No GIS database lookup performed — the operator must verify each item with
+    // the appropriate federal/state agency.
+    environmental_risk_matrix: (() => {
+      const qwM_env   = round2((300000 / frequency_khz) / 4);
+      const asrReq    = qwM_env > 60.96;
+      const nearBorder = treaty_zone != null;
+      const isHighPow_env = tpo_kw >= 25;
+
+      // Rough latitude/longitude-based proxies for general risk elevation.
+      // These are coarse — real determination requires GIS data from USFWS, NWI, FEMA, etc.
+      const lat_env  = pt.lat;
+      const lon_env  = pt.lon;
+      // Near coast (rough): east of -80°W or west of -125°W = coastal proximity flag
+      const nearCoast = lon_env > -80 || lon_env < -125;
+      // Pacific Northwest / Appalachia general high-biodiversity proxy
+      const highBiodiv = (lon_env < -110 && lat_env > 40) || (lon_env > -85 && lat_env < 38);
+
+      // §1.1306(b) 13 categories (codified in FCC environmental rules)
+      const items = [
+        {
+          id:          'FLOODPLAIN',
+          category:    'Floodplain',
+          cfr:         '47 CFR §1.1311(a)(1)',
+          risk_level:  'UNKNOWN',
+          description: 'FEMA FIRM floodplain overlay — 100-year and 500-year flood zones',
+          verification: 'Map site at FEMA MSC (msc.fema.gov) — download FIRM panel. Check if site is within Zone A, AE, or X-500 boundary.',
+          timeline_weeks: [1, 2],
+          action_if_triggered: 'If in 100-yr floodplain: EA required. Include flood-proofing measures for transmitter equipment. Obtain floodplain development permit.',
+          data_sources: ['FEMA MSC msc.fema.gov', 'USGS National Hydrography Dataset']
+        },
+        {
+          id:          'WETLANDS',
+          category:    'Wetlands',
+          cfr:         '47 CFR §1.1311(a)(2)',
+          risk_level:  'UNKNOWN',
+          description: 'Jurisdictional wetlands (USACE §404 permit area) and NWI-mapped wetlands',
+          verification: 'Run NWI Mapper (fws.gov/wetlands) for 500-m radius around site. Request USACE jurisdictional determination if NWI wetlands present.',
+          timeline_weeks: [2, 8],
+          action_if_triggered: 'USACE §404/§10 permit required before any ground disturbance. EA required in FCC filing. Mitigation banking may be required.',
+          data_sources: ['USFWS NWI fws.gov/wetlands', 'USACE Regulatory', 'USDA Soil Web']
+        },
+        {
+          id:          'ENDANGERED_SPECIES',
+          category:    'Threatened & Endangered Species',
+          cfr:         '47 CFR §1.1311(a)(3)',
+          risk_level:  highBiodiv ? 'ELEVATED' : 'UNKNOWN',
+          description: 'ESA §7 consultation — USFWS IPaC species occurrence within project area',
+          verification: 'Run USFWS IPaC (ecos.fws.gov/ipac) for project area. If listed species or critical habitat present, informal ESA §7 consultation with USFWS required.',
+          timeline_weeks: [4, 24],
+          action_if_triggered: 'If T&E species present: Biological Opinion required from USFWS. Can add 3–18 months to project timeline. May require biological survey.',
+          data_sources: ['USFWS IPaC ecos.fws.gov/ipac', 'USFS Sensitive Species list', 'State wildlife agency']
+        },
+        {
+          id:          'HISTORIC_PROPERTIES',
+          category:    'Historic Properties (NHPA §106)',
+          cfr:         '47 CFR §1.1311(a)(4)',
+          risk_level:  'HIGH',
+          description: 'NHPA §106 Section 106 review — Area of Potential Effect (APE) for above-ground and archaeological resources',
+          verification: `Consult State Historic Preservation Office (SHPO). Map APE within ${round2(qwM_env * 2)} m of proposed tower. Search National Register (nrhp.focus.nps.gov) for listed properties within APE.`,
+          timeline_weeks: [4, 20],
+          action_if_triggered: 'SHPO consultation required. If National Register-eligible properties in APE: formal Section 106 consultation and Memorandum of Agreement (MOA) may be required. High risk of delay (3–12 months).',
+          data_sources: ['SHPO (state-specific)', 'NPS NRHP Focus nrhp.focus.nps.gov', 'ACHP achp.gov']
+        },
+        {
+          id:          'WILDERNESS',
+          category:    'Wilderness & Wild/Scenic Areas',
+          cfr:         '47 CFR §1.1311(a)(5)',
+          risk_level:  'UNKNOWN',
+          description: 'Wilderness areas (Wilderness Act), Wild & Scenic Rivers, National Trails System',
+          verification: 'Check proximity to designated Wilderness (USFS/NPS/BLM), WSR corridors (rivers.gov), and National Scenic Trails (FS/NPS).',
+          timeline_weeks: [1, 3],
+          action_if_triggered: 'Any construction within designated Wilderness is generally prohibited. Buffer zones and visual compatibility analysis required for nearby wilderness areas.',
+          data_sources: ['USFS Wilderness (wilderness.net)', 'National Wild & Scenic Rivers rivers.gov', 'NPS lands']
+        },
+        {
+          id:          'COASTAL_ZONE',
+          category:    'Coastal Zone',
+          cfr:         '47 CFR §1.1311(a)(6)',
+          risk_level:  nearCoast ? 'ELEVATED' : 'LOW',
+          description: 'Coastal Zone Management Act (CZMA) — consistency with state CZM program',
+          verification: nearCoast
+            ? 'Site may be within state Coastal Zone Management area. Obtain state CZM consistency certification before FCC filing.'
+            : 'Site does not appear to be in coastal zone — verify with state CZM program boundary.',
+          timeline_weeks: nearCoast ? [4, 12] : [1, 1],
+          action_if_triggered: 'State CZM consistency certification required for federal license in coastal zone. Can add 3–6 months.',
+          data_sources: ['NOAA Office for Coastal Management coast.noaa.gov', 'State CZM program']
+        },
+        {
+          id:          'INDIAN_RELIGIOUS_SITES',
+          category:    'Indian Religious Sites (AIRFA)',
+          cfr:         '47 CFR §1.1311(a)(7)',
+          risk_level:  'UNKNOWN',
+          description: 'American Indian Religious Freedom Act — sacred sites and tribal consultation',
+          verification: 'Consult with Bureau of Indian Affairs (BIA) and appropriate tribal governments for site in or near tribal lands. Check proximity to Tribal Historic Properties.',
+          timeline_weeks: [4, 16],
+          action_if_triggered: 'Government-to-government consultation with affected tribes required. May require alternative site analysis if sacred site within APE.',
+          data_sources: ['BIA Tribal Directory bia.gov', 'THPO consultation (tribal historic preservation officers)']
+        },
+        {
+          id:          'SCENIC_BYWAYS',
+          category:    'Scenic Byways / Visual Resources',
+          cfr:         '47 CFR §1.1311(a)(8)',
+          risk_level:  asrReq ? 'ELEVATED' : 'LOW',
+          description: 'National Scenic Byways, All-American Roads, and visual resource impact of structure',
+          verification: `${asrReq ? `λ/4 tower (${qwM_env} m) is a significant visual element.` : ''} Check site proximity to National Scenic Byway corridors (fhwa.dot.gov/byways). Prepare visual impact analysis if within designated corridor viewshed.`,
+          timeline_weeks: [1, 4],
+          action_if_triggered: 'Visual impact analysis (photosimulation or wireframe) required if tower visible from designated scenic byway. Alternative siting or stealth design may be required.',
+          data_sources: ['FHWA Scenic Byways fhwa.dot.gov/byways', 'USFS Visual Quality Objective']
+        },
+        {
+          id:          'NOISE',
+          category:    'Noise',
+          cfr:         '47 CFR §1.1311(a)(9)',
+          risk_level:  'LOW',
+          description: 'Noise impact from transmitter equipment, generator backup, HVAC',
+          verification: 'Identify residential uses within 200 m of proposed transmitter building. Check local noise ordinance dBA limits. Generator backup units are primary noise concern at night.',
+          timeline_weeks: [1, 2],
+          action_if_triggered: 'If residential within 200 m: noise analysis (dBA at property line) required. Acoustic enclosure or setback may be needed.',
+          data_sources: ['Local municipal noise ordinance', 'EPA community noise guidelines']
+        },
+        {
+          id:          'CONTAMINATION',
+          category:    'Site Contamination / Hazardous Materials',
+          cfr:         '47 CFR §1.1311(a)(10)',
+          risk_level:  'UNKNOWN',
+          description: 'EPA Superfund, brownfield, underground storage tanks (USTs), PCB-contaminated soil',
+          verification: 'Search EPA ECHO (echo.epa.gov) and state environmental database for site address. Request Phase I Environmental Site Assessment (ESA) from qualified environmental professional.',
+          timeline_weeks: [4, 16],
+          action_if_triggered: 'Phase I ESA must be completed before ground disturbance. If recognized environmental conditions (RECs) found: Phase II ESA (soil sampling) required. Remediation adds 6–36 months.',
+          data_sources: ['EPA ECHO echo.epa.gov', 'EPA Envirofacts', 'State environmental database', 'ASTM E1527-21 Phase I ESA']
+        },
+        {
+          id:          'RF_EXPOSURE',
+          category:    'RF Exposure (MPE)',
+          cfr:         '47 CFR §1.1307(b); OET Bulletin 65',
+          risk_level:  isHighPow_env ? 'HIGH' : tpo_kw >= 5 ? 'MODERATE' : 'LOW',
+          description: 'Maximum Permissible Exposure (MPE) compliance — §1.1307(b) RF exposure evaluation',
+          verification: `TPO ${tpo_kw} kW at ${frequency_khz} kHz. Calculate near-field boundary per OET Bulletin 65. ${isHighPow_env ? 'High power: controlled and uncontrolled MPE boundaries must be shown on site plan.' : 'MPE evaluation and OET 65 calculation required before FCC filing.'}`,
+          timeline_weeks: [2, 4],
+          action_if_triggered: 'OET Bulletin 65 MPE analysis required. If public access within MPE zone: barriers, signs, or reduced access required. RF safety plan must be filed with FCC.',
+          data_sources: ['FCC OET Bulletin 65', 'IEEE C95.1 / ANSI RF safety standards', '47 CFR §1.1310']
+        },
+        {
+          id:          'GROUNDWATER',
+          category:    'Groundwater / Sole-Source Aquifer',
+          cfr:         '47 CFR §1.1311(a)(12)',
+          risk_level:  'UNKNOWN',
+          description: 'EPA Sole Source Aquifer (SSA) program — drinking water protection',
+          verification: 'Check site coordinates against EPA Sole Source Aquifer map (epa.gov/uic/sole-source-aquifer-designations). If within SSA: coordination with EPA Region required.',
+          timeline_weeks: [1, 3],
+          action_if_triggered: 'If within SSA: EPA review and approval of ground disturbance activities required. No hazardous materials storage below grade. Secondary containment for fuel tanks mandatory.',
+          data_sources: ['EPA Sole Source Aquifer Viewer epa.gov/uic', 'USGS Groundwater Atlas']
+        },
+        {
+          id:          'CUMULATIVE_IMPACTS',
+          category:    'Cumulative Impacts',
+          cfr:         '47 CFR §1.1311(b); NEPA §102(2)(C)',
+          risk_level:  'LOW',
+          description: 'Combined effect of this project with other past, present, and reasonably foreseeable future actions in the area',
+          verification: 'Review other construction projects, land use changes, and FCC applications within 5 km. Document cumulative impact analysis if EA is required for any individual trigger above.',
+          timeline_weeks: [2, 4],
+          action_if_triggered: 'Cumulative impact analysis required in EA. If project is one of many similar projects in a designated area: programmatic EIS may be triggered (rare for single AM stations).',
+          data_sources: ['NEPA NetCast (ceq.doe.gov)', 'FCC LMS for nearby antenna structure registrations']
+        }
+      ];
+
+      // Compute overall risk tier
+      const highCount = items.filter(i => i.risk_level === 'HIGH').length;
+      const elevCount = items.filter(i => i.risk_level === 'ELEVATED').length;
+      const overallRisk = highCount >= 2 ? 'HIGH'
+                        : highCount >= 1 || elevCount >= 2 ? 'ELEVATED'
+                        : elevCount >= 1 ? 'MODERATE'
+                        : 'LOW';
+
+      // Timeline estimate for the worst-case EA scenario
+      const longestWeeks = Math.max(...items.map(i => i.timeline_weeks[1]));
+      const ea_timeline_weeks_worst = longestWeeks;
+      const ea_timeline_note = highCount > 0
+        ? 'EA likely required due to HIGH-risk triggers above. Full EA preparation and FCC review typically adds 6–18 months.'
+        : elevCount > 0
+        ? 'EA may be required. Elevated-risk categories warrant desktop verification before concluding CE eligibility.'
+        : 'Categorical Exclusion (CE) may be achievable if all UNKNOWN items confirm clear — verify each with appropriate agency.';
+
+      return {
+        frequency_khz,
+        fcc_class,
+        lat: pt.lat,
+        lon: pt.lon,
+        tpo_kw,
+        quarter_wave_m: qwM_env,
+        asr_required: asrReq,
+        overall_nepa_risk: overallRisk,
+        high_risk_count: highCount,
+        elevated_risk_count: elevCount,
+        unknown_count: items.filter(i => i.risk_level === 'UNKNOWN').length,
+        low_risk_count: items.filter(i => i.risk_level === 'LOW').length,
+        ea_timeline_weeks_worst_case: ea_timeline_weeks_worst,
+        ea_eligibility_note: ea_timeline_note,
+        items,
+        reference: '47 CFR §1.1307–§1.1311; NEPA §102(2)(C); NHPA §106; ESA §7; CZMA; AIRFA',
+        note: 'Environmental screening matrix is a desktop-level pre-assessment only. Risk levels are site-parameter-driven estimates, NOT actual GIS database results. Each item must be verified with the listed data sources by a qualified environmental professional or FCC counsel before CP filing.'
       };
     })(),
 

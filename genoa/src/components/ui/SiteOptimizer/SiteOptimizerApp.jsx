@@ -1252,6 +1252,31 @@ const DEMO_RESULT = {
         ],
         reference: '47 CFR §73.1675; §73.182; §73.190; FCC Form 854; OET Bulletin 65',
         note: 'Compatibility scores are site-parameter-driven screening estimates. No actual infrastructure inventory lookup performed. Engage a licensed broadcast engineer for structural, RF, and lease compatibility verification before co-location commitment.'
+      },
+      environmental_risk_matrix: {
+        frequency_khz: 780, fcc_class: 'D', lat: 34.91, lon: -111.79,
+        tpo_kw: 5, quarter_wave_m: 96.2, asr_required: true,
+        overall_nepa_risk: 'ELEVATED', high_risk_count: 1, elevated_risk_count: 2,
+        unknown_count: 7, low_risk_count: 3,
+        ea_timeline_weeks_worst_case: 24,
+        ea_eligibility_note: 'EA may be required. Elevated-risk categories warrant desktop verification before concluding CE eligibility.',
+        items: [
+          { id: 'FLOODPLAIN', category: 'Floodplain', cfr: '47 CFR §1.1311(a)(1)', risk_level: 'UNKNOWN', description: 'FEMA FIRM floodplain overlay', verification: 'Map site at FEMA MSC (msc.fema.gov).', timeline_weeks: [1,2], action_if_triggered: 'EA required if in 100-yr floodplain.', data_sources: ['FEMA MSC'] },
+          { id: 'WETLANDS', category: 'Wetlands', cfr: '47 CFR §1.1311(a)(2)', risk_level: 'UNKNOWN', description: 'Jurisdictional wetlands and NWI-mapped wetlands', verification: 'Run NWI Mapper for 500-m radius.', timeline_weeks: [2,8], action_if_triggered: 'USACE §404 permit required.', data_sources: ['USFWS NWI'] },
+          { id: 'ENDANGERED_SPECIES', category: 'Threatened & Endangered Species', cfr: '47 CFR §1.1311(a)(3)', risk_level: 'ELEVATED', description: 'ESA §7 consultation', verification: 'Run USFWS IPaC for project area.', timeline_weeks: [4,24], action_if_triggered: 'Biological Opinion may be required from USFWS.', data_sources: ['USFWS IPaC'] },
+          { id: 'HISTORIC_PROPERTIES', category: 'Historic Properties (NHPA §106)', cfr: '47 CFR §1.1311(a)(4)', risk_level: 'HIGH', description: 'NHPA §106 — APE for above-ground and archaeological resources', verification: 'Consult Arizona SHPO. Map APE within 192 m of tower.', timeline_weeks: [4,20], action_if_triggered: 'SHPO consultation required. MOA may be needed.', data_sources: ['Arizona SHPO', 'NPS NRHP Focus'] },
+          { id: 'WILDERNESS', category: 'Wilderness & Wild/Scenic Areas', cfr: '47 CFR §1.1311(a)(5)', risk_level: 'UNKNOWN', description: 'Wilderness areas and Wild & Scenic Rivers', verification: 'Check proximity to Coconino National Forest wilderness areas.', timeline_weeks: [1,3], action_if_triggered: 'No construction in designated Wilderness.', data_sources: ['wilderness.net'] },
+          { id: 'COASTAL_ZONE', category: 'Coastal Zone', cfr: '47 CFR §1.1311(a)(6)', risk_level: 'LOW', description: 'CZMA consistency — state CZM program', verification: 'Site in AZ interior — coastal zone does not apply.', timeline_weeks: [1,1], action_if_triggered: 'N/A for interior AZ site.', data_sources: ['NOAA CZM'] },
+          { id: 'INDIAN_RELIGIOUS_SITES', category: 'Indian Religious Sites (AIRFA)', cfr: '47 CFR §1.1311(a)(7)', risk_level: 'ELEVATED', description: 'Sacred sites and tribal consultation — Yavapai County has significant tribal history', verification: 'Consult Yavapai-Prescott Tribe and Yavapai-Apache Nation. Check proximity to tribal lands.', timeline_weeks: [4,16], action_if_triggered: 'Government-to-government consultation required.', data_sources: ['BIA Tribal Directory'] },
+          { id: 'SCENIC_BYWAYS', category: 'Scenic Byways / Visual Resources', cfr: '47 CFR §1.1311(a)(8)', risk_level: 'ELEVATED', description: 'Visual impact of 96-m tower visible from AZ scenic routes', verification: 'Check SR-89A (Prescott area scenic byway) viewshed proximity.', timeline_weeks: [1,4], action_if_triggered: 'Visual impact analysis required.', data_sources: ['FHWA byways'] },
+          { id: 'NOISE', category: 'Noise', cfr: '47 CFR §1.1311(a)(9)', risk_level: 'LOW', description: 'Transmitter, generator, HVAC noise', verification: 'Identify residential within 200 m.', timeline_weeks: [1,2], action_if_triggered: 'Noise analysis at property line if residential nearby.', data_sources: ['Local ordinance'] },
+          { id: 'CONTAMINATION', category: 'Site Contamination / Hazardous Materials', cfr: '47 CFR §1.1311(a)(10)', risk_level: 'UNKNOWN', description: 'EPA Superfund, brownfields, USTs', verification: 'Search EPA ECHO. Phase I ESA recommended.', timeline_weeks: [4,16], action_if_triggered: 'Phase II ESA if RECs found.', data_sources: ['EPA ECHO'] },
+          { id: 'RF_EXPOSURE', category: 'RF Exposure (MPE)', cfr: '47 CFR §1.1307(b); OET Bulletin 65', risk_level: 'MODERATE', description: 'MPE compliance at 5 kW TPO', verification: 'Calculate near-field boundary per OET Bulletin 65.', timeline_weeks: [2,4], action_if_triggered: 'OET 65 analysis and RF safety plan required.', data_sources: ['FCC OET Bulletin 65'] },
+          { id: 'GROUNDWATER', category: 'Groundwater / Sole-Source Aquifer', cfr: '47 CFR §1.1311(a)(12)', risk_level: 'UNKNOWN', description: 'EPA Sole Source Aquifer program', verification: 'Check EPA SSA viewer for site.', timeline_weeks: [1,3], action_if_triggered: 'EPA coordination if within SSA.', data_sources: ['EPA epa.gov/uic'] },
+          { id: 'CUMULATIVE_IMPACTS', category: 'Cumulative Impacts', cfr: '47 CFR §1.1311(b)', risk_level: 'LOW', description: 'Combined project effects with other area actions', verification: 'Review nearby FCC applications and construction within 5 km.', timeline_weeks: [2,4], action_if_triggered: 'Cumulative analysis required in EA.', data_sources: ['FCC LMS', 'NEPA NetCast'] }
+        ],
+        reference: '47 CFR §1.1307–§1.1311; NEPA §102(2)(C); NHPA §106; ESA §7; CZMA; AIRFA',
+        note: 'Environmental screening matrix is a desktop-level pre-assessment only. Risk levels are site-parameter-driven estimates, NOT actual GIS database results. Each item must be verified with the listed data sources by a qualified environmental professional or FCC counsel before CP filing.'
       }
     },
     {
