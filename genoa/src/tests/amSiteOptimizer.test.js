@@ -5683,6 +5683,57 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- public_inspection_file_guide ----
+
+test('public_inspection_file_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.public_inspection_file_guide != null, 'public_inspection_file_guide missing');
+  const g = c.public_inspection_file_guide;
+  assert.ok('required_documents' in g, 'required_documents missing');
+  assert.ok('relocation_updates' in g, 'relocation_updates missing');
+  assert.ok('forfeiture_risk' in g, 'forfeiture_risk missing');
+  assert.ok('opif_system' in g, 'opif_system missing');
+});
+
+test('public_inspection_file_guide commercial AM is exempt from issues/programs list since 2018', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].public_inspection_file_guide;
+  assert.strictEqual(g.is_commercial_am, true, 'KAZM is commercial AM');
+  assert.strictEqual(g.issues_programs_list_required, false, 'commercial AM exempt from issues/programs list since 2018');
+});
+
+test('public_inspection_file_guide relocation updates are priority-ordered with CP grant as priority 1', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].public_inspection_file_guide;
+  assert.ok(Array.isArray(g.relocation_updates), 'relocation_updates must be array');
+  assert.ok(g.relocation_updates.length >= 5, 'must have at least 5 relocation updates');
+  const p1 = g.relocation_updates.find(u => u.priority === 1);
+  assert.ok(p1 != null, 'priority 1 update missing');
+  assert.ok(p1.action.toLowerCase().includes('cp') || p1.action.toLowerCase().includes('grant'), 'priority 1 must be CP grant upload');
+  assert.ok(p1.timeline != null, 'priority 1 must have timeline');
+});
+
+test('public_inspection_file_guide has required OPIF document categories including political file and license', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].public_inspection_file_guide;
+  assert.ok(Array.isArray(g.required_documents), 'required_documents must be array');
+  assert.ok(g.n_required_documents >= 5, 'must have at least 5 required document categories');
+  const ids = g.required_documents.map(d => d.id);
+  assert.ok(ids.includes('LICENSE'), 'LICENSE document required');
+  assert.ok(ids.includes('POLITICAL_FILE'), 'POLITICAL_FILE document required');
+  assert.ok(ids.includes('OWNERSHIP_RPT'), 'OWNERSHIP_RPT document required');
+});
+
+test('public_inspection_file_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pifg_n_docs' in row, 'pifg_n_docs missing from comparison table');
+    assert.ok('pifg_n_updates' in row, 'pifg_n_updates missing from comparison table');
+    assert.ok('pifg_issues_req' in row, 'pifg_issues_req missing from comparison table');
+  }
+});
+
 // ---- broadcast_content_compliance_guide ----
 
 test('broadcast_content_compliance_guide presence and structure', async () => {

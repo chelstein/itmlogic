@@ -1717,6 +1717,38 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      public_inspection_file_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        opif_system: 'FCC Online OPIF (publicfiles.fcc.gov)',
+        is_commercial_am: true,
+        issues_programs_list_required: false,
+        n_required_documents: 6,
+        required_documents: [
+          { id: 'LICENSE', label: 'Current license and all pending applications', cfr: '§73.3526(e)(1)', update_trigger: 'After any FCC action; upload CP within 24 hr of grant', retention: 'Duration of license period' },
+          { id: 'POLITICAL_FILE', label: 'Political file (requests, decisions, rates)', cfr: '§73.3526(e)(6)', update_trigger: 'Within 24 hours of any candidate request or decision', retention: '2 years' },
+          { id: 'OWNERSHIP_RPT', label: 'Ownership report (FCC Form 323)', cfr: '§73.3526(e)(3)', update_trigger: 'Biennially; within 30 days of any ownership change', retention: 'Current + previous' },
+          { id: 'EEO_REPORT', label: 'EEO public file report', cfr: '§73.3526(e)(7); §73.2080', update_trigger: 'Annually; due on renewal anniversary date', retention: '2 years' },
+          { id: 'LOCAL_NOTICE', label: 'Local public notice of filed applications (§73.3580)', cfr: '§73.3526(e)(10)', update_trigger: 'When application filed and FCC public notice issued', retention: 'Duration of proceeding' },
+          { id: 'ISSUES_PROGRAMS', label: 'Issues/programs list (if noncommercial) or quarterly reports', cfr: '§73.3527 (noncommercial only)', update_trigger: 'Quarterly', retention: '2 years — commercial AM EXEMPT since 2018' }
+        ],
+        n_relocation_updates: 5,
+        relocation_updates: [
+          { priority: 1, action: 'Upload CP grant', detail: 'Construction permit for new site must be uploaded to OPIF within 24 hours of FCC grant', cfr: '§73.3526(e)(1)', timeline: '24 hours after CP grant' },
+          { priority: 2, action: 'Update ownership report if needed', detail: 'If relocation accompanies any ownership change, Form 323 must be updated within 30 days', cfr: '§73.3526(e)(3); §73.3555', timeline: '30 days of change' },
+          { priority: 3, action: 'EEO report update', detail: 'EEO report must reflect new COL/service area if community of license changes with the relocation', cfr: '§73.2080; §73.3526(e)(7)', timeline: 'On next annual EEO report' },
+          { priority: 4, action: 'Local public notice', detail: 'FCC requires local notice in community of license upon application grant; post notice to OPIF', cfr: '§73.3580; §73.3526(e)(10)', timeline: 'When FCC issues public notice' },
+          { priority: 5, action: 'Confirm political file access', detail: 'OPIF political file does not move; confirm existing entries remain accessible and add new station address', cfr: '§73.1943(f); §73.3526(e)(6)', timeline: 'At time of move' }
+        ],
+        forfeiture_risk: {
+          missing_documents_usd: { low: 4000, high: 10000 },
+          political_file_violations_usd: { low: 8000, high: 25000 },
+          total_risk_per_inspection_usd: { low: 12000, high: 35000 },
+          cfr: '§503(b); FCC Forfeiture Policy Statement'
+        },
+        relocation_note: 'Upload CP grant to OPIF within 24 hours. Political file remains in FCC online system — no physical move needed. EEO report must reflect new service area at next annual filing. Commercial AM stations are exempt from issues/programs list requirement since 2018.',
+        reference: '47 CFR §73.2080; §73.3526; §73.3527; §73.3555; §73.3580; §73.1943; §503(b); FCC OPIF system (publicfiles.fcc.gov)',
+        note: 'OPIF: 6 document categories. 5 updates required post-relocation. Commercial AM EXEMPT from quarterly issues/programs list (since 2018). FCC OPIF: publicfiles.fcc.gov.'
+      },
       broadcast_content_compliance_guide: {
         frequency_khz: 780, fcc_class: 'D',
         indecency_rules: {

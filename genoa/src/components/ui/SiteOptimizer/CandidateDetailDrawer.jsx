@@ -2226,6 +2226,72 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Public Inspection File Guide */}
+        {candidate.public_inspection_file_guide && (() => {
+          const g = candidate.public_inspection_file_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Public Inspection File (OPIF) <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.3526</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>OPIF System</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.opif_system}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Required Documents</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.n_required_documents} categories</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Issues/Programs List</div>
+                  <div style={{ color: g.issues_programs_list_required ? '#f87171' : '#34d399', fontSize: 12, fontWeight: 600 }}>
+                    {g.issues_programs_list_required ? 'Required' : 'Exempt (commercial AM, since 2018)'}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Post-Relocation Updates</div>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 600 }}>{g.n_relocation_updates} required</div>
+                </div>
+              </div>
+              {g.relocation_updates && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Relocation OPIF Updates</div>
+                  {g.relocation_updates.slice(0, 3).map((u, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: '#334155', color: '#f1f5f9', borderRadius: 4, padding: '1px 6px', fontSize: 10, minWidth: 20, textAlign: 'center', marginTop: 1 }}>{u.priority}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{u.action}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{u.timeline} · {u.cfr}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.forfeiture_risk && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>OPIF Violation Forfeiture Risk</div>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 10 }}>Missing docs</div>
+                      <div style={{ color: '#f87171', fontSize: 12 }}>${g.forfeiture_risk.missing_documents_usd.low.toLocaleString()}–${g.forfeiture_risk.missing_documents_usd.high.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 10 }}>Political file</div>
+                      <div style={{ color: '#f87171', fontSize: 12 }}>${g.forfeiture_risk.political_file_violations_usd.low.toLocaleString()}–${g.forfeiture_risk.political_file_violations_usd.high.toLocaleString()}</div>
+                    </div>
+                    <div>
+                      <div style={{ color: '#64748b', fontSize: 10 }}>Total/inspection</div>
+                      <div style={{ color: '#f87171', fontSize: 12, fontWeight: 600 }}>${g.forfeiture_risk.total_risk_per_inspection_usd.low.toLocaleString()}–${g.forfeiture_risk.total_risk_per_inspection_usd.high.toLocaleString()}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Broadcast Content Compliance Guide */}
         {candidate.broadcast_content_compliance_guide && (() => {
           const g = candidate.broadcast_content_compliance_guide;

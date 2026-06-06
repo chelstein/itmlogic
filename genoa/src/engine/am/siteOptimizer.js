@@ -975,7 +975,10 @@ export async function runSiteOptimizer(body = {}){
     ppg_luc_general_days:   c.political_programming_compliance_guide?.election_windows?.luc_pre_general_days ?? null,
     bccg_n_elements:        c.broadcast_content_compliance_guide?.n_compliance_elements ?? null,
     bccg_high_priority:     c.broadcast_content_compliance_guide?.high_priority_elements ?? null,
-    bccg_max_forfeiture:    c.broadcast_content_compliance_guide?.max_forfeiture_indecency_usd ?? null
+    bccg_max_forfeiture:    c.broadcast_content_compliance_guide?.max_forfeiture_indecency_usd ?? null,
+    pifg_n_docs:            c.public_inspection_file_guide?.n_required_documents ?? null,
+    pifg_n_updates:         c.public_inspection_file_guide?.n_relocation_updates ?? null,
+    pifg_issues_req:        c.public_inspection_file_guide?.issues_programs_list_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6710,6 +6713,74 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    public_inspection_file_guide: (() => {
+      // §73.3526: Online public inspection file (OPIF) — AM broadcast stations must maintain OPIF
+      // Since 2018, AM stations must use FCC's online OPIF system (FCC OPIF database)
+      // §73.3526(a): File must be hosted on FCC OPIF system (not local file folder as of 2018)
+      // §73.3526(e): Required documents in OPIF:
+      //   (1) License and pending applications
+      //   (2) Political file (§73.1943)
+      //   (3) Contour maps (if applicable)
+      //   (4) Ownership reports (FCC Form 323)
+      //   (5) Public and broadcasting (§73.3527 deleted in 2018 — issues/programs list no longer required for commercial AM)
+      //   (6) EEO public file report (§73.2080)
+      //   (7) Must-carry/retransmission consents (not applicable to AM)
+      //   (8) Children's programming reports (not applicable to AM radio)
+      //   (9) Donor lists (if applicable to noncommercial)
+      //   (10) Local public notices (§73.3580)
+      //
+      // When relocating:
+      //   - New CP must be uploaded to OPIF within 24 hours of grant
+      //   - Political file remains in OPIF (no physical location change needed)
+      //   - EEO report must reflect new service area if COL changes
+      //   - Ownership report must be updated if any ownership change accompanies relocation
+      // §73.3526(c): OPIF must be current; deficiencies are cited by FCC during inspections
+
+      // Required OPIF documents for AM commercial station
+      const REQUIRED_DOCUMENTS = [
+        { id: 'LICENSE',         label: 'Current license and all pending applications', cfr: '§73.3526(e)(1)', update_trigger: 'After any FCC action; upload CP within 24 hr of grant', retention: 'Duration of license period' },
+        { id: 'POLITICAL_FILE',  label: 'Political file (requests, decisions, rates)', cfr: '§73.3526(e)(6)', update_trigger: 'Within 24 hours of any candidate request or decision', retention: '2 years' },
+        { id: 'OWNERSHIP_RPT',   label: 'Ownership report (FCC Form 323)', cfr: '§73.3526(e)(3)', update_trigger: 'Biennially; within 30 days of any ownership change', retention: 'Current + previous' },
+        { id: 'EEO_REPORT',      label: 'EEO public file report', cfr: '§73.3526(e)(7); §73.2080', update_trigger: 'Annually; due on renewal anniversary date', retention: '2 years' },
+        { id: 'LOCAL_NOTICE',    label: 'Local public notice of filed applications (§73.3580)', cfr: '§73.3526(e)(10)', update_trigger: 'When application filed and FCC public notice issued', retention: 'Duration of proceeding' },
+        { id: 'ISSUES_PROGRAMS', label: 'Issues/programs list (if noncommercial) or quarterly reports', cfr: '§73.3527 (noncommercial only)', update_trigger: 'Quarterly', retention: '2 years — commercial AM EXEMPT since 2018' }
+      ];
+
+      // Relocation-specific OPIF updates required
+      const RELOCATION_UPDATES = [
+        { priority: 1, action: 'Upload CP grant', detail: 'Construction permit for new site must be uploaded to OPIF within 24 hours of FCC grant', cfr: '§73.3526(e)(1)', timeline: '24 hours after CP grant' },
+        { priority: 2, action: 'Update ownership report if needed', detail: 'If relocation accompanies any ownership change, Form 323 must be updated within 30 days', cfr: '§73.3526(e)(3); §73.3555', timeline: '30 days of change' },
+        { priority: 3, action: 'EEO report update', detail: 'EEO report must reflect new COL/service area if community of license changes with the relocation', cfr: '§73.2080; §73.3526(e)(7)', timeline: 'On next annual EEO report' },
+        { priority: 4, action: 'Local public notice', detail: 'FCC requires local notice in community of license upon application grant; post notice to OPIF', cfr: '§73.3580; §73.3526(e)(10)', timeline: 'When FCC issues public notice' },
+        { priority: 5, action: 'Confirm political file access', detail: 'OPIF political file does not move; confirm existing entries remain accessible and add new station address', cfr: '§73.1943(f); §73.3526(e)(6)', timeline: 'At time of move' }
+      ];
+
+      // Forfeiture risk for OPIF violations
+      const FORFEITURE_RISK = {
+        missing_documents_usd: { low: 4000, high: 10000 }, // per FCC forfeiture policy §503(b)
+        political_file_violations_usd: { low: 8000, high: 25000 },
+        total_risk_per_inspection_usd: { low: 12000, high: 35000 },
+        cfr: '§503(b); FCC Forfeiture Policy Statement'
+      };
+
+      const is_commercial_am = true; // AM commercial stations exempt from issues/programs list since 2018
+
+      return {
+        frequency_khz, fcc_class,
+        opif_system: 'FCC Online OPIF (publicfiles.fcc.gov)',
+        is_commercial_am,
+        issues_programs_list_required: !is_commercial_am,
+        required_documents: REQUIRED_DOCUMENTS,
+        n_required_documents: REQUIRED_DOCUMENTS.length,
+        relocation_updates: RELOCATION_UPDATES,
+        n_relocation_updates: RELOCATION_UPDATES.length,
+        forfeiture_risk: FORFEITURE_RISK,
+        relocation_note: 'Upload CP grant to OPIF within 24 hours. Political file remains in FCC online system — no physical move needed. EEO report must reflect new service area at next annual filing. Commercial AM stations are exempt from issues/programs list requirement since 2018.',
+        reference: '47 CFR §73.2080; §73.3526; §73.3527; §73.3555; §73.3580; §73.1943; §503(b); FCC OPIF system (publicfiles.fcc.gov)',
+        note: `OPIF: ${REQUIRED_DOCUMENTS.length} document categories. ${RELOCATION_UPDATES.length} updates required post-relocation. Commercial AM EXEMPT from quarterly issues/programs list (since 2018). FCC OPIF: publicfiles.fcc.gov.`
       };
     })(),
 
