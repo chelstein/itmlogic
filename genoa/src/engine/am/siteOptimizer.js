@@ -864,7 +864,10 @@ export async function runSiteOptimizer(body = {}){
     reloc_cost_midpoint:    c.station_relocation_cost_estimator?.total_midpoint ?? null,
     pline_min_dist_m:       c.power_line_interference_analysis?.recommended_min_distance_m ?? null,
     pline_bpl_applicable:   c.power_line_interference_analysis?.bpl_exclusion_applicable ?? null,
-    pline_n_mitigations:    c.power_line_interference_analysis?.n_applicable_mitigations ?? null
+    pline_n_mitigations:    c.power_line_interference_analysis?.n_applicable_mitigations ?? null,
+    pop_col_estimate:       c.population_demographics_overlay?.col_population_estimate ?? null,
+    pop_primary_estimate:   c.population_demographics_overlay?.primary_population_estimate ?? null,
+    pop_col_radius_km:      c.population_demographics_overlay?.col_service_radius_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8397,6 +8400,85 @@ async function scoreCandidate(pt, ctx, warnings){
         n_applicable_mitigations:    mitigations.filter(m => m.applicable).length,
         reference: '47 CFR §73.184; §15.5; §15.615; IEEE Std 1560; ITU-R CISPR 22; FCC BPL Order (ET Docket 03-104)',
         note: `AM ${frequency_khz} kHz in AM broadcast band (${BPL_FREQ_BAND.low_khz}–${BPL_FREQ_BAND.high_khz} kHz). BPL exclusion zone: ${BPL_EXCLUSION_KM} km per §15.615(c). Minimum recommended distance from power lines: 300m.`
+      };
+    })(),
+
+    population_demographics_overlay: (() => {
+      // Census-based population analysis for coverage contours
+      // Uses FCC groundwave curves to compute contour radii, then disc approximation for population
+      // Source: US Census Bureau ACS 5-year estimates; population density by census tract
+      // Note: actual population query requires integration with census API; this provides
+      // the framework, scaling factors, and disc-area population estimates from density
+
+      // Compute contour radii for each service level
+      const contourDefs_pd = [
+        { id: 'col_min',  mvm: 5.0,  label: 'COL (5 mV/m)',    rule: '§73.24(j)' },
+        { id: 'standard', mvm: 2.0,  label: 'Standard (2 mV/m)', rule: 'FCC standard service' },
+        { id: 'primary',  mvm: 0.5,  label: 'Primary (0.5 mV/m)', rule: '§73.182 protection' }
+      ];
+
+      const contours_pd = contourDefs_pd.map(def => {
+        let radius_km = null;
+        try {
+          const r = fccAmDistanceKm({ frequency_khz, target_mvm: def.mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+          radius_km = r?.distance_km != null ? round2(r.distance_km) : null;
+        } catch { /* ok */ }
+        const area_km2 = radius_km != null ? round2(Math.PI * radius_km * radius_km) : null;
+        // Population density placeholder: candidate lat/lon determines regional density
+        // US average ≈ 36 people/km²; urban ≈ 800/km²; suburban ≈ 300/km²; rural ≈ 10/km²
+        // We use the candidate's conductivity as a proxy (higher σ often rural/agricultural)
+        const densityFactor = sigma_msm >= 8 ? 15 : sigma_msm >= 4 ? 50 : 200; // people/km² proxy
+        const pop_estimate = area_km2 != null ? Math.round(area_km2 * densityFactor) : null;
+        return {
+          ...def,
+          radius_km,
+          area_km2,
+          population_estimate:   pop_estimate,
+          pop_density_assumed_per_km2: densityFactor,
+          pop_data_source: 'Disc-area × regional density proxy (conductivity-based); replace with Census ACS API for accuracy'
+        };
+      });
+
+      // AM radio listener demographics (NAB/Nielsen AM audience research data, 2023)
+      // AM audience skews older; peak age 45–64
+      const audienceDemographics = {
+        peak_age_band:     '45–64',
+        median_listener_age: 54,
+        male_pct:          58,
+        female_pct:        42,
+        primary_daypart:   'Morning drive (6–9 AM)',
+        secondary_daypart: 'Afternoon drive (3–7 PM)',
+        top_formats:       ['News/Talk', 'Sports', 'Spanish-language', 'Religious'],
+        weekly_cume_pct_of_adults_12plus: 14.5,
+        source: 'NAB State of Audio 2023; Nielsen Audio Monthly; Edison Research Share of Ear 2023'
+      };
+
+      // COL rule context: §73.24(j) requires principal community to be within 5 mV/m daytime contour
+      const col_radius_pd = contours_pd.find(c => c.id === 'col_min')?.radius_km ?? null;
+      const col_area_pd   = contours_pd.find(c => c.id === 'col_min')?.area_km2 ?? null;
+      const col_pop_pd    = contours_pd.find(c => c.id === 'col_min')?.population_estimate ?? null;
+
+      // Primary contour for population reach score
+      const primary_radius_pd = contours_pd.find(c => c.id === 'primary')?.radius_km ?? null;
+      const primary_pop_pd    = contours_pd.find(c => c.id === 'primary')?.population_estimate ?? null;
+
+      return {
+        candidate_lat:   pt.lat,
+        candidate_lon:   pt.lon,
+        frequency_khz,
+        tpo_kw,
+        sigma_msm,
+        contours:                    contours_pd,
+        n_contours:                  contours_pd.length,
+        col_service_radius_km:       col_radius_pd,
+        col_service_area_km2:        col_area_pd,
+        col_population_estimate:     col_pop_pd,
+        primary_contour_radius_km:   primary_radius_pd,
+        primary_population_estimate: primary_pop_pd,
+        audience_demographics:       audienceDemographics,
+        pop_data_source: 'US Census ACS 5-year estimates (not yet integrated); disc-area approximation with conductivity-based density proxy',
+        reference: '47 CFR §73.24(j); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
+        note: `Population overlay at ${frequency_khz} kHz, ${tpo_kw} kW, σ=${sigma_msm} mS/m. COL radius: ${col_radius_pd ?? 'N/A'} km. Primary radius: ${primary_radius_pd ?? 'N/A'} km. Replace density proxy with Census API for filing-grade estimates.`
       };
     })(),
 

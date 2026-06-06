@@ -6503,3 +6503,48 @@ test('power_line_interference_analysis comparison table columns present', async 
     assert.ok('pline_n_mitigations' in row, 'pline_n_mitigations missing from comparison table');
   }
 });
+
+test('population_demographics_overlay presence and contour count', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].population_demographics_overlay;
+  assert.ok(p != null, 'population_demographics_overlay must be present');
+  assert.strictEqual(p.n_contours, 3, 'must have 3 contours (COL, standard, primary)');
+  assert.ok(Array.isArray(p.contours), 'contours must be an array');
+});
+
+test('population_demographics_overlay contour radii and population estimates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].population_demographics_overlay;
+  const col = p.contours.find(c => c.id === 'col_min');
+  const primary = p.contours.find(c => c.id === 'primary');
+  assert.ok(col != null, 'must have col_min contour');
+  assert.ok(primary != null, 'must have primary contour');
+  assert.ok(col.radius_km > 0, 'COL radius must be positive');
+  assert.ok(primary.radius_km > col.radius_km, 'primary (0.5 mV/m) must reach farther than COL (5 mV/m)');
+  assert.ok(primary.population_estimate >= col.population_estimate, 'primary pop must be >= COL pop');
+});
+
+test('population_demographics_overlay audience demographics present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].population_demographics_overlay;
+  assert.ok(p.audience_demographics != null, 'audience_demographics must be present');
+  assert.ok(typeof p.audience_demographics.median_listener_age === 'number', 'median_listener_age must be a number');
+  assert.ok(p.audience_demographics.top_formats.length > 0, 'top_formats must be non-empty');
+});
+
+test('population_demographics_overlay COL fields consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const p = out.candidates[0].population_demographics_overlay;
+  assert.ok(p.col_service_radius_km != null && p.col_service_radius_km > 0, 'col_service_radius_km must be positive');
+  assert.ok(p.col_service_area_km2 != null && p.col_service_area_km2 > 0, 'col_service_area_km2 must be positive');
+  assert.ok(p.primary_contour_radius_km > p.col_service_radius_km, 'primary radius must exceed COL radius');
+});
+
+test('population_demographics_overlay comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pop_col_estimate' in row,     'pop_col_estimate missing from comparison table');
+    assert.ok('pop_primary_estimate' in row, 'pop_primary_estimate missing from comparison table');
+    assert.ok('pop_col_radius_km' in row,    'pop_col_radius_km missing from comparison table');
+  }
+});

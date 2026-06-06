@@ -2226,6 +2226,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Population Demographics Overlay */}
+        {candidate.population_demographics_overlay && (() => {
+          const p = candidate.population_demographics_overlay;
+          const fmtN = n => n != null ? n.toLocaleString() : '—';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Population Demographics Overlay (§73.24j · Census ACS)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  Coverage population estimates at {p.frequency_khz} kHz, {p.tpo_kw} kW, σ={p.sigma_msm} mS/m.
+                  <span className="text-gray-400 ml-1 italic">(Disc-area × density proxy; replace with Census API for filing accuracy.)</span>
+                </div>
+                <div className="space-y-1 mb-2">
+                  {p.contours?.map(c => (
+                    <div key={c.id} className="flex items-center gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="text-gray-300 flex-1">{c.label}</span>
+                      <span className="text-blue-300 font-mono">{c.radius_km != null ? `${c.radius_km} km` : '—'}</span>
+                      <span className="text-white font-mono">{fmtN(c.population_estimate)}</span>
+                      <span className="text-gray-500">pop</span>
+                    </div>
+                  ))}
+                </div>
+                {p.audience_demographics && (
+                  <div className="bg-gray-800 rounded p-2 text-xs mb-2">
+                    <div className="text-gray-300 font-semibold mb-1">AM Audience Demographics (NAB/Nielsen 2023)</div>
+                    <div className="grid grid-cols-2 gap-1">
+                      <div className="text-gray-400">Median age: <span className="text-white">{p.audience_demographics.median_listener_age}</span></div>
+                      <div className="text-gray-400">M/F: <span className="text-white">{p.audience_demographics.male_pct}/{p.audience_demographics.female_pct}%</span></div>
+                      <div className="text-gray-400">Peak daypart: <span className="text-white">{p.audience_demographics.primary_daypart}</span></div>
+                      <div className="text-gray-400">Weekly cume: <span className="text-white">{p.audience_demographics.weekly_cume_pct_of_adults_12plus}%</span></div>
+                    </div>
+                    <div className="mt-1 text-gray-400">Top formats: <span className="text-gray-300">{p.audience_demographics.top_formats.join(', ')}</span></div>
+                  </div>
+                )}
+                <div className="text-xs text-gray-500">{p.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Power Line Interference Analysis */}
         {candidate.power_line_interference_analysis && (() => {
           const p = candidate.power_line_interference_analysis;

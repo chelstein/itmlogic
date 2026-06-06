@@ -1717,6 +1717,30 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      population_demographics_overlay: {
+        candidate_lat: 34.8606, candidate_lon: -111.8206,
+        frequency_khz: 780, tpo_kw: 5, sigma_msm: 9,
+        n_contours: 3,
+        contours: [
+          { id: 'col_min',  mvm: 5.0, label: 'COL (5 mV/m)',      rule: '§73.24(j)', radius_km: 18.4, area_km2: 1063, population_estimate: 15945,  pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' },
+          { id: 'standard', mvm: 2.0, label: 'Standard (2 mV/m)', rule: 'FCC standard service', radius_km: 42.3, area_km2: 5621, population_estimate: 84315,  pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' },
+          { id: 'primary',  mvm: 0.5, label: 'Primary (0.5 mV/m)',rule: '§73.182 protection', radius_km: 115.2, area_km2: 41710, population_estimate: 625650, pop_density_assumed_per_km2: 15, pop_data_source: 'Disc-area × conductivity-based density proxy' }
+        ],
+        col_service_radius_km: 18.4, col_service_area_km2: 1063, col_population_estimate: 15945,
+        primary_contour_radius_km: 115.2, primary_population_estimate: 625650,
+        audience_demographics: {
+          peak_age_band: '45–64', median_listener_age: 54,
+          male_pct: 58, female_pct: 42,
+          primary_daypart: 'Morning drive (6–9 AM)',
+          secondary_daypart: 'Afternoon drive (3–7 PM)',
+          top_formats: ['News/Talk', 'Sports', 'Spanish-language', 'Religious'],
+          weekly_cume_pct_of_adults_12plus: 14.5,
+          source: 'NAB State of Audio 2023; Nielsen Audio Monthly; Edison Research Share of Ear 2023'
+        },
+        pop_data_source: 'US Census ACS 5-year estimates (not yet integrated); disc-area approximation with conductivity-based density proxy',
+        reference: '47 CFR §73.24(j); §73.182; FCC Form 301-AM Schedule D; US Census Bureau ACS 5-year; NAB State of Audio 2023',
+        note: 'Population overlay at 780 kHz, 5 kW, σ=9 mS/m. COL radius: 18.4 km. Primary radius: 115.2 km. Replace density proxy with Census API for filing-grade estimates.'
+      },
       power_line_interference_analysis: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         in_am_broadcast_band: true, bpl_exclusion_zone_km: 1, bpl_exclusion_applicable: true,
