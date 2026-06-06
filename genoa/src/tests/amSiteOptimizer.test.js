@@ -4233,3 +4233,40 @@ test('permit_and_engineering_cost_estimate soft_cost columns in comparison table
     assert.ok('soft_cost_tier' in row, 'soft_cost_tier must be in comparison table');
   }
 });
+
+// ---------- total_project_cost_estimate ----------
+
+test('total_project_cost_estimate is present on response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  assert.ok(out.total_project_cost_estimate != null, 'total_project_cost_estimate must be present');
+});
+
+test('total_project_cost_estimate.top_candidates length matches min(candidates, 5)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const tpc = out.total_project_cost_estimate;
+  assert.ok(tpc.top_candidates.length <= Math.min(out.candidates.length, 5),
+    'top_candidates must not exceed 5 or candidates.length');
+});
+
+test('total_project_cost_estimate each row has total_low <= total_high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.total_project_cost_estimate.top_candidates) {
+    assert.ok(row.total_low_usd <= row.total_high_usd,
+      `rank ${row.rank}: total_low_usd must be <= total_high_usd`);
+    assert.ok(row.total_low_usd > 0, `rank ${row.rank}: total_low_usd must be positive`);
+  }
+});
+
+test('total_project_cost_estimate.lowest_cost_candidate_rank is a valid rank', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const tpc = out.total_project_cost_estimate;
+  if (tpc.lowest_cost_candidate_rank != null) {
+    const ranks = out.candidates.map(c => c.rank);
+    assert.ok(ranks.includes(tpc.lowest_cost_candidate_rank),
+      `lowest_cost_candidate_rank ${tpc.lowest_cost_candidate_rank} must be a valid rank`);
+  }
+});

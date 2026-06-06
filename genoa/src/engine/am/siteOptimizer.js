@@ -894,6 +894,49 @@ export async function runSiteOptimizer(body = {}){
     chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: ASR_THRESHOLD_M
   });
 
+  // ---- 19. Total project cost estimate ----
+  // Response-level summary combining soft costs (filing + engineering) and
+  // hard costs (tower + ground + construction) for each top candidate.
+  // Enables stakeholder budget conversations before committing to site selection.
+  const total_project_cost_estimate = (() => {
+    const rows = returned.slice(0, 5).map(c => {
+      const soft   = c.permit_and_engineering_cost_estimate;
+      const hard   = c.tower_cost_estimate;
+      if (!soft && !hard) return null;
+      const soft_low  = soft?.total_soft_cost_low_usd ?? 0;
+      const soft_high = soft?.total_soft_cost_high_usd ?? 0;
+      const hard_low  = hard?.total_low_usd ?? 0;
+      const hard_high = hard?.total_high_usd ?? 0;
+      const total_low  = Math.round(soft_low  + hard_low);
+      const total_high = Math.round(soft_high + hard_high);
+      return {
+        rank:           c.rank,
+        status:         c.status_category,
+        soft_cost_low:  soft_low,
+        soft_cost_high: soft_high,
+        hard_cost_low:  hard_low,
+        hard_cost_high: hard_high,
+        total_low_usd:  total_low,
+        total_high_usd: total_high,
+        range_label:    `$${(total_low / 1000).toFixed(0)}k–$${(total_high / 1000).toFixed(0)}k`,
+        cost_tier:      total_high > 800000 ? 'VERY_HIGH'
+          : total_high > 400000 ? 'HIGH'
+          : total_high > 150000 ? 'MODERATE'
+          : 'LOW'
+      };
+    }).filter(Boolean);
+
+    const best = rows.length ? rows.reduce((a, b) => a.total_low_usd < b.total_low_usd ? a : b) : null;
+
+    return {
+      top_candidates: rows,
+      lowest_cost_candidate_rank: best?.rank ?? null,
+      lowest_total_low_usd:  best?.total_low_usd ?? null,
+      lowest_total_high_usd: best?.total_high_usd ?? null,
+      note: 'All figures 2024 USD, screening-grade. Does not include land/lease costs, transmitter equipment, or facility upgrades. Add 20–35% contingency for accurate project budgeting.'
+    };
+  })();
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -910,6 +953,7 @@ export async function runSiteOptimizer(body = {}){
     candidate_set_statistics,
     candidate_scoring_audit,
     filing_complexity_score,
+    total_project_cost_estimate,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,

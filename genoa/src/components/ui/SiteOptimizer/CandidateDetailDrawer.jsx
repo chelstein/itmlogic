@@ -1752,6 +1752,78 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Permit and engineering cost estimate */}
+        {candidate.permit_and_engineering_cost_estimate && (() => {
+          const pe = candidate.permit_and_engineering_cost_estimate;
+          const tierColor = pe.cost_tier === 'VERY_HIGH' ? '#ff4444'
+            : pe.cost_tier === 'HIGH'     ? '#ffb347'
+            : pe.cost_tier === 'MODERATE' ? '#ffe066'
+            : '#63d471';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Soft-cost budget (filing + engineering)</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: tierColor + '22', color: tierColor }}>
+                    {pe.cost_tier}
+                  </span>
+                  <span className="text-cream text-[11px] font-bold">{pe.range_label}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5">
+                  {pe.line_items?.map((item) => (
+                    <div key={item.id} className="text-[9px]">
+                      <span className="text-textDim/60">{item.label}:</span>{' '}
+                      <span className="text-cream">${item.low_usd === item.high_usd
+                        ? item.low_usd.toLocaleString()
+                        : `${(item.low_usd / 1000).toFixed(0)}k–${(item.high_usd / 1000).toFixed(0)}k`}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-textDim/50 text-[8px] leading-snug">{pe.note}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Antenna base impedance */}
+        {candidate.antenna_base_impedance && (() => {
+          const ab = candidate.antenna_base_impedance;
+          const qw = ab.quarter_wave;
+          const effColor = qw?.efficiency_standard_pct >= 90 ? '#63d471'
+            : qw?.efficiency_standard_pct >= 80 ? '#ffe066'
+            : '#ffb347';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Antenna base impedance (λ/4 reference)</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                {qw && (
+                  <div className="grid grid-cols-4 gap-x-3">
+                    <div>
+                      <div className="text-textDim text-[9px]">R_r (Ω)</div>
+                      <div className="text-cream">{qw.radiation_resistance_ohm}</div>
+                    </div>
+                    <div>
+                      <div className="text-textDim text-[9px]">R_g std (Ω)</div>
+                      <div className="text-cream">{qw.ground_loss_standard_ohm}</div>
+                    </div>
+                    <div>
+                      <div className="text-textDim text-[9px]">R_total (Ω)</div>
+                      <div className="text-cream">{qw.total_base_resistance_ohm}</div>
+                    </div>
+                    <div>
+                      <div className="text-textDim text-[9px]">Efficiency</div>
+                      <div style={{ color: effColor }}>{qw.efficiency_standard_pct?.toFixed(0)}%</div>
+                    </div>
+                  </div>
+                )}
+                <div className="text-textDim/70 text-[9px] leading-snug">{ab.matching_network_complexity}</div>
+                <div className="text-textDim/50 text-[9px] leading-snug">{ab.design_note}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>
