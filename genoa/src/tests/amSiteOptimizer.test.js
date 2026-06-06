@@ -5683,6 +5683,58 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- am_monitoring_point_guide ----
+
+test('am_monitoring_point_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.am_monitoring_point_guide != null, 'am_monitoring_point_guide missing');
+  const g = c.am_monitoring_point_guide;
+  assert.ok('is_directional' in g, 'is_directional missing');
+  assert.ok('n_monitoring_points' in g, 'n_monitoring_points missing');
+  assert.ok('monitoring_methods' in g, 'monitoring_methods missing');
+  assert.ok('relocation_steps' in g, 'relocation_steps missing');
+});
+
+test('am_monitoring_point_guide KAZM NDA pattern yields correct monitoring point count', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_monitoring_point_guide;
+  // KAZM uses NDA pattern_mode — should be non-directional
+  assert.strictEqual(g.is_directional, false, 'KAZM NDA pattern_mode must not be directional');
+  assert.ok(g.n_monitoring_points >= 1, 'must have at least 1 monitoring point');
+  assert.ok(g.n_patterns === 1, 'NDA should have 1 pattern');
+});
+
+test('am_monitoring_point_guide monitoring distance is frequency-derived', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_monitoring_point_guide;
+  // At 780 kHz, wavelength = 300000/780 ≈ 384.6m; min distance = 0.5λ ≈ 192–193m
+  const expected_min = Math.round((300000 / 780) * 0.5);
+  assert.strictEqual(g.min_distance_m, expected_min, `min monitoring distance must be 0.5λ = ${expected_min}m at 780 kHz`);
+  assert.ok(g.fcc_tolerance_pct === 5, 'FCC field tolerance must be ±5%');
+});
+
+test('am_monitoring_point_guide DA fixture produces more monitoring points than NDA', async () => {
+  const [ndaOut, daOut] = await Promise.all([
+    runSiteOptimizer({ ...KAZM, candidate_limit: 1, pattern_mode: 'NDA' }),
+    runSiteOptimizer({ ...KAZM, candidate_limit: 1, pattern_mode: 'DA-2' })
+  ]);
+  const ndaG = ndaOut.candidates[0].am_monitoring_point_guide;
+  const daG  = daOut.candidates[0].am_monitoring_point_guide;
+  assert.strictEqual(ndaG.is_directional, false, 'NDA must not be directional');
+  assert.strictEqual(daG.is_directional, true, 'DA-2 must be directional');
+  assert.ok(daG.n_monitoring_points > ndaG.n_monitoring_points, 'DA must require more monitoring points than NDA');
+});
+
+test('am_monitoring_point_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ampg_is_da' in row, 'ampg_is_da missing from comparison table');
+    assert.ok('ampg_n_points' in row, 'ampg_n_points missing from comparison table');
+    assert.ok('ampg_annual_cost_usd' in row, 'ampg_annual_cost_usd missing from comparison table');
+  }
+});
+
 // ---- utility_power_service_guide ----
 
 test('utility_power_service_guide presence and structure', async () => {

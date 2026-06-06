@@ -990,7 +990,10 @@ export async function runSiteOptimizer(body = {}){
     adg_annual_cost_usd:    c.antenna_deicing_guide?.estimated_annual_deicing_cost_usd?.typical ?? null,
     upsg_power_kw:          c.utility_power_service_guide?.required_utility_service_kw ?? null,
     upsg_generator_req:     c.utility_power_service_guide?.generator_recommended ?? null,
-    upsg_service_cost_usd:  c.utility_power_service_guide?.estimated_utility_extension_cost_usd?.typical ?? null
+    upsg_service_cost_usd:  c.utility_power_service_guide?.estimated_utility_extension_cost_usd?.typical ?? null,
+    ampg_is_da:             c.am_monitoring_point_guide?.is_directional ?? null,
+    ampg_n_points:          c.am_monitoring_point_guide?.n_monitoring_points ?? null,
+    ampg_annual_cost_usd:   c.am_monitoring_point_guide?.estimated_annual_monitoring_cost_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6725,6 +6728,87 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_monitoring_point_guide: (() => {
+      // §73.1213: AM broadcast stations (particularly directional) must establish and maintain
+      // monitoring points to verify that the antenna system is operating within authorized parameters.
+      //
+      // Monitoring point requirements:
+      //   - §73.1213(a): Licensee must monitor at monitoring points specified in station authorization
+      //   - Monitoring points are established during proof-of-performance (§73.154) and recorded in FCC records
+      //   - For DA stations: at least one monitoring point per authorized antenna pattern (day/night/critical)
+      //   - For NDA stations: monitoring points are optional but recommended for license renewal documentation
+      //
+      // §73.1215: Frequency monitoring — carrier must stay within ±20 Hz, modulation ≤100% unmod / ≤125% on peaks
+      // §73.1216: AM modulation monitoring — must monitor modulation level continuously when on-air
+      // §73.1213(b): Pattern monitoring — DA stations must verify relative field strength at each monitoring point
+      //   agrees within ±5% of the authorized value on a regular basis
+      //
+      // Physical monitoring point setup:
+      //   - Monitoring points are geographic locations (typically 1–10 km from tower) in the direction of
+      //     each directional antenna lobe (or null) where FS is measured
+      //   - Remote monitoring: many modern stations use remote field strength monitoring systems (FSM)
+      //     (e.g., SpectraRep, NovAtel, or simple RTL-SDR-based recorders at fixed remote sites)
+      //   - Manual monitoring: licensed engineer physically drives to each point and measures field strength
+      //     using calibrated portable receiver; required at least quarterly for DA stations
+      //
+      // When relocating:
+      //   - Old monitoring points become invalid when tower is moved (FS geometry changes completely)
+      //   - New monitoring points must be established as part of the DA proof-of-performance (§73.154)
+      //   - Monitoring points are filed with FCC as an exhibit to Form 302-AM (license to cover)
+      //   - Must obtain landlord permission if monitoring point is on private property
+
+      const isDA_mon = /^DA/i.test(pattern_mode);
+
+      // Standard monitoring point requirements
+      const n_patterns = isDA_mon ? 2 : 1; // DA has day + night (or day + critical hours)
+      const n_points_per_pattern = isDA_mon ? 4 : 2; // 4 per pattern is typical for DA; 2 for NDA
+      const n_monitoring_points = n_patterns * n_points_per_pattern;
+
+      // Distance range for monitoring points
+      const wavelength_m = 300000 / frequency_khz; // meters
+      const min_distance_m = Math.round(wavelength_m * 0.5); // ≥0.5λ from tower
+      const typical_distance_m = Math.round(wavelength_m * 1.5); // 1–2λ typical
+      const max_useful_distance_m = Math.round(wavelength_m * 5); // beyond 5λ accuracy degrades
+
+      const MONITORING_METHODS = [
+        { id: 'REMOTE_FSM',   label: 'Remote field strength monitor (FSM)', cost_usd_per_year: { low: 2000, high: 6000 }, note: 'Automated; provides continuous monitoring with data logging; preferred for DA stations' },
+        { id: 'MANUAL_DRIVE', label: 'Manual drive-by monitoring', cost_usd_per_year: { low: 800, high: 2500 }, note: 'Licensed engineer quarterly measurements; lower cost but no continuous logging' },
+        { id: 'HYBRID',       label: 'Hybrid: FSM on critical bearings + manual on others', cost_usd_per_year: { low: 1500, high: 4000 }, note: 'Recommended for DA stations with complex patterns' }
+      ];
+
+      const RELOCATION_STEPS = [
+        { priority: 1, action: 'Identify provisional monitoring point locations for CP application', detail: 'Choose candidate monitoring point sites along main DA lobes and nulls; confirm GPS coordinates', cfr: '§73.154; §73.3533' },
+        { priority: 2, action: 'Obtain access permissions for monitoring points on private land', detail: 'Some monitoring points may require landowner permission; document access agreements', cfr: '§73.1213' },
+        { priority: 3, action: 'Establish monitoring points during proof-of-performance', detail: 'Measure field strength at all monitoring points during 72-radial proof (DA) or 8-radial proof (NDA)', cfr: '§73.154(a)' },
+        { priority: 4, action: 'File monitoring point data with FCC Form 302-AM', detail: 'Include monitoring point GPS coordinates, measured FS values, and antenna system parameters as an exhibit', cfr: '§73.3526; Form 302-AM' },
+        { priority: 5, action: 'Install remote FSM units at permanent monitoring points', detail: 'After license to cover is issued, install remote monitoring hardware at established monitoring points for ongoing compliance', cfr: '§73.1213(b)' }
+      ];
+
+      const annual_monitoring_cost_usd = isDA_mon ? 3000 : 1200; // DA stations need more monitoring
+
+      return {
+        frequency_khz, fcc_class,
+        pattern_mode,
+        is_directional: isDA_mon,
+        n_patterns,
+        n_points_per_pattern,
+        n_monitoring_points,
+        wavelength_m: round2(wavelength_m),
+        min_distance_m,
+        typical_monitoring_distance_m: typical_distance_m,
+        max_useful_distance_m,
+        monitoring_methods: MONITORING_METHODS,
+        relocation_steps: RELOCATION_STEPS,
+        n_relocation_steps: RELOCATION_STEPS.length,
+        estimated_annual_monitoring_cost_usd: annual_monitoring_cost_usd,
+        fcc_tolerance_pct: 5, // ±5% of authorized field value per §73.1213(b)
+        carrier_tolerance_hz: 20, // ±20 Hz per §73.1215
+        relocation_note: `${isDA_mon ? `DA station (${pattern_mode}): ${n_monitoring_points} monitoring points required (${n_points_per_pattern} per pattern × ${n_patterns} patterns). New monitoring points must be established during proof-of-performance and filed with FCC Form 302-AM.` : `NDA station: ${n_monitoring_points} recommended monitoring points. New points should be measured during proof and documented.`} Monitoring point distances: ${min_distance_m}–${max_useful_distance_m}m from tower (at ${frequency_khz} kHz). FCC tolerance: ±${5}% of authorized field value.`,
+        reference: '47 CFR §73.1213; §73.1215; §73.1216; §73.154; Form 302-AM exhibit requirements',
+        note: `AM monitoring: ${n_monitoring_points} points required (${n_patterns} patterns × ${n_points_per_pattern}). Distance range: ${min_distance_m}–${max_useful_distance_m}m. Annual cost: ~$${annual_monitoring_cost_usd.toLocaleString()}. ${isDA_mon ? 'DA: remote FSM recommended for continuous pattern monitoring.' : 'NDA: manual quarterly monitoring adequate.'}`
       };
     })(),
 

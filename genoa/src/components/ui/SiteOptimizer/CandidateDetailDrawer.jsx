@@ -2226,6 +2226,63 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Monitoring Point Guide */}
+        {candidate.am_monitoring_point_guide && (() => {
+          const g = candidate.am_monitoring_point_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                AM Monitoring Points <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.1213</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Station Type</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12, fontWeight: 600 }}>
+                    {g.is_directional ? `Directional (${g.pattern_mode})` : `Non-Directional (${g.pattern_mode})`}
+                  </div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Monitoring Points</div>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 600 }}>{g.n_monitoring_points} ({g.n_patterns} pattern{g.n_patterns > 1 ? 's' : ''} × {g.n_points_per_pattern} pts)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Distance Range</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.min_distance_m}–{g.max_useful_distance_m}m from tower</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Annual Monitoring Cost</div>
+                  <div style={{ color: '#fbbf24', fontSize: 12 }}>${g.estimated_annual_monitoring_cost_usd?.toLocaleString()}/yr</div>
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>FCC Field Tolerance</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>±{g.fcc_tolerance_pct}% of authorized value</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Carrier Tolerance</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>±{g.carrier_tolerance_hz} Hz (§73.1215)</div>
+                </div>
+              </div>
+              {g.relocation_steps && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Relocation Monitoring Steps</div>
+                  {g.relocation_steps.slice(0, 3).map((s, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: '#334155', color: '#f1f5f9', borderRadius: 4, padding: '1px 6px', fontSize: 10, minWidth: 20, textAlign: 'center', marginTop: 1 }}>{s.priority}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{s.action}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{s.cfr}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Utility Power Service Guide */}
         {candidate.utility_power_service_guide && (() => {
           const g = candidate.utility_power_service_guide;

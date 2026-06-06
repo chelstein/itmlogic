@@ -1717,6 +1717,37 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      am_monitoring_point_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        pattern_mode: 'NDA',
+        is_directional: false,
+        n_patterns: 1,
+        n_points_per_pattern: 2,
+        n_monitoring_points: 2,
+        wavelength_m: 384.6,
+        min_distance_m: 192,
+        typical_monitoring_distance_m: 577,
+        max_useful_distance_m: 1923,
+        monitoring_methods: [
+          { id: 'REMOTE_FSM', label: 'Remote field strength monitor (FSM)', cost_usd_per_year: { low: 2000, high: 6000 }, note: 'Automated; provides continuous monitoring with data logging; preferred for DA stations' },
+          { id: 'MANUAL_DRIVE', label: 'Manual drive-by monitoring', cost_usd_per_year: { low: 800, high: 2500 }, note: 'Licensed engineer quarterly measurements; lower cost but no continuous logging' },
+          { id: 'HYBRID', label: 'Hybrid: FSM on critical bearings + manual on others', cost_usd_per_year: { low: 1500, high: 4000 }, note: 'Recommended for DA stations with complex patterns' }
+        ],
+        relocation_steps: [
+          { priority: 1, action: 'Identify provisional monitoring point locations for CP application', detail: 'Choose candidate monitoring point sites along main DA lobes and nulls; confirm GPS coordinates', cfr: '§73.154; §73.3533' },
+          { priority: 2, action: 'Obtain access permissions for monitoring points on private land', detail: 'Some monitoring points may require landowner permission; document access agreements', cfr: '§73.1213' },
+          { priority: 3, action: 'Establish monitoring points during proof-of-performance', detail: 'Measure field strength at all monitoring points during 72-radial proof (DA) or 8-radial proof (NDA)', cfr: '§73.154(a)' },
+          { priority: 4, action: 'File monitoring point data with FCC Form 302-AM', detail: 'Include monitoring point GPS coordinates, measured FS values, and antenna system parameters as an exhibit', cfr: '§73.3526; Form 302-AM' },
+          { priority: 5, action: 'Install remote FSM units at permanent monitoring points', detail: 'After license to cover is issued, install remote monitoring hardware at established monitoring points for ongoing compliance', cfr: '§73.1213(b)' }
+        ],
+        n_relocation_steps: 5,
+        estimated_annual_monitoring_cost_usd: 1200,
+        fcc_tolerance_pct: 5,
+        carrier_tolerance_hz: 20,
+        relocation_note: 'NDA station: 2 recommended monitoring points. New points should be measured during proof and documented. Monitoring point distances: 192–1923m from tower (at 780 kHz). FCC tolerance: ±5% of authorized field value.',
+        reference: '47 CFR §73.1213; §73.1215; §73.1216; §73.154; Form 302-AM exhibit requirements',
+        note: 'AM monitoring: 2 points required (1 pattern × 2). Distance range: 192–1923m. Annual cost: ~$1,200. NDA: manual quarterly monitoring adequate.'
+      },
       utility_power_service_guide: {
         frequency_khz: 780, fcc_class: 'D',
         tpo_kw: 5,
