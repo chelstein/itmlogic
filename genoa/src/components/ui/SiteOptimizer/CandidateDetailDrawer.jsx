@@ -2226,6 +2226,68 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM IBOC / HD Radio Analysis */}
+        {candidate.iboc_hd_radio_analysis && (() => {
+          const h = candidate.iboc_hd_radio_analysis;
+          const riskColor = r => r === 'HIGH' ? 'text-red-400' : r === 'MODERATE' ? 'text-amber-400' : 'text-green-400';
+          const statusBadge = s => {
+            if (s === 'MANDATORY' || s === 'REQUIRED') return <span className="text-red-300 font-bold">REQ</span>;
+            if (s === 'REQUIRED_FOR_AM_IBOC') return <span className="text-amber-300 font-bold">AM-REQ</span>;
+            return <span className="text-gray-400">OPT</span>;
+          };
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">AM IBOC / HD Radio Analysis (§73.404 · NRSC-5-D)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  AM IBOC (HD Radio) adds digital sidebands at ±10–15 kHz around the {h.frequency_khz} kHz carrier.
+                  No FCC authorization required — file notification within 10 days of commencement (§73.404(d)).
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2 text-xs">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Analog Reach (0.5 mV/m)</div>
+                    <div className="text-white font-mono">{h.analog_reach_km != null ? `${h.analog_reach_km} km` : '—'}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Digital Reach (~85%)</div>
+                    <div className="text-blue-300 font-mono">{h.iboc_digital_reach_km != null ? `${h.iboc_digital_reach_km} km` : '—'}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Digital Sideband ERP</div>
+                    <div className="text-white font-mono">{h.digital_sideband_erp_kw?.toFixed(4)} kW ({h.iboc_digital_erp_dbw} dBc)</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Nighttime Interference Risk</div>
+                    <div className={`font-bold font-mono ${riskColor(h.nighttime_interference_risk)}`}>{h.nighttime_interference_risk}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-300 mb-2 italic">{h.nighttime_note}</div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">NRSC-5-D Requirements</div>
+                <div className="space-y-1 mb-2">
+                  {h.nrsc5_requirements?.map(r => (
+                    <div key={r.id} className="flex items-start gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="min-w-[40px]">{statusBadge(r.status)}</span>
+                      <span className="text-gray-300 font-semibold min-w-[160px]">{r.req}</span>
+                      <span className="text-gray-500">{r.note}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Equipment Cost Est.</div>
+                    <div className="text-white font-mono">${h.equipment_cost_estimate_usd?.low?.toLocaleString()} – ${h.equipment_cost_estimate_usd?.high?.toLocaleString()}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Filing Requirement</div>
+                    <div className="text-green-300">{h.filing_requirement?.form}</div>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">{h.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Coverage Service Area Map Spec */}
         {candidate.coverage_service_area_map_spec && (() => {
           const m = candidate.coverage_service_area_map_spec;

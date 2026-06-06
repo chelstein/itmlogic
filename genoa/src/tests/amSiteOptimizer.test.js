@@ -6040,3 +6040,48 @@ test('coverage_service_area_map_spec comparison table columns present', async ()
     assert.ok('map_blanket_radius_km' in row, 'map_blanket_radius_km missing from comparison table');
   }
 });
+
+test('iboc_hd_radio_analysis presence and applicability', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].iboc_hd_radio_analysis;
+  assert.ok(h != null, 'iboc_hd_radio_analysis must be present');
+  assert.strictEqual(h.applicable, true, 'must be applicable for all licensed classes');
+  assert.strictEqual(h.hybrid_mode_available, true, 'hybrid mode must be available');
+  assert.strictEqual(h.all_digital_available, false, 'all-digital AM not yet FCC approved');
+});
+
+test('iboc_hd_radio_analysis digital sideband power and bandwidth', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].iboc_hd_radio_analysis;
+  assert.strictEqual(h.iboc_digital_erp_dbw, -14, 'digital sideband level must be -14 dBc');
+  assert.ok(h.digital_sideband_erp_kw > 0, 'digital ERP must be positive');
+  assert.ok(h.digital_sideband_erp_kw < h.tpo_kw, 'digital ERP must be less than analog TPO');
+  assert.strictEqual(h.digital_bandwidth_khz.span_khz, 30, 'IBOC digital bandwidth must be 30 kHz (±15 kHz)');
+});
+
+test('iboc_hd_radio_analysis reach and coverage delta', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].iboc_hd_radio_analysis;
+  assert.ok(h.analog_reach_km != null && h.analog_reach_km > 0, 'analog reach must be computed');
+  assert.ok(h.iboc_digital_reach_km != null && h.iboc_digital_reach_km > 0, 'digital reach must be computed');
+  assert.ok(h.iboc_digital_reach_km < h.analog_reach_km, 'digital reach must be less than analog reach');
+  assert.strictEqual(h.iboc_digital_reach_fraction, 0.85, 'digital reach fraction must be 0.85');
+});
+
+test('iboc_hd_radio_analysis filing requirement is notification-only', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].iboc_hd_radio_analysis;
+  assert.strictEqual(h.filing_requirement.fee, 0, 'IBOC notification is free');
+  assert.ok(h.filing_requirement.rule.includes('73.404'), 'filing rule must cite §73.404');
+  assert.ok(h.nrsc5_requirements.length > 0, 'NRSC-5 requirements list must be non-empty');
+  assert.ok(h.n_mandatory_requirements > 0, 'must have mandatory requirements');
+});
+
+test('iboc_hd_radio_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('iboc_applicable' in row,       'iboc_applicable missing from comparison table');
+    assert.ok('iboc_digital_reach_km' in row, 'iboc_digital_reach_km missing from comparison table');
+    assert.ok('iboc_night_risk' in row,       'iboc_night_risk missing from comparison table');
+  }
+});

@@ -1057,3 +1057,17 @@ test('colocation GRID candidates have coverage_service_area_map_spec', async () 
     assert.strictEqual(c.coverage_service_area_map_spec.n_contours, 4, `rank ${c.rank} must have 4 contours`);
   }
 });
+
+test('colocation GRID candidates have iboc_hd_radio_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.iboc_hd_radio_analysis != null, `rank ${c.rank} missing iboc_hd_radio_analysis`);
+    assert.strictEqual(c.iboc_hd_radio_analysis.applicable, true, `rank ${c.rank} IBOC must be applicable`);
+  }
+});

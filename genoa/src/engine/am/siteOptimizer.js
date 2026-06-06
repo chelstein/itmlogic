@@ -834,7 +834,10 @@ export async function runSiteOptimizer(body = {}){
     fac_fence_required:     c.transmitter_facility_design_guide?.fencing?.required ?? null,
     map_col_radius_km:      c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'col_min')?.radius_km ?? null,
     map_primary_radius_km:  c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'primary')?.radius_km ?? null,
-    map_blanket_radius_km:  c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'blanket')?.radius_km ?? null
+    map_blanket_radius_km:  c.coverage_service_area_map_spec?.contours?.find(x => x.id === 'blanket')?.radius_km ?? null,
+    iboc_applicable:        c.iboc_hd_radio_analysis?.applicable ?? null,
+    iboc_digital_reach_km:  c.iboc_hd_radio_analysis?.iboc_digital_reach_km ?? null,
+    iboc_night_risk:        c.iboc_hd_radio_analysis?.nighttime_interference_risk ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7545,6 +7548,100 @@ async function scoreCandidate(pt, ctx, warnings){
         render_spec:          renderSpec,
         reference: '47 CFR §73.24(j) (COL 5 mV/m); §73.24(g) (blanket 1000 mV/m); §73.182 (0.5 mV/m protected); FCC M3 groundwave propagation curves',
         note: 'Contour radii are FCC groundwave screening estimates assuming flat terrain and uniform soil conductivity. Actual contour shapes vary with terrain and σ variation. Use §73.183 contour computation software for filing-grade coverage maps.'
+      };
+    })(),
+
+    iboc_hd_radio_analysis: (() => {
+      // AM IBOC (HD Radio) hybrid digital overlay per §73.404 and NRSC-5-D
+      // Digital sidebands occupy ±10–15 kHz around analog carrier
+      const HD_LOWER_KHZ_iboc   = round2(frequency_khz - 15);
+      const HD_UPPER_KHZ_iboc   = round2(frequency_khz + 15);
+      const IBOC_DIGITAL_ERP_DBW_iboc = -14; // per §73.404(c): −14 dBc max digital sideband level
+      const digitalErpW_iboc    = round2(tpo_kw * 1000 * Math.pow(10, IBOC_DIGITAL_ERP_DBW_iboc / 10));
+      const digitalErpKw_iboc   = round2(digitalErpW_iboc / 1000);
+
+      // Adjacent-channel interference window: digital sidebands threaten ±10 kHz neighbors
+      const firstAdjLower_iboc  = frequency_khz - 10;
+      const firstAdjUpper_iboc  = frequency_khz + 10;
+
+      // IBOC eligibility: FCC allows any class; but practical benefit for Class D on clear channel is limited
+      const isClearChannel_iboc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const classEligible_iboc  = ['A', 'B', 'C', 'D'].includes(fcc_class);
+
+      // Receiver compatibility: NRSC-5-D mandates backward analog compatibility
+      // Hybrid mode: simultaneous analog + digital
+      const hybridModeAvailable = true;
+      const allDigitalAvailable = false; // not yet approved for AM by FCC
+
+      // Nighttime skywave concerns: digital sidebands from distant stations cause IBOC hash
+      const nighttimeRisk = isClearChannel_iboc ? 'HIGH' : 'MODERATE';
+      const nighttimeNote = isClearChannel_iboc
+        ? 'Clear-channel 50 kW stations transmit IBOC at night causing digital hash to secondary stations. §73.404(c) requires nighttime digital power reduction to comply with interference rules.'
+        : 'Non-clear-channel IBOC interference at night is lower but still requires monitoring of first-adjacent complaint history.';
+
+      // Coverage delta: IBOC digital coverage slightly less than analog (fade margin)
+      const ibocDigitalReachFraction = 0.85; // digital coverage ~85% of analog
+      let analogReachKm_iboc = null;
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        analogReachKm_iboc = r?.distance_km != null ? round2(r.distance_km) : null;
+      } catch { /* ok */ }
+      const ibocDigitalReachKm = analogReachKm_iboc != null ? round2(analogReachKm_iboc * ibocDigitalReachFraction) : null;
+
+      // §73.404(d): IBOC notification — no FCC authorization required; notify FCC within 10 days of start
+      const filingRequirement = {
+        form: 'None — notification only',
+        rule: '47 CFR §73.404(d)',
+        deadline: 'Within 10 business days of commencement',
+        fee: 0,
+        note: 'IBOC operation does not require a construction permit or license modification. File notification letter with FCC Audio Division identifying call sign, frequency, and date of IBOC commencement.'
+      };
+
+      // NRSC-5-D technical requirements
+      const nrsc5Requirements = [
+        { id: 'hybrid_mode',    req: 'Hybrid (analog + digital) mode', standard: 'NRSC-5-D §4.2', status: 'REQUIRED_FOR_AM_IBOC', note: 'All-digital AM not yet FCC-approved.' },
+        { id: 'digital_power',  req: 'Digital sideband level ≤ −14 dBc', standard: '47 CFR §73.404(c)', status: 'MANDATORY', note: `At ${tpo_kw} kW analog, digital sidebands ≤ ${digitalErpKw_iboc.toFixed(4)} kW.` },
+        { id: 'exporter',       req: 'HD Exporter device', standard: 'NRSC-5-D Appendix D', status: 'REQUIRED', note: 'Converts audio + metadata to OFDM digital baseband for exciter injection.' },
+        { id: 'importer',       req: 'HD Importer (SFN/delay alignment)', standard: 'NRSC-5-D Appendix E', status: 'REQUIRED_IF_SFN', note: 'Required only for single-frequency networks using IBOC fill-in translators.' },
+        { id: 'psd',            req: 'Program Service Data (PSD)', standard: 'NRSC-5-D §7', status: 'RECOMMENDED', note: 'Artist/title metadata transmitted on IBOC logical channel 1.' },
+        { id: 'station_id',     req: 'Station ID logo (SIS)', standard: 'NRSC-5-D §6', status: 'RECOMMENDED', note: 'Station logo and slogan transmitted on Station Information Service channel.' }
+      ];
+
+      // Equipment manufacturers (informational)
+      const ibocEquipment = [
+        { vendor: 'Nautel', products: ['GV Series', 'VS Series'], iboc_integrated: true, note: 'Integrated HD Radio exciter; no external exporter required for basic operation.' },
+        { vendor: 'GatesAir', products: ['Flexiva', 'Maxiva'], iboc_integrated: true, note: 'Compatible with iBiquity/Xperi HD Radio chipset.' },
+        { vendor: 'Xperi (iBiquity)', products: ['HD Radio Exporter', 'HD Radio Importer'], iboc_integrated: false, note: 'Source-of-truth NRSC-5 implementation; required for non-integrated transmitters.' }
+      ];
+
+      // Cost estimate
+      const equipmentCostLow  = tpo_kw <= 5   ? 15000 : tpo_kw <= 20 ? 25000 : 40000;
+      const equipmentCostHigh = tpo_kw <= 5   ? 30000 : tpo_kw <= 20 ? 55000 : 90000;
+
+      return {
+        applicable:              classEligible_iboc,
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        is_clear_channel:        isClearChannel_iboc,
+        hybrid_mode_available:   hybridModeAvailable,
+        all_digital_available:   allDigitalAvailable,
+        iboc_digital_erp_dbw:    IBOC_DIGITAL_ERP_DBW_iboc,
+        digital_sideband_erp_kw: digitalErpKw_iboc,
+        digital_bandwidth_khz:   { lower: HD_LOWER_KHZ_iboc, upper: HD_UPPER_KHZ_iboc, span_khz: 30 },
+        first_adj_threatened_khz:{ lower: firstAdjLower_iboc, upper: firstAdjUpper_iboc },
+        analog_reach_km:         analogReachKm_iboc,
+        iboc_digital_reach_km:   ibocDigitalReachKm,
+        iboc_digital_reach_fraction: ibocDigitalReachFraction,
+        nighttime_interference_risk: nighttimeRisk,
+        nighttime_note:          nighttimeNote,
+        filing_requirement:      filingRequirement,
+        nrsc5_requirements:      nrsc5Requirements,
+        n_mandatory_requirements: nrsc5Requirements.filter(r => r.status === 'MANDATORY' || r.status === 'REQUIRED').length,
+        equipment_options:       ibocEquipment,
+        equipment_cost_estimate_usd: { low: equipmentCostLow, high: equipmentCostHigh },
+        reference: '47 CFR §73.404; NRSC-5-D (2017); iBiquity Digital / Xperi HD Radio System Specification',
+        note: `AM IBOC (HD Radio) adds digital sidebands at ±10–15 kHz from the analog carrier. No FCC authorization required — notify within 10 days per §73.404(d). Digital coverage ≈ ${Math.round(ibocDigitalReachFraction * 100)}% of analog reach.`
       };
     })(),
 

@@ -1717,6 +1717,38 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      iboc_hd_radio_analysis: {
+        applicable: true, fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
+        is_clear_channel: true, hybrid_mode_available: true, all_digital_available: false,
+        iboc_digital_erp_dbw: -14, digital_sideband_erp_kw: 0.0199,
+        digital_bandwidth_khz: { lower: 765, upper: 795, span_khz: 30 },
+        first_adj_threatened_khz: { lower: 770, upper: 790 },
+        analog_reach_km: 115.2, iboc_digital_reach_km: 97.92, iboc_digital_reach_fraction: 0.85,
+        nighttime_interference_risk: 'HIGH',
+        nighttime_note: 'Clear-channel 50 kW stations transmit IBOC at night causing digital hash to secondary stations. §73.404(c) requires nighttime digital power reduction to comply with interference rules.',
+        filing_requirement: {
+          form: 'None — notification only', rule: '47 CFR §73.404(d)',
+          deadline: 'Within 10 business days of commencement', fee: 0,
+          note: 'IBOC operation does not require a construction permit or license modification. File notification letter with FCC Audio Division.'
+        },
+        nrsc5_requirements: [
+          { id: 'hybrid_mode',   req: 'Hybrid (analog + digital) mode',      standard: 'NRSC-5-D §4.2',        status: 'REQUIRED_FOR_AM_IBOC', note: 'All-digital AM not yet FCC-approved.' },
+          { id: 'digital_power', req: 'Digital sideband level ≤ −14 dBc',    standard: '47 CFR §73.404(c)',     status: 'MANDATORY',            note: 'At 5 kW analog, digital sidebands ≤ 0.0199 kW.' },
+          { id: 'exporter',      req: 'HD Exporter device',                   standard: 'NRSC-5-D Appendix D',  status: 'REQUIRED',             note: 'Converts audio + metadata to OFDM digital baseband for exciter injection.' },
+          { id: 'importer',      req: 'HD Importer (SFN/delay alignment)',    standard: 'NRSC-5-D Appendix E',  status: 'REQUIRED_IF_SFN',      note: 'Required only for single-frequency networks using IBOC fill-in translators.' },
+          { id: 'psd',           req: 'Program Service Data (PSD)',           standard: 'NRSC-5-D §7',          status: 'RECOMMENDED',          note: 'Artist/title metadata on IBOC logical channel 1.' },
+          { id: 'station_id',    req: 'Station ID logo (SIS)',                standard: 'NRSC-5-D §6',          status: 'RECOMMENDED',          note: 'Station logo and slogan on Station Information Service channel.' }
+        ],
+        n_mandatory_requirements: 3,
+        equipment_options: [
+          { vendor: 'Nautel',           products: ['GV Series', 'VS Series'],  iboc_integrated: true,  note: 'Integrated HD Radio exciter; no external exporter required for basic operation.' },
+          { vendor: 'GatesAir',         products: ['Flexiva', 'Maxiva'],        iboc_integrated: true,  note: 'Compatible with iBiquity/Xperi HD Radio chipset.' },
+          { vendor: 'Xperi (iBiquity)', products: ['HD Radio Exporter'],        iboc_integrated: false, note: 'Required for non-integrated transmitters.' }
+        ],
+        equipment_cost_estimate_usd: { low: 15000, high: 30000 },
+        reference: '47 CFR §73.404; NRSC-5-D (2017); iBiquity Digital / Xperi HD Radio System Specification',
+        note: 'AM IBOC (HD Radio) adds digital sidebands at ±10–15 kHz from the analog carrier. No FCC authorization required — notify within 10 days per §73.404(d). Digital coverage ≈ 85% of analog reach.'
+      },
       coverage_service_area_map_spec: {
         candidate_lat: 34.8606, candidate_lon: -111.8206,
         frequency_khz: 780, tpo_kw: 5, sigma_msm: 9,
