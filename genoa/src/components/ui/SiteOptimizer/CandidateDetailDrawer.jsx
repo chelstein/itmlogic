@@ -2226,6 +2226,60 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Main Studio Rule Guide */}
+        {candidate.main_studio_rule_guide && (() => {
+          const m = candidate.main_studio_rule_guide;
+          const obs = m.current_obligations || [];
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Main Studio Rule (§73.1125 — Repealed Nov 2017)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Studio Required</span>
+                  <span style={{ color: '#34d399', fontWeight: 700 }}>{m.main_studio_required ? 'YES' : 'NO (Repealed)'}</span>
+                  <span style={{ color: '#94a3b8' }}>Repeal Date</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{m.repeal_date}</span>
+                  <span style={{ color: '#94a3b8' }}>Authority</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{m.repeal_doc}</span>
+                  <span style={{ color: '#94a3b8' }}>Waiver Needed</span>
+                  <span style={{ color: '#34d399', fontWeight: 700 }}>{m.waiver_eligible ? 'YES' : 'NO (N/A)'}</span>
+                  <span style={{ color: '#94a3b8' }}>Dist. from Current</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{m.distance_from_col_km} km</span>
+                </div>
+                {m.col_proximity_note && (
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>{m.col_proximity_note}</div>
+                )}
+              </div>
+              {/* Current obligations */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>CURRENT OBLIGATIONS (post-repeal)</div>
+                {obs.map(ob => (
+                  <div key={ob.id} style={{ background: '#020c18', borderRadius: 4, padding: '5px 10px', marginBottom: 4, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{ob.label}</span>
+                      <span style={{ color: '#38bdf8', fontSize: 11 }}>{ob.cfr}</span>
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: 11, marginTop: 2 }}>{ob.notes}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Practical guidance */}
+              {(m.practical_guidance || []).length > 0 && (
+                <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, marginBottom: 5 }}>PRACTICAL GUIDANCE</div>
+                  {(m.practical_guidance || []).map((tip, i) => (
+                    <div key={i} style={{ color: '#e2e8f0', fontSize: 11, marginBottom: 3, paddingLeft: 8 }}>• {tip}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{m.reference}</div>
+              {m.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{m.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Silent Station Consideration */}
         {candidate.silent_station_consideration && (() => {
           const s = candidate.silent_station_consideration;

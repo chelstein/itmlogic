@@ -1717,6 +1717,37 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      main_studio_rule_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        main_studio_required: false,
+        repeal_date: '2017-11-01',
+        repeal_doc: 'FCC 17-18 (MB Docket 17-106)',
+        distance_from_col_km: 20,
+        col_proximity_note: 'Candidate site is within ~40 km of current site; main studio historically would have been compliant',
+        waiver_eligible: false,
+        legacy_requirements: [
+          { id: 'LOCATION', label: 'Studio location', requirement: 'Within principal community contour or 25 miles of COL reference coordinates', cfr_repealed: '§73.1125(a)' },
+          { id: 'STAFFING', label: 'Staffing', requirement: 'Full-time managerial and full-time staff at main studio during business hours', cfr_repealed: '§73.1125(b)' },
+          { id: 'EQUIPMENT', label: 'Program origination', requirement: 'Technical capability to originate programming at main studio', cfr_repealed: '§73.1125(c)' },
+          { id: 'PUBLIC_FILE', label: 'Public inspection file access', requirement: 'OPIF accessible at main studio or online (online now required)', cfr_current: '§73.3526' }
+        ],
+        current_obligations: [
+          { id: 'OPIF', label: 'Online Public Inspection File (OPIF)', cfr: '§73.3526', notes: 'Must be maintained online at stations.fcc.gov; updated as required. No physical studio required for access.' },
+          { id: 'POLITICAL_FILE', label: 'Political file within 1 business day', cfr: '§73.3526(e)(6)', notes: 'Requests for political advertising time must be recorded in OPIF within 1 business day of request.' },
+          { id: 'EAS_STATION', label: 'EAS equipment at transmitter or remote control point', cfr: '§11.35', notes: 'EAS decoder must be operational at or electronically connected to monitoring point.' },
+          { id: 'REMOTE_CONTROL', label: 'Remote control or attended operation', cfr: '§73.1400', notes: 'Station may be operated unattended by remote control per §73.1400; operator must be able to reduce to minimum power or silence within 3 minutes.' }
+        ],
+        n_current_obligations: 4,
+        practical_guidance: [
+          'Main studio rule repealed Nov 2017; no physical staffed studio required',
+          'OPIF must be maintained online; accessible to public at stations.fcc.gov',
+          'EAS must remain operational; remote control or attended operation required per §73.1400',
+          'Political file still requires 1-business-day OPIF entry for advertising requests',
+          'Community ascertainment/program origination obligations eliminated for AM'
+        ],
+        reference: '47 CFR §73.1125 (repealed); §73.3526; §73.3527; §11.35; §73.1400; FCC 17-18 (MB Docket 17-106)',
+        note: '§73.1125 main studio requirement REPEALED Nov 2017 (FCC 17-18). No staffed studio required. 4 current OPIF/EAS obligations apply.'
+      },
       silent_station_consideration: {
         frequency_khz: 780, fcc_class: 'D',
         silent_authorization: {

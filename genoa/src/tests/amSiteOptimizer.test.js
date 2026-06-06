@@ -5683,6 +5683,54 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- main_studio_rule_guide ----
+
+test('main_studio_rule_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.main_studio_rule_guide != null, 'main_studio_rule_guide missing');
+  const m = c.main_studio_rule_guide;
+  assert.ok(Array.isArray(m.legacy_requirements), 'legacy_requirements must be array');
+  assert.ok(Array.isArray(m.current_obligations), 'current_obligations must be array');
+  assert.ok(m.current_obligations.length >= 3, 'at least 3 current obligations expected');
+  assert.ok(Array.isArray(m.practical_guidance), 'practical_guidance must be array');
+});
+
+test('main_studio_rule_guide studio requirement is repealed', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].main_studio_rule_guide;
+  assert.strictEqual(m.main_studio_required, false, '§73.1125 was repealed — main_studio_required must be false');
+  assert.ok(m.repeal_date != null && typeof m.repeal_date === 'string', 'repeal_date must be a string');
+  assert.ok(m.repeal_doc != null && typeof m.repeal_doc === 'string', 'repeal_doc must reference FCC 17-18');
+  assert.ok(m.repeal_doc.includes('17-18'), 'repeal_doc must reference FCC 17-18');
+});
+
+test('main_studio_rule_guide current obligations include OPIF and EAS', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].main_studio_rule_guide;
+  const hasOpif = m.current_obligations.some(o => o.id === 'OPIF');
+  const hasEas  = m.current_obligations.some(o => o.id === 'EAS_STATION');
+  assert.ok(hasOpif, 'current_obligations must include OPIF item');
+  assert.ok(hasEas, 'current_obligations must include EAS_STATION item');
+  assert.strictEqual(m.n_current_obligations, m.current_obligations.length, 'n_current_obligations must match array length');
+});
+
+test('main_studio_rule_guide waiver not eligible (rule repealed)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].main_studio_rule_guide;
+  assert.strictEqual(m.waiver_eligible, false, 'waiver_eligible must be false since rule was repealed');
+  assert.ok(typeof m.distance_from_col_km === 'number', 'distance_from_col_km must be a number');
+});
+
+test('main_studio_rule_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('msr_main_studio_required' in row, 'msr_main_studio_required missing from comparison table');
+    assert.ok('msr_dist_from_col_km' in row, 'msr_dist_from_col_km missing from comparison table');
+    assert.ok('msr_waiver_eligible' in row, 'msr_waiver_eligible missing from comparison table');
+  }
+});
+
 // ---- silent_station_consideration ----
 
 test('silent_station_consideration presence and structure', async () => {

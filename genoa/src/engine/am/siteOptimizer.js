@@ -933,7 +933,10 @@ export async function runSiteOptimizer(body = {}){
     apvg_night_boost_db:    c.am_propagation_variability_guide?.ionospheric_skip?.typical_night_boost_db ?? null,
     ssc_silent_weeks_max:   c.silent_station_consideration?.silent_authorization?.max_silent_weeks ?? null,
     ssc_cp_construction_wks: c.silent_station_consideration?.construction_timeline?.construction_weeks_typical ?? null,
-    ssc_license_risk:       c.silent_station_consideration?.license_risk_level ?? null
+    ssc_license_risk:       c.silent_station_consideration?.license_risk_level ?? null,
+    msr_main_studio_required: c.main_studio_rule_guide?.main_studio_required ?? null,
+    msr_dist_from_col_km:   c.main_studio_rule_guide?.distance_from_col_km ?? null,
+    msr_waiver_eligible:    c.main_studio_rule_guide?.waiver_eligible ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6668,6 +6671,70 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    main_studio_rule_guide: (() => {
+      // §73.1125: Main studio location requirements for AM stations
+      // The main studio must be located:
+      //   (a) Within the principal community contour (5 mV/m for Class D, Class A),
+      //   OR (b) Within the principal community contour of any co-located FM licensee,
+      //   OR (c) Within 25 miles of the reference coordinates of the community of license.
+      // FCC eliminated the main studio rule in 2017 (FCC 17-18) for most services,
+      // but AM stations retain OPIF physical inspection access obligations.
+      // Reference: FCC 17-18 (MB Docket No. 17-106); §73.1125; §73.3526; §73.3527
+
+      // Distance from candidate transmitter site to estimated city of license center
+      const distFromCOL_km = round2(pt.distance_from_current_km ?? 0); // approximation
+      // Note: after FCC 17-18 eliminated main studio rule (effective Nov 1, 2017),
+      // §73.1125 was removed. Stations are NO LONGER required to maintain a staffed main studio.
+      // However, political file, OPIF, and EAS obligations remain.
+      const main_studio_required = false; // §73.1125 eliminated by FCC 17-18 (Nov 2017)
+      const repeal_date = '2017-11-01';
+      const repeal_doc  = 'FCC 17-18 (MB Docket 17-106)';
+
+      // What DID the main studio rule require (pre-repeal reference)
+      const LEGACY_REQUIREMENTS = [
+        { id: 'LOCATION', label: 'Studio location', requirement: 'Within principal community contour or 25 miles of COL reference coordinates', cfr_repealed: '§73.1125(a)' },
+        { id: 'STAFFING', label: 'Staffing', requirement: 'Full-time managerial and full-time staff at main studio during business hours', cfr_repealed: '§73.1125(b)' },
+        { id: 'EQUIPMENT', label: 'Program origination', requirement: 'Technical capability to originate programming at main studio', cfr_repealed: '§73.1125(c)' },
+        { id: 'PUBLIC_FILE', label: 'Public inspection file access', requirement: 'OPIF accessible at main studio or online (online now required)', cfr_current: '§73.3526' }
+      ];
+
+      // Current obligations that survive the main studio rule repeal
+      const CURRENT_OBLIGATIONS = [
+        { id: 'OPIF', label: 'Online Public Inspection File (OPIF)', cfr: '§73.3526', notes: 'Must be maintained online at stations.fcc.gov; updated as required. No physical studio required for access.' },
+        { id: 'POLITICAL_FILE', label: 'Political file within 1 business day', cfr: '§73.3526(e)(6)', notes: 'Requests for political advertising time must be recorded in OPIF within 1 business day of request.' },
+        { id: 'EAS_STATION', label: 'EAS equipment at transmitter or remote control point', cfr: '§11.35', notes: 'EAS decoder must be operational at or electronically connected to monitoring point.' },
+        { id: 'REMOTE_CONTROL', label: 'Remote control or attended operation', cfr: '§73.1400', notes: 'Station may be operated unattended by remote control per §73.1400; operator must be able to reduce to minimum power or silence within 3 minutes.' }
+      ];
+
+      // Waiver eligibility: pre-2017 historical context; post-repeal, waivers N/A
+      const waiver_eligible = false; // rule is repealed; no waiver needed
+      const colDistCheck = distFromCOL_km < 40; // within 40 km of COL → historically compliant
+
+      return {
+        frequency_khz, fcc_class,
+        main_studio_required,
+        repeal_date,
+        repeal_doc,
+        distance_from_col_km: distFromCOL_km,
+        col_proximity_note: colDistCheck
+          ? 'Candidate site is within ~40 km of current site; main studio historically would have been compliant'
+          : 'Candidate site > 40 km from current site; would have required studio location re-evaluation under old rule',
+        waiver_eligible,
+        legacy_requirements: LEGACY_REQUIREMENTS,
+        current_obligations: CURRENT_OBLIGATIONS,
+        n_current_obligations: CURRENT_OBLIGATIONS.length,
+        practical_guidance: [
+          'Main studio rule repealed Nov 2017; no physical staffed studio required',
+          'OPIF must be maintained online; accessible to public at stations.fcc.gov',
+          'EAS must remain operational; remote control or attended operation required per §73.1400',
+          'Political file still requires 1-business-day OPIF entry for advertising requests',
+          'Community ascertainment/program origination obligations eliminated for AM'
+        ],
+        reference: '47 CFR §73.1125 (repealed); §73.3526; §73.3527; §11.35; §73.1400; FCC 17-18 (MB Docket 17-106)',
+        note: `§73.1125 main studio requirement REPEALED Nov 2017 (FCC 17-18). No staffed studio required. ${CURRENT_OBLIGATIONS.length} current OPIF/EAS obligations apply.`
       };
     })(),
 
