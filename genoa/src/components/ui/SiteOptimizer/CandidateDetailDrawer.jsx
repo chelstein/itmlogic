@@ -2226,6 +2226,52 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Spectrum Repack Readiness Guide */}
+        {candidate.spectrum_repack_readiness_guide && (() => {
+          const g = candidate.spectrum_repack_readiness_guide;
+          const vulnColors = { VERY_LOW: '#34d399', LOW: '#34d399', MODERATE: '#fbbf24', HIGH: '#f87171' };
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Spectrum Repack Readiness <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>MB 13-249</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Repack Vulnerability</div>
+                  <div style={{ color: vulnColors[g.repack_vulnerability] ?? '#94a3b8', fontSize: 14, fontWeight: 700 }}>{g.repack_vulnerability?.replace('_', ' ') ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Channel Type</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.channel_type?.replace(/_/g, ' ') ?? '—'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Repack Mandate</div>
+                  <div style={{ color: g.repack_mandate_current ? '#f87171' : '#34d399', fontSize: 13, fontWeight: 600 }}>{g.repack_mandate_current ? 'ACTIVE' : 'NONE'}</div>
+                </div>
+              </div>
+              {g.readiness_actions && g.readiness_actions.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Readiness Actions</div>
+                  {g.readiness_actions.map((a, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#818cf8', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>{a.priority}.</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{a.action}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.relocation_repack_interaction && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Relocation Impact</div>
+                  <div style={{ color: g.relocation_repack_interaction.voluntary_move_favorable ? '#34d399' : '#f87171', fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                    {g.relocation_repack_interaction.voluntary_move_favorable ? 'Relocation is FAVORABLE for repack readiness' : 'Relocation has uncertain repack impact'}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Interference Complaint Resolution Guide */}
         {candidate.interference_complaint_resolution_guide && (() => {
           const g = candidate.interference_complaint_resolution_guide;

@@ -5683,6 +5683,53 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- spectrum_repack_readiness_guide ----
+
+test('spectrum_repack_readiness_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.spectrum_repack_readiness_guide != null, 'spectrum_repack_readiness_guide missing');
+  const g = c.spectrum_repack_readiness_guide;
+  assert.ok('repack_vulnerability' in g, 'repack_vulnerability missing');
+  assert.ok('channel_type' in g, 'channel_type missing');
+  assert.ok(Array.isArray(g.active_proceedings), 'active_proceedings must be array');
+  assert.ok(Array.isArray(g.readiness_actions), 'readiness_actions must be array');
+  assert.ok('relocation_repack_interaction' in g, 'relocation_repack_interaction missing');
+});
+
+test('spectrum_repack_readiness_guide KAZM 780 kHz Class D clear channel is HIGH vulnerability', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].spectrum_repack_readiness_guide;
+  assert.strictEqual(g.repack_vulnerability, 'HIGH', 'KAZM 780 kHz Class D clear channel must be HIGH vulnerability');
+  assert.strictEqual(g.channel_type, 'CLEAR_CHANNEL', '780 kHz must be CLEAR_CHANNEL');
+  assert.strictEqual(g.repack_mandate_current, false, 'No mandatory AM repack exists currently');
+});
+
+test('spectrum_repack_readiness_guide readiness actions are priority-ordered', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].spectrum_repack_readiness_guide;
+  assert.ok(g.readiness_actions.length >= 3, 'must have at least 3 readiness actions');
+  assert.strictEqual(g.n_readiness_actions, g.readiness_actions.length, 'n_readiness_actions must match array length');
+  const priorities = g.readiness_actions.map(a => a.priority);
+  assert.deepStrictEqual(priorities, [...priorities].sort((a, b) => a - b), 'readiness actions must be in ascending priority order');
+});
+
+test('spectrum_repack_readiness_guide relocation is favorable for repack readiness', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].spectrum_repack_readiness_guide;
+  assert.strictEqual(g.relocation_repack_interaction.voluntary_move_favorable, true, 'voluntary relocation must be favorable for repack readiness');
+  assert.ok(typeof g.relocation_repack_interaction.reason === 'string' && g.relocation_repack_interaction.reason.length > 10, 'reason must be a descriptive string');
+});
+
+test('spectrum_repack_readiness_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('srg_vulnerability' in row, 'srg_vulnerability missing from comparison table');
+    assert.ok('srg_channel_type' in row, 'srg_channel_type missing from comparison table');
+    assert.ok('srg_repack_mandate' in row, 'srg_repack_mandate missing from comparison table');
+  }
+});
+
 // ---- interference_complaint_resolution_guide ----
 
 test('interference_complaint_resolution_guide presence and structure', async () => {

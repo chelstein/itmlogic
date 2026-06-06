@@ -951,7 +951,10 @@ export async function runSiteOptimizer(body = {}){
     amtp_max_erp_w:         c.am_broadcast_translator_path_guide?.fm_translator?.max_erp_w ?? null,
     icrg_high_risk_types:   c.interference_complaint_resolution_guide?.high_risk_types ?? null,
     icrg_mod_risk_types:    c.interference_complaint_resolution_guide?.moderate_risk_types ?? null,
-    icrg_n_complaints:      c.interference_complaint_resolution_guide?.n_complaint_types ?? null
+    icrg_n_complaints:      c.interference_complaint_resolution_guide?.n_complaint_types ?? null,
+    srg_vulnerability:      c.spectrum_repack_readiness_guide?.repack_vulnerability ?? null,
+    srg_channel_type:       c.spectrum_repack_readiness_guide?.channel_type ?? null,
+    srg_repack_mandate:     c.spectrum_repack_readiness_guide?.repack_mandate_current ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6686,6 +6689,76 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    spectrum_repack_readiness_guide: (() => {
+      // AM band repack / revitalization: FCC Docket 13-249 (AM Revitalization Order, 2015)
+      // The FCC has explored reorganizing/repacking the AM band but no mandatory repack has occurred.
+      // Key proceedings affecting AM relocation planning:
+      //   - FCC 15-14 (AM Revitalization): new AM-to-FM translator window; third-adjacent deletion process
+      //   - FCC 17-105: Additional AM-to-FM translator filing windows
+      //   - 600 MHz TV repack (FCC 12-118): did NOT affect AM band directly
+      //   - Potential future FCC action: AM band reorganization (530–1700 kHz)
+      // Unlike the TV 600 MHz repack, there is no current FCC mandate to move AM stations.
+      // However, voluntarily relocating to improve coverage is encouraged by FCC AM Revitalization policy.
+      // Class D and local channel stations are most at risk of future repack-like actions.
+
+      // Assess the station's vulnerability to potential future AM band reorganization
+      const isClearCh_srg = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal = LOCAL_CHANNEL_KHZ ? LOCAL_CHANNEL_KHZ.has(frequency_khz) : false;
+      const isRegional = !isClearCh_srg && !isLocal;
+
+      // Station class vulnerability to hypothetical repack (relative ranking)
+      // Class D on clear channel: HIGH (secondary to dominant; most at risk in interference rebalancing)
+      // Class D on regional: MODERATE
+      // Class C/B: LOW (regional channels with established service areas)
+      // Class A: VERY LOW (dominant clear-channel protected)
+      const REPACK_VULNERABILITY = {
+        A: 'VERY_LOW',
+        B: 'LOW',
+        C: 'LOW',
+        D: isClearCh_srg ? 'HIGH' : 'MODERATE'
+      };
+      const repack_vulnerability = REPACK_VULNERABILITY[fcc_class.toUpperCase()] ?? 'MODERATE';
+
+      // FCC proceedings to monitor
+      const ACTIVE_PROCEEDINGS = [
+        { docket: 'MB 13-249',   title: 'AM Revitalization',        status: 'ACTIVE',   note: 'Ongoing; AM-to-FM translator windows, third-adjacent deletion, nighttime power flexibility', url_hint: 'FCC ECFS MB 13-249' },
+        { docket: 'MB 04-233',   title: 'AM Broadcast Interference', status: 'ONGOING',  note: 'FCC interference policy development; affects co-channel spacing rules', url_hint: 'FCC ECFS MB 04-233' },
+        { docket: 'MB 17-105',   title: 'Additional AM-to-FM Windows', status: 'CLOSED', note: '2nd and 3rd AM-to-FM translator windows; completed 2019', url_hint: 'FCC ECFS MB 17-105' }
+      ];
+
+      // Actions a station should take NOW to protect its position in any future repack
+      const READINESS_ACTIONS = [
+        { priority: 1, action: 'File full-power CP at best available site', rationale: 'A granted CP establishes the station\'s preferred future site; a repack would grandfather existing authorizations', cfr: '§73.3533' },
+        { priority: 2, action: 'Obtain FM translator while windows open', rationale: 'An FM translator creates a secondary FM asset that survives AM band changes', cfr: '§74.1201; FCC 15-14' },
+        { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims in any FCC proceeding', cfr: '§73.3527; §73.3529' },
+        { priority: 4, action: 'Comment in MB 13-249 proceedings if affected', rationale: 'Participation in FCC rulemaking is the primary mechanism to protect small-market AM interests', cfr: '§1.415 (rulemaking comments)' },
+        { priority: 5, action: 'Evaluate digital (HD Radio / DRM) compatibility', rationale: 'FCC has authorized AM digital broadcasting; early conversion may provide spectrum flexibility', cfr: '§73.404; NRSC-5-D standard' }
+      ];
+
+      // Impact on relocation decision
+      const relocation_repack_interaction = {
+        voluntary_move_favorable: true,
+        reason: 'AM Revitalization policy encourages relocation to improve coverage; proactively moving to a better site now reduces vulnerability to any future repack by establishing a modern, better-engineered facility',
+        timing_note: 'File CP before any new FCC AM-band proceeding is initiated; a pending CP gives the station a stronger position in any rulemaking that proposes band reorganization',
+        risk_if_no_action: repack_vulnerability === 'HIGH' ? 'HIGH' : 'MODERATE'
+      };
+
+      return {
+        frequency_khz, fcc_class,
+        channel_type: isClearCh_srg ? 'CLEAR_CHANNEL' : isLocal ? 'LOCAL_CHANNEL' : 'REGIONAL_CHANNEL',
+        repack_vulnerability,
+        active_proceedings: ACTIVE_PROCEEDINGS,
+        n_proceedings: ACTIVE_PROCEEDINGS.length,
+        readiness_actions: READINESS_ACTIONS,
+        n_readiness_actions: READINESS_ACTIONS.length,
+        relocation_repack_interaction,
+        repack_mandate_current: false, // no mandatory AM repack as of 2025
+        last_major_action: 'FCC 15-14 (AM Revitalization, Feb 2015); FCC 17-105 (Additional translator windows, 2017)',
+        reference: 'FCC Docket MB 13-249; FCC 15-14 (AM Revitalization); FCC 17-105; 47 CFR §73.404 (AM digital); §1.415 (rulemaking); §74.1201 (FM translators); NRSC-5-D (HD Radio)',
+        note: `AM spectrum repack vulnerability: ${repack_vulnerability}. No mandatory AM repack exists (2025). Voluntary relocation under AM Revitalization policy is encouraged.`
       };
     })(),
 

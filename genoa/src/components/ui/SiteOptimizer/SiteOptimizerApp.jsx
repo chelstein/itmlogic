@@ -1717,6 +1717,33 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      spectrum_repack_readiness_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        channel_type: 'CLEAR_CHANNEL', repack_vulnerability: 'HIGH', repack_mandate_current: false,
+        active_proceedings: [
+          { docket: 'MB 13-249', title: 'AM Revitalization', status: 'ACTIVE', note: 'AM-to-FM translator windows, third-adjacent deletion, nighttime power flexibility' },
+          { docket: 'MB 04-233', title: 'AM Broadcast Interference', status: 'ONGOING', note: 'FCC interference policy; co-channel spacing rules' },
+          { docket: 'MB 17-105', title: 'Additional AM-to-FM Windows', status: 'CLOSED', note: '2nd and 3rd AM-to-FM translator windows; completed 2019' }
+        ],
+        n_proceedings: 3,
+        readiness_actions: [
+          { priority: 1, action: 'File full-power CP at best available site', rationale: 'Granted CP establishes preferred future site; repack would grandfather existing authorizations', cfr: '§73.3533' },
+          { priority: 2, action: 'Obtain FM translator while windows open', rationale: 'FM translator creates secondary FM asset surviving AM band changes', cfr: '§74.1201; FCC 15-14' },
+          { priority: 3, action: 'Update FCC LMS records with accurate site data', rationale: 'Inaccurate records weaken interference protection claims', cfr: '§73.3527; §73.3529' },
+          { priority: 4, action: 'Comment in MB 13-249 proceedings if affected', rationale: 'Participation in FCC rulemaking protects small-market AM interests', cfr: '§1.415' },
+          { priority: 5, action: 'Evaluate digital (HD Radio / DRM) compatibility', rationale: 'Early conversion may provide spectrum flexibility', cfr: '§73.404; NRSC-5-D' }
+        ],
+        n_readiness_actions: 5,
+        relocation_repack_interaction: {
+          voluntary_move_favorable: true,
+          reason: 'AM Revitalization policy encourages relocation; modern facility strengthens position in any future repack proceeding',
+          timing_note: 'File CP before any new FCC AM-band proceeding; pending CP gives stronger position in rulemaking',
+          risk_if_no_action: 'HIGH'
+        },
+        last_major_action: 'FCC 15-14 (AM Revitalization, Feb 2015); FCC 17-105 (Additional translator windows, 2017)',
+        reference: 'FCC Docket MB 13-249; FCC 15-14; FCC 17-105; 47 CFR §73.404; §1.415; §74.1201; NRSC-5-D',
+        note: 'AM spectrum repack vulnerability: HIGH. No mandatory AM repack exists (2025). Voluntary relocation under AM Revitalization policy is encouraged.'
+      },
       interference_complaint_resolution_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
         protected_contours_mvm: { day: 0.5, night: null },
