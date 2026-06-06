@@ -662,7 +662,7 @@ function ensureCurrentSiteIncluded(points, current){
  * shape documented on the route.
  */
 async function scoreCandidate(pt, ctx, warnings){
-  const { frequency_khz, tpo_kw, fcc_class, current_site, goals,
+  const { frequency_khz, tpo_kw, fcc_class, pattern_mode, current_site, goals,
           community_of_license_polygon, col_centroid, reach_scale_km = 200 } = ctx;
 
   // --- raw sub-metrics (computed independent of weighting) ---
@@ -1208,6 +1208,86 @@ async function scoreCandidate(pt, ctx, warnings){
         da_pattern_may_resolve:  daPotential,
         summary: summaryParts.join('; ') || 'Insufficient data for feasibility assessment'
       };
+    })(),
+    // Per-candidate engineering checklist — what studies must be done if this site
+    // is selected for detailed engineering evaluation.  Derived from the candidate's
+    // physical characteristics; complements the station-level form_301_checklist.
+    per_candidate_engineering_checklist: (() => {
+      const items = [];
+      const asrThresh = 60.96; // 200 ft in metres — 47 CFR §17.7
+      const lambdaM   = 300000 / frequency_khz;
+      const qwM       = lambdaM / 4;
+      // 1. Soil resistivity — always required if conductivity is screening-grade or poor.
+      if (ground_sigma_filing_grade !== 'filing'){
+        items.push({
+          id: 'SOIL_RESISTIVITY_SURVEY',
+          priority: 'REQUIRED',
+          label: 'Soil resistivity survey',
+          note: `Zone-table σ=${sigma_msm} mS/m used for screening. §73.190 and FCC Form 302-AM require measured ρ (Ω·m) for the ground system design. Commission a 4-electrode Wenner array survey at this candidate location.`
+        });
+      }
+      // 2. ASR — every AM quarter-wave antenna triggers §17.7 at most frequencies.
+      if (qwM > asrThresh){
+        items.push({
+          id: 'ASR_REGISTRATION',
+          priority: 'REQUIRED',
+          label: 'ASR registration (47 CFR §17.7)',
+          note: `λ/4 ≈ ${Math.round(qwM)} m at ${frequency_khz} kHz exceeds the §17.7 200-ft (60.96 m) threshold. File FCC Form 854 before construction; may require FAA aeronautical study and lighting compliance.`
+        });
+      }
+      // 3. RF exposure — mandatory for all licensed AM stations.
+      items.push({
+        id: 'MPE_STUDY',
+        priority: 'REQUIRED',
+        label: 'RF exposure (MPE) evaluation (OET-65 / §1.1307)',
+        note: `AM stations must file an RF exposure evaluation (OET Bulletin 65, §3.B near-field study). Near-field boundary λ/(2π) ≈ ${Math.round(lambdaM / (2 * Math.PI))} m at ${frequency_khz} kHz.`
+      });
+      // 4. Treaty zone.
+      if (treaty_zone){
+        items.push({
+          id: 'INTERNATIONAL_BORDER_COORDINATION',
+          priority: 'REQUIRED',
+          label: 'International border coordination',
+          note: `Site is within treaty zone: ${treaty_zone}. FCC International Bureau coordination required before filing; may impose power, pattern, or frequency restrictions.`
+        });
+      }
+      // 5. COL coverage fails.
+      if (coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR){
+        items.push({
+          id: 'COL_COVERAGE_REMEDY',
+          priority: 'REQUIRED',
+          label: 'COL coverage remedy engineering',
+          note: `${(coverage_pct * 100).toFixed(0)}% COL coverage < §73.24(j) 80% floor. Engineering options: (a) power increase to ${minimum_tpo_for_col_coverage_kw != null ? `${minimum_tpo_for_col_coverage_kw} kW` : '>50 kW'}, (b) DA pattern design (§73.150), or (c) COL boundary amendment. Commission a full §73.24(j) coverage study.`
+        });
+      }
+      // 6. Blanket pop fails.
+      if (blanket_population_pct != null && blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT){
+        items.push({
+          id: 'BLANKET_POP_STUDY',
+          priority: 'REQUIRED',
+          label: 'Blanket population study (§73.24(g))',
+          note: `Estimated blanket pop ${round2(blanket_population_pct)}% > 1% limit. Requires actual Census-block sum inside the 1000 mV/m contour. Consider power reduction or DA-N pattern to reduce the 1000 mV/m footprint.`
+        });
+      }
+      // 7. Poor soil — extended ground system advisory.
+      if (sigma_msm < 2){
+        items.push({
+          id: 'EXTENDED_GROUND_SYSTEM',
+          priority: 'HIGH',
+          label: 'Extended ground system design (§73.190)',
+          note: `σ=${sigma_msm} mS/m (POOR). Standard 120-radial system will have significant losses. Commission deep-driven rod grid and extended buried radial design before finalizing tower height.`
+        });
+      }
+      // 8. DA pattern — if the station already operates DA.
+      if (/DA/i.test(pattern_mode)){
+        items.push({
+          id: 'DA_PATTERN_DESIGN',
+          priority: 'REQUIRED',
+          label: `DA-${pattern_mode.slice(-1) || 'D'} antenna pattern design (§73.150)`,
+          note: `pattern_mode=${pattern_mode}: full directional antenna (§73.150) horizontal radiation pattern must be designed, measured, and filed on Form 301-AM. Anticipate 3–6 months of antenna range time.`
+        });
+      }
+      return items;
     })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,

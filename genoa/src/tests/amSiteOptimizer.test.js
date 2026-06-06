@@ -1947,3 +1947,102 @@ test('coverage_feasibility_assessment.tpo_needed_within_class_ceiling is consist
       `tpo_needed_within_class_ceiling should be ${expectedWithinCeiling} when tpo_needed=${fa.tpo_needed_for_col_floor_kw} vs ceiling=${fa.class_power_ceiling_kw}; rank ${c.rank}`);
   }
 });
+
+// ---------- per_candidate_engineering_checklist ----------
+
+test('per_candidate_engineering_checklist is present on every candidate as a non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const VALID_PRIORITIES = ['REQUIRED', 'HIGH', 'MEDIUM', 'ADVISORY'];
+  for (const c of out.candidates){
+    const cl = c.per_candidate_engineering_checklist;
+    assert.ok(Array.isArray(cl),
+      `per_candidate_engineering_checklist must be an array on rank ${c.rank}`);
+    assert.ok(cl.length >= 1,
+      `per_candidate_engineering_checklist must be non-empty on rank ${c.rank}; it was empty`);
+    for (const item of cl){
+      assert.ok(typeof item.id === 'string' && item.id.length > 0,
+        `checklist item.id must be non-empty string on rank ${c.rank}`);
+      assert.ok(VALID_PRIORITIES.includes(item.priority),
+        `checklist item.priority must be valid on rank ${c.rank}; got: ${item.priority}`);
+      assert.ok(typeof item.label === 'string' && item.label.length > 0,
+        `checklist item.label must be non-empty string on rank ${c.rank}`);
+      assert.ok(typeof item.note === 'string' && item.note.length > 0,
+        `checklist item.note must be non-empty string on rank ${c.rank}`);
+    }
+  }
+});
+
+test('per_candidate_engineering_checklist always includes MPE_STUDY (mandatory for all AM)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const mpe = c.per_candidate_engineering_checklist.find(i => i.id === 'MPE_STUDY');
+    assert.ok(mpe, `MPE_STUDY must appear on every candidate; missing on rank ${c.rank}`);
+    assert.equal(mpe.priority, 'REQUIRED', `MPE_STUDY must be REQUIRED; rank ${c.rank} got: ${mpe.priority}`);
+    assert.ok(/λ\/\(2π\)|near.field|OET.65/i.test(mpe.note),
+      `MPE_STUDY note must mention near-field boundary; rank ${c.rank} got: "${mpe.note}"`);
+  }
+});
+
+test('per_candidate_engineering_checklist includes ASR_REGISTRATION for low frequencies (long wavelength)', async () => {
+  // 540 kHz → λ/4 ≈ 139 m >> 60.96 m ASR threshold
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const asr = c.per_candidate_engineering_checklist.find(i => i.id === 'ASR_REGISTRATION');
+    assert.ok(asr, `ASR_REGISTRATION must appear on 540 kHz candidate (λ/4≈139m >> 60.96m threshold); rank ${c.rank}`);
+    assert.ok(/§17\.7|200.ft|60\.96/i.test(asr.note),
+      `ASR note must cite §17.7 / 200-ft threshold; got: "${asr.note}"`);
+  }
+});
+
+test('per_candidate_engineering_checklist includes INTERNATIONAL_BORDER_COORDINATION for treaty zone', async () => {
+  // Border-adjacent test: overriding treaty_zone via a location near the US/MX border
+  // (El Paso area ~31.8° lat, -106.4° lon is very close to the border).
+  const out = await runSiteOptimizer({
+    ...KAZM,
+    current_site: { lat: 31.8, lon: -106.4 },
+    search_radius_km: 10,
+    grid_spacing_km: 5,
+    candidate_limit: 10
+  });
+  assert.equal(out.available, true);
+  // At least some candidates near El Paso should be in the US/MX treaty zone.
+  const treatyCandidates = out.candidates.filter(c => c.treaty_zone != null);
+  if (treatyCandidates.length > 0){
+    for (const c of treatyCandidates){
+      const coord = c.per_candidate_engineering_checklist.find(i => i.id === 'INTERNATIONAL_BORDER_COORDINATION');
+      assert.ok(coord,
+        `Treaty-zone candidate at (${c.lat}, ${c.lon}) must have INTERNATIONAL_BORDER_COORDINATION checklist item`);
+      assert.equal(coord.priority, 'REQUIRED', 'Border coordination must be REQUIRED priority');
+    }
+  }
+  // Even if no treaty zone candidates, the test passes (location is on the edge).
+});
+
+test('per_candidate_engineering_checklist includes DA_PATTERN_DESIGN for DA stations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const da = c.per_candidate_engineering_checklist.find(i => i.id === 'DA_PATTERN_DESIGN');
+    assert.ok(da, `DA_PATTERN_DESIGN must appear when pattern_mode=DA-D; rank ${c.rank}`);
+    assert.equal(da.priority, 'REQUIRED');
+    assert.ok(/§73\.150|pattern/i.test(da.note), `DA note must mention §73.150; got: "${da.note}"`);
+  }
+});
+
+test('per_candidate_engineering_checklist includes SOIL_RESISTIVITY_SURVEY when conductivity is zone-table (screening grade)', async () => {
+  // Without AM_m3.tif loaded, conductivity is zone-table (screening-grade) → survey required.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  if (out.conductivity_mode === 'zone-table'){
+    for (const c of out.candidates){
+      const survey = c.per_candidate_engineering_checklist.find(i => i.id === 'SOIL_RESISTIVITY_SURVEY');
+      assert.ok(survey,
+        `SOIL_RESISTIVITY_SURVEY must appear when conductivity is zone-table (screening-grade); rank ${c.rank}`);
+      assert.equal(survey.priority, 'REQUIRED');
+    }
+  }
+  // If raster is loaded (filing-grade σ), survey is optional — test is a no-op.
+});

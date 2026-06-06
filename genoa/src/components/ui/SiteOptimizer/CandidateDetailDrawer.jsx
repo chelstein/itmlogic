@@ -787,6 +787,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
         {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}
 
+        {/* Per-candidate engineering checklist */}
+        {Array.isArray(candidate.per_candidate_engineering_checklist) && candidate.per_candidate_engineering_checklist.length > 0 && (() => {
+          const priorityColor = { REQUIRED: '#ff9b5a', HIGH: '#ffb347', MEDIUM: '#7ec8e3', ADVISORY: '#9b9b9b' };
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Site engineering checklist</div>
+              <div className="space-y-1">
+                {candidate.per_candidate_engineering_checklist.map((item) => (
+                  <details key={item.id} className="group">
+                    <summary className="flex items-center gap-2 cursor-pointer list-none font-mono text-[10px] hover:text-textMain">
+                      <span
+                        className="shrink-0 px-1 py-0.5 rounded-sm text-[9px] font-semibold"
+                        style={{ color: priorityColor[item.priority] || '#9b9b9b', background: (priorityColor[item.priority] || '#9b9b9b') + '22' }}
+                      >
+                        {item.priority}
+                      </span>
+                      <span className="text-text">{item.label}</span>
+                    </summary>
+                    <p className="font-mono text-[9px] text-textDim leading-relaxed mt-1 ml-16 pr-2">{item.note}</p>
+                  </details>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Schematic contour preview */}
         <div>
           <div className="rack-eyebrow mb-1">Contour preview <span className="normal-case text-textDim">(schematic — daytime reach circle)</span></div>
