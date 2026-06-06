@@ -958,6 +958,42 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Compliance pathway */}
+        {candidate.compliance_pathway?.steps?.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">
+              Compliance pathway
+              {candidate.compliance_pathway.estimated_weeks_to_filing != null && (
+                <span className="normal-case text-textDim ml-2">
+                  ~{candidate.compliance_pathway.estimated_weeks_to_filing} wk to filing (worst-case sum)
+                </span>
+              )}
+            </div>
+            <div className="space-y-1">
+              {candidate.compliance_pathway.steps.map((step) => {
+                const blockColor = step.blocking ? '#ff9b5a' : '#7ec8e3';
+                const phaseShort = step.phase.replace(/_/g, ' ').toLowerCase();
+                return (
+                  <div key={step.step} className="flex gap-2 font-mono text-[10px]">
+                    <span className="shrink-0 text-textDim w-4 text-right">{step.step}.</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="uppercase text-[9px] tracking-rack"
+                          style={{ color: blockColor }}>{phaseShort}</span>
+                        <span className="text-[9px] text-textDim/60">{step.timeline_weeks} wk</span>
+                        {step.blocking && (
+                          <span className="text-[9px] text-orange-400/80">blocking</span>
+                        )}
+                      </div>
+                      <div className="text-textDim/80 leading-snug mt-0.5">{step.action}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Schematic contour preview */}
         <div>
           <div className="rack-eyebrow mb-1">Contour preview <span className="normal-case text-textDim">(schematic — daytime reach circle)</span></div>

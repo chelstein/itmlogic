@@ -1385,6 +1385,117 @@ async function scoreCandidate(pt, ctx, warnings){
       }
       return items;
     })(),
+    // Compliance pathway — ordered engineering steps to bring this candidate to
+    // FCC filing readiness.  Keyed to the site's physical characteristics and the
+    // coverage_feasibility verdict; gives engineers a linear task sequence.
+    compliance_pathway: (() => {
+      const steps = [];
+
+      // Step 1 — always first: site investigation
+      steps.push({
+        step: 1,
+        phase: 'SITE_INVESTIGATION',
+        action: 'Conduct site survey: parcel availability, lease terms, zoning, setbacks, environmental triggers',
+        timeline_weeks: '2–4',
+        blocking: true
+      });
+
+      // Step 2 — soil survey (always needed for filing; critical if poor σ)
+      steps.push({
+        step: 2,
+        phase: 'SOIL_SURVEY',
+        action: sigma_msm < 2
+          ? `Urgent soil resistivity survey: POOR σ=${sigma_msm} mS/m — ground system design critically depends on measured ρ (Ω·m)`
+          : `Commission soil resistivity survey (4-electrode Wenner array) — required for §73.190 ground system certification and FCC Form 302-AM`,
+        timeline_weeks: sigma_msm < 2 ? '2–3' : '4–8',
+        blocking: sigma_msm < 2
+      });
+
+      // Step 3 — ASR/FAA coordination (if height triggers §17.7)
+      const lambdaM_cp = 300000 / frequency_khz;
+      const qwM_cp = lambdaM_cp / 4;
+      if (qwM_cp > 60.96){
+        steps.push({
+          step: 3,
+          phase: 'ASR_FAA_COORDINATION',
+          action: `File FAA Form 7460-1 aeronautical study and FCC Form 854 ASR registration — λ/4 = ${Math.round(qwM_cp)} m at ${frequency_khz} kHz exceeds 60.96 m §17.7 threshold`,
+          timeline_weeks: '8–16',
+          blocking: true
+        });
+      }
+
+      // Step 4 — treaty coordination (if in treaty zone)
+      if (treaty_zone){
+        steps.push({
+          step: steps.length + 1,
+          phase: 'TREATY_COORDINATION',
+          action: `Initiate FCC International Bureau coordination for ${treaty_zone} — required before any Form 301-AM can be processed`,
+          timeline_weeks: '12–52',
+          blocking: true
+        });
+      }
+
+      // Step 5 — coverage remedy (if COL coverage fails)
+      const colFails = coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR;
+      if (colFails){
+        if (minimum_tpo_for_col_coverage_kw != null){
+          steps.push({
+            step: steps.length + 1,
+            phase: 'POWER_ENGINEERING',
+            action: `Increase TPO to ≥${minimum_tpo_for_col_coverage_kw} kW to satisfy §73.24(j) 5 mV/m COL floor (current coverage ${coverage_pct != null ? (coverage_pct * 100).toFixed(0) : '?'}%)`,
+            timeline_weeks: '1–2',
+            blocking: false
+          });
+        } else if (/DA/i.test(pattern_mode) || (coverage_pct != null && coverage_pct >= 0.50)){
+          steps.push({
+            step: steps.length + 1,
+            phase: 'DA_PATTERN_ENGINEERING',
+            action: `Commission §73.150 DA pattern design to reshape 5 mV/m contour toward community of license — coverage currently ${coverage_pct != null ? (coverage_pct * 100).toFixed(0) : '?'}%`,
+            timeline_weeks: '12–24',
+            blocking: true
+          });
+        } else {
+          steps.push({
+            step: steps.length + 1,
+            phase: 'COL_BOUNDARY_REVIEW',
+            action: `COL coverage ${coverage_pct != null ? (coverage_pct * 100).toFixed(0) : '?'}% is below 80% floor and cannot be resolved by power alone at this location — consult FCC counsel on COL boundary amendment`,
+            timeline_weeks: '24–52',
+            blocking: true
+          });
+        }
+      }
+
+      // Step 6 — NIF study (always for non-local channels)
+      const lambdaM_cp2 = 300000 / frequency_khz;
+      const isLocalFreq = [1230, 1240, 1340, 1400, 1450, 1490].includes(frequency_khz);
+      if (!isLocalFreq){
+        steps.push({
+          step: steps.length + 1,
+          phase: 'NIF_STUDY',
+          action: `Commission §73.182 nighttime interference (NIF) study — required for all non-local-channel AM stations at a new transmitter site`,
+          timeline_weeks: '4–12',
+          blocking: true
+        });
+      }
+
+      // Step 7 — Form 301-AM filing
+      steps.push({
+        step: steps.length + 1,
+        phase: 'FCC_FILING',
+        action: 'File FCC Form 301-AM construction permit with all exhibits (antenna efficiency, coverage contour, NIF study, environmental checklist, ASR if required)',
+        timeline_weeks: '4–8 + FCC processing',
+        blocking: true
+      });
+
+      return {
+        total_steps: steps.length,
+        estimated_weeks_to_filing: steps.reduce((acc, s) => {
+          const wks = s.timeline_weeks.split('–');
+          return acc + (parseInt(wks[wks.length - 1], 10) || 0);
+        }, 0),
+        steps
+      };
+    })(),
     // Sigma sensitivity analysis — quantifies the benefit of a filed-grade soil
     // resistivity survey by projecting what the reach and score WOULD be if actual σ
     // were one quality tier better.  Only meaningful when zone-table σ is in use.

@@ -2472,3 +2472,77 @@ test('candidate_set_diversity: single candidate returns note about insufficient 
       'single-candidate response should have a diversity.note instead of metrics');
   }
 });
+
+// ---------- compliance_pathway ----------
+
+test('compliance_pathway is present on every candidate with steps array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const cp = c.compliance_pathway;
+    assert.ok(cp != null, `compliance_pathway must be present (rank ${c.rank})`);
+    assert.ok(Array.isArray(cp.steps) && cp.steps.length >= 3,
+      `compliance_pathway.steps must have ≥3 entries (rank ${c.rank})`);
+    assert.ok(typeof cp.total_steps === 'number' && cp.total_steps === cp.steps.length,
+      `total_steps must match steps.length (rank ${c.rank})`);
+    assert.ok(typeof cp.estimated_weeks_to_filing === 'number',
+      `estimated_weeks_to_filing must be a number (rank ${c.rank})`);
+  }
+});
+
+test('compliance_pathway: all steps have step, phase, action, timeline_weeks, blocking', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    for (const s of c.compliance_pathway.steps){
+      assert.ok(typeof s.step === 'number', `step must be a number (rank ${c.rank})`);
+      assert.ok(typeof s.phase === 'string' && s.phase.length > 0, `phase must be string (rank ${c.rank})`);
+      assert.ok(typeof s.action === 'string' && s.action.length > 5, `action must be string (rank ${c.rank})`);
+      assert.ok(typeof s.timeline_weeks === 'string', `timeline_weeks must be string (rank ${c.rank})`);
+      assert.ok(typeof s.blocking === 'boolean', `blocking must be boolean (rank ${c.rank})`);
+    }
+  }
+});
+
+test('compliance_pathway: always starts with SITE_INVESTIGATION step', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const first = c.compliance_pathway.steps[0];
+    assert.equal(first.phase, 'SITE_INVESTIGATION',
+      `first step must be SITE_INVESTIGATION (rank ${c.rank}); got ${first.phase}`);
+  }
+});
+
+test('compliance_pathway: always ends with FCC_FILING step', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const steps = c.compliance_pathway.steps;
+    const last = steps[steps.length - 1];
+    assert.equal(last.phase, 'FCC_FILING',
+      `last step must be FCC_FILING (rank ${c.rank}); got ${last.phase}`);
+  }
+});
+
+test('compliance_pathway: includes ASR_FAA_COORDINATION for 540 kHz (λ/4 >> 60.96 m)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const phases = c.compliance_pathway.steps.map(s => s.phase);
+    assert.ok(phases.includes('ASR_FAA_COORDINATION'),
+      `540 kHz should include ASR_FAA_COORDINATION step; got phases: ${phases.join(', ')} (rank ${c.rank})`);
+  }
+});
+
+test('compliance_pathway: step numbers are sequential starting at 1', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const steps = c.compliance_pathway.steps;
+    for (let i = 0; i < steps.length; i++){
+      assert.equal(steps[i].step, i + 1,
+        `step[${i}].step must be ${i + 1}; got ${steps[i].step} (rank ${c.rank})`);
+    }
+  }
+});
