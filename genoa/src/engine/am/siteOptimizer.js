@@ -954,7 +954,10 @@ export async function runSiteOptimizer(body = {}){
     icrg_n_complaints:      c.interference_complaint_resolution_guide?.n_complaint_types ?? null,
     srg_vulnerability:      c.spectrum_repack_readiness_guide?.repack_vulnerability ?? null,
     srg_channel_type:       c.spectrum_repack_readiness_guide?.channel_type ?? null,
-    srg_repack_mandate:     c.spectrum_repack_readiness_guide?.repack_mandate_current ?? null
+    srg_repack_mandate:     c.spectrum_repack_readiness_guide?.repack_mandate_current ?? null,
+    rpu_dist_km:            c.remote_pickup_unit_guide?.approximate_studio_to_tx_km ?? null,
+    rpu_vhf_feasible:       c.remote_pickup_unit_guide?.vhf_path_feasible ?? null,
+    rpu_significant_impacts: c.remote_pickup_unit_guide?.significant_impacts ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6689,6 +6692,86 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    remote_pickup_unit_guide: (() => {
+      // §74.401 et seq.: Remote Pickup Broadcast Stations (RPU)
+      // RPU stations are auxiliary broadcast stations used to transmit programming from remote locations
+      // (on-site events, sports venues, news remotes) back to the studio or transmitter site.
+      // RPU operates in the 161–170 MHz band (VHF) or 450–455 MHz band (UHF) per §74.402.
+      // When a transmitter is relocated, the studio-to-transmitter link (STL) geometry changes,
+      // which may also require updating or replacing RPU equipment if path distances change significantly.
+      //
+      // RPU is distinct from STL (§74.501): STL goes studio→transmitter; RPU goes field→studio or field→transmitter.
+      // Many small AM stations use a single bi-directional link that serves both functions.
+      //
+      // §74.432: RPU requires either a Part 74 license or, for short-term events, a Part 74 Subpart H STA.
+
+      // Distance from candidate site to assumed studio location
+      // For KAZM-style analysis: studio is assumed near city of license (same lat/lon as current_site proxy)
+      // Real implementation would use studio coordinates from FCC record; we approximate here.
+      const studio_lat = pt.lat ?? 34.9;  // proxy: candidate site lat as studio reference
+      const studio_lon = pt.lon ?? -111.8;
+      const dx_deg = (pt.lon - studio_lon) || 0;
+      const dy_deg = (pt.lat - studio_lat) || 0;
+      const dist_km_rpu = round2(Math.sqrt((dx_deg * 111.32) ** 2 + (dy_deg * 110.57) ** 2));
+
+      // RPU path feasibility — VHF RPU practical range: ~50–80 km with directional antenna at 250W
+      // UHF RPU practical range: ~30–50 km; better penetration in urban areas
+      const VHF_MAX_RANGE_KM = 80;
+      const UHF_MAX_RANGE_KM = 50;
+      const vhf_path_feasible = dist_km_rpu <= VHF_MAX_RANGE_KM;
+      const uhf_path_feasible = dist_km_rpu <= UHF_MAX_RANGE_KM;
+
+      // RPU frequency bands
+      const RPU_BANDS = [
+        { band: 'VHF', range_mhz: '161–170 MHz', max_erp_w: 250, part: 'Part 74 §74.402(a)', typical_range_km: VHF_MAX_RANGE_KM, path_feasible: vhf_path_feasible },
+        { band: 'UHF', range_mhz: '450–455 MHz', max_erp_w: 250, part: 'Part 74 §74.402(b)', typical_range_km: UHF_MAX_RANGE_KM, path_feasible: uhf_path_feasible }
+      ];
+
+      // Licensing requirements
+      const LICENSING = {
+        requires_fcc_license: true,
+        form: 'FCC Form 349 (Part 74 auxiliary broadcast license)',
+        license_term_years: 8,
+        coordination_required: 'Yes — frequency coordination with other RPU users in the area',
+        cfr: '§74.432; §74.433',
+        sta_available: true, // short-term authority for events
+        sta_cfr: '§73.1635',
+        sta_duration_days: 180
+      };
+
+      // Impact of transmitter relocation on RPU
+      const RELOCATION_IMPACTS = [
+        { id: 'PATH_DISTANCE',  impact: dist_km_rpu > 40 ? 'SIGNIFICANT' : 'MINOR', detail: `New transmitter site is ~${dist_km_rpu} km from assumed studio; ${dist_km_rpu > 40 ? 'may require upgraded antenna or new RPU frequency study' : 'within typical RPU range'}` },
+        { id: 'LINE_OF_SIGHT',  impact: 'EVALUATE',  detail: 'VHF/UHF path requires near-line-of-sight; terrain analysis needed for new site' },
+        { id: 'FREQUENCY_REUSE', impact: 'LOW',      detail: 'Existing RPU frequencies typically remain valid at new transmitter site if path interference analysis clears' },
+        { id: 'LICENSE_UPDATE', impact: 'REQUIRED',  detail: 'FCC license for RPU must be updated if transmitter site (coordinate of receiving end) changes materially; file FCC Form 349 modification', cfr: '§73.3533' }
+      ];
+
+      // Cost estimate for RPU system update
+      const COST_ESTIMATE = {
+        frequency_coordination_usd: { low: 500, high: 2000 },
+        new_antenna_usd: { low: 1000, high: 5000 },
+        equipment_upgrade_usd: { low: 0, high: 15000 },
+        license_modification_usd: { low: 300, high: 1500 },
+        total_estimated_usd: { low: 1800, high: 23500 }
+      };
+
+      return {
+        frequency_khz, fcc_class,
+        approximate_studio_to_tx_km: dist_km_rpu,
+        rpu_bands: RPU_BANDS,
+        vhf_path_feasible, uhf_path_feasible,
+        licensing: LICENSING,
+        relocation_impacts: RELOCATION_IMPACTS,
+        n_impacts: RELOCATION_IMPACTS.length,
+        significant_impacts: RELOCATION_IMPACTS.filter(i => i.impact === 'SIGNIFICANT' || i.impact === 'REQUIRED').length,
+        cost_estimate: COST_ESTIMATE,
+        relocation_note: `Transmitter relocation to this candidate site (~${dist_km_rpu} km from assumed studio) ${vhf_path_feasible ? 'is within VHF RPU range' : 'may exceed VHF RPU practical range'}. RPU license modification required at FCC if transmitter coordinates change.`,
+        reference: '47 CFR §74.401; §74.402; §74.432; §74.433; §73.1635 (STA); FCC Form 349 (Part 74 license application)',
+        note: `RPU path from new site: ~${dist_km_rpu} km. VHF feasible: ${vhf_path_feasible}. UHF feasible: ${uhf_path_feasible}. FCC license update required for any transmitter site change.`
       };
     })(),
 

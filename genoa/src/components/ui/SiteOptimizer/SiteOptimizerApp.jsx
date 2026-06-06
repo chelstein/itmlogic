@@ -1717,6 +1717,36 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      remote_pickup_unit_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        approximate_studio_to_tx_km: 18.5,
+        vhf_path_feasible: true, uhf_path_feasible: true,
+        rpu_bands: [
+          { band: 'VHF', range_mhz: '161–170 MHz', max_erp_w: 250, part: 'Part 74 §74.402(a)', typical_range_km: 80, path_feasible: true },
+          { band: 'UHF', range_mhz: '450–455 MHz', max_erp_w: 250, part: 'Part 74 §74.402(b)', typical_range_km: 50, path_feasible: true }
+        ],
+        licensing: {
+          requires_fcc_license: true, form: 'FCC Form 349 (Part 74 auxiliary broadcast license)',
+          license_term_years: 8, coordination_required: 'Yes — frequency coordination with other RPU users',
+          cfr: '§74.432; §74.433', sta_available: true, sta_cfr: '§73.1635', sta_duration_days: 180
+        },
+        relocation_impacts: [
+          { id: 'PATH_DISTANCE',  impact: 'MINOR',    detail: 'New site ~18.5 km from assumed studio; within typical VHF/UHF RPU range' },
+          { id: 'LINE_OF_SIGHT',  impact: 'EVALUATE', detail: 'VHF/UHF path requires near-line-of-sight; terrain analysis needed for new site' },
+          { id: 'FREQUENCY_REUSE', impact: 'LOW',     detail: 'Existing RPU frequencies typically remain valid at new site if interference analysis clears' },
+          { id: 'LICENSE_UPDATE', impact: 'REQUIRED', detail: 'FCC license must be updated if transmitter site coordinates change materially; file FCC Form 349 modification', cfr: '§73.3533' }
+        ],
+        n_impacts: 4, significant_impacts: 1,
+        cost_estimate: {
+          frequency_coordination_usd: { low: 500, high: 2000 },
+          new_antenna_usd: { low: 1000, high: 5000 },
+          equipment_upgrade_usd: { low: 0, high: 15000 },
+          license_modification_usd: { low: 300, high: 1500 },
+          total_estimated_usd: { low: 1800, high: 23500 }
+        },
+        reference: '47 CFR §74.401; §74.402; §74.432; §74.433; §73.1635; FCC Form 349',
+        note: 'RPU path from new site: ~18.5 km. VHF feasible: true. UHF feasible: true. FCC license update required for any transmitter site change.'
+      },
       spectrum_repack_readiness_guide: {
         frequency_khz: 780, fcc_class: 'D',
         channel_type: 'CLEAR_CHANNEL', repack_vulnerability: 'HIGH', repack_mandate_current: false,

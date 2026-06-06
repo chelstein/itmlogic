@@ -2226,6 +2226,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Remote Pickup Unit Guide */}
+        {candidate.remote_pickup_unit_guide && (() => {
+          const g = candidate.remote_pickup_unit_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Remote Pickup Unit Guide <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§74.401</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Studio→TX Distance</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 700 }}>{g.approximate_studio_to_tx_km ?? '—'} km</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>VHF Path</div>
+                  <div style={{ color: g.vhf_path_feasible ? '#34d399' : '#f87171', fontSize: 14, fontWeight: 600 }}>{g.vhf_path_feasible ? 'FEASIBLE' : 'AT LIMIT'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>UHF Path</div>
+                  <div style={{ color: g.uhf_path_feasible ? '#34d399' : '#f87171', fontSize: 14, fontWeight: 600 }}>{g.uhf_path_feasible ? 'FEASIBLE' : 'AT LIMIT'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Required Actions</div>
+                  <div style={{ color: (g.significant_impacts ?? 0) > 0 ? '#fbbf24' : '#34d399', fontSize: 14, fontWeight: 600 }}>{g.significant_impacts ?? 0}</div>
+                </div>
+              </div>
+              {g.relocation_impacts && g.relocation_impacts.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Relocation Impacts</div>
+                  {g.relocation_impacts.map((imp, i) => {
+                    const impColor = imp.impact === 'REQUIRED' ? '#f87171' : imp.impact === 'SIGNIFICANT' ? '#fbbf24' : '#94a3b8';
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                        <span style={{ color: impColor, fontSize: 11, fontWeight: 600, width: 80, flexShrink: 0, marginTop: 1 }}>{imp.impact}</span>
+                        <span style={{ color: '#f1f5f9', fontSize: 12 }}>{imp.detail}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {g.cost_estimate && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Update Cost Estimate</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>
+                    ${g.cost_estimate.total_estimated_usd?.low?.toLocaleString()} – ${g.cost_estimate.total_estimated_usd?.high?.toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Spectrum Repack Readiness Guide */}
         {candidate.spectrum_repack_readiness_guide && (() => {
           const g = candidate.spectrum_repack_readiness_guide;

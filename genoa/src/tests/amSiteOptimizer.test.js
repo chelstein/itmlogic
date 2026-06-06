@@ -5683,6 +5683,59 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- remote_pickup_unit_guide ----
+
+test('remote_pickup_unit_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.remote_pickup_unit_guide != null, 'remote_pickup_unit_guide missing');
+  const g = c.remote_pickup_unit_guide;
+  assert.ok('approximate_studio_to_tx_km' in g, 'approximate_studio_to_tx_km missing');
+  assert.ok(Array.isArray(g.rpu_bands), 'rpu_bands must be array');
+  assert.ok(Array.isArray(g.relocation_impacts), 'relocation_impacts must be array');
+  assert.ok('licensing' in g, 'licensing missing');
+  assert.ok('cost_estimate' in g, 'cost_estimate missing');
+});
+
+test('remote_pickup_unit_guide RPU bands include VHF and UHF', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].remote_pickup_unit_guide;
+  const vhf = g.rpu_bands.find(b => b.band === 'VHF');
+  const uhf = g.rpu_bands.find(b => b.band === 'UHF');
+  assert.ok(vhf != null, 'VHF RPU band missing');
+  assert.ok(uhf != null, 'UHF RPU band missing');
+  assert.ok(vhf.max_erp_w <= 250, 'VHF max ERP must not exceed 250W');
+  assert.ok(uhf.max_erp_w <= 250, 'UHF max ERP must not exceed 250W');
+  assert.ok(vhf.typical_range_km > uhf.typical_range_km, 'VHF must have greater typical range than UHF');
+});
+
+test('remote_pickup_unit_guide licensing requires FCC license', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].remote_pickup_unit_guide;
+  assert.strictEqual(g.licensing.requires_fcc_license, true, 'RPU requires FCC license');
+  assert.ok(typeof g.licensing.form === 'string' && g.licensing.form.length > 5, 'licensing form must be specified');
+  assert.ok(g.licensing.license_term_years > 0, 'license term must be positive');
+  assert.strictEqual(g.licensing.sta_available, true, 'STA must be available for temporary operations');
+});
+
+test('remote_pickup_unit_guide relocation impacts include REQUIRED entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].remote_pickup_unit_guide;
+  const required = g.relocation_impacts.find(i => i.impact === 'REQUIRED');
+  assert.ok(required != null, 'at least one REQUIRED relocation impact must exist (license update)');
+  assert.ok(g.n_impacts === g.relocation_impacts.length, 'n_impacts must match array length');
+  assert.ok(g.significant_impacts >= 0, 'significant_impacts must be non-negative');
+});
+
+test('remote_pickup_unit_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rpu_dist_km' in row, 'rpu_dist_km missing from comparison table');
+    assert.ok('rpu_vhf_feasible' in row, 'rpu_vhf_feasible missing from comparison table');
+    assert.ok('rpu_significant_impacts' in row, 'rpu_significant_impacts missing from comparison table');
+  }
+});
+
 // ---- spectrum_repack_readiness_guide ----
 
 test('spectrum_repack_readiness_guide presence and structure', async () => {
