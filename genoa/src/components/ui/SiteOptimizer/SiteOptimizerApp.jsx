@@ -1717,6 +1717,22 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      adjacent_market_coverage_analysis: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
+        candidate_dist_from_current_km: 20,
+        col_field_thresholds: { day_mvm: 2, night_mvm: null, service_contour_mvm: 0.5 },
+        coverage_zones: [
+          { id: 'PRIMARY', label: 'Primary Service Contour (0.5 mV/m)', cfr: '§73.182 / §73.187', threshold_mvm: 0.5, radius_km: 87.4, area_km2: 23990.2, service_quality: 'Reliable daytime reception; defines primary coverage area' },
+          { id: 'COL_MINIMUM', label: 'City of License Minimum Coverage', cfr: '§73.24 (Class D)', threshold_mvm: 2, radius_km: 42.1, area_km2: 5569.8, service_quality: 'COL must receive ≥2 mV/m daytime for Class D' },
+          { id: 'INTERFERENCE_FREE', label: 'Interference-Free Service (5 mV/m)', cfr: '§73.182 Table 1', threshold_mvm: 5, radius_km: 22.3, area_km2: 1561.8, service_quality: 'High-fidelity reception; resists co-channel interference at D/U > 20 dB' }
+        ],
+        n_coverage_zones: 3,
+        primary_service_radius_km: 87.4,
+        primary_service_area_km2: 23990.2,
+        translator_opportunity: { authorized: true, cfr: '47 CFR §74.1200; FCC AMTA 2020 proceeding', max_erp_w: 250, fm_band: '88.1–107.9 MHz', coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)', application_form: 'FCC Form 349', filing_fee_usd: 655, application_window: 'FCC AM Translator Window (periodic; last 2021)', band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204' },
+        reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
+        note: 'Class D at 780 kHz. Primary 0.5 mV/m reach: 87.4 km (23990.2 km²). COL min: 2 mV/m day. FM translator (250W) authorized under AMTA.'
+      },
       license_renewal_compliance_guide: {
         fcc_class: 'D', frequency_khz: 780,
         renewal_cycle: { term_years: 8, form: 'FCC Form 303-S', filing_fee_usd: 345, filing_window_days_before_expiry: 120, publication_required: true, publication_cfr: '§73.3580', publication_notes: '3 consecutive weeks in newspaper of general circulation; OR 4 weeks on-air. Months 5–4 before expiry.', grace_period_days: 30 },

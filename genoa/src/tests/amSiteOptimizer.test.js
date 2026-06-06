@@ -6929,6 +6929,51 @@ test('license_renewal_compliance_guide comparison table columns present', async 
   }
 });
 
+test('adjacent_market_coverage_analysis presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].adjacent_market_coverage_analysis;
+  assert.ok(a != null, 'adjacent_market_coverage_analysis must be present');
+  assert.ok(Array.isArray(a.coverage_zones), 'coverage_zones must be an array');
+  assert.ok(a.n_coverage_zones === a.coverage_zones.length, 'n_coverage_zones must match array length');
+  assert.ok(a.primary_service_radius_km > 0, 'primary_service_radius_km must be positive');
+  assert.ok(a.primary_service_area_km2 > 0, 'primary_service_area_km2 must be positive');
+});
+
+test('adjacent_market_coverage_analysis PRIMARY coverage zone uses 0.5 mV/m contour', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].adjacent_market_coverage_analysis;
+  const primary = a.coverage_zones.find(z => z.id === 'PRIMARY');
+  assert.ok(primary != null, 'PRIMARY zone must be present');
+  assert.strictEqual(primary.threshold_mvm, 0.5, '§73.182 primary contour is 0.5 mV/m');
+  assert.ok(primary.radius_km > 0, 'PRIMARY radius must be positive');
+});
+
+test('adjacent_market_coverage_analysis COL minimum field strength by class', async () => {
+  const outD = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const outA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', tpo_kw: 50, candidate_limit: 1 });
+  const aD = outD.candidates[0].adjacent_market_coverage_analysis;
+  const aA = outA.candidates[0].adjacent_market_coverage_analysis;
+  assert.ok(aD.col_field_thresholds.day_mvm > 0, 'Class D COL threshold must be set');
+  assert.ok(aA.col_field_thresholds.day_mvm >= aD.col_field_thresholds.day_mvm, 'Class A COL threshold must be ≥ Class D');
+});
+
+test('adjacent_market_coverage_analysis translator opportunity is authorized', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const a = out.candidates[0].adjacent_market_coverage_analysis;
+  assert.ok(a.translator_opportunity != null, 'translator_opportunity must be present');
+  assert.strictEqual(a.translator_opportunity.authorized, true, 'FM translator must be authorized under AMTA');
+  assert.strictEqual(a.translator_opportunity.max_erp_w, 250, 'AMTA translator max ERP must be 250W');
+});
+
+test('adjacent_market_coverage_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('amca_primary_reach_km' in row, 'amca_primary_reach_km missing from comparison table');
+    assert.ok('amca_primary_area_km2' in row, 'amca_primary_area_km2 missing from comparison table');
+    assert.ok('amca_translator_ok'    in row, 'amca_translator_ok missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;

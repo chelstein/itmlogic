@@ -924,7 +924,10 @@ export async function runSiteOptimizer(body = {}){
     ntps_asid_required:     c.nighttime_pattern_switching_guide?.asid_requirements?.required ?? null,
     lrc_term_years:         c.license_renewal_compliance_guide?.license_term_years ?? null,
     lrc_renewal_fee_usd:    c.license_renewal_compliance_guide?.renewal_filing_fee_usd ?? null,
-    lrc_n_opif_required:    c.license_renewal_compliance_guide?.n_opif_required ?? null
+    lrc_n_opif_required:    c.license_renewal_compliance_guide?.n_opif_required ?? null,
+    amca_primary_reach_km:  c.adjacent_market_coverage_analysis?.primary_service_radius_km ?? null,
+    amca_primary_area_km2:  c.adjacent_market_coverage_analysis?.primary_service_area_km2 ?? null,
+    amca_translator_ok:     c.adjacent_market_coverage_analysis?.translator_opportunity?.authorized ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -10383,6 +10386,97 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    adjacent_market_coverage_analysis: (() => {
+      // Adjacent market and COL (City of License) coverage analysis for AM relocation
+      // §73.318: Contour protection from FM; but for AM, key metric is city of license coverage
+      // §73.187/§73.24: COL must receive a specified minimum field strength
+      // FCC defines minimum COL field strength by class:
+      //   Class A: 5 mV/m day; Class B/C/D: 5 mV/m (day)/2 mV/m night to be "primary"
+      // Daytime groundwave reach at 0.5 mV/m defines the primary service contour
+
+      // COL city coverage assessment
+      const colDist_km = pt.distance_from_current_km ?? 0;
+      const COL_FIELD_THRESHOLDS = {
+        A: { day_mvm: 5, night_mvm: 5, service_contour_mvm: 0.5 },
+        B: { day_mvm: 5, night_mvm: 2, service_contour_mvm: 0.5 },
+        C: { day_mvm: 5, night_mvm: 0.5, service_contour_mvm: 0.5 },
+        D: { day_mvm: 2, night_mvm: null, service_contour_mvm: 0.5 }
+      };
+      const myThreshold = COL_FIELD_THRESHOLDS[fcc_class.toUpperCase()] ?? COL_FIELD_THRESHOLDS['D'];
+
+      // Estimate daytime 0.5 mV/m reach from this candidate site
+      const primary_reach_km = (() => {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        return round2(r?.distance_km ?? 0);
+      })();
+
+      // Coverage improvement estimate vs current site
+      // (We don't have current site sigma here, so estimate directionally)
+      const reach_pct_change = 0; // placeholder — would need current site reach
+
+      // Market overlap analysis: 3 concentric zones
+      const COVERAGE_ZONES = [
+        {
+          id: 'PRIMARY',
+          label: 'Primary Service Contour (0.5 mV/m)',
+          cfr: '§73.182 / §73.187',
+          threshold_mvm: 0.5,
+          radius_km: primary_reach_km,
+          area_km2: round2(Math.PI * Math.pow(primary_reach_km, 2)),
+          service_quality: 'Reliable daytime reception; defines primary coverage area'
+        },
+        {
+          id: 'COL_MINIMUM',
+          label: 'City of License Minimum Coverage',
+          cfr: `§73.24 (Class ${fcc_class})`,
+          threshold_mvm: myThreshold.day_mvm,
+          radius_km: round2(fccAmDistanceKm({ frequency_khz, target_mvm: myThreshold.day_mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw })?.distance_km ?? 0),
+          area_km2: null, // computed below
+          service_quality: `COL must receive ≥${myThreshold.day_mvm} mV/m daytime for Class ${fcc_class}`
+        },
+        {
+          id: 'INTERFERENCE_FREE',
+          label: 'Interference-Free Service (5 mV/m)',
+          cfr: '§73.182 Table 1',
+          threshold_mvm: 5,
+          radius_km: round2(fccAmDistanceKm({ frequency_khz, target_mvm: 5, conductivity_msm: sigma_msm, erp_kw: tpo_kw })?.distance_km ?? 0),
+          area_km2: null,
+          service_quality: 'High-fidelity reception; resists co-channel interference at D/U > 20 dB'
+        }
+      ];
+      // Fill in area_km2 after radius_km is set
+      COVERAGE_ZONES[1].area_km2 = round2(Math.PI * Math.pow(COVERAGE_ZONES[1].radius_km, 2));
+      COVERAGE_ZONES[2].area_km2 = round2(Math.PI * Math.pow(COVERAGE_ZONES[2].radius_km, 2));
+
+      // Translator opportunity: an FM translator can rebroadcast AM programming
+      // FCC AMTA (AM Translator proceeding) allows AM stations to obtain FM translators
+      // Maximum ERP 250 W for AM-authorized translators in most cases
+      const TRANSLATOR_OPPORTUNITY = {
+        authorized: true,
+        cfr: '47 CFR §74.1200; FCC AMTA 2020 proceeding',
+        max_erp_w: 250,
+        fm_band: '88.1–107.9 MHz',
+        coverage_note: 'FM translator can extend effective coverage into areas with poor AM reception (buildings, urban canyons)',
+        application_form: 'FCC Form 349',
+        filing_fee_usd: 655,
+        application_window: 'FCC AM Translator Window (periodic; last 2021)',
+        band_stacking: 'FM translator must protect all co-channel and adjacent FM stations per §74.1204'
+      };
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        candidate_dist_from_current_km: colDist_km,
+        col_field_thresholds: myThreshold,
+        coverage_zones: COVERAGE_ZONES,
+        n_coverage_zones: COVERAGE_ZONES.length,
+        primary_service_radius_km: primary_reach_km,
+        primary_service_area_km2: COVERAGE_ZONES[0].area_km2,
+        translator_opportunity: TRANSLATOR_OPPORTUNITY,
+        reference: '47 CFR §73.24; §73.182; §73.187; §73.318; §74.1200; FCC AMTA 2020; FCC Form 349',
+        note: `Class ${fcc_class} at ${frequency_khz} kHz. Primary 0.5 mV/m reach: ${primary_reach_km} km (${COVERAGE_ZONES[0].area_km2} km²). COL min: ${myThreshold.day_mvm} mV/m day. FM translator (250W) authorized under AMTA.`
       };
     })(),
 

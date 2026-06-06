@@ -2226,6 +2226,80 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Adjacent Market Coverage Analysis */}
+        {candidate.adjacent_market_coverage_analysis && (() => {
+          const a = candidate.adjacent_market_coverage_analysis;
+          const primary = (a.coverage_zones || []).find(z => z.id === 'PRIMARY');
+          const colMin  = (a.coverage_zones || []).find(z => z.id === 'COL_MINIMUM');
+          const ifZone  = (a.coverage_zones || []).find(z => z.id === 'INTERFERENCE_FREE');
+          const tr = a.translator_opportunity || {};
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Adjacent Market Coverage Analysis (§73.182 / §73.187)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>FCC Class</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{a.fcc_class}</span>
+                  <span style={{ color: '#94a3b8' }}>Frequency</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{a.frequency_khz} kHz</span>
+                  <span style={{ color: '#94a3b8' }}>TPO</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{a.tpo_kw} kW</span>
+                  <span style={{ color: '#94a3b8' }}>Primary Reach</span>
+                  <span style={{ color: '#34d399', fontWeight: 700 }}>{a.primary_service_radius_km} km ({a.primary_service_area_km2} km²)</span>
+                  <span style={{ color: '#94a3b8' }}>COL Day Min</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{a.col_field_thresholds?.day_mvm} mV/m</span>
+                  <span style={{ color: '#94a3b8' }}>COL Night Min</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{a.col_field_thresholds?.night_mvm != null ? `${a.col_field_thresholds.night_mvm} mV/m` : 'N/A (secondary)'}</span>
+                </div>
+              </div>
+              {/* Coverage Zones */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>COVERAGE ZONES</div>
+                {[primary, colMin, ifZone].filter(Boolean).map(z => (
+                  <div key={z.id} style={{ background: '#020c18', borderRadius: 4, padding: '7px 10px', marginBottom: 5, fontSize: 12 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+                      <span style={{ color: '#f1f5f9', fontWeight: 600 }}>{z.label}</span>
+                      <span style={{ color: '#38bdf8', fontSize: 11 }}>{z.cfr}</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 8px' }}>
+                      <span style={{ color: '#94a3b8' }}>Threshold</span>
+                      <span style={{ color: '#94a3b8' }}>Radius</span>
+                      <span style={{ color: '#94a3b8' }}>Area</span>
+                      <span style={{ color: '#34d399', fontWeight: 700 }}>{z.threshold_mvm} mV/m</span>
+                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{z.radius_km} km</span>
+                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{z.area_km2} km²</span>
+                    </div>
+                    <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 3 }}>{z.service_quality}</div>
+                  </div>
+                ))}
+              </div>
+              {/* FM Translator Opportunity */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8 }}>
+                <div style={{ color: '#fbbf24', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                  FM Translator Opportunity — {tr.authorized ? '✓ Authorized' : 'Not Available'}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px', fontSize: 12 }}>
+                  <span style={{ color: '#94a3b8' }}>Max ERP</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{tr.max_erp_w} W</span>
+                  <span style={{ color: '#94a3b8' }}>FM Band</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{tr.fm_band}</span>
+                  <span style={{ color: '#94a3b8' }}>Form</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{tr.application_form}</span>
+                  <span style={{ color: '#94a3b8' }}>Filing Fee</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>${tr.filing_fee_usd?.toLocaleString()}</span>
+                </div>
+                {tr.coverage_note && (
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginTop: 6, fontStyle: 'italic' }}>{tr.coverage_note}</div>
+                )}
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{a.reference}</div>
+              {a.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{a.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* License Renewal Compliance Guide */}
         {candidate.license_renewal_compliance_guide && (() => {
           const l = candidate.license_renewal_compliance_guide;
