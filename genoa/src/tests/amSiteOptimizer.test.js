@@ -3376,3 +3376,48 @@ test('coverage_overlap_analysis.tower_separation_km matches distance_from_curren
       `tower_separation_km should match distance_from_current_km (rank ${c.rank})`);
   }
 });
+
+// ---------- frequency_allocation_context ----------
+
+test('frequency_allocation_context is present on response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  assert.ok(out.frequency_allocation_context != null, 'frequency_allocation_context must be present');
+});
+
+test('frequency_allocation_context.channel_class matches frequency_channel_class', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.frequency_allocation_context.channel_class, out.frequency_channel_class,
+    'frequency_allocation_context.channel_class should match top-level frequency_channel_class');
+});
+
+test('frequency_allocation_context.nif_required is false for local channels', async () => {
+  const LOCAL_FREQ = 1230; // always local channel
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: LOCAL_FREQ, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  assert.equal(out.frequency_allocation_context.nif_required, false,
+    'Local channel (1230 kHz) should not require NIF');
+});
+
+test('frequency_allocation_context.nif_required is true for clear channel', async () => {
+  const CLEAR_FREQ = 780; // KAZM is 780 kHz — a clear channel
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: CLEAR_FREQ, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  assert.equal(out.frequency_allocation_context.nif_required, true,
+    '780 kHz (clear channel) should require NIF');
+});
+
+test('frequency_allocation_context.nighttime_flexibility is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const VALID = new Set(['HIGH', 'MODERATE', 'LOW']);
+  assert.ok(VALID.has(out.frequency_allocation_context.nighttime_flexibility),
+    `nighttime_flexibility "${out.frequency_allocation_context.nighttime_flexibility}" must be HIGH/MODERATE/LOW`);
+});
+
+test('frequency_allocation_context.implications is a non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.ok(Array.isArray(out.frequency_allocation_context.implications),
+    'implications must be an array');
+  assert.ok(out.frequency_allocation_context.implications.length > 0,
+    'implications must have at least one entry');
+});

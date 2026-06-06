@@ -629,6 +629,74 @@ export async function runSiteOptimizer(body = {}){
     coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null
   }));
 
+  // ---- 16a. Frequency allocation context ----
+  // Response-level block describing the operator's channel class and the key
+  // regulatory obligations that flow from it.  Gives FCC counsel and engineers
+  // an at-a-glance reference before they dig into per-candidate detail.
+  const frequency_allocation_context = (() => {
+    const isClear    = chanClass === 'clear_channel';
+    const isRegional = chanClass === 'regional';
+    const isLocal    = chanClass === 'local';
+
+    const channel_class_label = isClear ? 'Clear Channel' : isRegional ? 'Regional Channel' : 'Local Channel';
+    const channel_class_cfr   = isClear ? '47 CFR §73.21(a)' : isRegional ? '47 CFR §73.21(b)' : '47 CFR §73.21(c)';
+
+    // Does this frequency have an FCC-designated dominant (Class A) station?
+    // We approximate: clear-channel freqs in the 640-1210 kHz set are all
+    // designated clear channels per §73.25/§73.26.  The station itself may
+    // or may not be the dominant.
+    const dominant_station_note = isClear
+      ? `${frequency_khz} kHz is a clear channel with a designated Class A dominant station. All other stations (Class B/D) must protect the dominant's primary service area at night.`
+      : isRegional
+      ? `${frequency_khz} kHz is a regional channel. Class B stations share the frequency with §73.37 co-channel protections; no single dominant station exists.`
+      : `${frequency_khz} kHz is a local channel. Class C stations operate at 250 W maximum with simplified §73.37 separations. Daytime-only or limited-time operations are common.`;
+
+    // NIF obligation
+    const nif_obligation = isLocal
+      ? 'NOT REQUIRED'
+      : isClear ? 'REQUIRED — full Class A skywave NIF protection study (§73.182). High complexity; typically 6–12 consultant-weeks.'
+      : 'REQUIRED — Class B skywave NIF protection study (§73.182). Moderate complexity; typically 3–8 consultant-weeks.';
+
+    // Power ceiling at this class
+    const pwr = FCC_CLASS_POWER_KW[fcc_class] ?? null;
+    const power_ceiling_note = pwr
+      ? `Class ${fcc_class} TPO range: ${pwr.min}–${pwr.max} kW (47 CFR §73.21).`
+      : `Class ${fcc_class}: see 47 CFR §73.21 for TPO limits.`;
+
+    // Adjacent-channel clear-channel note
+    const adjChannels = [-10, 10].map(d => frequency_khz + d).filter(f => CLEAR_CHANNEL_KHZ.has(f));
+    const adj_clear_note = adjChannels.length > 0
+      ? `±10 kHz adjacent channel(s) ${adjChannels.join(', ')} kHz are clear channels — extra §73.37 first-adjacent protection applies.`
+      : null;
+
+    // Nighttime summary
+    const nighttime_summary = isClear
+      ? 'RESTRICTED — Must protect the dominant Class A skywave contour. Directional antenna (§73.150) or daytime-only STA is typical for Class B/D relocations.'
+      : isRegional
+      ? 'MODERATE — Class B nighttime requires §73.182 NIF study but no dominant station protection. DA pattern may expand nighttime authority.'
+      : 'FLEXIBLE — Class C local channel; §73.182 study not required but short spacing coordination with co-channel licensees is still needed.';
+
+    const implications = [
+      power_ceiling_note,
+      dominant_station_note,
+      adj_clear_note,
+      `NIF obligation: ${nif_obligation}`,
+      `Nighttime authority: ${nighttime_summary}`
+    ].filter(Boolean);
+
+    return {
+      frequency_khz,
+      channel_class: chanClass,
+      channel_class_label,
+      channel_class_cfr,
+      fcc_class,
+      nif_required: !isLocal,
+      nighttime_flexibility: isLocal ? 'HIGH' : isClear ? 'LOW' : 'MODERATE',
+      adj_clear_channel_frequencies: adjChannels.length > 0 ? adjChannels : null,
+      implications
+    };
+  })();
+
   // ---- 16. Engineering summary (executive-level synthesis) ----
   // A structured plain-language summary suitable for inclusion in an engineering
   // report, legal memo, or FCC counsel briefing.  Synthesizes the top findings
@@ -720,6 +788,7 @@ export async function runSiteOptimizer(body = {}){
     candidate_set_diversity,
     candidate_comparison_table,
     engineering_summary,
+    frequency_allocation_context,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,
