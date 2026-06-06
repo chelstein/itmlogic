@@ -449,6 +449,34 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 })()}
               </RackPanel>
             )}
+            {result?.engineering_confidence_matrix && (() => {
+              const ecm = result.engineering_confidence_matrix;
+              const confColor = c => c === 'FILING_GRADE' ? 'text-emerald-400' : c === 'HIGH' ? 'text-emerald-300' : c === 'SCREENING' ? 'text-amber-400' : 'text-textDim';
+              const overallBg = c => c === 'MEDIUM_HIGH' || c === 'HIGH' ? 'bg-emerald-400/10 border-emerald-400/30' : c === 'MEDIUM' ? 'bg-amber-400/10 border-amber-400/30' : 'bg-red-400/10 border-red-400/30';
+              return (
+                <RackPanel eyebrow="Scoring Confidence" title="Engineering confidence matrix" dense>
+                  <div className={`border rounded px-2 py-1 mb-2 ${overallBg(ecm.overall_confidence)}`}>
+                    <span className="font-mono text-[10px] text-text">Overall: <strong>{ecm.overall_confidence.replace(/_/g, ' ')}</strong> · {ecm.n_filing_grade} filing-grade · {ecm.n_screening} screening · {ecm.n_not_evaluated} not evaluated</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    {ecm.dimensions.map(d => (
+                      <div key={d.id} className="flex items-start justify-between gap-2 py-0.5 border-b border-rule">
+                        <span className="font-mono text-[10px] text-text">{d.label}</span>
+                        <div className="text-right shrink-0">
+                          <span className={`font-mono text-[10px] font-bold ${confColor(d.confidence)}`}>{d.confidence.replace(/_/g, ' ')}</span>
+                          {d.score_impact_pts > 0 && <span className="font-mono text-[9px] text-textDim ml-1">±{d.score_impact_pts}pt</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {ecm.highest_impact_upgrade && (
+                    <div className="font-mono text-[10px] text-amberDim mt-1.5 leading-snug">
+                      <span className="text-textDim uppercase text-[9px]">Top upgrade: </span>{ecm.highest_impact_upgrade}
+                    </div>
+                  )}
+                </RackPanel>
+              );
+            })()}
             {result?.recommended_actions?.length > 0 && (
               <RecommendedActionsPanel recommended_actions={result.recommended_actions} />
             )}
@@ -573,6 +601,44 @@ const DEMO_RESULT = {
       { rank: 4, status: 'NON_COMPLIANT', score: 58.5, col_pct: 62, gate_verdict: 'NON_VIABLE_AS_IS', gate_fail_count: 1, cost_tier: 'VERY_HIGH', skywave_advisory: 'CRITICAL', quadrant: 'SW', action: 'Hold — 1 gate failure(s) require engineering remediation before advancing. Commission DA or power-increase study.', priority: 'HOLD' }
     ],
     note: 'This recommendation is a SCREENING-GRADE advisory based on automated scoring. A licensed broadcast engineer and FCC counsel must review before any site commitment or filing.'
+  },
+  tower_construction_timeline: {
+    frequency_khz: 780, fcc_class: 'D', channel_class: 'clear_channel', tpo_kw: 5,
+    asr_required: true, da_required: true, treaty_factor: false,
+    phases: [
+      { id: 'PHASE_1', label: 'Site selection & parcel', weeks_min: 4,   weeks_max: 12,  notes: 'Site surveys, zoning review, lease negotiation, environmental desktop review.' },
+      { id: 'PHASE_2', label: 'Engineering studies',    weeks_min: 14,  weeks_max: 28,  notes: 'NIF study (14–20 wk), DA-N pattern design (8–16 wk), soil resistivity survey, MPE evaluation.' },
+      { id: 'PHASE_3', label: 'FCC Form 301-AM + CP',   weeks_min: 26,  weeks_max: 52,  notes: 'FCC processing time for AM change of site on clear channel. Docketed proceeding if petitions filed.' },
+      { id: 'PHASE_4', label: 'Tower procurement & site prep', weeks_min: 8, weeks_max: 20, notes: 'Guyed monopole steel delivery, concrete foundation, access road, FAA/ASR coordination.' },
+      { id: 'PHASE_5', label: 'Tower erection',         weeks_min: 4,   weeks_max: 8,   notes: 'Steel erection, guy wire anchoring, aviation marking/lighting installation.' },
+      { id: 'PHASE_6', label: 'Antenna, ATU & phasor',  weeks_min: 3,   weeks_max: 6,   notes: 'DA-N phasor cabinet installation, base ATU tuning, feedline, ground system copper burial.' },
+      { id: 'PHASE_7', label: 'Proof of performance + license', weeks_min: 4, weeks_max: 8, notes: 'Field-intensity proof runs per §73.154, FCC Form 302-AM license application.' }
+    ],
+    total_weeks_min: 63, total_weeks_max: 134,
+    total_months_min: 15, total_months_max: 31,
+    range_label: '15 – 31 months (clear channel, ASR, DA-N required)',
+    critical_path_notes: [
+      'NIF study is the longest single item at 14–20 weeks — start immediately after site selection.',
+      'FCC CP processing (Phase 3) is the most uncertain duration; clear channel Class D filings may attract informal objections.',
+      'ASR registration (FCC Form 854 + FAA 7460-1) must be complete before tower construction begins — start no later than end of Phase 2.',
+      'DA-N phasor procurement can take 10–20 weeks; order during Phase 3 FCC processing to avoid delay.'
+    ],
+    note: 'Timeline is a screening-grade planning estimate. Actual schedule depends on FCC workload, parcel availability, and engineering complexity.'
+  },
+  engineering_confidence_matrix: {
+    overall_confidence: 'LOW', conductivity_mode: 'zone-table', col_polygon_supplied: false,
+    n_filing_grade: 0, n_screening: 4, n_not_evaluated: 3,
+    dimensions: [
+      { id: 'CONDUCTIVITY', label: 'Ground conductivity (σ)', confidence: 'SCREENING', score_impact_pts: 12, upgrade_action: 'Deploy AM_m3.tif GeoTIFF raster via S3/CDN — eliminates ±50% conductivity uncertainty. Commission site soil resistivity survey.', upgrade_value: 'Conductivity sub-score resolves from ±12 pts to ±3 pts.' },
+      { id: 'COL_COVERAGE', label: 'Principal community (§73.24(j)) coverage', confidence: 'SCREENING', score_impact_pts: 10, upgrade_action: 'Supply community_of_license_polygon as GeoJSON Polygon in the request body.', upgrade_value: 'COL sub-score resolves from ±10 pts to ±2 pts.' },
+      { id: 'POPULATION', label: 'Population / people served', confidence: 'SCREENING', score_impact_pts: 8, upgrade_action: 'Integrate Census TIGER block-level population raster or polygon-level data.', upgrade_value: 'Population sub-score uncertainty reduces from ±40% to ±10%.' },
+      { id: 'BLANKET_POPULATION', label: 'Blanket population (§73.24(g)) fraction', confidence: 'SCREENING', score_impact_pts: 6, upgrade_action: 'Integrate Census TIGER block-level population within 1000 mV/m contour.', upgrade_value: 'Resolves blanket sub-score from ±50% to ±10% in urban areas.' },
+      { id: 'NIGHTTIME_NIF', label: 'Nighttime skywave interference (§73.182)', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Integrate FCC OET-72 skywave propagation engine + LMS database lookup.', upgrade_value: 'Would add a 5th scoring dimension.' },
+      { id: 'WILDFIRE_RISK', label: 'Wildfire / fuel risk', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Wire USFS FIA RiskMap API or LANDFIRE raster.', upgrade_value: 'Would add wildfire_risk scoring dimension.' },
+      { id: 'PARCEL_AVAILABILITY', label: 'Parcel availability / zoning', confidence: 'NOT_EVALUATED', score_impact_pts: 0, upgrade_action: 'Integrate county parcel GIS API.', upgrade_value: 'Would eliminate non-viable candidates before scoring.' }
+    ],
+    highest_impact_upgrade: 'Deploy AM_m3.tif GeoTIFF raster via S3/CDN — eliminates ±50% conductivity uncertainty. Commission site soil resistivity survey (4-electrode Wenner) for §73.190 certification.',
+    note: 'Confidence matrix shows the data quality behind each scoring dimension. Screening-grade dimensions have the highest uncertainty and upgrading them produces the most accurate site ranking.'
   },
   candidate_set_diversity: {
     n_candidates: 4,
@@ -1055,6 +1121,94 @@ const DEMO_RESULT = {
         ],
         skywave_25uvm_est_km: 120.2,
         note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
+      },
+      fcc_lms_filing_checklist: {
+        fcc_class: 'D', channel_class: 'clear_channel', frequency_khz: 780, tpo_kw: 5,
+        required_count: 9, conditional_count: 2, total_items: 11,
+        items: [
+          { id: 'LMS_FORM_301', form: 'FCC Form 301-AM', exhibit: 'Section I — Basic Engineering', status: 'REQUIRED', rule: '47 CFR §73.3500 / §73.3525', responsible: 'Communications counsel + broadcast engineer', note: 'Primary change-of-site application. Include antenna system description, coordinates, ground system plan, and TPO.' },
+          { id: 'LMS_GROUNDWAVE_STUDY', form: 'Form 301-AM — Exhibit B', exhibit: 'Groundwave field-intensity study (§73.184)', status: 'REQUIRED', rule: '47 CFR §73.183 / §73.184', responsible: 'Licensed broadcast engineer', note: 'FCC M3-zone conductivity σ=8 mS/m used for screening. Exhibit B requires groundwave distance/field table at compass bearings per §73.184.' },
+          { id: 'LMS_COL_EXHIBIT', form: 'Form 301-AM — Exhibit C', exhibit: 'Principal community (COL) 5 mV/m coverage certification', status: 'REQUIRED', rule: '47 CFR §73.24(j)', responsible: 'Licensed broadcast engineer', note: 'Demonstrate ≥80% of principal community (97% estimated at screening) is covered by the 5 mV/m daytime groundwave contour.' },
+          { id: 'LMS_BLANKET_POP', form: 'Form 301-AM — Exhibit D', exhibit: 'Blanket interference (§73.24(g)) population study', status: 'REQUIRED', rule: '47 CFR §73.24(g)', responsible: 'Licensed broadcast engineer', note: '1000 mV/m contour population must be <1% of service-area population. Current screen: 0.4%.' },
+          { id: 'LMS_MPE_STUDY', form: 'Form 301-AM — Exhibit E', exhibit: 'RF exposure (MPE) evaluation (OET Bulletin 65 / §1.1307)', status: 'REQUIRED', rule: '47 CFR §1.1307', responsible: 'Licensed broadcast engineer', note: 'Near-field boundary λ/(2π) ≈ 61 m at 780 kHz. Fence distance and restricted-zone perimeter must be documented.' },
+          { id: 'LMS_NEPA', form: 'Form 301-AM — NEPA Checklist', exhibit: 'NEPA environmental review (§1.1306)', status: 'REQUIRED', rule: '47 CFR §1.1306 / §1.1307', responsible: 'Environmental consultant + counsel', note: 'Complete 13-item §1.1306 checklist. File EA if any trigger applies.' },
+          { id: 'LMS_ASR_FORM_854', form: 'FCC Form 854 (ASR)', exhibit: 'Antenna Structure Registration', status: 'REQUIRED', rule: '47 CFR §17.7', responsible: 'Tower owner / communications counsel', note: 'λ/4 ≈ 96.2 m exceeds 200 ft (60.96 m) §17.7 threshold. Form 854 + FAA Form 7460-1 required before construction. FAA review can take 45–90 days.' },
+          { id: 'LMS_NIGHTTIME_NIF', form: 'Form 301-AM — Exhibit F / NIF Study', exhibit: '§73.182 nighttime interference field (NIF) study', status: 'REQUIRED', rule: '47 CFR §73.182', responsible: 'Licensed broadcast engineer (skywave)', note: 'Clear channel Class D — full §73.182 NIF required at 1° azimuthal resolution (OET-72). New site must not increase interference to dominant Class A protected contours.' },
+          { id: 'LMS_DA_PATTERN', form: 'Form 301-AM — Exhibit G / §73.316 pattern table', exhibit: 'Directional antenna (DA) horizontal pattern', status: 'REQUIRED', rule: '47 CFR §73.150 / §73.316', responsible: 'Licensed broadcast engineer (antenna)', note: '§73.316: horizontal pattern in 5° increments (72 tabulated values + 0°). DA pattern must be modeled with moment-method software; physical proof required after construction.' },
+          { id: 'LMS_TREATY_COORD', form: 'FCC IB coordination letter', exhibit: 'International treaty coordination', status: 'INFORMATIONAL', rule: 'US/MX AM Agreement (1986); US/CA LOU (1991)', responsible: 'FCC International Bureau + counsel', note: 'No treaty zone detected at screening. Verify actual site coordinates against NAFTA coordination zone boundaries if site moves.' },
+          { id: 'LMS_FORM_302', form: 'FCC Form 302-AM', exhibit: 'License application after construction', status: 'REQUIRED', rule: '47 CFR §73.3536', responsible: 'Communications counsel', note: 'File after construction and proof of performance per §73.154. License completes the site change authorization.' }
+        ],
+        note: 'Screening-grade LMS filing sequence. FCC form numbers, exhibits, and rule cites current as of 2024. Consult FCC communications counsel before filing; LMS item requirements may change.'
+      },
+      seasonal_propagation_summary: {
+        frequency_khz: 780, annual_avg_sigma_msm: 8,
+        contours: [
+          { season: 'SUMMER_DRY',  label: 'Summer (dry)',     sigma_msm: 6.8, sigma_factor: 0.85, daytime_reach_05mvm_km: 31.4, col_5mvm_dist_km: 5.4 },
+          { season: 'ANNUAL_AVG',  label: 'Annual average',   sigma_msm: 8.0, sigma_factor: 1.00, daytime_reach_05mvm_km: 34.1, col_5mvm_dist_km: 5.8 },
+          { season: 'SPRING_PEAK', label: 'Spring (wet)',      sigma_msm: 8.8, sigma_factor: 1.10, daytime_reach_05mvm_km: 36.1, col_5mvm_dist_km: 6.1 },
+          { season: 'WINTER_PEAK', label: 'Winter (max wet)', sigma_msm: 9.2, sigma_factor: 1.15, daytime_reach_05mvm_km: 37.5, col_5mvm_dist_km: 6.3 }
+        ],
+        daytime_reach_variation_km: 6.1,
+        daytime_reach_variation_pct: 17.9,
+        col_compliance_risk_tier: 'LOW',
+        col_risk_note: 'GOOD conductivity — seasonal variation is unlikely to threaten §73.24(j) COL compliance.',
+        reference: 'Seasonal conductivity variation factors are screening-grade proxies from NTIA 84-136 / FCC §73.190 guidance.',
+        note: 'Seasonal propagation summary is a planning tool only. All §73.24(j) compliance determinations must use FCC-approved groundwave software with measured soil data.'
+      },
+      fcc_class_power_ceiling_analysis: {
+        fcc_class: 'D', current_tpo_kw: 5, class_power_ceiling_kw: 50,
+        headroom_kw: 45, headroom_pct: 90, power_utilization_pct: 10,
+        utilization_tier: 'LOW_UTILIZATION',
+        reach_at_ceiling_km: 88.2, col_dist_at_ceiling_km: 14.1,
+        blanket_1000mvm_at_ceiling_km: 1.61, blanket_risk_at_ceiling: 'MODERATE',
+        min_tpo_for_col_kw: null,
+        upgrade_path: [
+          'Engineering study (§73.183 groundwave + §73.24(g) blanket re-evaluation)',
+          'Amended Form 301-AM with updated COL coverage exhibit',
+          '§73.182 NIF study update (re-evaluate nighttime skywave at new power)',
+          'New RF exposure (MPE) evaluation at higher ERP (OET Bulletin 65)',
+          'Consider blanket interference (§73.24(g)) risk — larger 1000 mV/m contour'
+        ],
+        upgrade_feasibility: 'SIGNIFICANT',
+        note: 'Class D ceiling is 50 kW (§73.21). Current TPO is 5 kW (10% of ceiling). 45 kW headroom available. Power increase requires amended Form 301-AM.'
+      },
+      technical_proof_guide: {
+        frequency_khz: 780, fcc_class: 'D', antenna_mode: 'DA', is_local_channel: false,
+        quarter_wave_m: 96.2, near_field_boundary_m: 61, n_proof_radials: 72,
+        estimated_field_days: [3, 5],
+        measurements: [
+          { id: 'BASE_CURRENT', label: 'Antenna base current reading', rule: '47 CFR §73.154(a)', instrument: 'Thermocouple ammeter at antenna base', notes: 'Read base current at licensed TPO. Record as reference for monitor-point calibration.' },
+          { id: 'GROUND_RESISTANCE', label: 'Antenna base resistance (§73.190)', rule: '47 CFR §73.190', instrument: 'RF bridge or vector impedance meter at antenna base', notes: 'Measure input impedance and radiation resistance at 780 kHz. Ground system must show R_ground ≤ design spec.' },
+          { id: 'FI_RADIAL_NDA', label: 'Pattern proof — all authorized radials', rule: '47 CFR §73.154', instrument: 'Calibrated FCC field-intensity meter with λ/4 whip', notes: 'DA pattern: measure all azimuthal radials specified in authorized DA pattern, plus 8 orthogonal radials for verification. §73.316 requires submission of measured pattern vs. theoretical.' },
+          { id: 'INVERSE_DISTANCE_FIELD', label: 'Inverse-distance field (IDF) at 1 km', rule: '47 CFR §73.154(b)', instrument: 'Derived from FI traverse measurements', notes: 'For each radial, plot field × distance vs. distance to extract IDF at 1 km.' },
+          { id: 'MPE_NEAR_FIELD', label: 'RF exposure near-field boundary verification (OET-65)', rule: '47 CFR §1.1310 / OET Bulletin 65', instrument: 'Broadband RF field meter calibrated at MF', notes: 'Verify that the general-population MPE is not exceeded beyond the 61 m near-field boundary.' },
+          { id: 'ANTENNA_EFFICIENCY', label: 'Antenna radiation efficiency calculation (§73.190)', rule: '47 CFR §73.190', instrument: 'Derived from IDF + base impedance measurements', notes: 'Efficiency η = R_r / (R_r + R_g). For 120-radial system: target η ≥ 85%.' },
+          { id: 'MONITOR_POINT', label: 'DA monitor point measurement (§73.158 / §73.62)', rule: '47 CFR §73.158 / §73.62', instrument: 'Calibrated FI meter at FCC-specified monitor point location', notes: 'Clear channel Class D with DA-N pattern: the authorized DA monitor point must be measured at reference field.' }
+        ],
+        nda_radial_plan: null,
+        filing_trigger: 'FCC Form 302-AM (license to cover) must be filed within 3 years of CP grant date (§73.3534). Proof measurements must be complete before 302-AM is submitted.',
+        reference: '47 CFR §73.154 (proof of performance); §73.190 (antenna efficiency); §73.316 (DA pattern measurements); OET Bulletin 65.',
+        note: 'This is a screening-grade proof guide. Actual proof methodology must be coordinated with the licensed broadcast engineer of record and FCC counsel before construction.'
+      },
+      site_acquisition_checklist: {
+        frequency_khz: 780, fcc_class: 'D', lat: 34.91, lon: -111.79,
+        quarter_wave_m: 96.2, min_parcel_radius_m: 105.8, min_parcel_area_ha: 3.52,
+        asr_required: true, treaty_zone_present: false,
+        critical_count: 4, high_count: 5, total_items: 11,
+        items: [
+          { id: 'ZONING_VERIFICATION', category: 'Zoning & Land Use', priority: 'CRITICAL', action: 'Verify county/municipal zoning classification permits telecommunications tower and broadcast facility', what_to_check: 'Contact Yavapai County planning; AM towers may require conditional use permit.', timeline_weeks: [2, 6], notes: 'AM tower at 96 m may exceed local height limits — confirm variance process.' },
+          { id: 'TITLE_SEARCH', category: 'Title & Encumbrances', priority: 'CRITICAL', action: 'Commission title search and title insurance for parcel', what_to_check: 'Easements, deed restrictions, mineral rights. Buried utility easements in ground system area must be documented.', timeline_weeks: [2, 4], notes: null },
+          { id: 'PARCEL_SIZE_ADEQUACY', category: 'Physical Requirements', priority: 'CRITICAL', action: 'Verify parcel ≥ 3.52 ha for 96.2-m radial system (min ~106 m radius)', what_to_check: 'Map all fence lines and structures within 106 m of proposed tower base.', timeline_weeks: [1, 2], notes: null },
+          { id: 'ASR_COORD_AIRPORT', category: 'FAA & ASR', priority: 'CRITICAL', action: 'File FAA Form 7460-1 aeronautical study — λ/4 tower (96.2 m) exceeds §17.7 200-ft threshold', what_to_check: 'Identify airports within 20 km. Pre-screen at FAA OE/AAA online tool.', timeline_weeks: [6, 16], notes: 'FAA review can take 45–90 days.' },
+          { id: 'NEPA_DESKTOP_REVIEW', category: 'Environmental', priority: 'HIGH', action: 'Complete NEPA §1.1306 13-item environmental desktop checklist', what_to_check: 'Floodplain, wetlands, protected species, historic properties, wilderness.', timeline_weeks: [2, 6], notes: 'Yavapai County has high potential for archaeological sites — allow extra time for SHPO review.' },
+          { id: 'NHPA_SECTION_106', category: 'Environmental', priority: 'HIGH', action: 'Initiate NHPA §106 historic properties review with Arizona SHPO', what_to_check: 'APE within 192 m of proposed tower. Run SHPO consultation if historic properties within APE.', timeline_weeks: [4, 16], notes: null },
+          { id: 'UTILITY_ACCESS', category: 'Utilities & Infrastructure', priority: 'HIGH', action: 'Confirm electrical service availability (3-phase preferred)', what_to_check: 'Identify nearest transformer. Estimate service extension cost.', timeline_weeks: [2, 4], notes: null },
+          { id: 'LEASE_TERM', category: 'Lease & Legal', priority: 'HIGH', action: 'Negotiate minimum 20-year lease with renewal options; include FCC CP approval contingency', what_to_check: 'CP grant typically 1–3 years. Lease must survive filing delay.', timeline_weeks: [4, 12], notes: null },
+          { id: 'SETBACKS_GUYWIRES', category: 'Physical Requirements', priority: 'HIGH', action: 'Verify guy wire anchors can be placed at 77–96 m from tower base', what_to_check: 'Standard guyed λ/4 monopole uses 3 guy sets. Each anchor needs 5–10 m clearance from property line.', timeline_weeks: [1, 2], notes: null },
+          { id: 'ACCESS_ROAD', category: 'Utilities & Infrastructure', priority: 'MEDIUM', action: 'Verify legal access road and easement — crane truck access required', what_to_check: 'Confirm all-weather road ≥4 m wide to tower base.', timeline_weeks: [1, 3], notes: null },
+          { id: 'TREATY_SETBACK', category: 'Regulatory', priority: 'INFORMATIONAL', action: 'Verify site is outside international treaty coordination zone', what_to_check: 'No treaty zone detected at screening. Verify final coordinates.', timeline_weeks: [1, 2], notes: null }
+        ],
+        note: 'Site acquisition checklist is a screening-grade planning guide only. Consult real estate attorney, licensed broadcast engineer, and FCC counsel before executing any land agreement.'
       }
     },
     {

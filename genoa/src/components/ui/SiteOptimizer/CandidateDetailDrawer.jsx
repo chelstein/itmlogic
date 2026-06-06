@@ -2000,6 +2000,195 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Seasonal Propagation Summary */}
+        {/* Class Power Ceiling Analysis */}
+        {candidate.fcc_class_power_ceiling_analysis && (() => {
+          const pa = candidate.fcc_class_power_ceiling_analysis;
+          const utilColor = u => u === 'AT_CEILING' ? 'text-red-400' : u === 'HIGH_UTILIZATION' ? 'text-amber-400' : 'text-emerald-400';
+          const feasColor = f => f === 'NONE' ? 'text-red-400' : f === 'LIMITED' ? 'text-amber-400' : 'text-emerald-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Class Power Ceiling (§73.21)</div>
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                <div className="bg-surface border border-rule rounded px-2 py-1 text-center">
+                  <div className="font-mono text-[9px] text-textDim uppercase">Current TPO</div>
+                  <div className="font-mono text-[13px] text-text font-bold">{pa.current_tpo_kw} kW</div>
+                </div>
+                <div className="bg-surface border border-rule rounded px-2 py-1 text-center">
+                  <div className="font-mono text-[9px] text-textDim uppercase">Class {pa.fcc_class} Ceiling</div>
+                  <div className="font-mono text-[13px] text-text font-bold">{pa.class_power_ceiling_kw} kW</div>
+                </div>
+                <div className="bg-surface border border-rule rounded px-2 py-1 text-center">
+                  <div className="font-mono text-[9px] text-textDim uppercase">Headroom</div>
+                  <div className={`font-mono text-[13px] font-bold ${pa.headroom_kw > 0 ? 'text-emerald-400' : 'text-red-400'}`}>{pa.headroom_kw} kW</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-[11px] mb-1.5">
+                <span className="text-textDim">Utilization</span>
+                <span className={utilColor(pa.utilization_tier)}>{pa.power_utilization_pct}% — {pa.utilization_tier.replace(/_/g, ' ')}</span>
+                <span className="text-textDim">Upgrade feasibility</span>
+                <span className={feasColor(pa.upgrade_feasibility)}>{pa.upgrade_feasibility.replace(/_/g, ' ')}</span>
+                {pa.reach_at_ceiling_km != null && <>
+                  <span className="text-textDim">Reach at ceiling</span>
+                  <span className="text-text">{pa.reach_at_ceiling_km} km (0.5 mV/m)</span>
+                </>}
+                {pa.blanket_risk_at_ceiling && <>
+                  <span className="text-textDim">Blanket risk at ceiling</span>
+                  <span className={pa.blanket_risk_at_ceiling === 'ELEVATED' ? 'text-red-400' : pa.blanket_risk_at_ceiling === 'MODERATE' ? 'text-amber-400' : 'text-emerald-400'}>{pa.blanket_risk_at_ceiling}</span>
+                </>}
+              </div>
+              {Array.isArray(pa.upgrade_path) && pa.upgrade_path.length > 0 && (
+                <div>
+                  <div className="font-mono text-[9px] text-textDim uppercase mb-0.5">Power upgrade path</div>
+                  <ul className="font-mono text-[10px] text-textDim list-disc list-inside space-y-0.5">
+                    {pa.upgrade_path.map((s, i) => <li key={i}>{s}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Technical Proof Guide */}
+        {candidate.technical_proof_guide && (() => {
+          const pg = candidate.technical_proof_guide;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.154 Proof of Performance Guide</div>
+              <div className="flex items-center gap-2 mb-1.5 font-mono text-[10px]">
+                <span className="border border-rule rounded px-1.5 py-0.5 text-text">{pg.antenna_mode} antenna</span>
+                <span className="border border-rule rounded px-1.5 py-0.5 text-text">{pg.n_proof_radials} radials</span>
+                <span className="border border-rule rounded px-1.5 py-0.5 text-text">{pg.estimated_field_days?.[0]}–{pg.estimated_field_days?.[1]} field days</span>
+              </div>
+              <div className="space-y-1.5">
+                {pg.measurements.map(m => (
+                  <div key={m.id} className="border border-rule rounded px-2 py-1.5 bg-surface">
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="font-mono text-[11px] text-text font-medium">{m.label}</span>
+                      <span className="font-mono text-[9px] text-textDim shrink-0">{m.rule}</span>
+                    </div>
+                    <div className="font-mono text-[10px] text-amberDim mt-0.5 leading-snug">{m.instrument}</div>
+                    <div className="font-mono text-[10px] text-textDim mt-0.5 leading-snug">{m.notes}</div>
+                  </div>
+                ))}
+              </div>
+              {pg.nda_radial_plan && (
+                <div className="mt-1.5">
+                  <div className="font-mono text-[9px] text-textDim uppercase mb-0.5">Radial plan</div>
+                  <div className="flex flex-wrap gap-1">
+                    {pg.nda_radial_plan.map(r => (
+                      <span key={r.azimuth_deg} className="font-mono text-[9px] border border-rule rounded px-1 py-0.5 text-textDim">{r.azimuth_deg}°</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="font-mono text-[9px] text-textDim mt-1 leading-snug">{pg.filing_trigger}</div>
+            </div>
+          );
+        })()}
+
+        {/* Seasonal Propagation Summary */}
+        {candidate.seasonal_propagation_summary && (() => {
+          const ss = candidate.seasonal_propagation_summary;
+          const riskColor = r => r === 'HIGH' ? 'text-red-400' : r === 'MODERATE' ? 'text-amber-400' : 'text-emerald-400';
+          const riskBg    = r => r === 'HIGH' ? 'bg-red-400/10 border-red-400/30' : r === 'MODERATE' ? 'bg-amber-400/10 border-amber-400/30' : 'bg-emerald-400/10 border-emerald-400/30';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Seasonal Propagation</div>
+              <div className={`border rounded px-2 py-1 mb-2 ${riskBg(ss.col_compliance_risk_tier)}`}>
+                <span className={`font-mono text-[10px] font-bold uppercase ${riskColor(ss.col_compliance_risk_tier)}`}>COL Compliance Risk: {ss.col_compliance_risk_tier}</span>
+                <div className="font-mono text-[10px] text-textDim mt-0.5 leading-snug">{ss.col_risk_note}</div>
+              </div>
+              <table className="w-full font-mono text-[10px] border-collapse">
+                <thead>
+                  <tr className="border-b border-rule">
+                    <th className="text-left text-textDim py-0.5 pr-2">Season</th>
+                    <th className="text-right text-textDim py-0.5 pr-2">σ (mS/m)</th>
+                    <th className="text-right text-textDim py-0.5 pr-2">0.5 mV/m reach</th>
+                    <th className="text-right text-textDim py-0.5">5 mV/m (COL)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ss.contours.map(c => (
+                    <tr key={c.season} className={`border-b border-rule ${c.season === 'ANNUAL_AVG' ? 'text-text font-bold' : 'text-textDim'}`}>
+                      <td className="py-0.5 pr-2">{c.label}</td>
+                      <td className="text-right py-0.5 pr-2">{c.sigma_msm}</td>
+                      <td className="text-right py-0.5 pr-2">{c.daytime_reach_05mvm_km != null ? `${c.daytime_reach_05mvm_km} km` : '—'}</td>
+                      <td className="text-right py-0.5">{c.col_5mvm_dist_km != null ? `${c.col_5mvm_dist_km} km` : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {ss.daytime_reach_variation_km != null && (
+                <div className="font-mono text-[10px] text-textDim mt-1">
+                  Seasonal reach variation: ±{ss.daytime_reach_variation_km} km ({ss.daytime_reach_variation_pct}% of annual average)
+                </div>
+              )}
+              <div className="font-mono text-[9px] text-textDim mt-1 leading-snug">{ss.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Site Acquisition Checklist */}
+        {candidate.site_acquisition_checklist && (() => {
+          const sa = candidate.site_acquisition_checklist;
+          const prioColor = p => p === 'CRITICAL' ? 'text-red-400' : p === 'HIGH' ? 'text-amber-400' : p === 'MEDIUM' ? 'text-blue-300' : 'text-textDim';
+          const prioBg    = p => p === 'CRITICAL' ? 'border-red-400/40 bg-red-400/10' : p === 'HIGH' ? 'border-amber-400/40 bg-amber-400/10' : 'border-rule bg-surface';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Site Acquisition Checklist</div>
+              <div className="font-mono text-[10px] text-textDim mb-1.5">
+                Min parcel: {sa.min_parcel_area_ha} ha · {sa.critical_count} critical · {sa.high_count} high priority ({sa.total_items} total)
+              </div>
+              <div className="space-y-1">
+                {sa.items.map(item => (
+                  <div key={item.id} className={`border rounded px-2 py-1.5 ${prioBg(item.priority)}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={`font-mono text-[10px] font-bold uppercase ${prioColor(item.priority)}`}>{item.priority}</span>
+                      <span className="font-mono text-[9px] text-textDim">{item.category}</span>
+                    </div>
+                    <div className="font-mono text-[11px] text-text mt-0.5 leading-snug">{item.action}</div>
+                    {item.notes && <div className="font-mono text-[10px] text-textDim mt-0.5 leading-snug">{item.notes}</div>}
+                    {item.timeline_weeks && (
+                      <div className="font-mono text-[9px] text-textDim mt-0.5">Timeline: {item.timeline_weeks[0]}–{item.timeline_weeks[1]} weeks</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[9px] text-textDim mt-1 leading-snug">{sa.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* FCC LMS Filing Checklist */}
+        {candidate.fcc_lms_filing_checklist && (() => {
+          const fl = candidate.fcc_lms_filing_checklist;
+          const statusColor = s => s === 'REQUIRED' ? 'text-amber-400' : s === 'CONDITIONAL' ? 'text-blue-300' : 'text-textDim';
+          const statusBg    = s => s === 'REQUIRED' ? 'bg-amber-400/10 border-amber-400/40' : s === 'CONDITIONAL' ? 'bg-blue-300/10 border-blue-300/40' : 'bg-rule border-rule';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">FCC LMS Filing Checklist</div>
+              <div className="font-mono text-[10px] text-textDim mb-1.5">
+                Form 301-AM change-of-site — {fl.required_count} required, {fl.conditional_count} conditional ({fl.total_items} total items)
+              </div>
+              <div className="space-y-1">
+                {fl.items.map(item => (
+                  <div key={item.id} className={`border rounded px-2 py-1.5 ${statusBg(item.status)}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className={`font-mono text-[10px] font-bold uppercase tracking-wide ${statusColor(item.status)}`}>{item.status}</span>
+                      <span className="font-mono text-[9px] text-textDim text-right">{item.rule}</span>
+                    </div>
+                    <div className="font-mono text-[11px] text-text mt-0.5">{item.exhibit}</div>
+                    <div className="font-mono text-[10px] text-textDim">{item.form}</div>
+                    {item.note && <div className="font-mono text-[10px] text-amberDim mt-0.5 leading-snug">{item.note}</div>}
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[9px] text-textDim mt-1 leading-snug">{fl.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>

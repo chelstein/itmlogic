@@ -709,3 +709,78 @@ test('colocation response has candidate_set_recommendation', async () => {
       `priority "${e.priority}" must be valid for rank ${e.rank}`);
   }
 });
+
+test('colocation GRID candidates have fcc_lms_filing_checklist', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.fcc_lms_filing_checklist != null, `rank ${c.rank} missing fcc_lms_filing_checklist`);
+    assert.ok(Array.isArray(c.fcc_lms_filing_checklist.items), `rank ${c.rank} fcc_lms_filing_checklist.items must be array`);
+  }
+});
+
+test('colocation GRID candidates have seasonal_propagation_summary', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.seasonal_propagation_summary != null, `rank ${c.rank} missing seasonal_propagation_summary`);
+    assert.ok(['HIGH', 'MODERATE', 'LOW'].includes(c.seasonal_propagation_summary.col_compliance_risk_tier),
+      `rank ${c.rank} invalid col_compliance_risk_tier`);
+  }
+});
+
+test('colocation GRID candidates have fcc_class_power_ceiling_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.fcc_class_power_ceiling_analysis != null, `rank ${c.rank} missing fcc_class_power_ceiling_analysis`);
+    assert.equal(c.fcc_class_power_ceiling_analysis.class_power_ceiling_kw, 50, `rank ${c.rank} Class D ceiling must be 50 kW`);
+    assert.ok(['NONE','LIMITED','SIGNIFICANT'].includes(c.fcc_class_power_ceiling_analysis.upgrade_feasibility),
+      `rank ${c.rank} invalid upgrade_feasibility`);
+  }
+});
+
+test('colocation GRID candidates have technical_proof_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.technical_proof_guide != null, `rank ${c.rank} missing technical_proof_guide`);
+    assert.ok(['NDA','DA'].includes(c.technical_proof_guide.antenna_mode), `rank ${c.rank} invalid antenna_mode`);
+    assert.ok(c.technical_proof_guide.n_proof_radials > 0, `rank ${c.rank} n_proof_radials must be positive`);
+  }
+});
+
+test('colocation GRID candidates have site_acquisition_checklist', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.site_acquisition_checklist != null, `rank ${c.rank} missing site_acquisition_checklist`);
+    assert.ok(Array.isArray(c.site_acquisition_checklist.items), `rank ${c.rank} site_acquisition_checklist.items must be array`);
+    assert.ok(c.site_acquisition_checklist.critical_count > 0, `rank ${c.rank} critical_count must be > 0`);
+  }
+});

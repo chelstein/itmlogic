@@ -4685,3 +4685,271 @@ test('tower_construction_timeline critical_path_notes is array', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
   assert.ok(Array.isArray(out.tower_construction_timeline.critical_path_notes), 'critical_path_notes must be an array');
 });
+
+// ---- fcc_lms_filing_checklist ----
+
+test('fcc_lms_filing_checklist is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.fcc_lms_filing_checklist != null, `rank ${c.rank} missing fcc_lms_filing_checklist`);
+  }
+});
+
+test('fcc_lms_filing_checklist has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const fl = out.candidates[0].fcc_lms_filing_checklist;
+  assert.ok(Array.isArray(fl.items), 'items must be an array');
+  assert.ok(fl.items.length >= 5, `expected ≥5 items, got ${fl.items.length}`);
+  assert.ok(typeof fl.required_count === 'number', 'required_count must be a number');
+  assert.ok(typeof fl.total_items === 'number', 'total_items must be a number');
+});
+
+test('fcc_lms_filing_checklist each item has id, form, status, rule', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const fl = out.candidates[0].fcc_lms_filing_checklist;
+  for (const item of fl.items) {
+    assert.ok(item.id, `item missing id: ${JSON.stringify(item)}`);
+    assert.ok(item.form, `item ${item.id} missing form`);
+    assert.ok(['REQUIRED', 'CONDITIONAL', 'INFORMATIONAL'].includes(item.status), `item ${item.id} has invalid status: ${item.status}`);
+    assert.ok(item.rule, `item ${item.id} missing rule`);
+  }
+});
+
+test('fcc_lms_filing_checklist LMS_FORM_301 is always REQUIRED', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const fl = out.candidates[0].fcc_lms_filing_checklist;
+  const form301 = fl.items.find(i => i.id === 'LMS_FORM_301');
+  assert.ok(form301 != null, 'LMS_FORM_301 item must be present');
+  assert.equal(form301.status, 'REQUIRED', 'LMS_FORM_301 must be REQUIRED');
+});
+
+test('fcc_lms_filing_checklist comparison table columns are populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const row = out.candidate_comparison_table?.[0];
+  assert.ok(row != null, 'comparison table must have at least one row');
+  assert.ok(typeof row.lms_required_items === 'number', 'lms_required_items must be a number');
+  assert.ok(typeof row.lms_total_items === 'number', 'lms_total_items must be a number');
+  assert.ok(row.lms_required_items > 0, 'lms_required_items must be > 0');
+});
+
+// ---- seasonal_propagation_summary ----
+
+test('seasonal_propagation_summary is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.seasonal_propagation_summary != null, `rank ${c.rank} missing seasonal_propagation_summary`);
+  }
+});
+
+test('seasonal_propagation_summary has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ss = out.candidates[0].seasonal_propagation_summary;
+  assert.ok(Array.isArray(ss.contours), 'contours must be an array');
+  assert.ok(ss.contours.length >= 3, `expected ≥3 seasonal contours, got ${ss.contours.length}`);
+  assert.ok(typeof ss.annual_avg_sigma_msm === 'number', 'annual_avg_sigma_msm must be a number');
+  assert.ok(['HIGH', 'MODERATE', 'LOW'].includes(ss.col_compliance_risk_tier), `invalid col_compliance_risk_tier: ${ss.col_compliance_risk_tier}`);
+});
+
+test('seasonal_propagation_summary each contour has season, sigma, and reach', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ss = out.candidates[0].seasonal_propagation_summary;
+  for (const c of ss.contours) {
+    assert.ok(c.season, `contour missing season: ${JSON.stringify(c)}`);
+    assert.ok(typeof c.sigma_msm === 'number', `contour ${c.season} missing sigma_msm`);
+    assert.ok(c.sigma_msm > 0, `contour ${c.season} sigma_msm must be positive`);
+  }
+});
+
+test('seasonal_propagation_summary comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const row = out.candidate_comparison_table?.[0];
+  assert.ok(row != null, 'comparison table must have at least one row');
+  assert.ok(['HIGH', 'MODERATE', 'LOW'].includes(row.seasonal_col_risk), `invalid seasonal_col_risk: ${row.seasonal_col_risk}`);
+});
+
+test('seasonal_propagation_summary summer-dry sigma is less than annual avg', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ss = out.candidates[0].seasonal_propagation_summary;
+  const summer = ss.contours.find(c => c.season === 'SUMMER_DRY');
+  assert.ok(summer != null, 'SUMMER_DRY contour must exist');
+  assert.ok(summer.sigma_msm < ss.annual_avg_sigma_msm, `summer sigma (${summer.sigma_msm}) must be < annual avg (${ss.annual_avg_sigma_msm})`);
+});
+
+// ---- fcc_class_power_ceiling_analysis ----
+
+test('fcc_class_power_ceiling_analysis is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.fcc_class_power_ceiling_analysis != null, `rank ${c.rank} missing fcc_class_power_ceiling_analysis`);
+  }
+});
+
+test('fcc_class_power_ceiling_analysis has correct class ceiling for Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
+  assert.equal(pa.fcc_class, 'D', 'fcc_class must be D');
+  assert.equal(pa.class_power_ceiling_kw, 50, 'Class D ceiling must be 50 kW');
+  assert.equal(pa.current_tpo_kw, 5, 'current_tpo_kw must be 5');
+  assert.ok(pa.headroom_kw > 0, 'headroom_kw must be positive for 5 kW / 50 kW ceiling');
+});
+
+test('fcc_class_power_ceiling_analysis utilization_pct is correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
+  assert.ok(pa.power_utilization_pct > 0, 'utilization_pct must be positive');
+  assert.ok(pa.power_utilization_pct <= 100, 'utilization_pct must be <= 100');
+  // 5 kW / 50 kW = 10%
+  assert.ok(Math.abs(pa.power_utilization_pct - 10) < 1, `expected ~10% utilization, got ${pa.power_utilization_pct}`);
+});
+
+test('fcc_class_power_ceiling_analysis upgrade_feasibility is valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const pa = out.candidates[0].fcc_class_power_ceiling_analysis;
+  assert.ok(['NONE', 'LIMITED', 'SIGNIFICANT'].includes(pa.upgrade_feasibility), `invalid upgrade_feasibility: ${pa.upgrade_feasibility}`);
+});
+
+test('fcc_class_power_ceiling_analysis comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const row = out.candidate_comparison_table?.[0];
+  assert.ok(row != null, 'comparison table must have at least one row');
+  assert.ok(typeof row.power_utilization_pct === 'number', 'power_utilization_pct must be a number');
+  assert.ok(['NONE', 'LIMITED', 'SIGNIFICANT'].includes(row.upgrade_feasibility), `invalid upgrade_feasibility: ${row.upgrade_feasibility}`);
+});
+
+// ---- technical_proof_guide ----
+
+test('technical_proof_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.technical_proof_guide != null, `rank ${c.rank} missing technical_proof_guide`);
+  }
+});
+
+test('technical_proof_guide has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const pg = out.candidates[0].technical_proof_guide;
+  assert.ok(Array.isArray(pg.measurements), 'measurements must be an array');
+  assert.ok(pg.measurements.length >= 4, `expected ≥4 measurements, got ${pg.measurements.length}`);
+  assert.ok(['NDA', 'DA'].includes(pg.antenna_mode), `invalid antenna_mode: ${pg.antenna_mode}`);
+  assert.ok(typeof pg.n_proof_radials === 'number', 'n_proof_radials must be a number');
+});
+
+test('technical_proof_guide NDA mode has 8 radials', async () => {
+  // KAZM/780 is clear channel, so DA is expected. Use local channel for NDA test.
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1490, fcc_class: 'C', candidate_limit: 2 });
+  const pg = out.candidates[0].technical_proof_guide;
+  // 1490 kHz is a local channel — NDA, 8 radials
+  assert.equal(pg.antenna_mode, 'NDA', 'local channel must be NDA mode');
+  assert.equal(pg.n_proof_radials, 8, 'NDA must have 8 proof radials');
+  assert.ok(Array.isArray(pg.nda_radial_plan), 'NDA must have nda_radial_plan');
+  assert.equal(pg.nda_radial_plan.length, 8, 'nda_radial_plan must have 8 entries');
+});
+
+test('technical_proof_guide each measurement has id, label, rule', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const pg = out.candidates[0].technical_proof_guide;
+  for (const m of pg.measurements) {
+    assert.ok(m.id, `measurement missing id`);
+    assert.ok(m.label, `measurement ${m.id} missing label`);
+    assert.ok(m.rule, `measurement ${m.id} missing rule`);
+  }
+});
+
+test('technical_proof_guide comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const row = out.candidate_comparison_table?.[0];
+  assert.ok(row != null, 'comparison table must have at least one row');
+  assert.ok(['NDA', 'DA'].includes(row.proof_antenna_mode), `invalid proof_antenna_mode: ${row.proof_antenna_mode}`);
+  assert.ok(typeof row.proof_radials === 'number', 'proof_radials must be a number');
+});
+
+// ---- site_acquisition_checklist ----
+
+test('site_acquisition_checklist is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.site_acquisition_checklist != null, `rank ${c.rank} missing site_acquisition_checklist`);
+  }
+});
+
+test('site_acquisition_checklist has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const sa = out.candidates[0].site_acquisition_checklist;
+  assert.ok(Array.isArray(sa.items), 'items must be an array');
+  assert.ok(sa.items.length >= 5, `expected ≥5 items, got ${sa.items.length}`);
+  assert.ok(typeof sa.critical_count === 'number', 'critical_count must be a number');
+  assert.ok(typeof sa.min_parcel_area_ha === 'number', 'min_parcel_area_ha must be a number');
+  assert.ok(sa.min_parcel_area_ha > 0, 'min_parcel_area_ha must be positive');
+});
+
+test('site_acquisition_checklist each item has id, category, priority, action', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const sa = out.candidates[0].site_acquisition_checklist;
+  for (const item of sa.items) {
+    assert.ok(item.id, `item missing id`);
+    assert.ok(item.category, `item ${item.id} missing category`);
+    assert.ok(['CRITICAL','HIGH','MEDIUM','INFORMATIONAL'].includes(item.priority), `item ${item.id} has invalid priority: ${item.priority}`);
+    assert.ok(item.action, `item ${item.id} missing action`);
+  }
+});
+
+test('site_acquisition_checklist has ZONING_VERIFICATION as CRITICAL', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const sa = out.candidates[0].site_acquisition_checklist;
+  const zoning = sa.items.find(i => i.id === 'ZONING_VERIFICATION');
+  assert.ok(zoning != null, 'ZONING_VERIFICATION must be present');
+  assert.equal(zoning.priority, 'CRITICAL', 'ZONING_VERIFICATION must be CRITICAL');
+});
+
+test('site_acquisition_checklist comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const row = out.candidate_comparison_table?.[0];
+  assert.ok(row != null, 'comparison table must have at least one row');
+  assert.ok(typeof row.acq_critical_items === 'number', 'acq_critical_items must be a number');
+  assert.ok(typeof row.acq_min_parcel_ha === 'number', 'acq_min_parcel_ha must be a number');
+  assert.ok(row.acq_critical_items > 0, 'acq_critical_items must be > 0');
+});
+
+// ---- engineering_confidence_matrix ----
+
+test('engineering_confidence_matrix is present on optimizer response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.ok(out.engineering_confidence_matrix != null, 'engineering_confidence_matrix must be present');
+});
+
+test('engineering_confidence_matrix has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ecm = out.engineering_confidence_matrix;
+  assert.ok(Array.isArray(ecm.dimensions), 'dimensions must be an array');
+  assert.ok(ecm.dimensions.length >= 4, `expected ≥4 dimensions, got ${ecm.dimensions.length}`);
+  assert.ok(['LOW', 'MEDIUM', 'MEDIUM_HIGH', 'HIGH'].includes(ecm.overall_confidence), `invalid overall_confidence: ${ecm.overall_confidence}`);
+  assert.ok(typeof ecm.n_filing_grade === 'number', 'n_filing_grade must be a number');
+  assert.ok(typeof ecm.n_not_evaluated === 'number', 'n_not_evaluated must be a number');
+});
+
+test('engineering_confidence_matrix each dimension has id, label, confidence', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ecm = out.engineering_confidence_matrix;
+  for (const d of ecm.dimensions) {
+    assert.ok(d.id, `dimension missing id`);
+    assert.ok(d.label, `dimension ${d.id} missing label`);
+    assert.ok(['FILING_GRADE','HIGH','SCREENING','NOT_EVALUATED'].includes(d.confidence),
+      `dimension ${d.id} has invalid confidence: ${d.confidence}`);
+  }
+});
+
+test('engineering_confidence_matrix has CONDUCTIVITY dimension', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ecm = out.engineering_confidence_matrix;
+  const cond = ecm.dimensions.find(d => d.id === 'CONDUCTIVITY');
+  assert.ok(cond != null, 'CONDUCTIVITY dimension must be present');
+  // Zone-table mode: SCREENING; raster mode: FILING_GRADE
+  assert.ok(['SCREENING', 'FILING_GRADE'].includes(cond.confidence), `invalid CONDUCTIVITY confidence: ${cond.confidence}`);
+});
+
+test('engineering_confidence_matrix col_polygon_supplied reflects input', async () => {
+  const outNo  = await runSiteOptimizer({ ...KAZM, candidate_limit: 2, community_of_license_polygon: null });
+  const outYes = await runSiteOptimizer({ ...KAZM, candidate_limit: 2, community_of_license_polygon: { type: 'Point', coordinates: [-111.82, 34.86] } });
+  assert.equal(outNo.engineering_confidence_matrix.col_polygon_supplied,  false, 'no polygon → col_polygon_supplied must be false');
+  assert.equal(outYes.engineering_confidence_matrix.col_polygon_supplied, true,  'with polygon → col_polygon_supplied must be true');
+});
