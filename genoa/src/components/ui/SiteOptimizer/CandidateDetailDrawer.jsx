@@ -577,6 +577,39 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* TPO-to-coverage table */}
+        {candidate.tpo_to_coverage_table?.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">TPO for §73.24(j) 5 mV/m at distance</div>
+            <table className="w-full font-mono text-[10px] border-collapse">
+              <thead>
+                <tr className="text-textDim text-left">
+                  <th className="pb-0.5 pr-3 font-normal">COL dist.</th>
+                  <th className="pb-0.5 pr-3 font-normal">Min TPO</th>
+                  <th className="pb-0.5 font-normal">Within class</th>
+                </tr>
+              </thead>
+              <tbody>
+                {candidate.tpo_to_coverage_table.map(row => {
+                  const withinCeiling = row.within_class_ceiling;
+                  const col = withinCeiling ? '#63d471' : '#ff7a7a';
+                  return (
+                    <tr key={row.col_distance_km} className="border-t border-white/5">
+                      <td className="py-0.5 pr-3 text-textDim">{row.col_distance_km} km</td>
+                      <td className="py-0.5 pr-3" style={{ color: row.tpo_needed_kw != null ? col : '#444' }}>
+                        {row.tpo_needed_kw != null ? `${row.tpo_needed_kw} kW` : '—'}
+                      </td>
+                      <td className="py-0.5 text-[9px]" style={{ color: withinCeiling ? '#63d471' : '#ff7a7a' }}>
+                        {withinCeiling == null ? '—' : withinCeiling ? '✓ yes' : '✕ exceeds §73.21'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Groundwave contour table */}
         {candidate.groundwave_contour_table?.length > 0 && (
           <div>
