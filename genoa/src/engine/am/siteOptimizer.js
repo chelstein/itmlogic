@@ -776,7 +776,10 @@ export async function runSiteOptimizer(body = {}){
     fin_total_buy_low:      c.financial_feasibility_summary?.total_buy_low_usd ?? null,
     fin_total_buy_high:     c.financial_feasibility_summary?.total_buy_high_usd ?? null,
     fin_feasibility:        c.financial_feasibility_summary?.overall_feasibility ?? null,
-    fin_payback_optimistic: c.financial_feasibility_summary?.payback_years_optimistic ?? null
+    fin_payback_optimistic: c.financial_feasibility_summary?.payback_years_optimistic ?? null,
+    ap_col_bearing_deg:     c.antenna_pattern_optimization_guide?.col_bearing_deg ?? null,
+    ap_col_field_nda_mvm:   c.antenna_pattern_optimization_guide?.field_at_col_nda_mvm ?? null,
+    ap_da_recommended:      c.antenna_pattern_optimization_guide?.da_recommended ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5054,7 +5057,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const qwM_ff    = round2((300000 / frequency_khz) / 4);
       const asrReq_ff = qwM_ff > 60.96;
       const isClear_ff = CLEAR_CHANNEL_KHZ.has(frequency_khz);
-      const isDA_ff    = /DA/i.test(pattern_mode);
+      const isDA_ff    = /^DA/i.test(pattern_mode);  // NDA starts with N, not DA
       const isLocal_ff = LOCAL_CHANNEL_KHZ.has(frequency_khz);
       const isHighPow_ff = tpo_kw >= 25;
       const isMedPow_ff  = tpo_kw >= 5 && tpo_kw < 25;
@@ -5187,6 +5190,108 @@ async function scoreCandidate(pt, ctx, warnings){
         overall_feasibility:         feasibility,
         reference: 'BIA/NRTC AM Station Cost Benchmarks (2023); FCC Form 301-AM fee schedule; IBEW/NECA construction wage data; NAB Radio Revenue Database',
         note: 'All cost estimates are 2024-dollar screening-grade figures. Regional labor, material, and real estate costs vary significantly. Engage a professional broadcast engineer, real estate attorney, and financial advisor for project-specific estimates before any capital commitment.'
+      };
+    })(),
+
+    // §73.150/§73.152/§73.316 Directional Antenna Pattern Optimization Guide.
+    // For DA stations: provides element spacing, orientation, current ratio
+    // guidance, pattern shape candidates, COL minimum field requirement,
+    // and §73.316 filing compliance checklist.
+    // For NDA stations: provides non-directional coverage summary and
+    // note on when DA could improve COL coverage or reduce blanket population.
+    antenna_pattern_optimization_guide: (() => {
+      const isDA_ap  = /^DA/i.test(pattern_mode);   // NDA starts with N, not DA
+      const isClear_ap = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const qwM_ap   = round2((300000 / frequency_khz) / 4);
+      const lambdaM  = round2(300000 / frequency_khz);
+
+      // COL bearing — azimuth from candidate to COL centroid (or current site proxy).
+      // Used to orient the DA pattern toward the community of license.
+      // Without a col_centroid, we compute bearing from candidate to current_site
+      // as a proxy (the COL is typically near the current transmitter).
+      const targetLat = col_centroid?.lat ?? current_site.lat;
+      const targetLon = col_centroid?.lon ?? current_site.lon;
+      const dLat      = (targetLat - pt.lat) * (Math.PI / 180);
+      const dLon      = (targetLon - pt.lon) * (Math.PI / 180);
+      const ptLatR    = pt.lat * (Math.PI / 180);
+      const tgtLatR   = targetLat * (Math.PI / 180);
+      const ay = Math.sin(dLon) * Math.cos(tgtLatR);
+      const ax = Math.cos(ptLatR) * Math.sin(tgtLatR) - Math.sin(ptLatR) * Math.cos(tgtLatR) * Math.cos(dLon);
+      const col_bearing_deg = round2(((Math.atan2(ay, ax) * 180 / Math.PI) + 360) % 360);
+
+      // Distance to COL centroid / current site proxy
+      const dLat_km = dLat * R_EARTH_KM;
+      const dLon_km = dLon * Math.cos(ptLatR) * R_EARTH_KM;
+      const dist_to_col_km = round2(Math.sqrt(dLat_km * dLat_km + dLon_km * dLon_km));
+
+      // Required field at COL per §73.24(j): 5 mV/m at the community of license
+      const colReqdMvm = 5.0;
+
+      // Field this station delivers at the COL distance (non-directional estimate)
+      let field_at_col_nda_mvm = null;
+      try {
+        const r = fccAmFieldMvmAtDistance({ frequency_khz, distance_km: dist_to_col_km, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        field_at_col_nda_mvm = r?.field_mvm != null ? round2(r.field_mvm) : null;
+      } catch { /* ok */ }
+
+      // Standard 2-element DA spacing options (§73.150)
+      // Common spacings: λ/4 (90°), λ/2 (180°), 3λ/8 (135°)
+      const spacingOptions = [
+        { spacing_label: 'λ/4',  spacing_m: round2(qwM_ap),            spacing_deg: 90,  pattern_type: 'CARDIOID',   gain_over_nda_db: round2(3.0), note: 'Standard 2-element cardioid; deep null opposite COL; simplest to optimize' },
+        { spacing_label: '3λ/8', spacing_m: round2(qwM_ap * 1.5),      spacing_deg: 135, pattern_type: 'MODIFIED_CARDIOID', gain_over_nda_db: round2(3.5), note: 'Wider front lobe; reduced null depth; useful when suppression is partial' },
+        { spacing_label: 'λ/2',  spacing_m: round2(lambdaM / 2),        spacing_deg: 180, pattern_type: 'FIGURE_EIGHT', gain_over_nda_db: round2(4.8), note: 'Figure-8 pattern; two nulls; gain toward COL; high suppression at 90°/270°' }
+      ];
+
+      // §73.316 horizontal radiation pattern compliance checklist
+      const hrpChecklist = [
+        { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 10° increments (0°–350°)', required: isDA_ap, note: '§73.316(b)(1): full 36-radial measured pattern required for all DA stations' },
+        { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: isDA_ap, note: '§73.316(b)(2): EF at 1 km computed from measured base currents and pattern' },
+        { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: isDA_ap, note: '§73.316: D/U at interfered-with protected contour must meet §73.207 limits' },
+        { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: isDA_ap, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
+        { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: isDA_ap && isClear_ap, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
+        { id: 'COL_MIN_FIELD', item: `COL minimum field: ${colReqdMvm} mV/m at ${dist_to_col_km} km toward ${col_bearing_deg}°`, required: true, note: `§73.24(j): 5 mV/m groundwave field must reach community of license from candidate site. NDA estimate: ${field_at_col_nda_mvm != null ? `${field_at_col_nda_mvm} mV/m` : 'N/A'}.` },
+        { id: 'NIGHTTIME_DA', item: 'DA-N (nighttime) pattern separate from DA-D (daytime) if nighttime authorized', required: isDA_ap && !isLocal_ap, note: '§73.150(b): separate pattern authorizations for DA-D and DA-N; skywave NIF analysis for DA-N' }
+      ];
+      function isLocal_ap(){ return LOCAL_CHANNEL_KHZ.has(frequency_khz); }
+
+      // DA vs NDA decision guidance
+      const colDeficit_mvm = field_at_col_nda_mvm != null ? round2(colReqdMvm - field_at_col_nda_mvm) : null;
+      const daRecommended = colDeficit_mvm != null && colDeficit_mvm > 0
+        ? 'STRONGLY_RECOMMENDED'   // NDA can't reach COL; DA gain toward COL may close gap
+        : isClear_ap
+        ? 'EVALUATE'               // Clear channel: DA to protect nighttime contour
+        : coverage_pct != null && coverage_pct < 0.80
+        ? 'CONSIDER'               // COL coverage marginal; DA can help
+        : 'NOT_NEEDED';
+
+      const daRecommendedNote = daRecommended === 'STRONGLY_RECOMMENDED'
+        ? `NDA field at COL (${field_at_col_nda_mvm ?? '?'} mV/m) is below the §73.24(j) 5 mV/m floor. A DA pattern toward ${col_bearing_deg}° can add 3–5 dB gain and may achieve compliance without increasing TPO.`
+        : daRecommended === 'EVALUATE'
+        ? `Clear channel (${frequency_khz} kHz): DA-N pattern may be required to protect dominant Class A nighttime skywave contour at night.`
+        : daRecommended === 'CONSIDER'
+        ? `COL coverage is marginal (${coverage_pct != null ? (coverage_pct*100).toFixed(0) : '?'}%). A DA pattern oriented toward ${col_bearing_deg}° could improve coverage without a power increase.`
+        : `NDA operation at ${tpo_kw} kW appears sufficient for COL coverage. DA adds cost and complexity; evaluate only if nighttime NIF study reveals issues.`;
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        tpo_kw,
+        is_directional: isDA_ap,
+        quarter_wave_m: qwM_ap,
+        wavelength_m: lambdaM,
+        col_bearing_deg,
+        dist_to_col_km,
+        col_required_field_mvm: colReqdMvm,
+        field_at_col_nda_mvm,
+        col_field_deficit_mvm: colDeficit_mvm,
+        da_recommended: daRecommended,
+        da_recommended_note: daRecommendedNote,
+        element_spacing_options: isDA_ap ? spacingOptions : null,
+        hrp_compliance_checklist: hrpChecklist,
+        n_checklist_required: hrpChecklist.filter(i => i.required).length,
+        reference: '47 CFR §73.150 (DA operation); §73.152 (DA-D/DA-N); §73.316 (pattern measurements); §73.24(j) (COL field); §73.207/§73.215 (protection)',
+        note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       };
     })(),
 

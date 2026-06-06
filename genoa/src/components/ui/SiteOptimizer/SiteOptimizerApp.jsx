@@ -1303,6 +1303,31 @@ const DEMO_RESULT = {
         ],
         reference: 'BIA/NRTC AM Station Cost Benchmarks (2023); FCC Form 301-AM fee schedule; IBEW/NECA construction wage data',
         note: 'All cost estimates are 2024-dollar screening-grade figures. Regional labor, material, and real estate costs vary significantly. Engage a professional broadcast engineer, real estate attorney, and financial advisor for project-specific estimates before any capital commitment.'
+      },
+      antenna_pattern_optimization_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'DA-D', tpo_kw: 5,
+        is_directional: true, quarter_wave_m: 96.2, wavelength_m: 384.6,
+        col_bearing_deg: 212, dist_to_col_km: 3.8,
+        col_required_field_mvm: 5.0, field_at_col_nda_mvm: 4.1, col_field_deficit_mvm: 0.9,
+        da_recommended: 'STRONGLY_RECOMMENDED',
+        da_recommended_note: 'NDA field at COL (4.1 mV/m) is below the §73.24(j) 5 mV/m floor. A DA pattern toward 212° can add 3–5 dB gain and may achieve compliance without increasing TPO.',
+        element_spacing_options: [
+          { spacing_label: 'λ/4', spacing_m: 96.2, spacing_deg: 90, pattern_type: 'CARDIOID', gain_over_nda_db: 3.0, note: 'Standard 2-element cardioid; deep null opposite COL; simplest to optimize' },
+          { spacing_label: '3λ/8', spacing_m: 144.2, spacing_deg: 135, pattern_type: 'MODIFIED_CARDIOID', gain_over_nda_db: 3.5, note: 'Wider front lobe; reduced null depth; useful when suppression is partial' },
+          { spacing_label: 'λ/2', spacing_m: 192.3, spacing_deg: 180, pattern_type: 'FIGURE_EIGHT', gain_over_nda_db: 4.8, note: 'Figure-8 pattern; two nulls; gain toward COL; high suppression at 90°/270°' }
+        ],
+        hrp_compliance_checklist: [
+          { id: 'HRP_TABLE', item: 'Horizontal radiation pattern table at 10° increments (0°–350°)', required: true, note: '§73.316(b)(1): full 36-radial measured pattern required for all DA stations' },
+          { id: 'HRP_CONTOUR', item: 'Effective field (mV/m at 1 km) for each radial tabulated', required: true, note: '§73.316(b)(2): EF at 1 km computed from measured base currents and pattern' },
+          { id: 'SUPPRESSION_RATIO', item: 'Suppression ratios toward protected stations computed', required: true, note: '§73.316: D/U at interfered-with protected contour must meet §73.207 limits' },
+          { id: 'DA_LICENSE_STATUS', item: 'DA pattern must be approved via FCC Form 302-AM (license to cover)', required: true, note: '§73.3533: proof-of-performance measurements required before DA operation authorized' },
+          { id: 'MONITOR_POINT', item: 'FCC-specified monitor points during DA operation', required: true, note: '§73.61/§73.62: clear-channel DA stations require FCC-specified monitoring' },
+          { id: 'COL_MIN_FIELD', item: 'COL minimum field: 5.0 mV/m at 3.8 km toward 212°', required: true, note: '§73.24(j): 5 mV/m groundwave field must reach community of license. NDA estimate: 4.1 mV/m.' },
+          { id: 'NIGHTTIME_DA', item: 'DA-N (nighttime) pattern separate from DA-D (daytime)', required: true, note: '§73.150(b): separate pattern authorizations for DA-D and DA-N; skywave NIF for DA-N' }
+        ],
+        n_checklist_required: 7,
+        reference: '47 CFR §73.150; §73.152; §73.316; §73.24(j); §73.207/§73.215',
+        note: 'Pattern optimization guidance is screening-grade. Actual DA element positions, current ratios, and phasing must be determined by a licensed broadcast engineer using full §73.182 analysis and field measurements per §73.154.'
       }
     },
     {

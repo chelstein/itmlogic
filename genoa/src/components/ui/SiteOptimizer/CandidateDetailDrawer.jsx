@@ -2129,6 +2129,69 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Antenna Pattern Optimization Guide */}
+        {candidate.antenna_pattern_optimization_guide && (() => {
+          const ap = candidate.antenna_pattern_optimization_guide;
+          const recColor = r => r === 'STRONGLY_RECOMMENDED' ? 'text-red-400' : r === 'EVALUATE' ? 'text-amber-400' : r === 'CONSIDER' ? 'text-blue-300' : 'text-emerald-400';
+          const recBg    = r => r === 'STRONGLY_RECOMMENDED' ? 'bg-red-400/15 border-red-400/40' : r === 'EVALUATE' ? 'bg-amber-400/15 border-amber-400/40' : r === 'CONSIDER' ? 'bg-blue-300/15 border-blue-300/40' : 'bg-emerald-400/15 border-emerald-400/40';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.150 Antenna Pattern Guide</div>
+              {/* DA recommendation badge */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${recBg(ap.da_recommended)} ${recColor(ap.da_recommended)}`}>
+                  DA: {ap.da_recommended?.replace(/_/g, ' ')}
+                </span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border ${ap.is_directional ? 'bg-amber-400/10 border-amber-400/40 text-amber-400' : 'bg-surface border-rule text-textDim'}`}>
+                  {ap.pattern_mode}
+                </span>
+              </div>
+              <div className="font-mono text-[9px] text-textDim mb-2 leading-snug">{ap.da_recommended_note}</div>
+              {/* COL bearing metrics */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'COL bearing', value: ap.col_bearing_deg != null ? `${ap.col_bearing_deg}°` : '—' },
+                  { label: 'Dist to COL', value: ap.dist_to_col_km != null ? `${ap.dist_to_col_km} km` : '—' },
+                  { label: 'NDA field at COL', value: ap.field_at_col_nda_mvm != null ? `${ap.field_at_col_nda_mvm} mV/m` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Spacing options (DA only) */}
+              {ap.element_spacing_options && (
+                <div className="mb-2">
+                  <div className="font-mono text-[9px] text-textDim mb-1">2-Element Spacing Options</div>
+                  <div className="space-y-1">
+                    {ap.element_spacing_options.map(s => (
+                      <div key={s.spacing_label} className="border border-rule rounded p-1.5 bg-surface/60">
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="font-mono text-[9px] text-textBright font-semibold">{s.spacing_label} ({s.spacing_m} m) — {s.pattern_type?.replace(/_/g, ' ')}</span>
+                          <span className="font-mono text-[9px] text-emerald-400">+{s.gain_over_nda_db} dB</span>
+                        </div>
+                        <div className="font-mono text-[8px] text-textDim leading-snug">{s.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* §73.316 HRP checklist */}
+              <div className="font-mono text-[9px] text-textDim mb-1">§73.316 Compliance Checklist</div>
+              <div className="space-y-0.5 mb-1">
+                {ap.hrp_compliance_checklist.map(c => (
+                  <div key={c.id} className={`flex items-start gap-1.5 px-1.5 py-0.5 rounded border ${c.required ? 'border-amber-400/30 bg-amber-400/5' : 'border-rule bg-surface/40'}`}>
+                    <span className={`font-mono text-[8px] font-bold min-w-[14px] ${c.required ? 'text-amber-400' : 'text-textDim'}`}>{c.required ? '✓' : '—'}</span>
+                    <span className="font-mono text-[8px] text-textBright leading-snug">{c.item}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{ap.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Financial Feasibility Summary */}
         {candidate.financial_feasibility_summary && (() => {
           const fin = candidate.financial_feasibility_summary;

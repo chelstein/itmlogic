@@ -5158,3 +5158,50 @@ test('financial_feasibility_summary comparison table columns populated', async (
     assert.ok('fin_payback_optimistic' in row);
   }
 });
+
+// ---- antenna_pattern_optimization_guide ----
+
+test('antenna_pattern_optimization_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.antenna_pattern_optimization_guide != null, `rank ${c.rank} missing antenna_pattern_optimization_guide`);
+  }
+});
+
+test('antenna_pattern_optimization_guide has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ap = out.candidates[0].antenna_pattern_optimization_guide;
+  assert.ok(typeof ap.col_bearing_deg === 'number');
+  assert.ok(typeof ap.dist_to_col_km === 'number');
+  assert.ok(typeof ap.col_required_field_mvm === 'number');
+  assert.ok(typeof ap.da_recommended === 'string');
+  assert.ok(typeof ap.da_recommended_note === 'string');
+  assert.ok(Array.isArray(ap.hrp_compliance_checklist));
+});
+
+test('antenna_pattern_optimization_guide NDA has no spacing options', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const ap = out.candidates[0].antenna_pattern_optimization_guide;
+  assert.equal(ap.is_directional, false);
+  assert.ok(ap.element_spacing_options === null);
+});
+
+test('antenna_pattern_optimization_guide DA has 3 spacing options', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const ap = out.candidates[0].antenna_pattern_optimization_guide;
+  assert.equal(ap.is_directional, true);
+  assert.equal(ap.element_spacing_options.length, 3);
+  const spacings = ap.element_spacing_options.map(s => s.spacing_label);
+  assert.ok(spacings.includes('λ/4'));
+  assert.ok(spacings.includes('λ/2'));
+});
+
+test('antenna_pattern_optimization_guide comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('ap_col_bearing_deg' in row);
+    assert.ok('ap_col_field_nda_mvm' in row);
+    assert.ok('ap_da_recommended' in row);
+  }
+});
