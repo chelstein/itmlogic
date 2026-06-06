@@ -583,6 +583,15 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                     </span>
                     {' '}<span className="opacity-60">— {candidate.antenna_system_summary.efficiency_range_db.label}</span>
                   </div>
+                  {candidate.antenna_system_summary.estimated_erp_kw != null && (
+                    <div>
+                      <span className="opacity-60">Est. ERP: </span>
+                      <span className="text-cream">{candidate.antenna_system_summary.estimated_erp_kw} kW</span>
+                      {candidate.antenna_system_summary.erp_vs_tpo_ratio != null && (
+                        <span className="opacity-50"> ({(candidate.antenna_system_summary.erp_vs_tpo_ratio * 100).toFixed(0)}% of TPO)</span>
+                      )}
+                    </div>
+                  )}
                   {candidate.antenna_system_summary.tpo_headroom_to_class_max_kw != null && (
                     <div>
                       <span className="opacity-60">TPO headroom: </span>

@@ -3169,3 +3169,49 @@ test('regulatory_risk_score.risk_factors is an array on all candidates', async (
       `regulatory_risk_score.risk_factors must be an array (rank ${c.rank})`);
   }
 });
+
+// ---------- antenna_system_summary ERP enrichment ----------
+
+test('antenna_system_summary.estimated_erp_kw is present and positive on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const erp = c.antenna_system_summary?.estimated_erp_kw;
+    assert.ok(erp != null && erp > 0,
+      `estimated_erp_kw must be positive (rank ${c.rank}, got ${erp})`);
+  }
+});
+
+test('antenna_system_summary.estimated_erp_kw <= tpo_kw (efficiency ≤ 1)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const { tpo_kw } = out.inputs_echo;
+  for (const c of out.candidates){
+    const erp = c.antenna_system_summary?.estimated_erp_kw;
+    if (erp != null){
+      assert.ok(erp <= tpo_kw,
+        `estimated_erp_kw ${erp} must be ≤ tpo_kw ${tpo_kw} (rank ${c.rank})`);
+    }
+  }
+});
+
+test('antenna_system_summary.erp_vs_tpo_ratio is in (0, 1]', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ratio = c.antenna_system_summary?.erp_vs_tpo_ratio;
+    if (ratio != null){
+      assert.ok(ratio > 0 && ratio <= 1,
+        `erp_vs_tpo_ratio ${ratio} must be in (0,1] (rank ${c.rank})`);
+    }
+  }
+});
+
+test('candidate_comparison_table has estimated_erp_kw and erp_efficiency_pct columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table){
+    assert.ok('estimated_erp_kw' in row, `comparison table row missing estimated_erp_kw (rank ${row.rank})`);
+    assert.ok('erp_efficiency_pct' in row, `comparison table row missing erp_efficiency_pct (rank ${row.rank})`);
+  }
+});

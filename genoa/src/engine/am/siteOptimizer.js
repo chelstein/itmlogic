@@ -619,7 +619,10 @@ export async function runSiteOptimizer(body = {}){
     efficiency_tier:        c.power_efficiency_metrics?.efficiency_tier ?? null,
     da_applicable:          c.da_gain_potential?.applicable ?? null,
     da_col_pct_estimate:    c.da_gain_potential?.da_col_coverage_estimate_pct ?? null,
-    da_would_recover:       c.da_gain_potential?.would_recover_col_compliance ?? null
+    da_would_recover:       c.da_gain_potential?.would_recover_col_compliance ?? null,
+    estimated_erp_kw:       c.antenna_system_summary?.estimated_erp_kw ?? null,
+    erp_efficiency_pct:     c.antenna_system_summary?.erp_vs_tpo_ratio != null
+      ? round2(c.antenna_system_summary.erp_vs_tpo_ratio * 100) : null
   }));
 
   // ---- 16. Engineering summary (executive-level synthesis) ----
@@ -1353,8 +1356,19 @@ async function scoreCandidate(pt, ctx, warnings){
         : { min_db: -4.0, max_db: -2.0, label: 'high loss — deep-driven rods + extended radials required' };
       const classMax = FCC_CLASS_POWER_KW[fcc_class]?.max ?? null;
       const service_area_km2 = daytime_reach_km != null ? round2(Math.PI * daytime_reach_km * daytime_reach_km) : null;
+
+      // Estimated ERP (effective radiated power) from TPO after antenna efficiency loss.
+      // Uses the midpoint of the efficiency range as a screening-grade ERP estimate.
+      // FCC Form 302-AM reports antenna efficiency as the ratio of radiated power to
+      // input power; for a λ/4 monopole on a typical ground system it's ~90% (−0.5 dB).
+      const midEffDb = (effRange.min_db + effRange.max_db) / 2;
+      const erp_efficiency_factor = Math.pow(10, midEffDb / 10);  // linear power ratio
+      const estimated_erp_kw = round2(tpo_kw * erp_efficiency_factor);
+
       return {
         efficiency_range_db: effRange,
+        estimated_erp_kw,
+        erp_vs_tpo_ratio: round2(erp_efficiency_factor),
         tpo_headroom_to_class_max_kw: classMax != null ? round2(classMax - tpo_kw) : null,
         effective_service_area_km2: service_area_km2,
         note: `Based on M3 zone σ=${sigma_msm} mS/m (${sigmaQuality(sigma_msm)}). Actual efficiency depends on tower design and installed ground system.`
