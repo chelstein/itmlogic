@@ -491,6 +491,94 @@ export async function runSiteOptimizer(body = {}){
     any_zone_table_sigma:   scored.some(c => c.ground_sigma_filing_grade !== 'filing')
   });
 
+  // ---- 13. Candidate shortlist — top 3 PROMISING (or best available) candidates ----
+  // A compact summary for display and handoff to the engineering team.  Each entry
+  // gets a 2-sentence action statement synthesized from the screening metrics.
+  const candidate_shortlist = (() => {
+    // Prefer PROMISING candidates; fall back to any non-NON_COMPLIANT if none exist.
+    const promising = returned.filter(c => c.status_category === 'PROMISING');
+    const pool = promising.length > 0 ? promising : returned.filter(c => c.status_category !== 'NON_COMPLIANT');
+    return pool.slice(0, 3).map(c => {
+      const dist = c.distance_from_current_km != null ? `${c.distance_from_current_km.toFixed(1)} km ${c.cardinal_direction ?? ''}` : 'unknown distance';
+      const col  = c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}%` : '?%';
+      const sigma = c.ground_sigma_quality ?? 'unknown';
+      const band = c.score_confidence_band;
+      const bandStr = band ? `score ${c.score.toFixed(1)} [${band.score_low}–${band.score_high}]` : `score ${c.score?.toFixed(1) ?? '?'}`;
+      const action = c.status_category === 'PROMISING'
+        ? `Advance to full §73.182 NIF study and parcel investigation.`
+        : c.status_category === 'RECOVERABLE_WITH_POWER_INCREASE'
+        ? `Increase TPO to ≥${c.minimum_tpo_for_col_coverage_kw} kW to achieve §73.24(j) compliance, then advance to NIF study.`
+        : c.status_category === 'RECOVERABLE_WITH_DA'
+        ? `Commission §73.150 directional antenna study to push 5 mV/m contour toward community of license.`
+        : c.status_category === 'TREATY_REVIEW'
+        ? `Initiate FCC International Bureau treaty coordination before any other action.`
+        : `Engineering review required before advancing — see per_candidate_engineering_checklist.`;
+      return {
+        rank: c.rank,
+        lat: c.lat, lon: c.lon,
+        status_category: c.status_category,
+        score_with_band: bandStr,
+        summary: `Rank ${c.rank} @ ${dist}: COL coverage ${col}, σ=${c.ground_sigma_mS_m ?? '?'} mS/m (${sigma}), reach ${c.daytime_reach_km?.toFixed(0) ?? '?'} km. ${action}`,
+        recommended_next_step: action
+      };
+    });
+  })();
+
+  // ---- 14. Candidate set diversity ----
+  // Cross-candidate analysis: directional spread, conductivity spread, score spread.
+  // Helps operators identify if the search returned a geographically clustered or
+  // informationally redundant set.
+  const candidate_set_diversity = (() => {
+    if (returned.length < 2) return { note: 'Insufficient candidates for diversity analysis.' };
+    const bearings = returned.map(c => c.bearing_deg).filter(b => b != null);
+    const sigmas   = returned.map(c => c.ground_sigma_mS_m).filter(s => s != null);
+    const scores   = returned.map(c => c.score).filter(s => s != null);
+    const dists    = returned.map(c => c.distance_from_current_km).filter(d => d != null);
+
+    // Bearing spread: max angular difference in the returned set.
+    let bearingSpreadDeg = null;
+    if (bearings.length >= 2){
+      const sorted = [...bearings].sort((a, b) => a - b);
+      let maxGap = 0;
+      for (let i = 1; i < sorted.length; i++){
+        maxGap = Math.max(maxGap, sorted[i] - sorted[i - 1]);
+      }
+      const wraparound = 360 - sorted.at(-1) + sorted[0];
+      maxGap = Math.max(maxGap, wraparound);
+      bearingSpreadDeg = round2(360 - maxGap); // the actual arc covered
+    }
+
+    const sigmaRange = sigmas.length >= 2 ? round2(Math.max(...sigmas) - Math.min(...sigmas)) : null;
+    const scoreRange = scores.length >= 2 ? round2(Math.max(...scores) - Math.min(...scores)) : null;
+    const distRange  = dists.length >= 2 ? round2(Math.max(...dists) - Math.min(...dists)) : null;
+
+    const directionalCoverage = bearingSpreadDeg == null ? 'UNKNOWN'
+      : bearingSpreadDeg >= 270 ? 'EXCELLENT (>270° compass arc covered)'
+      : bearingSpreadDeg >= 180 ? 'GOOD (>180° arc)'
+      : bearingSpreadDeg >= 90  ? 'MODERATE (>90° arc — consider candidates in other quadrants)'
+      : 'POOR (<90° arc — candidates are clustered in one direction; expand search)';
+
+    const sigmaVariety = sigmaRange == null ? 'UNKNOWN'
+      : sigmaRange >= 6 ? 'HIGH — wide range of conductivity environments sampled'
+      : sigmaRange >= 3 ? 'MODERATE'
+      : 'LOW — candidates have similar conductivity; all subject to same σ uncertainty';
+
+    return {
+      n_candidates: returned.length,
+      bearing_spread_deg: bearingSpreadDeg,
+      directional_coverage_assessment: directionalCoverage,
+      sigma_range_msm: sigmaRange,
+      sigma_variety_assessment: sigmaVariety,
+      score_range: scoreRange,
+      distance_range_km: distRange,
+      recommendation: bearingSpreadDeg != null && bearingSpreadDeg < 90
+        ? 'EXPAND SEARCH: candidates are directionally clustered. Try a larger search radius or adjust grid_spacing_km to sample all compass quadrants.'
+        : returned.length < 5
+        ? 'LIMITED POOL: fewer than 5 candidates returned — increase search_radius_km or reduce grid_spacing_km for a more complete search.'
+        : 'ADEQUATE: candidate set shows reasonable geographic spread for screening.'
+    };
+  })();
+
   return {
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
@@ -499,6 +587,8 @@ export async function runSiteOptimizer(body = {}){
     scoring_time_ms,
     candidate_count_by_status,
     top_candidates_summary,
+    candidate_shortlist,
+    candidate_set_diversity,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
     score_stats,

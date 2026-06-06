@@ -2399,3 +2399,76 @@ test('sigma_sensitivity_analysis: projected reach exceeds current reach when upg
     }
   }
 });
+
+// ---------- candidate_shortlist ----------
+
+test('candidate_shortlist is present and is an array of ≤3 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  assert.ok(Array.isArray(out.candidate_shortlist),
+    'candidate_shortlist must be an array');
+  assert.ok(out.candidate_shortlist.length <= 3,
+    `candidate_shortlist must have ≤3 entries; got ${out.candidate_shortlist.length}`);
+});
+
+test('candidate_shortlist entries have rank, lat, lon, status_category, summary, recommended_next_step', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const entry of out.candidate_shortlist){
+    assert.ok(typeof entry.rank === 'number', 'shortlist entry must have numeric rank');
+    assert.ok(typeof entry.lat === 'number', 'shortlist entry must have lat');
+    assert.ok(typeof entry.lon === 'number', 'shortlist entry must have lon');
+    assert.ok(typeof entry.status_category === 'string', 'shortlist entry must have status_category');
+    assert.ok(typeof entry.summary === 'string' && entry.summary.length > 10, 'shortlist entry must have non-empty summary');
+    assert.ok(typeof entry.recommended_next_step === 'string' && entry.recommended_next_step.length > 5,
+      'shortlist entry must have recommended_next_step');
+    assert.ok(typeof entry.score_with_band === 'string', 'shortlist entry must have score_with_band');
+  }
+});
+
+test('candidate_shortlist entries are from the top-N returned candidates by rank', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const shortlistRanks = new Set(out.candidate_shortlist.map(e => e.rank));
+  for (const rank of shortlistRanks){
+    const candidate = out.candidates.find(c => c.rank === rank);
+    assert.ok(candidate != null, `shortlist rank ${rank} must correspond to a returned candidate`);
+  }
+});
+
+// ---------- candidate_set_diversity ----------
+
+test('candidate_set_diversity is present in the response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  assert.ok(out.candidate_set_diversity != null, 'candidate_set_diversity must be present');
+});
+
+test('candidate_set_diversity has n_candidates matching returned length', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const div = out.candidate_set_diversity;
+  if (div.n_candidates != null){
+    assert.equal(div.n_candidates, out.candidates.length,
+      'candidate_set_diversity.n_candidates must match out.candidates.length');
+  }
+});
+
+test('candidate_set_diversity.bearing_spread_deg is between 0 and 360 when present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const div = out.candidate_set_diversity;
+  if (div.bearing_spread_deg != null){
+    assert.ok(div.bearing_spread_deg >= 0 && div.bearing_spread_deg <= 360,
+      `bearing_spread_deg must be in [0, 360]; got ${div.bearing_spread_deg}`);
+  }
+});
+
+test('candidate_set_diversity: single candidate returns note about insufficient candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  assert.equal(out.available, true);
+  if (out.candidates.length < 2){
+    assert.ok(out.candidate_set_diversity.note != null,
+      'single-candidate response should have a diversity.note instead of metrics');
+  }
+});
