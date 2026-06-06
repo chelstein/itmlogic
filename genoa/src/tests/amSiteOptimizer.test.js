@@ -812,18 +812,31 @@ test('DA pattern_mode causes protection_class_advisory to mention §73.150', asy
     `DA pattern_mode should cause advisory to mention §73.150; got: ${out.protection_class_advisory}`);
 });
 
-test('buildGroundRadialAdvisory returns null for GOOD/EXCELLENT σ, advisory for POOR/FAIR', () => {
+test('buildGroundRadialAdvisory returns structured object with advisory_level, note, and radial sizing fields', () => {
   const { buildGroundRadialAdvisory } = __test__;
-  assert.equal(buildGroundRadialAdvisory(4),    null,  'σ=4 mS/m (GOOD) should return null');
-  assert.equal(buildGroundRadialAdvisory(8),    null,  'σ=8 mS/m (EXCELLENT) should return null');
-  assert.equal(buildGroundRadialAdvisory(15),   null,  'σ=15 mS/m should return null');
-  assert.ok(buildGroundRadialAdvisory(2) != null,  'σ=2 mS/m (FAIR) should return an advisory');
-  assert.ok(/120.radial|§73\.190/i.test(buildGroundRadialAdvisory(2)),
-    'FAIR advisory should mention §73.190 or radial count');
-  assert.ok(buildGroundRadialAdvisory(0.5) != null, 'σ=0.5 mS/m (POOR) should return an advisory');
-  assert.ok(/POOR/i.test(buildGroundRadialAdvisory(0.5)),
-    'POOR advisory should mention POOR conductivity');
-  assert.equal(buildGroundRadialAdvisory(null), null, 'null σ should return null');
+  // GOOD/EXCELLENT: returns STANDARD advisory (not null — now always structured)
+  const good = buildGroundRadialAdvisory(4, 780);
+  assert.ok(good != null, 'σ=4 mS/m (GOOD) should return a structured advisory');
+  assert.equal(good.advisory_level, 'STANDARD', 'σ=4 mS/m should be STANDARD');
+  assert.ok(typeof good.recommended_radial_count === 'number' && good.recommended_radial_count > 0,
+    'STANDARD advisory must have recommended_radial_count');
+
+  // FAIR: returns ADVISORY
+  const fair = buildGroundRadialAdvisory(2, 780);
+  assert.ok(fair != null, 'σ=2 mS/m (FAIR) should return an advisory');
+  assert.equal(fair.advisory_level, 'ADVISORY', 'σ=2 mS/m should be ADVISORY');
+  assert.ok(/120.radial|§73\.190/i.test(fair.note),
+    'FAIR advisory note should mention §73.190 or radial count');
+
+  // POOR: returns REQUIRED with extended system flag
+  const poor = buildGroundRadialAdvisory(0.5, 780);
+  assert.ok(poor != null, 'σ=0.5 mS/m (POOR) should return an advisory');
+  assert.equal(poor.advisory_level, 'REQUIRED', 'σ=0.5 mS/m should be REQUIRED');
+  assert.ok(/POOR/i.test(poor.note), 'POOR advisory note should mention POOR conductivity');
+  assert.equal(poor.extended_system_required, true, 'POOR σ must flag extended_system_required');
+
+  // null σ: returns null
+  assert.equal(buildGroundRadialAdvisory(null, 780), null, 'null σ should return null');
 });
 
 // ---- recommended_actions ----
@@ -2724,5 +2737,62 @@ test('regulatory_risk_score is consistent: risk_score equals sum of risk_factors
     const expectedScore = Math.min(100, sumPoints);
     assert.equal(rrs.risk_score, expectedScore,
       `risk_score must equal min(100, sum of factor points) at rank ${c.rank}: expected ${expectedScore}, got ${rrs.risk_score}`);
+  }
+});
+
+// ---------- ground_radial_advisory (structured) ----------
+
+test('ground_radial_advisory is present on every candidate with required shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const gra = c.ground_radial_advisory;
+    assert.ok(gra != null, `ground_radial_advisory must be present (rank ${c.rank})`);
+    assert.ok(typeof gra.advisory_level === 'string',
+      `advisory_level must be a string (rank ${c.rank})`);
+    assert.ok(typeof gra.recommended_radial_count === 'number' && gra.recommended_radial_count >= 120,
+      `recommended_radial_count must be ≥120 (rank ${c.rank}); got ${gra.recommended_radial_count}`);
+    assert.ok(typeof gra.note === 'string' && gra.note.length > 0,
+      `note must be a non-empty string (rank ${c.rank})`);
+    assert.ok(typeof gra.certification_method === 'string',
+      `certification_method must be a string (rank ${c.rank})`);
+  }
+});
+
+test('ground_radial_advisory.advisory_level is one of STANDARD, ADVISORY, REQUIRED', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['STANDARD', 'ADVISORY', 'REQUIRED']);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.ground_radial_advisory.advisory_level),
+      `advisory_level "${c.ground_radial_advisory.advisory_level}" not valid (rank ${c.rank})`);
+  }
+});
+
+test('ground_radial_advisory.estimated_copper_kg is a positive number when radial length known', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const kg = c.ground_radial_advisory.estimated_copper_kg;
+    if (kg != null){
+      assert.ok(typeof kg === 'number' && kg > 0,
+        `estimated_copper_kg must be > 0 (rank ${c.rank}); got ${kg}`);
+    }
+  }
+});
+
+test('ground_radial_advisory REQUIRED advisory has extended_system_required=true', async () => {
+  // Force a POOR conductivity scenario via a very low sigma zone area.
+  // The test uses the real engine — we check that any REQUIRED advisory is consistent.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const gra = c.ground_radial_advisory;
+    if (gra.advisory_level === 'REQUIRED'){
+      assert.equal(gra.extended_system_required, true,
+        `REQUIRED advisory must have extended_system_required=true (rank ${c.rank})`);
+      assert.equal(gra.deep_driven_rods_required, true,
+        `REQUIRED advisory must have deep_driven_rods_required=true (rank ${c.rank})`);
+    }
   }
 });

@@ -1711,7 +1711,7 @@ async function scoreCandidate(pt, ctx, warnings){
     ground_sigma_quality:      sigmaQuality(sigma_msm),
     ground_sigma_source,
     ground_sigma_filing_grade,
-    ground_radial_advisory:  buildGroundRadialAdvisory(sigma_msm),
+    ground_radial_advisory:  buildGroundRadialAdvisory(sigma_msm, frequency_khz),
     // Per-candidate scoring confidence based on available data layers.
     // HIGH: filing-grade σ raster AND polygon provided.
     // MEDIUM: one of the two present.
@@ -1971,15 +1971,81 @@ function frequencyChannelClass(frequency_khz){
   return 'regional';
 }
 
-// Ground radial advisory based on soil conductivity (§73.190).
-// Returns null when conductivity is adequate (GOOD or EXCELLENT).
-function buildGroundRadialAdvisory(sigma_msm){
+// Ground radial system sizing — §73.190 FCC ground system engineering reference.
+// Returns a structured object with recommended radial count, length, copper estimate,
+// and certification method.  Based on the FCC AM Antenna Systems engineering guide and
+// standard 120-radial buried-copper system practice.
+//
+// Key references:
+//   - 47 CFR §73.190: Ground conductivity measurement method
+//   - FCC Form 302-AM: Ground system certification
+//   - Terman (1943) / Belrose (1975) radial length / count tradeoff empirical data
+//   - NBS Tech. Note 300 (Wait & Spies, 1969): effect of radial count on ERP
+function buildGroundRadialAdvisory(sigma_msm, frequency_khz){
   if (sigma_msm == null || !Number.isFinite(sigma_msm)) return null;
-  if (sigma_msm >= 4) return null;
-  if (sigma_msm >= 2){
-    return `FAIR conductivity (σ=${sigma_msm} mS/m): §73.190 standard 120-radial system at ≥λ/4 length should be adequate; verify soil resistivity before site commitment.`;
+
+  // Quarter-wave radial length for this frequency.
+  const lambda_m   = frequency_khz ? round2(300000 / frequency_khz) : null;
+  const qw_radial_m = lambda_m ? round2(lambda_m / 4) : null;
+
+  // Standard system: 120 radials at λ/4 length buried ≥5 cm.
+  // Extended system: 120–180 radials at λ/4–λ/2, + deep-driven rods, for poor σ.
+  // Copper weight: 120 × radial_length × AWG #10 wire (4.66 g/m) for rough cost estimate.
+  // AWG #10 is commonly used; #8 is preferred for high-power installations.
+  const aWireGPerM = 4.66;  // AWG #10 copper, g/m
+  const copperKg = (count, lenM) => round2(count * lenM * aWireGPerM / 1000);
+
+  const stdCount   = 120;
+  const extCount   = 180;
+  const stdLen     = qw_radial_m;                           // λ/4 = standard
+  const extLen     = qw_radial_m ? round2(qw_radial_m * 1.5) : null; // λ×3/8 for poor σ
+
+  const stdCopperKg = stdLen ? copperKg(stdCount, stdLen) : null;
+  const extCopperKg = extLen ? copperKg(extCount, extLen) : null;
+
+  const certMethod = '§73.190(c) Appendix A conductivity measurement (4-electrode Wenner array) — results must be filed on FCC Form 302-AM exhibit';
+
+  if (sigma_msm >= 4){
+    return {
+      advisory_level: 'STANDARD',
+      sigma_quality: sigmaQuality(sigma_msm),
+      recommended_radial_count: stdCount,
+      recommended_radial_length_m: stdLen,
+      radial_length_description: 'λ/4 (quarter-wave) — optimal for σ ≥ 4 mS/m',
+      extended_system_required: false,
+      deep_driven_rods_required: false,
+      estimated_copper_kg: stdCopperKg,
+      certification_method: certMethod,
+      note: `Standard 120-radial system at λ/4 (${stdLen ?? '?'} m) adequate for σ=${sigma_msm} mS/m. §73.190 survey still required for Form 302-AM certification.`
+    };
   }
-  return `POOR conductivity (σ=${sigma_msm} mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.`;
+  if (sigma_msm >= 2){
+    return {
+      advisory_level: 'ADVISORY',
+      sigma_quality: sigmaQuality(sigma_msm),
+      recommended_radial_count: stdCount,
+      recommended_radial_length_m: stdLen,
+      radial_length_description: 'λ/4 (quarter-wave) — minimum adequate for σ ≥ 2 mS/m',
+      extended_system_required: false,
+      deep_driven_rods_required: false,
+      estimated_copper_kg: stdCopperKg,
+      certification_method: certMethod,
+      note: `FAIR conductivity (σ=${sigma_msm} mS/m): 120-radial system at λ/4 (${stdLen ?? '?'} m) should be adequate; verify soil resistivity before site commitment. Extended system may be cost-effective if survey confirms σ < 3 mS/m.`
+    };
+  }
+  return {
+    advisory_level: 'REQUIRED',
+    sigma_quality: sigmaQuality(sigma_msm),
+    recommended_radial_count: extCount,
+    recommended_radial_length_m: extLen,
+    radial_length_description: '3λ/8 (1.5× quarter-wave) — extended for poor σ',
+    extended_system_required: true,
+    deep_driven_rods_required: true,
+    estimated_copper_kg: extCopperKg,
+    estimated_standard_copper_kg: stdCopperKg,
+    certification_method: certMethod,
+    note: `POOR conductivity (σ=${sigma_msm} mS/m): §73.190 extended ground system required. Recommend ${extCount} radials at 3λ/8 (${extLen ?? '?'} m) + deep-driven copper rods (≥3 m at 3 m centers). Estimated copper: ${extCopperKg ?? '?'} kg. Soil survey urgently needed before site commitment.`
+  };
 }
 
 // Minimum spacing reference — §73.37 Table of Minimum Separations for AM stations.
