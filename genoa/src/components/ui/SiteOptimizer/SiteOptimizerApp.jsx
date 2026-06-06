@@ -1717,6 +1717,11 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      directional_antenna_proof_guide: {
+        applicable: false,
+        reason: "Pattern mode 'NDA' is not a directional antenna (DA) pattern. §73.154 proof not required.",
+        reference: '47 CFR §73.154'
+      },
       insurance_liability_analysis: {
         tower_height_m: 144.23, asr_required: true,
         tower_replacement_cost_usd: 317076, equipment_value_usd: 95000, total_insured_value_usd: 412076,

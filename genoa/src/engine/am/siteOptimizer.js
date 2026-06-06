@@ -906,7 +906,10 @@ export async function runSiteOptimizer(body = {}){
     ssp_capex_usd:          c.site_security_perimeter_guide?.total_capex_usd ?? null,
     ins_total_value_usd:    c.insurance_liability_analysis?.total_insured_value_usd ?? null,
     ins_annual_premium_usd: c.insurance_liability_analysis?.total_annual_premium_usd ?? null,
-    ins_asr_required:       c.insurance_liability_analysis?.asr_required ?? null
+    ins_asr_required:       c.insurance_liability_analysis?.asr_required ?? null,
+    dapg_applicable:        c.directional_antenna_proof_guide?.applicable ?? null,
+    dapg_n_radials:         c.directional_antenna_proof_guide?.recommended_proof?.radials ?? null,
+    dapg_proof_cost_usd:    c.directional_antenna_proof_guide?.estimated_total_proof_cost_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -9887,6 +9890,97 @@ async function scoreCandidate(pt, ctx, warnings){
         asr_compliance: ASR_COMPLIANCE,
         reference: '47 CFR §17.7; 47 CFR §1.80; FAA Form 7460-1; ISO/IEC 27001 (cyber); NAIC Broadcast Insurance Guidelines; FCC ASR Database (towers.fcc.gov)',
         note: `Total insured value est. $${TOTAL_INSURED_VALUE_USD.toLocaleString()}. Annual premium est. $${TOTAL_ANNUAL_PREMIUM.toLocaleString()}. ASR ${asr_required ? 'required' : 'not required'} for ${towerH_ins}m tower.`
+      };
+    })(),
+
+    directional_antenna_proof_guide: (() => {
+      // §73.154 DA proof methodology for AM directional antenna systems
+      // Applies only to DA-N and DA-D pattern stations
+      // Key requirement: measured field intensities must agree within ±2 dB on all radials
+      const isDA_dapg = /^DA/i.test(pattern_mode);
+
+      if (!isDA_dapg) {
+        return {
+          applicable: false,
+          reason: `Pattern mode '${pattern_mode}' is not a directional antenna (DA) pattern. §73.154 proof not required.`,
+          reference: '47 CFR §73.154'
+        };
+      }
+
+      const PROOF_METHODS = [
+        {
+          id: 'FULL_PROOF',
+          label: 'Full Field Intensity Proof (§73.154(a))',
+          cfr: '47 CFR §73.154(a)',
+          radials: 72,
+          degree_interval: 5,
+          required_for: ['New DA construction', 'Major modification (>2% current change)', 'Pattern change'],
+          measurement_distances_km: [0.3, 1.0, 3.0, 10.0],
+          tolerance_db: 2.0,
+          estimated_days: 5,
+          cost_est_usd: 18000,
+          description: '72 radial traversals at 5° intervals. Measured pattern must agree with authorized pattern within ±2 dB on all radials.'
+        },
+        {
+          id: 'SPOT_CHECK',
+          label: 'Spot Check Proof (§73.154(c))',
+          cfr: '47 CFR §73.154(c)',
+          radials: 24,
+          degree_interval: 15,
+          required_for: ['Minor modification (≤2% current ratio or phase change)', 'Tower painting/lighting work'],
+          measurement_distances_km: [0.3, 1.0, 3.0],
+          tolerance_db: 2.0,
+          estimated_days: 2,
+          cost_est_usd: 6500,
+          description: '24 radial spot checks at 15° intervals. Acceptable for minor modifications with pre-approved antenna parameters.'
+        },
+        {
+          id: 'PARTIAL_PROOF',
+          label: 'Partial Proof / Theoretical (§73.154(b))',
+          cfr: '47 CFR §73.154(b)',
+          radials: 0,
+          degree_interval: null,
+          required_for: ['New CP where full proof not yet possible', 'Interim operation period'],
+          measurement_distances_km: [],
+          tolerance_db: null,
+          estimated_days: 1,
+          cost_est_usd: 2500,
+          description: 'Theoretical proof using computer modeling. Must be replaced by measured proof before license grant (within 12 months).'
+        }
+      ];
+
+      const ND_CHECK = {
+        required: true,
+        cfr: '47 CFR §73.154(e)',
+        description: 'Non-directional measurement at standard monitoring point to verify antenna efficiency reference',
+        standard_monitoring_point_m: round2(0.375 * 300000 / frequency_khz * 0.02),
+        base_current_tolerance_pct: 5
+      };
+
+      const ANTENNA_PARAMETERS = [
+        { param: 'Field ratio (RMS voltage ratio)', tolerance: '±2% of licensed value', cfr: '§73.62' },
+        { param: 'Phase (relative to reference tower)', tolerance: '±3° of licensed value', cfr: '§73.62' },
+        { param: 'Base impedance (resistance)', tolerance: '±3% of licensed value', cfr: '§73.62' },
+        { param: 'Base impedance (reactance)', tolerance: '±3% of licensed value', cfr: '§73.62' }
+      ];
+
+      const applicableProof = PROOF_METHODS[0];
+
+      return {
+        applicable: true,
+        pattern_mode,
+        proof_methods: PROOF_METHODS,
+        n_proof_methods: PROOF_METHODS.length,
+        recommended_proof: applicableProof,
+        nd_check: ND_CHECK,
+        antenna_parameters: ANTENNA_PARAMETERS,
+        n_antenna_parameters: ANTENNA_PARAMETERS.length,
+        estimated_total_proof_cost_usd: applicableProof.cost_est_usd,
+        estimated_proof_days: applicableProof.estimated_days,
+        proof_tolerance_db: 2.0,
+        filing_requirement: 'Proof must be filed with FCC as Exhibit to Form 302-AM (License to Cover) within 12 months of CP grant',
+        reference: '47 CFR §73.154; 47 CFR §73.62; FCC Media Bureau DA Proof Guidelines (2016); NAB Engineering Handbook §6.3',
+        note: `DA pattern — §73.154 proof required. Full proof: ${PROOF_METHODS[0].radials} radials at ${PROOF_METHODS[0].degree_interval}° intervals; est. ${PROOF_METHODS[0].estimated_days} days / $${PROOF_METHODS[0].cost_est_usd.toLocaleString()}.`
       };
     })(),
 

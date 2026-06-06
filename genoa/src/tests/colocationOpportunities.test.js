@@ -1240,6 +1240,21 @@ test('colocation GRID candidates have insurance_liability_analysis', async () =>
   }
 });
 
+test('colocation GRID candidates have directional_antenna_proof_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.directional_antenna_proof_guide != null, `rank ${c.rank} missing directional_antenna_proof_guide`);
+    // NDA pattern → applicable=false
+    assert.strictEqual(c.directional_antenna_proof_guide.applicable, false, `rank ${c.rank} NDA pattern must not require DA proof`);
+  }
+});
+
 test('colocation GRID candidates have ground_conductivity_improvement', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },

@@ -2226,6 +2226,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Directional Antenna Proof Guide */}
+        {candidate.directional_antenna_proof_guide && (() => {
+          const d = candidate.directional_antenna_proof_guide;
+          if (!d.applicable) {
+            return (
+              <div>
+                <h4 style={{ color: '#67e8f9', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Directional Antenna Proof (§73.154)
+                </h4>
+                <div style={{ background: '#021a1c', borderRadius: 4, padding: '8px 12px', fontSize: 11, color: '#9ca3af' }}>
+                  {d.reason || 'Non-directional pattern — §73.154 proof not required.'}
+                </div>
+              </div>
+            );
+          }
+          const fullProof = (d.proof_methods || []).find(p => p.id === 'FULL_PROOF');
+          const spotCheck = (d.proof_methods || []).find(p => p.id === 'SPOT_CHECK');
+          return (
+            <div>
+              <h4 style={{ color: '#67e8f9', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Directional Antenna Proof (§73.154)
+              </h4>
+              <div style={{ background: '#021a1c', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Pattern mode:</span> <strong style={{ color: '#67e8f9' }}>{d.pattern_mode || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Proof tolerance:</span> <strong>±{d.proof_tolerance_db ?? '—'} dB</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Full proof radials:</span> <strong>{fullProof?.radials ?? '—'} at {fullProof?.degree_interval ?? '—'}° intervals</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Full proof cost est.:</span> <strong style={{ color: '#f59e0b' }}>{fullProof?.cost_est_usd != null ? `$${fullProof.cost_est_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Spot check radials:</span> <strong>{spotCheck?.radials ?? '—'} at {spotCheck?.degree_interval ?? '—'}° intervals</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Est. proof days:</span> <strong>{d.estimated_proof_days != null ? `${d.estimated_proof_days} days` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ND check req'd:</span> <strong style={{ color: d.nd_check?.required ? '#22c55e' : '#9ca3af' }}>{d.nd_check?.required ? 'Yes (§73.154(e))' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Antenna params:</span> <strong>{d.n_antenna_parameters ?? '—'} parameters (§73.62)</strong></div>
+                </div>
+              </div>
+              {fullProof && (
+                <div style={{ background: '#011618', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#67e8f9', fontWeight: 700 }}>Full Proof: </span>
+                  <span style={{ color: '#d1d5db' }}>{fullProof.description}</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{d.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Insurance & Liability Analysis */}
         {candidate.insurance_liability_analysis && (() => {
           const ins = candidate.insurance_liability_analysis;

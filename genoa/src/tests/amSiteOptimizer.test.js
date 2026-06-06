@@ -6649,6 +6649,53 @@ test('insurance_liability_analysis comparison table columns present', async () =
   }
 });
 
+test('directional_antenna_proof_guide not applicable for NDA pattern', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const d = out.candidates[0].directional_antenna_proof_guide;
+  assert.ok(d != null, 'directional_antenna_proof_guide must be present');
+  assert.strictEqual(d.applicable, false, 'NDA pattern must set applicable=false');
+  assert.ok(d.reason != null, 'reason must be provided for non-applicable case');
+});
+
+test('directional_antenna_proof_guide applicable for DA-N pattern', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const d = out.candidates[0].directional_antenna_proof_guide;
+  assert.ok(d != null, 'directional_antenna_proof_guide must be present');
+  assert.strictEqual(d.applicable, true, 'DA-N pattern must set applicable=true');
+  assert.ok(Array.isArray(d.proof_methods), 'proof_methods must be an array');
+  assert.ok(d.n_proof_methods === d.proof_methods.length, 'n_proof_methods must match array length');
+  assert.ok(d.proof_tolerance_db === 2.0, '§73.154 tolerance must be ±2 dB');
+});
+
+test('directional_antenna_proof_guide full proof has 72 radials at 5° intervals', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const d = out.candidates[0].directional_antenna_proof_guide;
+  assert.strictEqual(d.applicable, true, 'DA-D must be applicable');
+  const fullProof = d.proof_methods.find(p => p.id === 'FULL_PROOF');
+  assert.ok(fullProof != null, 'FULL_PROOF method must be present');
+  assert.strictEqual(fullProof.radials, 72, '§73.154(a) full proof requires 72 radials');
+  assert.strictEqual(fullProof.degree_interval, 5, 'full proof requires 5° radial intervals');
+  assert.ok(fullProof.cost_est_usd > 0, 'full proof cost must be positive');
+});
+
+test('directional_antenna_proof_guide ND check requires base current monitoring', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const d = out.candidates[0].directional_antenna_proof_guide;
+  assert.strictEqual(d.applicable, true, 'must be applicable');
+  assert.ok(d.nd_check != null, 'nd_check must be present');
+  assert.strictEqual(d.nd_check.required, true, 'ND check is required per §73.154(e)');
+  assert.ok(d.nd_check.base_current_tolerance_pct > 0, 'base_current_tolerance_pct must be positive');
+});
+
+test('directional_antenna_proof_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('dapg_applicable'     in row, 'dapg_applicable missing from comparison table');
+    assert.ok('dapg_n_radials'      in row, 'dapg_n_radials missing from comparison table');
+    assert.ok('dapg_proof_cost_usd' in row, 'dapg_proof_cost_usd missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;
