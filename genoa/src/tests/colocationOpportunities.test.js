@@ -860,3 +860,101 @@ test('colocation GRID candidates have candidate_scoring_audit', async () => {
     assert.strictEqual(c.candidate_scoring_audit.goal_details.length, 6, `rank ${c.rank} must have 6 goal detail entries`);
   }
 });
+
+test('colocation GRID candidates have regulatory_compliance_checklist', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.regulatory_compliance_checklist != null, `rank ${c.rank} missing regulatory_compliance_checklist`);
+    assert.strictEqual(c.regulatory_compliance_checklist.items.length, 12, `rank ${c.rank} must have 12 checklist items`);
+  }
+});
+
+test('colocation GRID candidates have ground_system_design_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.ground_system_design_guide != null, `rank ${c.rank} missing ground_system_design_guide`);
+    assert.strictEqual(c.ground_system_design_guide.scenarios.length, 3, `rank ${c.rank} must have 3 radial scenarios`);
+  }
+});
+
+test('colocation GRID candidates have tower_structural_assessment_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.tower_structural_assessment_guide != null, `rank ${c.rank} missing tower_structural_assessment_guide`);
+    assert.ok(c.tower_structural_assessment_guide.tower_types.length === 3, `rank ${c.rank} must have 3 tower type entries`);
+  }
+});
+
+test('colocation GRID candidates have community_of_license_profile', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.community_of_license_profile != null, `rank ${c.rank} missing community_of_license_profile`);
+    assert.ok(c.community_of_license_profile.geographic_tier != null, `rank ${c.rank} missing geographic_tier`);
+  }
+});
+
+test('colocation GRID candidates have atmospheric_noise_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.atmospheric_noise_analysis != null, `rank ${c.rank} missing atmospheric_noise_analysis`);
+    assert.ok(c.atmospheric_noise_analysis.effective_noise_fa_day > 0, `rank ${c.rank} Fa_day must be positive`);
+  }
+});
+
+test('colocation GRID candidates have proof_of_performance_requirements', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.proof_of_performance_requirements != null, `rank ${c.rank} missing proof_of_performance_requirements`);
+    assert.strictEqual(c.proof_of_performance_requirements.traversal_spec.radial_count, 8, `rank ${c.rank} NDA must have 8 radials`);
+  }
+});
+
+test('colocation GRID candidates have operational_monitoring_requirements', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.operational_monitoring_requirements != null, `rank ${c.rank} missing operational_monitoring_requirements`);
+    assert.strictEqual(c.operational_monitoring_requirements.monitoring_items.length, 6, `rank ${c.rank} must have 6 monitoring items`);
+  }
+});

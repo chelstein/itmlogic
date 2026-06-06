@@ -5400,3 +5400,320 @@ test('per-candidate candidate_scoring_audit comparison table columns populated',
     assert.ok('audit_score_pre_conf' in row, 'audit_score_pre_conf missing from comparison table');
   }
 });
+
+// ---- regulatory_compliance_checklist ----
+
+test('regulatory_compliance_checklist is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.regulatory_compliance_checklist != null, `rank ${c.rank} missing regulatory_compliance_checklist`);
+  }
+});
+
+test('regulatory_compliance_checklist has 12 items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const rc = out.candidates[0].regulatory_compliance_checklist;
+  assert.strictEqual(rc.items.length, 12, 'checklist must have exactly 12 items');
+  const ids = rc.items.map(i => i.id);
+  assert.ok(ids.includes('col_coverage'), 'col_coverage item missing');
+  assert.ok(ids.includes('blanket_pop'), 'blanket_pop item missing');
+  assert.ok(ids.includes('asr_registration'), 'asr_registration item missing');
+  assert.ok(ids.includes('nif_study'), 'nif_study item missing');
+});
+
+test('regulatory_compliance_checklist counts match items array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const rc = c.regulatory_compliance_checklist;
+    const pass  = rc.items.filter(i => i.status === 'PASS').length;
+    const warn  = rc.items.filter(i => i.status === 'WARN').length;
+    const fail  = rc.items.filter(i => i.status === 'FAIL').length;
+    const notEv = rc.items.filter(i => i.status === 'NOT_EVALUATED').length;
+    assert.strictEqual(rc.pass_count,          pass,  `rank ${c.rank} pass_count mismatch`);
+    assert.strictEqual(rc.warn_count,          warn,  `rank ${c.rank} warn_count mismatch`);
+    assert.strictEqual(rc.fail_count,          fail,  `rank ${c.rank} fail_count mismatch`);
+    assert.strictEqual(rc.not_evaluated_count, notEv, `rank ${c.rank} not_evaluated_count mismatch`);
+  }
+});
+
+test('regulatory_compliance_checklist overall_status is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const VALID = new Set(['PASS', 'WARN', 'FAIL', 'INCOMPLETE']);
+  for (const c of out.candidates) {
+    const rc = c.regulatory_compliance_checklist;
+    assert.ok(VALID.has(rc.overall_status), `rank ${c.rank} invalid overall_status: ${rc.overall_status}`);
+  }
+});
+
+test('regulatory_compliance_checklist comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('comp_overall_status' in row, 'comp_overall_status missing');
+    assert.ok('comp_fail_count' in row, 'comp_fail_count missing');
+    assert.ok('comp_warn_count' in row, 'comp_warn_count missing');
+  }
+});
+
+// ---- ground_system_design_guide ----
+
+test('ground_system_design_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.ground_system_design_guide != null, `rank ${c.rank} missing ground_system_design_guide`);
+  }
+});
+
+test('ground_system_design_guide has 3 scenarios', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const gs = out.candidates[0].ground_system_design_guide;
+  assert.strictEqual(gs.scenarios.length, 3, 'ground_system_design_guide must have 3 scenarios');
+  assert.strictEqual(gs.scenarios[0].radial_count, 120, 'first scenario must be 120-radial standard');
+  assert.strictEqual(gs.scenarios[1].radial_count, 60, 'second scenario must be 60-radial reduced');
+  assert.strictEqual(gs.scenarios[2].radial_count, 30, 'third scenario must be 30-radial urban-constrained');
+});
+
+test('ground_system_design_guide antenna efficiency is in 0-100 range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    for (const s of c.ground_system_design_guide.scenarios) {
+      assert.ok(s.antenna_efficiency_pct > 0 && s.antenna_efficiency_pct <= 100,
+        `rank ${c.rank} scenario ${s.label} efficiency ${s.antenna_efficiency_pct} out of range`);
+    }
+  }
+});
+
+test('ground_system_design_guide standard efficiency > reduced > urban-constrained', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const gs = out.candidates[0].ground_system_design_guide;
+  assert.ok(gs.scenarios[0].antenna_efficiency_pct >= gs.scenarios[1].antenna_efficiency_pct,
+    'standard efficiency should be >= reduced');
+  assert.ok(gs.scenarios[1].antenna_efficiency_pct >= gs.scenarios[2].antenna_efficiency_pct,
+    'reduced efficiency should be >= urban-constrained');
+});
+
+test('ground_system_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gnd_soil_class' in row, 'gnd_soil_class missing from comparison table');
+    assert.ok('gnd_eff_std_pct' in row, 'gnd_eff_std_pct missing from comparison table');
+    assert.ok('gnd_rho_ohm_m' in row, 'gnd_rho_ohm_m missing from comparison table');
+  }
+});
+
+// ---- tower_structural_assessment_guide ----
+
+test('tower_structural_assessment_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.tower_structural_assessment_guide != null, `rank ${c.rank} missing tower_structural_assessment_guide`);
+  }
+});
+
+test('tower_structural_assessment_guide wind_ice_zone is a valid zone string', async () => {
+  const VALID_ZONES = new Set(['ZONE_I_HIGH_WIND', 'ZONE_II_MODERATE', 'ZONE_III_HEAVY_ICE', 'ZONE_IV_PNW']);
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const ts = c.tower_structural_assessment_guide;
+    assert.ok(VALID_ZONES.has(ts.wind_ice_zone), `rank ${c.rank} invalid wind_ice_zone: ${ts.wind_ice_zone}`);
+  }
+});
+
+test('tower_structural_assessment_guide tower_types has 3 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ts = out.candidates[0].tower_structural_assessment_guide;
+  assert.strictEqual(ts.tower_types.length, 3, 'tower_types must have 3 entries');
+  const types = ts.tower_types.map(t => t.type);
+  assert.ok(types.includes('GUYED_MAST'), 'GUYED_MAST type must be present');
+  assert.ok(types.includes('SELF_SUPPORTING_LATTICE'), 'SELF_SUPPORTING_LATTICE type must be present');
+  assert.ok(types.includes('MONOPOLE_TUBULAR'), 'MONOPOLE_TUBULAR type must be present');
+});
+
+test('tower_structural_assessment_guide asr_registration_required matches height threshold', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const ts = c.tower_structural_assessment_guide;
+    // 780 kHz: λ/4 = 300000/780/4 = 96.15 m > 60.96 m → ASR required
+    assert.strictEqual(ts.asr_registration_required, true, `rank ${c.rank}: ASR should be required at 780 kHz`);
+  }
+});
+
+test('tower_structural_assessment_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('twr_wind_ice_zone' in row, 'twr_wind_ice_zone missing from comparison table');
+    assert.ok('twr_asr_required' in row, 'twr_asr_required missing from comparison table');
+    assert.ok('twr_faa_type' in row, 'twr_faa_type missing from comparison table');
+  }
+});
+
+// ---- community_of_license_profile ----
+
+test('community_of_license_profile is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.community_of_license_profile != null, `rank ${c.rank} missing community_of_license_profile`);
+  }
+});
+
+test('community_of_license_profile geographic_tier is valid enum', async () => {
+  const VALID = new Set(['PROXIMATE', 'NEAR', 'MID', 'FAR', 'REMOTE', 'UNKNOWN']);
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const cp = c.community_of_license_profile;
+    assert.ok(VALID.has(cp.geographic_tier), `rank ${c.rank} invalid geographic_tier: ${cp.geographic_tier}`);
+  }
+});
+
+test('community_of_license_profile col_coverage_pct is in 0-100 range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const cp = c.community_of_license_profile;
+    if (cp.col_coverage_pct != null) {
+      assert.ok(cp.col_coverage_pct >= 0 && cp.col_coverage_pct <= 100,
+        `rank ${c.rank} col_coverage_pct ${cp.col_coverage_pct} out of 0-100 range`);
+    }
+  }
+});
+
+test('community_of_license_profile col_compliant is boolean or null', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const cp = c.community_of_license_profile;
+    assert.ok(cp.col_compliant === null || typeof cp.col_compliant === 'boolean', `rank ${c.rank} col_compliant must be boolean or null`);
+  }
+});
+
+test('community_of_license_profile comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('col_geo_tier' in row, 'col_geo_tier missing from comparison table');
+    assert.ok('col_dist_km' in row, 'col_dist_km missing from comparison table');
+    assert.ok('col_bearing_deg' in row, 'col_bearing_deg missing from comparison table');
+  }
+});
+
+// ---- atmospheric_noise_analysis ----
+
+test('atmospheric_noise_analysis is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.atmospheric_noise_analysis != null, `rank ${c.rank} missing atmospheric_noise_analysis`);
+  }
+});
+
+test('atmospheric_noise_analysis noise Fa values are physically plausible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const an = c.atmospheric_noise_analysis;
+    // Man-made noise Fa at AM frequencies should be in range 20-120 dB
+    assert.ok(an.effective_noise_fa_day >= 20 && an.effective_noise_fa_day <= 120,
+      `rank ${c.rank} effective_noise_fa_day ${an.effective_noise_fa_day} out of plausible range`);
+    // Nighttime noise should be >= daytime (ionospheric enhancement)
+    assert.ok(an.effective_noise_fa_night >= an.effective_noise_fa_day,
+      `rank ${c.rank} nighttime noise should be >= daytime`);
+  }
+});
+
+test('atmospheric_noise_analysis site_noise_class is valid enum', async () => {
+  const VALID = new Set(['BUSINESS', 'RESIDENTIAL', 'RURAL', 'QUIET_RURAL', 'UNKNOWN']);
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const an = c.atmospheric_noise_analysis;
+    assert.ok(VALID.has(an.site_noise_class), `rank ${c.rank} invalid site_noise_class: ${an.site_noise_class}`);
+  }
+});
+
+test('atmospheric_noise_analysis minimum_detectable_field is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const an = c.atmospheric_noise_analysis;
+    assert.ok(an.minimum_detectable_field_day_mvm > 0, `rank ${c.rank} minimum_detectable_field_day_mvm must be positive`);
+  }
+});
+
+test('atmospheric_noise_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('noise_class' in row, 'noise_class missing from comparison table');
+    assert.ok('noise_fa_day' in row, 'noise_fa_day missing from comparison table');
+    assert.ok('noise_min_field_mvm' in row, 'noise_min_field_mvm missing from comparison table');
+  }
+});
+
+// ---- proof_of_performance_requirements ----
+
+test('proof_of_performance_requirements is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.proof_of_performance_requirements != null, `rank ${c.rank} missing proof_of_performance_requirements`);
+  }
+});
+
+test('proof_of_performance_requirements NDA has 8-radial traversal spec', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const pp = out.candidates[0].proof_of_performance_requirements;
+  // KAZM uses NDA pattern
+  assert.strictEqual(pp.traversal_spec.radial_count, 8, 'NDA must have 8-radial traversal');
+  assert.strictEqual(pp.traversal_spec.radial_spacing_deg, 45, 'NDA radial spacing must be 45°');
+});
+
+test('proof_of_performance_requirements DA has 72-radial traversal spec', async () => {
+  const daResult = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const pp = daResult.candidates[0].proof_of_performance_requirements;
+  assert.strictEqual(pp.traversal_spec.radial_count, 72, 'DA must have 72-radial traversal');
+  assert.strictEqual(pp.traversal_spec.radial_spacing_deg, 5, 'DA radial spacing must be 5°');
+});
+
+test('proof_of_performance_requirements DA timeline > NDA timeline', async () => {
+  const [ndaR, daR] = await Promise.all([
+    runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 }),
+    runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 })
+  ]);
+  const ndaWks = ndaR.candidates[0].proof_of_performance_requirements.proof_timeline_weeks_high;
+  const daWks  = daR.candidates[0].proof_of_performance_requirements.proof_timeline_weeks_high;
+  assert.ok(daWks > ndaWks, 'DA proof timeline should be longer than NDA');
+});
+
+test('proof_of_performance_requirements comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('proof_radials' in row, 'proof_radials missing from comparison table');
+    assert.ok('proof_wks_low' in row, 'proof_wks_low missing from comparison table');
+    assert.ok('proof_mpe_required' in row, 'proof_mpe_required missing from comparison table');
+  }
+});
+
+// ---- operational_monitoring_requirements ----
+
+test('operational_monitoring_requirements is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.operational_monitoring_requirements != null, `rank ${c.rank} missing operational_monitoring_requirements`);
+  }
+});
+
+test('operational_monitoring_requirements has 6 monitoring items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const om = out.candidates[0].operational_monitoring_requirements;
+  assert.strictEqual(om.monitoring_items.length, 6, 'must have exactly 6 monitoring items');
+  const ids = om.monitoring_items.map(i => i.id);
+  assert.ok(ids.includes('power'), 'power monitoring item missing');
+  assert.ok(ids.includes('eas'), 'eas monitoring item missing');
+  assert.ok(ids.includes('renewal'), 'renewal monitoring item missing');
+});
+
+test('operational_monitoring_requirements local channel has nighttime power limit', async () => {
+  const localR = await runSiteOptimizer({ ...KAZM, frequency_khz: 1230, candidate_limit: 1 });
+  const om = localR.candidates[0].operational_monitoring_requirements;
+  assert.ok(om.nighttime_power.required === true, 'local channel must have nighttime power restriction');
+  assert.ok(om.nighttime_power.nighttime_tpo_limit_kw != null, 'local channel must have nighttime TPO limit');
+});
+
+test('operational_monitoring_requirements comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ops_nighttime_limit_kw' in row, 'ops_nighttime_limit_kw missing');
+    assert.ok('ops_renewal_cycle_yrs' in row, 'ops_renewal_cycle_yrs missing');
+    assert.ok('ops_eas_required' in row, 'ops_eas_required missing');
+  }
+});

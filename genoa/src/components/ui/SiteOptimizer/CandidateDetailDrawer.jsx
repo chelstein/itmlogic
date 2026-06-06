@@ -2129,6 +2129,367 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Operational Monitoring Requirements */}
+        {candidate.operational_monitoring_requirements && (() => {
+          const om = candidate.operational_monitoring_requirements;
+          const critColor = c => c ? 'text-amber-400' : 'text-textDim';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Post-Licensing Operational Monitoring</div>
+              {/* Monitoring items grid */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Required Monitoring Obligations</div>
+              <div className="space-y-0.5 mb-2">
+                {om.monitoring_items?.map(it => (
+                  <div key={it.id} className={`flex items-center justify-between border rounded px-1.5 py-1 ${it.critical ? 'border-amber-400/20 bg-amber-400/5' : 'border-rule bg-surface/40'}`}>
+                    <div>
+                      <span className={`font-mono text-[8px] font-semibold ${critColor(it.critical)}`}>{it.label}</span>
+                      <span className="font-mono text-[7px] text-textDim ml-1">({it.rule})</span>
+                    </div>
+                    <span className="font-mono text-[7px] text-textDim whitespace-nowrap ml-2">{it.frequency}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Nighttime power */}
+              {om.nighttime_power?.required && (
+                <div className="flex items-start gap-1.5 px-1.5 py-1 rounded border mb-2 border-amber-400/30 bg-amber-400/5">
+                  <span className="font-mono text-[8px] text-amber-400 font-bold">NIGHTTIME POWER RESTRICTION</span>
+                  <span className="font-mono text-[8px] text-textDim ml-1">
+                    {om.nighttime_power.nighttime_tpo_limit_kw != null
+                      ? `≤ ${om.nighttime_power.nighttime_tpo_limit_kw} kW`
+                      : 'see license conditions'}
+                  </span>
+                </div>
+              )}
+              {/* Power tolerance */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Power Tolerance (§73.1560)</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{om.power_tolerance?.tolerance} — {om.power_tolerance?.note}</div>
+              {/* License renewal */}
+              <div className="font-mono text-[9px] text-textDim mb-1">License Renewal (§73.3539)</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">
+                {om.license_renewal?.cycle} · File {om.license_renewal?.filing_window}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{om.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Proof of Performance Requirements */}
+        {candidate.proof_of_performance_requirements && (() => {
+          const pp = candidate.proof_of_performance_requirements;
+          const isDA = pp.traversal_spec?.radial_count === 72;
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.154 Proof of Performance (Form 302-AM)</div>
+              {/* Key chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${isDA ? 'bg-amber-400/15 border-amber-400/40 text-amber-400' : 'bg-blue-300/15 border-blue-300/40 text-blue-300'}`}>
+                  {isDA ? 'DA PROOF (72 radials)' : 'NDA PROOF (8 radials)'}
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  {pp.proof_timeline_weeks_low}–{pp.proof_timeline_weeks_high} weeks field work
+                </span>
+                <span className={`font-mono text-[9px] px-1 py-0.5 ${pp.mpe_requirements?.required ? 'text-amber-400' : 'text-textDim'}`}>
+                  MPE: {pp.mpe_requirements?.required ? 'REQUIRED' : 'SIMPLIFIED'}
+                </span>
+              </div>
+              {/* Traversal spec */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Traversal Specification</div>
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Radials',   value: pp.traversal_spec?.radial_count },
+                  { label: 'Spacing',   value: pp.traversal_spec?.radial_spacing_deg != null ? `${pp.traversal_spec.radial_spacing_deg}°` : '—' },
+                  { label: 'Max reach', value: pp.traversal_spec?.min_radial_length_km != null ? `${pp.traversal_spec.min_radial_length_km} km` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{pp.traversal_spec?.note}</div>
+              {/* Required exhibits */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Form 302-AM Required Exhibits</div>
+              <div className="space-y-0.5 mb-2">
+                {pp.antenna_proof_exhibits?.map((e, i) => (
+                  <div key={i} className="font-mono text-[8px] text-textDim leading-snug">• {e}</div>
+                ))}
+              </div>
+              {/* Instrumentation */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Required Instrumentation</div>
+              <div className="space-y-0.5 mb-2">
+                {pp.required_instrumentation?.slice(0, 3).map((inst, i) => (
+                  <div key={i} className="font-mono text-[8px] text-textDim leading-snug">• {inst}</div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{pp.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Atmospheric Noise Analysis */}
+        {candidate.atmospheric_noise_analysis && (() => {
+          const an = candidate.atmospheric_noise_analysis;
+          const noiseColor = c => c === 'QUIET_RURAL' ? 'text-emerald-400' : c === 'RURAL' ? 'text-blue-300' : c === 'RESIDENTIAL' ? 'text-sky-300' : c === 'BUSINESS' ? 'text-amber-400' : 'text-textDim';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">ITU-R P.372 Atmospheric Noise Analysis</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${noiseColor(an.site_noise_class)}`}>
+                  {an.site_noise_class}
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  Fa day = {an.effective_noise_fa_day} dB · night = {an.effective_noise_fa_night} dB
+                </span>
+              </div>
+              {/* Noise floors */}
+              <div className="grid grid-cols-2 gap-1 mb-2">
+                {[
+                  { label: 'Man-made Fa (site est.)', value: `${an.man_made_noise_fa?.site_estimate ?? '—'} dB` },
+                  { label: 'Atmospheric Fa (day)',    value: `${an.atmospheric_noise_fa_day ?? '—'} dB` },
+                  { label: 'Min field (day)',          value: an.minimum_detectable_field_day_mvm != null ? `${an.minimum_detectable_field_day_mvm} mV/m` : '—' },
+                  { label: 'Min field (night)',         value: an.minimum_detectable_field_night_mvm != null ? `${an.minimum_detectable_field_night_mvm} mV/m` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Man-made noise reference table */}
+              <div className="font-mono text-[9px] text-textDim mb-1">P.372-15 Man-Made Noise Reference ({an.frequency_mhz} MHz)</div>
+              <div className="grid grid-cols-2 gap-0.5 mb-2">
+                {[
+                  { label: 'Business',    v: an.man_made_noise_fa?.business },
+                  { label: 'Residential', v: an.man_made_noise_fa?.residential },
+                  { label: 'Rural',       v: an.man_made_noise_fa?.rural },
+                  { label: 'Quiet Rural', v: an.man_made_noise_fa?.quiet_rural }
+                ].map(r => (
+                  <div key={r.label} className="flex items-center justify-between px-1.5 py-0.5 rounded border border-rule bg-surface/40">
+                    <span className="font-mono text-[8px] text-textDim">{r.label}</span>
+                    <span className="font-mono text-[8px] text-textBright">{r.v ?? '—'} dB</span>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-1">{an.noise_advisory}</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{an.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Community of License Profile */}
+        {candidate.community_of_license_profile && (() => {
+          const cp = candidate.community_of_license_profile;
+          const tierColor = t => t === 'PROXIMATE' || t === 'NEAR' ? 'text-emerald-400' : t === 'MID' ? 'text-blue-300' : t === 'FAR' ? 'text-amber-400' : t === 'REMOTE' ? 'text-red-400' : 'text-textDim';
+          const tierBg    = t => t === 'PROXIMATE' || t === 'NEAR' ? 'bg-emerald-400/15 border-emerald-400/40' : t === 'MID' ? 'bg-blue-300/15 border-blue-300/40' : t === 'FAR' ? 'bg-amber-400/15 border-amber-400/40' : t === 'REMOTE' ? 'bg-red-400/15 border-red-400/40' : 'bg-surface/40 border-rule';
+          const srcColor  = s => s === 'POLYGON' ? 'text-emerald-400' : s === 'CENTROID_ONLY' ? 'text-blue-300' : 'text-amber-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Community of License Profile (§73.24j)</div>
+              {/* Geo tier chip */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${tierBg(cp.geographic_tier)} ${tierColor(cp.geographic_tier)}`}>
+                  {cp.geographic_tier}
+                </span>
+                <span className={`font-mono text-[9px] px-1 py-0.5 ${srcColor(cp.col_data_source)}`}>
+                  {cp.col_data_source}
+                </span>
+                <span className={`font-mono text-[9px] px-1 py-0.5 ${cp.col_compliant ? 'text-emerald-400' : cp.col_compliant === false ? 'text-red-400' : 'text-textDim'}`}>
+                  {cp.col_compliant ? '✓ COMPLIANT' : cp.col_compliant === false ? '✗ NON-COMPLIANT' : 'N/E'}
+                </span>
+              </div>
+              {/* Key metrics */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Dist to CoL',       value: cp.candidate_to_col_dist_km != null ? `${cp.candidate_to_col_dist_km} km` : '—' },
+                  { label: 'CoL bearing',        value: cp.bearing_from_candidate_to_col_deg != null ? `${cp.bearing_from_candidate_to_col_deg}°` : '—' },
+                  { label: 'CoL coverage',       value: cp.col_coverage_pct != null ? `${cp.col_coverage_pct}%` : '—' },
+                  { label: 'Reach (0.5 mV/m)',   value: cp.daytime_reach_km != null ? `${cp.daytime_reach_km} km` : '—' },
+                  { label: 'Field at CoL',       value: cp.field_at_col_centroid_mvm != null ? `${cp.field_at_col_centroid_mvm} mV/m` : '—' },
+                  { label: 'Min TPO for CoL',    value: cp.minimum_tpo_for_col_kw != null ? `${cp.minimum_tpo_for_col_kw} kW` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Tier note */}
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{cp.geographic_tier_note}</div>
+              {/* Engineering recommendations */}
+              {cp.engineering_recommendations && cp.engineering_recommendations.length > 0 && (
+                <>
+                  <div className="font-mono text-[9px] text-textDim mb-1">Engineering Recommendations</div>
+                  <div className="space-y-0.5 mb-2">
+                    {cp.engineering_recommendations.map((r, i) => (
+                      <div key={i} className="font-mono text-[8px] text-blue-300 leading-snug">→ {r}</div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="font-mono text-[8px] text-textDim leading-snug">{cp.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Tower Structural Assessment Guide */}
+        {candidate.tower_structural_assessment_guide && (() => {
+          const ts = candidate.tower_structural_assessment_guide;
+          const zoneColor = z => z === 'ZONE_I_HIGH_WIND' ? 'text-amber-400' : z === 'ZONE_II_MODERATE' ? 'text-blue-300' : z === 'ZONE_III_HEAVY_ICE' ? 'text-sky-300' : 'text-purple-400';
+          const faaColor  = t => t === 'NONE' ? 'text-emerald-400' : t === 'MEDIUM_INTENSITY' ? 'text-amber-400' : 'text-red-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Tower Structural Assessment (TIA-222-H)</div>
+              {/* Key chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${zoneColor(ts.wind_ice_zone)}`}>
+                  {ts.wind_ice_zone_data?.label ?? ts.wind_ice_zone}
+                </span>
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${faaColor(ts.faa_requirements?.type)}`}>
+                  FAA: {ts.faa_requirements?.type ?? '—'}
+                </span>
+                <span className={`font-mono text-[9px] px-1 py-0.5 ${ts.asr_registration_required ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  ASR: {ts.asr_registration_required ? 'REQUIRED' : 'VERIFY'}
+                </span>
+              </div>
+              {/* Key dims */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'λ/4 (typical height)', value: `${ts.quarter_wave_height_m} m` },
+                  { label: 'λ/2 (max height)',     value: `${ts.half_wave_height_m} m` },
+                  { label: 'Wind speed (design)',  value: ts.wind_ice_zone_data ? `${ts.wind_ice_zone_data.wind_speed_mph} mph` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Zone note */}
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{ts.wind_ice_zone_data?.note}</div>
+              {/* Tower types */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Tower Type Options</div>
+              <div className="space-y-1 mb-2">
+                {ts.tower_types.map(t => (
+                  <div key={t.type} className={`border rounded px-1.5 py-1 ${t.suitable ? 'border-rule bg-surface/60' : 'border-rule/40 bg-surface/20 opacity-50'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[8px] font-semibold text-textBright">{t.type}</span>
+                      <span className="font-mono text-[8px] text-textDim">≤{t.max_recommended_tpo_kw} kW · {t.typical_height_range_m} m</span>
+                    </div>
+                    <div className="font-mono text-[7px] text-textDim leading-snug mt-0.5">{t.notes}</div>
+                  </div>
+                ))}
+              </div>
+              {/* FAA marking */}
+              {ts.faa_requirements?.type !== 'NONE' && (
+                <>
+                  <div className="font-mono text-[9px] text-textDim mb-1">FAA Marking & Lighting</div>
+                  <div className="font-mono text-[8px] text-textDim leading-snug mb-1">{ts.faa_requirements?.note}</div>
+                </>
+              )}
+              {/* Foundation */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Foundation Screening</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{ts.foundation?.note}</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{ts.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Ground Radial System Design Guide */}
+        {candidate.ground_system_design_guide && (() => {
+          const gs = candidate.ground_system_design_guide;
+          const soilColor = c => c === 'EXCELLENT' ? 'text-emerald-400' : c === 'GOOD' ? 'text-blue-300' : c === 'AVERAGE' ? 'text-sky-300' : c === 'POOR' ? 'text-amber-400' : 'text-red-400';
+          const soilBg    = c => c === 'EXCELLENT' ? 'bg-emerald-400/10 border-emerald-400/30' : c === 'GOOD' ? 'bg-blue-300/10 border-blue-300/30' : c === 'AVERAGE' ? 'bg-sky-300/10 border-sky-300/30' : c === 'POOR' ? 'bg-amber-400/10 border-amber-400/30' : 'bg-red-400/10 border-red-400/30';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.190 Ground Radial System Design</div>
+              {/* Soil classification chip */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${soilBg(gs.soil_conductivity_class)} ${soilColor(gs.soil_conductivity_class)}`}>
+                  {gs.soil_conductivity_class} SOIL
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  σ = {gs.sigma_msm} mS/m · ρ = {gs.soil_resistivity_ohm_m} Ω·m
+                </span>
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{gs.soil_note}</div>
+              {/* Key dimensions */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Optimal radial (λ/4)', value: `${gs.optimal_radial_length_m} m` },
+                  { label: 'Min radial (λ/8)',      value: `${gs.minimum_radial_length_m} m` },
+                  { label: 'Burial depth',           value: gs.burial_depth_recommended }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Scenarios */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Radial System Scenarios</div>
+              <div className="space-y-1 mb-2">
+                {gs.scenarios.map((s, i) => (
+                  <div key={s.label} className={`border rounded p-1.5 ${i === 0 ? 'border-blue-300/30 bg-blue-300/5' : 'border-rule bg-surface/50'}`}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-mono text-[8px] font-semibold text-textBright">{s.label}</span>
+                      <div className="flex gap-2">
+                        <span className="font-mono text-[8px] text-textDim">R_gnd={s.ground_loss_ohm} Ω</span>
+                        <span className="font-mono text-[8px] text-blue-300 font-bold">{s.antenna_efficiency_pct}% eff</span>
+                      </div>
+                    </div>
+                    <div className="font-mono text-[7px] text-textDim leading-snug">{s.suitable_for}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Staging */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Construction Staging</div>
+              <div className="font-mono text-[8px] text-textDim mb-1 leading-snug">{gs.staging_phase1.description}</div>
+              <div className="font-mono text-[8px] text-textDim mb-2 leading-snug">{gs.staging_phase2.description}</div>
+              {/* Wenner survey */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Wenner Soil Resistivity Survey</div>
+              <div className="font-mono text-[8px] text-textDim mb-2 leading-snug">
+                Electrode spacing: {gs.wenner_survey.electrode_spacing_m} m · {gs.wenner_survey.measurement_locations}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{gs.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Regulatory Compliance Checklist */}
+        {candidate.regulatory_compliance_checklist && (() => {
+          const rc = candidate.regulatory_compliance_checklist;
+          const statusColor = s => s === 'PASS' ? 'text-emerald-400' : s === 'WARN' ? 'text-amber-400' : s === 'FAIL' ? 'text-red-400' : 'text-textDim';
+          const statusBg    = s => s === 'PASS' ? 'bg-emerald-400/10 border-emerald-400/30' : s === 'WARN' ? 'bg-amber-400/10 border-amber-400/30' : s === 'FAIL' ? 'bg-red-400/10 border-red-400/30' : 'bg-surface/30 border-rule/40';
+          const overallBg   = s => s === 'FAIL' ? 'bg-red-400/15 border-red-400/40' : s === 'WARN' ? 'bg-amber-400/15 border-amber-400/40' : s === 'PASS' ? 'bg-emerald-400/15 border-emerald-400/40' : 'bg-surface/40 border-rule';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Pre-Filing Compliance Checklist</div>
+              <div className={`flex items-center justify-between px-2 py-1.5 rounded border mb-2 ${overallBg(rc.overall_status)}`}>
+                <span className={`font-mono text-[10px] font-bold ${statusColor(rc.overall_status)}`}>{rc.overall_status}</span>
+                <span className="font-mono text-[8px] text-textDim">
+                  {rc.pass_count} PASS · {rc.warn_count} WARN · {rc.fail_count} FAIL · {rc.not_evaluated_count} N/E
+                </span>
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{rc.filing_readiness}</div>
+              <div className="space-y-1 mb-2">
+                {rc.items.map(it => (
+                  <div key={it.id} className={`border rounded px-1.5 py-1 ${statusBg(it.status)}`}>
+                    <div className="flex items-start justify-between gap-1">
+                      <span className="font-mono text-[8px] text-textBright font-semibold flex-1">{it.label}</span>
+                      <span className={`font-mono text-[8px] font-bold shrink-0 ${statusColor(it.status)}`}>{it.status}</span>
+                    </div>
+                    <div className="font-mono text-[7px] text-textDim leading-snug mt-0.5">{it.note}</div>
+                    {it.required_action && it.status !== 'PASS' && (
+                      <div className="font-mono text-[7px] text-blue-300 leading-snug mt-0.5">→ {it.required_action}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{rc.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Per-candidate Scoring Audit */}
         {candidate.candidate_scoring_audit && (() => {
           const a = candidate.candidate_scoring_audit;

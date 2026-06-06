@@ -792,7 +792,28 @@ export async function runSiteOptimizer(body = {}){
     lic_total_yrs_cons:     c.licensing_timeline_estimate?.total_years_conservative ?? null,
     audit_active_goals:     c.candidate_scoring_audit?.active_goals_count ?? null,
     audit_conf_tier:        c.candidate_scoring_audit?.confidence_tier ?? null,
-    audit_score_pre_conf:   c.candidate_scoring_audit?.score_pre_confidence ?? null
+    audit_score_pre_conf:   c.candidate_scoring_audit?.score_pre_confidence ?? null,
+    comp_overall_status:    c.regulatory_compliance_checklist?.overall_status ?? null,
+    comp_fail_count:        c.regulatory_compliance_checklist?.fail_count ?? null,
+    comp_warn_count:        c.regulatory_compliance_checklist?.warn_count ?? null,
+    gnd_soil_class:         c.ground_system_design_guide?.soil_conductivity_class ?? null,
+    gnd_eff_std_pct:        c.ground_system_design_guide?.scenarios?.[0]?.antenna_efficiency_pct ?? null,
+    gnd_rho_ohm_m:          c.ground_system_design_guide?.soil_resistivity_ohm_m ?? null,
+    twr_wind_ice_zone:      c.tower_structural_assessment_guide?.wind_ice_zone ?? null,
+    twr_asr_required:       c.tower_structural_assessment_guide?.asr_registration_required ?? null,
+    twr_faa_type:           c.tower_structural_assessment_guide?.faa_requirements?.type ?? null,
+    col_geo_tier:           c.community_of_license_profile?.geographic_tier ?? null,
+    col_dist_km:            c.community_of_license_profile?.candidate_to_col_dist_km ?? null,
+    col_bearing_deg:        c.community_of_license_profile?.bearing_from_candidate_to_col_deg ?? null,
+    noise_class:            c.atmospheric_noise_analysis?.site_noise_class ?? null,
+    noise_fa_day:           c.atmospheric_noise_analysis?.effective_noise_fa_day ?? null,
+    noise_min_field_mvm:    c.atmospheric_noise_analysis?.minimum_detectable_field_day_mvm ?? null,
+    proof_radials:          c.proof_of_performance_requirements?.traversal_spec?.radial_count ?? null,
+    proof_wks_low:          c.proof_of_performance_requirements?.proof_timeline_weeks_low ?? null,
+    proof_mpe_required:     c.proof_of_performance_requirements?.mpe_requirements?.required ?? null,
+    ops_nighttime_limit_kw: c.operational_monitoring_requirements?.nighttime_power?.nighttime_tpo_limit_kw ?? null,
+    ops_renewal_cycle_yrs:  8,  // fixed 8-year cycle per §73.3539
+    ops_eas_required:       c.operational_monitoring_requirements?.eas_requirements != null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5775,6 +5796,900 @@ async function scoreCandidate(pt, ctx, warnings){
         total_weighted_pts,
         goal_details,
         note: 'candidate_scoring_audit exposes every step of the scoring pipeline — sub-score per goal, weight, normalization factor, weighted contribution, and confidence dampening — for full explainability. Weights are from the weight pool (COL coverage 35, population 28, blanket 14, conductivity 10, wildfire 4, treaty 4); normalization factor = 100 / sum(active_weights). Confidence tier: HIGH = filing-grade σ AND CoL polygon; MEDIUM = one of the two; LOW = neither.'
+      };
+    })(),
+
+    // Per-candidate FCC pre-filing regulatory compliance checklist.
+    // 12 items drawn from §73.24, §73.182, §73.316, §1.1306, §1.1310,
+    // §17.7, §73.190, and §73.315.  Each item is evaluated at screening
+    // grade from available candidate data and assigned a status of
+    // PASS, WARN, FAIL, or NOT_EVALUATED.
+    regulatory_compliance_checklist: (() => {
+      const ASR_M = 60.96;   // §17.7 200-ft threshold
+      const MPE_ERP_THRESHOLD_KW = 5.0;  // OET-65 / §1.1310 threshold for FM; AM threshold varies
+      const lambda_rc = 300000 / frequency_khz;
+      const qwave_rc  = lambda_rc / 4;
+      const isDA_rc   = /^DA/i.test(pattern_mode);
+      const isClear_rc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_rc = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const chanCls_rc = isLocal_rc ? 'local' : isClear_rc ? 'clear_channel' : 'regional';
+
+      // Helper to produce a checklist item
+      const item = (id, label, rule, status, note, required_action = null) =>
+        ({ id, label, rule, status, note, required_action });
+
+      // 1. COL coverage — §73.24(j) 80% floor
+      const i1 = (() => {
+        if (coverage_pct == null) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(j)', 'NOT_EVALUATED',
+          'COL coverage not evaluated — no polygon or daytime reach data available.',
+          'Commission §73.183 coverage study with GIS polygon of principal community');
+        if (coverage_pct >= COL_COVERAGE_HARD_FLOOR) return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(j)', 'PASS',
+          `${(coverage_pct * 100).toFixed(0)}% of principal community receives ≥5 mV/m (floor: 80%).`);
+        return item('col_coverage', 'Principal community 5 mV/m coverage', '47 CFR §73.24(j)', 'FAIL',
+          `Coverage ${(coverage_pct * 100).toFixed(0)}% is below the 80% §73.24(j) floor — site is NON-COMPLIANT at current TPO.`,
+          `Increase TPO or select a site closer to principal community. Minimum compliant TPO is estimated at ${minimum_tpo_for_col_coverage_kw ?? 'unknown'} kW.`);
+      })();
+
+      // 2. Blanket population — §73.24(g) 1% ceiling
+      const i2 = (() => {
+        if (blanket_population_pct == null) return item('blanket_pop', 'Blanket population (1000 mV/m contour)', '47 CFR §73.24(g)', 'NOT_EVALUATED',
+          'Blanket population not evaluated — 1000 mV/m contour data unavailable.',
+          'Compute 1 mV/m groundwave radius and estimate population within contour');
+        if (blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT) return item('blanket_pop', 'Blanket population (1000 mV/m contour)', '47 CFR §73.24(g)', 'PASS',
+          `Estimated blanket population ${blanket_population_pct.toFixed(2)}% ≤ 1% ceiling.`);
+        return item('blanket_pop', 'Blanket population (1000 mV/m contour)', '47 CFR §73.24(g)', 'FAIL',
+          `Blanket population ${blanket_population_pct.toFixed(2)}% exceeds 1% ceiling — site is NON-COMPLIANT.`,
+          'Reduce TPO, install DA array to suppress lobes toward populated areas, or select a different site.');
+      })();
+
+      // 3. ASR tower registration — §17.7 (200 ft / 60.96 m threshold)
+      const asrRequired_rc = qwave_rc > ASR_M;
+      const i3 = asrRequired_rc
+        ? item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'WARN',
+          `λ/4 = ${round2(qwave_rc)} m at ${frequency_khz} kHz exceeds the 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 and FAA Form 7460-1 (aeronautical study) required before construction.`,
+          'File FAA Form 7460-1 and obtain FAA determination before filing Form 854 with FCC. Marking/lighting per FAA determination (§17.21–§17.50).')
+        : item('asr_registration', 'ASR tower registration (§17.7)', '47 CFR §17.7 / FCC Form 854', 'NOT_EVALUATED',
+          `λ/4 = ${round2(qwave_rc)} m at ${frequency_khz} kHz is below the 60.96 m threshold at quarter-wave. Final tower height determines ASR applicability.`,
+          'Confirm final antenna height. If tower exceeds 200 ft (60.96 m) ASR is mandatory regardless of frequency.');
+
+      // 4. RF exposure (MPE) — §1.1310 / OET Bulletin 65
+      // AM stations > 5 kW ERP must conduct MPE evaluation (general pop uncontrolled limits).
+      const mpeRequired_rc = tpo_kw >= MPE_ERP_THRESHOLD_KW;
+      const i4 = mpeRequired_rc
+        ? item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1310 / OET Bulletin 65', 'WARN',
+          `TPO = ${tpo_kw} kW ≥ 5 kW threshold. Routine MPE evaluation (field-strength measurement or calculation) is required before license grant. General population/uncontrolled limits apply beyond the antenna base exclusion zone.`,
+          'Compute uncontrolled MPE limit distance from antenna base; fence or post exclusion zone signage per OET-65 guidance.')
+        : item('mpe_evaluation', 'RF exposure MPE evaluation', '47 CFR §1.1310 / OET Bulletin 65', 'PASS',
+          `TPO = ${tpo_kw} kW < 5 kW screening threshold. Simplified MPE evaluation typically sufficient; confirm with Form 302-AM.`);
+
+      // 5. Nighttime NIF study — §73.182
+      const nifRequired_rc = !isLocal_rc;  // all non-local channels require NIF at new site
+      const nifNote_rc = isClear_rc
+        ? `Clear channel (§73.25): full NIF contour study required per §73.182. Class A dominant must protect exclusive skywave contour; secondary/other stations must demonstrate no new interference.`
+        : `Regional channel: §73.182 nighttime interference screening required. Demonstrate no increase in inter-station skywave interference at the candidate site.`;
+      const i5 = nifRequired_rc
+        ? item('nif_study', 'Nighttime interference-free (NIF) contour study', '47 CFR §73.182', 'WARN',
+          nifNote_rc, 'Commission §73.182 NIF study from consulting engineer before Form 301-AM filing.')
+        : item('nif_study', 'Nighttime interference-free (NIF) contour study', '47 CFR §73.182', 'PASS',
+          'Local channel (§73.27): §73.182 NIF study not required for local-channel stations. Confirm TPO ≤ 250 W daytime / 25 W nighttime.');
+
+      // 6. Treaty zone coordination
+      const i6 = (() => {
+        if (!treaty_zone) return item('treaty_zone', 'International treaty coordination', '1941/1986 US/MX, 1941 US/CA NARBA', 'PASS',
+          'Candidate site is outside the US/Mexico and US/Canada treaty coordination zones (screening-grade). No treaty coordination required at this stage.');
+        return item('treaty_zone', 'International treaty coordination', '1941/1986 US/MX, 1941 US/CA NARBA', 'WARN',
+          `Candidate is within the ${treaty_zone} treaty coordination zone (${treaty_min_border_km != null ? round2(treaty_min_border_km) + ' km to border' : 'distance unavailable'}). FCC IB coordination with the foreign administration is required before CP can be granted.`,
+          'File for treaty coordination through FCC International Bureau before or concurrent with Form 301-AM. Allow 6–18 months for coordination clearance.');
+      })();
+
+      // 7. Directional antenna pattern — §73.316 / §73.150
+      const i7 = isDA_rc
+        ? item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.316 / §73.150', 'WARN',
+          `Pattern mode ${pattern_mode}: §73.316 requires a horizontal radiation pattern table (36 radials at 10° increments) and suppression ratios filed with Form 301-AM. §73.150 requires proof-of-performance measurements at the new site (72-radial FI traversals per §73.154).`,
+          'Engage an AM DA design engineer. Prepare §73.316 HRP table, field intensity contour map, and §73.150 DA proof schedule. Budget 16–52 weeks for pre-application pattern design.')
+        : item('da_pattern', 'Directional antenna (DA) pattern requirements', '47 CFR §73.316 / §73.150', 'PASS',
+          `Pattern mode ${pattern_mode}: non-directional antenna. §73.316 DA pattern requirements do not apply. Standard 8-radial inverse-distance proof of performance required at new site.`);
+
+      // 8. Ground system — §73.190 (AM stations must have efficient ground radial system)
+      const sigmaAdequate = sigma_msm >= SIGMA_PREFERRED_MIN_MSM;
+      const i8 = (() => {
+        if (ground_sigma_filing_grade === 'filing') return item('ground_system', 'Ground system conductivity & §73.190 certification', '47 CFR §73.190', 'PASS',
+          `Filing-grade conductivity data (σ = ${sigma_msm} mS/m) available. §73.190 ground system certification supported by measured soil data.`);
+        if (sigmaAdequate) return item('ground_system', 'Ground system conductivity & §73.190 certification', '47 CFR §73.190', 'WARN',
+          `Zone-table conductivity σ = ${sigma_msm} mS/m (${ground_sigma_source ?? 'FCC M3 zone map'}). Soil survey required before §73.190 ground system certification. Consider commissioning a soil resistivity survey early in the process.`,
+          'Engage a licensed broadcast engineer for Wenner four-electrode soil resistivity survey. Survey results determine required radial count and burial depth for §73.190 certification.');
+        return item('ground_system', 'Ground system conductivity & §73.190 certification', '47 CFR §73.190', 'WARN',
+          `Zone-table conductivity σ = ${sigma_msm} mS/m is below the preferred ${SIGMA_PREFERRED_MIN_MSM} mS/m — poor ground conditions increase ground loss and may require more extensive radial system. Soil survey strongly recommended.`,
+          'Commission soil resistivity survey. Low-σ sites may require 120+ radials at greater burial depth and/or elevated antenna (base-insulated) to maintain acceptable antenna efficiency.');
+      })();
+
+      // 9. NEPA environmental screening — §1.1306
+      const nepaItems = (() => {
+        if (!pt.lat || !pt.lon) return [];
+        const lat_deg = pt.lat;
+        const hasFlood = lat_deg < 32;   // rough Southern US proxy (not real data)
+        return hasFlood ? ['potential flood plain'] : [];
+      })();
+      const i9 = item('nepa_screening', 'NEPA §1.1306 desktop environmental screening', '47 CFR §1.1306 / §1.1307', 'WARN',
+        'NEPA §1.1306 desktop environmental screening is required for all new transmitter site applications. An Environmental Assessment (EA) is triggered if any of the 13 categorical exclusion criteria cannot be satisfied.',
+        'Complete §1.1306 environmental checklist. If any trigger is present, prepare an EA before Form 301-AM filing. Typical EA adds 6–18 months to processing.');
+
+      // 10. NHPA §106 historic preservation consultation
+      const i10 = item('nhpa_106', 'NHPA §106 historic/cultural resource consultation', '47 CFR §1.1307(a)(4) / 36 CFR Part 800', 'WARN',
+        'All new tower construction requires NHPA §106 State Historic Preservation Office (SHPO) consultation for archaeological and architectural survey. Required before construction begins.',
+        'Submit tower proposal to SHPO for §106 review. Prepare Phase I Archaeological Survey if required. Allow 90–180 days for SHPO response.');
+
+      // 11. Form 301-AM application completeness
+      const i11 = item('form_301_am', 'FCC Form 301-AM application completeness', '47 CFR §73.3533 / LMS', 'WARN',
+        'Form 301-AM (change of transmitter site) requires: engineering exhibits (coverage map, blanket pop analysis, NIF study), antenna data (HRP if DA), ground system description, NEPA/NHPA certifications, filing fee (§73.3525), and ASR number (if applicable).',
+        'Prepare complete engineering filing package with licensed broadcast consultant. LMS rejects incomplete Form 301-AM submissions; completeness review before filing saves significant processing delays.');
+
+      // 12. Construction completion and license-to-cover deadline
+      const i12 = item('construction_deadline', 'CP construction completion and Form 302-AM deadline', '47 CFR §73.3534', 'WARN',
+        'FCC Construction Permits specify a completion deadline (typically 3 years from CP grant per §73.3534). Extensions can be requested but require showing of good cause. License to Cover (Form 302-AM) must be filed within 10 days of construction completion.',
+        'Develop construction schedule immediately upon CP grant. Request extension per §73.3534(b) if needed before deadline expiration — retroactive extensions are not available.');
+
+      const items_rc = [i1, i2, i3, i4, i5, i6, i7, i8, i9, i10, i11, i12];
+      const counts = { PASS: 0, WARN: 0, FAIL: 0, NOT_EVALUATED: 0 };
+      for (const it of items_rc) counts[it.status] = (counts[it.status] ?? 0) + 1;
+      const overall_status = counts.FAIL > 0 ? 'FAIL' : counts.WARN > 0 ? 'WARN' : counts.NOT_EVALUATED > 0 ? 'INCOMPLETE' : 'PASS';
+      const filing_readiness = overall_status === 'FAIL'
+        ? 'NOT READY — one or more hard compliance failures must be resolved before Form 301-AM filing'
+        : overall_status === 'WARN'
+        ? 'CONDITIONAL — no hard failures; outstanding items require professional study/consultation before filing'
+        : overall_status === 'INCOMPLETE'
+        ? 'INCOMPLETE — screening incomplete; additional data required to assess filing readiness'
+        : 'READY — all screening-grade items pass; commission full engineering study before filing';
+
+      return {
+        overall_status,
+        filing_readiness,
+        pass_count: counts.PASS,
+        warn_count: counts.WARN,
+        fail_count: counts.FAIL,
+        not_evaluated_count: counts.NOT_EVALUATED,
+        items: items_rc,
+        reference: '47 CFR §73.24(g)(j); §73.182; §73.316; §73.190; §1.1306; §1.1307; §1.1310; §17.7; §73.3534; OET Bulletin 65',
+        note: 'regulatory_compliance_checklist is a screening-grade pre-filing assessment only. All WARN and NOT_EVALUATED items require professional engineering study, legal review, or additional data collection before Form 301-AM can be filed. Consult a licensed broadcast consultant and FCC communications attorney before filing.'
+      };
+    })(),
+
+    // Per-candidate AM ground radial system design guide.
+    // Provides §73.190-compliant radial system specifications based on
+    // Terman/Belrose ground loss theory and FCC M3 conductivity at this
+    // candidate location.  Radial count, length, burial depth, staging,
+    // and soil resistivity measurement requirements are all addressed.
+    ground_system_design_guide: (() => {
+      const P_watts_gs  = tpo_kw * 1000;
+      const lambda_gs_m = round2(300000 / frequency_khz);   // full wavelength in meters
+      const qwave_gs_m  = round2(lambda_gs_m / 4);           // λ/4 radial length (optimal)
+      const min_radial_len_m = round2(lambda_gs_m / 8);      // λ/8 minimum practical radial length
+
+      // Standard and minimal radial counts per ARRL/FCC practice
+      const N_STD  = 120;  // industry standard: essentially achieves ideal ground for σ > ~4 mS/m
+      const N_MIN  = 60;   // minimum for reasonable efficiency (50–60 radials commonly practical)
+      const N_REDUCED = 30; // urban-constrained minimum (rooftop/limited-land sites)
+
+      // Terman/Belrose ground resistance formula for 120 radials
+      const R_gnd_std   = round2(1.65 / (N_STD     * Math.max(sigma_msm, 1) * 0.001));
+      const R_gnd_60    = round2(1.65 / (N_MIN     * Math.max(sigma_msm, 1) * 0.001));
+      const R_gnd_30    = round2(1.65 / (N_REDUCED * Math.max(sigma_msm, 1) * 0.001));
+      const R_rad_ideal = 36.6;  // Ω, ideal λ/4 monopole radiation resistance
+
+      // Antenna efficiency for each radial count scenario
+      const eff = (Rg) => round2((R_rad_ideal / (R_rad_ideal + Rg)) * 100);
+      const eff_std     = eff(R_gnd_std);
+      const eff_60      = eff(R_gnd_60);
+      const eff_30      = eff(R_gnd_30);
+
+      // Effective TPO after ground loss at each scenario
+      const eff_tpo = (pct) => round2(tpo_kw * (pct / 100));
+
+      // Soil resistivity classification (inverse of conductivity)
+      const rho_ohm_m = round2(1000 / Math.max(sigma_msm, 0.1));  // ρ = 1/σ (Ω·m)
+      const soilClass = sigma_msm >= 15 ? 'EXCELLENT' : sigma_msm >= 8 ? 'GOOD' : sigma_msm >= 4 ? 'AVERAGE' : sigma_msm >= 2 ? 'POOR' : 'VERY_POOR';
+      const soilNote = {
+        EXCELLENT: 'High-conductivity soil (swamp/marsh/coastal). 60–90 radials typically sufficient. Minimal ground loss expected.',
+        GOOD:      'Good conductivity. Standard 120-radial system (λ/4) achieves near-ideal efficiency. FCC M3 zone meets §73.190 screening threshold.',
+        AVERAGE:   'Average conductivity. Standard 120-radial λ/4 system required for acceptable efficiency. Commission soil resistivity survey before construction.',
+        POOR:      'Poor conductivity. Extended radials (up to λ/2) and/or elevated antenna may be necessary to achieve acceptable efficiency. Soil survey critical.',
+        VERY_POOR: 'Very poor conductivity. Ground system losses will be significant. Consider elevated (base-insulated) antenna to reduce dependence on ground conductivity. Soil survey mandatory.'
+      }[soilClass];
+
+      // Burial depth recommendation
+      const burialDepth_cm = sigma_msm >= 8 ? '5–10 cm' : sigma_msm >= 4 ? '10–15 cm' : '15–30 cm';
+      const conductor = sigma_msm >= 8 ? '#10 AWG copper-clad steel or solid copper' : '#8 AWG solid copper';
+
+      // Wenner 4-electrode measurement: electrode spacing for meaningful result
+      // Wenner spacing should equal or exceed radial length for a representative reading
+      const wennerSpacing_m = qwave_gs_m;  // spacing = a = radial length
+
+      // Staging plan: Phase 1 (minimum viable system for startup) vs Phase 2 (full system)
+      const phase1_count = Math.max(N_MIN, Math.round(N_STD * 0.5));
+      const phase2_count = N_STD;
+
+      const scenarios = [
+        {
+          label:           'Standard (120 radials)',
+          radial_count:    N_STD,
+          radial_length_m: qwave_gs_m,
+          ground_loss_ohm: R_gnd_std,
+          antenna_efficiency_pct: eff_std,
+          effective_tpo_kw: eff_tpo(eff_std),
+          suitable_for:    'Preferred for all AM stations. Required for §73.190 certification without soil survey waiver. Achieves near-ideal ground for σ ≥ 4 mS/m.'
+        },
+        {
+          label:           'Reduced (60 radials)',
+          radial_count:    N_MIN,
+          radial_length_m: qwave_gs_m,
+          ground_loss_ohm: R_gnd_60,
+          antenna_efficiency_pct: eff_60,
+          effective_tpo_kw: eff_tpo(eff_60),
+          suitable_for:    'Acceptable for temporary operations or land-constrained sites. §73.190 soil survey waiver application may be required. Efficiency reduction may affect coverage compliance.'
+        },
+        {
+          label:           'Urban-constrained (30 radials)',
+          radial_count:    N_REDUCED,
+          radial_length_m: min_radial_len_m,
+          ground_loss_ohm: R_gnd_30,
+          antenna_efficiency_pct: eff_30,
+          effective_tpo_kw: eff_tpo(eff_30),
+          suitable_for:    'Absolute minimum for urban/rooftop sites with severe land constraints. Significant efficiency reduction. §73.190 variance required. Coverage compliance uncertain without full field study.'
+        }
+      ];
+
+      // §73.190 certification checklist
+      const cert_requirements = [
+        'Soil resistivity survey (Wenner 4-electrode method) at proposed radial layout locations',
+        `Minimum ${N_STD} copper radials at λ/4 (${qwave_gs_m} m) length, buried ${burialDepth_cm}`,
+        `Ground ring: solid copper conductor connecting all radial tips at ${qwave_gs_m} m radius`,
+        'All radials bonded to tower base connection point (ground bus bar or direct burial clamp)',
+        `Conductor specification: ${conductor}`,
+        'Antenna base current measurement before and after radial installation to verify efficiency improvement',
+        'Document ground system layout (as-built drawing with radial bearings and lengths) for §73.190 filing',
+        'FCC Form 302-AM ground system certification: submit measured efficiency and base current data'
+      ];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        sigma_msm,
+        soil_resistivity_ohm_m:  rho_ohm_m,
+        soil_conductivity_class: soilClass,
+        soil_note:               soilNote,
+        wavelength_m:            lambda_gs_m,
+        optimal_radial_length_m: qwave_gs_m,
+        minimum_radial_length_m: min_radial_len_m,
+        burial_depth_recommended: burialDepth_cm,
+        conductor_specification:  conductor,
+        scenarios,
+        staging_phase1: {
+          radial_count: phase1_count,
+          description: `Phase 1 (${phase1_count} radials): minimum viable system for initial operation while Phase 2 radials are installed in stages.`
+        },
+        staging_phase2: {
+          radial_count: phase2_count,
+          description: `Phase 2 (${phase2_count} radials): complete standard system for §73.190 certification.`
+        },
+        wenner_survey: {
+          method:          'Wenner 4-electrode (equal-spacing) soil resistivity measurement',
+          electrode_spacing_m: wennerSpacing_m,
+          measurement_locations: `Minimum 4 traverses at 0°, 45°, 90°, 135° from tower base to ${qwave_gs_m} m radius. Additional traverses if soil heterogeneity suspected.`,
+          interpretation:  `Measured ρ (Ω·m) → σ (mS/m) = 1000/ρ. Compare to M3 zone value (${sigma_msm} mS/m). If measured σ differs > ±30%, update groundwave reach and coverage calculations.`
+        },
+        certification_requirements: cert_requirements,
+        reference: '47 CFR §73.190 (ground system); §73.61 (base current monitoring); ARRL Antenna Handbook (Ch. 9); Terman (1943) Radio Engineers Handbook; Belrose (1992) HF Antennas for All Locations; FCC M3 zone data',
+        note: `Ground system design guide based on Terman/Belrose ground loss formula and FCC M3 conductivity σ = ${sigma_msm} mS/m at this candidate location. All efficiency and ground loss values are theoretical screening estimates. Actual values require soil resistivity survey and field measurements by a licensed broadcast engineer.`
+      };
+    })(),
+
+    // Per-candidate tower structural assessment guide.
+    // Covers TIA-222-H wind and ice loading zones (latitude-based), tower type
+    // selection guidance, FAA marking/lighting requirements, and ASR registration.
+    // All structural values are screening-grade; a licensed structural engineer
+    // and FAA aeronautical study are required before construction.
+    tower_structural_assessment_guide: (() => {
+      const ASR_M_ts   = 60.96;  // §17.7 ASR threshold (200 ft)
+      const lambda_ts  = 300000 / frequency_khz;   // wavelength m
+      const qwave_ts   = round2(lambda_ts / 4);     // λ/4 height (typical AM tower)
+      const hwave_ts   = round2(lambda_ts / 2);     // λ/2 maximum practical height
+      const asrReq_ts  = qwave_ts > ASR_M_ts;
+
+      // TIA-222-H Wind/Ice zones based on candidate latitude (approximate, CONUS).
+      // Zone I: Gulf Coast / Southern (lat < 35°) — high wind, low ice
+      // Zone II: Central / Mid-Atlantic (35° ≤ lat < 45°) — moderate wind + ice
+      // Zone III: Northern / Great Lakes (lat ≥ 45°) — moderate wind, heavy ice
+      // Zone IV: Pacific Northwest (lon < -115° and lat ≥ 42°) — special (seismic + wind)
+      const lat_ts = pt.lat;
+      const lon_ts = pt.lon;
+      const windIceZone = (lat_ts >= 45 && lon_ts > -115)          ? 'ZONE_III_HEAVY_ICE'
+                        : (lat_ts >= 42 && lon_ts < -115)           ? 'ZONE_IV_PNW'
+                        : (lat_ts >= 35)                            ? 'ZONE_II_MODERATE'
+                        : /* lat < 35° */                             'ZONE_I_HIGH_WIND';
+
+      const zoneData = {
+        ZONE_I_HIGH_WIND:   { label: 'Zone I — High Wind (Gulf/South)', wind_speed_mph: 120, ice_thickness_in: 0.5,  note: 'Dominant design load is wind. Hurricane-grade bracing required for Gulf Coast exposure. Limited ice loading.' },
+        ZONE_II_MODERATE:   { label: 'Zone II — Moderate Wind + Ice',   wind_speed_mph: 90,  ice_thickness_in: 1.0,  note: 'Combined wind-on-ice design controls. Standard structural design applies. Guyed towers common.' },
+        ZONE_III_HEAVY_ICE: { label: 'Zone III — Heavy Ice (North)',     wind_speed_mph: 80,  ice_thickness_in: 1.5,  note: 'Heavy radial ice loading controls. Tower must be designed for ice-on-wire and ice-on-member loads. Galvanized or stainless hardware required.' },
+        ZONE_IV_PNW:        { label: 'Zone IV — Pacific Northwest',       wind_speed_mph: 85,  ice_thickness_in: 1.0,  note: 'Seismic loading (IBC Seismic Design Category B–D) applies in addition to wind and ice. Geotechnical report required for foundation design.' }
+      };
+      const zd = zoneData[windIceZone];
+
+      // Tower type recommendations by TPO and site constraints
+      // Note: AM towers are almost always vertical monopoles (series-excited base-insulated)
+      // The structure type (guyed, self-supporting, monopole) depends on power level and site.
+      const towerTypes = (() => {
+        const types = [];
+        types.push({
+          type: 'GUYED_MAST',
+          suitable: true,
+          typical_height_range_m: `${qwave_ts}–${hwave_ts}`,
+          notes: 'Most common AM tower type. Lower material cost, larger guy radius footprint (≈70–80% of tower height). Base-insulated series-fed monopole configuration. Requires substantial guy wire anchor area.',
+          max_recommended_tpo_kw: 50
+        });
+        types.push({
+          type: 'SELF_SUPPORTING_LATTICE',
+          suitable: tpo_kw <= 10,
+          typical_height_range_m: `${qwave_ts}–${round2(qwave_ts * 1.2)}`,
+          notes: 'Higher per-foot cost than guyed mast. Smaller footprint — no guy anchors. Suitable for urban/constrained sites where guy radius is impractical. Structural weight limits practical height at lower frequencies.',
+          max_recommended_tpo_kw: 10
+        });
+        types.push({
+          type: 'MONOPOLE_TUBULAR',
+          suitable: tpo_kw <= 5,
+          typical_height_range_m: `${round2(qwave_ts * 0.7)}–${qwave_ts}`,
+          notes: 'Tapered tubular steel monopole. Smallest footprint. Limited to lower heights and powers. Architectural option for urban/commercial locations. Higher cost per unit height than guyed mast.',
+          max_recommended_tpo_kw: 5
+        });
+        return types;
+      })();
+
+      // FAA marking and lighting requirements (per §17.21–§17.50 and AC 70/7460-1M)
+      const faaRequirements = (() => {
+        const h = qwave_ts;  // use λ/4 as representative tower height
+        if (h <= 60.96) {
+          return {
+            marking_required: false,
+            lighting_required: false,
+            type: 'NONE',
+            note: `Tower height (λ/4 = ${qwave_ts} m) is at or below the 60.96 m (200 ft) threshold. FAA marking/lighting not required unless within 3 nm of an airport or in controlled airspace. Verify with FAA Form 7460-1 regardless.`
+          };
+        }
+        if (h <= 152.4) {
+          return {
+            marking_required: true,
+            lighting_required: true,
+            type: 'MEDIUM_INTENSITY',
+            paint: 'Aviation orange/white alternating bands (§17.23)',
+            lights: 'Medium-intensity white flashing (L-864/L-865) day/night + red steady-burning night (L-810)',
+            note: `Tower height ${qwave_ts}–${hwave_ts} m (200–500 ft): medium-intensity marking/lighting required (§17.21 Table 1). 7 aviation-orange/white bands, 2 m minimum band width.`
+          };
+        }
+        return {
+          marking_required: true,
+          lighting_required: true,
+          type: 'HIGH_INTENSITY',
+          paint: 'Aviation orange/white alternating bands (§17.23) + red beacon',
+          lights: 'High-intensity white strobe (L-856) day + medium-intensity white flashing night + red steady-burning (L-810)',
+          note: `Tower height > 152.4 m (500 ft): high-intensity marking/lighting required (§17.21 Table 1). Full strobe beacon array. Budget $150–$350K for lighting system.`
+        };
+      })();
+
+      // Foundation requirements (screening grade)
+      const soilBearingKPa = sigma_msm >= 10 ? 150 : sigma_msm >= 5 ? 100 : 75;  // rough σ-to-bearing proxy
+      const foundationType = sigma_msm >= 8 ? 'spread_footing'
+                           : sigma_msm >= 4 ? 'drilled_pier'
+                           : 'deep_pile';
+      const foundationNote = {
+        spread_footing: 'Spread footing or mat foundation likely suitable. Geotechnical report required to confirm bearing capacity.',
+        drilled_pier:   'Drilled pier (caisson) foundation likely required for guyed mast anchors and tower base in moderate-conductivity (potentially softer) soil.',
+        deep_pile:      'Deep pile foundation may be required. Low-conductivity soil often correlates with poor bearing capacity. Geotechnical investigation critical.'
+      }[foundationType];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        candidate_lat:       round2(lat_ts),
+        candidate_lon:       round2(lon_ts),
+        wavelength_m:        round2(lambda_ts),
+        quarter_wave_height_m: qwave_ts,
+        half_wave_height_m:    hwave_ts,
+        asr_registration_required: asrReq_ts,
+        asr_note: asrReq_ts
+          ? `λ/4 = ${qwave_ts} m exceeds 60.96 m (200 ft) §17.7 threshold. FCC ASR Form 854 + FAA Form 7460-1 required before construction.`
+          : `λ/4 = ${qwave_ts} m is below 60.96 m threshold at quarter-wave. Confirm final tower height; if below 200 ft and not near an airport, ASR may not be required.`,
+        wind_ice_zone:      windIceZone,
+        wind_ice_zone_data: zd,
+        tower_types: towerTypes,
+        recommended_tower_type: tpo_kw >= 25 ? 'GUYED_MAST' : tpo_kw >= 10 ? 'GUYED_MAST' : 'GUYED_MAST',
+        faa_requirements:   faaRequirements,
+        foundation: {
+          estimated_soil_bearing_kpa: soilBearingKPa,
+          recommended_type:           foundationType,
+          note:                        foundationNote
+        },
+        structural_standards: [
+          'TIA-222-H (Structural Standard for Antenna Supporting Structures, Antennas, and Small Wind Turbine Support Structures)',
+          'ASCE 7-22 (Minimum Design Loads and Associated Criteria for Buildings and Other Structures)',
+          'IBC 2021 (International Building Code) — local jurisdiction may use earlier edition',
+          'AC 70/7460-1M (FAA Obstruction Marking and Lighting)'
+        ],
+        reference: '47 CFR §17.7 (ASR registration); §17.21–§17.50 (marking/lighting); TIA-222-H; AC 70/7460-1M; ASCE 7-22; IBC 2021',
+        note: `Tower structural assessment guide is a screening-grade reference. Actual structural design, foundation engineering, and FAA obstruction study must be performed by licensed structural/geotechnical engineers and registered in the FAA aeronautical study database before construction. All height and loading values are based on λ/4 antenna theory at ${frequency_khz} kHz and latitude-based TIA-222-H zone assignment.`
+      };
+    })(),
+
+    // Per-candidate community of license (CoL) geographic profile.
+    // Characterizes the principal community relative to this candidate site:
+    // distance from candidate to CoL centroid, geographic tier (near/mid/far),
+    // §73.24(j) five mV/m coverage assessment, and FCC engineering implications.
+    community_of_license_profile: (() => {
+      // Distance from candidate to COL centroid (or fallback: distance to current site)
+      const col_dist_km = col_centroid
+        ? round2(greatCircleKm(pt.lat, pt.lon, col_centroid.lat, col_centroid.lon))
+        : (pt.distance_from_current_km != null ? round2(pt.distance_from_current_km) : null);
+
+      // Geographic tier classification:
+      // PROXIMATE: candidate is very close to CoL — good coverage likely achievable at low TPO
+      // NEAR: candidate within 10 km — typically straightforward coverage
+      // MID: 10–30 km — moderate TPO required; ground conductivity matters
+      // FAR: 30–60 km — higher TPO or very good conductivity required
+      // REMOTE: > 60 km — coverage of CoL likely only achievable at high power (rare for standard relocation)
+      const geoTier_cp = col_dist_km == null ? 'UNKNOWN'
+        : col_dist_km <= 3  ? 'PROXIMATE'
+        : col_dist_km <= 10 ? 'NEAR'
+        : col_dist_km <= 30 ? 'MID'
+        : col_dist_km <= 60 ? 'FAR'
+        : 'REMOTE';
+
+      const geoTierNote = {
+        PROXIMATE: 'Candidate is within 3 km of CoL centroid. §73.24(j) 5 mV/m coverage highly achievable even at minimum TPO. Monitor blanket population (§73.24g) at close range.',
+        NEAR:      'Candidate within 10 km of CoL. §73.24(j) compliance straightforward at typical class TPO. Blanket population monitoring advisable.',
+        MID:       'Candidate 10–30 km from CoL. §73.24(j) compliance depends on TPO and ground conductivity. Groundwave reach calculation critical.',
+        FAR:       'Candidate 30–60 km from CoL. Higher TPO and/or better-conductivity site required for reliable §73.24(j) compliance. Consider DA pattern to direct energy toward CoL.',
+        REMOTE:    'Candidate > 60 km from CoL. §73.24(j) compliance likely requires near-maximum class TPO. Relocation to this candidate may require class upgrade or variance.',
+        UNKNOWN:   'CoL centroid not provided — geographic tier cannot be assessed. Supply a CoL polygon for accurate §73.24(j) analysis.'
+      }[geoTier_cp] ?? '';
+
+      // Coverage adequacy assessment
+      const col5MvmCovered = daytime_reach_km != null && col_dist_km != null
+        ? (daytime_reach_km >= col_dist_km)
+        : null;
+      const fieldAtColMvm = field_at_col_centroid_mvm;
+      const colCompliant = coverage_pct != null ? coverage_pct >= COL_COVERAGE_HARD_FLOOR : null;
+
+      // Bearing from candidate to CoL centroid
+      const bearingToCol_cp = (() => {
+        if (!col_centroid) return null;
+        const dLat = (col_centroid.lat - pt.lat) * (Math.PI / 180);
+        const dLon = (col_centroid.lon - pt.lon) * (Math.PI / 180);
+        const ptLatR  = pt.lat * (Math.PI / 180);
+        const tgtLatR = col_centroid.lat * (Math.PI / 180);
+        const ay = Math.sin(dLon) * Math.cos(tgtLatR);
+        const ax = Math.cos(ptLatR) * Math.sin(tgtLatR) - Math.sin(ptLatR) * Math.cos(tgtLatR) * Math.cos(dLon);
+        return round2(((Math.atan2(ay, ax) * 180 / Math.PI) + 360) % 360);
+      })();
+
+      // TPO needed to achieve 5 mV/m at the CoL centroid distance
+      let tpo_for_col_coverage_kw = minimum_tpo_for_col_coverage_kw;
+
+      // Data quality assessment
+      const data_quality = community_of_license_polygon
+        ? 'POLYGON' : col_centroid ? 'CENTROID_ONLY' : 'NO_COL_DATA';
+      const data_quality_note = {
+        POLYGON:        'CoL GeoJSON polygon supplied — intersection analysis available. §73.24(j) compliance can be assessed with high spatial resolution.',
+        CENTROID_ONLY:  'CoL centroid point supplied but no polygon. Coverage assessed as disc-proxy (§73.24j compliance treated as binary at centroid distance). Polygon recommended for accurate analysis.',
+        NO_COL_DATA:    'No CoL data supplied — distance proxy uses candidate-to-current-site distance. Commission GeoJSON polygon of principal community for §73.24(j) analysis.'
+      }[data_quality];
+
+      // Engineering recommendations
+      const engineering_recommendations = [];
+      if (geoTier_cp === 'FAR' || geoTier_cp === 'REMOTE') {
+        engineering_recommendations.push('Consider DA pattern to maximize signal toward CoL and reduce wasted power in non-service directions (§73.150 application).');
+      }
+      if (!colCompliant && tpo_for_col_coverage_kw != null) {
+        engineering_recommendations.push(`Increase TPO to ≥${tpo_for_col_coverage_kw} kW to achieve §73.24(j) 5 mV/m 80% CoL coverage floor at this site.`);
+      }
+      if (data_quality !== 'POLYGON') {
+        engineering_recommendations.push('Supply a GeoJSON polygon of the principal community for accurate §73.24(j) compliance analysis.');
+      }
+      if (fieldAtColMvm != null && fieldAtColMvm < 5.0) {
+        engineering_recommendations.push(`Field at CoL centroid = ${fieldAtColMvm} mV/m < 5 mV/m §73.24(j) threshold. Site fails principal-community coverage at current TPO.`);
+      }
+
+      return {
+        col_data_source:             data_quality,
+        col_data_source_note:        data_quality_note,
+        col_centroid_lat:            col_centroid?.lat ?? null,
+        col_centroid_lon:            col_centroid?.lon ?? null,
+        candidate_lat:               round2(pt.lat),
+        candidate_lon:               round2(pt.lon),
+        candidate_to_col_dist_km:    col_dist_km,
+        bearing_from_candidate_to_col_deg: bearingToCol_cp,
+        geographic_tier:             geoTier_cp,
+        geographic_tier_note:        geoTierNote,
+        daytime_reach_km,
+        field_at_col_centroid_mvm:   fieldAtColMvm,
+        col_5mvm_centroid_covered:   col5MvmCovered,
+        col_coverage_pct:            coverage_pct != null ? round2(coverage_pct * 100) : null,
+        col_compliant:               colCompliant,
+        minimum_tpo_for_col_kw:      tpo_for_col_coverage_kw,
+        engineering_recommendations: engineering_recommendations.length > 0 ? engineering_recommendations : ['No immediate engineering actions required at screening grade.'],
+        reference: '47 CFR §73.24(j) (5 mV/m principal community coverage); §73.24(g) (blanket population limit); §73.150 (directional antenna for coverage shaping)',
+        note: 'Community of license profile is a screening-grade geographic assessment. Coverage_pct uses a 10-km disc proxy when no CoL polygon is supplied. Bearing calculations use the WGS-84 spherical earth model.'
+      };
+    })(),
+
+    // Per-candidate atmospheric and man-made noise analysis.
+    // Models the expected RF noise environment at the candidate location
+    // using ITU-R P.372-15 man-made noise equations and a simplified
+    // atmospheric noise estimate for the MF AM broadcast band.
+    // Noise floor directly impacts the usable service area: higher ambient
+    // noise reduces the effective coverage radius for a given field strength.
+    atmospheric_noise_analysis: (() => {
+      const f_mhz  = frequency_khz / 1000;
+      const f_khz  = frequency_khz;
+
+      // ITU-R P.372-15 man-made noise figures (dB above kT0B at 290 K)
+      // Equations from ITU-R P.372-15 Table 1 (approximate):
+      // Fa = a + b * log10(f_MHz)
+      // Business:    a=76.8, b=-27.7  (higher noise from industrial/commercial density)
+      // Residential: a=72.5, b=-27.7
+      // Rural:       a=67.2, b=-27.7
+      // Quiet rural: a=53.6, b=-27.7  (typical for low-density areas)
+      const bLog = -27.7;
+      const fa_business    = round2(76.8 + bLog * Math.log10(f_mhz));
+      const fa_residential = round2(72.5 + bLog * Math.log10(f_mhz));
+      const fa_rural       = round2(67.2 + bLog * Math.log10(f_mhz));
+      const fa_quiet_rural = round2(53.6 + bLog * Math.log10(f_mhz));
+
+      // Atmospheric noise: ITU-R P.372-15 provides maps; for MF (0.3–3 MHz),
+      // a simplified model based on latitude (thunderstorm activity) is used:
+      // Equatorial/tropical (lat 0–20°): high atmospheric noise (active thunderstorm belt)
+      // Subtropical (lat 20–35°): moderate-high
+      // Mid-latitude (lat 35–50°): moderate
+      // Northern mid-lat (lat 50–60°): moderate-low
+      // Subarctic (lat > 60°): low
+      const lat_an = Math.abs(pt.lat);
+      const fa_atm_day = lat_an < 20 ? round2(60 + 15 * Math.log10(1000 / f_khz))
+                       : lat_an < 35 ? round2(54 + 15 * Math.log10(1000 / f_khz))
+                       : lat_an < 50 ? round2(48 + 15 * Math.log10(1000 / f_khz))
+                       : lat_an < 60 ? round2(42 + 15 * Math.log10(1000 / f_khz))
+                       :               round2(36 + 15 * Math.log10(1000 / f_khz));
+      // Nighttime atmospheric noise significantly higher (ionospheric enhancement of distant lightning)
+      const fa_atm_night = round2(fa_atm_day + 12);  // +10–15 dB typical for MF nighttime
+
+      // Expected noise environment for this candidate (urban proximity heuristic)
+      // We use sigma_msm as a weak proxy for urbanization:
+      // Low σ (arid, rocky) → likely rural; high σ (swampy, coastal) → could be either
+      // Better: use city_coverage_pct or population data. For now, use a simple model.
+      const pop_density_km2 = estimated_daytime_population_served != null && daytime_reach_km != null && daytime_reach_km > 0
+        ? Math.round(estimated_daytime_population_served / (Math.PI * daytime_reach_km * daytime_reach_km))
+        : null;
+
+      const siteNoiseClass = pop_density_km2 == null ? 'UNKNOWN'
+        : pop_density_km2 > 500  ? 'BUSINESS'
+        : pop_density_km2 > 100  ? 'RESIDENTIAL'
+        : pop_density_km2 > 20   ? 'RURAL'
+        : 'QUIET_RURAL';
+
+      const fa_site = {
+        BUSINESS:    fa_business,
+        RESIDENTIAL: fa_residential,
+        RURAL:       fa_rural,
+        QUIET_RURAL: fa_quiet_rural,
+        UNKNOWN:     fa_rural   // default to rural when unknown
+      }[siteNoiseClass];
+
+      // Effective noise figure: max(man-made, atmospheric) for worst-case
+      const fa_effective_day   = round2(Math.max(fa_site, fa_atm_day));
+      const fa_effective_night = round2(Math.max(fa_site, fa_atm_night));
+
+      // Minimum detectable signal above noise (typical AM receiver: SNR_min = 40 dB for listenable audio)
+      // P.372 uses kT0B reference: noise power in 1 Hz bandwidth at 290 K = -174 dBm/Hz
+      // Noise in 10 kHz AM bandwidth: -174 + 10*log10(10000) = -174 + 40 = -134 dBm
+      const ref_noise_dbm_10khz = -134;
+      const SNR_MIN_DB = 40;  // dB for intelligible AM audio
+      const min_signal_day_dbm   = round2(ref_noise_dbm_10khz + fa_effective_day  + SNR_MIN_DB);
+      const min_signal_night_dbm = round2(ref_noise_dbm_10khz + fa_effective_night + SNR_MIN_DB);
+
+      // Field strength equivalent (approximate, using: E[dBμV/m] = P[dBm] + 20*log10(f_MHz) + 167.2)
+      // (free-space path loss / antenna factor relationship at receive)
+      const ms_to_field_dbuvm = (p_dbm) => round2(p_dbm + 20 * Math.log10(f_mhz) + 167.2);
+      const min_field_day_dbuvm   = ms_to_field_dbuvm(min_signal_day_dbm);
+      const min_field_night_dbuvm = ms_to_field_dbuvm(min_signal_night_dbm);
+      // Convert dBμV/m to mV/m: E_mvm = 10^((E_dbuvm - 60) / 20)
+      const dbuvm_to_mvm = (db) => round2(Math.pow(10, (db - 60) / 20));
+      const min_field_day_mvm   = dbuvm_to_mvm(min_field_day_dbuvm);
+      const min_field_night_mvm = dbuvm_to_mvm(min_field_night_dbuvm);
+
+      // Noise impact on coverage
+      const coverage_noise_advisory = (() => {
+        if (fa_effective_day > fa_residential + 3) return `HIGH NOISE ENVIRONMENT: man-made + atmospheric noise (Fa ≈ ${fa_effective_day} dB) significantly reduces effective coverage radius. Minimum detectable field ≈ ${min_field_day_mvm} mV/m daytime.`;
+        if (fa_effective_day > fa_rural) return `MODERATE NOISE: Fa ≈ ${fa_effective_day} dB. Coverage radius may be reduced 10–20% vs ideal for noise-sensitive listening. Minimum field ≈ ${min_field_day_mvm} mV/m daytime.`;
+        return `LOW NOISE: Fa ≈ ${fa_effective_day} dB. Site is in a relatively quiet RF environment. Minimum detectable field ≈ ${min_field_day_mvm} mV/m daytime.`;
+      })();
+
+      return {
+        frequency_khz,
+        frequency_mhz: round2(f_mhz),
+        candidate_lat: round2(pt.lat),
+        candidate_lon: round2(pt.lon),
+        estimated_pop_density_km2:   pop_density_km2,
+        site_noise_class:            siteNoiseClass,
+        man_made_noise_fa: {
+          business:    fa_business,
+          residential: fa_residential,
+          rural:       fa_rural,
+          quiet_rural: fa_quiet_rural,
+          site_estimate: fa_site,
+          units: 'dB above kT0B (ITU-R P.372-15 Table 1)'
+        },
+        atmospheric_noise_fa_day:   fa_atm_day,
+        atmospheric_noise_fa_night: fa_atm_night,
+        effective_noise_fa_day:     fa_effective_day,
+        effective_noise_fa_night:   fa_effective_night,
+        minimum_detectable_field_day_mvm:   min_field_day_mvm,
+        minimum_detectable_field_night_mvm: min_field_night_mvm,
+        noise_advisory:  coverage_noise_advisory,
+        reference: 'ITU-R P.372-15 (Radio noise, 2019); ITU-R P.368-9 (Groundwave propagation curves); FCC §73.182 (interference protection)',
+        note: `Atmospheric and man-made noise analysis applies ITU-R P.372-15 simplified equations for the MF AM broadcast band at ${f_khz} kHz. Man-made noise class estimated from regional population density proxy. Atmospheric noise uses a latitude-based approximation of ITU-R P.372-15 Figure 1 (not a full P.372 map lookup). Results are screening-grade only — field measurements at the candidate site are the definitive noise assessment.`
+      };
+    })(),
+
+    // Per-candidate FCC Form 302-AM proof-of-performance requirements.
+    // Documents the field intensity traversal requirements, measurement
+    // procedures, and instrumentation specifications needed to obtain a
+    // license to cover (Form 302-AM) at this specific candidate site,
+    // based on antenna pattern mode and station class.
+    proof_of_performance_requirements: (() => {
+      const isDA_pp   = /^DA/i.test(pattern_mode);
+      const isLocal_pp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const lambda_pp = round2(300000 / frequency_khz);
+      const qwave_pp  = round2(lambda_pp / 4);
+      const asrReq_pp = qwave_pp > 60.96;
+
+      // §73.154 traversal requirements
+      // NDA: 8 radials at 45° intervals extending to the lesser of 16 km or the
+      //      1 mV/m contour; field intensities measured at fixed distances per
+      //      the inverse-distance formula.
+      // DA:  72 radials at 5° intervals for directional antenna proof. Must
+      //      include measurements at the 5 mV/m, 1 mV/m, and 0.5 mV/m contours.
+      const nda_traversal_spec = {
+        method:          'Inverse-distance (§73.154(b) NDA proof)',
+        radial_count:    8,
+        radial_spacing_deg: 45,
+        measurement_distances_km: [1.6, 3.2, 6.4, 12.9, 25.7],  // 1, 2, 4, 8, 16 miles
+        min_radial_length_km: 16,
+        field_contours_required: ['5.0 mV/m (principal community)', '1.0 mV/m', '0.5 mV/m'],
+        note: 'NDA proof: 8 radials at 45° intervals. For each radial, record measured field intensity and inverse distance. Submit with Form 302-AM. §73.154(b): measurements at ≥ 4 points per radial within the 1 mV/m contour.'
+      };
+      const da_traversal_spec = {
+        method:          'Full field intensity traversal (§73.154(a) DA proof)',
+        radial_count:    72,
+        radial_spacing_deg: 5,
+        measurement_distances_km: [0.8, 1.6, 3.2, 6.4, 12.9, 25.7],
+        min_radial_length_km: 25,
+        field_contours_required: ['5.0 mV/m', '2.0 mV/m', '1.0 mV/m', '0.5 mV/m', '0.25 mV/m'],
+        elements_measured_per_tower: 'Phase (deg) and ratio (dB) for each element during proof',
+        note: 'DA proof: 72 radials at 5° intervals per §73.154(a). Full field intensity measurements at each point. Must include element phases and ratios in proof report. §73.155 allows limited adjustments within ±2° phase and ±0.5 dB ratio tolerances during proof.'
+      };
+      const traversal_spec = isDA_pp ? da_traversal_spec : nda_traversal_spec;
+
+      // Base current monitoring requirements (§73.61)
+      const base_current_req = {
+        required:     tpo_kw >= 1,
+        rule:         '47 CFR §73.61',
+        location:     'Base of each tower in the antenna array',
+        monitor_type: 'RF ammeter or equivalent licensed measuring instrument',
+        reading_method: 'Readable from the transmitter control point',
+        note: tpo_kw >= 1
+          ? `§73.61: AM stations ≥ 1 kW licensed power must install base current monitors on each tower. Monitor must be readable from the transmitter control point. Record base current at beginning and end of each proof traversal run.`
+          : `§73.61 base current monitoring required only for stations ≥ 1 kW. At ${tpo_kw} kW, monitoring not required but recommended.`
+      };
+
+      // MPE measurement requirement (§1.1310 / OET-65)
+      const mpe_required = tpo_kw >= 5;
+      const mpe_req = {
+        required:       mpe_required,
+        rule:           '47 CFR §1.1310 / OET Bulletin 65',
+        measurement_method: 'Calibrated broadband or narrowband field meter (e.g., Narda, ETS-Lindgren)',
+        exclusion_zone_m:    round2(qwave_pp * 0.10),  // ~10% of λ/4 as rough MPE boundary estimate
+        note: mpe_required
+          ? `TPO = ${tpo_kw} kW ≥ 5 kW threshold. RF exposure (MPE) evaluation required. Measure field strength at accessible locations within and around the antenna exclusion zone. Post MPE warning signs at exclusion zone perimeter. Submit MPE evaluation with Form 302-AM.`
+          : `TPO = ${tpo_kw} kW < 5 kW. MPE evaluation simplified — confirm compliance with occupational (controlled) limits at base of antenna. General public (uncontrolled) limits apply at fence/accessible areas.`
+      };
+
+      // Antenna pattern proof specifics
+      const antenna_proof = {
+        type:    isDA_pp ? 'directional' : 'non-directional',
+        form:    'FCC Form 302-AM',
+        exhibits: [
+          isDA_pp
+            ? '§73.150/§73.316: Directional antenna proof report including all 72-radial FI traversals, element phases/ratios, composite field intensity plots, and comparison to licensed pattern'
+            : '§73.154(b): Non-directional proof report with 8-radial inverse-distance traversal data',
+          'Ground system description and base current measurement data (§73.190)',
+          `RF exposure (MPE) evaluation ${mpe_required ? '— required at this TPO' : '— simplified evaluation at this TPO'}`,
+          'Antenna monitoring point data (if DA: two or more monitoring points per §73.158)',
+          'Completed FCC Form 302-AM with engineering certification',
+          asrReq_pp ? 'ASR Form 854 registration confirmation (copy required with Form 302-AM)' : null
+        ].filter(Boolean)
+      };
+
+      // Required instrumentation
+      const instrumentation = [
+        'Calibrated field intensity meter (FIM-41, FIM-71, or equivalent; calibrated within 2 years)',
+        'GPS receiver with WAAS accuracy (for traversal point coordinates)',
+        'Calibrated dipole or whip antenna appropriate for AM broadcast band',
+        'RF base current monitor (for §73.61 compliance)',
+        mpe_required ? 'Broadband RF power density meter (Narda SRM-3006 or equivalent) for MPE measurement' : null,
+        isDA_pp ? 'Phase and ratio monitoring equipment for DA element measurements during proof' : null,
+        'Data recording system: GPS-tagged FIM readings at each traversal point'
+      ].filter(Boolean);
+
+      // Timing estimate for proof activities
+      const proof_weeks_low  = isDA_pp ? 8 : 3;
+      const proof_weeks_high = isDA_pp ? 16 : 6;
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        pattern_mode,
+        traversal_spec,
+        base_current_requirements:  base_current_req,
+        mpe_requirements:           mpe_req,
+        antenna_proof_exhibits:     antenna_proof.exhibits,
+        required_instrumentation:   instrumentation,
+        proof_timeline_weeks_low:   proof_weeks_low,
+        proof_timeline_weeks_high:  proof_weeks_high,
+        filing_form:                'FCC Form 302-AM (license to cover)',
+        reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
+        note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    // Per-candidate post-licensing operational monitoring requirements.
+    // Summarizes the ongoing FCC compliance obligations for station operation
+    // at this transmitter site once the license to cover is granted.
+    // Covers power monitoring, base current logs, EAS, environmental,
+    // and renewal obligations.
+    operational_monitoring_requirements: (() => {
+      const isDA_om  = /^DA/i.test(pattern_mode);
+      const isClear_om = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isHighPow_om = tpo_kw >= 25;
+      const mpeReq_om = tpo_kw >= 5;
+
+      // Operating power tolerance — §73.1560
+      const power_tolerance = {
+        rule:      '47 CFR §73.1560',
+        tolerance: tpo_kw >= 1 ? '+5% / -10% of licensed power'
+                               : '+5% / -50% of licensed power (stations < 1 kW)',
+        monitoring: 'Transmitter output power must be monitored during all periods of operation. For DA stations, base current at each element must be monitored.',
+        log_required: true,
+        note: 'Operating power must not exceed licensed TPO by more than +5% (§73.1560(a)). Underpower > 10% for licensed stations ≥ 1 kW requires notification to FCC (§73.1560(b)).'
+      };
+
+      // Base current monitoring — §73.1350 and §73.61
+      const base_current_monitoring = {
+        rule:         '47 CFR §73.1350 / §73.61',
+        required:     tpo_kw >= 1,
+        frequency:    'Continuous during operation; log 3-hour readings or per license condition',
+        towers:       isDA_om ? 'All towers in DA array (monitor point readings per §73.158)' : 'Single tower',
+        log_format:   'Station operating log (§73.1820): date, time, operating power, base currents, operator',
+        note: isDA_om
+          ? 'DA station: §73.158 monitor points must be checked at least once in each 3-hour period during hours of operation. Monitor point values must be within ±2% of licensed values.'
+          : '§73.61: Single-tower stations ≥ 1 kW must monitor base current continuously. Log readings per §73.1820.'
+      };
+
+      // EAS equipment — §11.35
+      const eas_requirements = {
+        rule:      '47 CFR Part 11 / §11.35',
+        equipment: 'FCC-certified EAS decoder/encoder (e.g., EAS Pro, Sage Digital ENDEC, or equivalent)',
+        test_weekly: 'Required Weekly Tests (RWT) — must transmit within 15 minutes of receipt',
+        test_monthly: 'Required Monthly Tests (RMT) — must conduct or relay once per month',
+        attention_signal: '8-13 second audio attention signal before EAS message',
+        log_required: true,
+        note: '§11.35: All EAS participants (including AM broadcast stations) must test and log EAS equipment at least weekly. Records must be maintained for 2 years and available for FCC inspection.'
+      };
+
+      // Environmental ongoing — §1.1307 annual certification
+      const environmental_compliance = {
+        rule:      '47 CFR §1.1307 / §1.97',
+        rf_annual: mpeReq_om ? 'Annual RF exposure self-certification required. Repeat MPE evaluation if TPO or antenna configuration changes.' : 'RF exposure simplified evaluation on license renewal.',
+        nepa_ongoing: 'Report any changes in construction or operations that might trigger previously unevaluated environmental impacts.',
+        environmental_record: 'Maintain on-site environmental records for NEPA compliance history.',
+        note: 'Any modification to the transmitter site (tower height, TPO increase, new construction) may trigger a new NEPA §1.1306 screening. File amendment with FCC before making changes.'
+      };
+
+      // License renewal — §73.3539
+      const license_renewal = {
+        rule:       '47 CFR §73.3539',
+        cycle:      '8-year renewal cycle (FCC Form 303-S)',
+        filing_window: 'Must file 4 months before license expiration',
+        petition_to_deny_window: '30 days after FCC public notice of the renewal application',
+        must_certify: [
+          'Station has operated in compliance with FCC rules',
+          'No character issues (FCC Multiple Ownership Certification)',
+          'Equal Employment Opportunity (EEO) compliance certification',
+          mpeReq_om ? 'RF exposure (MPE) remains compliant' : null,
+          isDA_om ? 'Directional antenna performance has not changed materially from licensed pattern' : null
+        ].filter(Boolean),
+        note: '§73.3539: AM broadcast licenses run 8 years. Applications for renewal must be filed electronically via LMS (FCC Form 303-S) 4 months before expiration. Licensees with pending complaints or proceedings must disclose in renewal application.'
+      };
+
+      // Nighttime power reduction — §73.99
+      const nighttime_power = (() => {
+        if (LOCAL_CHANNEL_KHZ.has(frequency_khz)) {
+          return {
+            required: true,
+            rule: '47 CFR §73.99 / §73.27',
+            nighttime_tpo_limit_kw: 0.025,  // 25 W local channel night limit
+            note: 'Local channel (§73.27): nighttime operation limited to 25 W maximum. Station must reduce power at local sunset and may resume daytime power at local sunrise. Automatic power-reduction controls required.'
+          };
+        }
+        if (fcc_class === 'D') {
+          return {
+            required: true,
+            rule: '47 CFR §73.99',
+            nighttime_tpo_limit_kw: null,
+            note: 'Class D on regional/clear channel: nighttime operation may require DA pattern per license conditions or may be prohibited (Class D = daytime only unless licensed for nighttime). Check specific license conditions.'
+          };
+        }
+        return {
+          required: false,
+          rule: '47 CFR §73.99',
+          nighttime_tpo_limit_kw: tpo_kw,
+          note: `Class ${fcc_class}: no mandatory power reduction at night beyond licensed conditions. Verify license conditions for any specific nighttime restrictions.`
+        };
+      })();
+
+      // Monthly station log requirements
+      const station_log = {
+        rule:         '47 CFR §73.1820',
+        log_contents: [
+          'Date and time of each operator station check',
+          'Transmitter output power and base current readings',
+          'Any anomalies or equipment failures and corrective action taken',
+          'EAS test receipt and transmission records',
+          isDA_om ? 'DA element monitor point values at each check' : null,
+          'Signature of licensed operator performing the check'
+        ].filter(Boolean),
+        retention_years: 2,
+        location:        'Must be kept at the station or made available electronically within 24 hours of FCC request',
+        note: '§73.1820: Station operating log must be maintained and retained for 2 years. Licensees must make the log available to the FCC upon request within 24 hours.'
+      };
+
+      // Clear channel additional obligations
+      const clear_channel_obligations = isClear_om ? {
+        applicable: true,
+        note: `Clear channel (§73.25): Must maintain watch for interference to dominant Class A station. Any changes that increase skywave interference must be reported and remediated. Dominant station coordination required for any modification.`
+      } : { applicable: false };
+
+      const monitoring_items = [
+        { id: 'power', label: 'Operating power monitoring', rule: '§73.1560', frequency: 'Continuous', critical: true },
+        { id: 'base_current', label: 'Base current monitoring', rule: '§73.1350/§73.61', frequency: isDA_om ? 'Every 3 hours (DA)' : 'Continuous (≥1 kW)', critical: tpo_kw >= 1 },
+        { id: 'eas', label: 'EAS weekly/monthly tests', rule: 'Part 11 §11.35', frequency: 'Weekly RWT + Monthly RMT', critical: true },
+        { id: 'station_log', label: 'Station operating log', rule: '§73.1820', frequency: 'Each operator check', critical: true },
+        { id: 'rf_exposure', label: 'RF exposure compliance', rule: '§1.1310 / OET-65', frequency: 'Annual self-cert; remeasure if changes', critical: mpeReq_om },
+        { id: 'renewal', label: 'License renewal filing', rule: '§73.3539', frequency: 'Every 8 years (4 months early)', critical: true }
+      ];
+
+      return {
+        frequency_khz, fcc_class, tpo_kw, pattern_mode,
+        power_tolerance,
+        base_current_monitoring,
+        eas_requirements,
+        environmental_compliance,
+        license_renewal,
+        nighttime_power,
+        station_log,
+        clear_channel_obligations,
+        monitoring_items,
+        reference: '47 CFR §73.1560 (power tolerance); §73.1350 (operating log); §73.61 (base current); Part 11 (EAS); §1.1307 (environmental); §73.3539 (renewal); §73.99 (nighttime power)',
+        note: 'Operational monitoring requirements are a post-licensing compliance reference for the transmitter site operator. Actual obligations depend on the specific license conditions granted by the FCC. Consult FCC rules and a licensed broadcast consultant for the definitive list of obligations applicable to this station.'
       };
     })(),
 
