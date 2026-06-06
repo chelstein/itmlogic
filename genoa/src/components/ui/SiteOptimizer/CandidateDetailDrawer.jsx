@@ -2129,6 +2129,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Licensing Timeline Estimate */}
+        {candidate.licensing_timeline_estimate && (() => {
+          const lt = candidate.licensing_timeline_estimate;
+          const riskColor = r => r === 'VERY_HIGH' ? 'text-red-400' : r === 'HIGH' ? 'text-amber-400' : r === 'ELEVATED' ? 'text-blue-300' : r === 'MODERATE' ? 'text-sky-300' : 'text-emerald-400';
+          const riskBg    = r => r === 'VERY_HIGH' ? 'bg-red-400/15 border-red-400/40' : r === 'HIGH' ? 'bg-amber-400/15 border-amber-400/40' : r === 'ELEVATED' ? 'bg-blue-300/15 border-blue-300/40' : 'bg-emerald-400/15 border-emerald-400/40';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">FCC CP Licensing Timeline</div>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${riskBg(lt.licensing_risk_tier)} ${riskColor(lt.licensing_risk_tier)}`}>
+                  {lt.licensing_risk_tier} RISK
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  {lt.total_years_optimistic}–{lt.total_years_conservative} years
+                </span>
+              </div>
+              <div className="font-mono text-[9px] text-textDim mb-2 leading-snug">{lt.risk_note}</div>
+              {/* Phases timeline */}
+              <div className="space-y-1 mb-2">
+                {lt.phases.map((p, i) => (
+                  <div key={p.phase} className="border border-rule rounded p-1.5 bg-surface/60">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-mono text-[8px] text-textDim">{i+1}.</span>
+                      <span className="font-mono text-[8px] font-semibold text-textBright flex-1 mx-1">{p.label}</span>
+                      <span className="font-mono text-[8px] text-blue-300 whitespace-nowrap">{p.weeks_low}–{p.weeks_high} wks</span>
+                    </div>
+                    {p.key_tasks.slice(0, 2).map((t, j) => (
+                      <div key={j} className="font-mono text-[8px] text-textDim leading-snug">• {t}</div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{lt.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Transmission System Design Guide */}
         {candidate.transmission_system_design_guide && (() => {
           const ts = candidate.transmission_system_design_guide;

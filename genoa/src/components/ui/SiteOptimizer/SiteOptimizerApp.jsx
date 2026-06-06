@@ -1363,6 +1363,23 @@ const DEMO_RESULT = {
         detuning: { required: false, note: 'NDA: single-tower — detuning not required. Verify no adjacent metallic structures within ~38 m (λ/10) of tower base.' },
         reference: '47 CFR §73.61; §73.150(c); §73.190; ARRL Antenna Handbook; Andrew/Commscope heliax data',
         note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula.'
+      },
+      licensing_timeline_estimate: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'DA-D',
+        total_weeks_optimistic: 63, total_weeks_conservative: 164,
+        total_years_optimistic: 1.21, total_years_conservative: 3.15,
+        licensing_risk_tier: 'HIGH',
+        risk_note: 'Clear channel (§73.25): FCC Media Bureau clear-channel analysis + dominant station notification adds 4–12 months to processing.',
+        treaty_zone_present: false, asr_required: true,
+        phases: [
+          { phase: 'PRE_APPLICATION', label: 'Pre-application (site study, engineering, NEPA/NHPA)', weeks_low: 26, weeks_high: 52, key_tasks: ['Conductivity survey (§73.190) and site evaluation', 'DA array design and §73.182 NIF analysis', 'NEPA §1.1306 desktop environmental review', 'NHPA §106 SHPO consultation', 'FAA Form 7460-1 aeronautical study + FCC ASR Form 854'] },
+          { phase: 'APPLICATION_FILING', label: 'Application preparation and LMS Form 301-AM filing', weeks_low: 4, weeks_high: 12, key_tasks: ['Finalize engineering exhibits (coverage, blanket pop, MPE)', 'DA pattern exhibits per §73.316 (36-radial HRP, suppression ratios)', 'FCC filing attorney review and LMS Form 301-AM submission'] },
+          { phase: 'FCC_PROCESSING', label: 'FCC processing, comment period, and CP grant', weeks_low: 26, weeks_high: 78, key_tasks: ['FCC public notice / comment period (30 days)', 'Clear-channel coordination — FCC Media Bureau field analysis', 'Petitions to deny / objections review', 'Construction Permit (CP) grant'] },
+          { phase: 'CONSTRUCTION', label: 'Construction and equipment installation', weeks_low: 20, weeks_high: 36, key_tasks: ['Tower erection with FAA marking/lighting (ASR required)', 'Ground radial system installation', 'DA array element installation and initial phasing'] },
+          { phase: 'LICENSE_TO_COVER', label: 'Proof of performance and Form 302-AM', weeks_low: 8, weeks_high: 16, key_tasks: ['DA proof (72-radial FI traversals per §73.154)', 'Base current measurements and antenna efficiency verification', 'File FCC Form 302-AM (license to cover)'] }
+        ],
+        reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
+        note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       }
     },
     {

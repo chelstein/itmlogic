@@ -5300,3 +5300,49 @@ test('transmission_system_design_guide comparison table columns populated', asyn
     assert.ok('tx_recommended_feedline' in row);
   }
 });
+
+// ---- licensing_timeline_estimate ----
+
+test('licensing_timeline_estimate is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.licensing_timeline_estimate != null, `rank ${c.rank} missing licensing_timeline_estimate`);
+  }
+});
+
+test('licensing_timeline_estimate has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const lt = out.candidates[0].licensing_timeline_estimate;
+  assert.ok(Array.isArray(lt.phases));
+  assert.ok(typeof lt.total_weeks_optimistic === 'number');
+  assert.ok(typeof lt.total_weeks_conservative === 'number');
+  assert.ok(typeof lt.total_years_optimistic === 'number');
+  assert.ok(typeof lt.licensing_risk_tier === 'string');
+  assert.ok(typeof lt.risk_note === 'string');
+});
+
+test('licensing_timeline_estimate has 5 phases', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lt = out.candidates[0].licensing_timeline_estimate;
+  assert.equal(lt.phases.length, 5);
+  const ids = lt.phases.map(p => p.phase);
+  assert.ok(ids.includes('PRE_APPLICATION'));
+  assert.ok(ids.includes('FCC_PROCESSING'));
+  assert.ok(ids.includes('LICENSE_TO_COVER'));
+});
+
+test('licensing_timeline_estimate conservative >= optimistic', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lt = out.candidates[0].licensing_timeline_estimate;
+  assert.ok(lt.total_weeks_conservative >= lt.total_weeks_optimistic, 'conservative must be >= optimistic');
+});
+
+test('licensing_timeline_estimate comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('lic_risk_tier' in row);
+    assert.ok('lic_total_yrs_opt' in row);
+    assert.ok('lic_total_yrs_cons' in row);
+  }
+});

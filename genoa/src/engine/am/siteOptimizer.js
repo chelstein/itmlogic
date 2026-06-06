@@ -786,7 +786,10 @@ export async function runSiteOptimizer(body = {}){
     prop_reach_high_km:     c.propagation_confidence_interval?.daytime_reach_bounds_km?.high ?? null,
     tx_efficiency_pct:      c.transmission_system_design_guide?.antenna_efficiency_pct ?? null,
     tx_base_impedance_ohm:  c.transmission_system_design_guide?.estimated_base_impedance_ohm ?? null,
-    tx_recommended_feedline: c.transmission_system_design_guide?.recommended_feedline ?? null
+    tx_recommended_feedline: c.transmission_system_design_guide?.recommended_feedline ?? null,
+    lic_risk_tier:          c.licensing_timeline_estimate?.licensing_risk_tier ?? null,
+    lic_total_yrs_opt:      c.licensing_timeline_estimate?.total_years_optimistic ?? null,
+    lic_total_yrs_cons:     c.licensing_timeline_estimate?.total_years_conservative ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5497,6 +5500,157 @@ async function scoreCandidate(pt, ctx, warnings){
         detuning,
         reference: '47 CFR §73.61 (base current monitoring); §73.150(c) (detuning); §73.190 (ground system); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
         note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula. Actual values require field measurements and full RF system design by a licensed broadcast engineer.'
+      };
+    })(),
+
+    // Per-candidate FCC CP licensing timeline estimate.
+    // Breaks the change-of-transmitter-site process into 5 phases with
+    // optimistic and conservative week estimates, then sums to a total
+    // project timeline including risk factors (treaty zone, clear channel,
+    // DA complexity, NEPA triggers, ASR).
+    licensing_timeline_estimate: (() => {
+      const isClear_lt  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_lt     = /^DA/i.test(pattern_mode);
+      const hasTreaty_lt = !!treaty_zone;
+      const asrReq_lt   = (300000 / frequency_khz / 4) > 60.96;
+      const isHighPow_lt = tpo_kw >= 25;
+
+      // Phase 1: Pre-application (site study, engineering design, NEPA/NHPA)
+      // DA adds §73.150 pattern design; high-power adds more complex study
+      const p1Low  = isDA_lt ? 26 : 16;
+      const p1High = isDA_lt ? 52 : 36;
+      // Treaty coordination can run concurrently with pre-app but often extends it
+      const p1TreatyExtra = hasTreaty_lt ? 26 : 0;
+
+      // Phase 2: Application preparation and LMS filing
+      const p2Low  = 4;
+      const p2High = isDA_lt ? 12 : 8;
+
+      // Phase 3: FCC processing (comment period 30 days + staff review + CP grant)
+      // Standard AM CP: 6–12 months. Clear channel / DA takes longer.
+      // Treaty coordination with Mexico/Canada: +6–18 months
+      const p3Low  = isClear_lt || isDA_lt ? 26 : 20;
+      const p3High = isClear_lt            ? 78 : isDA_lt ? 52 : 40;
+      const p3TreatyExtra = hasTreaty_lt ? 52 : 0;
+
+      // Phase 4: Construction (tower erection, ground system, building, equipment)
+      // ASR approval (FAA + FCC) typically runs concurrent with FCC processing
+      const p4Low  = isHighPow_lt ? 26 : isDA_lt ? 20 : 13;
+      const p4High = isHighPow_lt ? 52 : isDA_lt ? 36 : 26;
+      const p4AsrExtra = asrReq_lt ? 8 : 0;
+
+      // Phase 5: Proof of performance, license to cover (Form 302-AM), FCC review
+      const p5Low  = isDA_lt ? 8 : 4;
+      const p5High = isDA_lt ? 16 : 8;
+
+      const phases = [
+        {
+          phase:        'PRE_APPLICATION',
+          label:        'Pre-application (site study, engineering, NEPA/NHPA)',
+          weeks_low:    p1Low,
+          weeks_high:   p1High + p1TreatyExtra,
+          key_tasks:    [
+            `Conductivity survey (§73.190) and site evaluation`,
+            isDA_lt ? 'DA array design and §73.182 NIF analysis' : '§73.182 NIF skywave study',
+            'NEPA §1.1306 desktop environmental review',
+            'NHPA §106 SHPO consultation',
+            hasTreaty_lt ? 'FCC IB treaty pre-screening — US/Mexico or US/Canada coordination' : 'Verify site outside treaty coordination zone',
+            asrReq_lt ? 'FAA Form 7460-1 aeronautical study + FCC ASR Form 854' : 'FAA Part 77 pre-screen'
+          ]
+        },
+        {
+          phase:        'APPLICATION_FILING',
+          label:        'Application preparation and LMS Form 301-AM filing',
+          weeks_low:    p2Low,
+          weeks_high:   p2High,
+          key_tasks:    [
+            'Finalize engineering exhibits (coverage, blanket pop, MPE)',
+            'Prepare environmental exhibits (NEPA/NHPA sign-off documentation)',
+            isDA_lt ? 'DA pattern exhibits per §73.316 (36-radial HRP, suppression ratios)' : 'NDA radiation pattern certification',
+            'FCC filing attorney review and LMS Form 301-AM submission',
+            'Pay application fee (§73.3520)'
+          ]
+        },
+        {
+          phase:        'FCC_PROCESSING',
+          label:        'FCC processing, comment period, and CP grant',
+          weeks_low:    p3Low,
+          weeks_high:   p3High + p3TreatyExtra,
+          key_tasks:    [
+            'FCC public notice / comment period (typically 30 days)',
+            'Staff technical and legal review',
+            isClear_lt ? 'Clear-channel coordination — FCC Media Bureau field analysis' : 'Standard AM interference analysis',
+            hasTreaty_lt ? 'FCC International Bureau treaty coordination — 6–18 months added' : 'No treaty coordination required',
+            'Petitions to deny / objections review (if any)',
+            'Construction Permit (CP) grant'
+          ]
+        },
+        {
+          phase:        'CONSTRUCTION',
+          label:        'Construction and equipment installation',
+          weeks_low:    p4Low,
+          weeks_high:   p4High + p4AsrExtra,
+          key_tasks:    [
+            'Site preparation (grading, road, fence, utility connection)',
+            asrReq_lt ? `FAA marking/lighting installation — ASR notification to FCC` : 'Tower erection (no FAA marking required)',
+            'Ground radial system installation (trenching, burial)',
+            'Transmitter building and equipment installation',
+            'Transmission line and ATU installation and alignment',
+            isDA_lt ? 'DA array element installation and initial phasing' : 'Final antenna alignment and tuning'
+          ]
+        },
+        {
+          phase:        'LICENSE_TO_COVER',
+          label:        'Proof of performance and Form 302-AM (license to cover)',
+          weeks_low:    p5Low,
+          weeks_high:   p5High,
+          key_tasks:    [
+            `${isDA_lt ? 'DA proof (72-radial FI traversals per §73.154)' : 'NDA proof (8-radial inverse-distance traversals)'}`,
+            'Base current measurements and antenna efficiency verification (§73.190)',
+            'RF exposure (MPE) measurement per OET Bulletin 65',
+            'File FCC Form 302-AM (license to cover) with proof measurements',
+            'FCC staff review and full license grant'
+          ]
+        }
+      ];
+
+      // Total optimistic/conservative (sum of phases)
+      const totalLow  = p1Low + p2Low + p3Low + p4Low + p5Low;
+      const totalHigh = (p1High + p1TreatyExtra) + p2High + (p3High + p3TreatyExtra) + (p4High + p4AsrExtra) + p5High;
+
+      // Risk multiplier for conservative
+      const risk_tier = hasTreaty_lt ? 'VERY_HIGH'
+                      : isClear_lt ? 'HIGH'
+                      : isDA_lt ? 'ELEVATED'
+                      : isHighPow_lt ? 'MODERATE'
+                      : 'STANDARD';
+
+      const risk_note = hasTreaty_lt
+        ? 'Treaty zone present: FCC IB coordination with Mexico/Canada can add 6–18 months. CP cannot be granted before treaty clearance.'
+        : isClear_lt
+        ? 'Clear channel (§73.25): FCC Media Bureau clear-channel analysis + dominant station notification adds 4–12 months to processing.'
+        : isDA_lt
+        ? 'Directional antenna: §73.150 pattern design, §73.182 NIF analysis, and DA proof of performance (72 radials) extend every phase.'
+        : isHighPow_lt
+        ? 'High power (≥25 kW): more complex interference study and construction timeline.'
+        : 'Standard AM relocation: no major risk multipliers identified at screening stage.';
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        pattern_mode,
+        phases,
+        total_weeks_optimistic:    totalLow,
+        total_weeks_conservative:  totalHigh,
+        total_years_optimistic:    round2(totalLow  / 52),
+        total_years_conservative:  round2(totalHigh / 52),
+        licensing_risk_tier:       risk_tier,
+        risk_note,
+        treaty_zone_present:       hasTreaty_lt,
+        asr_required:              asrReq_lt,
+        reference: '47 CFR §73.3520 (application fee); §73.3533 (construction completion); §73.3534 (license to cover deadline); 47 CFR §1.47 (public notice); FCC Media Bureau AM processing data',
+        note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. Contested applications, environmental appeals, or treaty complications can add years. All phase estimates are calendar weeks.'
       };
     })(),
 
