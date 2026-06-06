@@ -231,6 +231,15 @@ export async function runColocationOpportunities(body = {}){
           c.estimated_daytime_population_served - baseline.estimated_daytime_population_served
         );
       }
+      const cbd  = c.explanation?.score_breakdown ?? {};
+      const bBd  = baseline.explanation?.score_breakdown ?? {};
+      const keys = new Set([...Object.keys(cbd), ...Object.keys(bBd)]);
+      const componentDeltas = {};
+      for (const k of keys){
+        const delta = round2((cbd[k] ?? 0) - (bBd[k] ?? 0));
+        if (delta !== 0) componentDeltas[k] = delta;
+      }
+      c.score_delta_explanation = { total: c.score_delta_vs_baseline, components: componentDeltas };
     }
   }
 

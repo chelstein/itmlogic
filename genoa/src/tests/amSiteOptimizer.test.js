@@ -1576,3 +1576,35 @@ test('regulatory_compliance_summary.treaty_zone.status is ADVISORY when treaty_z
     }
   }
 });
+
+test('score_delta_explanation is present and structurally correct when a baseline exists', async () => {
+  // KAZM run: current_site is inside the grid, so baseline will be found.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  // At least some candidates should have a baseline (if any point equals current_site coords).
+  const withDelta = out.candidates.filter(c => c.score_delta_explanation != null);
+  // score_delta_vs_baseline is always stamped; score_delta_explanation should match those.
+  const withScoreDelta = out.candidates.filter(c => c.score_delta_vs_baseline != null);
+  assert.equal(withDelta.length, withScoreDelta.length,
+    'every candidate with score_delta_vs_baseline must have score_delta_explanation');
+  for (const c of withDelta){
+    const sde = c.score_delta_explanation;
+    assert.ok(typeof sde.total === 'number', `score_delta_explanation.total must be a number (rank ${c.rank})`);
+    assert.ok(sde.components && typeof sde.components === 'object',
+      `score_delta_explanation.components must be an object (rank ${c.rank})`);
+    assert.ok(Math.abs(sde.total - c.score_delta_vs_baseline) < 0.01,
+      `score_delta_explanation.total (${sde.total}) must match score_delta_vs_baseline (${c.score_delta_vs_baseline})`);
+  }
+});
+
+test('score_delta_explanation.components values are non-zero (zero deltas are omitted)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    if (!c.score_delta_explanation) continue;
+    for (const [k, v] of Object.entries(c.score_delta_explanation.components)){
+      assert.notEqual(v, 0,
+        `score_delta_explanation.components must omit zero-delta keys; found ${k}=0 on rank ${c.rank}`);
+    }
+  }
+});

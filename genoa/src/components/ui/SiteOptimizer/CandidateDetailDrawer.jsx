@@ -488,6 +488,22 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 fmt={v => fmtPopulation(v)}
               />
             </div>
+            {/* Score delta by sub-component */}
+            {candidate.score_delta_explanation?.components && Object.keys(candidate.score_delta_explanation.components).length > 0 && (
+              <div className="mt-2">
+                <div className="text-textDim font-mono text-[9px] mb-0.5">score Δ by component</div>
+                <div className="font-mono text-[9px] space-y-0.5">
+                  {Object.entries(candidate.score_delta_explanation.components)
+                    .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+                    .map(([k, v]) => (
+                      <div key={k} className="flex justify-between gap-4">
+                        <span className="text-textDim">{k}</span>
+                        <span style={{ color: v > 0 ? '#63d471' : '#ff7a7a' }}>{v > 0 ? '+' : ''}{v.toFixed(1)}</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -409,6 +409,11 @@ const DEMO_RESULT = {
       status_labels: ['PROMISING', 'ENGINEER REVIEW REQUIRED'],
       status_category: 'PROMISING',
       blanket_pop_risk: 'OK', col_coverage_gap_pct: null, population_delta_vs_baseline: 37700,
+      power_class_ceiling_kw: 50, mpe_evaluation_required: true,
+      score_delta_explanation: {
+        total: 28.9,
+        components: { col_coverage: 12.1, population: 11.8, blanket: 3.6, conductivity: 6.3, confidence_penalty: -4.9 }
+      },
       regulatory_compliance_summary: {
         col_coverage: { status: 'PASS', value: 0.97, threshold: 0.80, rule: '47 CFR §73.24(j)' },
         blanket_pop:  { status: 'PASS', value: 0.40, threshold: 1.00, rule: '47 CFR §73.24(g)' },

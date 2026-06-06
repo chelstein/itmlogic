@@ -357,6 +357,7 @@ export async function runSiteOptimizer(body = {}){
 
   // Stamp deltas vs baseline on every candidate (null if baseline unknown).
   if (baseline){
+    const bBd = baseline.explanation?.score_breakdown ?? {};
     for (const c of scored){
       c.score_delta_vs_baseline = round2(c.score - baseline.score);
       // Population delta: how many more (or fewer) people does this site serve vs current?
@@ -365,6 +366,20 @@ export async function runSiteOptimizer(body = {}){
           c.estimated_daytime_population_served - baseline.estimated_daytime_population_served
         );
       }
+      // Structured per-component delta vs baseline score_breakdown.
+      const cbd = c.explanation?.score_breakdown ?? {};
+      const components = new Set([...Object.keys(cbd), ...Object.keys(bBd)]);
+      const componentDeltas = {};
+      for (const k of components){
+        const cv = cbd[k] ?? 0;
+        const bv = bBd[k] ?? 0;
+        const delta = round2(cv - bv);
+        if (delta !== 0) componentDeltas[k] = delta;
+      }
+      c.score_delta_explanation = {
+        total: c.score_delta_vs_baseline,
+        components: componentDeltas
+      };
     }
   }
 
