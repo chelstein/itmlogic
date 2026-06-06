@@ -292,6 +292,41 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
       </header>
 
       <section className="px-4 py-4 space-y-5">
+        {/* Go / No-Go viability banner */}
+        {candidate.site_viability_summary && (() => {
+          const svs = candidate.site_viability_summary;
+          const gng = svs.go_no_go;
+          const bannerColor = gng === 'GO' ? '#63d471'
+            : gng === 'CONDITIONAL' ? '#ffb347'
+            : gng === 'NO_GO' ? '#e05252'
+            : '#a89c84';
+          const bannerBg = gng === 'GO' ? 'rgba(99,212,113,0.08)'
+            : gng === 'CONDITIONAL' ? 'rgba(255,179,71,0.08)'
+            : gng === 'NO_GO' ? 'rgba(224,82,82,0.08)'
+            : 'rgba(168,156,132,0.06)';
+          const label = gng === 'GO' ? 'GO'
+            : gng === 'CONDITIONAL' ? 'CONDITIONAL'
+            : gng === 'NO_GO' ? 'NO GO'
+            : 'INSUFFICIENT DATA';
+          return (
+            <div className="rounded-sm border px-3 py-2.5 flex items-start gap-3"
+              style={{ borderColor: bannerColor + '55', background: bannerBg }}>
+              <span className="font-mono text-[11px] uppercase tracking-rack shrink-0 mt-0.5"
+                style={{ color: bannerColor }}>
+                {label}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="font-mono text-[10px] text-cream leading-snug">{svs.one_line}</div>
+                {svs.confidence && (
+                  <div className="font-mono text-[9px] text-textDim/60 mt-0.5 uppercase tracking-rack">
+                    {svs.confidence.replace(/_/g, ' ')} · {svs.evaluated_at_tpo_kw} kW TPO
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Score breakdown */}
         <div>
           <ScoreBreakdownChart

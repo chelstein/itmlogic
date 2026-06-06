@@ -639,6 +639,8 @@ export async function runSiteOptimizer(body = {}){
   // Supplements `candidates` (which has full details) with a lighter structure.
   const candidate_comparison_table = returned.map(c => ({
     rank:                   c.rank,
+    go_no_go:               c.site_viability_summary?.go_no_go ?? null,
+    viability_confidence:   c.site_viability_summary?.confidence ?? null,
     lat:                    c.lat,
     lon:                    c.lon,
     distance_km:            c.distance_from_current_km,
