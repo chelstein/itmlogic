@@ -634,7 +634,7 @@ function ensureCurrentSiteIncluded(points, current){
  * shape documented on the route.
  */
 async function scoreCandidate(pt, ctx, warnings){
-  const { frequency_khz, tpo_kw, current_site, goals,
+  const { frequency_khz, tpo_kw, fcc_class, current_site, goals,
           community_of_license_polygon, col_centroid, reach_scale_km = 200 } = ctx;
 
   // --- raw sub-metrics (computed independent of weighting) ---
@@ -981,6 +981,34 @@ async function scoreCandidate(pt, ctx, warnings){
       : blanket_population_pct >= 0.8 ? 'HIGH'
       : blanket_population_pct >= 0.5 ? 'ELEVATED'
       : 'OK',
+    // Structured per-candidate FCC compliance table.  Each entry: status, numeric value, threshold, rule cite.
+    regulatory_compliance_summary: {
+      col_coverage: {
+        status: coverage_pct == null ? 'NOT_EVALUATED'
+          : coverage_pct >= COL_COVERAGE_HARD_FLOOR ? 'PASS' : 'FAIL',
+        value: coverage_pct == null ? null : round2(coverage_pct),
+        threshold: COL_COVERAGE_HARD_FLOOR,
+        rule: '47 CFR §73.24(j)'
+      },
+      blanket_pop: {
+        status: blanket_population_pct == null ? 'NOT_EVALUATED'
+          : blanket_population_pct <= BLANKET_POP_HARD_CEIL_PCT ? 'PASS' : 'FAIL',
+        value: blanket_population_pct == null ? null : round2(blanket_population_pct),
+        threshold: BLANKET_POP_HARD_CEIL_PCT,
+        rule: '47 CFR §73.24(g)'
+      },
+      class_power: {
+        status: (FCC_CLASS_POWER_KW[fcc_class] && tpo_kw <= FCC_CLASS_POWER_KW[fcc_class].max) ? 'PASS' : 'ADVISORY',
+        value: tpo_kw,
+        ceiling: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
+        rule: '47 CFR §73.21'
+      },
+      treaty_zone: {
+        status: treaty_zone ? 'ADVISORY' : 'CLEAR',
+        value: treaty_zone ?? null,
+        rule: 'US/MX 1986 Agreement; US/CA 1991 LOU'
+      }
+    },
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
     minimum_tpo_for_col_coverage_kw,
@@ -1105,7 +1133,8 @@ function baselineSummary(b){
     nif_status:             b.nif_status,
     treaty_zone:            b.treaty_zone,
     status_labels:          b.status_labels,
-    score_breakdown:        b.explanation?.score_breakdown ?? null
+    score_breakdown:        b.explanation?.score_breakdown ?? null,
+    regulatory_compliance_summary: b.regulatory_compliance_summary ?? null
   };
 }
 

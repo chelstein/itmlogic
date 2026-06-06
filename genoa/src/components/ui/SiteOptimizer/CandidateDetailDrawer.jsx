@@ -491,6 +491,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         )}
 
+        {/* Regulatory compliance summary — structured FCC check table */}
+        {candidate.regulatory_compliance_summary && (() => {
+          const rcs = candidate.regulatory_compliance_summary;
+          const rowColor = s => s === 'PASS' ? '#63d471' : s === 'FAIL' ? '#ff5a5a' : s === 'ADVISORY' ? '#ffb347' : '#a89c84';
+          const rows = [
+            { label: 'COL coverage', entry: rcs.col_coverage,
+              display: rcs.col_coverage.value != null ? `${(rcs.col_coverage.value * 100).toFixed(0)}% (floor ${(rcs.col_coverage.threshold * 100).toFixed(0)}%)` : '—' },
+            { label: 'Blanket pop', entry: rcs.blanket_pop,
+              display: rcs.blanket_pop.value != null ? `${(rcs.blanket_pop.value * 100).toFixed(1)}% (limit ${(rcs.blanket_pop.threshold * 100).toFixed(0)}%)` : '—' },
+            { label: 'Class power', entry: rcs.class_power,
+              display: rcs.class_power.value != null ? `${rcs.class_power.value} kW${rcs.class_power.ceiling != null ? ` (ceil ${rcs.class_power.ceiling} kW)` : ''}` : '—' },
+            { label: 'Treaty zone', entry: rcs.treaty_zone,
+              display: rcs.treaty_zone.value ?? 'none' }
+          ];
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">FCC Compliance</div>
+              <table className="w-full font-mono text-[10px] border-collapse">
+                <thead>
+                  <tr className="text-textDim text-left">
+                    <th className="pb-0.5 pr-2 font-normal">Check</th>
+                    <th className="pb-0.5 pr-2 font-normal">Status</th>
+                    <th className="pb-0.5 pr-2 font-normal">Value</th>
+                    <th className="pb-0.5 font-normal">Rule</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ label, entry, display }) => (
+                    <tr key={label} className="border-t border-white/5">
+                      <td className="py-0.5 pr-2 text-textDim">{label}</td>
+                      <td className="py-0.5 pr-2" style={{ color: rowColor(entry.status) }}>{entry.status}</td>
+                      <td className="py-0.5 pr-2 text-cream">{display}</td>
+                      <td className="py-0.5 text-textDim text-[9px]">{entry.rule}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()}
+
         {/* Co-Location Analysis — only when source === INFRASTRUCTURE */}
         {isInfra && <ColocationAnalysisSection analysis={candidate.colocation_analysis} infra={candidate.infrastructure_ref} />}
 

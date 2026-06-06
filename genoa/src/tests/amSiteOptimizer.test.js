@@ -1474,3 +1474,81 @@ test('score_histogram buckets include promising_count field', async () => {
       `promising_count must be ≤ count; bucket ${bucket.bucket}: ${bucket.promising_count} > ${bucket.count}`);
   }
 });
+
+test('regulatory_compliance_summary present on every candidate with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const VALID_STATUS = new Set(['PASS', 'FAIL', 'ADVISORY', 'NOT_EVALUATED', 'CLEAR']);
+  for (const c of out.candidates){
+    const rcs = c.regulatory_compliance_summary;
+    assert.ok(rcs != null, `regulatory_compliance_summary must be present on every candidate (rank ${c.rank})`);
+    for (const key of ['col_coverage', 'blanket_pop', 'class_power', 'treaty_zone']){
+      assert.ok(key in rcs, `regulatory_compliance_summary must have '${key}' key (rank ${c.rank})`);
+      assert.ok(VALID_STATUS.has(rcs[key].status),
+        `${key}.status must be one of PASS/FAIL/ADVISORY/NOT_EVALUATED/CLEAR; rank ${c.rank} got '${rcs[key].status}'`);
+      assert.ok(typeof rcs[key].rule === 'string' && rcs[key].rule.length > 0,
+        `${key}.rule must be a non-empty string (rank ${c.rank})`);
+    }
+  }
+});
+
+test('regulatory_compliance_summary.col_coverage.status is FAIL for candidates below 80% COL floor', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 30 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rcs = c.regulatory_compliance_summary;
+    if (c.col_coverage_pct != null && c.col_coverage_pct < 0.80){
+      assert.equal(rcs.col_coverage.status, 'FAIL',
+        `rank ${c.rank}: col_coverage_pct=${c.col_coverage_pct} < 0.80 should yield FAIL status`);
+    } else if (c.col_coverage_pct != null && c.col_coverage_pct >= 0.80){
+      assert.equal(rcs.col_coverage.status, 'PASS',
+        `rank ${c.rank}: col_coverage_pct=${c.col_coverage_pct} >= 0.80 should yield PASS status`);
+    }
+  }
+});
+
+test('regulatory_compliance_summary.blanket_pop.status is FAIL when blanket_population_pct > 1%', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 40 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rcs = c.regulatory_compliance_summary;
+    if (c.blanket_population_pct != null){
+      const expected = c.blanket_population_pct > 1.0 ? 'FAIL' : 'PASS';
+      assert.equal(rcs.blanket_pop.status, expected,
+        `rank ${c.rank}: blanket_pop status mismatch (pct=${c.blanket_population_pct})`);
+    }
+  }
+});
+
+test('regulatory_compliance_summary.class_power.ceiling matches FCC §73.21 for the station class', async () => {
+  // Class B max = 50 kW per §73.21; KAZM is Class B.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rcs = c.regulatory_compliance_summary;
+    assert.equal(rcs.class_power.ceiling, 50,
+      `Class B ceiling must be 50 kW per §73.21; rank ${c.rank} got ${rcs.class_power.ceiling}`);
+    assert.ok(rcs.class_power.value > 0,
+      `class_power.value (tpo_kw) must be positive; rank ${c.rank} got ${rcs.class_power.value}`);
+  }
+});
+
+test('regulatory_compliance_summary.treaty_zone.status is ADVISORY when treaty_zone is set', async () => {
+  // Build a synthetic scored candidate by running the optimizer and checking any treaty candidates.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 50 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rcs = c.regulatory_compliance_summary;
+    if (c.treaty_zone){
+      assert.equal(rcs.treaty_zone.status, 'ADVISORY',
+        `rank ${c.rank}: treaty_zone set but regulatory_compliance_summary.treaty_zone.status is not ADVISORY`);
+      assert.equal(rcs.treaty_zone.value, c.treaty_zone,
+        `rcs.treaty_zone.value must equal candidate.treaty_zone (rank ${c.rank})`);
+    } else {
+      assert.equal(rcs.treaty_zone.status, 'CLEAR',
+        `rank ${c.rank}: no treaty_zone but status is ${rcs.treaty_zone.status}`);
+      assert.equal(rcs.treaty_zone.value, null,
+        `rcs.treaty_zone.value must be null when no treaty zone (rank ${c.rank})`);
+    }
+  }
+});

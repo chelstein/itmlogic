@@ -764,7 +764,8 @@ function baselineSummary(b){
     // Fields added in recent optimizer upgrades.
     field_at_col_centroid_mvm:            b.field_at_col_centroid_mvm ?? null,
     estimated_daytime_population_served:  b.estimated_daytime_population_served ?? null,
-    score_confidence:                     b.score_confidence ?? null
+    score_confidence:                     b.score_confidence ?? null,
+    regulatory_compliance_summary:        b.regulatory_compliance_summary ?? null
   };
 }
 

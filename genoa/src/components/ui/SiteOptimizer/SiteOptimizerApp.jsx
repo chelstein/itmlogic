@@ -408,6 +408,13 @@ const DEMO_RESULT = {
       },
       status_labels: ['PROMISING', 'ENGINEER REVIEW REQUIRED'],
       status_category: 'PROMISING',
+      blanket_pop_risk: 'OK', col_coverage_gap_pct: null, population_delta_vs_baseline: 37700,
+      regulatory_compliance_summary: {
+        col_coverage: { status: 'PASS', value: 0.97, threshold: 0.80, rule: '47 CFR §73.24(j)' },
+        blanket_pop:  { status: 'PASS', value: 0.40, threshold: 1.00, rule: '47 CFR §73.24(g)' },
+        class_power:  { status: 'PASS', value: 5, ceiling: 50, rule: '47 CFR §73.21' },
+        treaty_zone:  { status: 'CLEAR', value: null, rule: 'US/MX 1986 Agreement; US/CA 1991 LOU' }
+      },
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
@@ -456,6 +463,13 @@ const DEMO_RESULT = {
       },
       status_labels: ['NON-COMPLIANT', 'ENGINEER REVIEW REQUIRED'],
       status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
+      blanket_pop_risk: 'OK', col_coverage_gap_pct: 0.02, population_delta_vs_baseline: -1500,
+      regulatory_compliance_summary: {
+        col_coverage: { status: 'FAIL',  value: 0.78, threshold: 0.80, rule: '47 CFR §73.24(j)' },
+        blanket_pop:  { status: 'PASS',  value: 0.30, threshold: 1.00, rule: '47 CFR §73.24(g)' },
+        class_power:  { status: 'PASS',  value: 5, ceiling: 50, rule: '47 CFR §73.21' },
+        treaty_zone:  { status: 'CLEAR', value: null, rule: 'US/MX 1986 Agreement; US/CA 1991 LOU' }
+      },
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
