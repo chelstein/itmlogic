@@ -1344,6 +1344,25 @@ const DEMO_RESULT = {
         },
         reference: 'ITU-R P.527-5; FCC M3 zone table (§73.184); §73.190; OET Tech. Note 101',
         note: 'Confidence intervals are statistical estimates based on known σ source accuracy. Actual propagation may differ due to terrain, vegetation, moisture content, and near-field coupling.'
+      },
+      transmission_system_design_guide: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'NDA',
+        quarter_wave_m: 96.2, wavelength_m: 384.6, estimated_line_length_m: 107,
+        antenna_radiation_resistance_ohm: 36.6, estimated_ground_loss_ohm: 6.88,
+        estimated_base_impedance_ohm: 43.48, antenna_efficiency_pct: 84.18,
+        base_current_ideal_a: 11.68,
+        feedline_options: [
+          { type: 'HELIAX_7_8', label: '7/8" Heliax (LDF4-50A)', suitable: true, max_tpo_kw: 25, loss_db_per_100m: 0.04, approx_loss_db_this_run: 0.04, note: 'Standard choice for ≤25 kW; flexible; readily available.' },
+          { type: 'RIGID_COAX_3_1_8', label: '3-1/8" rigid coax (EIA flanged)', suitable: false, max_tpo_kw: 100, loss_db_per_100m: 0.01, approx_loss_db_this_run: 0.01, note: 'Preferred for ≥25 kW; lower loss, higher power rating.' },
+          { type: 'OPEN_WIRE', label: 'Open-wire transmission line', suitable: true, max_tpo_kw: 500, loss_db_per_100m: 0.01, approx_loss_db_this_run: 0.01, note: 'Very low loss; historically used for high-power AM. Rarely used in new installations.' }
+        ],
+        recommended_feedline: 'HELIAX_7_8',
+        atu_configuration_note: 'NDA: standard L, T, or Pi network ATU matching feedline impedance (typically 50Ω) to tower base impedance (~43Ω). Series capacitor to resonate antenna near resonance.',
+        base_current_monitor_required: true,
+        base_current_monitor_note: '§73.61: licensed AM stations ≥1 kW must install base current monitors on each tower. Monitor must be readable from the transmitter control point.',
+        detuning: { required: false, note: 'NDA: single-tower — detuning not required. Verify no adjacent metallic structures within ~38 m (λ/10) of tower base.' },
+        reference: '47 CFR §73.61; §73.150(c); §73.190; ARRL Antenna Handbook; Andrew/Commscope heliax data',
+        note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula.'
       }
     },
     {

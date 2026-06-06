@@ -2129,6 +2129,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmission System Design Guide */}
+        {candidate.transmission_system_design_guide && (() => {
+          const ts = candidate.transmission_system_design_guide;
+          const feedColor = s => s && ts.recommended_feedline === s ? 'border-emerald-400/40 bg-emerald-400/10 text-emerald-400' : 'border-rule bg-surface/50 text-textDim';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">RF Transmission System Design</div>
+              {/* Key metrics */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Antenna efficiency', value: ts.antenna_efficiency_pct != null ? `${ts.antenna_efficiency_pct}%` : '—' },
+                  { label: 'Base impedance', value: ts.estimated_base_impedance_ohm != null ? `${ts.estimated_base_impedance_ohm} Ω` : '—' },
+                  { label: 'Base current (ideal)', value: ts.base_current_ideal_a != null ? `${ts.base_current_ideal_a} A` : '—' }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Feedline options */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Feedline Options (est. {ts.estimated_line_length_m} m run)</div>
+              <div className="space-y-1 mb-2">
+                {ts.feedline_options.map(f => (
+                  <div key={f.type} className={`border rounded p-1.5 ${feedColor(f.type)}`}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-mono text-[9px] font-semibold">{f.label}</span>
+                      <span className="font-mono text-[8px]">{f.loss_db_per_100m} dB/100m · {f.approx_loss_db_this_run} dB this run</span>
+                    </div>
+                    <div className="font-mono text-[8px] leading-snug opacity-80">{f.note}</div>
+                  </div>
+                ))}
+              </div>
+              {/* ATU note */}
+              <div className="font-mono text-[9px] text-textDim mb-1">ATU Configuration</div>
+              <div className="font-mono text-[8px] text-textDim mb-2 leading-snug">{ts.atu_configuration_note}</div>
+              {/* Detuning */}
+              <div className={`flex items-start gap-1.5 px-1.5 py-1 rounded border mb-1.5 ${ts.detuning?.required ? 'border-amber-400/30 bg-amber-400/5' : 'border-rule bg-surface/40'}`}>
+                <span className={`font-mono text-[8px] font-bold ${ts.detuning?.required ? 'text-amber-400' : 'text-textDim'}`}>
+                  {ts.detuning?.required ? 'DETUNING REQUIRED' : 'DETUNING: N/A'}
+                </span>
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-1">{ts.detuning?.note}</div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{ts.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Propagation Confidence Interval */}
         {candidate.propagation_confidence_interval && (() => {
           const pci = candidate.propagation_confidence_interval;

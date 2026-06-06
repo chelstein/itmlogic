@@ -783,7 +783,10 @@ export async function runSiteOptimizer(body = {}){
     prop_confidence:        c.propagation_confidence_interval?.confidence_level ?? null,
     prop_reach_unc_pct:     c.propagation_confidence_interval?.reach_uncertainty_pct ?? null,
     prop_reach_low_km:      c.propagation_confidence_interval?.daytime_reach_bounds_km?.low ?? null,
-    prop_reach_high_km:     c.propagation_confidence_interval?.daytime_reach_bounds_km?.high ?? null
+    prop_reach_high_km:     c.propagation_confidence_interval?.daytime_reach_bounds_km?.high ?? null,
+    tx_efficiency_pct:      c.transmission_system_design_guide?.antenna_efficiency_pct ?? null,
+    tx_base_impedance_ohm:  c.transmission_system_design_guide?.estimated_base_impedance_ohm ?? null,
+    tx_recommended_feedline: c.transmission_system_design_guide?.recommended_feedline ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5380,6 +5383,120 @@ async function scoreCandidate(pt, ctx, warnings){
         recommended_data_upgrade: upgrade,
         reference: 'ITU-R P.527-5 (ground conductivity accuracy); FCC M3 zone table (§73.184); §73.190 (conductivity measurement); OET Tech. Note 101',
         note: 'Confidence intervals are statistical estimates based on known σ source accuracy. Actual propagation may differ due to terrain, vegetation, moisture content, and near-field coupling. These bounds are for screening purposes only — filing-grade predictions require a §73.190 soil conductivity measurement at each candidate site.'
+      };
+    })(),
+
+    // RF transmission system design guide.
+    // Covers feedline selection, ATU configuration, base current target,
+    // antenna efficiency, detuning (DA arrays), and FCC base current monitor
+    // requirements.  Complements tower_cost_estimate with the transmission
+    // engineering perspective.
+    transmission_system_design_guide: (() => {
+      const isDA_ts  = /^DA/i.test(pattern_mode);
+      const isLocal_ts = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const qwM_ts   = round2((300000 / frequency_khz) / 4);
+      const lambdaM_ts = round2(300000 / frequency_khz);
+
+      // Antenna radiation resistance at resonance (ideal λ/4 monopole over perfect ground ≈ 36.6 Ω)
+      // Actual R_r varies with height; we use the ideal value as a screening reference.
+      const R_RADIATION_IDEAL = 36.6;
+
+      // Ground loss resistance — Terman/Belrose formula (§73.190 reference)
+      // R_ground ≈ 1.65 / (N_radials × σ_msm) for N >= 120 radials, λ/4 length.
+      // Simplified for screening:
+      const N_RADIALS_STANDARD = 120;
+      const R_ground_ohm = round2(1.65 / (N_RADIALS_STANDARD * Math.max(sigma_msm, 1) * 0.001));
+
+      // Total base impedance estimate (screening only)
+      const R_total = round2(R_RADIATION_IDEAL + R_ground_ohm);
+
+      // Antenna efficiency η = R_r / (R_r + R_g)
+      const efficiency_pct = round2((R_RADIATION_IDEAL / R_total) * 100);
+
+      // Base current (I_base) = sqrt(P / R_r) for ideal case
+      // At actual efficiency: I_base = sqrt(P_tx / R_r) where P_tx = TPO / efficiency
+      const P_watts = tpo_kw * 1000;
+      const I_base_ideal_A = round2(Math.sqrt(P_watts / R_RADIATION_IDEAL));
+
+      // Transmission line power loss budget
+      // Typical heliax (7/8" LDF4-50A) loss at AM frequencies ≈ 0.03–0.05 dB/30m
+      // For screening: assume 0.04 dB/30m at the candidate frequency
+      const freqNorm  = frequency_khz / 1000;  // MHz for loss calc
+      const lossDb30m = round2(0.04 * Math.sqrt(freqNorm));
+      const txLineLen_m = round2(qwM_ts * 0.8 + 30);  // rough building-to-tower line estimate
+
+      // Feedline options
+      const feedlineOptions = [
+        {
+          type:     'HELIAX_7_8',
+          label:    '7/8" Heliax (LDF4-50A)',
+          suitable: tpo_kw <= 25,
+          max_tpo_kw: 25,
+          loss_db_per_100m: round2(lossDb30m * 100 / 30),
+          approx_loss_db_this_run: round2((lossDb30m / 30) * txLineLen_m),
+          note: tpo_kw <= 25 ? 'Standard choice for ≤25 kW; flexible; readily available. Use N-connectors at AM frequencies.' : 'Marginal for high power — consider rigid coax to reduce I²R loss and heating.'
+        },
+        {
+          type:     'RIGID_COAX_3_1_8',
+          label:    '3-1/8" rigid coax (EIA flanged)',
+          suitable: tpo_kw >= 10,
+          max_tpo_kw: 100,
+          loss_db_per_100m: round2(lossDb30m * 100 / 30 * 0.35),  // ~35% of heliax loss for rigid
+          approx_loss_db_this_run: round2((lossDb30m / 30 * 0.35) * txLineLen_m),
+          note: 'Preferred for ≥25 kW; lower loss, higher power rating, rigid installation. More expensive and requires careful expansion joint planning.'
+        },
+        {
+          type:     'OPEN_WIRE',
+          label:    'Open-wire transmission line',
+          suitable: true,
+          max_tpo_kw: 500,
+          loss_db_per_100m: round2(lossDb30m * 100 / 30 * 0.15),
+          approx_loss_db_this_run: round2((lossDb30m / 30 * 0.15) * txLineLen_m),
+          note: 'Very low loss; historically used for high-power AM. Requires careful routing away from metallic structures; rarely used in new installations.'
+        }
+      ];
+
+      // ATU configuration
+      const atuNote = isDA_ts
+        ? `DA array: a phasing and combining network (PCN) is required in addition to the ATU. Each tower element needs individual series capacitor and base impedance match. PCN design requires full mutual impedance matrix measurement.`
+        : `NDA: standard L, T, or Pi network ATU matching feedline impedance (typically 50Ω) to tower base impedance (~${R_total}Ω). Series capacitor to resonate antenna near resonance.`;
+
+      // FCC base current monitor requirements
+      const monitorRequired = !isLocal_ts && tpo_kw >= 1;
+      const monitorNote = monitorRequired
+        ? `§73.61: licensed AM stations ≥1 kW must install base current monitors on each tower. DA stations: monitors on all elements. Monitor must be readable from the transmitter control point.`
+        : `§73.61: base current monitor recommended; required if ≥1 kW operation. Local channel stations typically install for operational convenience.`;
+
+      // Detuning requirements (DA arrays)
+      const detuning = isDA_ts ? {
+        required: true,
+        note: `DA array: any unused or parasitic towers within ${round2(qwM_ts * 2)} m of the active elements must be detuned per §73.150(c). Detuning coils (series inductance) at each parasitic base. Detuning verified by field measurements before proof of performance.`
+      } : {
+        required: false,
+        note: 'NDA: single-tower — detuning not required. Verify no adjacent metallic structures within λ/10 (≈' + round2(lambdaM_ts / 10) + ' m) of tower base that could re-radiate.'
+      };
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        pattern_mode,
+        quarter_wave_m: qwM_ts,
+        wavelength_m: lambdaM_ts,
+        estimated_line_length_m: txLineLen_m,
+        antenna_radiation_resistance_ohm: R_RADIATION_IDEAL,
+        estimated_ground_loss_ohm: R_ground_ohm,
+        estimated_base_impedance_ohm: R_total,
+        antenna_efficiency_pct: efficiency_pct,
+        base_current_ideal_a: I_base_ideal_A,
+        feedline_options: feedlineOptions,
+        recommended_feedline: feedlineOptions.find(f => f.suitable && tpo_kw <= f.max_tpo_kw)?.type ?? 'RIGID_COAX_3_1_8',
+        atu_configuration_note: atuNote,
+        base_current_monitor_required: monitorRequired,
+        base_current_monitor_note: monitorNote,
+        detuning,
+        reference: '47 CFR §73.61 (base current monitoring); §73.150(c) (detuning); §73.190 (ground system); ARRL Antenna Handbook (ATU design); Andrew/Commscope heliax data',
+        note: 'Transmission system design guide is a screening-grade engineering reference. All impedances, efficiencies, and current values are based on ideal monopole theory and the Terman/Belrose ground loss formula. Actual values require field measurements and full RF system design by a licensed broadcast engineer.'
       };
     })(),
 

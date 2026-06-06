@@ -5254,3 +5254,49 @@ test('propagation_confidence_interval comparison table columns populated', async
     assert.ok('prop_reach_high_km' in row);
   }
 });
+
+// ---- transmission_system_design_guide ----
+
+test('transmission_system_design_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.transmission_system_design_guide != null, `rank ${c.rank} missing transmission_system_design_guide`);
+  }
+});
+
+test('transmission_system_design_guide has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const ts = out.candidates[0].transmission_system_design_guide;
+  assert.ok(typeof ts.antenna_efficiency_pct === 'number');
+  assert.ok(typeof ts.base_current_ideal_a === 'number');
+  assert.ok(typeof ts.estimated_base_impedance_ohm === 'number');
+  assert.ok(Array.isArray(ts.feedline_options));
+  assert.ok(typeof ts.recommended_feedline === 'string');
+  assert.ok(typeof ts.detuning === 'object');
+});
+
+test('transmission_system_design_guide has 3 feedline options', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ts = out.candidates[0].transmission_system_design_guide;
+  assert.equal(ts.feedline_options.length, 3);
+  const types = ts.feedline_options.map(f => f.type);
+  assert.ok(types.includes('HELIAX_7_8'));
+  assert.ok(types.includes('RIGID_COAX_3_1_8'));
+  assert.ok(types.includes('OPEN_WIRE'));
+});
+
+test('transmission_system_design_guide NDA has detuning.required = false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const ts = out.candidates[0].transmission_system_design_guide;
+  assert.equal(ts.detuning.required, false);
+});
+
+test('transmission_system_design_guide comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('tx_efficiency_pct' in row);
+    assert.ok('tx_base_impedance_ohm' in row);
+    assert.ok('tx_recommended_feedline' in row);
+  }
+});
