@@ -1077,6 +1077,39 @@ async function scoreCandidate(pt, ctx, warnings){
     warnings.push({ code: 'CURVE_LOOKUP_FAILED', message: `fccAmDistanceKm failed at (${pt.lat.toFixed(3)}, ${pt.lon.toFixed(3)}): ${e.message}` });
   }
 
+  // 1b. Multi-contour population reach bands.
+  //     Five standard field-strength contours: 5.0, 2.0, 1.0, 0.5, 0.25 mV/m.
+  //     Each band gives: distance_km, area_km2, and estimated_population (density proxy).
+  //     Useful for comparing relative audience reach across candidates without full §73.183 study.
+  const population_reach_bands = (() => {
+    const targets = [
+      { mvm: 5.0,  label: '5 mV/m (§73.24(j) principal community)' },
+      { mvm: 2.0,  label: '2 mV/m (urban fringe / primary coverage)' },
+      { mvm: 1.0,  label: '1 mV/m (rural primary)' },
+      { mvm: 0.5,  label: '0.5 mV/m (§73.24 secondary daytime)' },
+      { mvm: 0.25, label: '0.25 mV/m (fringe / distant secondary)' }
+    ];
+    const bands = [];
+    for (const { mvm, label } of targets) {
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        const dist_km = r.distance_km;
+        const area_km2 = round2(Math.PI * dist_km * dist_km);
+        const est_pop = Math.round(area_km2 * regional_density_per_km2);
+        bands.push({
+          target_mvm: mvm,
+          label,
+          distance_km: round2(dist_km),
+          area_km2,
+          estimated_population: est_pop
+        });
+      } catch (_) {
+        bands.push({ target_mvm: mvm, label, distance_km: null, area_km2: null, estimated_population: null });
+      }
+    }
+    return { bands, note: 'Screening-grade circular-area population estimate using distance-adjusted density proxy. Not a §73.183 propagation contour.' };
+  })();
+
   // 2. Principal-community coverage (§73.24(j)).  When a polygon was
   //    supplied we compute the fraction of the COL boundary inside the
   //    5 mV/m daytime contour (modeled as a circle of radius =
@@ -1451,6 +1484,7 @@ async function scoreCandidate(pt, ctx, warnings){
     nif_status,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     estimated_daytime_population_served,
+    population_reach_bands,
     // Land-use classification — distance + σ proxy for population density context.
     land_use_classification: { class: land_use_class, density_per_km2: regional_density_per_km2,
       density_factor: round2(land_use_density_factor),

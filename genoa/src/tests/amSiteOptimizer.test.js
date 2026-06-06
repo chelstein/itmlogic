@@ -3672,3 +3672,48 @@ test('antenna_height_options.full_wavelength_m matches 300000/freq_khz', async (
       `full_wavelength_m should equal 300000/${KAZM.frequency_khz} (rank ${c.rank})`);
   }
 });
+
+// ---------- population_reach_bands ----------
+
+test('population_reach_bands is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.population_reach_bands != null,
+      `population_reach_bands must be present (rank ${c.rank})`);
+  }
+});
+
+test('population_reach_bands.bands has 5 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.equal(c.population_reach_bands.bands.length, 5,
+      `should have 5 bands (rank ${c.rank})`);
+  }
+});
+
+test('population_reach_bands bands are sorted descending by target_mvm', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const mvms = c.population_reach_bands.bands.map(b => b.target_mvm);
+    for (let i = 1; i < mvms.length; i++) {
+      assert.ok(mvms[i] < mvms[i - 1],
+        `bands should be sorted descending by target_mvm (rank ${c.rank})`);
+    }
+  }
+});
+
+test('population_reach_bands 5 mV/m distance_km <= 0.5 mV/m distance_km (farther at lower field)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const b5 = c.population_reach_bands.bands.find(b => b.target_mvm === 5.0);
+    const b05 = c.population_reach_bands.bands.find(b => b.target_mvm === 0.5);
+    if (b5?.distance_km != null && b05?.distance_km != null) {
+      assert.ok(b5.distance_km <= b05.distance_km,
+        `5 mV/m contour should be closer than 0.5 mV/m (rank ${c.rank}): ${b5.distance_km} vs ${b05.distance_km}`);
+    }
+  }
+});
