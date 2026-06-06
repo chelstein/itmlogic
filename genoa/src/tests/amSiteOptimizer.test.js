@@ -1807,6 +1807,55 @@ test('tpo_power_sweep: all rows within class ceiling and class minimum', async (
   }
 });
 
+test('antenna_height_profile present on every candidate with required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ahp = c.antenna_height_profile;
+    assert.ok(ahp != null, `antenna_height_profile must be present (rank ${c.rank})`);
+    assert.equal(ahp.frequency_khz, KAZM.frequency_khz, `antenna_height_profile.frequency_khz must match input (rank ${c.rank})`);
+    assert.ok(typeof ahp.wavelength_m === 'number' && ahp.wavelength_m > 0,
+      `antenna_height_profile.wavelength_m must be positive (rank ${c.rank})`);
+    assert.ok(typeof ahp.quarter_wave_m === 'number' && ahp.quarter_wave_m > 0,
+      `antenna_height_profile.quarter_wave_m must be positive (rank ${c.rank})`);
+    assert.ok(typeof ahp.five_eighths_wave_m === 'number' && ahp.five_eighths_wave_m > ahp.quarter_wave_m,
+      `five_eighths_wave_m must exceed quarter_wave_m (rank ${c.rank})`);
+    assert.ok(typeof ahp.quarter_wave_asr_required === 'boolean',
+      `antenna_height_profile.quarter_wave_asr_required must be boolean (rank ${c.rank})`);
+    assert.ok(typeof ahp.note === 'string' && ahp.note.length > 0,
+      `antenna_height_profile.note must be a string (rank ${c.rank})`);
+  }
+});
+
+test('antenna_height_profile: 540 kHz requires ASR (λ/4 ≈ 139 m >> 60.96 m threshold)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ahp = c.antenna_height_profile;
+    assert.ok(ahp.quarter_wave_asr_required === true,
+      `540 kHz λ/4 ≈ 139 m must trigger ASR requirement (rank ${c.rank})`);
+    assert.ok(ahp.if_asr_constrained != null,
+      `if_asr_constrained must be populated when ASR is required (rank ${c.rank})`);
+    assert.ok(ahp.if_asr_constrained.max_physical_height_m === 60.96,
+      `if_asr_constrained.max_physical_height_m must be 60.96 m (rank ${c.rank})`);
+    assert.ok(ahp.if_asr_constrained.electrical_height_deg < 90,
+      `ASR-constrained electrical height must be < 90° at 540 kHz (rank ${c.rank})`);
+    assert.ok(ahp.if_asr_constrained.efficiency_loss_db < 0,
+      `efficiency_loss_db must be negative (rank ${c.rank})`);
+  }
+});
+
+test('antenna_height_profile: quarter_wave_m × 4 ≈ wavelength_m', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ahp = c.antenna_height_profile;
+    const computed_lambda = ahp.quarter_wave_m * 4;
+    assert.ok(Math.abs(computed_lambda - ahp.wavelength_m) < 0.5,
+      `quarter_wave_m × 4 should ≈ wavelength_m; got ${computed_lambda} vs ${ahp.wavelength_m} (rank ${c.rank})`);
+  }
+});
+
 test('groundwave_contour_table present on every candidate with 4 standard FCC contours', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);

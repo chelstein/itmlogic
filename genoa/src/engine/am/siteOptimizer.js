@@ -1351,6 +1351,52 @@ async function scoreCandidate(pt, ctx, warnings){
           : 'LIMITED VALUE — conductivity upgrade would have minor coverage impact; survey still required for §73.190 ground system design.'
       };
     })(),
+    // Antenna height profile — standard vertical heights for this frequency and their
+    // regulatory implications.  All heights in meters.
+    // §17.7: any structure > 60.96 m (200 ft) AGL requires ASR registration.
+    // The FCC M3 groundwave model assumes optimal λ/4 (90°) electrical height;
+    // reduced antenna heights lower radiation efficiency approximately as sin²(h/λ·360°).
+    antenna_height_profile: (() => {
+      const ASR_M = 60.96;           // 200 ft — §17.7 ASR trigger
+      const lambdaM = 300000 / frequency_khz;
+      const qw  = round2(lambdaM / 4);       // 90° — standard, optimal radiation resistance
+      const hw  = round2(lambdaM / 2);       // 180° — null pattern above; rarely used
+      const fe  = round2(lambdaM * 5 / 8);  // 225° — maximum gain, used on some Class A clear-channel
+
+      // Relative radiation efficiency vs. quarter-wave baseline.
+      // M3 groundwave tables assume 90° (λ/4) electrical height.
+      // Shorter antennas have less radiation resistance, reducing ERP.
+      // Approximate effective gain vs. 90° using sin²(electrical_deg * π/180).
+      const relEfficiency = (deg) => {
+        const sinVal = Math.sin(deg * Math.PI / 180);
+        return round2(sinVal * sinVal / 1.0); // normalized to 1.0 at 90°
+      };
+
+      // What's the maximum physical height allowed without ASR complications?
+      // ASR_M = 60.96 m; compute the electrical height in degrees at that limit.
+      const asr_limited_deg = round2((ASR_M / lambdaM) * 360);
+      const asr_limited_eff = relEfficiency(Math.min(asr_limited_deg, 90));
+
+      return {
+        frequency_khz,
+        wavelength_m: round2(lambdaM),
+        asr_threshold_m: ASR_M,
+        quarter_wave_m: qw,
+        five_eighths_wave_m: fe,
+        half_wave_m: hw,
+        quarter_wave_asr_required: qw > ASR_M,
+        // Electrical height (degrees) if ASR precludes a full λ/4 tower.
+        // Only relevant at frequencies where λ/4 > 60.96 m (< ~1230 kHz for all AM).
+        if_asr_constrained: qw > ASR_M ? {
+          max_physical_height_m: ASR_M,
+          electrical_height_deg: asr_limited_deg,
+          relative_efficiency_vs_quarter_wave: asr_limited_eff,
+          efficiency_loss_db: round2(10 * Math.log10(asr_limited_eff)),
+          note: `ASR constraint (no FAA exemption): max height ${ASR_M} m → ${asr_limited_deg}° electrical height. Efficiency vs. λ/4 baseline: ${(asr_limited_eff * 100).toFixed(0)}%. File FCC Form 854 before construction.`
+        } : null,
+        note: `At ${frequency_khz} kHz: λ/4=${qw} m, 5λ/8=${fe} m, λ/2=${hw} m. ${qw > ASR_M ? `ALL standard heights EXCEED the §17.7 60.96 m ASR trigger — FCC Form 854 and FAA 7460-1 aeronautical study required.` : `λ/4 is within ASR limit (${ASR_M} m); ASR registration not required at standard height.`}`
+      };
+    })(),
     // TPO power sweep — for 4-5 representative transmitter power levels within the
     // FCC class ceiling, shows what groundwave coverage metrics you'd get.
     // Answers the screening question: "what's the optimal TPO for this site?"

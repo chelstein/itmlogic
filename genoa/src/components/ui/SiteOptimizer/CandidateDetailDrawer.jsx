@@ -529,6 +529,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 </div>
               )}
             </div>
+            {/* Antenna height profile */}
+            {candidate.antenna_height_profile && (() => {
+              const ahp = candidate.antenna_height_profile;
+              const asrColor = ahp.quarter_wave_asr_required ? '#ffb347' : '#63d471';
+              return (
+                <div className="col-span-2 border border-rule/40 rounded p-2 font-mono text-[10px] space-y-0.5">
+                  <div className="text-textDim text-[9px] uppercase tracking-rack mb-1">Antenna height (λ/4)</div>
+                  <div className="flex gap-3 flex-wrap">
+                    <span><span className="text-textDim">λ =</span> <span className="text-cream">{ahp.wavelength_m} m</span></span>
+                    <span><span className="text-textDim">λ/4 =</span> <span className="text-cream">{ahp.quarter_wave_m} m</span></span>
+                    <span><span className="text-textDim">5λ/8 =</span> <span className="text-cream">{ahp.five_eighths_wave_m} m</span></span>
+                  </div>
+                  <div style={{ color: asrColor }}>
+                    ASR §17.7: {ahp.quarter_wave_asr_required ? `REQUIRED (λ/4=${ahp.quarter_wave_m} m > 60.96 m)` : `Not required (λ/4=${ahp.quarter_wave_m} m ≤ 60.96 m)`}
+                  </div>
+                  {ahp.if_asr_constrained && (
+                    <div className="text-textDim/80 leading-tight mt-0.5">
+                      ASR limit at 60.96 m → {ahp.if_asr_constrained.electrical_height_deg}° electrical height
+                      {' '}({ahp.if_asr_constrained.efficiency_loss_db} dB efficiency loss)
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             <div className="col-span-2">
               <span className="text-textDim">NIF status</span>{' '}
               {(() => {
