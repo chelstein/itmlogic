@@ -2112,3 +2112,38 @@ test('minimum_spacing_reference: Class C proposed station has smaller separation
   assert.ok(acac > cccc,
     `Class A vs A co-channel (${acac} km) must exceed Class C vs C (${cccc} km)`);
 });
+
+// ---------- buildMinimumSpacingReference unit tests ----------
+
+test('buildMinimumSpacingReference: Class D co-channel vs A is 1037 km', () => {
+  const msr = __test__.buildMinimumSpacingReference({ fcc_class: 'D', channel_class: 'clear_channel' });
+  const row = msr.co_channel.find(r => r.existing_class === 'A');
+  assert.equal(row.min_separation_km, 1037,
+    `Class D vs A co-channel should be 1037 km; got: ${row.min_separation_km}`);
+});
+
+test('buildMinimumSpacingReference: Class C co-channel vs C is 354 km (smallest co-channel)', () => {
+  const msr = __test__.buildMinimumSpacingReference({ fcc_class: 'C', channel_class: 'local' });
+  const row = msr.co_channel.find(r => r.existing_class === 'C');
+  assert.equal(row.min_separation_km, 354,
+    `Class C vs C co-channel should be 354 km; got: ${row.min_separation_km}`);
+});
+
+test('buildMinimumSpacingReference: adjacent_20khz always < adjacent_10khz', () => {
+  for (const cls of ['A', 'B', 'C', 'D']){
+    const msr = __test__.buildMinimumSpacingReference({ fcc_class: cls, channel_class: 'regional' });
+    for (const ex of ['A', 'B', 'C', 'D']){
+      const adj10 = msr.adjacent_10khz.find(r => r.existing_class === ex).min_separation_km;
+      const adj20 = msr.adjacent_20khz.find(r => r.existing_class === ex).min_separation_km;
+      assert.ok(adj20 <= adj10,
+        `Class ${cls} vs ${ex}: 2nd adjacent (${adj20}) should be <= 1st adjacent (${adj10})`);
+    }
+  }
+});
+
+test('buildMinimumSpacingReference: unknown fcc_class falls back to Class D table', () => {
+  const msr = __test__.buildMinimumSpacingReference({ fcc_class: 'X', channel_class: 'regional' });
+  assert.equal(msr.proposed_class, 'D', 'Unknown class should fall back to D');
+  assert.ok(Array.isArray(msr.co_channel) && msr.co_channel.length === 4,
+    'Fallback to D should still return 4 co-channel rows');
+});
