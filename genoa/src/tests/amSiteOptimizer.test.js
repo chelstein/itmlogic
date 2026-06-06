@@ -5683,6 +5683,54 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- adjacent_channel_protection_guide ----
+
+test('adjacent_channel_protection_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.adjacent_channel_protection_guide != null, 'adjacent_channel_protection_guide missing');
+  const g = c.adjacent_channel_protection_guide;
+  assert.ok(g.adjacent_10khz != null, 'adjacent_10khz block missing');
+  assert.ok(g.adjacent_20khz != null, 'adjacent_20khz block missing');
+  assert.ok(Array.isArray(g.adjacent_channels), 'adjacent_channels must be array');
+  assert.ok(Array.isArray(g.sideband_rolloff), 'sideband_rolloff must be array');
+  assert.ok(g.n_adjacent_channels_checked > 0, 'n_adjacent_channels_checked must be positive');
+});
+
+test('adjacent_channel_protection_guide D/U ratios by class (KAZM Class D)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].adjacent_channel_protection_guide;
+  // Class D: 20 dB at 10 kHz, 6 dB at 20 kHz
+  assert.ok(g.adjacent_10khz.required_du_db > 0, '10 kHz D/U must be positive');
+  assert.ok(g.adjacent_20khz.required_du_db > 0, '20 kHz D/U must be positive');
+  assert.ok(g.adjacent_10khz.required_du_db > g.adjacent_20khz.required_du_db, '10 kHz D/U must exceed 20 kHz D/U');
+});
+
+test('adjacent_channel_protection_guide KAZM 780 kHz adjacent channels correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].adjacent_channel_protection_guide;
+  assert.strictEqual(g.adjacent_10khz.lower_channel_khz, 770, '780-10=770 kHz lower adjacent');
+  assert.strictEqual(g.adjacent_10khz.upper_channel_khz, 790, '780+10=790 kHz upper adjacent');
+  assert.strictEqual(g.adjacent_20khz.lower_channel_khz, 760, '780-20=760 kHz second lower adjacent');
+  assert.strictEqual(g.adjacent_20khz.upper_channel_khz, 800, '780+20=800 kHz second upper adjacent');
+});
+
+test('adjacent_channel_protection_guide primary reach is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].adjacent_channel_protection_guide;
+  assert.ok(g.candidate_primary_reach_km > 0, 'primary_reach_km must be positive');
+  assert.ok(Array.isArray(g.assessment_notes) && g.assessment_notes.length >= 4, 'at least 4 assessment notes');
+});
+
+test('adjacent_channel_protection_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('acpg_adj10_du_db' in row, 'acpg_adj10_du_db missing from comparison table');
+    assert.ok('acpg_adj20_du_db' in row, 'acpg_adj20_du_db missing from comparison table');
+    assert.ok('acpg_n_adj_stations' in row, 'acpg_n_adj_stations missing from comparison table');
+  }
+});
+
 // ---- main_studio_rule_guide ----
 
 test('main_studio_rule_guide presence and structure', async () => {

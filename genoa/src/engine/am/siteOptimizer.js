@@ -936,7 +936,10 @@ export async function runSiteOptimizer(body = {}){
     ssc_license_risk:       c.silent_station_consideration?.license_risk_level ?? null,
     msr_main_studio_required: c.main_studio_rule_guide?.main_studio_required ?? null,
     msr_dist_from_col_km:   c.main_studio_rule_guide?.distance_from_col_km ?? null,
-    msr_waiver_eligible:    c.main_studio_rule_guide?.waiver_eligible ?? null
+    msr_waiver_eligible:    c.main_studio_rule_guide?.waiver_eligible ?? null,
+    acpg_adj10_du_db:       c.adjacent_channel_protection_guide?.adjacent_10khz?.required_du_db ?? null,
+    acpg_adj20_du_db:       c.adjacent_channel_protection_guide?.adjacent_20khz?.required_du_db ?? null,
+    acpg_n_adj_stations:    c.adjacent_channel_protection_guide?.n_adjacent_channels_checked ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6671,6 +6674,94 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    adjacent_channel_protection_guide: (() => {
+      // §73.182 Table 1: Adjacent channel (±10 kHz and ±20 kHz) protection requirements for AM
+      // AM stations must protect adjacent-channel assignments from daytime interference.
+      // The D/U (desired-to-undesired) signal ratio requirements differ by:
+      //   - 10 kHz separation (first adjacent): much higher D/U due to strong sideband energy
+      //   - 20 kHz separation (second adjacent): relaxed D/U; sideband rolloff reduces interference
+      //   - Class A vs secondary (Classes B/C/D): Class A gets more protection
+      // Key: moving transmitter site changes coverage contours → may create new adjacent-ch conflicts
+
+      // §73.182 Table 1 D/U ratios (approximate; exact values in Table 1 by class pair)
+      // For a secondary station (Class D) being analyzed:
+      const isClassA   = fcc_class.toUpperCase() === 'A';
+      const isClassB   = fcc_class.toUpperCase() === 'B';
+
+      // Required D/U for 10 kHz adjacent channel — Class D protecting others
+      // Per §73.182(b): interference protection at 0.5 mV/m (primary) contour
+      // D/U ratios at Class D: 20 dB (10 kHz), 6 dB (20 kHz) approximately (simplified)
+      const DU_10KHZ_DB = isClassA ? 30 : (isClassB ? 25 : 20); // D/U required (dB) — 10 kHz adj
+      const DU_20KHZ_DB = isClassA ? 20 : (isClassB ? 15 : 6);  // D/U required (dB) — 20 kHz adj
+
+      // Adjacent channel frequencies to check
+      const adj10_low  = frequency_khz - 10;
+      const adj10_high = frequency_khz + 10;
+      const adj20_low  = frequency_khz - 20;
+      const adj20_high = frequency_khz + 20;
+
+      // AM channel spacing: 10 kHz in Americas; must check adjacent assignments
+      // Typical analysis: does the candidate site's 0.5 mV/m contour interfere with
+      // adjacent channel stations' protected contours?
+      // We don't have a database of adjacent stations here, so we document the methodology.
+      const ADJACENT_CHANNELS = [
+        { id: 'ADJ10_LOW',  frequency_khz: adj10_low,  separation_khz: 10, direction: 'LOWER', du_db_required: DU_10KHZ_DB },
+        { id: 'ADJ10_HIGH', frequency_khz: adj10_high, separation_khz: 10, direction: 'UPPER', du_db_required: DU_10KHZ_DB },
+        { id: 'ADJ20_LOW',  frequency_khz: adj20_low,  separation_khz: 20, direction: 'LOWER', du_db_required: DU_20KHZ_DB },
+        { id: 'ADJ20_HIGH', frequency_khz: adj20_high, separation_khz: 20, direction: 'UPPER', du_db_required: DU_20KHZ_DB }
+      ].filter(ch => ch.frequency_khz >= 530 && ch.frequency_khz <= 1700);
+
+      // Candidate site 0.5 mV/m reach — used in interference assessment
+      const primaryReach_km = (() => {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        return round2(r?.distance_km ?? 0);
+      })();
+
+      // Sideband rolloff analysis: first adjacent (-10 kHz) energy relative to carrier
+      // Per ITU AM bandwidth spec: 99% power in ±4.5 kHz; significant energy out to ±10 kHz
+      const SIDEBAND_ROLLOFF = [
+        { offset_khz: 5,  rolloff_db: 3  },   // half-power
+        { offset_khz: 10, rolloff_db: 20 },   // first adjacent — ~20 dB below carrier
+        { offset_khz: 20, rolloff_db: 40 },   // second adjacent — ~40 dB below carrier
+        { offset_khz: 30, rolloff_db: 60 }    // third adjacent
+      ];
+
+      // Interference assessment notes
+      const ASSESSMENT_NOTES = [
+        'Check §73.182 Table 1 for exact D/U ratios applicable to your class-pair combination',
+        `Your 0.5 mV/m reach from this candidate: ${primaryReach_km} km — adjacent stations within ~${round2(primaryReach_km * 1.5)} km may need interference analysis`,
+        `First adjacent (±10 kHz, ${DU_10KHZ_DB} dB D/U required): check ${adj10_low} kHz and ${adj10_high} kHz licensees`,
+        `Second adjacent (±20 kHz, ${DU_20KHZ_DB} dB D/U required): check ${adj20_low} kHz and ${adj20_high} kHz licensees`,
+        'Use FCC AM Query (query.fcc.gov) or LMS to find adjacent-channel stations within interference range',
+        'If site change creates new adjacent-channel conflict, FCC may require directional antenna or reduced power to protect'
+      ];
+
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        adjacent_10khz: {
+          required_du_db: DU_10KHZ_DB,
+          lower_channel_khz: adj10_low,
+          upper_channel_khz: adj10_high,
+          sideband_rolloff_db: 20,
+          cfr: '§73.182(b) Table 1'
+        },
+        adjacent_20khz: {
+          required_du_db: DU_20KHZ_DB,
+          lower_channel_khz: adj20_low,
+          upper_channel_khz: adj20_high,
+          sideband_rolloff_db: 40,
+          cfr: '§73.182(b) Table 1'
+        },
+        adjacent_channels: ADJACENT_CHANNELS,
+        n_adjacent_channels_checked: ADJACENT_CHANNELS.length,
+        candidate_primary_reach_km: primaryReach_km,
+        sideband_rolloff: SIDEBAND_ROLLOFF,
+        assessment_notes: ASSESSMENT_NOTES,
+        reference: '47 CFR §73.182(b) Table 1; §73.207; FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
+        note: `${frequency_khz} kHz Class ${fcc_class}. Adj-10 D/U: ${DU_10KHZ_DB} dB. Adj-20 D/U: ${DU_20KHZ_DB} dB. ${ADJACENT_CHANNELS.length} adjacent channels to check.`
       };
     })(),
 

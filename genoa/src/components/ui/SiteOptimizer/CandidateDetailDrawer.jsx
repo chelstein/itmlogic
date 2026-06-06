@@ -2226,6 +2226,62 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Adjacent Channel Protection Guide */}
+        {candidate.adjacent_channel_protection_guide && (() => {
+          const g = candidate.adjacent_channel_protection_guide;
+          const a10 = g.adjacent_10khz || {};
+          const a20 = g.adjacent_20khz || {};
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Adjacent Channel Protection (§73.182 Table 1)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px 8px' }}>
+                  <span style={{ color: '#94a3b8' }}>Separation</span>
+                  <span style={{ color: '#94a3b8' }}>Channels</span>
+                  <span style={{ color: '#94a3b8' }}>D/U Required</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>±10 kHz (1st adj)</span>
+                  <span style={{ color: '#e2e8f0' }}>{a10.lower_channel_khz}/{a10.upper_channel_khz}</span>
+                  <span style={{ color: '#f87171', fontWeight: 700 }}>{a10.required_du_db} dB</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>±20 kHz (2nd adj)</span>
+                  <span style={{ color: '#e2e8f0' }}>{a20.lower_channel_khz}/{a20.upper_channel_khz}</span>
+                  <span style={{ color: '#34d399', fontWeight: 700 }}>{a20.required_du_db} dB</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px', marginTop: 8 }}>
+                  <span style={{ color: '#94a3b8' }}>Primary Reach</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.candidate_primary_reach_km} km</span>
+                  <span style={{ color: '#94a3b8' }}>Channels to Check</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.n_adjacent_channels_checked}</span>
+                </div>
+              </div>
+              {/* Sideband rolloff */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 10px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 700, marginBottom: 5, fontSize: 11 }}>SIDEBAND ROLLOFF</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+                  {(g.sideband_rolloff || []).map(sr => (
+                    <div key={sr.offset_khz} style={{ background: '#0f172a', borderRadius: 4, padding: '5px 6px', textAlign: 'center' }}>
+                      <div style={{ color: '#94a3b8', fontSize: 10 }}>±{sr.offset_khz} kHz</div>
+                      <div style={{ color: '#f87171', fontWeight: 700, fontSize: 13 }}>−{sr.rolloff_db} dB</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Assessment notes */}
+              {(g.assessment_notes || []).length > 0 && (
+                <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 10px', marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, marginBottom: 5 }}>ANALYSIS GUIDANCE</div>
+                  {(g.assessment_notes || []).map((note, i) => (
+                    <div key={i} style={{ color: '#e2e8f0', fontSize: 11, marginBottom: 3, paddingLeft: 8 }}>• {note}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Main Studio Rule Guide */}
         {candidate.main_studio_rule_guide && (() => {
           const m = candidate.main_studio_rule_guide;

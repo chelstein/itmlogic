@@ -1717,6 +1717,35 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      adjacent_channel_protection_guide: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+        adjacent_10khz: { required_du_db: 20, lower_channel_khz: 770, upper_channel_khz: 790, sideband_rolloff_db: 20, cfr: '§73.182(b) Table 1' },
+        adjacent_20khz: { required_du_db: 6,  lower_channel_khz: 760, upper_channel_khz: 800, sideband_rolloff_db: 40, cfr: '§73.182(b) Table 1' },
+        adjacent_channels: [
+          { id: 'ADJ10_LOW',  frequency_khz: 770, separation_khz: 10, direction: 'LOWER', du_db_required: 20 },
+          { id: 'ADJ10_HIGH', frequency_khz: 790, separation_khz: 10, direction: 'UPPER', du_db_required: 20 },
+          { id: 'ADJ20_LOW',  frequency_khz: 760, separation_khz: 20, direction: 'LOWER', du_db_required: 6  },
+          { id: 'ADJ20_HIGH', frequency_khz: 800, separation_khz: 20, direction: 'UPPER', du_db_required: 6  }
+        ],
+        n_adjacent_channels_checked: 4,
+        candidate_primary_reach_km: 87.4,
+        sideband_rolloff: [
+          { offset_khz: 5,  rolloff_db: 3  },
+          { offset_khz: 10, rolloff_db: 20 },
+          { offset_khz: 20, rolloff_db: 40 },
+          { offset_khz: 30, rolloff_db: 60 }
+        ],
+        assessment_notes: [
+          'Check §73.182 Table 1 for exact D/U ratios applicable to your class-pair combination',
+          'Your 0.5 mV/m reach from this candidate: 87.4 km — adjacent stations within ~131.1 km may need interference analysis',
+          'First adjacent (±10 kHz, 20 dB D/U required): check 770 kHz and 790 kHz licensees',
+          'Second adjacent (±20 kHz, 6 dB D/U required): check 760 kHz and 800 kHz licensees',
+          'Use FCC AM Query (query.fcc.gov) or LMS to find adjacent-channel stations within interference range',
+          'If site change creates new adjacent-channel conflict, FCC may require directional antenna or reduced power to protect'
+        ],
+        reference: '47 CFR §73.182(b) Table 1; §73.207; FCC AM Query (query.fcc.gov); ITU AM Bandwidth Spec',
+        note: '780 kHz Class D. Adj-10 D/U: 20 dB. Adj-20 D/U: 6 dB. 4 adjacent channels to check.'
+      },
       main_studio_rule_guide: {
         frequency_khz: 780, fcc_class: 'D',
         main_studio_required: false,
