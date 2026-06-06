@@ -987,3 +987,17 @@ test('colocation GRID candidates have am_fm_translator_opportunity', async () =>
     assert.strictEqual(c.am_fm_translator_opportunity.am_revitalization_eligible, true, `rank ${c.rank} must be eligible`);
   }
 });
+
+test('colocation GRID candidates have spacing_rule_compliance_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.spacing_rule_compliance_guide != null, `rank ${c.rank} missing spacing_rule_compliance_guide`);
+    assert.ok(c.spacing_rule_compliance_guide.spacing_table.length === 4, `rank ${c.rank} spacing table must have 4 rows`);
+  }
+});

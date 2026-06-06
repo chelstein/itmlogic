@@ -1385,6 +1385,30 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.1560; §73.1350; §73.61; Part 11; §1.1307; §73.3539; §73.99',
         note: 'Operational monitoring requirements are a post-licensing compliance reference. Actual obligations depend on the specific license conditions granted by the FCC.'
       },
+      spacing_rule_compliance_guide: {
+        fcc_class: 'D', frequency_khz: 780, channel_class: 'clear_channel',
+        spacing_risk_tier: 'VERY_HIGH',
+        spacing_risk_note: 'Secondary Class D on clear channel 780 kHz: must maintain enormous spacing from the dominant Class A and from other co-channel secondaries. Each clear-channel domestic secondary assignment is individually negotiated.',
+        spacing_table: [
+          { to_class: 'A', cc_km: 1610, fa_km: 402, sa_km: 178, from_class: 'D', co_channel_freq: 780 },
+          { to_class: 'B', cc_km:  402, fa_km: 322, sa_km: 177, from_class: 'D', co_channel_freq: 780 },
+          { to_class: 'C', cc_km:  322, fa_km: 161, sa_km:  97, from_class: 'D', co_channel_freq: 780 },
+          { to_class: 'D', cc_km:  402, fa_km: 322, sa_km: 177, from_class: 'D', co_channel_freq: 780 }
+        ],
+        verification_checklist: [
+          { id: 'cc_query', item: 'Co-channel (780 kHz) station database query', action: 'Query FCC LMS for all AM stations authorized on this frequency. Apply §73.37 Table 1 spacings to each.', data_source: 'FCC LMS AM Query or BIA/Kelsey AM database', required: true },
+          { id: 'fa_query', item: 'First-adjacent (770/790 kHz) station query', action: 'Query LMS for stations on ±10 kHz. Apply FA spacing column from §73.37 Table 1.', data_source: 'FCC LMS AM Query', required: true },
+          { id: 'sa_query', item: 'Second-adjacent (760/800 kHz) station query', action: 'Query LMS for stations on ±20 kHz. Apply SA spacing column.', data_source: 'FCC LMS AM Query', required: true },
+          { id: 'nif_check', item: '§73.182 skywave NIF consistency check', action: 'After §73.37 spacing compliance verified, confirm NIF study covers same station database snapshot.', data_source: 'LMS + §73.182 NIF study', required: true },
+          { id: 'treaty_check', item: 'International co-channel check', action: 'Verify spacing to Canadian and Mexican AM stations on same frequency per bilateral agreements.', data_source: 'CRTC AM database (Canada); IFT (Mexico)', required: false },
+          { id: 'blanket_check', item: '§73.24(g) blanket interference (1000 mV/m contour)', action: 'Verify 1000 mV/m groundwave contour does not encompass inhabited communities.', data_source: 'FCC groundwave curve computation', required: true }
+        ],
+        n_checklist_required: 5,
+        spacing_analysis_timeline: { database_query_days: 1, spacing_calculation_days: 5, report_preparation_days: 3, total_days_optimistic: 9, total_days_conservative: 18, note: 'Clear-channel Class A and secondary analyses take longer due to larger station populations affected.' },
+        candidate_lat: 34.86, candidate_lon: -111.82,
+        note: 'Screening-grade §73.37 framework — no actual station database query performed. A licensed broadcast engineer must query FCC LMS before any filing.',
+        reference: '47 CFR §73.37; §73.182; §73.24(g); FCC LMS database'
+      },
       am_fm_translator_opportunity: {
         am_revitalization_eligible: true, translator_max_erp_kw: 0.25,
         translator_haat_m_assumed: 30, fm_60dbu_radius_screening_km: 12.5,

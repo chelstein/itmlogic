@@ -5810,3 +5810,50 @@ test('am_fm_translator_opportunity comparison table columns present', async () =
     assert.ok('trans_am_2mvm_km' in row, 'trans_am_2mvm_km missing from comparison table');
   }
 });
+
+// ---- spacing_rule_compliance_guide ----
+
+test('spacing_rule_compliance_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.spacing_rule_compliance_guide != null, `rank ${c.rank} missing spacing_rule_compliance_guide`);
+  }
+});
+
+test('spacing_rule_compliance_guide has correct shape and spacing table', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].spacing_rule_compliance_guide;
+  assert.strictEqual(s.fcc_class, KAZM.fcc_class, 'fcc_class must match input');
+  assert.strictEqual(s.frequency_khz, KAZM.frequency_khz, 'frequency_khz must match input');
+  assert.strictEqual(s.spacing_table.length, 4, 'must have 4 spacing table rows (A, B, C, D)');
+  assert.ok(s.spacing_risk_tier != null, 'spacing_risk_tier must be present');
+  assert.ok(['VERY_HIGH', 'HIGH', 'MODERATE', 'LOW'].includes(s.spacing_risk_tier), 'risk tier must be a known value');
+});
+
+test('spacing_rule_compliance_guide Class D clear channel has VERY_HIGH risk', async () => {
+  // KAZM: 780 kHz (clear channel), fcc_class D → VERY_HIGH
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].spacing_rule_compliance_guide;
+  assert.strictEqual(s.channel_class, 'clear_channel', '780 kHz is a clear channel');
+  assert.strictEqual(s.spacing_risk_tier, 'VERY_HIGH', 'Class D on clear channel must be VERY_HIGH risk');
+});
+
+test('spacing_rule_compliance_guide verification checklist has required items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].spacing_rule_compliance_guide;
+  const ids = s.verification_checklist.map(i => i.id);
+  assert.ok(ids.includes('cc_query'), 'must have co-channel query item');
+  assert.ok(ids.includes('fa_query'), 'must have first-adjacent query item');
+  assert.ok(ids.includes('sa_query'), 'must have second-adjacent query item');
+  assert.ok(ids.includes('blanket_check'), 'must have blanket_check item');
+  assert.ok(s.n_checklist_required >= 4, 'at least 4 items must be required');
+});
+
+test('spacing_rule_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('spacing_risk_tier' in row, 'spacing_risk_tier missing from comparison table');
+    assert.ok('spacing_n_required' in row, 'spacing_n_required missing from comparison table');
+    assert.ok('spacing_chan_class' in row, 'spacing_chan_class missing from comparison table');
+  }
+});

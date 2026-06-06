@@ -819,7 +819,10 @@ export async function runSiteOptimizer(body = {}){
     da_array_footprint_m:   c.da_array_design_guide?.recommended_config?.property_footprint_m ?? null,
     trans_contour_check:    c.am_fm_translator_opportunity?.translator_contour_check ?? null,
     trans_60dbu_km:         c.am_fm_translator_opportunity?.fm_60dbu_radius_screening_km ?? null,
-    trans_am_2mvm_km:       c.am_fm_translator_opportunity?.am_2mvm_contour_km ?? null
+    trans_am_2mvm_km:       c.am_fm_translator_opportunity?.am_2mvm_contour_km ?? null,
+    spacing_risk_tier:      c.spacing_rule_compliance_guide?.spacing_risk_tier ?? null,
+    spacing_n_required:     c.spacing_rule_compliance_guide?.n_checklist_required ?? null,
+    spacing_chan_class:      c.spacing_rule_compliance_guide?.channel_class ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6982,6 +6985,143 @@ async function scoreCandidate(pt, ctx, warnings){
         docket:                       'MB Docket No. 13-249 (FCC 15-142)',
         reference: '47 CFR §73.850 (translator general); §73.850(b) (AM revitalization power limit); §73.850(d) (LPFM protection); §73.207 (spacing tables); §73.313 (FM propagation); MB Docket 13-249',
         note: 'FM translator opportunity is a screening-grade assessment. Actual channel availability requires a full §73.207 spacing analysis against all FM stations in the area using FCC LMS data. A licensed broadcast engineer or communications attorney should conduct the channel search and prepare Form 349.'
+      };
+    })(),
+
+    // §73.37 Minimum Spacing Rule Compliance Guide.
+    // AM stations must maintain minimum geographic separations from other AM stations
+    // on the same and adjacent channels.  These are the primary engineering gate for
+    // any new site filing; failure to meet §73.37 spacings is an absolute filing bar.
+    // Without actual co-channel station database access, this block presents the
+    // applicable spacing table entries, risk tier, and what the engineer must verify.
+    spacing_rule_compliance_guide: (() => {
+      const isClear_sr  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_sr  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const chanClass_sr = isClear_sr ? 'clear_channel' : isLocal_sr ? 'local_channel' : 'regional';
+
+      // §73.37 Table 1: Minimum spacings (km) by class pair, co-channel (CC).
+      // Source: 47 CFR §73.37 Table 1 (daytime reference, U.S. domestic).
+      // Format: { from: 'D', to: 'A', cc_km: 1126, fa_km: 800, sa_km: 400 }
+      // CC = co-channel, FA = first-adjacent (±10 kHz), SA = second-adjacent (±20 kHz)
+      const SPACING_TABLE = [
+        { to_class: 'A', cc_km: 1610, fa_km: 402, sa_km: 178 },
+        { to_class: 'B', cc_km:  402, fa_km: 322, sa_km: 177 },
+        { to_class: 'C', cc_km:  322, fa_km: 161, sa_km:  97 },
+        { to_class: 'D', cc_km:  402, fa_km: 322, sa_km: 177 }
+      ];
+
+      // Effective spacings for THIS station's class (we must protect other classes).
+      // The spacing table is symmetric in that we also get protection FROM other classes,
+      // but for FILING purposes, we must show we protect their contours.
+      const classProtectionMap = {
+        A: { protects: ['A', 'B', 'C', 'D'], protected_by: ['A', 'B', 'C', 'D'] },
+        B: { protects: ['A', 'B', 'C', 'D'], protected_by: ['A', 'B', 'C', 'D'] },
+        C: { protects: ['A', 'B', 'C', 'D'], protected_by: ['A', 'B', 'C', 'D'] },
+        D: { protects: ['A', 'B', 'C', 'D'], protected_by: [] }   // D must protect all; gets less protection
+      };
+
+      // For daytime-only (Class D), the spacing requirements are from §73.37 Table 1
+      // Applicable row for this station class protecting each other class:
+      const applicableRows = SPACING_TABLE.map(row => ({
+        ...row,
+        from_class: fcc_class,
+        channel_offset_khz_cc: 0,
+        channel_offset_khz_fa: 10,
+        channel_offset_khz_sa: 20,
+        co_channel_freq:        frequency_khz,
+        first_adj_freqs:        [frequency_khz - 10, frequency_khz + 10],
+        second_adj_freqs:       [frequency_khz - 20, frequency_khz + 20]
+      }));
+
+      // Risk tier based on channel type and class:
+      // Clear channel co-channel (Class A protected): very high risk — only one dominant per clear channel
+      // Regional channel Class A: high risk — must maintain 1610 km from other Class A
+      // Class D on regional: lower risk — only ~402 km CC required
+      const spacingRisk = (isClear_sr && fcc_class !== 'A')  ? 'VERY_HIGH'
+        : (isClear_sr && fcc_class === 'A')                  ? 'HIGH'
+        : (fcc_class === 'A' && !isClear_sr)                 ? 'HIGH'
+        : (fcc_class === 'B')                                ? 'MODERATE'
+        : (fcc_class === 'D' && !isLocal_sr)                 ? 'LOW'
+        : 'LOW';
+
+      const spacingRiskNote = {
+        VERY_HIGH: `Secondary Class ${fcc_class} on clear channel ${frequency_khz} kHz: must maintain enormous spacing from the dominant Class A and from other co-channel secondaries. Each clear-channel domestic secondary assignment is individually negotiated; §73.37 spacings are near-impossible to satisfy near major population centers.`,
+        HIGH:      `Class ${fcc_class} on ${isClear_sr ? 'clear' : 'regional'} channel ${frequency_khz} kHz: §73.37 CC spacing to other Class A stations requires 1610 km. A site change requires re-running the full spacing analysis against ALL co-channel Class A stations in the database.`,
+        MODERATE:  `Class ${fcc_class} on regional channel ${frequency_khz} kHz: 402 km CC spacing required to other Class B stations. Site change must demonstrate compliance via §73.37 Table 1 analysis. Typically feasible in uncrowded regional markets.`,
+        LOW:       `Class ${fcc_class} on regional channel ${frequency_khz} kHz: 402 km CC spacing from Class B stations required. Class D receives limited protection and must yield to all higher classes. Generally achievable with a thorough LMS database search.`,
+        MODERATE_LOCAL: `Local channel Class C (${frequency_khz} kHz): sharing under §73.27; formal §73.37 spacings less restrictive. Co-channel sharing framework applies.`
+      }[spacingRisk] ?? `Class ${fcc_class} spacing risk level: ${spacingRisk}.`;
+
+      // Verification checklist items
+      const verificationItems = [
+        {
+          id: 'cc_query',
+          item: `Co-channel (${frequency_khz} kHz) station database query`,
+          action: 'Query FCC LMS for all AM stations authorized on this frequency. Apply §73.37 Table 1 spacings to each.',
+          data_source: 'FCC LMS AM Query (media.fcc.gov/api) or BIA/Kelsey AM database',
+          required: true
+        },
+        {
+          id: 'fa_query',
+          item: `First-adjacent (${frequency_khz - 10}/${frequency_khz + 10} kHz) station query`,
+          action: 'Query LMS for stations on ±10 kHz. Apply FA spacing column from §73.37 Table 1.',
+          data_source: 'FCC LMS AM Query',
+          required: true
+        },
+        {
+          id: 'sa_query',
+          item: `Second-adjacent (${frequency_khz - 20}/${frequency_khz + 20} kHz) station query`,
+          action: 'Query LMS for stations on ±20 kHz. Apply SA spacing column.',
+          data_source: 'FCC LMS AM Query',
+          required: true
+        },
+        {
+          id: 'nif_check',
+          item: '§73.182 skywave NIF consistency check',
+          action: 'After §73.37 spacing compliance verified, confirm NIF study covers same station database snapshot.',
+          data_source: 'LMS + § 73.182 NIF study',
+          required: !isLocal_sr && fcc_class !== 'C'
+        },
+        {
+          id: 'treaty_check',
+          item: 'International co-channel check (Canada/Mexico treaty)',
+          action: 'Verify spacing to Canadian and Mexican AM stations on same frequency per bilateral agreements.',
+          data_source: 'CRTC AM database (Canada); IFT (Mexico); treaty coordination if within 320 km of border',
+          required: pt.lat < 32 || pt.lat > 44 || pt.lon < -120  // near border proxy
+        },
+        {
+          id: 'blanket_check',
+          item: '§73.24(g) blanket interference (1000 mV/m contour)',
+          action: 'Verify 1000 mV/m groundwave contour does not encompass inhabited communities. Submit §73.24(g) showing if applicable.',
+          data_source: 'FCC groundwave curve computation',
+          required: true
+        }
+      ];
+
+      // Expected timeline for spacing analysis:
+      const spacingAnalysisTimeline = {
+        database_query_days:     1,
+        spacing_calculation_days: fcc_class === 'A' || isClear_sr ? 5 : 2,
+        report_preparation_days: 3,
+        total_days_optimistic:   round2(1 + (fcc_class === 'A' || isClear_sr ? 5 : 2) + 3),
+        total_days_conservative: round2((1 + (fcc_class === 'A' || isClear_sr ? 5 : 2) + 3) * 2),
+        note: 'Timeline assumes a licensed broadcast engineer with LMS database access. Clear-channel Class A and secondary analyses take longer due to larger station populations affected.'
+      };
+
+      return {
+        fcc_class,
+        frequency_khz,
+        channel_class: chanClass_sr,
+        spacing_risk_tier: spacingRisk,
+        spacing_risk_note: spacingRiskNote,
+        spacing_table: applicableRows,
+        verification_checklist: verificationItems,
+        n_checklist_required: verificationItems.filter(i => i.required).length,
+        spacing_analysis_timeline: spacingAnalysisTimeline,
+        candidate_lat: pt.lat,
+        candidate_lon: pt.lon,
+        note: 'This is a screening-grade §73.37 framework — no actual station database query has been performed. A licensed broadcast engineer must query the current FCC LMS database and run the full §73.37 spacing analysis before any filing. Spacing failures are absolute filing bars with no waiver process.',
+        reference: '47 CFR §73.37 (minimum spacing); §73.182 (NIF); §73.24(g) (blanket); FCC LMS database'
       };
     })(),
 

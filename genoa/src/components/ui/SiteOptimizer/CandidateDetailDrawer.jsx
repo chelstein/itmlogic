@@ -2226,6 +2226,78 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* §73.37 Spacing Rule Compliance Guide */}
+        {candidate.spacing_rule_compliance_guide && (() => {
+          const s = candidate.spacing_rule_compliance_guide;
+          const riskColor = r => r === 'VERY_HIGH' ? 'text-rose-400' : r === 'HIGH' ? 'text-orange-400' : r === 'MODERATE' ? 'text-amber-400' : 'text-emerald-400';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.37 Minimum Spacing Rule Compliance</div>
+              {/* Risk and channel class badges */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold bg-surface/40 border-rule ${riskColor(s.spacing_risk_tier)}`}>
+                  {s.spacing_risk_tier} RISK
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5 uppercase">
+                  {s.channel_class?.replace('_', ' ')} · Class {s.fcc_class} · {s.frequency_khz} kHz
+                </span>
+              </div>
+              {/* Risk note */}
+              <div className="font-mono text-[8px] text-textDim leading-snug mb-2">{s.spacing_risk_note}</div>
+              {/* Spacing table */}
+              <div className="font-mono text-[9px] text-textDim mb-1">§73.37 Table 1 — Minimum Spacings (km) From Class {s.fcc_class}</div>
+              <div className="overflow-x-auto mb-2">
+                <table className="w-full text-[8px] font-mono border-collapse">
+                  <thead>
+                    <tr className="border-b border-rule text-textDim">
+                      <th className="text-left py-0.5 pr-2">Protect Class</th>
+                      <th className="text-right pr-2">CC (0 kHz)</th>
+                      <th className="text-right pr-2">FA (±10 kHz)</th>
+                      <th className="text-right">SA (±20 kHz)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {s.spacing_table?.map((row, i) => (
+                      <tr key={i} className="border-b border-rule/30 hover:bg-surface/30">
+                        <td className="py-0.5 pr-2 text-textBright font-bold">Class {row.to_class}</td>
+                        <td className="text-right pr-2 text-rose-400">{row.cc_km} km</td>
+                        <td className="text-right pr-2 text-amber-400">{row.fa_km} km</td>
+                        <td className="text-right text-blue-300">{row.sa_km} km</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Verification checklist */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Required Verification Steps ({s.n_checklist_required} items)</div>
+              <div className="space-y-0.5 mb-2">
+                {s.verification_checklist?.filter(i => i.required).map((item, i) => (
+                  <div key={i} className="flex gap-1.5 items-start">
+                    <span className="text-amber-400 font-mono text-[8px] shrink-0">!</span>
+                    <div>
+                      <span className="font-mono text-[8px] text-textBright font-bold">{item.item}: </span>
+                      <span className="font-mono text-[8px] text-textDim">{item.data_source}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* Timeline */}
+              <div className="grid grid-cols-2 gap-1 mb-2">
+                {[
+                  { label: 'Analysis (optimistic)',    value: `${s.spacing_analysis_timeline?.total_days_optimistic ?? '—'} days` },
+                  { label: 'Analysis (conservative)',  value: `${s.spacing_analysis_timeline?.total_days_conservative ?? '—'} days` }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{s.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Revitalization FM Translator Opportunity */}
         {candidate.am_fm_translator_opportunity && (() => {
           const t = candidate.am_fm_translator_opportunity;
