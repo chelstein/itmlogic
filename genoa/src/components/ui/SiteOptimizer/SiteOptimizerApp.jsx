@@ -454,8 +454,8 @@ const DEMO_RESULT = {
         score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0 },
         ranking_rationale: 'Conductivity wins offset lower coverage; lower COL coverage is a flagged limitation.'
       },
-      status_labels: ['ENGINEER REVIEW REQUIRED'],
-      status_category: 'REVIEW_REQUIRED',
+      status_labels: ['NON-COMPLIANT', 'ENGINEER REVIEW REQUIRED'],
+      status_category: 'RECOVERABLE_WITH_DA',
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,

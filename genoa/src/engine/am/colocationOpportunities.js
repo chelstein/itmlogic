@@ -723,6 +723,8 @@ function echoInputs(o){
     fcc_class: o.fcc_class,
     goals_enabled: Object.entries(o.goals).filter(([_, v]) => v).map(([k]) => k),
     community_of_license_polygon_provided: !!o.community_of_license_polygon,
+    col_centroid_provided: !!o.col_centroid,
+    col_centroid: o.col_centroid ?? null,
     candidate_limit: o.candidate_limit,
     search_mode: o.search_mode,
     infrastructure_source: o.infrastructure_source,
