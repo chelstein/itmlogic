@@ -891,7 +891,13 @@ export async function runSiteOptimizer(body = {}){
     rfc_needs_asr:          c.regulatory_filing_checklist?.needs_asr ?? null,
     stl_rec_type:           c.stl_network_link_guide?.recommended_stl?.id ?? null,
     stl_path_km:            c.stl_network_link_guide?.stl_path_distance_km ?? null,
-    stl_total_cost_usd:     c.stl_network_link_guide?.total_stl_cost_usd ?? null
+    stl_total_cost_usd:     c.stl_network_link_guide?.total_stl_cost_usd ?? null,
+    fsc_channel_class:      c.frequency_spectrum_coordination?.channel_class ?? null,
+    fsc_coord_zone_km:      c.frequency_spectrum_coordination?.coordination_zone_km ?? null,
+    fsc_nif_required:       c.frequency_spectrum_coordination?.nif_required ?? null,
+    gci_baseline_sigma:     c.ground_conductivity_improvement?.baseline_sigma_msm ?? null,
+    gci_sigma_improved:     c.ground_conductivity_improvement?.sigma_after_improvement_msm ?? null,
+    gci_coverage_gain_pct:  c.ground_conductivity_improvement?.coverage_gain_pct ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -9366,6 +9372,225 @@ async function scoreCandidate(pt, ctx, warnings){
         total_stl_cost_usd:        totalCost_usd,
         reference: '47 CFR Part 74 §74.502; Part 101 §101.113; §11.35 EAS; SBE RP-5 (2020) STL system design guide; FCC Form 601',
         note: `STL path ~${stlDistKm} km. Recommended: ${recommendedStl.label}. Total estimated cost: $${totalCost_usd.toLocaleString()}.`
+      };
+    })(),
+
+    frequency_spectrum_coordination: (() => {
+      // Frequency/spectrum coordination for AM relocation
+      // Covers co-channel, adjacent-channel, 2nd/3rd adjacent, IBOC sideband protection
+      // Key rule: §73.182 co-channel; §73.184 adjacent-channel; §73.209 2nd adj; §73.213 3rd adj
+
+      const isClear_fsc  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocal_fsc  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const chanClass_fsc = isClear_fsc ? 'CLEAR' : isLocal_fsc ? 'LOCAL' : 'REGIONAL';
+
+      // Protection requirements by channel relationship
+      const CHANNEL_RELATIONSHIPS = [
+        {
+          id: 'CO_CHANNEL',       label: 'Co-channel (0 kHz separation)',
+          cfr: '47 CFR §73.182',
+          du_daytime_db:  20,     du_nighttime_db: 0,
+          min_spacing_km: isClear_fsc ? 1610 : 402,
+          class_applies:  'ALL',
+          notes: 'Dominant-to-secondary ratio (D/U ≥ 20 dB day; ≥ 0 dB night). Clear channel adds 1610 km day separation.'
+        },
+        {
+          id: 'FIRST_ADJ',        label: 'First adjacent (±10 kHz)',
+          cfr: '47 CFR §73.184',
+          du_daytime_db:  6,      du_nighttime_db: -6,
+          min_spacing_km: 322,
+          class_applies:  'ALL',
+          notes: 'D/U ≥ 6 dB during daytime. First adjacent interference is common at low power.'
+        },
+        {
+          id: 'SECOND_ADJ',       label: 'Second adjacent (±20 kHz)',
+          cfr: '47 CFR §73.209',
+          du_daytime_db:  0,      du_nighttime_db: -12,
+          min_spacing_km: 161,
+          class_applies:  'ALL',
+          notes: 'D/U ≥ 0 dB day. Second adjacent interference typically only an issue at very high power.'
+        },
+        {
+          id: 'THIRD_ADJ',        label: 'Third adjacent (±30 kHz)',
+          cfr: '47 CFR §73.213',
+          du_daytime_db:  -6,     du_nighttime_db: -18,
+          min_spacing_km: 80,
+          class_applies:  'ALL',
+          notes: 'D/U ≥ -6 dB day. Rarely a problem except with very close high-power stations.'
+        },
+        {
+          id: 'IBOC_SIDEBAND',    label: 'IBOC/HD Radio sideband (±15 kHz)',
+          cfr: '47 CFR §73.404',
+          du_daytime_db:  -10,    du_nighttime_db: -10,
+          min_spacing_km: 160,
+          class_applies:  'HD_AUTHORIZED',
+          notes: 'HD Radio digital sidebands at ±15 kHz. D/U ≥ -10 dB. Nighttime interference increases if IBOC runs overnight.'
+        }
+      ];
+
+      // Field strength to ERP reference conversion
+      // §73.182 Table 1: theoretical field strengths at specified distances
+      const PROTECTION_CONTOURS = {
+        class_a: { day_mvm: 0.5, night_mvm: 0.5, col_mvm: 5 },
+        class_b: { day_mvm: 2.0, night_mvm: 0.5, col_mvm: 5 },
+        class_c: { day_mvm: 2.0, night_mvm: 0.5, col_mvm: 5 },
+        class_d: { day_mvm: 2.0, night_mvm: null, col_mvm: 5 }
+      };
+      const myContour = PROTECTION_CONTOURS[`class_${fcc_class.toLowerCase()}`] ?? PROTECTION_CONTOURS.class_d;
+
+      // NIF (nighttime interference-free) area computation
+      // Clear channel stations must protect nighttime 0.5 mV/m contour from co-channel
+      const nifRequired    = isClear_fsc;
+      const nifArea_km2    = nifRequired
+        ? round2(Math.PI * Math.pow(fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: sigma_msm, erp_kw: tpo_kw }), 2))
+        : null;
+
+      // Coordination zone by class
+      const coordinationZone_km = CHANNEL_RELATIONSHIPS[0].min_spacing_km;
+
+      // Frequency coordination study items
+      const coordinationItems = [
+        { item: 'Co-channel station database search',         cfr: '§73.182', required: true,  tool: 'FCC LMS API or REC Networks AMQUERY' },
+        { item: 'First adjacent station search (±10 kHz)',    cfr: '§73.184', required: true,  tool: 'FCC LMS API' },
+        { item: 'Second adjacent station search (±20 kHz)',   cfr: '§73.209', required: true,  tool: 'FCC LMS API' },
+        { item: 'Third adjacent station search (±30 kHz)',    cfr: '§73.213', required: true,  tool: 'FCC LMS API' },
+        { item: 'IBOC interference study',                    cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
+        { item: 'NIF study (clear channel)',                  cfr: '§73.182', required: nifRequired, tool: 'FCC groundwave/skywave propagation software' },
+        { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1205', required: true,  tool: 'FCC treaty database; AMQUERY' }
+      ];
+
+      // Typical engineering timeline for coordination study
+      const coordinationTimeline = {
+        database_search_days:   3,
+        propagation_study_days: isClear_fsc ? 10 : 5,
+        expert_review_days:     5,
+        total_days:             isClear_fsc ? 18 : 13,
+        note:                   'Engineering study must be filed with Form 301-AM as Exhibit C (Interference Analysis)'
+      };
+
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        channel_class:               chanClass_fsc,
+        is_clear_channel:            isClear_fsc,
+        is_local_channel:            isLocal_fsc,
+        channel_relationships:       CHANNEL_RELATIONSHIPS,
+        n_relationships:             CHANNEL_RELATIONSHIPS.length,
+        protection_contours:         myContour,
+        nif_required:                nifRequired,
+        nif_service_area_km2:        nifArea_km2,
+        coordination_zone_km:        coordinationZone_km,
+        coordination_items:          coordinationItems,
+        n_coordination_items:        coordinationItems.length,
+        n_required_items:            coordinationItems.filter(i => i.required).length,
+        coordination_timeline:        coordinationTimeline,
+        reference: '47 CFR §73.182; §73.184; §73.209; §73.213; §73.404; §73.1205; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
+        note: `${chanClass_fsc} channel at ${frequency_khz} kHz. Co-channel zone: ${coordinationZone_km} km. NIF study: ${nifRequired ? 'required' : 'not required'}.`
+      };
+    })(),
+
+    ground_conductivity_improvement: (() => {
+      // Ground conductivity improvement techniques for AM transmitter sites
+      // Low sigma severely limits groundwave propagation and radial system efficiency
+      // References: FCC §73.150; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE
+
+      // Baseline sigma evaluation
+      const sigma_gci         = sigma_msm; // mS/m
+      const isHighConductivity = sigma_gci >= SIGMA_PREFERRED_MIN_MSM; // 8 mS/m preferred
+      const isModerateCond    = sigma_gci >= 4 && sigma_gci < SIGMA_PREFERRED_MIN_MSM;
+      const isLowConductivity = sigma_gci < 4;
+
+      // Conductivity improvement techniques
+      const IMPROVEMENT_TECHNIQUES = [
+        {
+          id: 'RADIAL_EXTENSION',   label: 'Extended radial count and length',
+          sigma_impact:  'INDIRECT', // reduces ground resistance, not sigma directly
+          applicable:    true,
+          cost_per_km2:  round2(12000), // material + labor per km²
+          max_improvement_pct: 15,
+          description:   'FCC §73.150(b): increasing radial count from 60 to 120 reduces ground loss by ~40%. Extends effective capture area.',
+          prerequisites: ['Open site with >100m radial field', 'No wet season flooding'],
+          standard:      '§73.150; Terman 1950'
+        },
+        {
+          id: 'BENTONITE_BACKFILL', label: 'Bentonite clay soil injection',
+          sigma_impact:  'DIRECT', // increases sigma in treated zone
+          applicable:    isLowConductivity,
+          cost_per_km2:  round2(35000),
+          max_improvement_pct: 200, // sigma improvement in treated zone
+          description:   'Sodium bentonite (montmorillonite) expanded 15× in water; injected around radials via pressure injection. Increases local sigma from ~1 to ~3–5 mS/m in sandy soils.',
+          prerequisites: ['Sandy / loamy soil', 'Available water source', 'Permit for ground injection'],
+          standard:      'IEEE 80-2013 ground improvement; EPRI EL-3073'
+        },
+        {
+          id: 'CARBON_GROUND_ROD',  label: 'Carbon/graphite ground enhancement',
+          sigma_impact:  'DIRECT',
+          applicable:    isLowConductivity || isModerateCond,
+          cost_per_km2:  round2(22000),
+          max_improvement_pct: 120,
+          description:   'ERITECH ERICO compound (or equivalent) installed around base radial burial depth; highly conductive carbon matrix bonds to soil. Used in rocky/desert terrain.',
+          prerequisites: ['Ground rods accessible', 'No water table interference'],
+          standard:      'IEEE 80; ERITECH GCP-35 guidelines'
+        },
+        {
+          id: 'COPPER_MESH',        label: 'Copper mesh ground plane (short radials)',
+          sigma_impact:  'EFFECTIVE', // effective conductivity improvement
+          applicable:    true,
+          cost_per_km2:  round2(45000),
+          max_improvement_pct: 80,
+          description:   'Dense copper mesh (#10 AWG, 1m grid) buried at 0.15m around tower base. Effective for small urban sites where 120 full-length radials aren\'t feasible.',
+          prerequisites: ['Clear site within 50m radius', 'Budget for copper commodity pricing'],
+          standard:      'FCC §73.150(b)(2); MIL-HDBK-419A volume II'
+        },
+        {
+          id: 'SALTWATER_PROXIMITY',label: 'Site selection near saltwater / high-sigma terrain',
+          sigma_impact:  'SITE_DEPENDENT',
+          applicable:    true,
+          cost_per_km2:  0, // no treatment cost — site selection
+          max_improvement_pct: 400, // sigma jump from 1→4+ mS/m
+          description:   'Best sigma improvement is site relocation to coastal marsh, lakeside, or agricultural bottomland. Sigma 8–30 mS/m vs. 0.5–2 mS/m in desert/rocky.',
+          prerequisites: ['Available land near water', 'No EPA wetland restriction'],
+          standard:      'FCC §73.183 conductivity maps; Salat & Ziegler (1991) ITT Reference Data'
+        }
+      ];
+
+      // Applicable techniques (filter by site conditions)
+      const applicableTechniques = IMPROVEMENT_TECHNIQUES.filter(t => t.applicable);
+
+      // Effective sigma after improvement (order-of-magnitude estimate)
+      const sigmaAfterImprovement = (() => {
+        if (isHighConductivity) return sigma_gci; // already good
+        if (applicableTechniques.some(t => t.id === 'BENTONITE_BACKFILL')) {
+          return round2(Math.min(sigma_gci * 3, 8)); // up to 3× improvement, capped at 8
+        }
+        return round2(Math.min(sigma_gci * 1.5, 5)); // conservative 50% improvement
+      })();
+
+      const coverageGainPct = round2((Math.sqrt(sigmaAfterImprovement / sigma_gci) - 1) * 100);
+
+      // Budget estimate for improvement package
+      const siteAreaKm2 = round2(Math.PI * Math.pow(0.15, 2)); // ~0.07 km² treatment zone (150m radius)
+      const improvementBudget = (() => {
+        if (isHighConductivity) return { low: 0, high: 0, note: 'No improvement needed — sigma already preferred.' };
+        const baseCost = round2(applicableTechniques.reduce((s, t) => s + t.cost_per_km2, 0) * siteAreaKm2);
+        return { low: round2(baseCost * 0.6), high: round2(baseCost * 1.4), note: `Estimated for ${round2(siteAreaKm2 * 1e6)}m² treatment area` };
+      })();
+
+      return {
+        frequency_khz, tpo_kw, fcc_class,
+        baseline_sigma_msm:          sigma_gci,
+        is_high_conductivity:        isHighConductivity,
+        is_moderate_conductivity:    isModerateCond,
+        is_low_conductivity:         isLowConductivity,
+        improvement_techniques:      IMPROVEMENT_TECHNIQUES,
+        applicable_techniques:       applicableTechniques,
+        n_all_techniques:            IMPROVEMENT_TECHNIQUES.length,
+        n_applicable_techniques:     applicableTechniques.length,
+        sigma_after_improvement_msm: sigmaAfterImprovement,
+        coverage_gain_pct:           Math.max(coverageGainPct, 0),
+        treatment_area_km2:          siteAreaKm2,
+        improvement_budget_usd:      improvementBudget,
+        reference: '47 CFR §73.150; §73.183; IEEE Std 80-2013 ground electrode systems; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
+        note: `Baseline σ=${sigma_gci} mS/m (${isHighConductivity ? 'preferred — no improvement needed' : isLowConductivity ? 'low — improvement recommended' : 'moderate — improvement beneficial'}). Est. σ after improvement: ${sigmaAfterImprovement} mS/m (+${Math.max(coverageGainPct, 0)}% coverage).`
       };
     })(),
 

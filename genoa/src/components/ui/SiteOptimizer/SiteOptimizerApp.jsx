@@ -1717,6 +1717,57 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      ground_conductivity_improvement: {
+        frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
+        baseline_sigma_msm: 9, is_high_conductivity: true, is_moderate_conductivity: false, is_low_conductivity: false,
+        improvement_techniques: [
+          { id: 'RADIAL_EXTENSION', label: 'Extended radial count and length', sigma_impact: 'INDIRECT', applicable: true, cost_per_km2: 12000, max_improvement_pct: 15, description: 'FCC §73.150(b): increasing radial count from 60 to 120 reduces ground loss by ~40%.', prerequisites: ['Open site', 'No flooding'], standard: '§73.150' },
+          { id: 'BENTONITE_BACKFILL', label: 'Bentonite clay soil injection', sigma_impact: 'DIRECT', applicable: false, cost_per_km2: 35000, max_improvement_pct: 200, description: 'Sodium bentonite expanded 15× in water; injected around radials.', prerequisites: ['Sandy soil', 'Available water source'], standard: 'IEEE 80-2013' },
+          { id: 'CARBON_GROUND_ROD', label: 'Carbon/graphite ground enhancement', sigma_impact: 'DIRECT', applicable: false, cost_per_km2: 22000, max_improvement_pct: 120, description: 'ERITECH ERICO compound; highly conductive carbon matrix bonds to soil.', prerequisites: ['Ground rods accessible'], standard: 'IEEE 80' },
+          { id: 'COPPER_MESH', label: 'Copper mesh ground plane (short radials)', sigma_impact: 'EFFECTIVE', applicable: true, cost_per_km2: 45000, max_improvement_pct: 80, description: 'Dense copper mesh buried at 0.15m around tower base.', prerequisites: ['Clear site within 50m'], standard: 'FCC §73.150(b)(2)' },
+          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation to coastal/agricultural bottomland.', prerequisites: ['Available land near water'], standard: 'FCC §73.183 conductivity maps' }
+        ],
+        applicable_techniques: [
+          { id: 'RADIAL_EXTENSION', label: 'Extended radial count and length', sigma_impact: 'INDIRECT', applicable: true, cost_per_km2: 12000, max_improvement_pct: 15, description: 'Increasing radials from 60 to 120 reduces ground loss ~40%.', prerequisites: [], standard: '§73.150' },
+          { id: 'COPPER_MESH', label: 'Copper mesh ground plane (short radials)', sigma_impact: 'EFFECTIVE', applicable: true, cost_per_km2: 45000, max_improvement_pct: 80, description: 'Dense copper mesh (#10 AWG, 1m grid) buried at 0.15m around tower base.', prerequisites: [], standard: 'FCC §73.150(b)(2)' },
+          { id: 'SALTWATER_PROXIMITY', label: 'Site selection near saltwater / high-sigma terrain', sigma_impact: 'SITE_DEPENDENT', applicable: true, cost_per_km2: 0, max_improvement_pct: 400, description: 'Best sigma improvement via site relocation.', prerequisites: [], standard: 'FCC §73.183' }
+        ],
+        n_all_techniques: 5, n_applicable_techniques: 3,
+        sigma_after_improvement_msm: 9, coverage_gain_pct: 0,
+        treatment_area_km2: 0.07,
+        improvement_budget_usd: { low: 0, high: 0, note: 'No improvement needed — sigma already preferred.' },
+        reference: '47 CFR §73.150; §73.183; IEEE Std 80-2013; Terman (1950) Radio Engineers Handbook; Belrose (1966) IRE; ERITECH GCP-35',
+        note: 'Baseline σ=9 mS/m (preferred — no improvement needed). Est. σ after improvement: 9 mS/m (+0% coverage).'
+      },
+      frequency_spectrum_coordination: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+        channel_class: 'REGIONAL',
+        is_clear_channel: false, is_local_channel: false,
+        channel_relationships: [
+          { id: 'CO_CHANNEL', label: 'Co-channel (0 kHz separation)', cfr: '47 CFR §73.182', du_daytime_db: 20, du_nighttime_db: 0, min_spacing_km: 402, class_applies: 'ALL', notes: 'D/U ≥ 20 dB day; ≥ 0 dB night.' },
+          { id: 'FIRST_ADJ', label: 'First adjacent (±10 kHz)', cfr: '47 CFR §73.184', du_daytime_db: 6, du_nighttime_db: -6, min_spacing_km: 322, class_applies: 'ALL', notes: 'D/U ≥ 6 dB during daytime.' },
+          { id: 'SECOND_ADJ', label: 'Second adjacent (±20 kHz)', cfr: '47 CFR §73.209', du_daytime_db: 0, du_nighttime_db: -12, min_spacing_km: 161, class_applies: 'ALL', notes: 'D/U ≥ 0 dB day.' },
+          { id: 'THIRD_ADJ', label: 'Third adjacent (±30 kHz)', cfr: '47 CFR §73.213', du_daytime_db: -6, du_nighttime_db: -18, min_spacing_km: 80, class_applies: 'ALL', notes: 'D/U ≥ -6 dB day.' },
+          { id: 'IBOC_SIDEBAND', label: 'IBOC/HD Radio sideband (±15 kHz)', cfr: '47 CFR §73.404', du_daytime_db: -10, du_nighttime_db: -10, min_spacing_km: 160, class_applies: 'HD_AUTHORIZED', notes: 'HD Radio digital sidebands at ±15 kHz.' }
+        ],
+        n_relationships: 5,
+        protection_contours: { day_mvm: 2.0, night_mvm: 0.5, col_mvm: 5 },
+        nif_required: false, nif_service_area_km2: null,
+        coordination_zone_km: 402,
+        coordination_items: [
+          { item: 'Co-channel station database search', cfr: '§73.182', required: true, tool: 'FCC LMS API or REC Networks AMQUERY' },
+          { item: 'First adjacent station search (±10 kHz)', cfr: '§73.184', required: true, tool: 'FCC LMS API' },
+          { item: 'Second adjacent station search (±20 kHz)', cfr: '§73.209', required: true, tool: 'FCC LMS API' },
+          { item: 'Third adjacent station search (±30 kHz)', cfr: '§73.213', required: true, tool: 'FCC LMS API' },
+          { item: 'IBOC interference study', cfr: '§73.404', required: false, tool: 'iBiquity/xperi modeling software' },
+          { item: 'NIF study (clear channel)', cfr: '§73.182', required: false, tool: 'FCC groundwave/skywave propagation software' },
+          { item: 'Treaty protection analysis (Canada/Mexico)', cfr: '§73.1205', required: true, tool: 'FCC treaty database; AMQUERY' }
+        ],
+        n_coordination_items: 7, n_required_items: 5,
+        coordination_timeline: { database_search_days: 3, propagation_study_days: 5, expert_review_days: 5, total_days: 13, note: 'Engineering study must be filed with Form 301-AM as Exhibit C (Interference Analysis)' },
+        reference: '47 CFR §73.182; §73.184; §73.209; §73.213; §73.404; §73.1205; FCC AM Allocation Engineering Data; REC Networks AMQUERY',
+        note: 'REGIONAL channel at 780 kHz. Co-channel zone: 402 km. NIF study: not required.'
+      },
       stl_network_link_guide: {
         frequency_khz: 780, fcc_class: 'D',
         stl_path_distance_km: 20,

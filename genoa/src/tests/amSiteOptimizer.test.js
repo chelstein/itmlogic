@@ -6504,6 +6504,105 @@ test('power_line_interference_analysis comparison table columns present', async 
   }
 });
 
+test('ground_conductivity_improvement presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_conductivity_improvement;
+  assert.ok(g != null, 'ground_conductivity_improvement must be present');
+  assert.strictEqual(g.n_all_techniques, 5, 'must have 5 improvement techniques');
+  assert.ok(Array.isArray(g.improvement_techniques), 'improvement_techniques must be an array');
+  assert.ok(Array.isArray(g.applicable_techniques), 'applicable_techniques must be an array');
+  assert.ok(g.n_applicable_techniques > 0, 'must have at least one applicable technique');
+});
+
+test('ground_conductivity_improvement baseline sigma and improved sigma', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_conductivity_improvement;
+  assert.ok(g.baseline_sigma_msm > 0, 'baseline_sigma_msm must be positive');
+  assert.ok(g.sigma_after_improvement_msm >= g.baseline_sigma_msm, 'improved sigma must be >= baseline');
+  assert.ok(g.coverage_gain_pct >= 0, 'coverage_gain_pct must be >= 0');
+});
+
+test('ground_conductivity_improvement high sigma means no improvement needed', async () => {
+  // Create a high-sigma scenario — use a station with high conductivity
+  // We test by checking when sigma >= 8, is_high_conductivity should be true
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_conductivity_improvement;
+  if (g.is_high_conductivity) {
+    assert.ok(g.coverage_gain_pct === 0, 'high conductivity should have 0 coverage gain');
+    assert.ok(g.sigma_after_improvement_msm === g.baseline_sigma_msm, 'sigma unchanged for high-conductivity sites');
+  } else {
+    assert.ok(g.sigma_after_improvement_msm > g.baseline_sigma_msm, 'improved sigma must exceed baseline for low/moderate conductivity');
+  }
+});
+
+test('ground_conductivity_improvement techniques all have required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_conductivity_improvement;
+  for (const t of g.improvement_techniques) {
+    assert.ok(t.id != null, `technique must have id`);
+    assert.ok(t.label != null, `technique must have label`);
+    assert.ok(typeof t.applicable === 'boolean', `technique applicable must be boolean`);
+    assert.ok(t.max_improvement_pct > 0, `technique must have positive max_improvement_pct`);
+  }
+});
+
+test('ground_conductivity_improvement comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gci_baseline_sigma' in row,    'gci_baseline_sigma missing from comparison table');
+    assert.ok('gci_sigma_improved' in row,    'gci_sigma_improved missing from comparison table');
+    assert.ok('gci_coverage_gain_pct' in row, 'gci_coverage_gain_pct missing from comparison table');
+  }
+});
+
+test('frequency_spectrum_coordination presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const f = out.candidates[0].frequency_spectrum_coordination;
+  assert.ok(f != null, 'frequency_spectrum_coordination must be present');
+  assert.strictEqual(f.n_relationships, 5, 'must have 5 channel relationship types');
+  assert.ok(Array.isArray(f.channel_relationships), 'channel_relationships must be an array');
+  assert.ok(Array.isArray(f.coordination_items), 'coordination_items must be an array');
+  assert.ok(f.n_coordination_items > 0, 'must have coordination items');
+});
+
+test('frequency_spectrum_coordination channel class for KAZM 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const f = out.candidates[0].frequency_spectrum_coordination;
+  // 780 kHz — need to check if it's clear/regional/local; it appears in the WHO clear channel list
+  assert.ok(['CLEAR', 'REGIONAL', 'LOCAL'].includes(f.channel_class), `channel_class must be valid: got ${f.channel_class}`);
+  assert.ok(f.coordination_zone_km > 0, 'coordination_zone_km must be positive');
+});
+
+test('frequency_spectrum_coordination co-channel relationship is first with correct D/U', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const f = out.candidates[0].frequency_spectrum_coordination;
+  const coChannel = f.channel_relationships.find(r => r.id === 'CO_CHANNEL');
+  assert.ok(coChannel != null, 'CO_CHANNEL relationship must be present');
+  assert.strictEqual(coChannel.du_daytime_db, 20, 'co-channel D/U must be 20 dB daytime');
+  assert.strictEqual(coChannel.du_nighttime_db, 0, 'co-channel D/U must be 0 dB nighttime');
+});
+
+test('frequency_spectrum_coordination NIF required only for clear channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const f = out.candidates[0].frequency_spectrum_coordination;
+  if (f.is_clear_channel) {
+    assert.strictEqual(f.nif_required, true, 'clear channel must require NIF study');
+    assert.ok(f.nif_service_area_km2 > 0, 'clear channel NIF area must be positive');
+  } else {
+    assert.strictEqual(f.nif_required, false, 'non-clear channel must not require NIF study');
+    assert.ok(f.nif_service_area_km2 == null, 'non-clear channel NIF area must be null');
+  }
+});
+
+test('frequency_spectrum_coordination comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fsc_channel_class' in row, 'fsc_channel_class missing from comparison table');
+    assert.ok('fsc_coord_zone_km' in row, 'fsc_coord_zone_km missing from comparison table');
+    assert.ok('fsc_nif_required' in row,  'fsc_nif_required missing from comparison table');
+  }
+});
+
 test('stl_network_link_guide presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const s = out.candidates[0].stl_network_link_guide;

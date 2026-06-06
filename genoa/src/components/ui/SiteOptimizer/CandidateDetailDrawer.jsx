@@ -2226,6 +2226,87 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Ground Conductivity Improvement */}
+        {candidate.ground_conductivity_improvement && (() => {
+          const g = candidate.ground_conductivity_improvement;
+          const condColor = g.is_high_conductivity ? '#22c55e' : g.is_moderate_conductivity ? '#f59e0b' : '#ef4444';
+          const condLabel = g.is_high_conductivity ? 'High (preferred)' : g.is_moderate_conductivity ? 'Moderate' : 'Low — improvement recommended';
+          return (
+            <div>
+              <h4 style={{ color: '#86efac', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Ground Conductivity Improvement
+              </h4>
+              <div style={{ background: '#031a0a', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Baseline σ:</span> <strong style={{ color: condColor }}>{g.baseline_sigma_msm != null ? `${g.baseline_sigma_msm} mS/m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Conductivity:</span> <strong style={{ color: condColor }}>{condLabel}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>σ after treatment:</span> <strong style={{ color: '#86efac' }}>{g.sigma_after_improvement_msm != null ? `${g.sigma_after_improvement_msm} mS/m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Coverage gain:</span> <strong style={{ color: g.coverage_gain_pct > 0 ? '#22c55e' : '#9ca3af' }}>{g.coverage_gain_pct != null ? `+${g.coverage_gain_pct}%` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Applicable techniques:</span> <strong>{g.n_applicable_techniques ?? '—'} / {g.n_all_techniques ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Budget (low):</span> <strong>{g.improvement_budget_usd?.low != null ? `$${g.improvement_budget_usd.low.toLocaleString()}` : '—'}</strong></div>
+                </div>
+              </div>
+              {(g.applicable_techniques || []).map((t, i) => (
+                <div key={i} style={{ background: '#031205', borderRadius: 3, padding: '5px 8px', marginBottom: 4, fontSize: 11 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 1 }}>
+                    <span style={{ color: '#86efac', fontWeight: 700 }}>{t.label}</span>
+                    <span style={{ color: '#6b7280' }}>+{t.max_improvement_pct}% max · ${t.cost_per_km2?.toLocaleString()}/km²</span>
+                  </div>
+                  <div style={{ color: '#9ca3af', fontSize: 10 }}>{t.description.substring(0, 120)}{t.description.length > 120 ? '…' : ''}</div>
+                </div>
+              ))}
+              <div style={{ color: '#4b5563', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Frequency Spectrum Coordination */}
+        {candidate.frequency_spectrum_coordination && (() => {
+          const f = candidate.frequency_spectrum_coordination;
+          const chanColors = { CLEAR: '#fbbf24', REGIONAL: '#60a5fa', LOCAL: '#a78bfa' };
+          return (
+            <div>
+              <h4 style={{ color: '#f472b6', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Frequency Spectrum Coordination
+              </h4>
+              <div style={{ background: '#1a0d18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Channel class:</span> <strong style={{ color: chanColors[f.channel_class] || '#d1d5db' }}>{f.channel_class || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Coord. zone:</span> <strong style={{ color: '#f472b6' }}>{f.coordination_zone_km != null ? `${f.coordination_zone_km} km` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>NIF required:</span> <strong style={{ color: f.nif_required ? '#ef4444' : '#22c55e' }}>{f.nif_required ? 'Yes (clear channel)' : 'No'}</strong></div>
+                  {f.nif_required && <div><span style={{ color: '#9ca3af' }}>NIF area:</span> <strong>{f.nif_service_area_km2 != null ? `${f.nif_service_area_km2.toLocaleString()} km²` : '—'}</strong></div>}
+                  <div><span style={{ color: '#9ca3af' }}>Required coord. items:</span> <strong>{f.n_required_items ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Coord. timeline:</span> <strong>{f.coordination_timeline?.total_days != null ? `~${f.coordination_timeline.total_days} days` : '—'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Channel Relationships & Protection Thresholds</div>
+                <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: '#6b7280', borderBottom: '1px solid #374151' }}>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>Relationship</th>
+                      <th style={{ textAlign: 'center', padding: '2px 4px' }}>D/U Day</th>
+                      <th style={{ textAlign: 'center', padding: '2px 4px' }}>D/U Night</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Min km</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(f.channel_relationships || []).map((r, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #1f2937' }}>
+                        <td style={{ padding: '2px 4px', color: '#d1d5db' }}>{r.label}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'center', color: r.du_daytime_db >= 0 ? '#22c55e' : '#f59e0b' }}>{r.du_daytime_db} dB</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'center', color: r.du_nighttime_db >= 0 ? '#22c55e' : '#ef4444' }}>{r.du_nighttime_db} dB</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>{r.min_spacing_km}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{f.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* STL Network Link Guide */}
         {candidate.stl_network_link_guide && (() => {
           const s = candidate.stl_network_link_guide;
