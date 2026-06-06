@@ -246,14 +246,24 @@ export async function runColocationOpportunities(body = {}){
   if (community_of_license_polygon)        confidenceLayers.push('col_polygon_provided');
   if (infraSites.length > 0)               confidenceLayers.push('infrastructure_inventory');
   const nLayers = confidenceLayers.length;
+
+  // Per-candidate confidence distribution over the scored pool.
+  const confDist = { HIGH: 0, MEDIUM: 0, LOW: 0 };
+  for (const c of pool) confDist[c.score_confidence || 'LOW'] = (confDist[c.score_confidence || 'LOW'] || 0) + 1;
+  const nPoolTotal = pool.length || 1;
+  const pctLow = ((confDist.LOW / nPoolTotal) * 100).toFixed(0);
   const optimization_confidence = {
     level: nLayers >= 4 ? 'HIGH' : nLayers >= 2 ? 'MEDIUM' : 'LOW',
     contributing_layers: confidenceLayers,
+    per_candidate_confidence: confDist,
     notes: [
       ...(!rasterLoaded && goals.prefer_high_conductivity ? ['Ground conductivity: FCC M3 zone table (15 zones, ±50% vs. raster) — deploy AM_m3.tif for filing-grade σ'] : []),
       ...(goals.avoid_wildfire_risk       ? ['Wildfire scoring is a placeholder — USFS FIA / LANDFIRE not yet integrated'] : []),
       ...(!community_of_license_polygon   ? ['COL coverage uses a 10 km disc proxy; supply community_of_license_polygon for higher confidence'] : []),
-      ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : [])
+      ...(infraSites.length > 0           ? [`${infraSites.length} infrastructure site(s) from ${infrastructure_source} inventory included in pool`] : []),
+      ...(confDist.LOW === nPoolTotal ? [`All ${nPoolTotal} candidates scored at LOW confidence (zone-table σ + disc-proxy COL) — provide AM_m3.tif and community_of_license_polygon to raise ranking reliability.`]
+        : confDist.LOW > nPoolTotal * 0.7 ? [`${pctLow}% of candidates scored at LOW confidence — upgrade conductivity raster and/or COL polygon for more reliable ranking.`]
+        : [])
     ]
   };
 

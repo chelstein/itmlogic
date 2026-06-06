@@ -1466,6 +1466,15 @@ function buildTopSummary(top, baseline, nEvaluated){
   const sBits = Object.entries(statusCount).map(([s, n]) => `${n} ${s}`).join(', ');
   parts.push(`statuses: ${sBits} (out of ${nEvaluated} evaluated)`);
 
+  // Score confidence note: flag when all top candidates are LOW confidence.
+  const confCounts = {};
+  for (const c of top) confCounts[c.score_confidence || 'LOW'] = (confCounts[c.score_confidence || 'LOW'] || 0) + 1;
+  if (confCounts.LOW === top.length){
+    parts.push(`all top-${top.length} ranked at LOW confidence (zone-table σ + disc-proxy COL) — provide filing-grade inputs for more reliable ranking`);
+  } else if (r1.score_confidence === 'LOW'){
+    parts.push(`Rank 1 scored at LOW confidence — upgrade to raster σ and COL polygon for a more reliable #1 site selection`);
+  }
+
   return parts.join('. ') + '.';
 }
 
