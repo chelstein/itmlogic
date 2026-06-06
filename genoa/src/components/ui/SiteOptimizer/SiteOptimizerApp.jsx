@@ -1717,6 +1717,25 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      skywave_coverage_analysis: {
+        fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
+        is_clear_channel: true, is_directional: false,
+        nighttime_power_max_kw: 0.25, actual_night_power_kw: 0.25,
+        skywave_contour: { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class D secondary)' },
+        skywave_dist_50pct_km: 70.7, skywave_dist_10pct_km: 91.9, skywave_dist_1pct_km: 120.2,
+        nif_required: true, nif_study_type: 'FULL_CLEAR_CHANNEL_NIF',
+        nighttime_da_note: 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing.',
+        protection_levels: [
+          { id: 'class_a_protected', field_mvm: 0.5,   basis: '§73.182: Class A 0.5 mV/m daytime GW',          applies_to_us: false },
+          { id: 'class_b_protected', field_mvm: 0.25,  basis: '§73.182: Class B 0.25 mV/m daytime GW',         applies_to_us: false },
+          { id: 'skywave_50pct',     field_mvm: 0.05,  basis: '§73.182: skywave 50 µV/m, 50% time, 50% locs',  applies_to_us: true },
+          { id: 'skywave_10pct',     field_mvm: 0.05,  basis: '§73.182: skywave 50 µV/m, 10% time',            applies_to_us: true },
+          { id: 'skywave_1pct',      field_mvm: 0.025, basis: '§73.182: NIF skywave (1% time)',                 applies_to_us: true }
+        ],
+        n_protection_levels: 5,
+        reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (M3/M3a); ITU-R P.1147',
+        note: 'Nighttime skywave at 0.25 kW: 50% time ≈ 70.7 km; 10% ≈ 91.9 km; NIF 1% ≈ 120.2 km. NIF study: FULL_CLEAR_CHANNEL_NIF.'
+      },
       radial_system_engineering_guide: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5, sigma_msm_current: 9,
         wavelength_m: 384.62, quarter_wave_m: 96.15,

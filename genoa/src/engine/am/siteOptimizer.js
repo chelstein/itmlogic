@@ -846,7 +846,10 @@ export async function runSiteOptimizer(body = {}){
     cpt_n_milestones:       c.construction_permit_timeline_optimizer?.total_milestones ?? null,
     radial_n_recommended:   c.radial_system_engineering_guide?.recommended_n_radials ?? null,
     radial_len_m:           c.radial_system_engineering_guide?.optimum_radial_length_m ?? null,
-    radial_cost_usd:        c.radial_system_engineering_guide?.material_cost_usd_estimate ?? null
+    radial_cost_usd:        c.radial_system_engineering_guide?.material_cost_usd_estimate ?? null,
+    sky_50pct_km:           c.skywave_coverage_analysis?.skywave_dist_50pct_km ?? null,
+    sky_1pct_km:            c.skywave_coverage_analysis?.skywave_dist_1pct_km ?? null,
+    sky_nif_required:       c.skywave_coverage_analysis?.nif_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7929,6 +7932,83 @@ async function scoreCandidate(pt, ctx, warnings){
         n_compliance_items:       complianceItems.length,
         reference: '47 CFR §73.190; Terman (1943) "Radio Engineers Handbook"; Belrose (1966) IRE; IEEE 1100; NEC Article 250',
         note: `Recommended: ${recommendedN} radials at ${optRadialLen_m} m (0.4λ) length, #${recommendedAWG.awg} AWG copper. Total copper: ${totalRadialLength_m} m. Estimated material cost: $${materialCost_usd.toLocaleString()}.`
+      };
+    })(),
+
+    skywave_coverage_analysis: (() => {
+      // Nighttime skywave per §73.182: FCC uses International Radio Consultative Committee (CCIR)
+      // skywave propagation model for AM. Protection uses 1% ionospheric propagation, 50% locations.
+      // FCC §73.182(j): skywave field at 50% of time, 10% of time, and 1% of time for different purposes
+      const isClear_sw   = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_sw      = /^DA/i.test(pattern_mode);
+
+      // Class-based nighttime power limits (per §73.21, §73.25, §73.27)
+      // FCC allows Class A 50 kW night; Class B 50 kW night; Class C 1 kW night; Class D daytime only or limited
+      const CLASS_NIGHT_POWER_KW = { A: 50, B: 50, C: 1, D: 0.25 };
+      const nightPowerMax_kw = CLASS_NIGHT_POWER_KW[fcc_class] ?? 0.25;
+      const actualNightPower_kw = Math.min(tpo_kw, nightPowerMax_kw);
+
+      // Skywave protection distances per §73.182 Table 1 (approximate screening values)
+      // §73.182: clear-channel Class A protected to 0.5 mV/m groundwave daytime;
+      // nighttime protected skywave contour depends on class
+      // FCC §73.182(a)(1): skywave field ≥ 50 µV/m (0.05 mV/m) at 50% of time, 50% of locations
+      // protected for Class A within its service area
+      const SKYWAVE_CONTOUR_MVM = {
+        A:   { field_mvm: 0.05,  label: '50 µV/m skywave (§73.182 Class A protected)' },
+        B:   { field_mvm: 0.05,  label: '50 µV/m skywave (§73.182 Class B)' },
+        C:   { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class C)' },
+        D:   { field_mvm: 0.025, label: '25 µV/m skywave (§73.182 Class D secondary)' }
+      };
+      const skywaveContour = SKYWAVE_CONTOUR_MVM[fcc_class] ?? SKYWAVE_CONTOUR_MVM.D;
+
+      // Skywave propagation distance estimate: ITU/FCC curves
+      // FCC §73.182 Table 1: approximate skywave distances for 50 kW at 50% time, 50% locations
+      // At 800 kHz, 50 kW, 50% time: ~800–1200 km; scale as sqrt(ERP)
+      const SKY_BASE_KM_50KW = 1000; // approximate for MF band (800 kHz region)
+      const skyDistERP_km = round2(SKY_BASE_KM_50KW * Math.sqrt(actualNightPower_kw / 50));
+      // Scale to different time percentages:
+      const sky50pct_km  = skyDistERP_km;                           // 50% of time
+      const sky10pct_km  = round2(skyDistERP_km * 1.3);             // 10% — farther
+      const sky1pct_km   = round2(skyDistERP_km * 1.7);             // 1% — farthest (used in NIF)
+
+      // NIF study requirement: clear channel or Class A/B
+      const nifRequiredSw = isClear_sw || ['A', 'B'].includes(fcc_class);
+      const nifStudyType_sw = isClear_sw ? 'FULL_CLEAR_CHANNEL_NIF' :
+                               fcc_class === 'B' ? 'REGIONAL_NIF' : 'NOT_REQUIRED';
+
+      // Nighttime DA: directional pattern must be maintained after sunset
+      const nighttimeDA_note = isDA_sw
+        ? 'Directional antenna (DA) must be operated at night per authorized pattern. §73.154 proof must document nighttime base currents and phases at monitoring points.'
+        : 'Non-directional; nighttime protection based on omnidirectional ERP and §73.182 spacing.';
+
+      // Key §73.182 protection distances (nominal, from FCC tables)
+      const protectionLevels = [
+        { id: 'class_a_protected', field_mvm: 0.5,  basis: '§73.182: Class A 0.5 mV/m daytime GW', applies_to_us: fcc_class === 'A' },
+        { id: 'class_b_protected', field_mvm: 0.25, basis: '§73.182: Class B 0.25 mV/m daytime GW', applies_to_us: fcc_class === 'B' },
+        { id: 'skywave_50pct',     field_mvm: 0.05, basis: '§73.182: skywave 50 µV/m, 50% time, 50% locs', applies_to_us: true },
+        { id: 'skywave_10pct',     field_mvm: 0.05, basis: '§73.182: skywave 50 µV/m, 10% time', applies_to_us: true },
+        { id: 'skywave_1pct',      field_mvm: 0.025, basis: '§73.182: NIF skywave (1% time)', applies_to_us: nifRequiredSw }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        is_clear_channel:       isClear_sw,
+        is_directional:         isDA_sw,
+        nighttime_power_max_kw: nightPowerMax_kw,
+        actual_night_power_kw:  actualNightPower_kw,
+        skywave_contour:        skywaveContour,
+        skywave_dist_50pct_km:  sky50pct_km,
+        skywave_dist_10pct_km:  sky10pct_km,
+        skywave_dist_1pct_km:   sky1pct_km,
+        nif_required:           nifRequiredSw,
+        nif_study_type:         nifStudyType_sw,
+        nighttime_da_note:      nighttimeDA_note,
+        protection_levels:      protectionLevels,
+        n_protection_levels:    protectionLevels.length,
+        reference: '47 CFR §73.182; §73.21; §73.25; §73.27; FCC skywave propagation curves (M3/M3a); ITU-R P.1147',
+        note: `Nighttime skywave at ${actualNightPower_kw} kW: 50% time ≈ ${sky50pct_km} km; 10% ≈ ${sky10pct_km} km; NIF 1% ≈ ${sky1pct_km} km. NIF study: ${nifRequiredSw ? nifStudyType_sw : 'NOT REQUIRED'}.`
       };
     })(),
 

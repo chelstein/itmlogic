@@ -6227,3 +6227,46 @@ test('radial_system_engineering_guide comparison table columns present', async (
     assert.ok('radial_cost_usd' in row,      'radial_cost_usd missing from comparison table');
   }
 });
+
+test('skywave_coverage_analysis presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].skywave_coverage_analysis;
+  assert.ok(s != null, 'skywave_coverage_analysis must be present');
+  assert.ok(s.skywave_dist_50pct_km > 0, 'skywave 50pct distance must be positive');
+  assert.ok(s.skywave_dist_1pct_km > s.skywave_dist_50pct_km, '1% skywave must reach farther than 50%');
+  assert.ok(Array.isArray(s.protection_levels), 'protection_levels must be an array');
+});
+
+test('skywave_coverage_analysis NIF requirement for clear channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].skywave_coverage_analysis;
+  // KAZM is Class D on clear channel 780 kHz
+  assert.strictEqual(s.nif_required, true, 'Class D on clear channel must require NIF');
+  assert.strictEqual(s.nif_study_type, 'FULL_CLEAR_CHANNEL_NIF', 'must be full clear channel NIF');
+});
+
+test('skywave_coverage_analysis nighttime power limits enforced', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const s = out.candidates[0].skywave_coverage_analysis;
+  // Class D max night power is 0.25 kW; TPO 5 kW should clamp to 0.25
+  assert.ok(s.actual_night_power_kw <= s.nighttime_power_max_kw, 'actual night power must not exceed class max');
+  assert.ok(s.nighttime_power_max_kw > 0, 'nighttime power max must be positive');
+});
+
+test('skywave_coverage_analysis protection levels present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].skywave_coverage_analysis;
+  assert.strictEqual(s.n_protection_levels, 5, 'must have 5 protection levels');
+  const nif = s.protection_levels.find(p => p.id === 'skywave_1pct');
+  assert.ok(nif != null, 'must include skywave_1pct (NIF) protection level');
+  assert.strictEqual(nif.applies_to_us, true, 'NIF level must apply to this station');
+});
+
+test('skywave_coverage_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sky_50pct_km' in row,    'sky_50pct_km missing from comparison table');
+    assert.ok('sky_1pct_km' in row,     'sky_1pct_km missing from comparison table');
+    assert.ok('sky_nif_required' in row,'sky_nif_required missing from comparison table');
+  }
+});

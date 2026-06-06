@@ -1113,3 +1113,17 @@ test('colocation GRID candidates have radial_system_engineering_guide', async ()
     assert.ok(c.radial_system_engineering_guide.recommended_n_radials > 0, `rank ${c.rank} radial count must be positive`);
   }
 });
+
+test('colocation GRID candidates have skywave_coverage_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.skywave_coverage_analysis != null, `rank ${c.rank} missing skywave_coverage_analysis`);
+    assert.ok(c.skywave_coverage_analysis.skywave_dist_50pct_km > 0, `rank ${c.rank} skywave distance must be positive`);
+  }
+});

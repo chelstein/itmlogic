@@ -2226,6 +2226,48 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Skywave Coverage Analysis */}
+        {candidate.skywave_coverage_analysis && (() => {
+          const s = candidate.skywave_coverage_analysis;
+          const nifColor = s.nif_required ? 'text-amber-300' : 'text-green-300';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Skywave Coverage Analysis (§73.182)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  Nighttime skywave at {s.actual_night_power_kw} kW ({s.fcc_class} class max {s.nighttime_power_max_kw} kW).
+                  NIF study: <span className={`font-bold ${nifColor}`}>{s.nif_required ? s.nif_study_type : 'NOT REQUIRED'}</span>.
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs text-center mb-2">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">50% Time</div>
+                    <div className="text-blue-300 font-mono">{s.skywave_dist_50pct_km} km</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">10% Time</div>
+                    <div className="text-indigo-300 font-mono">{s.skywave_dist_10pct_km} km</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">1% Time (NIF)</div>
+                    <div className="text-purple-300 font-mono">{s.skywave_dist_1pct_km} km</div>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-300 mb-1 italic">{s.nighttime_da_note}</div>
+                <div className="text-xs font-semibold text-gray-300 mb-1">Protection Levels</div>
+                <div className="space-y-1 mb-2">
+                  {s.protection_levels?.filter(p => p.applies_to_us).map(p => (
+                    <div key={p.id} className="flex items-start gap-2 text-xs bg-gray-800 rounded px-2 py-1">
+                      <span className="text-amber-300 font-mono w-14 flex-shrink-0">{p.field_mvm} mV/m</span>
+                      <span className="text-gray-400">{p.basis}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500">{s.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Radial System Engineering Guide */}
         {candidate.radial_system_engineering_guide && (() => {
           const r = candidate.radial_system_engineering_guide;
