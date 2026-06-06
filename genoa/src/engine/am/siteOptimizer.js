@@ -1005,7 +1005,10 @@ export async function runSiteOptimizer(body = {}){
     colcg_auction_required: c.community_of_license_change_guide?.auction_required ?? null,
     sbpg_am_booster_authorized: c.signal_booster_prohibited_guide?.am_booster_authorized ?? null,
     sbpg_legal_alternatives: c.signal_booster_prohibited_guide?.n_legal_alternatives ?? null,
-    sbpg_forfeiture_usd:    c.signal_booster_prohibited_guide?.forfeiture_risk_usd?.typical ?? null
+    sbpg_forfeiture_usd:    c.signal_booster_prohibited_guide?.forfeiture_risk_usd?.typical ?? null,
+    tig_equipment_value_usd: c.transmitter_insurance_guide?.estimated_equipment_value_usd ?? null,
+    tig_annual_premium_usd:  c.transmitter_insurance_guide?.estimated_annual_premium_usd?.typical ?? null,
+    tig_tower_coverage:      c.transmitter_insurance_guide?.tower_covered ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6740,6 +6743,101 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    transmitter_insurance_guide: (() => {
+      // AM transmitter sites require several types of insurance coverage. When relocating, the
+      // broadcaster should update all policies to reflect the new site and equipment configuration.
+      //
+      // Insurance types relevant to AM transmitter sites:
+      //
+      //   1. Broadcast Equipment Floater (BEF):
+      //      - Covers transmitter, ATU, EAS equipment, studio-to-transmitter link (STL), and ancillary gear
+      //      - Typically scheduled property coverage — all equipment listed on schedule with values
+      //      - Replacement cost coverage preferred (vs. ACV) for transmitter equipment
+      //      - Standard exclusions: gradual deterioration, intentional damage, flood (add separate rider)
+      //      - Carrier: Chubb, Lloyd's of London, Navigators, or specialty broadcast insurers
+      //
+      //   2. Tower and Structure Coverage:
+      //      - AM towers are expensive to replace; a 144m (3/8λ at 780 kHz) guyed tower can cost
+      //        $150,000–$400,000 to design, fabricate, erect, and commission
+      //      - Tower coverage is often written separately from the BEF or as a rider
+      //      - Must list tower by ASR number, height, and replacement value
+      //      - Wind/ice loading events, lightning strikes, and aircraft strikes are covered perils
+      //
+      //   3. General Liability (GL):
+      //      - Covers bodily injury and property damage at the transmitter site
+      //      - AM towers attract unauthorized visitors; climbers who fall may sue
+      //      - §73.49 fence required; but even with fencing, trespassers can establish liability claims
+      //      - Minimum $1 million per occurrence / $2 million aggregate recommended
+      //
+      //   4. Business Interruption (BI):
+      //      - Covers revenue loss if the station is forced off the air due to a covered peril
+      //      - Waiting period: typically 24–72 hours after shutdown before BI kicks in
+      //      - For a small AM station (Class D), off-air revenue loss: $500–$3,000/day
+      //      - FCC has a 10-day silent rule: stations not on-air for >10 days must notify FCC (§73.1740)
+      //      - BI coverage should exceed 10 days to cover FCC notification and restoration period
+      //
+      //   Equipment values (replacement cost estimates):
+      //   - 5 kW AM transmitter (new Nautel VS5 or GatesAir Flexiva): $60,000–$90,000
+      //   - ATU cabinet: $8,000–$20,000 depending on complexity
+      //   - AM tower (3/8λ guyed, new): $150,000–$400,000 (varies by contractor and location)
+      //   - EAS equipment, STL gear, metering: $8,000–$15,000
+      //   - Transmitter building (prefab): $25,000–$60,000
+
+      const tpo_kw_num = Number(tpo_kw) || 5;
+
+      // Equipment value estimates
+      const transmitter_value_usd = tpo_kw_num <= 5 ? 75000 :
+                                    tpo_kw_num <= 10 ? 120000 : 200000;
+      const tower_value_usd = 275000; // 3/8λ at 780 kHz, guyed tower, midpoint estimate
+      const atu_value_usd = 14000;
+      const ancillary_value_usd = 12000; // EAS, STL, metering
+      const building_value_usd = 40000;
+      const total_equipment_value_usd = transmitter_value_usd + tower_value_usd + atu_value_usd + ancillary_value_usd + building_value_usd;
+
+      // Annual premium estimates (typically 0.8–1.5% of insured value for broadcast equipment)
+      const rate_pct = 1.0; // 1% midpoint rate
+      const annual_premium_usd = Math.round(total_equipment_value_usd * rate_pct / 100);
+
+      const COVERAGE_TYPES = [
+        { id: 'BEF',        label: 'Broadcast Equipment Floater', value_usd: transmitter_value_usd + atu_value_usd + ancillary_value_usd, coverage: 'Replacement cost; transmitter, ATU, EAS, STL', carrier_examples: 'Chubb, Lloyd\'s, Navigators' },
+        { id: 'TOWER',      label: 'Tower and Structure Coverage', value_usd: tower_value_usd, coverage: 'Wind, ice, lightning, aircraft strike; guyed tower at new site', note: 'List by ASR number and replacement value' },
+        { id: 'BUILDING',   label: 'Transmitter Building Coverage', value_usd: building_value_usd, coverage: 'Fire, wind, hail, vandalism at transmitter building' },
+        { id: 'GL',         label: 'General Liability', value_usd: null, coverage: 'Bodily injury/property damage; $1M per occurrence / $2M aggregate minimum', note: 'AM towers attract unauthorized climbers; §73.49 fence required but insufficient alone' },
+        { id: 'BI',         label: 'Business Interruption', value_usd: null, coverage: '72-hour waiting period; should exceed 10 days (§73.1740 silent station rule)', note: `Off-air revenue loss: ~$1,000–$3,000/day for small AM` }
+      ];
+
+      const RELOCATION_INSURANCE_STEPS = [
+        { priority: 1, action: 'Update BEF schedule with new site address and equipment', detail: 'Notify insurer of new transmitter site before moving equipment; coverage may lapse if insurer not notified', timeline: 'Before equipment move' },
+        { priority: 2, action: 'Add new tower to structure coverage', detail: 'New tower must be listed by ASR number and replacement value; old tower coverage ends when decommissioned', timeline: 'Upon CP grant / tower erection' },
+        { priority: 3, action: 'Update GL policy with new site address', detail: 'General liability must name new site as covered location; blanket site coverage may or may not automatically include new site', timeline: 'Before going on-air at new site' },
+        { priority: 4, action: 'Confirm BI coverage covers silent period during move', detail: 'Some BI policies require a covered physical peril; a planned move may not trigger BI — separate coverage for planned outage may be needed', timeline: 'Before construction begins' }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        tpo_kw: tpo_kw_num,
+        transmitter_value_usd,
+        tower_value_usd,
+        atu_value_usd,
+        ancillary_value_usd,
+        building_value_usd,
+        estimated_equipment_value_usd: total_equipment_value_usd,
+        coverage_types: COVERAGE_TYPES,
+        n_coverage_types: COVERAGE_TYPES.length,
+        tower_covered: true,
+        estimated_annual_premium_usd: {
+          low: Math.round(total_equipment_value_usd * 0.008),
+          typical: annual_premium_usd,
+          high: Math.round(total_equipment_value_usd * 0.015)
+        },
+        relocation_steps: RELOCATION_INSURANCE_STEPS,
+        silent_station_rule_days: 10, // §73.1740 — must notify FCC if off-air > 10 days
+        relocation_note: `Total insured value: ~$${total_equipment_value_usd.toLocaleString()} (transmitter $${transmitter_value_usd.toLocaleString()} + tower $${tower_value_usd.toLocaleString()} + ATU + building). Estimated annual premium: $${annual_premium_usd.toLocaleString()} (~1% rate). Update all policies before equipment moves. Business interruption should exceed 10 days (§73.1740 silent station rule).`,
+        reference: '47 CFR §73.49; §73.1740; §17.7 (ASR); NFPA 101; standard broadcast insurance underwriting guidelines',
+        note: `Broadcast equipment insurance: $${total_equipment_value_usd.toLocaleString()} insured value. Annual premium ~$${annual_premium_usd.toLocaleString()}. ${COVERAGE_TYPES.length} coverage types including BEF, tower, GL, and BI. Update all policies before site move.`
       };
     })(),
 

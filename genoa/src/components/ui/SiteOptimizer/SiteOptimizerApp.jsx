@@ -1717,6 +1717,36 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      transmitter_insurance_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        tpo_kw: 5,
+        transmitter_value_usd: 75000,
+        tower_value_usd: 275000,
+        atu_value_usd: 14000,
+        ancillary_value_usd: 12000,
+        building_value_usd: 40000,
+        estimated_equipment_value_usd: 416000,
+        tower_covered: true,
+        coverage_types: [
+          { id: 'BEF', label: 'Broadcast Equipment Floater', value_usd: 101000, coverage: 'Replacement cost; transmitter, ATU, EAS, STL', carrier_examples: "Chubb, Lloyd's, Navigators" },
+          { id: 'TOWER', label: 'Tower and Structure Coverage', value_usd: 275000, coverage: 'Wind, ice, lightning, aircraft strike; guyed tower at new site', note: 'List by ASR number and replacement value' },
+          { id: 'BUILDING', label: 'Transmitter Building Coverage', value_usd: 40000, coverage: 'Fire, wind, hail, vandalism at transmitter building' },
+          { id: 'GL', label: 'General Liability', value_usd: null, coverage: 'Bodily injury/property damage; $1M per occurrence / $2M aggregate minimum', note: 'AM towers attract unauthorized climbers; §73.49 fence required but insufficient alone' },
+          { id: 'BI', label: 'Business Interruption', value_usd: null, coverage: '72-hour waiting period; should exceed 10 days (§73.1740 silent station rule)', note: 'Off-air revenue loss: ~$1,000–$3,000/day for small AM' }
+        ],
+        n_coverage_types: 5,
+        estimated_annual_premium_usd: { low: 3328, typical: 4160, high: 6240 },
+        relocation_steps: [
+          { priority: 1, action: 'Update BEF schedule with new site address and equipment', detail: 'Notify insurer of new transmitter site before moving equipment; coverage may lapse if insurer not notified', timeline: 'Before equipment move' },
+          { priority: 2, action: 'Add new tower to structure coverage', detail: 'New tower must be listed by ASR number and replacement value; old tower coverage ends when decommissioned', timeline: 'Upon CP grant / tower erection' },
+          { priority: 3, action: 'Update GL policy with new site address', detail: 'General liability must name new site as covered location; blanket site coverage may or may not automatically include new site', timeline: 'Before going on-air at new site' },
+          { priority: 4, action: 'Confirm BI coverage covers silent period during move', detail: 'Some BI policies require a covered physical peril; a planned move may not trigger BI — separate coverage for planned outage may be needed', timeline: 'Before construction begins' }
+        ],
+        silent_station_rule_days: 10,
+        relocation_note: 'Total insured value: ~$416,000 (transmitter $75,000 + tower $275,000 + ATU + building). Estimated annual premium: $4,160 (~1% rate). Update all policies before equipment moves. Business interruption should exceed 10 days (§73.1740 silent station rule).',
+        reference: '47 CFR §73.49; §73.1740; §17.7 (ASR); NFPA 101; standard broadcast insurance underwriting guidelines',
+        note: 'Broadcast equipment insurance: $416,000 insured value. Annual premium ~$4,160. 5 coverage types including BEF, tower, GL, and BI. Update all policies before site move.'
+      },
       signal_booster_prohibited_guide: {
         frequency_khz: 780, fcc_class: 'D',
         am_booster_authorized: false,

@@ -1325,6 +1325,20 @@ test('colocation GRID candidates have license_renewal_compliance_guide', async (
   }
 });
 
+test('colocation GRID candidates have transmitter_insurance_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.transmitter_insurance_guide != null, `rank ${c.rank} missing transmitter_insurance_guide`);
+    assert.ok(c.transmitter_insurance_guide.estimated_equipment_value_usd >= 200000, `rank ${c.rank} insured value must be >= $200,000`);
+  }
+});
+
 test('colocation GRID candidates have signal_booster_prohibited_guide', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },

@@ -5683,6 +5683,56 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- transmitter_insurance_guide ----
+
+test('transmitter_insurance_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.transmitter_insurance_guide != null, 'transmitter_insurance_guide missing');
+  const g = c.transmitter_insurance_guide;
+  assert.ok('estimated_equipment_value_usd' in g, 'estimated_equipment_value_usd missing');
+  assert.ok('coverage_types' in g, 'coverage_types missing');
+  assert.ok('estimated_annual_premium_usd' in g, 'estimated_annual_premium_usd missing');
+  assert.ok('relocation_steps' in g, 'relocation_steps missing');
+});
+
+test('transmitter_insurance_guide equipment value reflects 5kW transmitter + tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_insurance_guide;
+  assert.ok(g.transmitter_value_usd >= 50000, 'transmitter replacement value must be >= $50,000');
+  assert.ok(g.tower_value_usd >= 100000, 'tower replacement value must be >= $100,000');
+  assert.ok(g.estimated_equipment_value_usd >= 200000, 'total insured value must be >= $200,000');
+  assert.strictEqual(g.tower_covered, true, 'tower must be covered');
+});
+
+test('transmitter_insurance_guide has at least 4 coverage types including tower and BI', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_insurance_guide;
+  assert.ok(Array.isArray(g.coverage_types), 'coverage_types must be array');
+  assert.ok(g.n_coverage_types >= 4, 'must have at least 4 coverage types');
+  const ids = g.coverage_types.map(t => t.id);
+  assert.ok(ids.includes('TOWER'), 'TOWER coverage must be present');
+  assert.ok(ids.includes('BI'), 'Business Interruption coverage must be present');
+  assert.ok(ids.includes('GL'), 'General Liability coverage must be present');
+});
+
+test('transmitter_insurance_guide annual premium is within reasonable range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_insurance_guide;
+  assert.ok(g.estimated_annual_premium_usd.typical > 0, 'annual premium must be positive');
+  assert.ok(g.estimated_annual_premium_usd.high > g.estimated_annual_premium_usd.typical, 'high premium must exceed typical');
+  assert.strictEqual(g.silent_station_rule_days, 10, 'silent station rule must be 10 days per §73.1740');
+});
+
+test('transmitter_insurance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tig_equipment_value_usd' in row, 'tig_equipment_value_usd missing from comparison table');
+    assert.ok('tig_annual_premium_usd' in row, 'tig_annual_premium_usd missing from comparison table');
+    assert.ok('tig_tower_coverage' in row, 'tig_tower_coverage missing from comparison table');
+  }
+});
+
 // ---- signal_booster_prohibited_guide ----
 
 test('signal_booster_prohibited_guide presence and structure', async () => {

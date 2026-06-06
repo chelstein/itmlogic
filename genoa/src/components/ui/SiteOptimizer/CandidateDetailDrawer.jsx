@@ -2226,6 +2226,53 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Insurance Guide */}
+        {candidate.transmitter_insurance_guide && (() => {
+          const g = candidate.transmitter_insurance_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Broadcast Equipment Insurance <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.49 / §73.1740</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Total Insured Value</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>${g.estimated_equipment_value_usd?.toLocaleString()}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Est. Annual Premium</div>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 600 }}>${g.estimated_annual_premium_usd?.typical?.toLocaleString()}/yr</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>${g.estimated_annual_premium_usd?.low?.toLocaleString()}–${g.estimated_annual_premium_usd?.high?.toLocaleString()}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Transmitter Value</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>${g.transmitter_value_usd?.toLocaleString()}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Tower Value</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>${g.tower_value_usd?.toLocaleString()}</div>
+                </div>
+              </div>
+              {g.coverage_types && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Coverage Types ({g.n_coverage_types})</div>
+                  {g.coverage_types.map((t, i) => (
+                    <div key={i} style={{ marginBottom: 3, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{ background: '#334155', color: '#e2e8f0', borderRadius: 4, padding: '1px 5px', fontSize: 9, minWidth: 36, textAlign: 'center', marginTop: 1 }}>{t.id}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 11 }}>{t.label}{t.value_usd ? ` — $${t.value_usd.toLocaleString()}` : ''}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ background: '#0f172a', borderRadius: 6, padding: 7 }}>
+                <div style={{ color: '#94a3b8', fontSize: 10 }}>Silent station rule: notify FCC after {g.silent_station_rule_days} days off-air (§73.1740). Business interruption coverage should exceed {g.silent_station_rule_days} days.</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Signal Booster Prohibited Guide */}
         {candidate.signal_booster_prohibited_guide && (() => {
           const g = candidate.signal_booster_prohibited_guide;
