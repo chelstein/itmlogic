@@ -903,7 +903,10 @@ export async function runSiteOptimizer(body = {}){
     eia_ea_days_est:        c.environmental_impact_assessment?.estimated_ea_days ?? null,
     ssp_perimeter_m:        c.site_security_perimeter_guide?.perimeter_m ?? null,
     ssp_n_components:       c.site_security_perimeter_guide?.n_components ?? null,
-    ssp_capex_usd:          c.site_security_perimeter_guide?.total_capex_usd ?? null
+    ssp_capex_usd:          c.site_security_perimeter_guide?.total_capex_usd ?? null,
+    ins_total_value_usd:    c.insurance_liability_analysis?.total_insured_value_usd ?? null,
+    ins_annual_premium_usd: c.insurance_liability_analysis?.total_annual_premium_usd ?? null,
+    ins_asr_required:       c.insurance_liability_analysis?.asr_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -9782,6 +9785,108 @@ async function scoreCandidate(pt, ctx, warnings){
         violation_risk: 'Forfeiture up to $10,000 per violation per day (47 CFR §1.80)',
         reference: '47 CFR §73.49; 47 CFR §1.1310; OET Bulletin 65; ANSI Z535.2; DHS CISA AM Tower Security Guide',
         note: `§73.49 requires fence/enclosure around AM antenna base. Perimeter est. ${perimeterCirc_m}m at ${fenceRadius_m}m radius. Total security capex est. $${total_capex.toLocaleString()}.`
+      };
+    })(),
+
+    insurance_liability_analysis: (() => {
+      // AM broadcast tower insurance: property, liability, E&O, cyber
+      // §17.7 ASR non-compliance increases premium and voids aviation-related claims
+      const towerH_ins = round2(0.375 * 300000 / frequency_khz); // 3/8λ estimate
+      const asr_required = towerH_ins > 60.96; // >200 ft requires ASR registration per §17.7
+
+      // Replacement cost value: tower structure + equipment + transmitter building
+      // FCC Class D AM: 5 kW, modest infrastructure
+      const TOWER_REPLACEMENT_COST_USD = Math.round(tpo_kw * 18000 + towerH_ins * 1200 + 45000);
+      const EQUIPMENT_VALUE_USD        = Math.round(tpo_kw * 12000 + 35000); // transmitter + ancillary
+      const TOTAL_INSURED_VALUE_USD    = TOWER_REPLACEMENT_COST_USD + EQUIPMENT_VALUE_USD;
+
+      // Premium estimate: typically 0.5–1.2% of replacement cost for broadcast property
+      const PROP_PREMIUM_RATE   = 0.009; // 0.9% midpoint for AM towers
+      const PROP_ANNUAL_PREMIUM = Math.round(TOTAL_INSURED_VALUE_USD * PROP_PREMIUM_RATE);
+
+      // General liability: $1M per occurrence / $2M aggregate standard for broadcast
+      const GL_ANNUAL_PREMIUM   = Math.round(1500 + tpo_kw * 120); // base + power surcharge
+
+      // Professional liability (E&O): covers errors in broadcast operations
+      const EO_ANNUAL_PREMIUM   = 2400; // typical AM broadcast E&O
+
+      const TOTAL_ANNUAL_PREMIUM = PROP_ANNUAL_PREMIUM + GL_ANNUAL_PREMIUM + EO_ANNUAL_PREMIUM;
+
+      const COVERAGE_LINES = [
+        {
+          id: 'PROPERTY',
+          label: 'Tower & Equipment Property Insurance',
+          required: true,
+          coverage_limit_usd: TOTAL_INSURED_VALUE_USD,
+          annual_premium_usd: PROP_ANNUAL_PREMIUM,
+          premium_rate_pct: round2(PROP_PREMIUM_RATE * 100),
+          insured_items: ['Tower structure (replacement cost)', 'Transmitter and RF equipment', 'Transmitter building / equipment shelter'],
+          notes: 'Replacement cost coverage required by most lenders. ASR non-compliance may trigger exclusion for aviation-related damage.'
+        },
+        {
+          id: 'GENERAL_LIABILITY',
+          label: 'General Liability (CGL)',
+          required: true,
+          per_occurrence_usd: 1000000,
+          aggregate_usd: 2000000,
+          annual_premium_usd: GL_ANNUAL_PREMIUM,
+          notes: '$1M/$2M CGL is FCC standard recommendation. Tower collapse and RF exposure claims covered. Tenant/visitor injuries on transmitter site.'
+        },
+        {
+          id: 'ERRORS_OMISSIONS',
+          label: 'Broadcast Professional Liability (E&O)',
+          required: false,
+          coverage_limit_usd: 1000000,
+          annual_premium_usd: EO_ANNUAL_PREMIUM,
+          notes: 'Covers claims related to broadcast content, signal interference, and operational errors. Required by some broadcast groups.'
+        },
+        {
+          id: 'UMBRELLA',
+          label: 'Umbrella / Excess Liability',
+          required: false,
+          coverage_limit_usd: 5000000,
+          annual_premium_usd: Math.round(GL_ANNUAL_PREMIUM * 0.4),
+          notes: 'Extends general liability limits. Recommended for towers adjacent to public areas or roads. ~40% of CGL premium.'
+        }
+      ];
+
+      // ASR compliance risk factors
+      const ASR_COMPLIANCE = {
+        asr_required,
+        tower_height_m: towerH_ins,
+        threshold_m: 60.96,
+        cfr: '47 CFR §17.7',
+        non_compliance_risks: [
+          'Premium surcharge of 15–25% on property coverage',
+          'Exclusion of aviation-related hull/liability claims',
+          'FCC forfeiture up to $10,000 (§1.80)',
+          'FAA enforcement referral for lighting/marking failures',
+          'Voided coverage if damage linked to non-compliant structure'
+        ],
+        compliance_steps: asr_required ? [
+          'Register tower with FCC ASR (towers.fcc.gov) before construction',
+          'Obtain FAA determination (Form 7460-1) if within 6 miles of airport or >60m AGL',
+          'Install aviation lighting per FAA Advisory Circular 70/7460-1L',
+          'Submit CP (FCC Form 301-AM) with ASR number in exhibit',
+          'Notify FCC within 5 days of completion (Form 854)'
+        ] : ['Tower height < 200 ft — ASR registration not required per §17.7']
+      };
+
+      return {
+        tower_height_m: towerH_ins,
+        asr_required,
+        tower_replacement_cost_usd: TOWER_REPLACEMENT_COST_USD,
+        equipment_value_usd: EQUIPMENT_VALUE_USD,
+        total_insured_value_usd: TOTAL_INSURED_VALUE_USD,
+        coverage_lines: COVERAGE_LINES,
+        n_coverage_lines: COVERAGE_LINES.length,
+        n_required_lines: COVERAGE_LINES.filter(l => l.required).length,
+        total_annual_premium_usd: TOTAL_ANNUAL_PREMIUM,
+        property_annual_premium_usd: PROP_ANNUAL_PREMIUM,
+        gl_annual_premium_usd: GL_ANNUAL_PREMIUM,
+        asr_compliance: ASR_COMPLIANCE,
+        reference: '47 CFR §17.7; 47 CFR §1.80; FAA Form 7460-1; ISO/IEC 27001 (cyber); NAIC Broadcast Insurance Guidelines; FCC ASR Database (towers.fcc.gov)',
+        note: `Total insured value est. $${TOTAL_INSURED_VALUE_USD.toLocaleString()}. Annual premium est. $${TOTAL_ANNUAL_PREMIUM.toLocaleString()}. ASR ${asr_required ? 'required' : 'not required'} for ${towerH_ins}m tower.`
       };
     })(),
 

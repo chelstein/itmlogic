@@ -2226,6 +2226,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Insurance & Liability Analysis */}
+        {candidate.insurance_liability_analysis && (() => {
+          const ins = candidate.insurance_liability_analysis;
+          return (
+            <div>
+              <h4 style={{ color: '#a78bfa', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Insurance &amp; Liability Analysis
+              </h4>
+              <div style={{ background: '#0d0a1a', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Tower height est.:</span> <strong>{ins.tower_height_m != null ? `${ins.tower_height_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: ins.asr_required ? '#ef4444' : '#22c55e' }}>{ins.asr_required ? 'Yes (§17.7)' : 'No (< 200 ft)'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Total insured value:</span> <strong style={{ color: '#a78bfa' }}>{ins.total_insured_value_usd != null ? `$${ins.total_insured_value_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Annual premium est.:</span> <strong style={{ color: '#f59e0b' }}>{ins.total_annual_premium_usd != null ? `$${ins.total_annual_premium_usd.toLocaleString()}/yr` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Coverage lines:</span> <strong>{ins.n_coverage_lines ?? '—'} ({ins.n_required_lines ?? '—'} required)</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>GL limit:</span> <strong>$1M per occurrence / $2M aggregate</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Coverage Lines</div>
+                {(ins.coverage_lines || []).map((l, i) => (
+                  <div key={i} style={{ background: '#080614', borderRadius: 3, padding: '5px 8px', marginBottom: 4, fontSize: 11, opacity: l.required ? 1 : 0.75 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 1 }}>
+                      <span style={{ color: l.required ? '#a78bfa' : '#6b7280', fontWeight: 700 }}>{l.label}{!l.required && ' (optional)'}</span>
+                      <span style={{ color: '#6b7280' }}>{l.annual_premium_usd != null ? `$${l.annual_premium_usd.toLocaleString()}/yr` : ''}</span>
+                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: 10 }}>{l.notes?.substring(0, 120)}{l.notes?.length > 120 ? '…' : ''}</div>
+                  </div>
+                ))}
+              </div>
+              {ins.asr_required && ins.asr_compliance && (
+                <div style={{ background: '#12080e', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#ef4444', fontWeight: 700 }}>ASR Non-Compliance Risks: </span>
+                  <span style={{ color: '#d1d5db' }}>15–25% premium surcharge, aviation claim exclusion, FCC forfeiture up to $10k/day.</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{ins.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Site Security Perimeter Guide */}
         {candidate.site_security_perimeter_guide && (() => {
           const s = candidate.site_security_perimeter_guide;

@@ -6598,6 +6598,57 @@ test('site_security_perimeter_guide comparison table columns present', async () 
   }
 });
 
+test('insurance_liability_analysis presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ins = out.candidates[0].insurance_liability_analysis;
+  assert.ok(ins != null, 'insurance_liability_analysis must be present');
+  assert.ok(ins.total_insured_value_usd > 0, 'total_insured_value_usd must be positive');
+  assert.ok(Array.isArray(ins.coverage_lines), 'coverage_lines must be an array');
+  assert.ok(ins.n_coverage_lines === ins.coverage_lines.length, 'n_coverage_lines must match array length');
+  assert.ok(ins.total_annual_premium_usd > 0, 'total_annual_premium_usd must be positive');
+});
+
+test('insurance_liability_analysis ASR required for towers > 60.96m (200 ft)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ins = out.candidates[0].insurance_liability_analysis;
+  // KAZM 780 kHz: 3/8λ ≈ 144m > 60.96m → ASR required
+  assert.strictEqual(ins.asr_required, true, '780 kHz tower (~144m) must require ASR per §17.7');
+  assert.ok(ins.asr_compliance != null, 'asr_compliance must be present');
+  assert.ok(ins.asr_compliance.non_compliance_risks.length > 0, 'non_compliance_risks must be listed');
+  assert.ok(ins.asr_compliance.compliance_steps.length > 0, 'compliance_steps must be listed');
+});
+
+test('insurance_liability_analysis PROPERTY and GL coverage lines are required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ins = out.candidates[0].insurance_liability_analysis;
+  const prop = ins.coverage_lines.find(l => l.id === 'PROPERTY');
+  const gl   = ins.coverage_lines.find(l => l.id === 'GENERAL_LIABILITY');
+  assert.ok(prop != null, 'PROPERTY coverage line must exist');
+  assert.strictEqual(prop.required, true, 'PROPERTY must be required');
+  assert.ok(prop.coverage_limit_usd > 0, 'PROPERTY coverage limit must be positive');
+  assert.ok(gl != null, 'GENERAL_LIABILITY coverage line must exist');
+  assert.strictEqual(gl.required, true, 'GL must be required');
+  assert.ok(gl.per_occurrence_usd >= 1000000, 'GL per-occurrence must be ≥ $1M');
+});
+
+test('insurance_liability_analysis premium scales with TPO power', async () => {
+  const out5  = await runSiteOptimizer({ ...KAZM, tpo_kw: 5,  candidate_limit: 1 });
+  const out50 = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  const ins5  = out5.candidates[0].insurance_liability_analysis;
+  const ins50 = out50.candidates[0].insurance_liability_analysis;
+  assert.ok(ins50.total_insured_value_usd > ins5.total_insured_value_usd, '50 kW total insured value must exceed 5 kW');
+  assert.ok(ins50.total_annual_premium_usd > ins5.total_annual_premium_usd, '50 kW annual premium must exceed 5 kW');
+});
+
+test('insurance_liability_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ins_total_value_usd'    in row, 'ins_total_value_usd missing from comparison table');
+    assert.ok('ins_annual_premium_usd' in row, 'ins_annual_premium_usd missing from comparison table');
+    assert.ok('ins_asr_required'       in row, 'ins_asr_required missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;
