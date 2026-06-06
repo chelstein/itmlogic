@@ -239,6 +239,58 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 protectionClassAdvisory={result.protection_class_advisory}
               />
             )}
+            {result?.candidate_shortlist?.length > 0 && (
+              <RackPanel eyebrow="Shortlist" title="Top candidate picks" dense>
+                <div className="space-y-2">
+                  {result.candidate_shortlist.map(entry => {
+                    const statusCol = entry.status_category === 'PROMISING' ? '#63d471'
+                      : entry.status_category?.startsWith('RECOVERABLE') ? '#ffb347'
+                      : entry.status_category === 'TREATY_REVIEW' ? '#c79bff'
+                      : '#a89c84';
+                    return (
+                      <div key={entry.rank} className="border border-rule/40 rounded p-2 font-mono text-[10px]">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-cream font-semibold">#{entry.rank}</span>
+                          <span className="font-mono text-[9px] border rounded-sm px-1 py-0.5"
+                            style={{ color: statusCol, borderColor: `${statusCol}44` }}>
+                            {entry.status_category?.replace(/_/g, ' ')}
+                          </span>
+                          <span className="text-textDim">{entry.score_with_band}</span>
+                        </div>
+                        <div className="text-textDim/80 leading-snug">{entry.summary}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </RackPanel>
+            )}
+            {result?.candidate_set_diversity && result.candidate_set_diversity.n_candidates >= 2 && (
+              <RackPanel eyebrow="Diversity" title="Candidate set diversity" dense>
+                <div className="font-mono text-[10px] space-y-1.5">
+                  {result.candidate_set_diversity.directional_coverage_assessment && (
+                    <div>
+                      <span className="text-textDim">Directional coverage: </span>
+                      <span className="text-cream">{result.candidate_set_diversity.directional_coverage_assessment}</span>
+                    </div>
+                  )}
+                  {result.candidate_set_diversity.sigma_variety_assessment && (
+                    <div>
+                      <span className="text-textDim">Conductivity variety: </span>
+                      <span className="text-cream">{result.candidate_set_diversity.sigma_variety_assessment}</span>
+                    </div>
+                  )}
+                  {result.candidate_set_diversity.score_range != null && (
+                    <div>
+                      <span className="text-textDim">Score spread: </span>
+                      <span className="text-cream">{result.candidate_set_diversity.score_range} pts across {result.candidate_set_diversity.n_candidates} candidates</span>
+                    </div>
+                  )}
+                  {result.candidate_set_diversity.recommendation && (
+                    <div className="text-textDim/80 italic mt-1">{result.candidate_set_diversity.recommendation}</div>
+                  )}
+                </div>
+              </RackPanel>
+            )}
             {result?.recommended_actions?.length > 0 && (
               <RecommendedActionsPanel recommended_actions={result.recommended_actions} />
             )}
@@ -316,6 +368,36 @@ const DEMO_RESULT = {
     PROMISING: 58, REVIEW_REQUIRED: 142, NON_COMPLIANT: 34
   },
   top_candidates_summary: 'Rank 1 scores 91.3 (PROMISING), 6 km NE of current site, σ=8 mS/m (EXCELLENT). COL field 18.4 mV/m (≥§73.24(j) 5 mV/m floor). est. 125K served @0.5 mV/m. vs current site: score +28.9, reach +5.6 km. top 4 σ quality: 3×EXCELLENT, 1×FAIR. statuses: 3 PROMISING, 1 REVIEW_REQUIRED (out of 234 evaluated).',
+  candidate_shortlist: [
+    {
+      rank: 1, lat: 34.91, lon: -111.79, status_category: 'PROMISING',
+      score_with_band: 'score 91.3 [69.3–100]',
+      summary: 'Rank 1 @ 6.2 km NE: COL coverage 97%, σ=8 mS/m (EXCELLENT), reach 34 km. Advance to full §73.182 NIF study and parcel investigation.',
+      recommended_next_step: 'Advance to full §73.182 NIF study and parcel investigation.'
+    },
+    {
+      rank: 2, lat: 34.83, lon: -111.74, status_category: 'PROMISING',
+      score_with_band: 'score 84.0 [62.0–100]',
+      summary: 'Rank 2 @ 7.8 km SE: COL coverage 91%, σ=6 mS/m (GOOD), reach 31 km. Advance to full §73.182 NIF study and parcel investigation.',
+      recommended_next_step: 'Advance to full §73.182 NIF study and parcel investigation.'
+    },
+    {
+      rank: 3, lat: 34.95, lon: -111.92, status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
+      score_with_band: 'score 71.8 [49.8–93.8]',
+      summary: 'Rank 3 @ 12.5 km NW: COL coverage 78% (below 80% floor), σ=10 mS/m (EXCELLENT), reach 28 km. Increase TPO to ≥8.5 kW to achieve §73.24(j) compliance, then advance to NIF study.',
+      recommended_next_step: 'Increase TPO to ≥8.5 kW to achieve §73.24(j) compliance, then advance to NIF study.'
+    }
+  ],
+  candidate_set_diversity: {
+    n_candidates: 4,
+    bearing_spread_deg: 283,
+    directional_coverage_assessment: 'EXCELLENT (>270° compass arc covered)',
+    sigma_range_msm: 8.5,
+    sigma_variety_assessment: 'HIGH — wide range of conductivity environments sampled',
+    score_range: 29.2,
+    distance_range_km: 19.0,
+    recommendation: 'ADEQUATE: candidate set shows reasonable geographic spread for screening.'
+  },
   score_stats: { mean: 76.5, std_dev: 13.2, min: 58.5, max: 91.3 },
   score_histogram: [
     { bucket: '0–9',   min: 0,  max: 9,  count: 0 },
