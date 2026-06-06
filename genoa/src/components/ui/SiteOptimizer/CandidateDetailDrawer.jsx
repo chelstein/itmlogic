@@ -2226,6 +2226,44 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* License Renewal Compliance Guide */}
+        {candidate.license_renewal_compliance_guide && (() => {
+          const l = candidate.license_renewal_compliance_guide;
+          const reqOpif = (l.opif_requirements || []).filter(o => o.required);
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                License Renewal Compliance (§73.3539)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>FCC class:</span> <strong style={{ color: '#38bdf8' }}>{l.fcc_class || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>License term:</span> <strong>{l.license_term_years != null ? `${l.license_term_years} years` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Renewal form:</span> <strong>{l.renewal_form || 'FCC Form 303-S'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Renewal fee:</span> <strong style={{ color: '#f59e0b' }}>{l.renewal_filing_fee_usd != null ? `$${l.renewal_filing_fee_usd}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>OPIF required items:</span> <strong>{l.n_opif_required ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Publication req'd:</span> <strong style={{ color: l.renewal_cycle?.publication_required ? '#22c55e' : '#9ca3af' }}>{l.renewal_cycle?.publication_required ? 'Yes (§73.3580)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>EEO outreach/yr:</span> <strong>{l.eeo_obligations?.outreach_initiatives_per_year ?? '—'} initiatives</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Form 323 freq.:</span> <strong>Biennial (even years)</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Required OPIF Items (§73.3526)</div>
+                {reqOpif.slice(0, 5).map((o, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: '#38bdf8', minWidth: 8 }}>●</span>
+                    <div>
+                      <span style={{ color: '#d1d5db', fontWeight: 600 }}>{o.label}</span>
+                      <span style={{ color: '#6b7280' }}> — {o.update_freq}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{l.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Nighttime Pattern Switching Guide */}
         {candidate.nighttime_pattern_switching_guide && (() => {
           const n = candidate.nighttime_pattern_switching_guide;

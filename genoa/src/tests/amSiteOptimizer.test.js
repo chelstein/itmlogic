@@ -6883,6 +6883,52 @@ test('nighttime_pattern_switching_guide comparison table columns present', async
   }
 });
 
+test('license_renewal_compliance_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const l = out.candidates[0].license_renewal_compliance_guide;
+  assert.ok(l != null, 'license_renewal_compliance_guide must be present');
+  assert.strictEqual(l.license_term_years, 8, 'AM license term must be 8 years per §73.3539');
+  assert.ok(Array.isArray(l.opif_requirements), 'opif_requirements must be an array');
+  assert.ok(l.n_opif_required > 0, 'must have required OPIF items');
+});
+
+test('license_renewal_compliance_guide Form 303-S renewal fee is $345', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const l = out.candidates[0].license_renewal_compliance_guide;
+  assert.strictEqual(l.renewal_filing_fee_usd, 345, 'Form 303-S filing fee must be $345');
+  assert.strictEqual(l.renewal_form, 'FCC Form 303-S', 'renewal form must be FCC Form 303-S');
+  assert.ok(l.renewal_cycle.publication_required, 'renewal publication must be required (§73.3580)');
+});
+
+test('license_renewal_compliance_guide OPIF has required quarterly issues list', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const l = out.candidates[0].license_renewal_compliance_guide;
+  const quarterly = l.opif_requirements.find(o => o.id === 'QUARTERLY_ISSUES');
+  assert.ok(quarterly != null, 'QUARTERLY_ISSUES must be in OPIF requirements');
+  assert.strictEqual(quarterly.required, true, 'quarterly issues list must be required');
+  const political = l.opif_requirements.find(o => o.id === 'POLITICAL_FILE');
+  assert.ok(political != null, 'POLITICAL_FILE must be in OPIF requirements');
+  assert.strictEqual(political.required, true, 'political file must be required');
+});
+
+test('license_renewal_compliance_guide EEO obligations and Form 323 ownership reporting', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const l = out.candidates[0].license_renewal_compliance_guide;
+  assert.ok(l.eeo_obligations != null, 'eeo_obligations must be present');
+  assert.ok(l.eeo_obligations.outreach_initiatives_per_year >= 2, 'must have ≥2 EEO outreach initiatives/year');
+  assert.ok(l.ownership_reporting != null, 'ownership_reporting must be present');
+  assert.strictEqual(l.ownership_reporting.form, 'FCC Form 323', 'ownership reporting must use Form 323');
+});
+
+test('license_renewal_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lrc_term_years'      in row, 'lrc_term_years missing from comparison table');
+    assert.ok('lrc_renewal_fee_usd' in row, 'lrc_renewal_fee_usd missing from comparison table');
+    assert.ok('lrc_n_opif_required' in row, 'lrc_n_opif_required missing from comparison table');
+  }
+});
+
 test('ground_conductivity_improvement presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].ground_conductivity_improvement;

@@ -921,7 +921,10 @@ export async function runSiteOptimizer(body = {}){
     pag_dd_cost_usd:        c.property_acquisition_guide?.due_diligence_cost_usd ?? null,
     ntps_power_reduction:   c.nighttime_pattern_switching_guide?.power_reduction_required ?? null,
     ntps_pattern_switch:    c.nighttime_pattern_switching_guide?.pattern_switch_required ?? null,
-    ntps_asid_required:     c.nighttime_pattern_switching_guide?.asid_requirements?.required ?? null
+    ntps_asid_required:     c.nighttime_pattern_switching_guide?.asid_requirements?.required ?? null,
+    lrc_term_years:         c.license_renewal_compliance_guide?.license_term_years ?? null,
+    lrc_renewal_fee_usd:    c.license_renewal_compliance_guide?.renewal_filing_fee_usd ?? null,
+    lrc_n_opif_required:    c.license_renewal_compliance_guide?.n_opif_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -10301,6 +10304,85 @@ async function scoreCandidate(pt, ctx, warnings){
         sr_ss_variation: SR_SS_VARIATION,
         reference: '47 CFR §73.99; §73.21–§73.24; §73.1745; §73.1820; FCC Sunrise/Sunset Table (Media Bureau)',
         note: `Class ${fcc_class} on ${isClearCh ? 'clear' : 'regional/local'} channel. Night power reduction: ${myObligation.power_reduction_required ? 'required' : 'not required'}. Pattern switch: ${myObligation.pattern_switch_required ? 'required (DA-N)' : 'not required'}. ASID: ${ASID_REQUIREMENTS.required ? 'required' : 'optional'}.`
+      };
+    })(),
+
+    license_renewal_compliance_guide: (() => {
+      // §73.3539: AM broadcast license renewal — Form 303-S, 8-year term
+      // §73.3526: Online public inspection file (OPIF) — continuous obligation
+      // §73.2080: EEO requirements for stations with 5+ full-time employees
+      // §73.3580: Publication of notice of renewal filing
+
+      // Renewal timing
+      const RENEWAL_CYCLE = {
+        term_years: 8,
+        form: 'FCC Form 303-S',
+        filing_fee_usd: 345,
+        filing_window_days_before_expiry: 4 * 30, // 4 months before expiry
+        publication_required: true,
+        publication_cfr: '§73.3580',
+        publication_notes: '3 consecutive weeks in newspaper of general circulation in community of license; OR 4 weeks on-air announcement. Must occur during months 5–4 before expiry.',
+        grace_period_days: 30
+      };
+
+      // Online Public Inspection File obligations (§73.3526)
+      const OPIF_REQUIREMENTS = [
+        { id: 'LICENSE', label: 'FCC License and authorizations', update_freq: 'As issued', cfr: '§73.3526(e)(1)', required: true },
+        { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(4)', required: true },
+        { id: 'POLITICAL_FILE', label: 'Political broadcasting records', update_freq: 'Within 1 business day of request', cfr: '§73.3526(e)(6)', required: true },
+        { id: 'EEO_ANNUAL', label: 'EEO Annual Public File Report', update_freq: 'Annually, 1 year after renewal window opens', cfr: '§73.2080(c)(6)', required: true },
+        { id: 'QUARTERLY_ISSUES', label: 'Issues & Programs Lists', update_freq: 'Quarterly (Jan 10, Apr 10, Jul 10, Oct 10)', cfr: '§73.3526(e)(11)(i)', required: true },
+        { id: 'CONTOUR_MAPS', label: 'Station contour maps', update_freq: 'On change of coverage area', cfr: '§73.3526(e)(3)', required: true },
+        { id: 'CONSTRUCTION_PERMIT', label: 'Construction permit (if CP pending)', update_freq: 'As issued', cfr: '§73.3526(e)(2)', required: false }
+      ];
+
+      // EEO obligations
+      const EEO_OBLIGATIONS = {
+        threshold_employees: 5,
+        applicable: true, // assume ≥5 FTE for typical commercial AM
+        cfr: '§73.2080',
+        outreach_initiatives_per_year: 2,
+        annual_report_form: 'FCC Form 2100 (Schedule 396)',
+        mid_term_review: {
+          required: true,
+          timing: '4 years into license term',
+          form: 'EEO Mid-term Review (informal FCC review)',
+          cfr: '§73.2080(f)'
+        },
+        violation_risk: 'Forfeiture or license renewal challenge for documented EEO deficiencies'
+      };
+
+      // Ownership reporting
+      const OWNERSHIP_REPORTING = {
+        form: 'FCC Form 323',
+        frequency: 'Biennial (even-numbered years, by December 1)',
+        cfr: '§73.3615',
+        covers: ['Licensee identity and ownership structure', 'Attributable interests', 'Local marketing agreements', 'Time brokerage agreements'],
+        filing_fee_usd: 0
+      };
+
+      // Key compliance calendar
+      const complianceCalendar = [
+        { month_before_expiry: 4, action: 'Begin renewal application preparation; confirm OPIF is complete', cfr: '§73.3539' },
+        { month_before_expiry: 4, action: 'Publish first newspaper notice of renewal or begin on-air announcements', cfr: '§73.3580' },
+        { month_before_expiry: 3, action: 'File Form 303-S with FCC (4 months before license expiry)', cfr: '§73.3539' },
+        { month_before_expiry: 0, action: 'License expiry — if renewal not granted, must cease operations or operate under pending status', cfr: '§73.3539(d)' }
+      ];
+
+      return {
+        fcc_class, frequency_khz,
+        renewal_cycle: RENEWAL_CYCLE,
+        license_term_years: 8,
+        renewal_form: 'FCC Form 303-S',
+        renewal_filing_fee_usd: 345,
+        opif_requirements: OPIF_REQUIREMENTS,
+        n_opif_required: OPIF_REQUIREMENTS.filter(o => o.required).length,
+        eeo_obligations: EEO_OBLIGATIONS,
+        ownership_reporting: OWNERSHIP_REPORTING,
+        compliance_calendar: complianceCalendar,
+        n_calendar_actions: complianceCalendar.length,
+        reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
+        note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
       };
     })(),
 

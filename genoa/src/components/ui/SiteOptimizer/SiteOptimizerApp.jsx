@@ -1717,6 +1717,32 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      license_renewal_compliance_guide: {
+        fcc_class: 'D', frequency_khz: 780,
+        renewal_cycle: { term_years: 8, form: 'FCC Form 303-S', filing_fee_usd: 345, filing_window_days_before_expiry: 120, publication_required: true, publication_cfr: '§73.3580', publication_notes: '3 consecutive weeks in newspaper of general circulation; OR 4 weeks on-air. Months 5–4 before expiry.', grace_period_days: 30 },
+        license_term_years: 8, renewal_form: 'FCC Form 303-S', renewal_filing_fee_usd: 345,
+        opif_requirements: [
+          { id: 'LICENSE', label: 'FCC License and authorizations', update_freq: 'As issued', cfr: '§73.3526(e)(1)', required: true },
+          { id: 'OWNERSHIP_REPORTS', label: 'FCC Form 323 Ownership Reports', update_freq: 'Biennial (every 2 years in even years)', cfr: '§73.3526(e)(4)', required: true },
+          { id: 'POLITICAL_FILE', label: 'Political broadcasting records', update_freq: 'Within 1 business day of request', cfr: '§73.3526(e)(6)', required: true },
+          { id: 'EEO_ANNUAL', label: 'EEO Annual Public File Report', update_freq: 'Annually, 1 year after renewal window opens', cfr: '§73.2080(c)(6)', required: true },
+          { id: 'QUARTERLY_ISSUES', label: 'Issues & Programs Lists', update_freq: 'Quarterly (Jan 10, Apr 10, Jul 10, Oct 10)', cfr: '§73.3526(e)(11)(i)', required: true },
+          { id: 'CONTOUR_MAPS', label: 'Station contour maps', update_freq: 'On change of coverage area', cfr: '§73.3526(e)(3)', required: true },
+          { id: 'CONSTRUCTION_PERMIT', label: 'Construction permit (if CP pending)', update_freq: 'As issued', cfr: '§73.3526(e)(2)', required: false }
+        ],
+        n_opif_required: 6,
+        eeo_obligations: { threshold_employees: 5, applicable: true, cfr: '§73.2080', outreach_initiatives_per_year: 2, annual_report_form: 'FCC Form 2100 (Schedule 396)', mid_term_review: { required: true, timing: '4 years into license term', form: 'EEO Mid-term Review', cfr: '§73.2080(f)' }, violation_risk: 'Forfeiture or license renewal challenge for documented EEO deficiencies' },
+        ownership_reporting: { form: 'FCC Form 323', frequency: 'Biennial (even-numbered years, by December 1)', cfr: '§73.3615', covers: ['Licensee identity and ownership structure', 'Attributable interests', 'Local marketing agreements', 'Time brokerage agreements'], filing_fee_usd: 0 },
+        compliance_calendar: [
+          { month_before_expiry: 4, action: 'Begin renewal application preparation; confirm OPIF is complete', cfr: '§73.3539' },
+          { month_before_expiry: 4, action: 'Publish first newspaper notice of renewal or begin on-air announcements', cfr: '§73.3580' },
+          { month_before_expiry: 3, action: 'File Form 303-S with FCC (4 months before license expiry)', cfr: '§73.3539' },
+          { month_before_expiry: 0, action: 'License expiry — operate under pending status if renewal not yet granted', cfr: '§73.3539(d)' }
+        ],
+        n_calendar_actions: 4,
+        reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
+        note: 'AM Class D. 8-year license term. Form 303-S renewal filing fee $345. OPIF: 6 required items. EEO: 2 outreach initiatives/year if ≥5 FTE.'
+      },
       nighttime_pattern_switching_guide: {
         fcc_class: 'D', frequency_khz: 780, pattern_mode: 'NDA',
         is_clear_channel: true, is_da_pattern: false,
