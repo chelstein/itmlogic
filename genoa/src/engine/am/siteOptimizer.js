@@ -656,16 +656,19 @@ async function scoreCandidate(pt, ctx, warnings){
       });
       coverage_computed_from = 'polygon-overlap (Monte-Carlo)';
     } else {
-      // Proxy COL = 10 km disc around the OPERATOR'S current site —
-      // i.e., the community of license stays where it is even when
-      // the transmitter moves.
+      // Proxy COL = 10 km disc centered on the community of license.
+      // When col_centroid is provided, use it; otherwise fall back to the
+      // current transmitter site as a rough proxy for the COL location.
+      const colCenter = col_centroid ?? current_site;
       coverage_pct = discCoverageFraction({
         circle_center: pt,
         circle_radius_km: r5km,
-        disc_center: current_site,
+        disc_center: colCenter,
         disc_radius_km: 10
       });
-      coverage_computed_from = 'disc-disc analytical proxy (10 km COL)';
+      coverage_computed_from = col_centroid
+        ? 'disc-disc analytical proxy (10 km COL at supplied centroid)'
+        : 'disc-disc analytical proxy (10 km COL at current site)';
     }
   } catch (e){
     warnings.push({ code: 'COL_CURVE_FAILED', message: `fccAmDistanceKm(5 mV/m) failed: ${e.message}` });

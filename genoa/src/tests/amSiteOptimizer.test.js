@@ -1222,6 +1222,35 @@ test('status_category: NON_COMPLIANT candidates have HARD CHECK FAIL in limitati
   }
 });
 
+test('col_centroid changes coverage_computed_from to indicate centroid was used', async () => {
+  const colCenter = { lat: KAZM.current_site.lat + 0.2, lon: KAZM.current_site.lon + 0.2 };
+  const outNoCentroid = await runSiteOptimizer({
+    ...KAZM, candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  const outWithCentroid = await runSiteOptimizer({
+    ...KAZM, candidate_limit: 5, col_centroid: colCenter,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(outWithCentroid.available, true);
+  // Candidates that used the disc-disc proxy should report the centroid in the description.
+  for (const c of outWithCentroid.candidates){
+    const cov = c.explanation?.coverage_computed_from;
+    if (cov && cov.includes('disc-disc')){
+      assert.ok(/supplied centroid/i.test(cov),
+        `coverage_computed_from should mention supplied centroid; got: "${cov}"`);
+    }
+  }
+  // Without centroid, the description uses current site.
+  for (const c of outNoCentroid.candidates){
+    const cov = c.explanation?.coverage_computed_from;
+    if (cov && cov.includes('disc-disc')){
+      assert.ok(!/supplied centroid/i.test(cov),
+        `coverage_computed_from should not mention supplied centroid without one; got: "${cov}"`);
+    }
+  }
+});
+
 test('ranking_rationale for non-compliant candidates includes fix hint when minimum_tpo values are present', async () => {
   // Use 50 kW near-border to force blanket pop failures with minimum_tpo_for_compliance_kw set.
   const out = await runSiteOptimizer({
