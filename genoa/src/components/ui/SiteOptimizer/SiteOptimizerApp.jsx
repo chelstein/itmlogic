@@ -1717,6 +1717,239 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      stl_network_link_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        stl_path_distance_km: 20,
+        stl_options: [
+          { id: 'UHF_950MHZ', label: '950 MHz STL (Part 74)', band_mhz: 950, part: 'Part 74 §74.502', los_required: true, max_range_km: 80, audio_quality: 'BROADCAST_QUALITY', latency_ms: 2, data_rate_kbps: 128, fcc_license_required: true, cost_usd_est: 8500, suitable: true, pros: ['Broadcast standard', 'Low latency', 'Licensed spectrum protection'], cons: ['LOS required', 'FCC license ($1,035 fee)'] },
+          { id: 'IP_STL', label: 'IP/Internet STL (codec pair)', band_mhz: null, part: 'No FCC license required', los_required: false, max_range_km: 10000, audio_quality: 'BROADCAST_QUALITY', latency_ms: 80, data_rate_kbps: 192, fcc_license_required: false, cost_usd_est: 4200, suitable: true, pros: ['No LOS required', 'No FCC license', 'Low cost'], cons: ['Internet latency/jitter'] },
+          { id: 'MICROWAVE_STL', label: 'Microwave STL (Part 101, 6–11 GHz)', band_mhz: 7125, part: 'Part 101 §101.113', los_required: true, max_range_km: 120, audio_quality: 'BROADCAST_QUALITY', latency_ms: 1, data_rate_kbps: 10000, fcc_license_required: true, cost_usd_est: 18000, suitable: true, pros: ['Very high capacity', 'Extremely low latency'], cons: ['High cost', 'Strict LOS requirement'] },
+          { id: 'FIBER_STL', label: 'Fiber optic (leased or owned)', band_mhz: null, part: 'No FCC license (private wire)', los_required: false, max_range_km: 1000, audio_quality: 'BROADCAST_QUALITY', latency_ms: 5, data_rate_kbps: 1000000, fcc_license_required: false, cost_usd_est: 29000, suitable: false, pros: ['No weather fade', 'Unlimited capacity'], cons: ['Expensive for long distances', 'Trenching required'] }
+        ],
+        n_stl_options: 4,
+        recommended_stl: { id: 'UHF_950MHZ', label: '950 MHz STL (Part 74)', los_required: true, fcc_license_required: true, cost_usd_est: 8500 },
+        los_analysis: { path_distance_km: 20, fresnel_zone_1_m: 14.49, clearance_required_m: 8.69, k_factor: 1.33, earth_bulge_m: 5.91, note: 'Actual LOS analysis requires 30m terrain DEM profile.', survey_required: true },
+        redundancy_plan: { primary: '950 MHz STL (Part 74)', secondary: 'IP/Internet STL (codec pair)', failover_time_sec: 5, eas_continuity: 'EAS audio must be maintained through backup link per §11.35', sla_requirement: '99.9% uptime = max 8.76 hrs/yr downtime' },
+        part74_licensing: { applicable: true, form: 'FCC Form 601 (UHF STL) or FCC Form 601 (microwave)', fee_usd: 1035, coordination: 'Frequency coordination required before filing', processing_days: 45, note: 'Part 74 STL license is separate from AM station license' },
+        equip_cost_usd: 8500, install_cost_usd: 2550, license_fee_usd: 1035, total_stl_cost_usd: 12085,
+        reference: '47 CFR Part 74 §74.502; Part 101 §101.113; §11.35 EAS; SBE RP-5 (2020) STL system design guide; FCC Form 601',
+        note: 'STL path ~20 km. Recommended: 950 MHz STL (Part 74). Total estimated cost: $12,085.'
+      },
+      regulatory_filing_checklist: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
+        is_da: false, is_clear_channel: false, needs_asr: true,
+        pre_filing: [
+          { id: 'SITE_SURVEY', phase: 'PRE_FILING', form: 'None (internal)', required: true, description: 'Ground conductivity survey (Wenner 4-pin method); soil analysis for radial design' },
+          { id: 'FAA_OE', phase: 'PRE_FILING', form: 'FAA Form 7460-1', required: true, description: 'FAA aeronautical study (OE/AAA). Required when tower exceeds 61m. REQUIRED for this site.' },
+          { id: 'ASR', phase: 'PRE_FILING', form: 'FCC ASR (CORES)', required: true, description: 'Antenna Structure Registration. Required when tower ≥ 60.96m AGL. REQUIRED.' },
+          { id: 'ENV_REVIEW', phase: 'PRE_FILING', form: 'FCC Environmental Review', required: false, description: 'FCC §11.4 NEPA environmental checklist.' },
+          { id: 'SHPO', phase: 'PRE_FILING', form: 'NHPA §106 Consultation', required: false, description: 'State Historic Preservation Officer consultation.' },
+          { id: 'SPACING_STUDY', phase: 'PRE_FILING', form: 'Engineering study', required: true, description: 'Co-channel and adjacent-channel spacing verification per §73.182.' },
+          { id: 'NIF_STUDY', phase: 'PRE_FILING', form: 'Engineering study', required: false, description: 'Nighttime interference/protection study. Not required (not clear channel).' }
+        ],
+        fcc_forms: [
+          { id: 'FORM_301_AM', phase: 'FCC_APPLICATION', form: 'FCC Form 301-AM', required: true, fee_usd: 6465, description: 'Application for construction permit — major change of facility.' },
+          { id: 'FORM_603', phase: 'FCC_APPLICATION', form: 'FCC Form 603 (if transfer)', required: false, fee_usd: 820, description: 'Transfer of control / assignment of license.' },
+          { id: 'FORM_301_EXH', phase: 'FCC_APPLICATION', form: 'Form 301-AM Exhibit A', required: false, description: 'Directional antenna pattern exhibit. Not required (NDA).' },
+          { id: 'FORM_301_HRP', phase: 'FCC_APPLICATION', form: 'Form 301-AM HRP', required: false, description: 'Horizontal radiation pattern table. Not required (NDA).' },
+          { id: 'FORM_335', phase: 'FCC_APPLICATION', form: 'FCC Form 335', required: true, fee_usd: 0, description: 'AM antenna efficiency certification.' }
+        ],
+        construction_filings: [
+          { id: 'GROUND_SYSTEM', phase: 'CONSTRUCTION', form: 'Engineering certification', required: true, description: 'Radial ground system installation certification.' },
+          { id: 'TOWER_LIGHTING', phase: 'CONSTRUCTION', form: 'FCC FAA coordination', required: true, description: 'Tower lighting and marking compliance certification per §17.7.' },
+          { id: 'TOWER_REG', phase: 'CONSTRUCTION', form: 'ASR update', required: true, description: 'Update ASR registration with actual tower height after construction.' }
+        ],
+        post_construction: [
+          { id: 'FORM_302_AM', phase: 'POST_CONSTRUCTION', form: 'FCC Form 302-AM', required: true, fee_usd: 0, description: 'License to cover construction permit.' },
+          { id: 'DA_PROOF', phase: 'POST_CONSTRUCTION', form: 'DA Proof of Performance', required: false, description: 'DA field strength traversal. Not required (NDA).' },
+          { id: 'MPE_STUDY', phase: 'POST_CONSTRUCTION', form: 'MPE Exhibit (Form 302)', required: true, description: 'RF exposure MPE analysis per OET Bulletin 65. REQUIRED (5 kW).' },
+          { id: 'ANNUAL_EAS', phase: 'ONGOING', form: 'EAS Compliance Review', required: true, description: 'Annual EAS compliance review per §11.61.' }
+        ],
+        n_total_filings: 18,
+        n_required_filings: 11,
+        total_required_fees_usd: 6465,
+        filings_by_phase: [
+          { phase: 'PRE_FILING', required_count: 4, filings: [] },
+          { phase: 'FCC_APPLICATION', required_count: 2, filings: [] },
+          { phase: 'CONSTRUCTION', required_count: 3, filings: [] },
+          { phase: 'POST_CONSTRUCTION', required_count: 2, filings: [] },
+          { phase: 'ONGOING', required_count: 1, filings: [] }
+        ],
+        reference: '47 CFR §73.150; §73.154; §73.182; §73.1212; §11.4; §17.7; FCC Form 301-AM instructions; FCC Media Bureau AM processing guide 2024',
+        note: '11 required filings for Class D NDA at 780 kHz. Total FCC fees: $6,465. DA proof required: false. ASR/FAA: true.'
+      },
+      transmitter_cooling_hvac_guide: {
+        frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
+        tx_efficiency_pct: 58, tx_heat_kw: 3.62, tx_draw_kw: 8.62,
+        ancillary_heat_kw: 0.65, total_heat_kw: 4.27, total_heat_btu_h: 14569.64,
+        hvac_capacity_tons: 1.76, hvac_capacity_kw: 6.19,
+        design_criteria: { supply_air_temp_c: 18, return_air_temp_c: 27, max_room_temp_c: 30, min_room_temp_c: 15, humidity_rh_low: 40, humidity_rh_high: 60, air_changes_per_hour: 14 },
+        hvac_options: [
+          { id: 'SPLIT_SYSTEM', label: 'Mini-split or split system', suitable_kw_max: 10, suitable: true, cooling_cop: 3.2, power_kw: 1.93, pros: ['Low first cost', 'Easy installation'], cons: ['Limited capacity'] },
+          { id: 'PACKAGED_RTU', label: 'Packaged rooftop unit (RTU)', suitable_kw_max: 50, suitable: true, cooling_cop: 2.8, power_kw: 2.21, pros: ['Self-contained', 'Standard utility connections'], cons: ['Requires roof penetrations'] },
+          { id: 'PRECISION_COOLING', label: 'Precision computer room AC (CRAC)', suitable_kw_max: 200, suitable: true, cooling_cop: 2.5, power_kw: 2.48, pros: ['Temperature/humidity control ±0.5°C', 'ASHRAE A1 rated'], cons: ['High cost'] }
+        ],
+        n_hvac_options: 3,
+        recommended_hvac: { id: 'SPLIT_SYSTEM', label: 'Mini-split or split system', suitable_kw_max: 10, suitable: true, cooling_cop: 3.2, power_kw: 1.93 },
+        n_plus_one_redundancy: { strategy: 'N+1 redundancy', n_units: 2, each_unit_tons: 1.14, note: 'N+1: each unit sized at 65% capacity so either unit alone handles 100% of design load' },
+        annual_hvac_cost_usd: 2032,
+        maintenance_schedule: [
+          { interval: 'Monthly', task: 'Check filter condition and replace if ΔP > 0.25 in. H2O' },
+          { interval: 'Monthly', task: 'Verify supply/return air temperatures meet ASHRAE targets' },
+          { interval: 'Quarterly', task: 'Clean condenser coils; check refrigerant pressure' },
+          { interval: 'Biannual', task: 'Belt tension check (if belt-drive); motor lubrication' },
+          { interval: 'Annual', task: 'Full refrigerant leak test; compressor megohm test; EER measurement' }
+        ],
+        n_maintenance_tasks: 5,
+        thermal_risk_level: 'MODERATE',
+        thermal_protection: [
+          { measure: 'High-temp transmitter interlock (§73.49)', threshold_c: 55, action: 'Reduce power to 50%; alarm' },
+          { measure: 'High-temp room alarm', threshold_c: 38, action: 'Alert engineer; engage backup cooling' },
+          { measure: 'Fire suppression (FM-200 preferred)', threshold_c: null, action: 'Automatic release at detector activation' }
+        ],
+        reference: 'ASHRAE 2021 Thermal Guidelines for Data Processing Environments; NFPA 70 §430; FCC §73.49; EIA/TIA-569-D',
+        note: 'Transmitter heat: 3.62 kW; total facility heat: 4.27 kW (14,569 BTU/h). HVAC capacity: 1.76 tons (6.19 kW). Est. annual HVAC cost: $2,032.'
+      },
+      zoning_land_use_compatibility_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        tower_height_est_m: 144.23, tower_height_est_ft: 473.19,
+        zoning_tiers: [
+          { id: 'AGRICULTURAL', label: 'Agricultural / Rural', compatibility: 'EXCELLENT', approval_difficulty: 'LOW', typical_setback_m: 50, height_limit_m: null, conditional_use_required: false, variance_likely: false, timeline_months: 2, notes: 'Best zoning class for AM towers.' },
+          { id: 'INDUSTRIAL', label: 'Industrial / Heavy Commercial', compatibility: 'GOOD', approval_difficulty: 'LOW', typical_setback_m: 30, height_limit_m: null, conditional_use_required: true, variance_likely: false, timeline_months: 3, notes: 'CUP typically required.' },
+          { id: 'COMMERCIAL', label: 'Commercial', compatibility: 'FAIR', approval_difficulty: 'MODERATE', typical_setback_m: 20, height_limit_m: 30, conditional_use_required: true, variance_likely: true, timeline_months: 5, notes: 'Height variance required.' },
+          { id: 'RESIDENTIAL', label: 'Residential', compatibility: 'POOR', approval_difficulty: 'HIGH', typical_setback_m: 15, height_limit_m: 12, conditional_use_required: true, variance_likely: true, timeline_months: 12, notes: 'Significant opposition likely.' },
+          { id: 'WETLAND_FLOODPLAIN', label: 'Wetland / Floodplain', compatibility: 'EXCELLENT_CONDUCTIVITY', approval_difficulty: 'VERY_HIGH', typical_setback_m: 100, height_limit_m: null, conditional_use_required: true, variance_likely: false, timeline_months: 18, notes: 'Excellent conductivity but permitting burden 12–24 months.' }
+        ],
+        n_zoning_tiers: 5,
+        tower_height_vs_zoning: [
+          { zone_id: 'AGRICULTURAL', zone_label: 'Agricultural / Rural', height_limit_m: null, tower_height_m: 144.23, variance_required: false, clearance_m: null },
+          { zone_id: 'INDUSTRIAL', zone_label: 'Industrial / Heavy Commercial', height_limit_m: null, tower_height_m: 144.23, variance_required: false, clearance_m: null },
+          { zone_id: 'COMMERCIAL', zone_label: 'Commercial', height_limit_m: 30, tower_height_m: 144.23, variance_required: true, clearance_m: 114.23 },
+          { zone_id: 'RESIDENTIAL', zone_label: 'Residential', height_limit_m: 12, tower_height_m: 144.23, variance_required: true, clearance_m: 132.23 },
+          { zone_id: 'WETLAND_FLOODPLAIN', zone_label: 'Wetland / Floodplain', height_limit_m: null, tower_height_m: 144.23, variance_required: false, clearance_m: null }
+        ],
+        nepa_triggers: [
+          { trigger: 'Wilderness Area / National Park', applies: false, form: 'FCC Form 620 Environmental Review', risk: 'PROHIBITIVE' },
+          { trigger: 'Floodplain (100-year)', applies: false, form: 'FEMA Elevation Certificate + §11.4', risk: 'HIGH' },
+          { trigger: 'Wetland (CWA §404)', applies: false, form: 'Army Corps NWP or Individual Permit', risk: 'HIGH' },
+          { trigger: 'Endangered Species (ESA)', applies: false, form: 'USFWS Section 7 Consultation', risk: 'MODERATE' },
+          { trigger: 'Historic Properties (NHPA §106)', applies: false, form: 'SHPO Consultation', risk: 'MODERATE' },
+          { trigger: 'Tribal Lands', applies: false, form: 'Tribal Consultation Required', risk: 'MODERATE' },
+          { trigger: 'ATDS Aeronautical Study (FAA OE)', applies: true, form: 'FAA Form 7460-1', risk: 'REQUIRED' }
+        ],
+        n_nepa_triggers: 7,
+        fcc_preemption: { statute: '47 USC §332(c)(7)', applies_to_am: 'PARTIAL', effective_prohibition_standard: 'Local zoning cannot effectively prohibit broadcast service', shot_clock: 'No FCC shot clock for AM broadcast', note: 'AM broadcast towers fall under local zoning authority more fully than wireless towers.' },
+        site_preference_order: [
+          { rank: 1, zone: 'AGRICULTURAL', reason: 'Lowest opposition, no height limit, excellent conductivity typical' },
+          { rank: 2, zone: 'INDUSTRIAL', reason: 'CUP required but approvals fast' },
+          { rank: 3, zone: 'COMMERCIAL', reason: 'Feasible with variance for height' },
+          { rank: 4, zone: 'WETLAND_FLOODPLAIN', reason: 'Superior conductivity but permitting burden 12–24 months' },
+          { rank: 5, zone: 'RESIDENTIAL', reason: 'Avoid unless no alternative' }
+        ],
+        access_requirements: [
+          { item: 'Permanent access road easement', required: true, width_m: 5, notes: 'FCC requires reliable access to transmitter site per §73.49' },
+          { item: 'Ground radial field easement', required: true, width_m: 57.69, notes: 'Radials extend ~57.69m; need easement or ownership' },
+          { item: 'Utility easement (power + telco)', required: true, width_m: 10, notes: 'Electrical service + STL/IP link easement' },
+          { item: 'Fencing easement (§73.49 RF barrier)', required: true, width_m: 2, notes: 'FCC §73.49 requires locked fencing around tower base' }
+        ],
+        n_access_requirements: 4,
+        reference: '47 CFR §11.4 (NEPA); 47 USC §332(c)(7); CWA §404; ESA §7; NHPA §106; NFPA 101; FCC Env. Review',
+        note: 'Tower height est. 144.23 m (473.19 ft) for Class D at 780 kHz. Agricultural/industrial zoning preferred. Height variance likely in commercial zones.'
+      },
+      emergency_power_backup_guide: {
+        frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
+        transmitter_draw_kw: 8.62, facility_overhead_kw: 1.05, total_facility_load_kw: 9.67,
+        recommended_gen_kw: 12.09,
+        gen_options: [
+          { id: 'PORTABLE', label: 'Portable genset', rating_kw: 12.09, fuel_type: 'gasoline', runtime_hrs_per_tank: 8, suitable: true, pros: ['Low capital cost ($2K–$5K)', 'Moveable'], cons: ['Gasoline storage risk', 'Manual start', 'High maintenance', 'Noisy'] },
+          { id: 'STATIONARY_DIESEL', label: 'Stationary diesel genset', rating_kw: 30, fuel_type: 'diesel', runtime_hrs_per_tank: 72, suitable: true, pros: ['NFPA 110 compliant', 'Auto-start ATS', 'Long runtime (≥72hr)', 'Lower fuel cost than propane'], cons: ['Higher capital cost ($15K–$80K)', 'Requires spill containment'] },
+          { id: 'PROPANE_NG', label: 'Propane / natural gas genset', rating_kw: 20, fuel_type: 'propane_or_ng', runtime_hrs_per_tank: 48, suitable: true, pros: ['No diesel spill risk', 'Indefinite runtime (NG tie-in)', 'Lower maintenance'], cons: ['NG pressure may drop during regional emergency'] }
+        ],
+        n_gen_options: 3,
+        ups_bridge_target_min: 15, eas_load_w: 250, ups_capacity_wh: 75,
+        ups_options: [
+          { type: 'ONLINE_DOUBLE_CONVERSION', watt_hours: 600, runtime_min: 144, cost_usd_est: 800 },
+          { type: 'LINE_INTERACTIVE', watt_hours: 400, runtime_min: 96, cost_usd_est: 400 }
+        ],
+        diesel_fuel_72hr_gal: 93.6, fuel_storage_class: 'CLASS_IIB_TANK',
+        ats_spec: { transfer_time_sec: 10, ats_rating_a: 50, nec_article: '700.12(B)', nfpa_110_class: 'CLASS_60', utility_notify: 'Required if >100A at utility meter per NESC §230' },
+        compliance_checklist: [
+          { item: '§11.35(a) EAS equipment on backup power', required: true, status: 'REQUIRED' },
+          { item: '§73.1530 auxiliary transmitter authorization', required: false, status: 'OPTIONAL' },
+          { item: 'NFPA 110 generator installation standard', required: false, status: 'RECOMMENDED' },
+          { item: 'Local fire code — fuel storage permit', required: true, status: 'REQUIRED' },
+          { item: 'Monthly genset test run (30 min at ≥30% load)', required: false, status: 'RECOMMENDED' },
+          { item: 'Annual load bank test', required: false, status: 'RECOMMENDED' },
+          { item: 'Automatic transfer switch test quarterly', required: false, status: 'RECOMMENDED' }
+        ],
+        n_checklist_items: 7,
+        total_capex_est_usd: 18850,
+        reference: '47 CFR §11.35; §73.1530; NFPA 110 (2021 ed.); NEC Article 700; NESC §230; NFPA 30 fuel storage',
+        note: 'Emergency power for 5 kW TPO at 780 kHz. Total facility load: 9.67 kW; recommended generator: 12.09 kW. Estimated capital cost: $18,850.'
+      },
+      market_competitive_analysis: {
+        frequency_khz: 780, tpo_kw: 5, fcc_class: 'D',
+        channel_type: 'REGIONAL',
+        market_profile: { n_am_typical: 8, n_clear_typical: 1, competition_tier: 'SMALL_MARKET' },
+        am_formats: [
+          { id: 'NEWS_TALK', label: 'News/Talk', share_pct: 28, trend: 'STABLE', revenue_index: 1.20 },
+          { id: 'SPORTS', label: 'Sports', share_pct: 18, trend: 'GROWING', revenue_index: 1.35 },
+          { id: 'RELIGIOUS', label: 'Religious', share_pct: 16, trend: 'STABLE', revenue_index: 0.75 },
+          { id: 'SPANISH', label: 'Spanish/Ethnic', share_pct: 14, trend: 'GROWING', revenue_index: 1.10 },
+          { id: 'OLDIES_MOR', label: 'Oldies/MOR', share_pct: 10, trend: 'DECLINING', revenue_index: 0.80 },
+          { id: 'COUNTRY', label: 'Country', share_pct: 7, trend: 'STABLE', revenue_index: 1.00 },
+          { id: 'OTHER', label: 'Other/Unrated', share_pct: 7, trend: 'DECLINING', revenue_index: 0.60 }
+        ],
+        n_formats: 7,
+        co_channel_competitor_radius_km: 402,
+        estimated_co_channel_competitors: 2,
+        streaming_competition: { dab_applicable: false, iboc_hd_pct: 18, streaming_threat: 'MODERATE', podcast_overlap: 'MODERATE', smart_speaker_pct: 31 },
+        moat_factors: [
+          { factor: 'High conductivity site', value: true, benefit: 'Superior groundwave propagation; larger COL service area' }
+        ],
+        n_moat_factors: 1,
+        revenue_benchmark_usd: { low: 50000, high: 300000, median: 120000 },
+        audience_erosion: { am_total_weekly_reach_pct: 14.5, annual_decline_pct: -3.2, under_35_share_pct: 8, peak_commute_share_pct: 52, sports_bump_pct: 6 },
+        relocation_impact: { coverage_expansion_benefit: 'Larger COL contour increases TSA eligibility', signal_parity_note: 'Site relocation cannot increase TPO; coverage improvement from conductor/height only', format_flexibility: 'MODERATE', comp_differentiation: 'Competitive differentiation via format strategy and local content' },
+        reference: 'BIA/Kelsey AM Revenue Survey 2022; NAB State of the News Media 2023; Pew Research AM/FM Listening 2023; FCC LMS AM database',
+        note: 'Class D regional at 780 kHz. Estimated 8 co-market AM stations; 1 competitive moat factor identified.'
+      },
+      terrain_path_loss_analysis: {
+        frequency_khz: 780, tpo_kw: 5, sigma_msm: 9, wavelength_m: 384.62,
+        terrain_class: { id: 'FLAT', label: 'Flat / coastal', delta_h_m: 15, path_loss_extra_db: 0, description: 'Plains, desert, coastal marsh. Closest to smooth-earth FCC curves.' },
+        terrain_classes: [
+          { id: 'FLAT', label: 'Flat / coastal', delta_h_m: 15, path_loss_extra_db: 0, description: 'Plains, desert, coastal marsh.' },
+          { id: 'ROLLING', label: 'Rolling terrain', delta_h_m: 50, path_loss_extra_db: 2.5, description: 'Gently rolling hills.' },
+          { id: 'HILLY', label: 'Hilly terrain', delta_h_m: 120, path_loss_extra_db: 5.0, description: 'Pronounced hills.' },
+          { id: 'MOUNTAINOUS', label: 'Mountainous', delta_h_m: 300, path_loss_extra_db: 9.0, description: 'Ridge-to-valley terrain.' },
+          { id: 'SEVERE', label: 'Severe mountain', delta_h_m: 500, path_loss_extra_db: 14, description: 'Deep canyons.' }
+        ],
+        n_terrain_classes: 5,
+        itm_inputs: { frequency_mhz: 0.78, wavelength_m: 384.62, polarization: 'vertical', climate_zone: 'continental_temperate', surface_refractivity_N: 301, delta_h_m: 15, ground_sigma_msm: 9, relative_permittivity: 25 },
+        path_loss_profile: [
+          { distance_km: 1,   smooth_loss_db: 30, terrain_extra_db: 0,   total_loss_db: 30, field_strength_mvm: 316.23 },
+          { distance_km: 10,  smooth_loss_db: 58, terrain_extra_db: 0,   total_loss_db: 58, field_strength_mvm: 39.81 },
+          { distance_km: 25,  smooth_loss_db: 72, terrain_extra_db: 0,   total_loss_db: 72, field_strength_mvm: 7.94 },
+          { distance_km: 50,  smooth_loss_db: 84, terrain_extra_db: 0,   total_loss_db: 84, field_strength_mvm: 1.99 },
+          { distance_km: 100, smooth_loss_db: 96, terrain_extra_db: 0,   total_loss_db: 96, field_strength_mvm: 0.50 },
+          { distance_km: 200, smooth_loss_db: 110, terrain_extra_db: 0,  total_loss_db: 110, field_strength_mvm: 0.10 }
+        ],
+        n_profile_distances: 6,
+        ridge_diffraction: { applicable: false, note: 'Terrain too flat for significant knife-edge diffraction.' },
+        coverage_reduction_factor: 1.0,
+        effective_2mvm_coverage_km: 50,
+        propagation_study_required: false,
+        propagation_notes: [
+          'Terrain class: Flat / coastal (Δh ≈ 15m)',
+          'Estimated terrain correction: +0 dB excess path loss',
+          'Smooth-earth FCC groundwave curves (§73.183) applicable with minor terrain correction',
+          'Ground conductivity σ=9 mS/m; permittivity ε=25',
+          'Polarization: vertical (AM §73.150); climate: continental_temperate'
+        ],
+        fcc_method: '§73.182 groundwave curves; §73.183 terrain correction; ITM (Longley-Rice) for mountainous terrain',
+        reference: '47 CFR §73.182; §73.183; FCC OET Supplement B (ITM v7.0); Longley-Rice (NTIA Report 82-100); Hufford (1995)',
+        note: 'ITM terrain path loss analysis for 780 kHz at 5 kW. Flat terrain — smooth-earth FCC curves apply directly.'
+      },
       antenna_height_optimization: {
         fcc_class: 'D', frequency_khz: 780,
         wavelength_m: 384.62, quarter_wave_m: 96.15, five_eighths_wave_m: 240.38,

@@ -2226,6 +2226,357 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* STL Network Link Guide */}
+        {candidate.stl_network_link_guide && (() => {
+          const s = candidate.stl_network_link_guide;
+          const rec = s.recommended_stl || {};
+          return (
+            <div>
+              <h4 style={{ color: '#818cf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                STL / Network Link Guide
+              </h4>
+              <div style={{ background: '#0d0a1f', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>STL path distance:</span> <strong style={{ color: '#818cf8' }}>{s.stl_path_distance_km != null ? `${s.stl_path_distance_km} km` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Recommended:</span> <strong style={{ color: '#c4b5fd' }}>{rec.label || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Equipment cost:</span> <strong>{s.equip_cost_usd != null ? `$${s.equip_cost_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Total STL cost:</span> <strong style={{ color: '#818cf8' }}>{s.total_stl_cost_usd != null ? `$${s.total_stl_cost_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>LOS required:</span> <strong style={{ color: rec.los_required ? '#f59e0b' : '#22c55e' }}>{rec.los_required ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>FCC license:</span> <strong style={{ color: rec.fcc_license_required ? '#f59e0b' : '#22c55e' }}>{rec.fcc_license_required ? 'Required' : 'Not required'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>STL Technology Options</div>
+                {(s.stl_options || []).map((opt, i) => (
+                  <div key={i} style={{ background: opt.id === rec.id ? '#150d2a' : '#0a0614', borderRadius: 3, padding: '4px 8px', marginBottom: 3, fontSize: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 1 }}>
+                      <span style={{ color: opt.id === rec.id ? '#818cf8' : opt.suitable ? '#9ca3af' : '#4b5563', fontWeight: opt.id === rec.id ? 700 : 400 }}>
+                        {opt.label}{opt.id === rec.id ? ' ★' : ''}
+                      </span>
+                      <span style={{ color: '#6b7280' }}>
+                        {opt.latency_ms}ms · {opt.suitable ? '✓' : '✗'} · ${opt.cost_usd_est?.toLocaleString()}
+                      </span>
+                    </div>
+                    <div style={{ color: '#22c55e', fontSize: 9 }}>{(opt.pros || []).join(' · ')}</div>
+                  </div>
+                ))}
+              </div>
+              {s.los_analysis && (
+                <div style={{ background: '#0a0614', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#9ca3af' }}>Fresnel zone (950 MHz, midpath): </span>
+                  <span style={{ color: '#d1d5db' }}>{s.los_analysis.fresnel_zone_1_m}m radius; clearance needed: {s.los_analysis.clearance_required_m}m; earth bulge: {s.los_analysis.earth_bulge_m}m</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{s.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Regulatory Filing Checklist */}
+        {candidate.regulatory_filing_checklist && (() => {
+          const r = candidate.regulatory_filing_checklist;
+          const phaseColors = { PRE_FILING: '#60a5fa', FCC_APPLICATION: '#f59e0b', CONSTRUCTION: '#34d399', POST_CONSTRUCTION: '#a78bfa', ONGOING: '#9ca3af' };
+          return (
+            <div>
+              <h4 style={{ color: '#fde047', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Regulatory Filing Checklist
+              </h4>
+              <div style={{ background: '#1a1800', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Total filings:</span> <strong>{r.n_total_filings ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Required:</span> <strong style={{ color: '#fde047' }}>{r.n_required_filings ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Total FCC fees:</span> <strong style={{ color: '#f97316' }}>{r.total_required_fees_usd != null ? `$${r.total_required_fees_usd.toLocaleString()}` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>ASR required:</span> <strong style={{ color: r.needs_asr ? '#ef4444' : '#22c55e' }}>{r.needs_asr ? 'Yes' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>DA pattern:</span> <strong style={{ color: r.is_da ? '#f59e0b' : '#9ca3af' }}>{r.is_da ? 'DA — proof required' : 'NDA'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Clear channel:</span> <strong style={{ color: r.is_clear_channel ? '#fbbf24' : '#9ca3af' }}>{r.is_clear_channel ? 'Yes (NIF study)' : 'No'}</strong></div>
+                </div>
+              </div>
+              {(r.filings_by_phase || []).map((phase, pi) => (
+                <div key={pi} style={{ marginBottom: 6 }}>
+                  <div style={{ color: phaseColors[phase.phase] || '#9ca3af', fontSize: 11, fontWeight: 700, marginBottom: 3 }}>
+                    {phase.phase?.replace(/_/g, ' ')} ({phase.required_count} required)
+                  </div>
+                  {phase.filings.map((f, fi) => (
+                    <div key={fi} style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 10, marginBottom: 2, paddingLeft: 8 }}>
+                      <span style={{ color: f.required ? '#ef4444' : '#6b7280', minWidth: 8, marginTop: 1 }}>{f.required ? '●' : '○'}</span>
+                      <div>
+                        <span style={{ color: f.required ? '#fde047' : '#9ca3af', fontWeight: f.required ? 700 : 400 }}>{f.form}</span>
+                        {f.fee_usd > 0 && <span style={{ color: '#f97316' }}> (${f.fee_usd.toLocaleString()})</span>}
+                        <span style={{ color: '#6b7280' }}> — {f.description.substring(0, 80)}{f.description.length > 80 ? '…' : ''}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{r.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Transmitter Cooling / HVAC Guide */}
+        {candidate.transmitter_cooling_hvac_guide && (() => {
+          const h = candidate.transmitter_cooling_hvac_guide;
+          const riskColor = { LOW: '#22c55e', MODERATE: '#f59e0b', HIGH: '#ef4444' };
+          return (
+            <div>
+              <h4 style={{ color: '#67e8f9', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Transmitter Cooling / HVAC Guide
+              </h4>
+              <div style={{ background: '#001a1f', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>TX efficiency:</span> <strong>{h.tx_efficiency_pct != null ? `${h.tx_efficiency_pct}%` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>TX heat dissipated:</span> <strong style={{ color: '#67e8f9' }}>{h.tx_heat_kw != null ? `${h.tx_heat_kw} kW` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Total facility heat:</span> <strong style={{ color: '#f97316' }}>{h.total_heat_kw != null ? `${h.total_heat_kw} kW` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>HVAC capacity:</span> <strong style={{ color: '#fbbf24' }}>{h.hvac_capacity_tons != null ? `${h.hvac_capacity_tons} tons` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Thermal risk:</span> <strong style={{ color: riskColor[h.thermal_risk_level] || '#9ca3af' }}>{h.thermal_risk_level || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Annual HVAC cost:</span> <strong>{h.annual_hvac_cost_usd != null ? `$${h.annual_hvac_cost_usd.toLocaleString()}` : '—'}</strong></div>
+                </div>
+              </div>
+              {h.design_criteria && (
+                <div style={{ background: '#001215', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <div style={{ color: '#9ca3af', marginBottom: 3 }}>ASHRAE Design Criteria (Class A1)</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, fontSize: 10 }}>
+                    <div style={{ color: '#d1d5db' }}>Supply air: {h.design_criteria.supply_air_temp_c}°C</div>
+                    <div style={{ color: '#d1d5db' }}>Return air: {h.design_criteria.return_air_temp_c}°C</div>
+                    <div style={{ color: '#d1d5db' }}>Max room: {h.design_criteria.max_room_temp_c}°C</div>
+                    <div style={{ color: '#d1d5db' }}>RH: {h.design_criteria.humidity_rh_low}–{h.design_criteria.humidity_rh_high}%</div>
+                  </div>
+                </div>
+              )}
+              {h.recommended_hvac && (
+                <div style={{ background: '#0a1f20', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#67e8f9', fontWeight: 700 }}>Recommended: </span>
+                  <span style={{ color: '#d1d5db' }}>{h.recommended_hvac.label} ({h.recommended_hvac.rating_kw || h.hvac_capacity_kw} kW, COP {h.recommended_hvac.cooling_cop})</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{h.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Zoning Land Use Compatibility Guide */}
+        {candidate.zoning_land_use_compatibility_guide && (() => {
+          const z = candidate.zoning_land_use_compatibility_guide;
+          const compColor = { EXCELLENT: '#22c55e', EXCELLENT_CONDUCTIVITY: '#84cc16', GOOD: '#84cc16', FAIR: '#f59e0b', POOR: '#ef4444' };
+          const diffColor = { LOW: '#22c55e', MODERATE: '#f59e0b', HIGH: '#f97316', VERY_HIGH: '#ef4444' };
+          return (
+            <div>
+              <h4 style={{ color: '#c084fc', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Zoning Land Use Compatibility Guide
+              </h4>
+              <div style={{ background: '#130a1f', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Est. tower height:</span> <strong style={{ color: '#c084fc' }}>{z.tower_height_est_m != null ? `${z.tower_height_est_m} m (${z.tower_height_est_ft} ft)` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Zoning tiers:</span> <strong>{z.n_zoning_tiers ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>NEPA triggers:</span> <strong>{z.n_nepa_triggers ?? '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Access reqs.:</span> <strong>{z.n_access_requirements ?? '—'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Zoning Compatibility by District</div>
+                <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: '#6b7280', borderBottom: '1px solid #374151' }}>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>Zone</th>
+                      <th style={{ textAlign: 'center', padding: '2px 4px' }}>Compat.</th>
+                      <th style={{ textAlign: 'center', padding: '2px 4px' }}>Difficulty</th>
+                      <th style={{ textAlign: 'center', padding: '2px 4px' }}>Variance?</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Mo.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(z.zoning_tiers || []).map((tier, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #1f2937' }}>
+                        <td style={{ padding: '2px 4px', color: '#d1d5db' }}>{tier.label}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'center', color: compColor[tier.compatibility] || '#9ca3af', fontWeight: 700, fontSize: 9 }}>{tier.compatibility?.replace(/_/g, ' ')}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'center', color: diffColor[tier.approval_difficulty] || '#9ca3af' }}>{tier.approval_difficulty}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'center', color: tier.variance_likely ? '#f97316' : '#22c55e' }}>{tier.variance_likely ? 'Yes' : 'No'}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>{tier.timeline_months}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {(z.access_requirements || []).length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Easement / Access Requirements</div>
+                  {z.access_requirements.map((req, i) => (
+                    <div key={i} style={{ fontSize: 10, marginBottom: 2, color: '#d1d5db' }}>
+                      <span style={{ color: '#c084fc' }}>• {req.item}</span>
+                      {req.width_m && <span style={{ color: '#6b7280' }}> ({req.width_m}m)</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{z.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Emergency Power Backup Guide */}
+        {candidate.emergency_power_backup_guide && (() => {
+          const e = candidate.emergency_power_backup_guide;
+          const fmtKw = v => v != null ? `${v} kW` : '—';
+          const fmtUsd = v => v != null ? `$${v.toLocaleString()}` : '—';
+          return (
+            <div>
+              <h4 style={{ color: '#fb923c', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Emergency Power Backup Guide
+              </h4>
+              <div style={{ background: '#1a0d00', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Transmitter draw:</span> <strong>{fmtKw(e.transmitter_draw_kw)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Facility overhead:</span> <strong>{fmtKw(e.facility_overhead_kw)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Total load:</span> <strong style={{ color: '#fb923c' }}>{fmtKw(e.total_facility_load_kw)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Rec. generator:</span> <strong style={{ color: '#fbbf24' }}>{fmtKw(e.recommended_gen_kw)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>UPS capacity:</span> <strong>{e.ups_capacity_wh != null ? `${e.ups_capacity_wh} Wh` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Est. capital cost:</span> <strong style={{ color: '#fb923c' }}>{fmtUsd(e.total_capex_est_usd)}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>72-hr diesel fuel:</span> <strong>{e.diesel_fuel_72hr_gal != null ? `${e.diesel_fuel_72hr_gal} gal` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Fuel storage class:</span> <strong style={{ color: '#9ca3af' }}>{e.fuel_storage_class?.replace(/_/g, ' ') || '—'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Generator Options</div>
+                {(e.gen_options || []).map((g, i) => (
+                  <div key={i} style={{ background: '#120800', borderRadius: 3, padding: '5px 8px', marginBottom: 4, fontSize: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                      <span style={{ color: g.suitable ? '#fb923c' : '#6b7280', fontWeight: 700 }}>{g.label}</span>
+                      <span style={{ color: '#9ca3af' }}>{g.rating_kw} kW · {g.fuel_type}</span>
+                    </div>
+                    <div style={{ color: '#22c55e', fontSize: 10 }}>{g.pros.join(' · ')}</div>
+                    <div style={{ color: '#ef4444', fontSize: 10 }}>{g.cons.join(' · ')}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>§11.35 Compliance Checklist</div>
+                {(e.compliance_checklist || []).map((c, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, marginBottom: 2 }}>
+                    <span style={{ color: c.status === 'REQUIRED' ? '#ef4444' : c.status === 'RECOMMENDED' ? '#f59e0b' : '#6b7280', minWidth: 80, fontWeight: 700 }}>{c.status}</span>
+                    <span style={{ color: '#d1d5db' }}>{c.item}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{e.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Market Competitive Analysis */}
+        {candidate.market_competitive_analysis && (() => {
+          const m = candidate.market_competitive_analysis;
+          const mp = m.market_profile || {};
+          const tierColor = { MAJOR_MARKET: '#ef4444', LARGE_MARKET: '#f97316', MEDIUM_MARKET: '#f59e0b', SMALL_MARKET: '#22c55e' };
+          const chanColor = { CLEAR_CHANNEL: '#fbbf24', REGIONAL: '#60a5fa', LOCAL: '#a78bfa' };
+          return (
+            <div>
+              <h4 style={{ color: '#34d399', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Market Competitive Analysis
+              </h4>
+              <div style={{ background: '#0a1f14', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Channel type:</span> <strong style={{ color: chanColor[m.channel_type] || '#d1d5db' }}>{m.channel_type?.replace(/_/g, ' ') || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Market tier:</span> <strong style={{ color: tierColor[mp.competition_tier] || '#d1d5db' }}>{mp.competition_tier?.replace(/_/g, ' ') || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Est. co-market AM:</span> <strong>{mp.n_am_typical != null ? `~${mp.n_am_typical} stations` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Co-channel radius:</span> <strong>{m.co_channel_competitor_radius_km != null ? `${m.co_channel_competitor_radius_km} km` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Moat factors:</span> <strong style={{ color: m.n_moat_factors >= 2 ? '#22c55e' : m.n_moat_factors === 1 ? '#f59e0b' : '#ef4444' }}>{m.n_moat_factors ?? 0}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Revenue (median):</span> <strong>{m.revenue_benchmark_usd?.median != null ? `$${(m.revenue_benchmark_usd.median / 1000).toFixed(0)}K` : '—'}</strong></div>
+                </div>
+              </div>
+              {(m.moat_factors || []).length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Competitive Moat Factors</div>
+                  {m.moat_factors.map((f, i) => (
+                    <div key={i} style={{ background: '#0f2a1a', borderRadius: 3, padding: '4px 8px', marginBottom: 3, fontSize: 11 }}>
+                      <span style={{ color: '#34d399', fontWeight: 700 }}>{f.factor}: </span>
+                      <span style={{ color: '#d1d5db' }}>{f.benefit}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>AM Format Market Share</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {(m.am_formats || []).map((f, i) => (
+                    <div key={i} style={{ background: '#1a2a1a', borderRadius: 3, padding: '2px 6px', fontSize: 10 }}>
+                      <span style={{ color: '#d1d5db' }}>{f.label} </span>
+                      <span style={{ color: f.trend === 'GROWING' ? '#22c55e' : f.trend === 'DECLINING' ? '#ef4444' : '#9ca3af', fontWeight: 700 }}>{f.share_pct}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {m.streaming_competition && (
+                <div style={{ background: '#1a1a2e', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#9ca3af' }}>Streaming threat: </span>
+                  <span style={{ color: m.streaming_competition.streaming_threat === 'HIGH' ? '#ef4444' : m.streaming_competition.streaming_threat === 'MODERATE' ? '#f59e0b' : '#22c55e', fontWeight: 700 }}>{m.streaming_competition.streaming_threat}</span>
+                  <span style={{ color: '#6b7280' }}> · IBOC penetration: {m.streaming_competition.iboc_hd_pct}%</span>
+                </div>
+              )}
+              <div style={{ color: '#4b5563', fontSize: 10 }}>{m.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* Terrain Path Loss Analysis */}
+        {candidate.terrain_path_loss_analysis && (() => {
+          const t = candidate.terrain_path_loss_analysis;
+          const tc = t.terrain_class || {};
+          const tierColors = { FLAT: '#22c55e', ROLLING: '#84cc16', HILLY: '#f59e0b', MOUNTAINOUS: '#f97316', SEVERE: '#ef4444' };
+          const color = tierColors[tc.id] || '#9ca3af';
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Terrain Path Loss Analysis
+              </h4>
+              <div style={{ background: '#0a1929', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <div><span style={{ color: '#9ca3af' }}>Terrain class:</span> <strong style={{ color }}>{tc.label || '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Δh roughness:</span> <strong>{tc.delta_h_m != null ? `${tc.delta_h_m} m` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Extra path loss:</span> <strong style={{ color: tc.path_loss_extra_db > 5 ? '#f97316' : '#d1d5db' }}>{tc.path_loss_extra_db != null ? `+${tc.path_loss_extra_db} dB` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Prop. study req.:</span> <strong style={{ color: t.propagation_study_required ? '#f87171' : '#22c55e' }}>{t.propagation_study_required ? 'Yes (ITM)' : 'No'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Eff. 2 mV/m reach:</span> <strong>{t.effective_2mvm_coverage_km != null ? `${t.effective_2mvm_coverage_km} km` : '—'}</strong></div>
+                  <div><span style={{ color: '#9ca3af' }}>Cov. reduction:</span> <strong>{t.coverage_reduction_factor != null ? `${(t.coverage_reduction_factor * 100).toFixed(0)}%` : '—'}</strong></div>
+                </div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#9ca3af', fontSize: 11, marginBottom: 4 }}>Path Loss Profile (smooth earth + terrain correction)</div>
+                <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ color: '#6b7280', borderBottom: '1px solid #374151' }}>
+                      <th style={{ textAlign: 'left', padding: '2px 4px' }}>Dist</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Smooth</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Terrain</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>Total</th>
+                      <th style={{ textAlign: 'right', padding: '2px 4px' }}>FS (mV/m)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(t.path_loss_profile || []).map((row, i) => (
+                      <tr key={i} style={{ borderBottom: '1px solid #1f2937' }}>
+                        <td style={{ padding: '2px 4px', color: '#d1d5db' }}>{row.distance_km} km</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>{row.smooth_loss_db} dB</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right', color: '#9ca3af' }}>+{row.terrain_extra_db} dB</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right', color: '#d1d5db' }}>{row.total_loss_db} dB</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right', color: row.field_strength_mvm >= 2 ? '#22c55e' : row.field_strength_mvm >= 0.5 ? '#f59e0b' : '#6b7280' }}>{row.field_strength_mvm}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {t.ridge_diffraction?.applicable && (
+                <div style={{ background: '#1c0a00', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
+                  <span style={{ color: '#f97316', fontWeight: 700 }}>Ridge diffraction: </span>
+                  <span style={{ color: '#d1d5db' }}>{t.ridge_diffraction.diffraction_loss_db} dB loss (ν={t.ridge_diffraction.nu}, Fresnel r={t.ridge_diffraction.fresnel_radius_m} m)</span>
+                </div>
+              )}
+              {(t.propagation_notes || []).map((n, i) => (
+                <div key={i} style={{ color: '#6b7280', fontSize: 10, marginBottom: 2 }}>• {n}</div>
+              ))}
+              <div style={{ color: '#4b5563', fontSize: 10, marginTop: 4 }}>{t.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Antenna Height Optimization */}
         {candidate.antenna_height_optimization && (() => {
           const a = candidate.antenna_height_optimization;

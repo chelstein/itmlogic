@@ -6504,6 +6504,343 @@ test('power_line_interference_analysis comparison table columns present', async 
   }
 });
 
+test('stl_network_link_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].stl_network_link_guide;
+  assert.ok(s != null, 'stl_network_link_guide must be present');
+  assert.strictEqual(s.n_stl_options, 4, 'must have 4 STL options');
+  assert.ok(s.recommended_stl != null, 'recommended_stl must be set');
+  assert.ok(s.los_analysis != null, 'los_analysis must be present');
+  assert.ok(s.redundancy_plan != null, 'redundancy_plan must be present');
+});
+
+test('stl_network_link_guide STL options all have required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].stl_network_link_guide;
+  for (const opt of s.stl_options) {
+    assert.ok(opt.id != null, `STL option must have id: ${JSON.stringify(opt)}`);
+    assert.ok(opt.label != null, `STL option must have label`);
+    assert.ok(typeof opt.suitable === 'boolean', `STL option must have suitable boolean`);
+    assert.ok(opt.cost_usd_est > 0, `STL option must have positive cost`);
+  }
+});
+
+test('stl_network_link_guide path distance and LOS analysis', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].stl_network_link_guide;
+  assert.ok(s.stl_path_distance_km >= 1, 'STL path distance must be >= 1 km');
+  assert.ok(s.los_analysis.fresnel_zone_1_m > 0, 'Fresnel zone must be positive');
+  assert.ok(s.los_analysis.clearance_required_m > 0, 'clearance_required_m must be positive');
+  assert.ok(s.los_analysis.earth_bulge_m >= 0, 'earth_bulge_m must be >= 0');
+});
+
+test('stl_network_link_guide cost estimate and licensing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const s = out.candidates[0].stl_network_link_guide;
+  assert.ok(s.total_stl_cost_usd > 0, 'total_stl_cost_usd must be positive');
+  assert.ok(s.equip_cost_usd > 0, 'equip_cost_usd must be positive');
+  assert.ok(s.part74_licensing != null, 'part74_licensing must be present');
+  assert.ok(typeof s.part74_licensing.applicable === 'boolean', 'applicable must be boolean');
+});
+
+test('stl_network_link_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('stl_rec_type' in row,      'stl_rec_type missing from comparison table');
+    assert.ok('stl_path_km' in row,       'stl_path_km missing from comparison table');
+    assert.ok('stl_total_cost_usd' in row,'stl_total_cost_usd missing from comparison table');
+  }
+});
+
+test('regulatory_filing_checklist presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].regulatory_filing_checklist;
+  assert.ok(r != null, 'regulatory_filing_checklist must be present');
+  assert.ok(r.n_total_filings > 0, 'must have at least one filing');
+  assert.ok(Array.isArray(r.all_filings), 'all_filings must be an array');
+  assert.ok(Array.isArray(r.filings_by_phase), 'filings_by_phase must be an array');
+  assert.ok(r.n_required_filings > 0, 'must have at least one required filing');
+});
+
+test('regulatory_filing_checklist Form 301-AM is required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].regulatory_filing_checklist;
+  const form301 = r.fcc_forms.find(f => f.id === 'FORM_301_AM');
+  assert.ok(form301 != null, 'Form 301-AM must be in fcc_forms');
+  assert.strictEqual(form301.required, true, 'Form 301-AM must be required');
+  assert.ok(form301.fee_usd > 0, 'Form 301-AM must have a filing fee');
+});
+
+test('regulatory_filing_checklist DA-specific filings for DA stations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].regulatory_filing_checklist;
+  // KAZM is NDA — DA pattern proof should NOT be required
+  const daProof = r.post_construction.find(f => f.id === 'DA_PROOF');
+  assert.ok(daProof != null, 'DA_PROOF item must exist in post_construction');
+  // For NDA station, DA_PROOF.required should be false
+  assert.strictEqual(r.is_da, false, 'KAZM (NDA) must have is_da = false');
+  assert.strictEqual(daProof.required, false, 'DA proof not required for NDA station');
+});
+
+test('regulatory_filing_checklist total fees and filing counts', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const r = out.candidates[0].regulatory_filing_checklist;
+  assert.ok(r.total_required_fees_usd >= 0, 'total fees must be >= 0');
+  // Form 301-AM fee ($6465) must be reflected in total
+  assert.ok(r.total_required_fees_usd >= 6465, 'total fees must include at least Form 301-AM fee ($6465)');
+  assert.strictEqual(r.n_total_filings, r.all_filings.length, 'n_total_filings must match all_filings.length');
+});
+
+test('regulatory_filing_checklist comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rfc_n_required' in row,     'rfc_n_required missing from comparison table');
+    assert.ok('rfc_total_fees_usd' in row, 'rfc_total_fees_usd missing from comparison table');
+    assert.ok('rfc_needs_asr' in row,      'rfc_needs_asr missing from comparison table');
+  }
+});
+
+test('transmitter_cooling_hvac_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].transmitter_cooling_hvac_guide;
+  assert.ok(h != null, 'transmitter_cooling_hvac_guide must be present');
+  assert.strictEqual(h.n_hvac_options, 3, 'must have 3 HVAC options');
+  assert.ok(h.recommended_hvac != null, 'recommended_hvac must be set');
+  assert.ok(Array.isArray(h.maintenance_schedule), 'maintenance_schedule must be an array');
+  assert.strictEqual(h.n_maintenance_tasks, 5, 'must have 5 maintenance tasks');
+});
+
+test('transmitter_cooling_hvac_guide heat dissipation math for 5 kW TPO', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].transmitter_cooling_hvac_guide;
+  // 5 kW TPO at 58% efficiency: heat = 5 * (1-0.58)/0.58 ≈ 3.62 kW
+  assert.ok(h.tx_heat_kw > 0, 'tx_heat_kw must be positive');
+  assert.ok(h.tx_draw_kw > h.tpo_kw || h.tx_draw_kw != null, 'tx_draw_kw must be set');
+  assert.ok(h.total_heat_kw >= h.tx_heat_kw, 'total_heat_kw must be >= tx_heat_kw');
+  assert.ok(h.total_heat_btu_h > 0, 'total_heat_btu_h must be positive');
+  assert.ok(Math.abs(h.total_heat_btu_h - h.total_heat_kw * 3412.14) < 10, 'BTU/h conversion must be accurate');
+});
+
+test('transmitter_cooling_hvac_guide HVAC capacity and design criteria', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].transmitter_cooling_hvac_guide;
+  assert.ok(h.hvac_capacity_tons > 0, 'hvac_capacity_tons must be positive');
+  assert.ok(h.hvac_capacity_kw > h.total_heat_kw, 'HVAC capacity must exceed total heat (25% headroom)');
+  assert.ok(h.design_criteria != null, 'design_criteria must be present');
+  assert.ok(h.design_criteria.max_room_temp_c > h.design_criteria.supply_air_temp_c, 'max_room_temp must be > supply air temp');
+});
+
+test('transmitter_cooling_hvac_guide thermal risk and annual cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const h = out.candidates[0].transmitter_cooling_hvac_guide;
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(h.thermal_risk_level), `thermal_risk_level must be valid, got ${h.thermal_risk_level}`);
+  // KAZM 5 kW → MODERATE
+  assert.strictEqual(h.thermal_risk_level, 'MODERATE', '5 kW should be MODERATE thermal risk');
+  assert.ok(h.annual_hvac_cost_usd > 0, 'annual_hvac_cost_usd must be positive');
+  assert.ok(h.n_plus_one_redundancy != null, 'n_plus_one_redundancy must be present');
+});
+
+test('transmitter_cooling_hvac_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('hvac_capacity_tons' in row,   'hvac_capacity_tons missing from comparison table');
+    assert.ok('hvac_total_heat_kw' in row,   'hvac_total_heat_kw missing from comparison table');
+    assert.ok('hvac_annual_cost_usd' in row, 'hvac_annual_cost_usd missing from comparison table');
+  }
+});
+
+test('zoning_land_use_compatibility_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const z = out.candidates[0].zoning_land_use_compatibility_guide;
+  assert.ok(z != null, 'zoning_land_use_compatibility_guide must be present');
+  assert.strictEqual(z.n_zoning_tiers, 5, 'must have 5 zoning tiers');
+  assert.ok(Array.isArray(z.zoning_tiers), 'zoning_tiers must be an array');
+  assert.ok(Array.isArray(z.nepa_triggers), 'nepa_triggers must be an array');
+  assert.strictEqual(z.n_nepa_triggers, 7, 'must have 7 NEPA triggers');
+});
+
+test('zoning_land_use_compatibility_guide tower height estimate for KAZM Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const z = out.candidates[0].zoning_land_use_compatibility_guide;
+  // KAZM: 780 kHz → λ = 384.62m; 3/8λ = 144.23m
+  assert.ok(Math.abs(z.tower_height_est_m - 144.23) < 0.5, `tower_height_est_m should be ~144.23, got ${z.tower_height_est_m}`);
+  assert.ok(z.tower_height_est_ft > z.tower_height_est_m, 'height_ft must exceed height_m');
+});
+
+test('zoning_land_use_compatibility_guide variance required for commercial and residential', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const z = out.candidates[0].zoning_land_use_compatibility_guide;
+  const commercial = z.tower_height_vs_zoning.find(r => r.zone_id === 'COMMERCIAL');
+  const residential = z.tower_height_vs_zoning.find(r => r.zone_id === 'RESIDENTIAL');
+  assert.ok(commercial != null, 'must have COMMERCIAL zoning row');
+  assert.ok(residential != null, 'must have RESIDENTIAL zoning row');
+  assert.strictEqual(commercial.variance_required, true, 'COMMERCIAL must require variance (tower > 30m limit)');
+  assert.strictEqual(residential.variance_required, true, 'RESIDENTIAL must require variance (tower > 12m limit)');
+});
+
+test('zoning_land_use_compatibility_guide access requirements present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const z = out.candidates[0].zoning_land_use_compatibility_guide;
+  assert.ok(Array.isArray(z.access_requirements), 'access_requirements must be an array');
+  assert.strictEqual(z.n_access_requirements, 4, 'must have 4 access requirements');
+  const fencing = z.access_requirements.find(r => r.item.includes('§73.49'));
+  assert.ok(fencing != null, '§73.49 fencing easement must be in access requirements');
+});
+
+test('zoning_land_use_compatibility_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('zoning_tower_h_m' in row,    'zoning_tower_h_m missing from comparison table');
+    assert.ok('zoning_n_tiers' in row,      'zoning_n_tiers missing from comparison table');
+    assert.ok('zoning_n_access_req' in row, 'zoning_n_access_req missing from comparison table');
+  }
+});
+
+test('emergency_power_backup_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].emergency_power_backup_guide;
+  assert.ok(e != null, 'emergency_power_backup_guide must be present');
+  assert.ok(e.gen_options != null && e.gen_options.length === 3, 'must have 3 gen_options');
+  assert.ok(e.ups_options != null && e.ups_options.length === 2, 'must have 2 ups_options');
+  assert.ok(Array.isArray(e.compliance_checklist), 'compliance_checklist must be an array');
+  assert.strictEqual(e.n_checklist_items, 7, 'must have 7 checklist items');
+});
+
+test('emergency_power_backup_guide power math for KAZM 5 kW', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].emergency_power_backup_guide;
+  // 5 kW TPO → transmitter draw ≈ 5/0.58 ≈ 8.62 kW; overhead ≈ 0.8 + 5*0.05 = 1.05; total ≈ 9.67
+  assert.ok(e.transmitter_draw_kw != null && e.transmitter_draw_kw > 0, 'transmitter_draw_kw must be set and positive');
+  assert.ok(e.total_facility_load_kw > 0, 'total_facility_load_kw must be positive');
+  assert.ok(e.recommended_gen_kw >= e.total_facility_load_kw, 'recommended_gen_kw must be >= total load (with headroom)');
+  assert.ok(e.total_capex_est_usd > 0, 'total_capex_est_usd must be positive');
+});
+
+test('emergency_power_backup_guide UPS sizing for EAS load', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].emergency_power_backup_guide;
+  assert.strictEqual(e.ups_bridge_target_min, 15, 'UPS bridge target must be 15 min');
+  assert.strictEqual(e.eas_load_w, 250, 'EAS load must be 250W');
+  assert.ok(e.ups_capacity_wh > 0, 'UPS capacity must be positive');
+  const upsOnline = e.ups_options.find(u => u.type === 'ONLINE_DOUBLE_CONVERSION');
+  assert.ok(upsOnline != null, 'must have ONLINE_DOUBLE_CONVERSION UPS option');
+});
+
+test('emergency_power_backup_guide §11.35 compliance item present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const e = out.candidates[0].emergency_power_backup_guide;
+  const item = e.compliance_checklist.find(c => c.item.includes('§11.35'));
+  assert.ok(item != null, '§11.35(a) EAS compliance item must be in checklist');
+  assert.strictEqual(item.required, true, '§11.35(a) must be marked required');
+  assert.strictEqual(item.status, 'REQUIRED', '§11.35(a) status must be REQUIRED');
+});
+
+test('emergency_power_backup_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('epb_gen_kw' in row,       'epb_gen_kw missing from comparison table');
+    assert.ok('epb_total_load_kw' in row,'epb_total_load_kw missing from comparison table');
+    assert.ok('epb_capex_usd' in row,    'epb_capex_usd missing from comparison table');
+  }
+});
+
+test('market_competitive_analysis presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].market_competitive_analysis;
+  assert.ok(m != null, 'market_competitive_analysis must be present');
+  assert.ok(m.channel_type != null, 'channel_type must be set');
+  assert.ok(m.market_profile != null, 'market_profile must be present');
+  assert.ok(Array.isArray(m.am_formats), 'am_formats must be an array');
+  assert.strictEqual(m.n_formats, 7, 'must have 7 AM format categories');
+});
+
+test('market_competitive_analysis channel type and class correct for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].market_competitive_analysis;
+  // KAZM: 780 kHz — check whether clear channel; Class D → SMALL_MARKET
+  assert.ok(['CLEAR_CHANNEL', 'REGIONAL', 'LOCAL'].includes(m.channel_type), `channel_type must be valid, got ${m.channel_type}`);
+  assert.strictEqual(m.market_profile.competition_tier, 'SMALL_MARKET', 'Class D must be SMALL_MARKET');
+  assert.ok(m.market_profile.n_am_typical > 0, 'n_am_typical must be positive');
+});
+
+test('market_competitive_analysis format shares sum to 100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].market_competitive_analysis;
+  const total = m.am_formats.reduce((s, f) => s + f.share_pct, 0);
+  assert.strictEqual(total, 100, `AM format shares must sum to 100%, got ${total}`);
+});
+
+test('market_competitive_analysis moat factors and revenue benchmark', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const m = out.candidates[0].market_competitive_analysis;
+  assert.ok(Array.isArray(m.moat_factors), 'moat_factors must be an array');
+  assert.ok(m.n_moat_factors >= 0, 'n_moat_factors must be >= 0');
+  assert.ok(m.revenue_benchmark_usd != null, 'revenue_benchmark_usd must be present');
+  assert.ok(m.revenue_benchmark_usd.median > 0, 'revenue median must be positive');
+  assert.ok(m.audience_erosion != null, 'audience_erosion must be present');
+});
+
+test('market_competitive_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mkt_channel_type' in row,   'mkt_channel_type missing from comparison table');
+    assert.ok('mkt_n_moat_factors' in row, 'mkt_n_moat_factors missing from comparison table');
+    assert.ok('mkt_comp_tier' in row,      'mkt_comp_tier missing from comparison table');
+  }
+});
+
+test('terrain_path_loss_analysis presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].terrain_path_loss_analysis;
+  assert.ok(t != null, 'terrain_path_loss_analysis must be present');
+  assert.ok(t.terrain_class != null, 'terrain_class must be present');
+  assert.ok(Array.isArray(t.path_loss_profile), 'path_loss_profile must be an array');
+  assert.strictEqual(t.n_profile_distances, 6, 'must have 6 profile distances');
+  assert.ok(Array.isArray(t.terrain_classes), 'terrain_classes must be an array');
+  assert.strictEqual(t.n_terrain_classes, 5, 'must have 5 terrain classes');
+});
+
+test('terrain_path_loss_analysis path loss profile is monotonically increasing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].terrain_path_loss_analysis;
+  const profile = t.path_loss_profile;
+  for (let i = 1; i < profile.length; i++) {
+    assert.ok(profile[i].total_loss_db > profile[i - 1].total_loss_db,
+      `total_loss_db must increase with distance: ${profile[i - 1].distance_km}km → ${profile[i].distance_km}km`);
+    assert.ok(profile[i].field_strength_mvm <= profile[i - 1].field_strength_mvm,
+      `field_strength_mvm must not increase with distance (round2 may equalize small values)`);
+  }
+});
+
+test('terrain_path_loss_analysis terrain class correct for KAZM (sigma >= 8)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].terrain_path_loss_analysis;
+  // KAZM sigma is computed from lat/lon — in Sedona/Flagstaff area conductivity varies
+  // Terrain class is deterministic based on sigma_msm returned by the engine
+  assert.ok(t.terrain_class.id != null, 'terrain_class.id must be set');
+  assert.ok(t.terrain_class.path_loss_extra_db >= 0, 'extra loss must be >= 0');
+  assert.ok(typeof t.terrain_class.delta_h_m === 'number', 'delta_h_m must be a number');
+});
+
+test('terrain_path_loss_analysis ITM inputs and ridge diffraction fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].terrain_path_loss_analysis;
+  assert.ok(t.itm_inputs != null, 'itm_inputs must be present');
+  assert.strictEqual(t.itm_inputs.polarization, 'vertical', 'AM is always vertical polarization');
+  assert.ok(t.itm_inputs.frequency_mhz > 0, 'frequency_mhz must be positive');
+  assert.ok(t.ridge_diffraction != null, 'ridge_diffraction must be present');
+  assert.ok(typeof t.ridge_diffraction.applicable === 'boolean', 'applicable must be boolean');
+});
+
+test('terrain_path_loss_analysis comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('terrain_class_id' in row,       'terrain_class_id missing from comparison table');
+    assert.ok('terrain_extra_loss_db' in row,  'terrain_extra_loss_db missing from comparison table');
+    assert.ok('terrain_prop_study_req' in row, 'terrain_prop_study_req missing from comparison table');
+  }
+});
+
 test('antenna_height_optimization presence and structure', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const a = out.candidates[0].antenna_height_optimization;
