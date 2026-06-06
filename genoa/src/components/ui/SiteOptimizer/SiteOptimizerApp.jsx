@@ -16,6 +16,7 @@ import TowerReferencePanel from './TowerReferencePanel.jsx';
 import RecommendedActionsPanel from './RecommendedActionsPanel.jsx';
 import Form301ChecklistPanel from './Form301ChecklistPanel.jsx';
 import ProtectionRequirementsPanel from './ProtectionRequirementsPanel.jsx';
+import MinimumSpacingPanel from './MinimumSpacingPanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -247,6 +248,11 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
             {result?.protection_requirements && (
               <ProtectionRequirementsPanel protection_requirements={result.protection_requirements} />
             )}
+            {result?.minimum_spacing_reference && (
+              <RackPanel eyebrow="§73.37" title="Minimum station separation" dense>
+                <MinimumSpacingPanel data={result.minimum_spacing_reference} />
+              </RackPanel>
+            )}
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
             ) : (
@@ -403,6 +409,30 @@ const DEMO_RESULT = {
       plus_20khz:  { protection_db: 14, note: '2nd adjacent upper: 14 dB D/U' },
       note: 'D/U ratios are at the undesired station\'s 0.5 mV/m skywave or 5 mV/m groundwave contour (§73.182 Table 1). Exact values depend on class and time of operation.'
     }
+  },
+  minimum_spacing_reference: {
+    rule: '47 CFR §73.37',
+    proposed_class: 'D',
+    channel_class: 'clear_channel',
+    caveat: 'These are screening-grade minimums from the §73.37 table. Actual required separation for a specific site pair must be computed using the FCC groundwave field-intensity method (§73.182) against all stations in the LMS database.',
+    co_channel: [
+      { existing_class: 'A', min_separation_km: 1037, note: 'Proposed Class D vs. existing Class A — co-channel (0 kHz)' },
+      { existing_class: 'B', min_separation_km:  953, note: 'Proposed Class D vs. existing Class B — co-channel (0 kHz)' },
+      { existing_class: 'C', min_separation_km:  724, note: 'Proposed Class D vs. existing Class C — co-channel (0 kHz)' },
+      { existing_class: 'D', min_separation_km:  953, note: 'Proposed Class D vs. existing Class D — co-channel (0 kHz)' }
+    ],
+    adjacent_10khz: [
+      { existing_class: 'A', min_separation_km: 805, note: 'Proposed Class D vs. existing Class A — ±10 kHz adjacent channel' },
+      { existing_class: 'B', min_separation_km: 724, note: 'Proposed Class D vs. existing Class B — ±10 kHz adjacent channel' },
+      { existing_class: 'C', min_separation_km: 402, note: 'Proposed Class D vs. existing Class C — ±10 kHz adjacent channel' },
+      { existing_class: 'D', min_separation_km: 724, note: 'Proposed Class D vs. existing Class D — ±10 kHz adjacent channel' }
+    ],
+    adjacent_20khz: [
+      { existing_class: 'A', min_separation_km: 402, note: 'Proposed Class D vs. existing Class A — ±20 kHz second adjacent' },
+      { existing_class: 'B', min_separation_km: 354, note: 'Proposed Class D vs. existing Class B — ±20 kHz second adjacent' },
+      { existing_class: 'C', min_separation_km: 177, note: 'Proposed Class D vs. existing Class C — ±20 kHz second adjacent' },
+      { existing_class: 'D', min_separation_km: 354, note: 'Proposed Class D vs. existing Class D — ±20 kHz second adjacent' }
+    ]
   },
   warnings: [
     {

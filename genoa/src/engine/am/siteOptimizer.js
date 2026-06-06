@@ -508,6 +508,7 @@ export async function runSiteOptimizer(body = {}){
     protection_requirements: buildProtectionRequirements({
       fcc_class, frequency_khz, channel_class: chanClass
     }),
+    minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
     tower_reference,
     inputs_echo: {
       callsign, frequency_khz, current_site, search_radius_km,
@@ -1466,6 +1467,68 @@ function buildGroundRadialAdvisory(sigma_msm){
   return `POOR conductivity (σ=${sigma_msm} mS/m): §73.190 extended ground system likely required — consider deep-driven ground rods or buried copper grid in addition to standard 120 radials. Site soil resistivity survey strongly recommended before committing to this location.`;
 }
 
+// Minimum spacing reference — §73.37 Table of Minimum Separations for AM stations.
+// Returns co-channel and adjacent-channel minimum mileage rows for the proposed station's
+// class vs. each existing station class. Values from 47 CFR §73.37(a) (daytime, km).
+// Adjacent-channel separations are from §73.37(b) Table B1.
+// NOTE: These are the FCC-specified distances for initial screening; actual required separation
+// depends on the exact power, height, and pattern of BOTH stations — file-grade separation
+// studies must use the FCC LMS database and the applicable §73.182 D/U methodology.
+function buildMinimumSpacingReference({ fcc_class, channel_class }){
+  // §73.37(a) co-channel minimum distances (km), daytime.
+  // Rows = proposed station class; columns = existing station class A/B/C/D.
+  // Values extracted from Table 1 of §73.37.
+  const CO_CHANNEL_KM = {
+    A: { A: 1037, B: 1037, C:  805, D: 1037 },
+    B: { A: 1037, B:  953, C:  724, D:  953 },
+    C: { A:  805, B:  724, C:  354, D:  724 },
+    D: { A: 1037, B:  953, C:  724, D:  953 }
+  };
+  // §73.37(b) Table B1 — first adjacent channel (±10 kHz) minimum distances (km), daytime.
+  const ADJ10_KM = {
+    A: { A: 805, B: 805, C: 402, D: 805 },
+    B: { A: 805, B: 724, C: 402, D: 724 },
+    C: { A: 402, B: 402, C: 177, D: 402 },
+    D: { A: 805, B: 724, C: 402, D: 724 }
+  };
+  // §73.37(b) Table B2 — second adjacent channel (±20 kHz) minimum distances (km), daytime.
+  const ADJ20_KM = {
+    A: { A: 402, B: 402, C: 177, D: 402 },
+    B: { A: 402, B: 354, C: 177, D: 354 },
+    C: { A: 177, B: 177, C:  96, D: 177 },
+    D: { A: 402, B: 354, C: 177, D: 354 }
+  };
+
+  const proposed = fcc_class in CO_CHANNEL_KM ? fcc_class : 'D';
+  const existingClasses = ['A', 'B', 'C', 'D'];
+
+  const co_channel = existingClasses.map(ex => ({
+    existing_class: ex,
+    min_separation_km: CO_CHANNEL_KM[proposed]?.[ex] ?? null,
+    note: `Proposed Class ${proposed} vs. existing Class ${ex} — co-channel (0 kHz)`
+  }));
+  const adjacent_10khz = existingClasses.map(ex => ({
+    existing_class: ex,
+    min_separation_km: ADJ10_KM[proposed]?.[ex] ?? null,
+    note: `Proposed Class ${proposed} vs. existing Class ${ex} — ±10 kHz adjacent channel`
+  }));
+  const adjacent_20khz = existingClasses.map(ex => ({
+    existing_class: ex,
+    min_separation_km: ADJ20_KM[proposed]?.[ex] ?? null,
+    note: `Proposed Class ${proposed} vs. existing Class ${ex} — ±20 kHz second adjacent`
+  }));
+
+  return {
+    rule: '47 CFR §73.37',
+    proposed_class: proposed,
+    channel_class,
+    caveat: 'These are screening-grade minimums from the §73.37 table. Actual required separation for a specific site pair must be computed using the FCC groundwave field-intensity method (§73.182) against all stations in the LMS database.',
+    co_channel,
+    adjacent_10khz,
+    adjacent_20khz
+  };
+}
+
 // Protection class advisory — §73.182 skywave risk guidance based on the
 // station's FCC class and channel type.  Returns { protection_class_advisory, skywave_risk_level }.
 function buildProtectionAdvisory({ fcc_class, frequency_khz, channel_class, pattern_mode }){
@@ -2177,6 +2240,7 @@ export const __test__ = {
   frequencyChannelClass,
   buildGroundRadialAdvisory,
   buildProtectionAdvisory,
+  buildMinimumSpacingReference,
   buildRecommendedActions,
   FCC_CLASS_POWER_KW,
   LOCAL_CHANNEL_KHZ,

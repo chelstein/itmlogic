@@ -30,7 +30,7 @@
 //   manualInfrastructureClient).  All scoring is deterministic.
 
 import { runSiteOptimizer, buildTopSummary, frequencyChannelClass, __test__ as SO } from './siteOptimizer.js';
-const { buildProtectionAdvisory, buildRecommendedActions } = SO;
+const { buildProtectionAdvisory, buildMinimumSpacingReference, buildRecommendedActions } = SO;
 import { fccAmDistanceKm } from '../curves/fcc/index.mjs';
 import { m3LoadStatus } from './m3.js';
 import { complianceDistance_m, nearFieldBoundary_m } from '../regulatory/oet65.js';
@@ -346,6 +346,7 @@ export async function runColocationOpportunities(body = {}){
     skywave_risk_level,
     protection_class_advisory,
     recommended_actions,
+    minimum_spacing_reference: buildMinimumSpacingReference({ fcc_class, channel_class: chanClass }),
     candidate_count_by_status,
     n_infrastructure_sites: infraSites.length,
     scoring_time_ms,

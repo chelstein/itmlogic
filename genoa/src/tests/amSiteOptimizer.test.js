@@ -2046,3 +2046,69 @@ test('per_candidate_engineering_checklist includes SOIL_RESISTIVITY_SURVEY when 
   }
   // If raster is loaded (filing-grade σ), survey is optional — test is a no-op.
 });
+
+// ---------- minimum_spacing_reference ----------
+
+test('minimum_spacing_reference is present in response with correct structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const msr = out.minimum_spacing_reference;
+  assert.ok(msr, 'minimum_spacing_reference must be present in response');
+  assert.ok(typeof msr.rule === 'string' && /§73\.37/i.test(msr.rule),
+    `rule must cite §73.37; got: "${msr.rule}"`);
+  assert.ok(['A', 'B', 'C', 'D'].includes(msr.proposed_class),
+    `proposed_class must be A/B/C/D; got: ${msr.proposed_class}`);
+  assert.ok(['local', 'regional', 'clear_channel'].includes(msr.channel_class),
+    `channel_class must be local/regional/clear_channel; got: ${msr.channel_class}`);
+  assert.ok(typeof msr.caveat === 'string' && msr.caveat.length > 20,
+    'caveat must be a non-empty explanation string');
+
+  for (const tableKey of ['co_channel', 'adjacent_10khz', 'adjacent_20khz']){
+    assert.ok(Array.isArray(msr[tableKey]) && msr[tableKey].length === 4,
+      `${tableKey} must be an array of 4 entries (one per class A/B/C/D)`);
+    for (const row of msr[tableKey]){
+      assert.ok(['A', 'B', 'C', 'D'].includes(row.existing_class),
+        `${tableKey} row.existing_class must be A/B/C/D; got: ${row.existing_class}`);
+      assert.ok(row.min_separation_km == null || Number.isFinite(row.min_separation_km),
+        `${tableKey} row.min_separation_km must be null or finite; got: ${row.min_separation_km}`);
+    }
+  }
+});
+
+test('minimum_spacing_reference.co_channel: Class A vs Class A is the largest separation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 3 });
+  assert.equal(out.available, true);
+  const msr = out.minimum_spacing_reference;
+  const aaRow = msr.co_channel.find(r => r.existing_class === 'A');
+  const acRow = msr.co_channel.find(r => r.existing_class === 'C');
+  assert.ok(aaRow?.min_separation_km != null, 'A vs A co-channel row must have a distance');
+  assert.ok(acRow?.min_separation_km != null, 'A vs C co-channel row must have a distance');
+  assert.ok(aaRow.min_separation_km >= acRow.min_separation_km,
+    `A vs A separation (${aaRow.min_separation_km} km) should be ≥ A vs C (${acRow.min_separation_km} km)`);
+});
+
+test('minimum_spacing_reference: co_channel separations are always >= adjacent_10khz', async () => {
+  for (const cls of ['A', 'B', 'C', 'D']){
+    const out = await runSiteOptimizer({ ...KAZM, fcc_class: cls, candidate_limit: 1 });
+    const msr = out.minimum_spacing_reference;
+    for (const exCls of ['A', 'B', 'C', 'D']){
+      const coRow  = msr.co_channel.find(r => r.existing_class === exCls);
+      const adjRow = msr.adjacent_10khz.find(r => r.existing_class === exCls);
+      if (coRow?.min_separation_km == null || adjRow?.min_separation_km == null) continue;
+      assert.ok(coRow.min_separation_km >= adjRow.min_separation_km,
+        `Class ${cls} co-channel vs ${exCls} (${coRow.min_separation_km}) must be >= adjacent-10kHz (${adjRow.min_separation_km})`);
+    }
+  }
+});
+
+test('minimum_spacing_reference: Class C proposed station has smaller separations than Class A', async () => {
+  const outA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const outC = await runSiteOptimizer({ ...KAZM, fcc_class: 'C', candidate_limit: 1 });
+  const msrA = outA.minimum_spacing_reference;
+  const msrC = outC.minimum_spacing_reference;
+  // C vs C should be much smaller than A vs A
+  const acac = msrA.co_channel.find(r => r.existing_class === 'A').min_separation_km;
+  const cccc = msrC.co_channel.find(r => r.existing_class === 'C').min_separation_km;
+  assert.ok(acac > cccc,
+    `Class A vs A co-channel (${acac} km) must exceed Class C vs C (${cccc} km)`);
+});
