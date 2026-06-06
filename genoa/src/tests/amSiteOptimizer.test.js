@@ -5683,6 +5683,56 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- ground_lease_negotiation_guide ----
+
+test('ground_lease_negotiation_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.ground_lease_negotiation_guide != null, 'ground_lease_negotiation_guide missing');
+  const g = c.ground_lease_negotiation_guide;
+  assert.ok('lease_term' in g, 'lease_term missing');
+  assert.ok('rent_estimates' in g, 'rent_estimates missing');
+  assert.ok('key_provisions' in g, 'key_provisions missing');
+  assert.ok('min_site_area_acres' in g, 'min_site_area_acres missing');
+});
+
+test('ground_lease_negotiation_guide recommended lease term is at least 20 years with renewals', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_lease_negotiation_guide;
+  assert.ok(g.recommended_lease_term_years >= 20, 'lease term must be at least 20 years');
+  assert.ok(g.lease_term.renewal_options >= 1, 'must have at least 1 renewal option');
+  assert.ok(g.lease_term.total_max_years >= 30, 'total max term must be at least 30 years');
+});
+
+test('ground_lease_negotiation_guide ground radial radius matches frequency physics', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_lease_negotiation_guide;
+  // At 780 kHz, λ/4 = 300000/780/4 ≈ 96m
+  const expected_radial_m = Math.round((300000 / 780) / 4);
+  assert.strictEqual(g.ground_radial_radius_m, expected_radial_m, `radial radius must be λ/4 ≈ ${expected_radial_m}m at 780 kHz`);
+  assert.ok(g.min_site_area_acres > 0, 'min_site_area_acres must be positive');
+});
+
+test('ground_lease_negotiation_guide has CRITICAL provisions including quiet enjoyment and assignment', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].ground_lease_negotiation_guide;
+  assert.ok(Array.isArray(g.key_provisions), 'key_provisions must be array');
+  assert.ok(g.n_critical_provisions >= 2, 'must have at least 2 CRITICAL provisions');
+  const ids = g.key_provisions.map(p => p.id);
+  assert.ok(ids.includes('QUIET_ENJOYMENT'), 'QUIET_ENJOYMENT provision must be present');
+  assert.ok(ids.includes('ASSIGNMENT'), 'ASSIGNMENT provision must be present');
+  assert.strictEqual(g.option_to_purchase_recommended, true, 'option to purchase must be recommended');
+});
+
+test('ground_lease_negotiation_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('glng_lease_term_yrs' in row, 'glng_lease_term_yrs missing from comparison table');
+    assert.ok('glng_base_rent_usd' in row, 'glng_base_rent_usd missing from comparison table');
+    assert.ok('glng_option_to_buy' in row, 'glng_option_to_buy missing from comparison table');
+  }
+});
+
 // ---- emergency_alert_system_equipment_guide ----
 
 test('emergency_alert_system_equipment_guide presence and structure', async () => {

@@ -981,7 +981,10 @@ export async function runSiteOptimizer(body = {}){
     pifg_issues_req:        c.public_inspection_file_guide?.issues_programs_list_required ?? null,
     easg_equipment_req:     c.emergency_alert_system_equipment_guide?.eas_equipment_required ?? null,
     easg_n_caps_sources:    c.emergency_alert_system_equipment_guide?.n_required_cap_sources ?? null,
-    easg_test_weekly:       c.emergency_alert_system_equipment_guide?.weekly_test_required ?? null
+    easg_test_weekly:       c.emergency_alert_system_equipment_guide?.weekly_test_required ?? null,
+    glng_lease_term_yrs:    c.ground_lease_negotiation_guide?.recommended_lease_term_years ?? null,
+    glng_base_rent_usd:     c.ground_lease_negotiation_guide?.estimated_annual_rent_usd?.typical ?? null,
+    glng_option_to_buy:     c.ground_lease_negotiation_guide?.option_to_purchase_recommended ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6716,6 +6719,100 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    ground_lease_negotiation_guide: (() => {
+      // AM transmitter sites require a ground lease for the land area covered by the tower, radial
+      // ground system, guy wire anchors, transmitter building, and access road.
+      //
+      // Key lease elements for AM tower sites:
+      //   - Term: Typically 20–30 years with renewal options (AM licenses renew every 8 years; lease
+      //     should span at least two license terms to avoid mid-license lease expiration risk)
+      //   - Rent: Varies by geography; rural agricultural land $3,000–$8,000/yr; suburban $8,000–$20,000/yr
+      //   - Ground system easement: Must cover radial wire layout (ground radials extend up to λ/4 from base;
+      //     at 780 kHz, λ/4 ≈ 96m — but efficient systems often use 120-radial layouts extending to λ/2 ≈ 192m)
+      //   - Tower access road: Must be all-weather; requires easement if crossing adjacent parcels
+      //   - Transmitter building: Typically 12×20 ft minimum; may need HVAC (transmitter heat load)
+      //   - Guy wire anchors: Must be within leased/owned parcel; min. distance from base = guy radius
+      //     (for a 144m tower, 3/8λ, guy radius ~60–100m depending on tower design)
+      //   - Quiet enjoyment: Lease must protect against landlord interference with tower or ground system
+      //   - Condemnation clause: AM sites in agricultural zones face eminent domain risk from road widening
+      //   - Assignment clause: Must permit assignment to FCC permittee or successor-in-interest
+      //   - FCC approval: New lease location must be reflected in CP application (§73.3533)
+      //
+      // Regulatory considerations:
+      //   - §73.49: Antenna towers must be enclosed within an effective locked fence
+      //   - Ground lease must include fence line and buffer area within leased parcel
+      //   - §73.1560: Authorized antenna height must match the leased tower height
+      //   - Interference protection radius: Site must maintain protection ratios under §73.182
+      //   - FAA considerations: If tower exceeds 61m AGL (200 ft), requires FAA study (§17.7)
+      //   - Zoning: AM tower sites often require conditional use permits (CUP) or special exceptions
+      //   - Environmental: If wetland or floodplain is present, EIS may be required (§1.1307)
+
+      // Estimate site area requirements based on tower height
+      const tower_height_m = 144.23; // 3/8λ at 780 kHz
+      const guy_radius_m = Math.round(tower_height_m * 0.7); // approximate guy wire radius
+      const ground_radial_radius_m = Math.round((300000 / frequency_khz) / 4); // λ/4 in meters
+      const fence_buffer_m = 3; // 3m minimum buffer inside fence
+      const min_site_radius_m = Math.max(guy_radius_m, ground_radial_radius_m) + fence_buffer_m;
+      const min_site_area_acres = parseFloat((Math.PI * (min_site_radius_m / 1000) ** 2 * 247.105).toFixed(2));
+
+      // Lease term recommendations
+      const LEASE_TERM = {
+        recommended_years: 25,
+        minimum_years: 20,
+        renewal_options: 2,
+        renewal_option_years: 10,
+        total_max_years: 45,
+        rationale: 'AM license term is 8 years (§73.3574). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.'
+      };
+
+      // Rent estimates by land type
+      const RENT_ESTIMATES = {
+        rural_agricultural: { low_usd: 3000, typical_usd: 5500, high_usd: 8000, note: 'Per acre basis; AM sites typically 5–15 acres' },
+        suburban_fringe:    { low_usd: 8000, typical_usd: 13000, high_usd: 20000, note: 'Higher land values; may need additional permitting' },
+        urban_industrial:   { low_usd: 15000, typical_usd: 25000, high_usd: 45000, note: 'Limited AM tower sites in urban industrial zones' }
+      };
+
+      // Key lease provisions that must be negotiated
+      const KEY_PROVISIONS = [
+        { id: 'QUIET_ENJOYMENT', label: 'Quiet enjoyment covenant', priority: 'CRITICAL', note: 'Protects broadcaster from landlord interference with tower or radial ground system during lease term', cfr: '§73.49; §73.1560' },
+        { id: 'ASSIGNMENT',      label: 'Assignment and sublease rights', priority: 'CRITICAL', note: 'Lease must be freely assignable to FCC permittees and successors-in-interest without landlord consent', cfr: '§73.3533' },
+        { id: 'CONDEMNATION',    label: 'Condemnation proceeds', priority: 'HIGH', note: 'In the event of eminent domain taking, broadcaster receives share of condemnation award proportionate to lease value' },
+        { id: 'FAA_ZONING',     label: 'Landlord cooperation for FAA/zoning filings', priority: 'HIGH', note: 'Landlord must sign as property owner on FAA Form 7460-1 and local CUP applications' },
+        { id: 'GROUND_SYSTEM',  label: 'Ground radial system easement', priority: 'HIGH', note: `Ground radials must extend to ${ground_radial_radius_m}m from tower base (λ/4 at ${frequency_khz} kHz). Easement must cover full radial sweep.` },
+        { id: 'ACCESS_ROAD',    label: 'All-weather access road easement', priority: 'MEDIUM', note: 'Broadcaster needs 24/7 unobstructed access to transmitter site for maintenance; road must support equipment delivery trucks' },
+        { id: 'EXPANSION',      label: 'Right to expand tower or building', priority: 'MEDIUM', note: 'Broadcaster may need to add directional antenna elements, change tower height, or expand transmitter building during lease term' }
+      ];
+
+      const critical_provisions = KEY_PROVISIONS.filter(p => p.priority === 'CRITICAL').length;
+
+      return {
+        frequency_khz, fcc_class,
+        recommended_lease_term_years: LEASE_TERM.recommended_years,
+        minimum_lease_term_years: LEASE_TERM.minimum_years,
+        lease_term: LEASE_TERM,
+        tower_height_m: round2(tower_height_m),
+        guy_radius_m,
+        ground_radial_radius_m,
+        min_site_radius_m,
+        min_site_area_acres,
+        estimated_annual_rent_usd: {
+          rural: RENT_ESTIMATES.rural_agricultural.typical_usd,
+          suburban: RENT_ESTIMATES.suburban_fringe.typical_usd,
+          urban: RENT_ESTIMATES.urban_industrial.typical_usd,
+          typical: RENT_ESTIMATES.rural_agricultural.typical_usd
+        },
+        rent_estimates: RENT_ESTIMATES,
+        key_provisions: KEY_PROVISIONS,
+        n_key_provisions: KEY_PROVISIONS.length,
+        n_critical_provisions: critical_provisions,
+        option_to_purchase_recommended: true,
+        option_to_purchase_note: 'Negotiate right of first refusal or option to purchase the site at fair market value. AM transmitter sites are difficult to replicate once lost.',
+        relocation_note: `New transmitter site lease must cover: tower base, ${ground_radial_radius_m}m radial ground system, guy wire anchors (${guy_radius_m}m radius), transmitter building, and all-weather access road. Minimum site area: ~${min_site_area_acres} acres. Lease term: ${LEASE_TERM.recommended_years} years minimum.`,
+        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FCC Form 7460-1; local zoning/CUP requirements',
+        note: `Ground lease: ${LEASE_TERM.recommended_years}-year recommended term, 2×10-year renewals. Minimum site area ~${min_site_area_acres} acres (${min_site_radius_m}m radius). ${KEY_PROVISIONS.length} key provisions; ${critical_provisions} CRITICAL. Option to purchase recommended.`
       };
     })(),
 

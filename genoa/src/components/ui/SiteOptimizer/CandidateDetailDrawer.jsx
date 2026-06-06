@@ -2226,6 +2226,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Ground Lease Negotiation Guide */}
+        {candidate.ground_lease_negotiation_guide && (() => {
+          const g = candidate.ground_lease_negotiation_guide;
+          const prioColors = { CRITICAL: '#f87171', HIGH: '#fbbf24', MEDIUM: '#34d399' };
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Ground Lease Negotiation <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.49 / §73.3533</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Recommended Term</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.recommended_lease_term_years} yrs + {g.lease_term?.renewal_options}×{g.lease_term?.renewal_option_years}-yr options</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Min. Site Area</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.min_site_area_acres} acres ({g.min_site_radius_m}m radius)</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Rural Annual Rent</div>
+                  <div style={{ color: '#fbbf24', fontSize: 12 }}>${g.rent_estimates?.rural_agricultural?.low_usd?.toLocaleString()}–${g.rent_estimates?.rural_agricultural?.high_usd?.toLocaleString()}/yr</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Ground Radial Radius</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>{g.ground_radial_radius_m}m (λ/4 at {g.frequency_khz} kHz)</div>
+                </div>
+              </div>
+              {g.key_provisions && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Key Lease Provisions ({g.n_critical_provisions} CRITICAL)</div>
+                  {g.key_provisions.slice(0, 4).map((p, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 4 }}>
+                      <span style={{ background: prioColors[p.priority] || '#475569', color: '#0f172a', borderRadius: 4, padding: '1px 5px', fontSize: 9, fontWeight: 700, minWidth: 52, textAlign: 'center', marginTop: 1 }}>{p.priority}</span>
+                      <div>
+                        <div style={{ color: '#f1f5f9', fontSize: 12 }}>{p.label}</div>
+                        <div style={{ color: '#64748b', fontSize: 10 }}>{p.cfr}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ background: '#0f172a', borderRadius: 6, padding: 8, marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Option to Purchase</div>
+                <div style={{ color: g.option_to_purchase_recommended ? '#34d399' : '#94a3b8', fontSize: 12 }}>
+                  {g.option_to_purchase_recommended ? 'Recommended — negotiate right of first refusal or purchase option' : 'Not recommended'}
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 10 }}>{g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* Emergency Alert System Equipment Guide */}
         {candidate.emergency_alert_system_equipment_guide && (() => {
           const g = candidate.emergency_alert_system_equipment_guide;

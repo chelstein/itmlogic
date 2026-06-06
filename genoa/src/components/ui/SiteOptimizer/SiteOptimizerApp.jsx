@@ -1717,6 +1717,39 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      ground_lease_negotiation_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        recommended_lease_term_years: 25,
+        minimum_lease_term_years: 20,
+        lease_term: { recommended_years: 25, minimum_years: 20, renewal_options: 2, renewal_option_years: 10, total_max_years: 45, rationale: 'AM license term is 8 years (§73.3574). Lease should span at least 3 license terms to avoid mid-license lease expiration. Two 10-year renewal options provide flexibility.' },
+        tower_height_m: 144.23,
+        guy_radius_m: 101,
+        ground_radial_radius_m: 96,
+        min_site_radius_m: 99,
+        min_site_area_acres: 0.07,
+        estimated_annual_rent_usd: { rural: 5500, suburban: 13000, urban: 25000, typical: 5500 },
+        rent_estimates: {
+          rural_agricultural: { low_usd: 3000, typical_usd: 5500, high_usd: 8000, note: 'Per acre basis; AM sites typically 5–15 acres' },
+          suburban_fringe: { low_usd: 8000, typical_usd: 13000, high_usd: 20000, note: 'Higher land values; may need additional permitting' },
+          urban_industrial: { low_usd: 15000, typical_usd: 25000, high_usd: 45000, note: 'Limited AM tower sites in urban industrial zones' }
+        },
+        key_provisions: [
+          { id: 'QUIET_ENJOYMENT', label: 'Quiet enjoyment covenant', priority: 'CRITICAL', note: 'Protects broadcaster from landlord interference with tower or radial ground system during lease term', cfr: '§73.49; §73.1560' },
+          { id: 'ASSIGNMENT', label: 'Assignment and sublease rights', priority: 'CRITICAL', note: 'Lease must be freely assignable to FCC permittees and successors-in-interest without landlord consent', cfr: '§73.3533' },
+          { id: 'CONDEMNATION', label: 'Condemnation proceeds', priority: 'HIGH', note: 'In the event of eminent domain taking, broadcaster receives share of condemnation award proportionate to lease value' },
+          { id: 'FAA_ZONING', label: 'Landlord cooperation for FAA/zoning filings', priority: 'HIGH', note: 'Landlord must sign as property owner on FAA Form 7460-1 and local CUP applications' },
+          { id: 'GROUND_SYSTEM', label: 'Ground radial system easement', priority: 'HIGH', note: 'Ground radials must extend to 96m from tower base (λ/4 at 780 kHz). Easement must cover full radial sweep.' },
+          { id: 'ACCESS_ROAD', label: 'All-weather access road easement', priority: 'MEDIUM', note: 'Broadcaster needs 24/7 unobstructed access to transmitter site for maintenance; road must support equipment delivery trucks' },
+          { id: 'EXPANSION', label: 'Right to expand tower or building', priority: 'MEDIUM', note: 'Broadcaster may need to add directional antenna elements, change tower height, or expand transmitter building during lease term' }
+        ],
+        n_key_provisions: 7,
+        n_critical_provisions: 2,
+        option_to_purchase_recommended: true,
+        option_to_purchase_note: 'Negotiate right of first refusal or option to purchase the site at fair market value. AM transmitter sites are difficult to replicate once lost.',
+        relocation_note: 'New transmitter site lease must cover: tower base, 96m radial ground system, guy wire anchors (101m radius), transmitter building, and all-weather access road. Minimum site area: ~0.07 acres. Lease term: 25 years minimum.',
+        reference: '47 CFR §73.49; §73.1560; §73.3533; §73.182; §17.7; §1.1307; FCC Form 7460-1; local zoning/CUP requirements',
+        note: 'Ground lease: 25-year recommended term, 2×10-year renewals. Minimum site area ~0.07 acres (99m radius). 7 key provisions; 2 CRITICAL. Option to purchase recommended.'
+      },
       emergency_alert_system_equipment_guide: {
         frequency_khz: 780, fcc_class: 'D',
         eas_equipment_required: true,
