@@ -393,7 +393,7 @@ const DEMO_RESULT = {
       rank: 1, rank_percentile: 99.6, lat: 34.91, lon: -111.79,
       distance_from_current_km: 6.2, bearing_deg: 42, cardinal_direction: 'NE', score: 91.3,
       score_delta_vs_baseline: 28.9,
-      col_coverage_pct: 0.97, nif_status: 'PROMISING',
+      col_coverage_pct: 0.97, nif_status: 'PROMISING — HIGH skywave risk (§73.182 NIF study required)',
       principal_community_5mvm_km: 5.8, daytime_reach_km: 34.1, blanket_population_pct: 0.4,
       blanket_1000mvm_km: 0.8, minimum_tpo_for_compliance_kw: null, minimum_tpo_for_col_coverage_kw: null,
       ground_sigma_mS_m: 8, ground_sigma_quality: 'EXCELLENT', ground_sigma_filing_grade: 'screening',
@@ -403,7 +403,7 @@ const DEMO_RESULT = {
       treaty_zone: null, fuel_risk: 'NOT-EVALUATED',
       notes: '97% city-coverage, σ=8 mS/m, 0.4% blanket pop, 6 km from current.',
       explanation: {
-        score_breakdown: { col_coverage: 40.2, population: 32.2, blanket: 16.1, conductivity: 11.5, wildfire: 0, treaty_zone: 0 },
+        score_breakdown: { col_coverage: 40.2, population: 32.2, blanket: 16.1, conductivity: 11.5, wildfire: 0, treaty_zone: 0, confidence_penalty: -7.0 },
         ranking_rationale: 'Highest COL coverage and population in pool; conductivity 8 mS/m is M3-zone max for region.'
       },
       status_labels: ['PROMISING', 'ENGINEER REVIEW REQUIRED'],
@@ -417,7 +417,7 @@ const DEMO_RESULT = {
       rank: 2, rank_percentile: 96.1, lat: 34.83, lon: -111.74,
       distance_from_current_km: 7.8, bearing_deg: 128, cardinal_direction: 'SE', score: 84.0,
       score_delta_vs_baseline: 21.6,
-      col_coverage_pct: 0.91, nif_status: 'REVIEW',
+      col_coverage_pct: 0.91, nif_status: 'PROMISING — HIGH skywave risk (§73.182 NIF study required)',
       principal_community_5mvm_km: 4.9, daytime_reach_km: 31.2, blanket_population_pct: 0.7,
       blanket_1000mvm_km: 0.7, minimum_tpo_for_compliance_kw: null, minimum_tpo_for_col_coverage_kw: null,
       ground_sigma_mS_m: 6, ground_sigma_quality: 'GOOD', ground_sigma_filing_grade: 'screening',
@@ -427,7 +427,7 @@ const DEMO_RESULT = {
       treaty_zone: null, fuel_risk: 'LOW',
       notes: '91% city-coverage; ground σ slightly lower; daytime reach acceptable.',
       explanation: {
-        score_breakdown: { col_coverage: 35.6, population: 27.6, blanket: 14.9, conductivity: 9.2, wildfire: 0, treaty_zone: 0 },
+        score_breakdown: { col_coverage: 35.6, population: 27.6, blanket: 14.9, conductivity: 9.2, wildfire: 0, treaty_zone: 0, confidence_penalty: -6.4 },
         ranking_rationale: 'Strong overall — second only on COL coverage; fuel-risk score positive.'
       },
       status_labels: ['PROMISING', 'REVIEW REQUIRED'],
@@ -441,7 +441,7 @@ const DEMO_RESULT = {
       rank: 3, rank_percentile: 72.6, lat: 34.95, lon: -111.92,
       distance_from_current_km: 12.5, bearing_deg: 315, cardinal_direction: 'NW', score: 71.8,
       score_delta_vs_baseline: 9.4,
-      col_coverage_pct: 0.78, nif_status: 'PROMISING',
+      col_coverage_pct: 0.78, nif_status: 'NON-COMPLIANT — HIGH skywave risk (§73.182 NIF study required)',
       principal_community_5mvm_km: 6.1, daytime_reach_km: 28.4, blanket_population_pct: 0.3,
       blanket_1000mvm_km: 0.9, minimum_tpo_for_compliance_kw: null, minimum_tpo_for_col_coverage_kw: 8.5,
       ground_sigma_mS_m: 10, ground_sigma_quality: 'EXCELLENT', ground_sigma_filing_grade: 'screening',
@@ -451,11 +451,11 @@ const DEMO_RESULT = {
       treaty_zone: null, fuel_risk: 'MODERATE',
       notes: 'Lower COL but excellent conductivity and minimal blanket exposure.',
       explanation: {
-        score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0 },
-        ranking_rationale: 'Conductivity wins offset lower coverage; lower COL coverage is a flagged limitation.'
+        score_breakdown: { col_coverage: 27.6, population: 20.7, blanket: 18.4, conductivity: 13.8, wildfire: 0, treaty_zone: 0, confidence_penalty: -5.63 },
+        ranking_rationale: 'Conductivity wins offset lower coverage; §73.24(j) COL coverage 78% is below 80% floor — increase TPO to ≥8.5 kW to fix.'
       },
       status_labels: ['NON-COMPLIANT', 'ENGINEER REVIEW REQUIRED'],
-      status_category: 'RECOVERABLE_WITH_DA',
+      status_category: 'RECOVERABLE_WITH_POWER_INCREASE',
       source: 'GRID',
       infrastructure_ref: null,
       colocation_analysis: null,
@@ -502,7 +502,8 @@ const DEMO_COLOCATION_RESULT = {
   n_candidates_evaluated: 312,
   n_candidates_returned:  6,
   candidate_count_by_status: {
-    PROMISING: 71, REVIEW_REQUIRED: 178, NON_COMPLIANT: 42, RECOVERABLE_WITH_DA: 21
+    PROMISING: 71, REVIEW_REQUIRED: 178, NON_COMPLIANT: 42,
+    RECOVERABLE_WITH_DA: 18, RECOVERABLE_WITH_POWER_INCREASE: 3
   },
   candidates: [
     ...DEMO_RESULT.candidates,

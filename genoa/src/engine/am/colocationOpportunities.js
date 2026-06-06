@@ -20,8 +20,8 @@
 //   Each candidate gets a single `status_category` from a fixed
 //   vocabulary so the UI can render a colored chip per result:
 //     PROMISING, REVIEW_REQUIRED, RECOVERABLE_WITH_DA,
-//     RECOVERABLE_WITH_REDUCED_POWER, RECOVERABLE_WITH_COL_CHANGE,
-//     TREATY_REVIEW, NON_COMPLIANT, UNKNOWN_DATA.
+//     RECOVERABLE_WITH_POWER_INCREASE, RECOVERABLE_WITH_REDUCED_POWER,
+//     RECOVERABLE_WITH_COL_CHANGE, TREATY_REVIEW, NON_COMPLIANT, UNKNOWN_DATA.
 //   The recovery-state logic is fully explained in
 //   explanation.recovery_reasoning.
 //
@@ -583,9 +583,13 @@ function assignStatusCategory(c, scoreCutoff, { current_site }){
     category = 'TREATY_REVIEW';
     reasoning.push(`Candidate sits inside ${c.treaty_zone}; cross-border treaty review required.`);
   } else if (colFail && !blanketFail && c.score >= RECOVERY_SCORE_FLOOR){
-    // COL coverage fails but the rest of the score is healthy — a DA
-    // pattern can usually pull the 5 mV/m contour toward the city.
-    if (c.distance_from_current_km <= NEARBY_COMMUNITY_RADIUS_KM){
+    // COL coverage fails but the rest of the score is healthy — determine
+    // the most specific recovery path.
+    if (c.minimum_tpo_for_col_coverage_kw != null){
+      // Engine found a feasible power level (≤50 kW) — direct TPO increase is the fix.
+      category = 'RECOVERABLE_WITH_POWER_INCREASE';
+      reasoning.push(`Engine computed minimum TPO of ${c.minimum_tpo_for_col_coverage_kw} kW to reach §73.24(j) 5 mV/m at COL centroid distance; direct power increase (no DA pattern) is the primary path.`);
+    } else if (c.distance_from_current_km <= NEARBY_COMMUNITY_RADIUS_KM){
       category = 'RECOVERABLE_WITH_DA';
       reasoning.push('Principal-community 5 mV/m contour shortfall is plausibly recoverable via directional-antenna design (§73.150).');
     } else {
