@@ -2897,3 +2897,65 @@ test('engineering_summary statements are all non-empty strings', async () => {
       `All statements must be non-empty strings; got "${s}"`);
   }
 });
+
+// ---------- co_channel_spacing_estimate ----------
+
+test('co_channel_spacing_estimate is present on every candidate with required shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ccs = c.co_channel_spacing_estimate;
+    assert.ok(ccs != null, `co_channel_spacing_estimate must be present (rank ${c.rank})`);
+    assert.ok(typeof ccs.candidate_distance_km === 'number',
+      `candidate_distance_km must be a number (rank ${c.rank})`);
+    assert.ok(typeof ccs.co_channel?.meets_separation === 'boolean',
+      `co_channel.meets_separation must be boolean (rank ${c.rank})`);
+    assert.ok(typeof ccs.adjacent_10khz?.meets_separation === 'boolean',
+      `adjacent_10khz.meets_separation must be boolean (rank ${c.rank})`);
+    assert.ok(typeof ccs.adjacent_20khz?.meets_separation === 'boolean',
+      `adjacent_20khz.meets_separation must be boolean (rank ${c.rank})`);
+    assert.ok(typeof ccs.screening_verdict === 'string',
+      `screening_verdict must be a string (rank ${c.rank})`);
+  }
+});
+
+test('co_channel_spacing_estimate.screening_verdict is one of valid values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const VALID = new Set([
+    'CO_CHANNEL_ELIGIBLE', 'FIRST_ADJACENT_ELIGIBLE',
+    'SECOND_ADJACENT_ELIGIBLE', 'BELOW_ALL_SPACING_MINIMUMS'
+  ]);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.co_channel_spacing_estimate.screening_verdict),
+      `screening_verdict "${c.co_channel_spacing_estimate.screening_verdict}" is not valid (rank ${c.rank})`);
+  }
+});
+
+test('co_channel_spacing_estimate: current site candidate has distance_km ≈ 0 and BELOW_ALL_SPACING_MINIMUMS', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const currentSite = out.candidates.find(c =>
+    Math.abs(c.lat - KAZM.current_site.lat) < 0.001 &&
+    Math.abs(c.lon - KAZM.current_site.lon) < 0.001
+  );
+  if (currentSite){
+    const ccs = currentSite.co_channel_spacing_estimate;
+    assert.ok(ccs.candidate_distance_km < 1,
+      `Current site distance should be ~0 km; got ${ccs.candidate_distance_km}`);
+    assert.equal(ccs.screening_verdict, 'BELOW_ALL_SPACING_MINIMUMS',
+      `Current site (distance 0) must be BELOW_ALL_SPACING_MINIMUMS; got ${ccs.screening_verdict}`);
+  }
+});
+
+test('co_channel_spacing_estimate: adjacent spacing minimums decrease from co-channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const ccs = c.co_channel_spacing_estimate;
+    assert.ok(ccs.co_channel.min_separation_km >= ccs.adjacent_10khz.min_separation_km,
+      `co_channel min must be >= adj10 min (rank ${c.rank})`);
+    assert.ok(ccs.adjacent_10khz.min_separation_km >= ccs.adjacent_20khz.min_separation_km,
+      `adj10 min must be >= adj20 min (rank ${c.rank})`);
+  }
+});

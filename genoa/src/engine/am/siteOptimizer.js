@@ -1778,6 +1778,59 @@ async function scoreCandidate(pt, ctx, warnings){
         };
       });
     })(),
+    // Co-channel and adjacent-channel §73.37 minimum spacing estimate.
+    // Computes whether this candidate's distance from the current transmitter site
+    // satisfies the §73.37 minimum for the proposed station's class vs. itself
+    // (treating the current site as the closest potential co-channel station of the
+    // same class — a conservative screening proxy for identifying candidates that
+    // may be too close to the current site to be legally viable at the same frequency).
+    // NOTE: In practice §73.37 applies against LMS-licensed stations; this checks
+    // only the current-site-to-candidate distance as a red-flag filter.
+    co_channel_spacing_estimate: (() => {
+      // §73.37(a) co-channel minimums for proposed class vs. same class.
+      const CO_SAME_CLASS_KM = { A: 1037, B: 953, C: 354, D: 953 };
+      // §73.37(b) first adjacent (±10 kHz) minimums for proposed vs. same class.
+      const ADJ10_SAME_CLASS_KM = { A: 805, B: 724, C: 177, D: 724 };
+      const ADJ20_SAME_CLASS_KM = { A: 402, B: 354, C:  96, D: 354 };
+
+      const cls = fcc_class in CO_SAME_CLASS_KM ? fcc_class : 'D';
+      const dist_km = pt.distance_from_current_km ?? 0;
+
+      const co_min  = CO_SAME_CLASS_KM[cls];
+      const adj10_min = ADJ10_SAME_CLASS_KM[cls];
+      const adj20_min = ADJ20_SAME_CLASS_KM[cls];
+
+      const co_ok   = dist_km >= co_min;
+      const adj10_ok = dist_km >= adj10_min;
+      const adj20_ok = dist_km >= adj20_min;
+
+      return {
+        candidate_distance_km: round2(dist_km),
+        co_channel: {
+          min_separation_km: co_min,
+          meets_separation: co_ok,
+          note: `Proposed Class ${cls} vs. existing Class ${cls} co-channel (§73.37(a)): ${co_ok ? 'MEETS' : 'FAILS'} ${co_min} km minimum (distance ${round2(dist_km)} km)`
+        },
+        adjacent_10khz: {
+          min_separation_km: adj10_min,
+          meets_separation: adj10_ok,
+          note: `Proposed Class ${cls} vs. existing Class ${cls} ±10 kHz (§73.37(b)): ${adj10_ok ? 'MEETS' : 'FAILS'} ${adj10_min} km minimum`
+        },
+        adjacent_20khz: {
+          min_separation_km: adj20_min,
+          meets_separation: adj20_ok,
+          note: `Proposed Class ${cls} vs. existing Class ${cls} ±20 kHz (§73.37(b)): ${adj20_ok ? 'MEETS' : 'FAILS'} ${adj20_min} km minimum`
+        },
+        // Does the candidate site have adequate separation from the current site to
+        // operate on the same frequency, first adjacent, or second adjacent channel?
+        screening_verdict: co_ok ? 'CO_CHANNEL_ELIGIBLE'
+          : adj10_ok ? 'FIRST_ADJACENT_ELIGIBLE'
+          : adj20_ok ? 'SECOND_ADJACENT_ELIGIBLE'
+          : 'BELOW_ALL_SPACING_MINIMUMS',
+        rule: '47 CFR §73.37 (daytime, proposed station vs. same class)',
+        caveat: 'This checks only the current-site distance as a proxy. A filing requires separation analysis against ALL co-channel and adjacent-channel stations in the FCC LMS database using the §73.182 field-intensity method.'
+      };
+    })(),
     // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
     power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
     // OET Bulletin 65 / 47 CFR §1.1307 RF exposure summary.
