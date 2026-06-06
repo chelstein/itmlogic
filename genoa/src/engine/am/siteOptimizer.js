@@ -685,7 +685,9 @@ export async function runSiteOptimizer(body = {}){
     coverage_continuity:    c.coverage_overlap_analysis?.coverage_continuity ?? null,
     cost_tier:              c.tower_cost_estimate?.cost_tier ?? null,
     cost_low_usd:           c.tower_cost_estimate?.total_low_usd ?? null,
-    cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null
+    cost_high_usd:          c.tower_cost_estimate?.total_high_usd ?? null,
+    seasonal_variability:   c.seasonal_conductivity_note?.seasonal_variability ?? null,
+    seasonal_risk:          c.seasonal_conductivity_note?.risk_level ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -1695,6 +1697,58 @@ async function scoreCandidate(pt, ctx, warnings){
           civil_work:   { low: civilLow,  high: civilHigh,  note: 'Grading, access road, fence, foundation' }
         },
         disclaimer: 'SCREENING ESTIMATE ONLY. Actual costs depend on tower supplier quotes, soil borings, utility access, local labor market, and environmental permitting. Commission a civil/RF engineering feasibility study before budgeting.'
+      };
+    })(),
+    // Seasonal conductivity note — AM groundwave propagation is sensitive to seasonal
+    // soil moisture variation, particularly for low-σ sites (poor / fair quality).
+    // The FCC M3 map provides annual-average values; actual σ can vary ±40% peak-to-trough.
+    // High-σ (agricultural) flatland sites are more stable; desert/rocky sites most variable.
+    seasonal_conductivity_note: (() => {
+      // Seasonal variability proxy based on σ class
+      let variability, risk_level, notes;
+      if (sigma_msm >= 8) {
+        variability = 'LOW';
+        risk_level  = 'MINIMAL';
+        notes = [
+          `High-conductivity soil (σ=${sigma_msm} mS/m) is typically deep clay or agricultural flatland — seasonal moisture variation is modest (±10–20%) and unlikely to affect §73.24(j) compliance.`,
+          'Annual-average FCC M3 value is a reliable proxy for filing-grade conductivity at this site.'
+        ];
+      } else if (sigma_msm >= 4) {
+        variability = 'MODERATE';
+        risk_level  = 'LOW';
+        notes = [
+          `Moderate-conductivity soil (σ=${sigma_msm} mS/m) may show ±20–30% seasonal variation (wet winter vs. dry summer).`,
+          'Commission a multi-season resistivity survey (at least wet-season and dry-season) before finalizing ground system design.',
+          'FCC Form 302-AM ground system calculations should use measured dry-season values as the conservative case.'
+        ];
+      } else if (sigma_msm >= 2) {
+        variability = 'MODERATE_HIGH';
+        risk_level  = 'ELEVATED';
+        notes = [
+          `Fair-conductivity soil (σ=${sigma_msm} mS/m) often shows ±30–45% seasonal swing — a wet-season σ may be acceptable but a dry-season σ near 1 mS/m could drop effective groundwave reach significantly.`,
+          'Mandatory: multi-season Wenner-array soil resistivity survey before site commitment.',
+          'Engineering budget for an extended radial ground system (≥180 radials or copper mesh) to compensate for summer conductivity degradation.',
+          'At low-σ sites, a DA pattern angled away from low-conductivity terrain may partially compensate.'
+        ];
+      } else {
+        variability = 'HIGH';
+        risk_level  = 'HIGH';
+        notes = [
+          `Poor-conductivity soil (σ=${sigma_msm} mS/m) will exhibit large seasonal swings — a dry-season effective σ could fall below 1 mS/m, severely limiting groundwave reach and potentially dropping §73.24(j) COL coverage below the 80% floor.`,
+          'This site carries high seasonal risk. Commission at least three-season soil resistivity surveys before site commitment.',
+          'Consider requiring a contractual TPO cap reduction during certified dry seasons to maintain §73.24(g) blanket compliance.',
+          'If no alternative sites are available, engineer for the worst-case (dry-season) conductivity throughout the ground system design.'
+        ];
+      }
+
+      return {
+        sigma_msm,
+        sigma_quality: sigmaQuality(sigma_msm),
+        seasonal_variability: variability,
+        risk_level,
+        notes,
+        rule: '47 CFR §73.190; FCC M3 conductivity map (annual average)',
+        disclaimer: 'Seasonal variability is a screening-grade proxy based on σ class. Site-specific multi-season Wenner-array measurements are required before filing.'
       };
     })(),
     // Per-candidate engineering checklist — what studies must be done if this site

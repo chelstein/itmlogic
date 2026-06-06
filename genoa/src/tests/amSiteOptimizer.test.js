@@ -3569,3 +3569,54 @@ test('candidate_comparison_table has cost_tier and cost_low_usd columns', async 
     assert.ok('cost_low_usd' in row, `missing cost_low_usd in comparison table (rank ${row.rank})`);
   }
 });
+
+// ---------- seasonal_conductivity_note ----------
+
+test('seasonal_conductivity_note is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.seasonal_conductivity_note != null,
+      `seasonal_conductivity_note must be present (rank ${c.rank})`);
+  }
+});
+
+test('seasonal_conductivity_note.seasonal_variability is a valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['LOW', 'MODERATE', 'MODERATE_HIGH', 'HIGH']);
+  for (const c of out.candidates) {
+    const v = c.seasonal_conductivity_note?.seasonal_variability;
+    assert.ok(VALID.has(v), `seasonal_variability "${v}" not valid (rank ${c.rank})`);
+  }
+});
+
+test('seasonal_conductivity_note.notes is a non-empty array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const notes = c.seasonal_conductivity_note?.notes;
+    assert.ok(Array.isArray(notes) && notes.length > 0,
+      `seasonal notes must be a non-empty array (rank ${c.rank})`);
+  }
+});
+
+test('high-sigma candidates have LOW seasonal variability', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    if ((c.ground_sigma_mS_m ?? 0) >= 8) {
+      assert.equal(c.seasonal_conductivity_note?.seasonal_variability, 'LOW',
+        `σ≥8 candidate should have LOW seasonal variability (rank ${c.rank}, σ=${c.ground_sigma_mS_m})`);
+    }
+  }
+});
+
+test('comparison table has seasonal_variability and seasonal_risk columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('seasonal_variability' in row, `missing seasonal_variability (rank ${row.rank})`);
+    assert.ok('seasonal_risk' in row, `missing seasonal_risk (rank ${row.rank})`);
+  }
+});
