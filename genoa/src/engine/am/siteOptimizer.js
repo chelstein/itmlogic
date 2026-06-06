@@ -1751,6 +1751,68 @@ async function scoreCandidate(pt, ctx, warnings){
         disclaimer: 'Seasonal variability is a screening-grade proxy based on σ class. Site-specific multi-season Wenner-array measurements are required before filing.'
       };
     })(),
+    // Antenna height options — three standard AM monopole electrical heights with
+    // estimated efficiency gains (relative to 0.19λ base) and ASR implications.
+    // Based on standard FCC groundwave efficiency table (FCC R-4) for λ/4 = 0 dB ref.
+    // Ref: FCC OET Bulletin 69; AM antenna efficiency curves vs. electrical height.
+    antenna_height_options: (() => {
+      const lambdaM = 300000 / frequency_khz;
+      const qwM     = lambdaM / 4;
+
+      // Efficiency gain in dB relative to a λ/4 monopole (standard reference).
+      // 5/8λ: approx +1.7 dB gain over λ/4 (empirical from AM engineering tables)
+      // λ/4:  reference, 0 dB
+      // 0.19λ: approx -3.0 dB (commonly used for co-located or compact towers)
+      const options = [
+        {
+          id:              '5_8_LAMBDA',
+          label:           '5/8 λ (optimum)',
+          electrical_deg:  225,
+          height_m:        round2(lambdaM * 0.625),
+          height_ft:       Math.round(lambdaM * 0.625 * 3.28084),
+          gain_vs_qw_db:   1.7,
+          erp_vs_tpo_ratio: round2(tpo_kw * Math.pow(10, 1.7 / 10) / tpo_kw),
+          estimated_erp_kw: round2(tpo_kw * Math.pow(10, 1.7 / 10)),
+          asr_required:    (lambdaM * 0.625) > 60.96,
+          pros:            '~1.7 dB ERP gain over λ/4; maximum groundwave efficiency for most soil types.',
+          cons:            'Taller physical structure; always triggers §17.7 ASR + FAA study at most AM frequencies. Higher construction cost.'
+        },
+        {
+          id:              'QUARTER_WAVE',
+          label:           'λ/4 (standard)',
+          electrical_deg:  90,
+          height_m:        round2(qwM),
+          height_ft:       Math.round(qwM * 3.28084),
+          gain_vs_qw_db:   0.0,
+          erp_vs_tpo_ratio: 1.0,
+          estimated_erp_kw: round2(tpo_kw),
+          asr_required:    qwM > 60.96,
+          pros:            'Industry standard; FCC groundwave curves calibrated to λ/4 reference. Simplest engineering.',
+          cons:            'Not maximum efficiency. At most AM frequencies (< 1.6 MHz), λ/4 exceeds ASR threshold (200 ft = 60.96 m).'
+        },
+        {
+          id:              '0_19_LAMBDA',
+          label:           '0.19 λ (compact)',
+          electrical_deg:  68,
+          height_m:        round2(lambdaM * 0.19),
+          height_ft:       Math.round(lambdaM * 0.19 * 3.28084),
+          gain_vs_qw_db:   -3.0,
+          erp_vs_tpo_ratio: round2(Math.pow(10, -3.0 / 10)),
+          estimated_erp_kw: round2(tpo_kw * Math.pow(10, -3.0 / 10)),
+          asr_required:    (lambdaM * 0.19) > 60.96,
+          pros:            'May avoid ASR/FAA at some frequencies (check exact height_m). Lower steel cost. Useful for DA-in, series-capacitor base tuning.',
+          cons:            '~3 dB ERP penalty vs. λ/4; requires larger ground system to partially compensate. Coverage loss may push below §73.24(j) floor.'
+        }
+      ];
+
+      return {
+        frequency_khz,
+        full_wavelength_m: round2(lambdaM),
+        reference_tpo_kw:  tpo_kw,
+        options,
+        note: 'Efficiency figures are engineering approximations from FCC R-4 table for σ-independent electrical height comparison. Actual efficiency depends on soil conductivity, ground system design, and base impedance matching.'
+      };
+    })(),
     // Per-candidate engineering checklist — what studies must be done if this site
     // is selected for detailed engineering evaluation.  Derived from the candidate's
     // physical characteristics; complements the station-level form_301_checklist.

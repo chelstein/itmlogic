@@ -3620,3 +3620,55 @@ test('comparison table has seasonal_variability and seasonal_risk columns', asyn
     assert.ok('seasonal_risk' in row, `missing seasonal_risk (rank ${row.rank})`);
   }
 });
+
+// ---------- antenna_height_options ----------
+
+test('antenna_height_options is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.antenna_height_options != null,
+      `antenna_height_options must be present (rank ${c.rank})`);
+  }
+});
+
+test('antenna_height_options.options has exactly 3 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.equal(c.antenna_height_options.options.length, 3,
+      `options must have 3 entries (rank ${c.rank})`);
+  }
+});
+
+test('antenna_height_options λ/4 entry has gain_vs_qw_db = 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const qw = c.antenna_height_options.options.find(o => o.id === 'QUARTER_WAVE');
+    assert.ok(qw != null, `QUARTER_WAVE option must exist (rank ${c.rank})`);
+    assert.equal(qw.gain_vs_qw_db, 0.0, 'λ/4 gain vs λ/4 must be 0.0 dB');
+    assert.equal(qw.erp_vs_tpo_ratio, 1.0, 'λ/4 ERP ratio must be 1.0');
+  }
+});
+
+test('antenna_height_options 5/8λ has higher estimated_erp_kw than 0.19λ', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const five8 = c.antenna_height_options.options.find(o => o.id === '5_8_LAMBDA');
+    const compact = c.antenna_height_options.options.find(o => o.id === '0_19_LAMBDA');
+    assert.ok(five8.estimated_erp_kw > compact.estimated_erp_kw,
+      `5/8λ ERP should exceed 0.19λ ERP (rank ${c.rank})`);
+  }
+});
+
+test('antenna_height_options.full_wavelength_m matches 300000/freq_khz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  assert.equal(out.available, true);
+  const expectedLambda = Math.round(300000 / KAZM.frequency_khz * 100) / 100;
+  for (const c of out.candidates) {
+    assert.equal(c.antenna_height_options.full_wavelength_m, expectedLambda,
+      `full_wavelength_m should equal 300000/${KAZM.frequency_khz} (rank ${c.rank})`);
+  }
+});
