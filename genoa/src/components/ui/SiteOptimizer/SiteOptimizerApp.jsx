@@ -1717,6 +1717,39 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      tower_climbing_safety_plan_guide: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5,
+        rf_ppe_required: true, safe_work_power_threshold_kw: 0.05,
+        estimated_tower_height_m: 144.23,
+        fall_protection_zones: [
+          { zone: 'Ground (0–1.8 m)', requirement: 'No fall protection required; perimeter fencing §73.49', cfr: '§73.49; OSHA §1910.268(n)' },
+          { zone: 'Low (1.8–3 m)',    requirement: '100% tie-off required; personal fall arrest system (PFAS)', cfr: 'OSHA §1926.502(d)' },
+          { zone: 'Mid (3–30 m)',     requirement: '100% tie-off; PFAS; periodic rest platforms recommended', cfr: 'OSHA §1926.502(d); ANSI/TIA-1019-A §6' },
+          { zone: 'High (30+ m)',     requirement: '100% tie-off; PFAS; rescue plan required; two-person climb rule recommended', cfr: 'OSHA §1926.502(d); ANSI/TIA-1019-A §7' }
+        ],
+        n_fall_protection_zones: 4,
+        rf_safety_requirements: [
+          { id: 'DE_ENERGIZE', label: 'Station must be off-air for all structural work unless RF shielding provided', cfr: '§1.1310; OET Bulletin 65', required: true },
+          { id: 'RF_PPE',      label: 'RF protective equipment (RF-shielded suit, gloves) required for on-air tower work', cfr: 'OET Bulletin 65; ANSI C95.1', required: true },
+          { id: 'MONITOR',     label: 'On-site RF field strength monitor during any on-air climbing', cfr: 'OET Bulletin 65 §4.3', required: true },
+          { id: 'RESCUE_PLAN', label: 'Rescue plan required for work above 30 m; tower rescue certification', cfr: 'OSHA §1926.502(d)(16)', required: true }
+        ],
+        n_rf_requirements: 4, n_required_rf_measures: 4,
+        safety_plan_documents: [
+          'Job Hazard Analysis (JHA) for all tower climbing tasks',
+          'Emergency Response and Rescue Plan (ERP)',
+          'RF Exposure Plan: de-energize protocol for transmitter (5 kW)',
+          'Worker RF training records (OET Bulletin 65 awareness training)',
+          'PFAS inspection logs (pre-climb and post-climb)',
+          'ANSI/TIA-1019-A compliance acknowledgment signed by tower crew supervisor',
+          'FAA coordination for any work on towers with lighting systems (§17.48 notification)'
+        ],
+        n_safety_documents: 7,
+        osha_applicable_standards: ['29 CFR §1910.268 (telecommunications)', '29 CFR §1926.502 (fall protection)', 'ANSI/TIA-1019-A (tower climbing)', 'ANSI C95.1 (RF safety)'],
+        fcc_applicable: '47 CFR §73.49; §1.1310; OET Bulletin 65',
+        reference: 'OSHA 29 CFR §1910.268; §1926.502; ANSI/TIA-1019-A; ANSI C95.1; 47 CFR §73.49; §1.1310; OET Bulletin 65; NATE Safety Guidelines; FAA §17.48',
+        note: 'Tower climbing safety plan required for new 144.23m AM tower. RF PPE REQUIRED at 5 kW. 7 plan documents needed.'
+      },
       remote_pickup_unit_guide: {
         frequency_khz: 780, fcc_class: 'D',
         approximate_studio_to_tx_km: 18.5,

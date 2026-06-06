@@ -957,7 +957,10 @@ export async function runSiteOptimizer(body = {}){
     srg_repack_mandate:     c.spectrum_repack_readiness_guide?.repack_mandate_current ?? null,
     rpu_dist_km:            c.remote_pickup_unit_guide?.approximate_studio_to_tx_km ?? null,
     rpu_vhf_feasible:       c.remote_pickup_unit_guide?.vhf_path_feasible ?? null,
-    rpu_significant_impacts: c.remote_pickup_unit_guide?.significant_impacts ?? null
+    rpu_significant_impacts: c.remote_pickup_unit_guide?.significant_impacts ?? null,
+    tcsg_tower_height_m:    c.tower_climbing_safety_plan_guide?.estimated_tower_height_m ?? null,
+    tcsg_rf_ppe_required:   c.tower_climbing_safety_plan_guide?.rf_ppe_required ?? null,
+    tcsg_n_rf_required:     c.tower_climbing_safety_plan_guide?.n_required_rf_measures ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6692,6 +6695,82 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    tower_climbing_safety_plan_guide: (() => {
+      // OSHA 29 CFR §1910.268 (telecommunications tower) and §1926.502 (fall protection construction)
+      // FCC §73.49: AM tower fencing and warning signs required (RF hazard and access control)
+      // FAA: tower workers must not inadvertently trigger lighting systems (§17.48 reporting)
+      // ANSI/TIA-1019-A: Tower Climbing Standard
+      // NATE (National Association of Tower Erectors): industry-standard fall protection protocols
+      //
+      // Relocation relevance: a new tower (or modified existing tower) requires a fresh fall protection
+      // and climbing safety plan as part of the construction permit (CP) work.
+      // Workers on AM towers face additional RF exposure hazard vs. structural-only towers.
+
+      // Estimate the RF hazard zone on the tower for climbers
+      // AM towers conduct RF current along the entire structure; the base insulator is at ground level
+      // RF current is highest at the base and varies with tower height per the sinusoidal distribution
+      // For §1.1310 MPE: occupational limit = 3 mW/cm² averaged over 6 min (1.6–30 MHz range)
+      // AM band is 0.53–1.7 MHz; OET Bulletin 65 applies occupational limits for workers ON structure
+      const tpo_w_tc = (tpo_kw ?? 1) * 1000;
+      // Simplified RF hazard: at base of a 1/4-wavelength tower at 5 kW, fields near base can exceed limits
+      // Typical safe operating power for unprotected tower work on an AM tower: ~0W (must de-energize)
+      // Work with station on-air requires proper RF protective equipment above safe_power_threshold_kw
+      const safe_work_power_threshold_kw = 0.050; // 50W — above this, RF PPE required on structure
+      const rf_ppe_required = tpo_kw > safe_work_power_threshold_kw;
+
+      // Tower height for this candidate (from antenna system summary if available; else estimate)
+      // 3/8λ for 780 kHz ≈ 144 m; typical AM towers: 60–160 m
+      const c_mps = 299792458;
+      const wavelength_m_tc = c_mps / (frequency_khz * 1000);
+      const three_eights_height_m = round2(wavelength_m_tc * 0.375);
+
+      // Fall protection zones and requirements per OSHA §1910.268 / ANSI/TIA-1019-A
+      const FALL_PROTECTION_ZONES = [
+        { zone: 'Ground (0–1.8 m)', requirement: 'No fall protection required; perimeter fencing §73.49', cfr: '§73.49; OSHA §1910.268(n)' },
+        { zone: 'Low (1.8–3 m)',    requirement: '100% tie-off required; personal fall arrest system (PFAS)', cfr: 'OSHA §1926.502(d)' },
+        { zone: 'Mid (3–30 m)',     requirement: '100% tie-off; PFAS; periodic rest platforms recommended', cfr: 'OSHA §1926.502(d); ANSI/TIA-1019-A §6' },
+        { zone: `High (30+ m)`,    requirement: '100% tie-off; PFAS; rescue plan required; two-person climb rule recommended', cfr: 'OSHA §1926.502(d); ANSI/TIA-1019-A §7' }
+      ];
+
+      // RF safety requirements for tower climbers (on-air work)
+      const RF_SAFETY_REQUIREMENTS = [
+        { id: 'DE_ENERGIZE',   label: 'Station must be off-air for all structural work unless RF shielding provided', cfr: '§1.1310; OET Bulletin 65', required: rf_ppe_required },
+        { id: 'RF_PPE',        label: 'RF personal protective equipment (RF-shielded suit, gloves) required if on-air work needed', cfr: 'OET Bulletin 65; ANSI C95.1', required: rf_ppe_required },
+        { id: 'MONITOR',       label: 'On-site RF field strength monitor during any on-air climbing', cfr: 'OET Bulletin 65 §4.3', required: rf_ppe_required },
+        { id: 'RESCUE_PLAN',   label: `Rescue plan required for work above ${three_eights_height_m > 30 ? 30 : 15} m; tower rescue certification`, cfr: 'OSHA §1926.502(d)(16)', required: true }
+      ];
+
+      // Documentation required for CP/construction safety plan
+      const SAFETY_PLAN_DOCUMENTS = [
+        'Job Hazard Analysis (JHA) for all tower climbing tasks',
+        'Emergency Response and Rescue Plan (ERP) — specific to tower height and site access',
+        `RF Exposure Plan: de-energize protocol for transmitter (TPO ${tpo_kw} kW)`,
+        'Worker RF training records (OET Bulletin 65 awareness training)',
+        'PFAS inspection logs (pre-climb and post-climb)',
+        'ANSI/TIA-1019-A compliance acknowledgment signed by tower crew supervisor',
+        'FAA coordination for any work on towers with lighting systems (§17.48 notification)'
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        tpo_kw, rf_ppe_required,
+        safe_work_power_threshold_kw,
+        estimated_tower_height_m: three_eights_height_m,
+        fall_protection_zones: FALL_PROTECTION_ZONES,
+        n_fall_protection_zones: FALL_PROTECTION_ZONES.length,
+        rf_safety_requirements: RF_SAFETY_REQUIREMENTS,
+        n_rf_requirements: RF_SAFETY_REQUIREMENTS.length,
+        n_required_rf_measures: RF_SAFETY_REQUIREMENTS.filter(r => r.required).length,
+        safety_plan_documents: SAFETY_PLAN_DOCUMENTS,
+        n_safety_documents: SAFETY_PLAN_DOCUMENTS.length,
+        osha_applicable_standards: ['29 CFR §1910.268 (telecommunications)', '29 CFR §1926.502 (fall protection)', 'ANSI/TIA-1019-A (tower climbing)', 'ANSI C95.1 (RF safety)'],
+        fcc_applicable: '47 CFR §73.49 (tower fencing); §1.1310 (MPE); OET Bulletin 65',
+        relocation_note: `New tower construction at this site requires a fresh tower climbing safety plan. RF PPE ${rf_ppe_required ? 'IS required' : 'may not be required'} for work with transmitter on-air at ${tpo_kw} kW. Estimated tower height: ~${three_eights_height_m} m (3/8λ at ${frequency_khz} kHz).`,
+        reference: 'OSHA 29 CFR §1910.268; §1926.502; ANSI/TIA-1019-A; ANSI C95.1; 47 CFR §73.49; §1.1310; OET Bulletin 65; NATE Safety Guidelines; FAA §17.48',
+        note: `Tower climbing safety plan required for new ${three_eights_height_m}m AM tower. RF PPE ${rf_ppe_required ? 'REQUIRED' : 'NOT required'} at ${tpo_kw} kW. ${SAFETY_PLAN_DOCUMENTS.length} plan documents needed.`
       };
     })(),
 

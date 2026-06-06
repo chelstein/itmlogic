@@ -5683,6 +5683,53 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- tower_climbing_safety_plan_guide ----
+
+test('tower_climbing_safety_plan_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.tower_climbing_safety_plan_guide != null, 'tower_climbing_safety_plan_guide missing');
+  const g = c.tower_climbing_safety_plan_guide;
+  assert.ok('estimated_tower_height_m' in g, 'estimated_tower_height_m missing');
+  assert.ok(Array.isArray(g.fall_protection_zones), 'fall_protection_zones must be array');
+  assert.ok(Array.isArray(g.rf_safety_requirements), 'rf_safety_requirements must be array');
+  assert.ok(Array.isArray(g.safety_plan_documents), 'safety_plan_documents must be array');
+  assert.ok(Array.isArray(g.osha_applicable_standards), 'osha_applicable_standards must be array');
+});
+
+test('tower_climbing_safety_plan_guide KAZM 780 kHz tower height ~144m (3/8 wavelength)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_climbing_safety_plan_guide;
+  assert.ok(g.estimated_tower_height_m >= 130 && g.estimated_tower_height_m <= 160, `KAZM 780 kHz 3/8λ tower height must be 130–160 m, got ${g.estimated_tower_height_m}`);
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz must be 780');
+  assert.strictEqual(g.tpo_kw, 5, 'tpo_kw must be 5');
+});
+
+test('tower_climbing_safety_plan_guide RF PPE required at 5 kW KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_climbing_safety_plan_guide;
+  assert.strictEqual(g.rf_ppe_required, true, 'RF PPE must be required at 5 kW (above 50W threshold)');
+  assert.ok(g.n_required_rf_measures >= 1, 'at least 1 RF safety measure must be required');
+  assert.ok(g.safe_work_power_threshold_kw > 0 && g.safe_work_power_threshold_kw < 1, 'safe threshold must be between 0 and 1 kW');
+});
+
+test('tower_climbing_safety_plan_guide fall protection zones cover ground through high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_climbing_safety_plan_guide;
+  assert.ok(g.fall_protection_zones.length >= 3, 'must have at least 3 fall protection zones');
+  assert.strictEqual(g.n_fall_protection_zones, g.fall_protection_zones.length, 'n_fall_protection_zones must match array length');
+  assert.ok(g.safety_plan_documents.length >= 5, 'must have at least 5 safety plan documents');
+});
+
+test('tower_climbing_safety_plan_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tcsg_tower_height_m' in row, 'tcsg_tower_height_m missing from comparison table');
+    assert.ok('tcsg_rf_ppe_required' in row, 'tcsg_rf_ppe_required missing from comparison table');
+    assert.ok('tcsg_n_rf_required' in row, 'tcsg_n_rf_required missing from comparison table');
+  }
+});
+
 // ---- remote_pickup_unit_guide ----
 
 test('remote_pickup_unit_guide presence and structure', async () => {

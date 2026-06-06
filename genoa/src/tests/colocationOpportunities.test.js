@@ -1325,6 +1325,20 @@ test('colocation GRID candidates have license_renewal_compliance_guide', async (
   }
 });
 
+test('colocation GRID candidates have tower_climbing_safety_plan_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.tower_climbing_safety_plan_guide != null, `rank ${c.rank} missing tower_climbing_safety_plan_guide`);
+    assert.strictEqual(c.tower_climbing_safety_plan_guide.rf_ppe_required, true, `rank ${c.rank} RF PPE must be required at 5 kW`);
+  }
+});
+
 test('colocation GRID candidates have remote_pickup_unit_guide', async () => {
   const out = await runColocationOpportunities({
     callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },

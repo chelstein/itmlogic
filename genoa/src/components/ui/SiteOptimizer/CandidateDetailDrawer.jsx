@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Tower Climbing Safety Plan Guide */}
+        {candidate.tower_climbing_safety_plan_guide && (() => {
+          const g = candidate.tower_climbing_safety_plan_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                Tower Climbing Safety Plan <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>OSHA §1910.268</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Tower Height</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 700 }}>{g.estimated_tower_height_m ?? '—'} m</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>RF PPE Required</div>
+                  <div style={{ color: g.rf_ppe_required ? '#f87171' : '#34d399', fontSize: 14, fontWeight: 700 }}>{g.rf_ppe_required ? 'YES' : 'NO'}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 120px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Safety Documents</div>
+                  <div style={{ color: '#fbbf24', fontSize: 15, fontWeight: 700 }}>{g.n_safety_documents ?? '—'}</div>
+                </div>
+              </div>
+              {g.rf_safety_requirements && g.rf_safety_requirements.filter(r => r.required).length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>RF Safety Requirements (Active)</div>
+                  {g.rf_safety_requirements.filter(r => r.required).map((r, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#f87171', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>REQ</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{r.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.fall_protection_zones && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fall Protection Zones</div>
+                  {g.fall_protection_zones.map((z, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#818cf8', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1, width: 90, flexShrink: 0 }}>{z.zone.split(' (')[0]}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 11 }}>{z.requirement}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Remote Pickup Unit Guide */}
         {candidate.remote_pickup_unit_guide && (() => {
           const g = candidate.remote_pickup_unit_guide;
