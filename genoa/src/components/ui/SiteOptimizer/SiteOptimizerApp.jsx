@@ -15,6 +15,7 @@ import LimitationsGlobalPanel from './LimitationsGlobalPanel.jsx';
 import TowerReferencePanel from './TowerReferencePanel.jsx';
 import RecommendedActionsPanel from './RecommendedActionsPanel.jsx';
 import Form301ChecklistPanel from './Form301ChecklistPanel.jsx';
+import ProtectionRequirementsPanel from './ProtectionRequirementsPanel.jsx';
 
 // SiteOptimizerApp — the entire /am-relocation page.  Top-level for
 // the new route; the existing Contour Studio is unaffected.
@@ -243,6 +244,9 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
             {result?.form_301_checklist?.length > 0 && (
               <Form301ChecklistPanel checklist={result.form_301_checklist} />
             )}
+            {result?.protection_requirements && (
+              <ProtectionRequirementsPanel protection_requirements={result.protection_requirements} />
+            )}
             {isColocationMode ? (
               <ColocationDoctrineBlock candidates={candidates} />
             ) : (
@@ -374,6 +378,32 @@ const DEMO_RESULT = {
     { id: 'NEPA_ENVIRONMENTAL',status: 'REQUIRED',    description: 'Complete NEPA environmental checklist (§1.1306); file EA if any triggers apply', rule: '47 CFR §1.1306 / §1.1307', note: 'Check for protected species, historic properties (NHPA §106), floodplains, wetlands, wilderness areas' },
     { id: 'FAA_AERONAUTICAL',  status: 'CONDITIONAL', description: 'File FAA Form 7460-1 (aeronautical study) for any structure > 200 ft or near airports', rule: '47 CFR §17.7; 14 CFR Part 77', note: 'Required if tower height > 200 ft AGL or if within obstacle free zone of an airport' }
   ],
+  protection_requirements: {
+    station_class: 'D',
+    channel_class: 'clear_channel',
+    frequency_khz: 780,
+    receives_co_channel_protection: {
+      type: 'SECONDARY',
+      description: 'Class D secondary on clear channel — must not interfere with dominant Class A; 0.5 mV/m and 25 µV/m Class A contours are absolute constraints.',
+      protected_contour_mvm: null,
+      rule: '47 CFR §73.25 / §73.182'
+    },
+    must_protect_against_interference: [
+      { constraint: 'Must not increase interference to dominant Class A 0.5 mV/m skywave contour', threshold: '0 additional interference persons (NIF standard)', rule: '47 CFR §73.182(k)' },
+      { constraint: 'Must not increase interference to Class A 25 µV/m skywave contour', threshold: 'No new interference at this contour', rule: '47 CFR §73.182(k)' },
+      { constraint: 'Must maintain §73.37 minimum distance separations from co-channel and adjacent-channel stations', threshold: '§73.25 clear-channel separations', rule: '47 CFR §73.37' },
+      { constraint: 'Demonstrate no objectionable interference to other stations via §73.182 field-intensity method', threshold: 'D/U ratio per §73.182 Table 1 at receiving station 0.5 mV/m or 5 mV/m contour', rule: '47 CFR §73.182' }
+    ],
+    nif_study_required: true,
+    nif_study_notes: 'Full §73.182 NIF study required — new site must not increase nighttime interference to Class A dominant station contours.',
+    adjacent_channel_advisory: {
+      minus_10khz: { protection_db: 6, note: '1st adjacent lower: 6 dB D/U (§73.182 Table 1)' },
+      plus_10khz:  { protection_db: 6, note: '1st adjacent upper: 6 dB D/U' },
+      minus_20khz: { protection_db: 14, note: '2nd adjacent lower: 14 dB D/U' },
+      plus_20khz:  { protection_db: 14, note: '2nd adjacent upper: 14 dB D/U' },
+      note: 'D/U ratios are at the undesired station\'s 0.5 mV/m skywave or 5 mV/m groundwave contour (§73.182 Table 1). Exact values depend on class and time of operation.'
+    }
+  },
   warnings: [
     {
       code: 'ADJACENT_TO_CLEAR_CHANNEL',
