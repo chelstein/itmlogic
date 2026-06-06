@@ -3878,3 +3878,134 @@ test('candidate_scoring_audit truncation warnings present when limit is very sma
     assert.ok(audit.total_truncated > 0, 'truncated should be positive with limit=1');
   }
 });
+
+// ---------- directional_antenna_study_guide ----------
+
+test('directional_antenna_study_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.directional_antenna_study_guide != null,
+      `directional_antenna_study_guide must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('directional_antenna_study_guide.recommended is boolean', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.directional_antenna_study_guide;
+    assert.ok(typeof g.recommended === 'boolean',
+      `directional_antenna_study_guide.recommended must be boolean for rank ${c.rank}`);
+  }
+});
+
+test('directional_antenna_study_guide study_type is valid enum when recommended', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const validTypes = new Set(['FULL_DA_STUDY_DAY_NIGHT', 'DA_N_NIGHTTIME_ONLY', 'DA_D_DAYTIME_ONLY']);
+  for (const c of out.candidates) {
+    const g = c.directional_antenna_study_guide;
+    if (g.recommended && g.study_type != null) {
+      assert.ok(validTypes.has(g.study_type),
+        `study_type "${g.study_type}" must be valid enum for rank ${c.rank}`);
+    }
+  }
+});
+
+test('directional_antenna_study_guide triggers is array when recommended', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.directional_antenna_study_guide;
+    if (g.recommended) {
+      assert.ok(Array.isArray(g.triggers) && g.triggers.length > 0,
+        `triggers must be non-empty array when recommended=true for rank ${c.rank}`);
+    }
+  }
+});
+
+test('directional_antenna_study_guide pattern_radials_required = 72 when recommended', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.directional_antenna_study_guide;
+    if (g.recommended) {
+      assert.equal(g.pattern_radials_required, 72,
+        `pattern_radials_required must be 72 (§73.316 5° increments) for rank ${c.rank}`);
+    }
+  }
+});
+
+test('directional_antenna_study_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('da_study_recommended' in row, 'da_study_recommended must be in comparison table');
+    assert.ok('da_study_type' in row, 'da_study_type must be in comparison table');
+  }
+});
+
+// ---------- skywave_protection_advisory ----------
+
+test('skywave_protection_advisory is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.skywave_protection_advisory != null,
+      `skywave_protection_advisory must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('skywave_protection_advisory.advisory_level is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const validLevels = new Set(['NONE', 'LOW', 'MODERATE', 'HIGH', 'CRITICAL']);
+  for (const c of out.candidates) {
+    const s = c.skywave_protection_advisory;
+    assert.ok(validLevels.has(s.advisory_level),
+      `advisory_level "${s.advisory_level}" must be valid enum for rank ${c.rank}`);
+  }
+});
+
+test('skywave_protection_advisory.nif_required is boolean', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(typeof c.skywave_protection_advisory.nif_required === 'boolean',
+      `nif_required must be boolean for rank ${c.rank}`);
+  }
+});
+
+test('skywave_protection_advisory.protected_contour_25uvm_est_km is positive number when nif_required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const s = c.skywave_protection_advisory;
+    if (s.nif_required) {
+      assert.ok(typeof s.protected_contour_25uvm_est_km === 'number' && s.protected_contour_25uvm_est_km > 0,
+        `protected_contour_25uvm_est_km must be positive number for rank ${c.rank}`);
+    }
+  }
+});
+
+test('skywave_protection_advisory.advisory_items is non-empty array when nif_required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const s = c.skywave_protection_advisory;
+    if (s.nif_required) {
+      assert.ok(Array.isArray(s.advisory_items) && s.advisory_items.length > 0,
+        `advisory_items must be non-empty array when nif_required for rank ${c.rank}`);
+    }
+  }
+});
+
+test('skywave_protection_advisory skywave_advisory_level in comparison table', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('skywave_advisory_level' in row,
+      'skywave_advisory_level must be in comparison table');
+  }
+});

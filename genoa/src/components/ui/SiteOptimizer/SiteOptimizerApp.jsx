@@ -773,6 +773,43 @@ const DEMO_RESULT = {
         blanket_concern_at_max: { blanket_1000mvm_km: 2.3, estimated_blanket_pop_pct: 0.8, would_exceed_limit: false },
         verdict: 'UPGRADE_RESOLVES_COL',
         note: 'Class D ceiling is 50 kW (+45 kW / +900% over current TPO).'
+      },
+      directional_antenna_study_guide: {
+        recommended: true,
+        primary_reason: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
+        study_type: 'DA_N_NIGHTTIME_ONLY',
+        triggers: [
+          {
+            trigger: 'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
+            detail: 'Secondary Class D on clear channel 780 kHz. DA-N (nighttime directional) almost always required to protect dominant WJR Class A skywave contours at night.',
+            cfr: '47 CFR §73.25 / §73.182'
+          }
+        ],
+        key_constraints: [
+          'DA-N pattern must protect Class A dominant\'s 0.5 mV/m and 25 µV/m contours.',
+          '§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).',
+          'Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.'
+        ],
+        pattern_radials_required: 72,
+        additional_engineering_weeks_min: 8,
+        additional_engineering_weeks_max: 16,
+        note: 'Commission a DA N NIGHTTIME ONLY study before filing. DA engineering adds 8–16 weeks; budget for multiple antenna modeling iterations.',
+        rule: '47 CFR §73.150 / §73.316'
+      },
+      skywave_protection_advisory: {
+        advisory_level: 'HIGH',
+        nif_required: true,
+        nif_study_type: '§73.182 full azimuthal skywave NIF (1° bearings, standard skip-zone increments, OET-72 methodology)',
+        protected_contour_25uvm_est_km: 120.21,
+        groundwave_05mvm_est_km: 34.1,
+        advisory_items: [
+          'Secondary Class D on clear channel 780 kHz: must not INCREASE nighttime interference to dominant WJR Class A station\'s 0.5 mV/m groundwave AND 25 µV/m skywave contours.',
+          'The §73.182 NIF must demonstrate interference is not materially increased from the current authorized site — this is a delta comparison, not an absolute limit.',
+          'Clear-channel secondary NIF requires 1° azimuthal resolution (360 bearings × standard skip-distance increments).'
+        ],
+        key_risk: 'Secondary on §73.25 clear channel — must not increase interference to Class A dominant\'s protected contours (0.5 mV/m groundwave / 25 µV/m skywave)',
+        treaty_factor: null,
+        rule: '47 CFR §73.25 / §73.182'
       }
     },
     {

@@ -731,7 +731,10 @@ export async function runSiteOptimizer(body = {}){
     seasonal_variability:   c.seasonal_conductivity_note?.seasonal_variability ?? null,
     seasonal_risk:          c.seasonal_conductivity_note?.risk_level ?? null,
     power_upgrade_verdict:  c.power_upgrade_analysis?.verdict ?? null,
-    headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null
+    headroom_kw:            c.power_upgrade_analysis?.headroom_kw ?? null,
+    da_study_recommended:   c.directional_antenna_study_guide?.recommended ?? null,
+    da_study_type:          c.directional_antenna_study_guide?.study_type ?? null,
+    skywave_advisory_level: c.skywave_protection_advisory?.advisory_level ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -2717,6 +2720,103 @@ async function scoreCandidate(pt, ctx, warnings){
         rule: '47 CFR §73.150 / §73.24(j)'
       };
     })(),
+    // Directional antenna study guide — actionable guidance on whether to pursue
+    // a §73.150 DA study for this candidate and what kind of study to commission.
+    // Distinct from da_gain_potential (COL-focused): this covers ALL reasons a
+    // DA could be needed — COL recovery, blanket suppression, treaty compliance,
+    // or clear-channel secondary nighttime protection.
+    directional_antenna_study_guide: (() => {
+      const colPct        = coverage_pct == null ? null : round2(coverage_pct * 100);
+      const colNeedsDA    = colPct != null && colPct < 80 && colPct >= 40;
+      const blankHigh     = blanket_population_pct != null && blanket_population_pct >= 0.8;
+      const isClear       = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isClassA      = fcc_class === 'A';
+      const secondaryClear = isClear && !isClassA;
+      const isLocal       = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isClassC      = fcc_class === 'C';
+
+      // Local/Class C: DA not applicable (250 W max; no meaningful pattern optimization).
+      if (isLocal || isClassC) {
+        return {
+          recommended: false,
+          primary_reason: 'NOT_APPLICABLE',
+          note: `Class ${fcc_class} on local channel — DA not applicable at ≤250 W. No §73.150 study needed.`
+        };
+      }
+
+      const triggers = [];
+
+      if (colNeedsDA) {
+        triggers.push({
+          trigger:  'COL_COVERAGE_GAP',
+          detail:   `NDA coverage ${colPct.toFixed(0)}% < §73.24(j) 80% floor. DA with maximum ERP toward the COL centroid bearing can recover compliance.`,
+          cfr:      '47 CFR §73.150 / §73.24(j)'
+        });
+      }
+      if (blankHigh) {
+        triggers.push({
+          trigger:  'BLANKET_POP_SUPPRESSION',
+          detail:   `Blanket pop ${round2(blanket_population_pct)}% approaching/exceeding §73.24(g) 1% limit. DA pattern nulls the 1000 mV/m lobe away from population centers.`,
+          cfr:      '47 CFR §73.24(g) / §73.150'
+        });
+      }
+      if (treaty_zone) {
+        triggers.push({
+          trigger:  'TREATY_CONSTRAINT',
+          detail:   `Within ${treaty_zone} treaty zone. DA likely required to reduce power toward the border while maintaining COL coverage.`,
+          cfr:      '1986 US/Mexico AM Agreement / US-Canada AM Treaty'
+        });
+      }
+      if (secondaryClear) {
+        triggers.push({
+          trigger:  'CLEAR_CHANNEL_SECONDARY_NIGHTTIME',
+          detail:   `Secondary Class ${fcc_class} on clear channel ${frequency_khz} kHz. DA-N (nighttime directional) almost always required to protect dominant Class A skywave contours.`,
+          cfr:      '47 CFR §73.25 / §73.182'
+        });
+      }
+
+      const recommended   = triggers.length > 0;
+      const primary_reason = triggers.length > 0 ? triggers[0].trigger : 'NONE';
+
+      if (!recommended) {
+        return {
+          recommended: false,
+          primary_reason: 'NONE',
+          note: `NDA operation appears sufficient: COL ${colPct != null ? colPct.toFixed(0)+'%' : 'unknown'}, blanket pop within limits, no treaty zone, not secondary on clear channel. Full §73.37 analysis may still reveal interference constraints.`
+        };
+      }
+
+      // Determine study type from trigger mix
+      const needsDaN  = secondaryClear;              // clear-channel secondary → DA-N required
+      const needsDaD  = colNeedsDA || blankHigh || treaty_zone;
+      const study_type = needsDaN && needsDaD ? 'FULL_DA_STUDY_DAY_NIGHT'
+        : needsDaN ? 'DA_N_NIGHTTIME_ONLY'
+        : 'DA_D_DAYTIME_ONLY';
+
+      const key_constraints = [];
+      if (colNeedsDA)     key_constraints.push(`Maximize ERP toward COL centroid bearing (§73.24(j) ≥80% coverage goal).`);
+      if (blankHigh)      key_constraints.push(`Null 1000 mV/m contour away from populated areas (§73.24(g) ≤1% blanket limit).`);
+      if (treaty_zone)    key_constraints.push(`Reduce power toward ${treaty_zone} border for binational coordination.`);
+      if (secondaryClear) key_constraints.push(`DA-N pattern must protect Class A dominant's 0.5 mV/m and 25 µV/m contours.`);
+      key_constraints.push(`§73.316: horizontal pattern filed in 5° increments (72 tabulated values + 0°).`);
+      key_constraints.push(`Typical AM DA array: 2–4 tower elements; ground system must be extended to all towers.`);
+
+      const add_wks_min = study_type === 'FULL_DA_STUDY_DAY_NIGHT' ? 16 : 8;
+      const add_wks_max = study_type === 'FULL_DA_STUDY_DAY_NIGHT' ? 32 : 16;
+
+      return {
+        recommended,
+        primary_reason,
+        study_type,
+        triggers,
+        key_constraints,
+        pattern_radials_required: 72,  // §73.316: 5° increments
+        additional_engineering_weeks_min: add_wks_min,
+        additional_engineering_weeks_max: add_wks_max,
+        note: `Commission a ${study_type.replace(/_/g, ' ')} study before filing. DA engineering adds ${add_wks_min}–${add_wks_max} weeks; budget for multiple antenna modeling iterations.`,
+        rule: '47 CFR §73.150 / §73.316'
+      };
+    })(),
     // Signal environment advisory — characterizes the directional interference
     // environment for this candidate based on bearing and distance context.
     // Complements co_channel_spacing_estimate with geographic framing.
@@ -2763,6 +2863,88 @@ async function scoreCandidate(pt, ctx, warnings){
         distance_km: round2(dist),
         notes: notes.length > 0 ? notes : [`No specific signal environment alerts for this candidate location.`],
         caution: `This is a screening-grade directional assessment only. Full §73.37 co-channel/adjacent-channel separation must be measured to all licensed stations in the region before filing.`
+      };
+    })(),
+    // Skywave protection advisory — quantifies the nighttime skywave NIF burden
+    // for this candidate and identifies the key interference constraint class.
+    // Complements nighttime_classification with a location-specific risk level and
+    // estimated 25 µV/m protected contour radius.  Screening-grade only — the real
+    // §73.182 NIF uses FCC skywave propagation software with 1° azimuthal resolution.
+    skywave_protection_advisory: (() => {
+      const isLocal  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isClear  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isClassA = fcc_class === 'A';
+      const isClassC = fcc_class === 'C';
+
+      // Local and Class C channels: no skywave NIF burden.
+      if (isLocal || isClassC) {
+        return {
+          advisory_level:  'NONE',
+          nif_required:    false,
+          note:            `${frequency_khz} kHz Class ${fcc_class}: no §73.182 skywave NIF required under local-channel framework (§73.27).`,
+          rule:            '47 CFR §73.27'
+        };
+      }
+
+      // Estimate 25 µV/m skywave protected contour radius.
+      // FCC skywave curves (OET-72 methodology): approximate D_25uv ≈ 1700 * sqrt(ERP_kw/1000).
+      // This is a textbook approximation; actual FCC skywave computation uses
+      // F(50,10) curves with seasonal/geographic correction.
+      const erp_ref_kw = isClassA ? Math.min(50, tpo_kw) : Math.min(tpo_kw, FCC_CLASS_POWER_KW[fcc_class]?.max ?? 50);
+      const protected_contour_25uvm_est_km = round2(1700 * Math.sqrt(erp_ref_kw / 1000));
+
+      // 0.5 mV/m groundwave protected radius (already computed as daytime_reach_km at 0.5 mV/m target).
+      const groundwave_05mvm_est_km = daytime_reach_km ?? null;
+
+      const advisory_items = [];
+      let advisory_level;
+      let key_risk;
+
+      if (isClear && !isClassA) {
+        // Secondary on clear channel — hardest constraint class.
+        advisory_items.push(`Secondary Class ${fcc_class} on clear channel ${frequency_khz} kHz: must not INCREASE nighttime interference to dominant Class A station's 0.5 mV/m groundwave AND 25 µV/m skywave contours.`);
+        advisory_items.push(`The §73.182 NIF must demonstrate interference is not materially increased from the current authorized site — this is a delta comparison, not an absolute limit.`);
+        advisory_items.push(`Clear-channel secondary NIF requires 1° azimuthal resolution (360 bearings × standard skip-distance increments).`);
+        if (treaty_zone) {
+          advisory_items.push(`TREATY ZONE ${treaty_zone}: binational skywave coordination required — FCC IB review adds 12–52 weeks. Pattern authorization may be restricted in directions toward the border.`);
+        }
+        advisory_level = treaty_zone ? 'CRITICAL' : 'HIGH';
+        key_risk = `Secondary on §73.25 clear channel — must not increase interference to Class A dominant's protected contours (0.5 mV/m groundwave / 25 µV/m skywave)`;
+      } else if (isClear && isClassA) {
+        // Dominant Class A — protected but still must file NIF for changes.
+        advisory_items.push(`Class A dominant on clear channel ${frequency_khz} kHz: full nighttime authorization with strongest §73.25 protection rights.`);
+        advisory_items.push(`§73.182 NIF still required for any site change — must demonstrate that the NEW location does not cause additional interference to OTHER co-channel or adjacent-channel protected stations.`);
+        advisory_items.push(`NIF submission for Class A relocation typically includes skywave field strength in all 1° bearings at distances from the first skip-zone out to 3200 km.`);
+        if (treaty_zone) {
+          advisory_items.push(`TREATY ZONE ${treaty_zone}: FCC IB staff review required even for dominant Class A relocations. Binational agreement may restrict nighttime power or pattern toward border.`);
+        }
+        advisory_level = treaty_zone ? 'HIGH' : 'MODERATE';
+        key_risk = `Class A dominant filing — §73.182 NIF required to demonstrate no NEW interference to other protected stations`;
+      } else {
+        // Regional channel (Class B/D).
+        advisory_items.push(`Regional channel ${frequency_khz} kHz (Class ${fcc_class}): §73.182 NIF required. Demonstrate no increase in interference to co-channel stations' 0.5 mV/m groundwave and 25 µV/m skywave protected contours.`);
+        advisory_items.push(`Regional NIF complexity depends on co-channel station density. Typically simpler than clear-channel studies; commission §73.37 spacing analysis simultaneously.`);
+        if (treaty_zone) {
+          advisory_items.push(`TREATY ZONE ${treaty_zone}: international coordination adds 12–52 weeks even for regional channels — File FCC IB coordination request in parallel with domestic NIF.`);
+        }
+        advisory_level = treaty_zone ? 'MODERATE' : 'LOW';
+        key_risk = `Regional channel — §73.182 NIF required; complexity scales with co-channel station density in the region`;
+      }
+
+      const nif_study_type = isClear
+        ? `§73.182 full azimuthal skywave NIF (1° bearings, standard skip-zone increments, OET-72 methodology)`
+        : `§73.182 skywave NIF (regional channel format — co-channel and adj-channel stations in region)`;
+
+      return {
+        advisory_level,
+        nif_required:                     true,
+        nif_study_type,
+        protected_contour_25uvm_est_km,
+        groundwave_05mvm_est_km,
+        advisory_items,
+        key_risk,
+        treaty_factor:                    treaty_zone ?? null,
+        rule:                             isClear ? '47 CFR §73.25 / §73.182' : '47 CFR §73.182'
       };
     })(),
     // Coverage overlap analysis — two-circle intersection model.

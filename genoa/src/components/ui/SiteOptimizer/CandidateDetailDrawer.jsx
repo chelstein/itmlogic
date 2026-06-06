@@ -1341,6 +1341,102 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Directional antenna study guide */}
+        {candidate.directional_antenna_study_guide && (() => {
+          const g = candidate.directional_antenna_study_guide;
+          if (g.primary_reason === 'NOT_APPLICABLE') return null;
+          const recColor = g.recommended ? '#ffb347' : '#888';
+          const typeLabel = {
+            FULL_DA_STUDY_DAY_NIGHT: 'Full DA (Day + Night)',
+            DA_N_NIGHTTIME_ONLY:     'DA-N (Night only)',
+            DA_D_DAYTIME_ONLY:       'DA-D (Day only)'
+          }[g.study_type] ?? g.study_type ?? '—';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.150 DA study guide</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: recColor + '22', color: recColor }}>
+                    {g.recommended ? 'RECOMMENDED' : 'NOT REQUIRED'}
+                  </span>
+                  {g.study_type && (
+                    <span className="text-cream">{typeLabel}</span>
+                  )}
+                  {g.additional_engineering_weeks_min != null && (
+                    <span className="text-textDim">+{g.additional_engineering_weeks_min}–{g.additional_engineering_weeks_max} wks</span>
+                  )}
+                </div>
+                {g.triggers?.length > 0 && (
+                  <div className="space-y-1">
+                    {g.triggers.map((t, i) => (
+                      <div key={i} className="text-textDim/80 leading-snug">
+                        <span className="text-textDim/50 text-[9px] uppercase mr-1">{t.trigger.replace(/_/g, ' ')}:</span>
+                        {t.detail}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {g.key_constraints?.length > 0 && (
+                  <ul className="text-textDim/60 text-[9px] list-disc list-inside space-y-0.5">
+                    {g.key_constraints.slice(0, 3).map((c, i) => <li key={i}>{c}</li>)}
+                  </ul>
+                )}
+                {g.pattern_radials_required != null && (
+                  <div className="text-textDim/50 text-[9px]">Pattern: {g.pattern_radials_required} radials (5° increments) · {g.rule}</div>
+                )}
+                {!g.recommended && g.note && (
+                  <div className="text-textDim/60 leading-snug">{g.note}</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Skywave protection advisory */}
+        {candidate.skywave_protection_advisory && (() => {
+          const s = candidate.skywave_protection_advisory;
+          const levelColor = s.advisory_level === 'CRITICAL' ? '#ff4444'
+            : s.advisory_level === 'HIGH'    ? '#ffb347'
+            : s.advisory_level === 'MODERATE' ? '#ffe066'
+            : s.advisory_level === 'LOW'      ? '#63d471'
+            : '#888';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">§73.182 skywave protection</div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: levelColor + '22', color: levelColor }}>
+                    {s.advisory_level}
+                  </span>
+                  <span className="text-textDim">NIF required:</span>
+                  <span className="text-cream">{s.nif_required ? 'YES' : 'NO'}</span>
+                  {s.protected_contour_25uvm_est_km != null && (
+                    <>
+                      <span className="text-textDim">25 µV/m est:</span>
+                      <span className="text-cream">{s.protected_contour_25uvm_est_km.toFixed(0)} km</span>
+                    </>
+                  )}
+                </div>
+                {s.advisory_items?.length > 0 && (
+                  <div className="space-y-1">
+                    {s.advisory_items.slice(0, 2).map((item, i) => (
+                      <div key={i} className="text-textDim/80 leading-snug">{item}</div>
+                    ))}
+                  </div>
+                )}
+                {s.nif_study_type && (
+                  <div className="text-textDim/50 text-[9px]">{s.nif_study_type}</div>
+                )}
+                {s.key_risk && (
+                  <div className="text-textDim/60 text-[9px] leading-snug">Risk: {s.key_risk}</div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Power efficiency metrics */}
         {candidate.power_efficiency_metrics && (() => {
           const pem = candidate.power_efficiency_metrics;
