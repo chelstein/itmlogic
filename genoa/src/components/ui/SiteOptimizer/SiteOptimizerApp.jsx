@@ -1717,6 +1717,33 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      tower_lighting_marking_guide: {
+        fcc_class: 'D', frequency_khz: 780,
+        tower_height_estimate_m: 144.23, tower_height_estimate_ft: 473.15,
+        tower_height_basis: '3/8λ typical AM tower height estimate',
+        asr_required: true, asr_threshold_m: 61,
+        faa_lighting_tier: 'Medium obstruction',
+        faa_lighting_required: 'L-864 red medium-intensity flashing + L-810 red steady-burning',
+        faa_marking_required: 'Aviation orange/white paint bands',
+        faa_rule: 'FAA AC 70/7460-1M §3.5',
+        led_retrofit: {
+          applicable: true, led_power_l810_w: 11, led_power_l864_w: 56,
+          energy_savings_pct: 89, fcc_notice_required: true,
+          fcc_notice_rule: '§73.1213(e): 30-day advance notice to FCC for lighting system changes',
+          faa_authorization: 'FAA determination of no hazard required for lighting system changes',
+          note: 'FAA SN (Solid-State Lighting) approved; FCC allows LED equivalents per §73.1213.'
+        },
+        maintenance_obligations: [
+          { id: 'daily_check',    task: 'Daily lighting status check (or automated monitor)', rule: '§73.1213(b)', note: 'Lights must be inspected daily.' },
+          { id: 'faa_notify',     task: 'Notify FAA immediately if lights fail',              rule: '§17.47(a)',   note: 'FAA Flight Service Station within 30 minutes.' },
+          { id: 'fcc_notify',     task: 'Notify FCC within 30 min if lights fail',            rule: '§17.47(b)',   note: 'FCC notification via ASR system or phone.' },
+          { id: 'repair_72hr',    task: 'Restore lighting within 72 hours of failure',        rule: '§17.56',     note: 'Contact FAA and FCC if repair exceeds 72 hours.' },
+          { id: 'annual_inspect', task: 'Annual tower inspection by qualified technician',     rule: '§73.1213(d)', note: 'Retain inspection records 3 years.' }
+        ],
+        n_maintenance_items: 5,
+        reference: '47 CFR §17.7; §17.21; §17.23; §17.47; §17.56; §73.1213; FAA AC 70/7460-1M',
+        note: 'Estimated tower height: 144.23 m (473 ft) at 3/8λ. ASR REQUIRED (> 61m). FAA tier: Medium obstruction.'
+      },
       eas_acp_compliance_guide: {
         fcc_class: 'D', frequency_khz: 780, tpo_kw: 5,
         station_type: 'FULL_PARTICIPANT', eas_participation: 'MANDATORY',

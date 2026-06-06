@@ -852,7 +852,10 @@ export async function runSiteOptimizer(body = {}){
     sky_nif_required:       c.skywave_coverage_analysis?.nif_required ?? null,
     eas_participation:      c.eas_acp_compliance_guide?.eas_participation ?? null,
     eas_n_equipment:        c.eas_acp_compliance_guide?.n_required_equipment ?? null,
-    eas_ipaws_required:     c.eas_acp_compliance_guide?.ipaws_required ?? null
+    eas_ipaws_required:     c.eas_acp_compliance_guide?.ipaws_required ?? null,
+    tower_height_est_m:     c.tower_lighting_marking_guide?.tower_height_estimate_m ?? null,
+    tower_asr_required:     c.tower_lighting_marking_guide?.asr_required ?? null,
+    tower_faa_tier:         c.tower_lighting_marking_guide?.faa_lighting_tier ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -8080,6 +8083,80 @@ async function scoreCandidate(pt, ctx, warnings){
         ipaws_required:         true,
         reference: '47 CFR Part 11 (§11.15; §11.31; §11.35; §11.45; §11.52; §11.56; §11.61); FEMA IPAWS; NRSC EAS Standards',
         note: 'All AM broadcast stations must participate in EAS. IPAWS-compatible encoder/decoder required. Monitor 2 LP sources; relay RWT weekly, RMT monthly. Log all messages for 60 days.'
+      };
+    })(),
+
+    tower_lighting_marking_guide: (() => {
+      // FAA/FCC tower obstruction lighting and marking per:
+      // §17.21 (FCC tower registration), §17.23 (lighting standards)
+      // FAA Advisory Circulars 70/7460-1M (obstruction marking and lighting)
+      // §73.1213 (FCC: antenna structure maintenance)
+      // ASR (Antenna Structure Registration) required for towers ≥ 61m AGL
+
+      // Tower height estimation: AM towers are typically λ/4 to λ/2
+      // Standard AM tower: 5/8λ for max gain
+      const lambda_tl   = round2(300000 / frequency_khz); // m
+      const qwave_tl    = round2(lambda_tl / 4);           // m
+      const towerHeightEst_m  = round2(0.375 * lambda_tl);  // 3/8λ as typical for AM
+      const towerHeightEst_ft = round2(towerHeightEst_m * 3.28084);
+
+      // ASR threshold: ≥ 61m AGL (200 ft) per §17.7
+      const ASR_THRESHOLD_M = 61;
+      const asrRequired_tl = towerHeightEst_m >= ASR_THRESHOLD_M;
+
+      // FAA AC 70/7460-1M lighting tiers based on height AGL
+      // < 152 m (500 ft): L-810 red lights (medium intensity)
+      // 152–457 m (500–1500 ft): L-864/L-865 dual medium/high intensity
+      // > 457 m (1500 ft): L-856 high intensity (very tall structures)
+      const FAA_TIERS = [
+        { max_m: 61,  max_ft: 200,  label: 'No FAA marking required',  lighting: null,         marking: null,         rule: 'FAA AC 70/7460-1M §3.3' },
+        { max_m: 152, max_ft: 500,  label: 'Low obstruction',          lighting: 'L-810 red steady-burning', marking: 'Aviation orange paint (alternating)', rule: 'FAA AC 70/7460-1M §3.4' },
+        { max_m: 457, max_ft: 1500, label: 'Medium obstruction',       lighting: 'L-864 red medium-intensity flashing + L-810 red steady-burning', marking: 'Aviation orange/white paint bands', rule: 'FAA AC 70/7460-1M §3.5' },
+        { max_m: Infinity, max_ft: Infinity, label: 'High obstruction', lighting: 'L-856 white high-intensity day + L-864 red night', marking: 'Aviation orange/white bands; 150 ft intervals', rule: 'FAA AC 70/7460-1M §3.6' }
+      ];
+      const tier = FAA_TIERS.find(t => towerHeightEst_m <= t.max_m) ?? FAA_TIERS[FAA_TIERS.length - 1];
+
+      // LED retrofit: FCC and FAA now allow LED lighting; reduces energy consumption significantly
+      const LED_POWER_L810_W = 11;    // LED equivalent of L-810 incandescent (100W)
+      const LED_POWER_L864_W = 56;    // LED L-864 vs 500W incandescent
+      const LED_ENERGY_SAVINGS_PCT = 89; // approximate
+      const ledRetrofit = {
+        applicable: tier.lighting != null,
+        led_power_l810_w:   LED_POWER_L810_W,
+        led_power_l864_w:   LED_POWER_L864_W,
+        energy_savings_pct: LED_ENERGY_SAVINGS_PCT,
+        fcc_notice_required: true,
+        fcc_notice_rule:    '§73.1213(e): 30-day advance notice to FCC for lighting system changes',
+        faa_authorization:  'FAA determination of no hazard required for lighting system changes',
+        note: 'FAA SN (Solid-State Lighting) approved; FCC allows LED equivalents per §73.1213.'
+      };
+
+      // Maintenance obligations per §73.1213
+      const maintenanceObs = [
+        { id: 'daily_check',    task: 'Daily lighting status check (or automated monitor)', rule: '§73.1213(b)', note: 'Lights must be inspected daily. Automated monitoring with remote alarm acceptable.' },
+        { id: 'faa_notify',     task: 'Notify FAA immediately if lights fail (flight service station)', rule: '§17.47(a)', note: 'FAA Flight Service Station must be notified within 30 minutes of lighting failure.' },
+        { id: 'fcc_notify',     task: 'Notify FCC within 30 min if lights fail and not repaired within 30 min', rule: '§17.47(b)', note: 'FCC notification via ASR system online or by phone.' },
+        { id: 'repair_72hr',    task: 'Restore lighting within 72 hours of failure', rule: '§17.56', note: 'If repair will exceed 72 hours, contact FAA and FCC for interim measures.' },
+        { id: 'annual_inspect', task: 'Annual tower inspection by qualified tower technician', rule: '§73.1213(d)', note: 'Log and retain inspection records for 3 years.' }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tower_height_estimate_m:   towerHeightEst_m,
+        tower_height_estimate_ft:  towerHeightEst_ft,
+        tower_height_basis:        '3/8λ typical AM tower height estimate',
+        asr_required:              asrRequired_tl,
+        asr_threshold_m:           ASR_THRESHOLD_M,
+        faa_lighting_tier:         tier.label,
+        faa_lighting_required:     tier.lighting,
+        faa_marking_required:      tier.marking,
+        faa_rule:                  tier.rule,
+        led_retrofit:              ledRetrofit,
+        maintenance_obligations:   maintenanceObs,
+        n_maintenance_items:       maintenanceObs.length,
+        reference: '47 CFR §17.7; §17.21; §17.23; §17.47; §17.56; §73.1213; FAA AC 70/7460-1M',
+        note: `Estimated tower height: ${towerHeightEst_m} m (${towerHeightEst_ft} ft) at 3/8λ. ASR ${asrRequired_tl ? 'REQUIRED' : 'not required (< 61m)'}. FAA tier: ${tier.label}.`
       };
     })(),
 

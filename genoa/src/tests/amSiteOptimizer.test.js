@@ -6319,3 +6319,46 @@ test('eas_acp_compliance_guide comparison table columns present', async () => {
     assert.ok('eas_ipaws_required' in row, 'eas_ipaws_required missing from comparison table');
   }
 });
+
+test('tower_lighting_marking_guide presence and height estimate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_lighting_marking_guide;
+  assert.ok(t != null, 'tower_lighting_marking_guide must be present');
+  assert.ok(t.tower_height_estimate_m > 0, 'tower height estimate must be positive');
+  assert.ok(t.tower_height_estimate_ft > t.tower_height_estimate_m, 'ft must exceed m');
+  assert.ok(typeof t.faa_lighting_tier === 'string', 'FAA lighting tier must be a string');
+});
+
+test('tower_lighting_marking_guide ASR threshold check', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_lighting_marking_guide;
+  assert.strictEqual(t.asr_threshold_m, 61, 'ASR threshold must be 61m (§17.7)');
+  // KAZM at 780 kHz: λ = 384.6m; 3/8λ ≈ 144m > 61m → ASR required
+  assert.strictEqual(t.asr_required, true, 'KAZM tower at 780 kHz must require ASR (> 61m)');
+});
+
+test('tower_lighting_marking_guide LED retrofit spec', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_lighting_marking_guide;
+  assert.ok(t.led_retrofit != null, 'led_retrofit must be present');
+  assert.ok(t.led_retrofit.energy_savings_pct > 0, 'LED energy savings must be positive');
+  assert.strictEqual(t.led_retrofit.fcc_notice_required, true, 'FCC notice required for lighting changes');
+});
+
+test('tower_lighting_marking_guide maintenance obligations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const t = out.candidates[0].tower_lighting_marking_guide;
+  assert.ok(t.maintenance_obligations.length > 0, 'must have maintenance obligations');
+  assert.ok(t.n_maintenance_items > 0, 'n_maintenance_items must be positive');
+  const faaNotify = t.maintenance_obligations.find(m => m.id === 'faa_notify');
+  assert.ok(faaNotify != null, 'must include FAA notification obligation');
+});
+
+test('tower_lighting_marking_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tower_height_est_m' in row, 'tower_height_est_m missing from comparison table');
+    assert.ok('tower_asr_required' in row, 'tower_asr_required missing from comparison table');
+    assert.ok('tower_faa_tier' in row,     'tower_faa_tier missing from comparison table');
+  }
+});

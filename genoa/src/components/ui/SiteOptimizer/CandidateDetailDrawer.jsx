@@ -2226,6 +2226,57 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Tower Lighting & Marking Guide */}
+        {candidate.tower_lighting_marking_guide && (() => {
+          const t = candidate.tower_lighting_marking_guide;
+          const asrColor = t.asr_required ? 'text-amber-300' : 'text-green-300';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Tower Lighting & Marking Guide (§17.21 · FAA AC 70/7460-1M)</div>
+              <div className="rack-panel p-3 mb-3">
+                <div className="text-xs text-blue-200 mb-2">
+                  Estimated tower height: <span className="text-white font-mono">{t.tower_height_estimate_m} m ({t.tower_height_estimate_ft} ft)</span> ({t.tower_height_basis}).
+                  ASR: <span className={`font-bold ${asrColor}`}>{t.asr_required ? 'REQUIRED' : 'Not required'}</span>
+                  (≥ {t.asr_threshold_m}m threshold).
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">FAA Tier</div>
+                    <div className="text-amber-300 font-semibold">{t.faa_lighting_tier}</div>
+                  </div>
+                  <div className="bg-gray-800 rounded p-2">
+                    <div className="text-gray-400">Lighting</div>
+                    <div className="text-white text-xs">{t.faa_lighting_required ?? 'None required'}</div>
+                  </div>
+                </div>
+                {t.faa_marking_required && (
+                  <div className="text-xs bg-gray-800 rounded px-2 py-1 mb-2">
+                    <span className="text-gray-400">Marking: </span>
+                    <span className="text-gray-300">{t.faa_marking_required}</span>
+                  </div>
+                )}
+                {t.led_retrofit?.applicable && (
+                  <div className="text-xs bg-blue-900 rounded px-2 py-1 mb-2">
+                    <div className="text-blue-300 font-semibold mb-1">LED Retrofit Available</div>
+                    <div className="text-gray-300">Energy savings: {t.led_retrofit.energy_savings_pct}% · L-810: {t.led_retrofit.led_power_l810_w}W · L-864: {t.led_retrofit.led_power_l864_w}W</div>
+                    <div className="text-gray-400">{t.led_retrofit.note}</div>
+                  </div>
+                )}
+                <div className="text-xs font-semibold text-gray-300 mb-1">Maintenance Obligations</div>
+                <div className="space-y-0.5 mb-2">
+                  {t.maintenance_obligations?.map(m => (
+                    <div key={m.id} className="text-xs bg-gray-800 rounded px-2 py-0.5 flex items-start gap-2">
+                      <span className="text-gray-500 flex-shrink-0">{m.rule}</span>
+                      <span className="text-gray-300">{m.task}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-xs text-gray-500">{t.reference}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* EAS / ACP Compliance Guide */}
         {candidate.eas_acp_compliance_guide && (() => {
           const e = candidate.eas_acp_compliance_guide;

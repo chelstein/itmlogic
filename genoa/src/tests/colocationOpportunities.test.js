@@ -1141,3 +1141,17 @@ test('colocation GRID candidates have eas_acp_compliance_guide', async () => {
     assert.strictEqual(c.eas_acp_compliance_guide.eas_participation, 'MANDATORY', `rank ${c.rank} EAS must be MANDATORY`);
   }
 });
+
+test('colocation GRID candidates have tower_lighting_marking_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.tower_lighting_marking_guide != null, `rank ${c.rank} missing tower_lighting_marking_guide`);
+    assert.ok(c.tower_lighting_marking_guide.tower_height_estimate_m > 0, `rank ${c.rank} tower height must be positive`);
+  }
+});
