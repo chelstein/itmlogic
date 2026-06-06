@@ -872,6 +872,39 @@ const DEMO_RESULT = {
         treaty_factor: null,
         rule: '47 CFR §73.25 / §73.182'
       },
+      ground_system_design_specification: {
+        frequency_khz: 780, sigma_msm: 8, soil_resistivity_ohm_m: 125, quarter_wave_m: 96.2,
+        ideal_radial_length_m: 96.2, practical_radial_length_m: 96.2, min_radial_length_m: 48.1,
+        standard_design: {
+          n_radials: 120, radial_length_m: 96.2, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
+          burial_depth_mm: 150, R_g_estimated_ohm: 2.2, efficiency_pct: 94.3,
+          efficiency_tier: 'EXCELLENT (≥90%)', area_required_ha: 29.1
+        },
+        extended_design: {
+          n_radials: 180, radial_length_m: 144.3, wire_gauge: '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)',
+          burial_depth_mm: 150, R_g_estimated_ohm: 1.0, efficiency_pct: 97.3,
+          note: 'Extended design recommended for σ < 5 mS/m or when §73.190 efficiency certification targets >90%'
+        },
+        minimum_design: {
+          n_radials: 60, radial_length_m: 48.1,
+          note: 'Minimum emergency design — ~10% efficiency loss vs. standard. Acceptable for temporary operation only.'
+        },
+        recommended_design: 'standard', soil_quality_tier: 'GOOD',
+        note: 'Ground system design per NBS Technical Note 24 (Terman formula for R_g) and FCC §73.190 efficiency certification guidelines.'
+      },
+      regulatory_gate_summary: {
+        overall_verdict: 'CONDITIONAL', overall_note: '4 gate(s) require additional studies — site is viable pending engineering work.',
+        fail_count: 0, warn_count: 4,
+        gates: [
+          { id: 'COL_COVERAGE', label: '§73.24(j) COL 5 mV/m coverage', status: 'PASS', value: '97% (need ≥80%)', rule: '47 CFR §73.24(j)', note: null },
+          { id: 'BLANKET_POP', label: '§73.24(g) blanket population <1%', status: 'PASS', value: '0.5% (max 1%)', rule: '47 CFR §73.24(g)', note: null },
+          { id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration', status: 'WARN', value: 'λ/4 ≈ 96 m (threshold 60.96 m)', rule: '47 CFR §17.7', note: 'FCC Form 854 + FAA aeronautical study (7460-1) required before construction.' },
+          { id: 'RF_EXPOSURE_MPE', label: '§1.1307 RF exposure (MPE) evaluation', status: 'WARN', value: 'Near-field boundary λ/(2π) ≈ 61 m', rule: '47 CFR §1.1307 / OET Bulletin 65', note: 'OET-65 near-field evaluation required — fence at ≥61 m from antenna base.' },
+          { id: 'TREATY_COORDINATION', label: 'International treaty zone', status: 'PASS', value: 'None detected', rule: 'US/MX AM Agreement (1986)', note: null },
+          { id: 'NIGHTTIME_NIF', label: '§73.182 nighttime NIF study', status: 'WARN', value: 'Required at any new site', rule: '47 CFR §73.182', note: 'NIF study must demonstrate no increase in nighttime interference from authorized site.' },
+          { id: 'DA_PATTERN', label: '§73.316 directional antenna pattern', status: 'WARN', value: 'DA-N study recommended (clear channel secondary)', rule: '47 CFR §73.150 / §73.316', note: 'Clear channel secondary status requires DA-N nighttime directional pattern.' }
+        ]
+      },
       transmission_line_analysis: {
         frequency_khz: 780, tpo_kw: 5, assumed_run_m: 60,
         feedline_options: [

@@ -1867,6 +1867,105 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Regulatory Gate Summary */}
+        {candidate.regulatory_gate_summary && (() => {
+          const rg = candidate.regulatory_gate_summary;
+          const verdictColor = rg.overall_verdict === 'VIABLE' ? '#63d471'
+            : rg.overall_verdict === 'CONDITIONAL' ? '#f6c90e'
+            : '#ff9b5a';
+          const statusColor = s => s === 'PASS' ? '#63d471' : s === 'FAIL' ? '#ff9b5a' : s === 'WARN' ? '#f6c90e' : '#a89c8488';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Regulatory Gate Summary</div>
+              <div className="bg-surface/30 rounded p-2 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[9px] uppercase tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: verdictColor + '22', color: verdictColor }}>
+                    {rg.overall_verdict?.replace(/_/g, ' ')}
+                  </span>
+                  <span className="font-mono text-[9px] text-textDim/60">
+                    {rg.fail_count} fail · {rg.warn_count} warn
+                  </span>
+                </div>
+                {rg.overall_note && (
+                  <p className="font-mono text-[9px] text-textDim/70 leading-snug">{rg.overall_note}</p>
+                )}
+                <div className="space-y-1">
+                  {Array.isArray(rg.gates) && rg.gates.map(g => (
+                    <div key={g.id} className="flex items-start gap-2">
+                      <span className="font-mono text-[8px] uppercase tracking-rack shrink-0 w-10 mt-0.5 text-right"
+                        style={{ color: statusColor(g.status) }}>
+                        {g.status}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-mono text-[9px] text-textDim leading-snug">{g.label}</div>
+                        <div className="font-mono text-[8px] text-textDim/50 leading-snug">{g.value}</div>
+                        {g.note && (
+                          <div className="font-mono text-[8px] text-amber/60 leading-snug">{g.note}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Ground System Design Specification */}
+        {candidate.ground_system_design_specification && (() => {
+          const gs = candidate.ground_system_design_specification;
+          const std = gs.standard_design;
+          const ext = gs.extended_design;
+          const effColor = eff => eff >= 90 ? '#63d471' : eff >= 80 ? '#a8e063' : eff >= 70 ? '#f6c90e' : '#ff9b5a';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Ground System Design</div>
+              <div className="bg-surface/30 rounded p-2 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-[9px] text-textDim">σ={gs.sigma_msm} mS/m · ρ={gs.soil_resistivity_ohm_m} Ω·m · λ/4={gs.quarter_wave_m} m</span>
+                  <span className="font-mono text-[8px] uppercase tracking-rack px-1 py-0.5 rounded-sm"
+                    style={{ background: effColor(std?.efficiency_pct ?? 0) + '22', color: effColor(std?.efficiency_pct ?? 0) }}>
+                    {std?.efficiency_tier}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1 text-[9px] font-mono text-textDim/60 uppercase tracking-wide border-b border-white/10 pb-1">
+                  <span>Design</span>
+                  <span className="text-right">Radials × Length</span>
+                  <span className="text-right">R_g / η</span>
+                </div>
+                {[
+                  { label: 'Standard', d: std, highlight: gs.recommended_design === 'standard' },
+                  { label: 'Extended', d: ext, highlight: gs.recommended_design === 'extended' },
+                  { label: 'Minimum', d: gs.minimum_design, highlight: false }
+                ].map(({ label, d, highlight }) => d && (
+                  <div key={label} className="grid grid-cols-3 gap-1 items-center"
+                    style={{ opacity: highlight ? 1 : 0.65 }}>
+                    <span className="font-mono text-[9px]"
+                      style={{ color: highlight ? '#f6c90e' : undefined }}>
+                      {highlight ? '▶ ' : ''}{label}
+                    </span>
+                    <span className="text-right font-mono text-[9px] text-textPrimary">
+                      {d.n_radials} × {d.radial_length_m} m
+                    </span>
+                    <span className="text-right font-mono text-[9px]"
+                      style={{ color: d.R_g_estimated_ohm != null ? effColor(d.efficiency_pct ?? 0) : '#a89c84' }}>
+                      {d.R_g_estimated_ohm != null ? `${d.R_g_estimated_ohm} Ω / ${d.efficiency_pct}%` : '—'}
+                    </span>
+                  </div>
+                ))}
+                {std?.wire_gauge && (
+                  <div className="text-[9px] text-textDim/60 font-mono">Wire: {std.wire_gauge} · Burial: {std.burial_depth_mm} mm</div>
+                )}
+                {std?.area_required_ha != null && (
+                  <div className="text-[9px] text-textDim/50 font-mono">Site area needed: {std.area_required_ha} ha for full λ/4 radial field</div>
+                )}
+                <p className="text-[8px] text-textDim/40 leading-snug">{gs.note}</p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>

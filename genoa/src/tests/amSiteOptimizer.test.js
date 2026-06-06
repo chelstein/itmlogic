@@ -4409,3 +4409,134 @@ test('geographic_diversity_analysis.median_distance_km is positive', async () =>
   const { median_distance_km } = out.geographic_diversity_analysis;
   assert.ok(typeof median_distance_km === 'number' && median_distance_km > 0, `median_distance_km must be positive, got ${median_distance_km}`);
 });
+
+// ---------- regulatory_gate_summary ----------
+
+test('regulatory_gate_summary is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.regulatory_gate_summary != null,
+      `regulatory_gate_summary must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('regulatory_gate_summary has overall_verdict and gates array', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const rg = c.regulatory_gate_summary;
+    assert.ok(['VIABLE','CONDITIONAL','NON_VIABLE_AS_IS'].includes(rg.overall_verdict),
+      `overall_verdict "${rg.overall_verdict}" must be valid for rank ${c.rank}`);
+    assert.ok(Array.isArray(rg.gates) && rg.gates.length >= 5,
+      `gates must be an array with ≥5 entries for rank ${c.rank}`);
+    assert.ok(typeof rg.fail_count === 'number', `fail_count must be a number for rank ${c.rank}`);
+    assert.ok(typeof rg.warn_count === 'number', `warn_count must be a number for rank ${c.rank}`);
+  }
+});
+
+test('regulatory_gate_summary each gate has id, status, rule', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const VALID_STATUSES = ['PASS','WARN','FAIL','N/A'];
+  for (const c of out.candidates) {
+    for (const g of c.regulatory_gate_summary.gates) {
+      assert.ok(typeof g.id === 'string' && g.id.length > 0,
+        `gate must have id string on rank ${c.rank}`);
+      assert.ok(VALID_STATUSES.includes(g.status),
+        `gate ${g.id} status "${g.status}" must be valid on rank ${c.rank}`);
+      assert.ok(typeof g.rule === 'string' && g.rule.length > 0,
+        `gate ${g.id} must have rule on rank ${c.rank}`);
+    }
+  }
+});
+
+test('regulatory_gate_summary fail_count matches actual FAIL gates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  for (const c of out.candidates) {
+    const rg = c.regulatory_gate_summary;
+    const actualFails = rg.gates.filter(g => g.status === 'FAIL').length;
+    assert.equal(rg.fail_count, actualFails,
+      `fail_count ${rg.fail_count} must match actual FAIL gate count ${actualFails} on rank ${c.rank}`);
+  }
+});
+
+test('regulatory_gate_summary NON_VIABLE_AS_IS iff fail_count > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  for (const c of out.candidates) {
+    const rg = c.regulatory_gate_summary;
+    if (rg.fail_count > 0) {
+      assert.equal(rg.overall_verdict, 'NON_VIABLE_AS_IS',
+        `verdict must be NON_VIABLE_AS_IS when fail_count=${rg.fail_count} on rank ${c.rank}`);
+    } else {
+      assert.notEqual(rg.overall_verdict, 'NON_VIABLE_AS_IS',
+        `verdict must NOT be NON_VIABLE_AS_IS when fail_count=0 on rank ${c.rank}`);
+    }
+  }
+});
+
+test('regulatory_gate_summary gate_verdict in comparison table', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gate_verdict' in row, 'gate_verdict must be in comparison table');
+    assert.ok('gate_fail_count' in row, 'gate_fail_count must be in comparison table');
+    assert.ok('gate_warn_count' in row, 'gate_warn_count must be in comparison table');
+  }
+});
+
+// ---------- ground_system_design_specification ----------
+
+test('ground_system_design_specification is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.ground_system_design_specification != null,
+      `ground_system_design_specification must be present on rank ${c.rank}`);
+  }
+});
+
+test('ground_system_design_specification has standard and extended designs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const gs = c.ground_system_design_specification;
+    assert.ok(gs.standard_design != null, `standard_design must be present on rank ${c.rank}`);
+    assert.ok(gs.extended_design != null, `extended_design must be present on rank ${c.rank}`);
+    assert.ok(gs.minimum_design != null, `minimum_design must be present on rank ${c.rank}`);
+    assert.ok(typeof gs.standard_design.n_radials === 'number', `n_radials must be a number on rank ${c.rank}`);
+    assert.ok(typeof gs.standard_design.efficiency_pct === 'number', `efficiency_pct must be a number on rank ${c.rank}`);
+  }
+});
+
+test('ground_system_design_specification efficiency_pct is 0-100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  for (const c of out.candidates) {
+    const eff = c.ground_system_design_specification.standard_design.efficiency_pct;
+    assert.ok(eff >= 0 && eff <= 100,
+      `efficiency_pct ${eff} must be 0-100 on rank ${c.rank}`);
+  }
+});
+
+test('ground_system_design_specification extended efficiency > standard efficiency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const gs = c.ground_system_design_specification;
+    assert.ok(gs.extended_design.efficiency_pct >= gs.standard_design.efficiency_pct,
+      `extended efficiency must be >= standard efficiency on rank ${c.rank}`);
+  }
+});
+
+test('ground_system_design_specification quarter_wave_m positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const gs = c.ground_system_design_specification;
+    assert.ok(typeof gs.quarter_wave_m === 'number' && gs.quarter_wave_m > 0,
+      `quarter_wave_m must be positive on rank ${c.rank}`);
+  }
+});
+
+test('ground_system_design_specification comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 4 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ground_eff_pct' in row, 'ground_eff_pct must be in comparison table');
+    assert.ok('ground_rg_ohm' in row, 'ground_rg_ohm must be in comparison table');
+    assert.ok('ground_design_grade' in row, 'ground_design_grade must be in comparison table');
+  }
+});

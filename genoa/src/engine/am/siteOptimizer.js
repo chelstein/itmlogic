@@ -739,7 +739,13 @@ export async function runSiteOptimizer(body = {}){
     erp_at_antenna_kw:      c.transmission_line_analysis?.feedline_options?.find(f => f.id === (c.transmission_line_analysis?.recommended_feedline_id))?.erp_at_antenna_kw ?? null,
     soft_cost_low_usd:      c.permit_and_engineering_cost_estimate?.total_soft_cost_low_usd ?? null,
     soft_cost_high_usd:     c.permit_and_engineering_cost_estimate?.total_soft_cost_high_usd ?? null,
-    soft_cost_tier:         c.permit_and_engineering_cost_estimate?.cost_tier ?? null
+    soft_cost_tier:         c.permit_and_engineering_cost_estimate?.cost_tier ?? null,
+    gate_verdict:           c.regulatory_gate_summary?.overall_verdict ?? null,
+    gate_fail_count:        c.regulatory_gate_summary?.fail_count ?? null,
+    gate_warn_count:        c.regulatory_gate_summary?.warn_count ?? null,
+    ground_eff_pct:         c.ground_system_design_specification?.standard_design?.efficiency_pct ?? null,
+    ground_rg_ohm:          c.ground_system_design_specification?.standard_design?.R_g_estimated_ohm ?? null,
+    ground_design_grade:    c.ground_system_design_specification?.recommended_design ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -3514,6 +3520,189 @@ async function scoreCandidate(pt, ctx, warnings){
         coverage_continuity,
         note: `Screening-grade 2-circle model using same TPO (${tpo_kw} kW) and σ=${sigma_msm} mS/m. Current site σ may differ; a measured σ at both locations would refine this estimate.`,
         rule: '§73.24 service area continuity — not an FCC filing requirement, but relevant for listener base analysis'
+      };
+    })(),
+    regulatory_gate_summary: (() => {
+      const PASS = 'PASS'; const WARN = 'WARN'; const FAIL = 'FAIL'; const NA = 'N/A';
+      const gates = [];
+
+      // Gate 1: §73.24(j) COL coverage
+      const colPct = coverage_pct != null ? Math.round(coverage_pct * 100) : null;
+      const colStatus = colPct == null ? WARN : colPct >= 80 ? PASS : FAIL;
+      gates.push({
+        id: 'COL_COVERAGE', label: '§73.24(j) COL 5 mV/m coverage',
+        status: colStatus,
+        value: colPct != null ? `${colPct}% (need ≥80%)` : 'unknown — no COL polygon',
+        rule: '47 CFR §73.24(j)',
+        note: colStatus === FAIL ? `COL coverage ${colPct}% below 80% floor — power increase or DA required.`
+          : colStatus === WARN ? 'COL polygon not supplied; disc proxy used. Commission polygon-based study.'
+          : null
+      });
+
+      // Gate 2: §73.24(g) blanket population
+      const blankPct = blanket_population_pct != null ? blanket_population_pct : null;
+      const blankStatus = blankPct == null ? WARN : blankPct >= BLANKET_POP_HARD_CEIL_PCT ? FAIL : blankPct >= 0.8 ? WARN : PASS;
+      gates.push({
+        id: 'BLANKET_POP', label: '§73.24(g) blanket population <1%',
+        status: blankStatus,
+        value: blankPct != null ? `${blankPct.toFixed(1)}% (max 1%)` : 'unknown',
+        rule: '47 CFR §73.24(g)',
+        note: blankStatus === FAIL ? `Blanket population ${blankPct?.toFixed(1)}% exceeds 1% hard limit — power reduction or site relocation required.`
+          : blankStatus === WARN ? `Blanket population ${blankPct?.toFixed(1)}% approaching 1% ceiling — verify with accurate census data.`
+          : null
+      });
+
+      // Gate 3: §17.7 ASR registration
+      const lambdaM_g = 300000 / frequency_khz;
+      const qwM_g = lambdaM_g / 4;
+      const asrReqd = qwM_g > 60.96;
+      gates.push({
+        id: 'ASR_REGISTRATION', label: '§17.7 ASR tower registration',
+        status: asrReqd ? WARN : PASS,
+        value: `λ/4 ≈ ${Math.round(qwM_g)} m (threshold 60.96 m)`,
+        rule: '47 CFR §17.7',
+        note: asrReqd ? `FCC Form 854 + FAA aeronautical study (7460-1) required before construction.` : null
+      });
+
+      // Gate 4: §1.1307 RF exposure (MPE)
+      const freq_mhz_g = frequency_khz / 1000;
+      const nf_boundary_m = Math.round((300000 / frequency_khz) / (2 * Math.PI));
+      gates.push({
+        id: 'RF_EXPOSURE_MPE', label: '§1.1307 RF exposure (MPE) evaluation',
+        status: WARN,
+        value: `Near-field boundary λ/(2π) ≈ ${nf_boundary_m} m`,
+        rule: '47 CFR §1.1307 / OET Bulletin 65',
+        note: `OET-65 near-field evaluation required — fence at ≥${nf_boundary_m} m from antenna base.`
+      });
+
+      // Gate 5: Treaty zone
+      const treatyStatus = treaty_zone ? WARN : PASS;
+      gates.push({
+        id: 'TREATY_COORDINATION', label: 'International treaty zone',
+        status: treatyStatus,
+        value: treaty_zone ?? 'None detected',
+        rule: 'US/MX AM Agreement (1986) / US/CA Letter of Understanding',
+        note: treaty_zone ? `FCC International Bureau coordination required — adds 12–52 weeks and may restrict power/pattern toward border.` : null
+      });
+
+      // Gate 6: §73.182 nighttime NIF
+      const isLocal = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isClassC = fcc_class === 'C';
+      const nifStatus = (isLocal || isClassC) ? NA : WARN;
+      gates.push({
+        id: 'NIGHTTIME_NIF', label: '§73.182 nighttime NIF study',
+        status: nifStatus,
+        value: (isLocal || isClassC) ? 'Not required (local/Class C)' : 'Required at any new site',
+        rule: '47 CFR §73.182',
+        note: nifStatus === WARN ? 'NIF study must demonstrate no increase in nighttime interference from authorized site — required before Form 301-AM can be accepted.' : null
+      });
+
+      // Gate 7: §73.316 DA pattern (if recommended)
+      const daRec = false; // placeholder — actual recommendation comes from directional_antenna_study_guide
+      const daStatus = daRec ? WARN : NA;
+      // We can check if coverage_pct < 80 and coverage_pct >= 40 as a proxy for DA need
+      const daProxy = colPct != null && colPct < 80 && colPct >= 40;
+      gates.push({
+        id: 'DA_PATTERN', label: '§73.316 directional antenna pattern',
+        status: daProxy ? WARN : NA,
+        value: daProxy ? 'DA study likely needed' : 'Not indicated at this coverage level',
+        rule: '47 CFR §73.150 / §73.316',
+        note: daProxy ? 'COL coverage gap may be recoverable with DA pattern — see directional_antenna_study_guide.' : null
+      });
+
+      const failCount = gates.filter(g => g.status === FAIL).length;
+      const warnCount = gates.filter(g => g.status === WARN).length;
+      const overall_verdict = failCount > 0 ? 'NON_VIABLE_AS_IS'
+        : warnCount > 2 ? 'CONDITIONAL'
+        : warnCount > 0 ? 'CONDITIONAL'
+        : 'VIABLE';
+      const overall_note = {
+        NON_VIABLE_AS_IS: `${failCount} hard regulatory gate(s) failed — site requires engineering remediation before filing.`,
+        CONDITIONAL:      `${warnCount} gate(s) require additional studies — site is viable pending engineering work.`,
+        VIABLE:           'All mandatory gates pass at screening level — advance to detailed engineering study.'
+      }[overall_verdict];
+      return { overall_verdict, overall_note, fail_count: failCount, warn_count: warnCount, gates };
+    })(),
+    ground_system_design_specification: (() => {
+      // AM ground system design per FCC §73.190 / NBS TN-24 / Terman textbook.
+      // Prescribes radial count, length, conductor gauge, and burial depth.
+      const lambdaM_gs = 300000 / frequency_khz;
+      const qwM_gs = round2(lambdaM_gs / 4);
+
+      // Ideal radial length is λ/4; shorter acceptable for constrained lots.
+      const idealRadialLengthM = qwM_gs;
+      const minRadialLengthM   = round2(qwM_gs * 0.5);  // NBS TN-24: 50% still effective
+      const practicalLengthM   = round2(Math.min(idealRadialLengthM, 120)); // lot constraint proxy
+
+      // Radial count: NBS TN-24 / Terman — 120 radials is the proven sweet spot;
+      // 60 provides ~90% of 120-radial efficiency. Extended to 180 for poor soil.
+      const radials_standard  = 120;
+      const radials_extended  = 180;
+      const radials_minimum   = 60;
+
+      // Ground resistance estimate (Terman formula).
+      const rho_ohm_m = round2(1000 / sigma_msm);
+      const rg_std = round2(Math.min(30, (120 * rho_ohm_m) / (radials_standard * practicalLengthM)));
+      const rg_ext = round2(Math.min(30, (120 * rho_ohm_m) / (radials_extended * practicalLengthM * 1.5)));
+
+      // Radiation resistance for λ/4 tower: R_r ≈ 36.6 Ω (standard result for short dipole ×2)
+      const R_r = 36.6;
+      const eff_std = round2((R_r / (R_r + rg_std)) * 100);
+      const eff_ext = round2((R_r / (R_r + rg_ext)) * 100);
+
+      // Wire gauge recommendation — NBS TN-24 Table: #10 AWG (2.59 mm diam) for < 200 m,
+      // #8 AWG (3.26 mm) for 200-400 m, #6 AWG for longer.
+      const wireGauge = practicalLengthM < 200 ? '#10 AWG (2.59 mm diameter, ~13.2 Ω/km)'
+        : practicalLengthM < 400 ? '#8 AWG (3.26 mm diameter, ~8.3 Ω/km)'
+        : '#6 AWG (4.11 mm diameter, ~5.2 Ω/km)';
+
+      // Burial depth: 150–200 mm below grade to minimize surface-wave losses.
+      const burial_depth_mm = 150;
+
+      // Area required for full λ/4 radial field (circle of radius qwM_gs).
+      const area_ha = round2(Math.PI * practicalLengthM * practicalLengthM / 10000);
+
+      const sigma_tier = sigma_msm >= 10 ? 'GOOD' : sigma_msm >= 5 ? 'MARGINAL' : 'POOR';
+      const design_grade = sigma_tier === 'POOR' ? 'extended' : 'standard';
+
+      // NBS TN-24 efficiency tier annotation
+      const eff_tier = eff_std >= 90 ? 'EXCELLENT (≥90%)' : eff_std >= 80 ? 'GOOD (80–90%)' : eff_std >= 70 ? 'MARGINAL (70–80%)' : 'POOR (<70%)';
+
+      return {
+        frequency_khz,
+        sigma_msm,
+        soil_resistivity_ohm_m: rho_ohm_m,
+        quarter_wave_m: qwM_gs,
+        ideal_radial_length_m: idealRadialLengthM,
+        practical_radial_length_m: practicalLengthM,
+        min_radial_length_m: minRadialLengthM,
+        standard_design: {
+          n_radials: radials_standard,
+          radial_length_m: practicalLengthM,
+          wire_gauge: wireGauge,
+          burial_depth_mm,
+          R_g_estimated_ohm: rg_std,
+          efficiency_pct: eff_std,
+          efficiency_tier: eff_tier,
+          area_required_ha: area_ha
+        },
+        extended_design: {
+          n_radials: radials_extended,
+          radial_length_m: round2(practicalLengthM * 1.5),
+          wire_gauge: wireGauge,
+          burial_depth_mm,
+          R_g_estimated_ohm: rg_ext,
+          efficiency_pct: eff_ext,
+          note: 'Extended design recommended for σ < 5 mS/m or when §73.190 efficiency certification targets >90%'
+        },
+        minimum_design: {
+          n_radials: radials_minimum,
+          radial_length_m: minRadialLengthM,
+          note: 'Minimum emergency design — ~10% efficiency loss vs. standard. Acceptable for temporary operation only.'
+        },
+        recommended_design: design_grade,
+        soil_quality_tier: sigma_tier,
+        note: 'Ground system design per NBS Technical Note 24 (Terman formula for R_g) and FCC §73.190 efficiency certification guidelines. All figures are pre-construction estimates — a field soil resistivity survey (4-electrode Wenner array) is required before final design.'
       };
     })(),
     treaty_zone,
