@@ -1717,6 +1717,51 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      am_broadcast_translator_path_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
+        translator_opportunity_available: true,
+        am_2mvm_coverage_radius_km: 22.4,
+        fm_translator: {
+          max_erp_w: 250, max_erp_dbw: 23.98,
+          estimated_60dbu_radius_km: 4.5,
+          assumed_haat_m: 30,
+          band: 'Non-reserved FM (92.1–107.9 MHz)',
+          status: 'Secondary (§74.1201(a))'
+        },
+        spacing_requirements: [
+          { separation_type: 'Co-channel',   min_km: 115, cfr: '§74.1204(a)(1)' },
+          { separation_type: '1st adjacent', min_km: 55,  cfr: '§74.1204(a)(2)' },
+          { separation_type: '2nd adjacent', min_km: 32,  cfr: '§74.1204(a)(3)' },
+          { separation_type: '3rd adjacent', min_km: 8,   cfr: '§74.1204(a)(4)' }
+        ],
+        filing_steps: [
+          { step: 1, action: 'Frequency search', detail: 'Identify candidate FM frequencies at proposed AM site', cfr: '§74.1201; §74.1204' },
+          { step: 2, action: 'Contour overlay study', detail: 'Verify FM 60 dBu fits within AM 2 mV/m daytime contour', cfr: '§74.1232(d)' },
+          { step: 3, action: 'Interference analysis', detail: 'Protect all full-power FM, LPFM, existing translators', cfr: '§74.1204' },
+          { step: 4, action: 'File FCC Form 349', detail: 'Submit construction permit application in filing window', cfr: '§74.1231; Form 349' },
+          { step: 5, action: 'Construction', detail: 'Build translator facility', cfr: '§74.1263' },
+          { step: 6, action: 'License', detail: 'File FCC Form 350 after construction', cfr: '§74.1265' }
+        ],
+        n_filing_steps: 6,
+        cost_estimate: {
+          frequency_search_usd: { low: 500, high: 2000 },
+          engineering_filing_usd: { low: 3000, high: 8000 },
+          equipment_usd: { low: 5000, high: 20000 },
+          construction_usd: { low: 5000, high: 30000 },
+          total_estimated_usd: { low: 13500, high: 60000 },
+          annual_operating_usd: { low: 1000, high: 5000 }
+        },
+        restrictions: [
+          { id: 'SIMULCAST_ONLY',   label: 'Must simulcast AM programming 100%', cfr: '§74.1232(d)(3)', severity: 'HARD' },
+          { id: 'MAX_ERP',          label: 'Maximum 250W ERP', cfr: '§74.1235(b)', severity: 'HARD' },
+          { id: 'CONTOUR_FIT',      label: 'FM 60 dBu contour must fit within AM 2 mV/m daytime contour', cfr: '§74.1232(d)(1)', severity: 'HARD' },
+          { id: 'SECONDARY_STATUS', label: 'FM translator is secondary — must accept interference', cfr: '§74.1201(a)', severity: 'HARD' },
+          { id: 'NO_STL_RELAY',     label: 'Cannot use translator to relay STL or other studio link', cfr: '§74.1231', severity: 'HARD' }
+        ],
+        n_restrictions: 5,
+        reference: '47 CFR §74.1201; §74.1204; §74.1231; §74.1232; §74.1235; §74.1263; FCC Report and Order FCC 09-15; FCC 12-17; FCC 20-52',
+        note: 'AM-to-FM translator simulcast opportunity: 250W ERP max. FM 60 dBu service radius ~4.5 km. AM 2 mV/m daytime radius ~22.4 km.'
+      },
       daytime_only_operation_guide: {
         frequency_khz: 780, fcc_class: 'D',
         is_daytime_only: true, is_clear_channel: true,

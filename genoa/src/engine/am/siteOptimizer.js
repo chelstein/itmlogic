@@ -945,7 +945,10 @@ export async function runSiteOptimizer(body = {}){
     omrg_attribution_risk:  c.ownership_multiple_rules_guide?.attribution_risk_level ?? null,
     dtog_is_daytime_only:   c.daytime_only_operation_guide?.is_daytime_only ?? null,
     dtog_hours_per_day:     c.daytime_only_operation_guide?.operating_hours?.estimated_hours_per_day ?? null,
-    dtog_fulltime_eligible: c.daytime_only_operation_guide?.fulltime_upgrade?.eligible ?? null
+    dtog_fulltime_eligible: c.daytime_only_operation_guide?.fulltime_upgrade?.eligible ?? null,
+    amtp_2mvm_radius_km:    c.am_broadcast_translator_path_guide?.am_2mvm_coverage_radius_km ?? null,
+    amtp_60dbu_radius_km:   c.am_broadcast_translator_path_guide?.fm_translator?.estimated_60dbu_radius_km ?? null,
+    amtp_max_erp_w:         c.am_broadcast_translator_path_guide?.fm_translator?.max_erp_w ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6680,6 +6683,110 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_broadcast_translator_path_guide: (() => {
+      // §74.1201 et seq.: AM-to-FM broadcast translator program
+      // FCC allows AM stations to file for an FM translator to simulcast AM programming.
+      // Translators operate on non-reserved FM band (92.1–107.9 MHz), secondary status.
+      // AM-specific translator windows: AM stations get priority in FCC filing windows.
+      // LPFM conflict: translator must not cause interference to existing LPFM or full-power FM stations.
+      // Relocation relevance: moving the AM transmitter changes the translator's service area;
+      // some translator authorizations are tied to the AM station's contour.
+
+      // Determine if translator opportunity is plausible for this candidate site
+      // Key constraints per FCC Report and Order (FCC 09-15, FCC 12-17, FCC 20-52):
+      // 1. Translator must simulcast AM 100% of time (§74.1232(d)(3)) — no separate programming
+      // 2. 250W ERP maximum for AM-only translators (secondary service, non-reserved band)
+      // 3. Service area: translator 60 dBu contour must fit within AM 2 mV/m daytime contour
+      // 4. Class D AM stations may apply in any window; no seniority restriction
+
+      const isDA_tr = /^DA/i.test(pattern_mode);
+      const tpo_w_tr = (tpo_kw ?? 1) * 1000;
+
+      // Rough AM 2 mV/m groundwave coverage radius (simplified estimate)
+      // Use a simple proxy: ~10 km for 250W, scaling with sqrt(power) and conductivity factor
+      // Real calculation requires FCC groundwave curves; this is a planning estimate
+      const cond_mSm_tr = 8; // typical terrestrial (mS/m)
+      const power_factor_tr = Math.sqrt(tpo_w_tr / 1000); // relative to 1 kW baseline
+      // AM 2 mV/m radius estimate: ~10–50 km for typical AM stations at 1 kW
+      const am_2mvm_radius_km = round2(Math.min(50, Math.max(5, 10 * power_factor_tr * (cond_mSm_tr / 8) ** 0.3)));
+
+      // FM translator ERP limits for AM simulcasts
+      // §74.1235(b): maximum 250W (24 dBW) for an AM-only translator
+      const max_erp_w = 250;
+      const max_erp_dbw = round2(10 * Math.log10(max_erp_w));
+
+      // FM translator 60 dBu service radius at 250W
+      // At 250W ERP, 60 dBu coverage radius is approximately 3–6 km (varies with HAAT)
+      // §73.333 Fig. M1/F(50,50): for 250W, median 60 dBu radius ≈ 4–5 km
+      const haat_m_tr = 30; // assumed typical translator HAAT
+      const haat_factor_tr = Math.pow(haat_m_tr / 30, 0.3);
+      const fm_60dbu_radius_km = round2(Math.min(am_2mvm_radius_km, 4.5 * haat_factor_tr));
+
+      // Translator frequency selection considerations
+      // Must be non-reserved (92.1+), must not cause interference to existing stations
+      // FCC LMS search required; short-spaced if within 2nd-adjacent distances
+      const TRANSLATOR_SPACING = [
+        { separation_type: 'Co-channel',      min_km: 115, cfr: '§74.1204(a)(1)' },
+        { separation_type: '1st adjacent',    min_km: 55,  cfr: '§74.1204(a)(2)' },
+        { separation_type: '2nd adjacent',    min_km: 32,  cfr: '§74.1204(a)(3)' },
+        { separation_type: '3rd adjacent',    min_km: 8,   cfr: '§74.1204(a)(4)' }
+      ];
+
+      // Filing procedure overview
+      // AM-specific windows open periodically; last window: 2023 (limited)
+      // Outside windows: may file for vacant channels as a singleton filing
+      // Must demonstrate: (a) no interference to full-power FM; (b) no interference to LPFM
+      const FILING_STEPS = [
+        { step: 1, action: 'Frequency search', detail: 'Use FCC AM-to-FM translator search tool or independent FM search to identify candidate frequencies at proposed AM transmitter site', cfr: '§74.1201; §74.1204' },
+        { step: 2, action: 'Contour overlay study', detail: 'Verify FM translator 60 dBu contour fits within AM 2 mV/m daytime contour (§74.1232(d)(1))', cfr: '§74.1232(d)' },
+        { step: 3, action: 'Interference analysis', detail: 'Protect all full-power FM, LPFM, and existing FM translators per §74.1204 spacing tables', cfr: '§74.1204' },
+        { step: 4, action: 'File FCC Form 349', detail: 'Submit application for FM translator construction permit during FCC filing window or as singleton filing', cfr: '§74.1231; Form 349' },
+        { step: 5, action: 'Construction', detail: 'Build translator facility; typical 6–18 months after grant', cfr: '§74.1263' },
+        { step: 6, action: 'License', detail: 'File FCC Form 350 (license to cover) after construction, test, and proof of performance', cfr: '§74.1265' }
+      ];
+
+      // Cost estimate for AM-to-FM translator
+      const COST_ESTIMATE = {
+        frequency_search_usd: { low: 500, high: 2000 },
+        engineering_filing_usd: { low: 3000, high: 8000 },
+        equipment_usd: { low: 5000, high: 20000 }, // exciter + antenna + feedline + tower
+        construction_usd: { low: 5000, high: 30000 },
+        total_estimated_usd: { low: 13500, high: 60000 },
+        annual_operating_usd: { low: 1000, high: 5000 }
+      };
+
+      // Key restrictions
+      const RESTRICTIONS = [
+        { id: 'SIMULCAST_ONLY',   label: 'Must simulcast AM programming 100%', cfr: '§74.1232(d)(3)', severity: 'HARD' },
+        { id: 'MAX_ERP',          label: `Maximum ${max_erp_w}W ERP`, cfr: '§74.1235(b)', severity: 'HARD' },
+        { id: 'CONTOUR_FIT',      label: 'FM 60 dBu contour must fit within AM 2 mV/m daytime contour', cfr: '§74.1232(d)(1)', severity: 'HARD' },
+        { id: 'SECONDARY_STATUS', label: 'FM translator is secondary — must accept interference, cannot cause interference', cfr: '§74.1201(a)', severity: 'HARD' },
+        { id: 'NO_STL_RELAY',     label: 'Cannot use translator to relay STL or other studio link', cfr: '§74.1231', severity: 'HARD' }
+      ];
+
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        translator_opportunity_available: true, // structural opportunity; actual depends on spectrum availability
+        am_2mvm_coverage_radius_km: am_2mvm_radius_km,
+        fm_translator: {
+          max_erp_w, max_erp_dbw,
+          estimated_60dbu_radius_km: fm_60dbu_radius_km,
+          assumed_haat_m: haat_m_tr,
+          band: 'Non-reserved FM (92.1–107.9 MHz)',
+          status: 'Secondary (§74.1201(a))'
+        },
+        spacing_requirements: TRANSLATOR_SPACING,
+        filing_steps: FILING_STEPS,
+        n_filing_steps: FILING_STEPS.length,
+        cost_estimate: COST_ESTIMATE,
+        restrictions: RESTRICTIONS,
+        n_restrictions: RESTRICTIONS.length,
+        relocation_note: 'Moving the AM transmitter site requires re-evaluating FM translator frequency and contour fit. A new AM site may enable or eliminate translator opportunities depending on local FM spectrum density.',
+        reference: '47 CFR §74.1201; §74.1204; §74.1231; §74.1232; §74.1235; §74.1263; FCC Report and Order FCC 09-15; FCC 12-17; FCC 20-52 (AM-to-FM Translator windows)',
+        note: `AM-to-FM translator simulcast opportunity: ${max_erp_w}W ERP max. Translator 60 dBu service radius ~${fm_60dbu_radius_km} km (assumed HAAT ${haat_m_tr}m). AM 2 mV/m daytime radius ~${am_2mvm_radius_km} km.`
       };
     })(),
 

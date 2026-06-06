@@ -5683,6 +5683,56 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- am_broadcast_translator_path_guide ----
+
+test('am_broadcast_translator_path_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.am_broadcast_translator_path_guide != null, 'am_broadcast_translator_path_guide missing');
+  const g = c.am_broadcast_translator_path_guide;
+  assert.ok('translator_opportunity_available' in g, 'translator_opportunity_available missing');
+  assert.ok('fm_translator' in g, 'fm_translator missing');
+  assert.ok(Array.isArray(g.spacing_requirements), 'spacing_requirements must be array');
+  assert.ok(Array.isArray(g.filing_steps), 'filing_steps must be array');
+  assert.ok(Array.isArray(g.restrictions), 'restrictions must be array');
+});
+
+test('am_broadcast_translator_path_guide FM translator max ERP is 250W', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_translator_path_guide;
+  assert.strictEqual(g.fm_translator.max_erp_w, 250, 'max ERP must be 250W per §74.1235(b)');
+  assert.ok(g.fm_translator.max_erp_dbw > 0, 'max_erp_dbw must be positive');
+  assert.ok(g.fm_translator.estimated_60dbu_radius_km > 0, 'FM 60 dBu radius must be positive');
+  assert.ok(g.fm_translator.estimated_60dbu_radius_km < g.am_2mvm_coverage_radius_km, 'FM 60 dBu radius must fit within AM 2 mV/m radius');
+});
+
+test('am_broadcast_translator_path_guide spacing requirements include co-channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_translator_path_guide;
+  const coCh = g.spacing_requirements.find(s => s.separation_type === 'Co-channel');
+  assert.ok(coCh != null, 'Co-channel spacing requirement missing');
+  assert.ok(coCh.min_km >= 100, 'Co-channel minimum separation must be >= 100 km');
+  assert.ok(g.spacing_requirements.length >= 4, 'must have at least 4 spacing requirement entries');
+});
+
+test('am_broadcast_translator_path_guide filing steps are ordered and complete', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_translator_path_guide;
+  assert.ok(g.filing_steps.length >= 4, 'must have at least 4 filing steps');
+  assert.strictEqual(g.n_filing_steps, g.filing_steps.length, 'n_filing_steps must match array length');
+  const steps = g.filing_steps.map(s => s.step);
+  assert.deepStrictEqual(steps, [...steps].sort((a, b) => a - b), 'filing steps must be in ascending order');
+});
+
+test('am_broadcast_translator_path_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('amtp_2mvm_radius_km' in row, 'amtp_2mvm_radius_km missing from comparison table');
+    assert.ok('amtp_60dbu_radius_km' in row, 'amtp_60dbu_radius_km missing from comparison table');
+    assert.ok('amtp_max_erp_w' in row, 'amtp_max_erp_w missing from comparison table');
+  }
+});
+
 // ---- daytime_only_operation_guide ----
 
 test('daytime_only_operation_guide presence and structure', async () => {

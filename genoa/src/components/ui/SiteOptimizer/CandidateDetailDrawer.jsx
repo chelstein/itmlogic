@@ -2226,6 +2226,55 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Broadcast Translator Path Guide */}
+        {candidate.am_broadcast_translator_path_guide && (() => {
+          const g = candidate.am_broadcast_translator_path_guide;
+          const fm = g.fm_translator;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <h4 style={{ color: '#f1f5f9', margin: '0 0 12px', fontSize: 14, fontWeight: 600 }}>
+                AM-to-FM Translator Path <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§74.1201</span>
+              </h4>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Max FM ERP</div>
+                  <div style={{ color: '#34d399', fontSize: 15, fontWeight: 700 }}>{fm?.max_erp_w ?? '—'}W</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>FM 60 dBu Radius</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{fm?.estimated_60dbu_radius_km ?? '—'} km</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: '8px 14px', flex: '1 1 130px' }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>AM 2 mV/m Radius</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 15, fontWeight: 600 }}>{g.am_2mvm_coverage_radius_km ?? '—'} km</div>
+                </div>
+              </div>
+              {g.restrictions && g.restrictions.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12, marginBottom: 10 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Key Restrictions</div>
+                  {g.restrictions.filter(r => r.severity === 'HARD').map((r, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#f87171', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>{r.cfr}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{r.label}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.filing_steps && g.filing_steps.length > 0 && (
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 12 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Filing Steps ({g.n_filing_steps})</div>
+                  {g.filing_steps.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'flex-start' }}>
+                      <span style={{ color: '#818cf8', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', marginTop: 1 }}>Step {s.step}</span>
+                      <span style={{ color: '#f1f5f9', fontSize: 12 }}>{s.action}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Daytime Only Operation Guide */}
         {candidate.daytime_only_operation_guide && (() => {
           const d = candidate.daytime_only_operation_guide;
