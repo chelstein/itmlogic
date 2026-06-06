@@ -1533,6 +1533,30 @@ test('regulatory_compliance_summary.class_power.ceiling matches FCC §73.21 for 
   }
 });
 
+test('power_class_ceiling_kw is stamped on every candidate and matches §73.21 class table', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.power_class_ceiling_kw != null,
+      `power_class_ceiling_kw must be non-null; rank ${c.rank}`);
+    // KAZM is Class B → ceiling 50 kW per §73.21.
+    assert.equal(c.power_class_ceiling_kw, 50,
+      `KAZM Class B ceiling must be 50 kW; rank ${c.rank} got ${c.power_class_ceiling_kw}`);
+    // consistency with regulatory_compliance_summary
+    assert.equal(c.regulatory_compliance_summary.class_power.ceiling, c.power_class_ceiling_kw,
+      `power_class_ceiling_kw must match regulatory_compliance_summary.class_power.ceiling (rank ${c.rank})`);
+  }
+});
+
+test('mpe_evaluation_required is true on every candidate (AM broadcast categorical requirement)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.strictEqual(c.mpe_evaluation_required, true,
+      `mpe_evaluation_required must be true for all AM broadcast candidates; rank ${c.rank}`);
+  }
+});
+
 test('regulatory_compliance_summary.treaty_zone.status is ADVISORY when treaty_zone is set', async () => {
   // Build a synthetic scored candidate by running the optimizer and checking any treaty candidates.
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 50 });

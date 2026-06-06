@@ -208,7 +208,8 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                     'field_at_col_centroid_mvm','estimated_daytime_population_served',
                     'population_delta_vs_baseline','score_confidence',
                     'lat','lon','treaty_zone',
-                    'minimum_tpo_for_compliance_kw','minimum_tpo_for_col_coverage_kw'];
+                    'minimum_tpo_for_compliance_kw','minimum_tpo_for_col_coverage_kw',
+                    'power_class_ceiling_kw','mpe_evaluation_required'];
                   const esc = v => v == null ? '' : (String(v).includes(',') ? `"${String(v).replace(/"/g,'""')}"` : String(v));
                   const lines = [CSV_COLS.join(','),
                     ...candidates.map(c => CSV_COLS.map(k => esc(c[k])).join(','))];

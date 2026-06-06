@@ -765,7 +765,9 @@ function baselineSummary(b){
     field_at_col_centroid_mvm:            b.field_at_col_centroid_mvm ?? null,
     estimated_daytime_population_served:  b.estimated_daytime_population_served ?? null,
     score_confidence:                     b.score_confidence ?? null,
-    regulatory_compliance_summary:        b.regulatory_compliance_summary ?? null
+    regulatory_compliance_summary:        b.regulatory_compliance_summary ?? null,
+    power_class_ceiling_kw:               b.power_class_ceiling_kw ?? null,
+    mpe_evaluation_required:              b.mpe_evaluation_required ?? null
   };
 }
 

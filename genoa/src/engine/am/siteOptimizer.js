@@ -1009,6 +1009,12 @@ async function scoreCandidate(pt, ctx, warnings){
         rule: 'US/MX 1986 Agreement; US/CA 1991 LOU'
       }
     },
+    // Max TPO (kW) allowed under 47 CFR §73.21 for this station's FCC class.
+    power_class_ceiling_kw: FCC_CLASS_POWER_KW[fcc_class]?.max ?? null,
+    // OET Bulletin 65 / 47 CFR §1.1307: AM broadcast stations are categorically
+    // required to perform an RF exposure evaluation (MPE study).  True for all
+    // licensed AM stations regardless of power level.
+    mpe_evaluation_required: true,
     blanket_1000mvm_km,
     minimum_tpo_for_compliance_kw,
     minimum_tpo_for_col_coverage_kw,
@@ -1134,7 +1140,9 @@ function baselineSummary(b){
     treaty_zone:            b.treaty_zone,
     status_labels:          b.status_labels,
     score_breakdown:        b.explanation?.score_breakdown ?? null,
-    regulatory_compliance_summary: b.regulatory_compliance_summary ?? null
+    regulatory_compliance_summary: b.regulatory_compliance_summary ?? null,
+    power_class_ceiling_kw: b.power_class_ceiling_kw ?? null,
+    mpe_evaluation_required: b.mpe_evaluation_required ?? null
   };
 }
 

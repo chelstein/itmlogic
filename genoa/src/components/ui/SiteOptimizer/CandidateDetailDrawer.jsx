@@ -528,6 +528,11 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                   ))}
                 </tbody>
               </table>
+              {candidate.mpe_evaluation_required && (
+                <div className="font-mono text-[9px] text-textDim mt-1 leading-tight">
+                  ⓘ RF exposure (MPE) evaluation required — 47 CFR §1.1307 / OET Bulletin 65
+                </div>
+              )}
             </div>
           );
         })()}
