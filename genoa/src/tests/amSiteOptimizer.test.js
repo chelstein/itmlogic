@@ -1732,6 +1732,41 @@ test('field_strength_profile present on every candidate with 6 distance entries'
   }
 });
 
+test('tpo_to_coverage_table present on every candidate with correct structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const EXPECTED_DISTANCES = [5, 10, 15, 20, 30, 50];
+  for (const c of out.candidates){
+    assert.ok(Array.isArray(c.tpo_to_coverage_table),
+      `tpo_to_coverage_table must be an array (rank ${c.rank})`);
+    assert.equal(c.tpo_to_coverage_table.length, 6,
+      `tpo_to_coverage_table must have 6 entries (rank ${c.rank})`);
+    for (let i = 0; i < 6; i++){
+      const row = c.tpo_to_coverage_table[i];
+      assert.equal(row.col_distance_km, EXPECTED_DISTANCES[i],
+        `tpo_to_coverage_table[${i}].col_distance_km must be ${EXPECTED_DISTANCES[i]} (rank ${c.rank})`);
+      if (row.tpo_needed_kw != null){
+        assert.ok(row.tpo_needed_kw > 0,
+          `tpo_needed_kw must be positive (rank ${c.rank}, dist ${row.col_distance_km} km)`);
+      }
+      assert.equal(row.rule, '47 CFR §73.24(j) 5 mV/m floor',
+        `rule must cite §73.24(j) (rank ${c.rank})`);
+    }
+  }
+});
+
+test('tpo_to_coverage_table: TPO increases monotonically with distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const valid = c.tpo_to_coverage_table.filter(r => r.tpo_needed_kw != null);
+    for (let i = 1; i < valid.length; i++){
+      assert.ok(valid[i].tpo_needed_kw >= valid[i-1].tpo_needed_kw,
+        `tpo_needed_kw must increase with distance: [${i}]=${valid[i].tpo_needed_kw} < [${i-1}]=${valid[i-1].tpo_needed_kw} (rank ${c.rank})`);
+    }
+  }
+});
+
 test('field_strength_profile: field decreases monotonically with distance', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
   assert.equal(out.available, true);

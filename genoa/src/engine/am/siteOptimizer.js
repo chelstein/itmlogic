@@ -837,6 +837,35 @@ async function scoreCandidate(pt, ctx, warnings){
     });
   })();
 
+  // 3a-e. TPO-to-coverage table — minimum TPO (kW) required to produce 5 mV/m
+  // at each of several canonical COL-centroid distances.  Uses binary search
+  // on fccAmFieldMvmAtDistance (O(1) per call) rather than fccAmDistanceKm.
+  const tpo_to_coverage_table = (() => {
+    const classCeil = FCC_CLASS_POWER_KW[fcc_class]?.max ?? 50;
+    const distances = [5, 10, 15, 20, 30, 50];
+    return distances.map(d => {
+      try {
+        // Binary-search TPO in [0.001, classCeil×2] so that field at d km = 5 mV/m.
+        // fccAmFieldMvmAtDistance is a direct table lookup — much faster than fccAmDistanceKm.
+        let lo = 0.001, hi = classCeil * 2;
+        for (let iter = 0; iter < 25; iter++){
+          const mid = (lo + hi) / 2;
+          const f = fccAmFieldMvmAtDistance({ frequency_khz, distance_km: d, conductivity_msm: sigma_msm, erp_kw: mid });
+          if (f < 5.0) lo = mid; else hi = mid;
+        }
+        const tpoNeeded = round2((lo + hi) / 2);
+        return {
+          col_distance_km: d,
+          tpo_needed_kw: tpoNeeded,
+          within_class_ceiling: tpoNeeded <= classCeil,
+          rule: '47 CFR §73.24(j) 5 mV/m floor'
+        };
+      } catch (_){
+        return { col_distance_km: d, tpo_needed_kw: null, within_class_ceiling: null, rule: '47 CFR §73.24(j) 5 mV/m floor' };
+      }
+    });
+  })();
+
   // 3b. Minimum-TPO for §73.24(g) compliance — only computed when blanket
   //     pop fails (blanket_population_pct > 1%).  Binary search on TPO to
   //     find the highest power where the proxy blanket pop stays ≤ 1%.
@@ -1090,6 +1119,7 @@ async function scoreCandidate(pt, ctx, warnings){
     },
     groundwave_contour_table,
     field_strength_profile,
+    tpo_to_coverage_table,
     // Antenna system summary — efficiency estimate, power headroom, service area proxy.
     antenna_system_summary: (() => {
       // Antenna efficiency range: based on empirical M3 conductivity correlations.
