@@ -1421,6 +1421,45 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           </div>
         </div>
 
+        {/* Tower cost estimate */}
+        {candidate.tower_cost_estimate && (() => {
+          const tce = candidate.tower_cost_estimate;
+          const tierColor = tce.cost_tier === 'LOW' ? '#63d471'
+            : tce.cost_tier === 'MODERATE' ? '#a8d46a'
+            : tce.cost_tier === 'HIGH' ? '#ffb347'
+            : '#e05252';
+          const bk = tce.breakdown ?? {};
+          const rows = [
+            { label: 'Tower steel', data: bk.tower_steel },
+            { label: 'Ground system', data: bk.ground_system },
+            { label: 'FAA lighting', data: bk.faa_lighting },
+            { label: 'Civil work', data: bk.civil_work }
+          ];
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Construction cost estimate <span className="normal-case text-textDim/60">(screening only)</span></div>
+              <div className="font-mono text-[10px] space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="uppercase text-[9px] tracking-rack px-1.5 py-0.5 rounded-sm"
+                    style={{ background: tierColor + '22', color: tierColor }}>
+                    {tce.cost_tier}
+                  </span>
+                  <span className="text-cream text-[11px] font-bold">{tce.range_label}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[9px]">
+                  {rows.map(({ label, data }) => data && (
+                    <div key={label}>
+                      <span className="text-textDim">{label}: </span>
+                      <span className="text-cream">${Math.round(data.low / 1000)}k–${Math.round(data.high / 1000)}k</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="text-textDim/40 text-[9px] leading-tight">{tce.disclaimer}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>
