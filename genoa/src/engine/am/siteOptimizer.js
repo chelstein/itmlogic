@@ -993,7 +993,10 @@ export async function runSiteOptimizer(body = {}){
     upsg_service_cost_usd:  c.utility_power_service_guide?.estimated_utility_extension_cost_usd?.typical ?? null,
     ampg_is_da:             c.am_monitoring_point_guide?.is_directional ?? null,
     ampg_n_points:          c.am_monitoring_point_guide?.n_monitoring_points ?? null,
-    ampg_annual_cost_usd:   c.am_monitoring_point_guide?.estimated_annual_monitoring_cost_usd ?? null
+    ampg_annual_cost_usd:   c.am_monitoring_point_guide?.estimated_annual_monitoring_cost_usd ?? null,
+    tbdg_min_area_sqft:     c.transmitter_building_design_guide?.min_floor_area_sqft ?? null,
+    tbdg_hvac_tons:         c.transmitter_building_design_guide?.hvac_tons_required ?? null,
+    tbdg_build_cost_usd:    c.transmitter_building_design_guide?.estimated_building_cost_usd?.typical ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6728,6 +6731,106 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    transmitter_building_design_guide: (() => {
+      // The transmitter building houses the transmitter, ATU, control systems, EAS equipment,
+      // and related infrastructure. When relocating an AM station, a new transmitter building
+      // must be designed and built at the new site. Key engineering and regulatory considerations:
+      //
+      // Minimum space requirements:
+      //   - Transmitter footprint: 5 kW class transmitters (Nautel VS5, GatesAir Flexiva 5) ≈ 24" × 36" × 72"H
+      //   - ATU cabinet: typically 24" × 36" × 72"H; must be close to tower base (short antenna lead)
+      //   - Service/work space: NFPA 70 (NEC) requires 36" clearance in front of electrical panels
+      //   - EAS equipment rack: 19" rack, 2U–4U
+      //   - Control console / metering panel
+      //   - Generator connection point (transfer switch room or outdoor enclosure)
+      //   - Minimum practical floor area: 10 ft × 16 ft (160 sq ft) for a small AM transmitter site
+      //     Comfortable working space with all equipment: 12 ft × 20 ft (240 sq ft) recommended
+      //
+      // HVAC requirements:
+      //   - AM transmitter heat dissipation ≈ (1 - efficiency) × input power
+      //   - At 36% efficiency, 5 kW TPO → 14 kW input → 9 kW (≈ 0.75 tons) heat dissipation
+      //   - Add solar gain through walls: +0.5–1.0 tons for a 240 sq ft building in warm climate
+      //   - Total HVAC cooling load for KAZM class D at 5 kW: 1.5–2.0 tons (18,000–24,000 BTU/hr)
+      //   - Must maintain interior ≤85°F for transmitter reliability; most manufacturers rate to 122°F ambient
+      //
+      // Building construction standards:
+      //   - Unattended transmitter buildings: must meet local building code (typically IBC/IRC)
+      //   - §73.49: Antenna tower fence must be attached to or adjacent to transmitter building perimeter
+      //   - Fire suppression: not required by FCC, but recommended for unattended sites; CO2/dry chemical
+      //   - Security: deadbolt locks, alarm system (FCC encourages security for unattended sites)
+      //   - Grounding: NEC §250 equipment grounding + broadcast-specific ground ring (IEEE Std 1100)
+      //
+      // ATU siting:
+      //   - ATU must be located as close to tower base as practical to minimize transmission line loss
+      //   - In some designs, ATU is mounted in an outdoor weatherproof cabinet at the tower base
+      //   - Indoor ATU in transmitter building requires a short coax or buried RF transmission line
+      //   - §73.182: ATU design must maintain directional array operating parameters within FCC limits
+
+      const tpo_kw_num = Number(tpo_kw) || 5;
+      const transmitter_efficiency = 0.36;
+      const tx_input_kw = Math.round(tpo_kw_num / transmitter_efficiency);
+      const heat_dissipation_kw = tx_input_kw - tpo_kw_num;
+      const solar_gain_kw = 3; // typical solar gain for small building in AZ climate
+      const total_heat_kw = heat_dissipation_kw + solar_gain_kw;
+      const hvac_tons = Math.ceil((total_heat_kw * 3412) / 12000 * 10) / 10; // kW to BTU/hr to tons, 1 sig fig
+
+      // Floor area sizing
+      const min_floor_area_sqft = 160; // 10×16
+      const recommended_floor_area_sqft = 240; // 12×20
+
+      // Building cost estimates
+      const cost_per_sqft_prefab = 85; // $/sqft for prefab metal building
+      const cost_per_sqft_block = 150; // $/sqft for concrete block (more durable)
+      const building_sqft = recommended_floor_area_sqft;
+      const prefab_cost = building_sqft * cost_per_sqft_prefab;
+      const block_cost = building_sqft * cost_per_sqft_block;
+      const site_prep_cost = 8000; // excavation, slab, utilities rough-in
+      const grounding_cost = 4000; // ground ring + equipment bonding
+
+      const EQUIPMENT_LIST = [
+        { id: 'TRANSMITTER',   label: 'AM transmitter', space_sqft: 8, note: `${tpo_kw_num} kW class; 24"×36"×72" footprint` },
+        { id: 'ATU',           label: 'Antenna tuning unit (ATU)', space_sqft: 8, note: 'Must be sited close to tower base; outdoor cabinet alternative' },
+        { id: 'EAS_RACK',      label: 'EAS encoder/decoder + rack', space_sqft: 4, note: '19" rack, 2U–4U; requires broadband connection for IPAWS CAP' },
+        { id: 'TRANSFER_SW',   label: 'Automatic transfer switch (ATS)', space_sqft: 4, note: 'For generator changeover; must be inside or in adjacent weatherproof enclosure' },
+        { id: 'CONTROL',       label: 'Control console / metering panel', space_sqft: 6, note: 'Base current metering, modulation monitoring, remote control interface' },
+        { id: 'HVAC',          label: 'HVAC system', space_sqft: 0, note: `${hvac_tons} tons cooling required; mini-split preferred for unattended sites` },
+        { id: 'WORKBENCH',     label: 'Work/maintenance area', space_sqft: 20, note: '5×4 ft minimum for service work on transmitter and ATU' }
+      ];
+
+      const CONSTRUCTION_STEPS = [
+        { priority: 1, action: 'Site survey and soil test for slab design', detail: 'Confirm bearing capacity; design concrete slab for transmitter/ATU static + dynamic loads', timeline_weeks: [1, 2] },
+        { priority: 2, action: 'Building permit and local code review', detail: 'Submit plans to county; confirm setbacks from fence line per §73.49 fence requirements', timeline_weeks: [2, 8] },
+        { priority: 3, action: 'Slab pour and ground ring installation', detail: 'Install perimeter ground ring (2" copper) during slab pour; bond all equipment to ring per IEEE Std 1100', timeline_weeks: [1, 3] },
+        { priority: 4, action: 'Building erection (prefab or block)', detail: `${recommended_floor_area_sqft} sq ft transmitter building; HVAC rough-in; electrical service entrance`, timeline_weeks: [2, 6] },
+        { priority: 5, action: 'Equipment installation and AT alignment', detail: 'Install transmitter, ATU, EAS, ATS; tune ATU to new antenna; verify carrier frequency and modulation', timeline_weeks: [1, 3] }
+      ];
+
+      return {
+        frequency_khz, fcc_class,
+        tpo_kw: tpo_kw_num,
+        tx_input_kw,
+        heat_dissipation_kw,
+        hvac_tons_required: hvac_tons,
+        min_floor_area_sqft,
+        recommended_floor_area_sqft,
+        equipment_list: EQUIPMENT_LIST,
+        n_equipment_items: EQUIPMENT_LIST.length,
+        construction_steps: CONSTRUCTION_STEPS,
+        estimated_building_cost_usd: {
+          prefab_shell_usd: prefab_cost,
+          block_shell_usd: block_cost,
+          site_prep_usd: site_prep_cost,
+          grounding_usd: grounding_cost,
+          typical: prefab_cost + site_prep_cost + grounding_cost,
+          high: block_cost + site_prep_cost + grounding_cost + 10000
+        },
+        atu_location_note: 'ATU should be at or very near tower base to minimize RF transmission line loss. Outdoor weatherproof ATU cabinet is an alternative to running coax to the transmitter building.',
+        relocation_note: `${tpo_kw_num} kW transmitter → ${heat_dissipation_kw} kW heat dissipation + solar gain → ${hvac_tons} tons HVAC. Recommended building: ${recommended_floor_area_sqft} sq ft (12×20 ft). Estimated cost: $${(prefab_cost + site_prep_cost + grounding_cost).toLocaleString()} (prefab) to $${(block_cost + site_prep_cost + grounding_cost + 10000).toLocaleString()} (block).`,
+        reference: '47 CFR §73.49; §73.182; §73.1215; NEC §250; IEEE Std 1100; IBC; NFPA 70/72; manufacturer specifications',
+        note: `Transmitter building: ${recommended_floor_area_sqft} sq ft recommended. HVAC: ${hvac_tons} tons (${heat_dissipation_kw} kW transmitter heat + solar). Estimated build cost: $${(prefab_cost + site_prep_cost + grounding_cost).toLocaleString()} typical.`
       };
     })(),
 

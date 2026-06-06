@@ -2226,6 +2226,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Building Design Guide */}
+        {candidate.transmitter_building_design_guide && (() => {
+          const g = candidate.transmitter_building_design_guide;
+          return (
+            <div style={{ background: '#1e293b', borderRadius: 8, padding: 16, marginBottom: 16 }}>
+              <div style={{ fontWeight: 600, color: '#f1f5f9', marginBottom: 8, fontSize: 14 }}>
+                Transmitter Building Design <span style={{ color: '#94a3b8', fontWeight: 400, fontSize: 12 }}>§73.49 / NEC §250</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Recommended Area</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 13, fontWeight: 600 }}>{g.recommended_floor_area_sqft} sq ft</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>Min: {g.min_floor_area_sqft} sq ft</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>HVAC Required</div>
+                  <div style={{ color: '#fbbf24', fontSize: 13, fontWeight: 600 }}>{g.hvac_tons_required} tons</div>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>{g.heat_dissipation_kw} kW Tx heat + solar gain</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Build Cost (prefab)</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12, fontWeight: 600 }}>${g.estimated_building_cost_usd?.typical?.toLocaleString()}</div>
+                </div>
+                <div style={{ background: '#0f172a', borderRadius: 6, padding: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 2 }}>Build Cost (block)</div>
+                  <div style={{ color: '#f1f5f9', fontSize: 12 }}>${g.estimated_building_cost_usd?.high?.toLocaleString()}</div>
+                </div>
+              </div>
+              {g.equipment_list && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ color: '#94a3b8', fontSize: 11, marginBottom: 4 }}>Equipment ({g.n_equipment_items} items)</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {g.equipment_list.map((e, i) => (
+                      <span key={i} style={{ background: '#334155', color: '#e2e8f0', borderRadius: 4, padding: '2px 6px', fontSize: 10 }}>{e.label}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ background: '#0f172a', borderRadius: 6, padding: 7, marginTop: 6 }}>
+                <div style={{ color: '#64748b', fontSize: 10 }}>{g.atu_location_note}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Monitoring Point Guide */}
         {candidate.am_monitoring_point_guide && (() => {
           const g = candidate.am_monitoring_point_guide;

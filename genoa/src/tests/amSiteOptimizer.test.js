@@ -5683,6 +5683,53 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- transmitter_building_design_guide ----
+
+test('transmitter_building_design_guide presence and structure', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const c = out.candidates[0];
+  assert.ok(c.transmitter_building_design_guide != null, 'transmitter_building_design_guide missing');
+  const g = c.transmitter_building_design_guide;
+  assert.ok('min_floor_area_sqft' in g, 'min_floor_area_sqft missing');
+  assert.ok('hvac_tons_required' in g, 'hvac_tons_required missing');
+  assert.ok('equipment_list' in g, 'equipment_list missing');
+  assert.ok('estimated_building_cost_usd' in g, 'estimated_building_cost_usd missing');
+});
+
+test('transmitter_building_design_guide HVAC sizing is consistent with 5kW TPO heat dissipation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_building_design_guide;
+  assert.strictEqual(g.tpo_kw, 5, 'tpo_kw must be 5 for KAZM');
+  assert.ok(g.heat_dissipation_kw > 0, 'heat_dissipation_kw must be positive');
+  assert.ok(g.hvac_tons_required >= 1, 'HVAC must be at least 1 ton for a 5 kW AM station');
+  assert.ok(g.hvac_tons_required <= 5, 'HVAC should not exceed 5 tons for 5 kW station');
+});
+
+test('transmitter_building_design_guide floor area meets minimum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_building_design_guide;
+  assert.ok(g.min_floor_area_sqft >= 100, 'minimum floor area must be at least 100 sq ft');
+  assert.ok(g.recommended_floor_area_sqft >= g.min_floor_area_sqft, 'recommended area must be >= minimum');
+});
+
+test('transmitter_building_design_guide building cost is positive and high > typical', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_building_design_guide;
+  assert.ok(g.estimated_building_cost_usd.typical > 0, 'building cost must be positive');
+  assert.ok(g.estimated_building_cost_usd.high > g.estimated_building_cost_usd.typical, 'high cost must exceed typical');
+  assert.ok(Array.isArray(g.equipment_list), 'equipment_list must be array');
+  assert.ok(g.n_equipment_items >= 5, 'must list at least 5 equipment items');
+});
+
+test('transmitter_building_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tbdg_min_area_sqft' in row, 'tbdg_min_area_sqft missing from comparison table');
+    assert.ok('tbdg_hvac_tons' in row, 'tbdg_hvac_tons missing from comparison table');
+    assert.ok('tbdg_build_cost_usd' in row, 'tbdg_build_cost_usd missing from comparison table');
+  }
+});
+
 // ---- am_monitoring_point_guide ----
 
 test('am_monitoring_point_guide presence and structure', async () => {

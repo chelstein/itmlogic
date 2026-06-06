@@ -1717,6 +1717,37 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      transmitter_building_design_guide: {
+        frequency_khz: 780, fcc_class: 'D',
+        tpo_kw: 5,
+        tx_input_kw: 14,
+        heat_dissipation_kw: 9,
+        hvac_tons_required: 2,
+        min_floor_area_sqft: 160,
+        recommended_floor_area_sqft: 240,
+        equipment_list: [
+          { id: 'TRANSMITTER', label: 'AM transmitter', space_sqft: 8, note: '5 kW class; 24"×36"×72" footprint' },
+          { id: 'ATU', label: 'Antenna tuning unit (ATU)', space_sqft: 8, note: 'Must be sited close to tower base; outdoor cabinet alternative' },
+          { id: 'EAS_RACK', label: 'EAS encoder/decoder + rack', space_sqft: 4, note: '19" rack, 2U–4U; requires broadband connection for IPAWS CAP' },
+          { id: 'TRANSFER_SW', label: 'Automatic transfer switch (ATS)', space_sqft: 4, note: 'For generator changeover; must be inside or in adjacent weatherproof enclosure' },
+          { id: 'CONTROL', label: 'Control console / metering panel', space_sqft: 6, note: 'Base current metering, modulation monitoring, remote control interface' },
+          { id: 'HVAC', label: 'HVAC system', space_sqft: 0, note: '2 tons cooling required; mini-split preferred for unattended sites' },
+          { id: 'WORKBENCH', label: 'Work/maintenance area', space_sqft: 20, note: '5×4 ft minimum for service work on transmitter and ATU' }
+        ],
+        n_equipment_items: 7,
+        construction_steps: [
+          { priority: 1, action: 'Site survey and soil test for slab design', detail: 'Confirm bearing capacity; design concrete slab for transmitter/ATU static + dynamic loads', timeline_weeks: [1, 2] },
+          { priority: 2, action: 'Building permit and local code review', detail: 'Submit plans to county; confirm setbacks from fence line per §73.49 fence requirements', timeline_weeks: [2, 8] },
+          { priority: 3, action: 'Slab pour and ground ring installation', detail: 'Install perimeter ground ring (2" copper) during slab pour; bond all equipment to ring per IEEE Std 1100', timeline_weeks: [1, 3] },
+          { priority: 4, action: 'Building erection (prefab or block)', detail: '240 sq ft transmitter building; HVAC rough-in; electrical service entrance', timeline_weeks: [2, 6] },
+          { priority: 5, action: 'Equipment installation and AT alignment', detail: 'Install transmitter, ATU, EAS, ATS; tune ATU to new antenna; verify carrier frequency and modulation', timeline_weeks: [1, 3] }
+        ],
+        estimated_building_cost_usd: { prefab_shell_usd: 20400, block_shell_usd: 36000, site_prep_usd: 8000, grounding_usd: 4000, typical: 32400, high: 58000 },
+        atu_location_note: 'ATU should be at or very near tower base to minimize RF transmission line loss. Outdoor weatherproof ATU cabinet is an alternative to running coax to the transmitter building.',
+        relocation_note: '5 kW transmitter → 9 kW heat dissipation + solar gain → 2 tons HVAC. Recommended building: 240 sq ft (12×20 ft). Estimated cost: $32,400 (prefab) to $58,000 (block).',
+        reference: '47 CFR §73.49; §73.182; §73.1215; NEC §250; IEEE Std 1100; IBC; NFPA 70/72; manufacturer specifications',
+        note: 'Transmitter building: 240 sq ft recommended. HVAC: 2 tons (9 kW transmitter heat + solar). Estimated build cost: $32,400 typical.'
+      },
       am_monitoring_point_guide: {
         frequency_khz: 780, fcc_class: 'D',
         pattern_mode: 'NDA',
