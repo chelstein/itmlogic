@@ -3215,3 +3215,54 @@ test('candidate_comparison_table has estimated_erp_kw and erp_efficiency_pct col
     assert.ok('erp_efficiency_pct' in row, `comparison table row missing erp_efficiency_pct (rank ${row.rank})`);
   }
 });
+
+// ---------- land_use_classification ----------
+
+test('land_use_classification is present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    assert.ok(c.land_use_classification != null,
+      `land_use_classification must be present (rank ${c.rank})`);
+  }
+});
+
+test('land_use_classification.class is a valid value', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['SUBURBAN', 'SUBURBAN_RURAL', 'RURAL', 'REMOTE']);
+  for (const c of out.candidates){
+    const cls = c.land_use_classification?.class;
+    assert.ok(VALID.has(cls),
+      `land_use_classification.class "${cls}" must be SUBURBAN/SUBURBAN_RURAL/RURAL/REMOTE (rank ${c.rank})`);
+  }
+});
+
+test('land_use_classification.density_factor is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const f = c.land_use_classification?.density_factor;
+    assert.ok(f != null && f > 0,
+      `density_factor must be positive (rank ${c.rank}, got ${f})`);
+  }
+});
+
+test('current-site candidate (dist=0) gets SUBURBAN land_use_class', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 20 });
+  assert.equal(out.available, true);
+  const currentSite = out.candidates.find(c => c.distance_from_current_km === 0);
+  if (currentSite){
+    assert.equal(currentSite.land_use_classification?.class, 'SUBURBAN',
+      `Current site (dist=0) should be SUBURBAN, got ${currentSite.land_use_classification?.class}`);
+  }
+});
+
+test('candidate_comparison_table has land_use_class and density_factor columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const row of out.candidate_comparison_table){
+    assert.ok('land_use_class' in row, `comparison table missing land_use_class (rank ${row.rank})`);
+    assert.ok('density_factor' in row, `comparison table missing density_factor (rank ${row.rank})`);
+  }
+});

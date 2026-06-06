@@ -622,7 +622,9 @@ export async function runSiteOptimizer(body = {}){
     da_would_recover:       c.da_gain_potential?.would_recover_col_compliance ?? null,
     estimated_erp_kw:       c.antenna_system_summary?.estimated_erp_kw ?? null,
     erp_efficiency_pct:     c.antenna_system_summary?.erp_vs_tpo_ratio != null
-      ? round2(c.antenna_system_summary.erp_vs_tpo_ratio * 100) : null
+      ? round2(c.antenna_system_summary.erp_vs_tpo_ratio * 100) : null,
+    land_use_class:         c.land_use_classification?.class ?? null,
+    density_factor:         c.land_use_classification?.density_factor ?? null
   }));
 
   // ---- 16. Engineering summary (executive-level synthesis) ----
@@ -902,6 +904,25 @@ async function scoreCandidate(pt, ctx, warnings){
   const ground_sigma_filing_grade = _m3?.available
     ? (_m3.filing_grade || 'filing')   // GeoTIFF result → filing-grade; zone table sets 'screening'
     : 'screening';
+  // Land-use classification — distance-based proxy for urban/rural character.
+  // Candidates close to the current site (assumed metro/suburban) get higher density;
+  // remote candidates get lower.  Conductivity is a secondary signal: high σ in
+  // the US correlates with agricultural flatlands (moderate density, not urban).
+  const dist_km = pt.distance_from_current_km ?? 0;
+  let land_use_class, land_use_density_factor;
+  if (dist_km < 15) {
+    land_use_class = 'SUBURBAN';  land_use_density_factor = 1.8;   // close to current city
+  } else if (dist_km < 35) {
+    land_use_class = 'SUBURBAN_RURAL'; land_use_density_factor = 1.0;  // mixed
+  } else if (dist_km < 80) {
+    land_use_class = 'RURAL';    land_use_density_factor = 0.55;  // regional rural
+  } else {
+    land_use_class = 'REMOTE';   land_use_density_factor = 0.30;  // remote / large radius
+  }
+  // High σ (≥8 mS/m) in the US = agriculture-dominated flatlands → lower density than suburban
+  if (sigma_msm >= 8 && land_use_density_factor > 0.55) land_use_density_factor = Math.min(land_use_density_factor, 0.80);
+  const regional_density_per_km2 = round2(US_AVG_POP_DENSITY_PER_KM2 * land_use_density_factor);
+
   let daytime_reach_km = null;
   let estimated_daytime_population_served = null;
   try {
@@ -912,18 +933,11 @@ async function scoreCandidate(pt, ctx, warnings){
       erp_kw: tpo_kw
     });
     daytime_reach_km = r.distance_km;
-    // Rough estimate: people inside the 0.5 mV/m contour.
-    // Uses the same urbanisation factor as the blanket pop proxy but
-    // inverted (rural = further from current city = lower density).
-    // At large distances (≥ 100 km) the contour is regional; use
-    // the national average density.  Only meaningful for the population
-    // sub-score comparison — treat as a screening-grade proxy.
     if (daytime_reach_km > 0){
       const reach_area_km2 = Math.PI * daytime_reach_km * daytime_reach_km;
-      // No urbanisation factor here — daytime reach is regional and the
-      // density of the served area is closer to the national average than
-      // to the dense urban core at distance 0.
-      estimated_daytime_population_served = Math.round(reach_area_km2 * US_AVG_POP_DENSITY_PER_KM2);
+      // Distance-adjusted density: near-city candidates serve denser areas;
+      // far/remote candidates serve rural areas.  National avg × factor.
+      estimated_daytime_population_served = Math.round(reach_area_km2 * regional_density_per_km2);
     }
   } catch (e){
     // M3 / range errors fall through to NOT-EVALUATED for this candidate.
@@ -1304,6 +1318,10 @@ async function scoreCandidate(pt, ctx, warnings){
     nif_status,
     daytime_reach_km:        daytime_reach_km == null ? null : round2(daytime_reach_km),
     estimated_daytime_population_served,
+    // Land-use classification — distance + σ proxy for population density context.
+    land_use_classification: { class: land_use_class, density_per_km2: regional_density_per_km2,
+      density_factor: round2(land_use_density_factor),
+      note: `Distance ${round2(dist_km)} km from current site → ${land_use_class}; σ=${sigma_msm} mS/m adjustment applied` },
     blanket_population_pct:  blanket_population_pct == null ? null : round2(blanket_population_pct),
     // Qualitative §73.24(g) blanket-population risk tier.
     // OK: well clear of limit; ELEVATED: monitoring warranted; HIGH: near limit; EXCEEDS_LIMIT: non-compliant.
