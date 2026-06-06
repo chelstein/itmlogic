@@ -24,8 +24,10 @@ const COLUMNS = [
   { key: 'distance_from_current_km',   label: 'Dist',      align: 'right' },
   { key: 'bearing_deg',                label: 'Brg',       align: 'right' },
   { key: 'col_coverage_pct',           label: 'COL %',     align: 'right' },
+  { key: 'col_coverage_gap_pct',       label: 'COL gap',   align: 'right' },
   { key: 'blanket_population_pct',     label: 'Blkt pop',  align: 'right' },
   { key: 'daytime_reach_km',           label: 'Reach',     align: 'right' },
+  { key: 'population_delta_vs_baseline', label: 'Pop Δ',   align: 'right' },
   { key: 'ground_sigma_mS_m',          label: 'σ mS/m',    align: 'right' },
   { key: '_status',                    label: 'Status',    align: 'left',  unsortable: true }
 ];
@@ -48,8 +50,19 @@ function fmt(key, v){
   if (key === 'distance_from_current_km') return `${Number(v).toFixed(1)} km`;
   if (key === 'bearing_deg')             return `${Math.round(Number(v))}°`;
   if (key === 'col_coverage_pct')     return `${(Number(v) * 100).toFixed(0)}%`;
+  if (key === 'col_coverage_gap_pct'){
+    const n = Number(v);
+    return n > 0 ? `+${(n * 100).toFixed(0)}%` : '—';
+  }
   if (key === 'blanket_population_pct') return `${Number(v).toFixed(2)}%`;
   if (key === 'daytime_reach_km')     return `${Number(v).toFixed(1)} km`;
+  if (key === 'population_delta_vs_baseline'){
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '—';
+    if (Math.abs(n) >= 1e6) return (n >= 0 ? '+' : '') + (n / 1e6).toFixed(2) + 'M';
+    if (Math.abs(n) >= 1e3) return (n >= 0 ? '+' : '') + Math.round(n / 1e3) + 'K';
+    return (n >= 0 ? '+' : '') + String(Math.round(n));
+  }
   if (key === 'ground_sigma_mS_m')    return Number.isFinite(Number(v)) ? Number(v).toFixed(0) : '—';
   return String(v);
 }
@@ -329,7 +342,20 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                         </span>
                       ) : '—'}
                     </td>
-                    <td className="px-2 py-1.5 text-right text-textDim">{fmt('col_coverage_pct', c.col_coverage_pct)}</td>
+                    <td
+                      className="px-2 py-1.5 text-right"
+                      style={{ color: c.col_coverage_pct != null && c.col_coverage_pct < 0.80 ? '#ff7a7a' : '#b8d0cc' }}
+                      title={c.col_coverage_pct != null ? `${(c.col_coverage_pct * 100).toFixed(0)}% (floor 80% §73.24(j))` : ''}
+                    >
+                      {fmt('col_coverage_pct', c.col_coverage_pct)}
+                    </td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono text-[10px]"
+                      style={{ color: c.col_coverage_gap_pct > 0 ? '#ff7a7a' : '#444' }}
+                      title={c.col_coverage_gap_pct > 0 ? `${(c.col_coverage_gap_pct * 100).toFixed(0)}% additional COL coverage needed` : ''}
+                    >
+                      {fmt('col_coverage_gap_pct', c.col_coverage_gap_pct)}
+                    </td>
                     <td
                       className="px-2 py-1.5 text-right"
                       style={{ color: c.blanket_population_pct > 1 ? '#ff5a5a' : c.blanket_population_pct > 0.5 ? '#ffb347' : '#63d471' }}
@@ -338,6 +364,18 @@ export default function CandidateTable({ candidates, selectedRank, onSelect, eva
                       {fmt('blanket_population_pct', c.blanket_population_pct)}
                     </td>
                     <td className="px-2 py-1.5 text-right text-textDim">{fmt('daytime_reach_km', c.daytime_reach_km)}</td>
+                    <td
+                      className="px-2 py-1.5 text-right font-mono text-[10px]"
+                      style={{
+                        color: c.population_delta_vs_baseline == null ? '#444'
+                             : c.population_delta_vs_baseline > 0 ? '#63d471'
+                             : c.population_delta_vs_baseline < 0 ? '#ff7a7a'
+                             : '#6b6b5e'
+                      }}
+                      title={c.population_delta_vs_baseline != null ? `Population delta vs current site baseline` : ''}
+                    >
+                      {fmt('population_delta_vs_baseline', c.population_delta_vs_baseline)}
+                    </td>
                     <td
                       className="px-2 py-1.5 text-right font-mono"
                       style={{ color: sigmaColor(c.ground_sigma_mS_m) }}
