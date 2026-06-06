@@ -600,7 +600,12 @@ export async function runSiteOptimizer(body = {}){
     score_confidence:       c.score_confidence,
     uncertainty_pts:        c.score_confidence_band?.uncertainty_pts ?? null,
     feasibility_verdict:    c.coverage_feasibility_assessment?.verdict ?? null,
-    pathway_weeks:          c.compliance_pathway?.estimated_weeks_to_filing ?? null
+    pathway_weeks:          c.compliance_pathway?.estimated_weeks_to_filing ?? null,
+    risk_score:             c.regulatory_risk_score?.risk_score ?? null,
+    risk_category:          c.regulatory_risk_score?.risk_category ?? null,
+    score_delta:            c.score_delta_vs_baseline ?? null,
+    col_coverage_gap_pct:   c.col_coverage_gap_pct ?? null,
+    min_tpo_for_col_kw:     c.minimum_tpo_for_col_coverage_kw ?? null
   }));
 
   return {
@@ -1741,6 +1746,84 @@ async function scoreCandidate(pt, ctx, warnings){
         score_high:        round2(Math.min(100, score_final + uncertainty)),
         uncertainty_pts:   uncertainty,
         uncertainty_factors: factors
+      };
+    })(),
+    // Regulatory risk score — composite 0-100 risk index (lower = less risk).
+    // Synthesizes filing-difficulty factors that are independent of the optimization
+    // score: treaty zone, ASR, poor σ, blanket-pop proximity, COL coverage failure,
+    // NIF complexity, and DA pattern requirements.  Designed so a PROMISING site with
+    // high regulatory risk still gets flagged for early mitigation planning.
+    regulatory_risk_score: (() => {
+      const lambdaM_r = 300000 / frequency_khz;
+      const qwM_r     = lambdaM_r / 4;
+      const asrRequired = qwM_r > 60.96;
+      const risks = [];
+      let total = 0;
+
+      if (treaty_zone){
+        risks.push({ factor: 'TREATY_ZONE', points: 40, note: `In treaty zone (${treaty_zone}): FCC IB coordination adds 12–52 weeks; power/pattern restrictions likely` });
+        total += 40;
+      }
+      if (asrRequired){
+        risks.push({ factor: 'ASR_REQUIRED', points: 15, note: `λ/4=${Math.round(qwM_r)} m > 60.96 m §17.7 threshold: FAA 7460-1 + FCC Form 854 required before construction; adds 8–16 weeks` });
+        total += 15;
+      }
+      if (sigma_msm < 2){
+        risks.push({ factor: 'POOR_CONDUCTIVITY', points: 20, note: `σ=${sigma_msm} mS/m (POOR): extended ground system required; adds cost, time, and uncertainty to §73.190 certification` });
+        total += 20;
+      } else if (sigma_msm < 4){
+        risks.push({ factor: 'FAIR_CONDUCTIVITY', points: 10, note: `σ=${sigma_msm} mS/m (FAIR): soil resistivity survey strongly recommended before ground system design` });
+        total += 10;
+      } else if (sigma_msm < 8){
+        risks.push({ factor: 'MODERATE_CONDUCTIVITY', points: 5, note: `σ=${sigma_msm} mS/m (GOOD): standard 120-radial system adequate but soil survey still required for §73.190 certification` });
+        total += 5;
+      }
+      if (blanket_population_pct != null && blanket_population_pct > BLANKET_POP_HARD_CEIL_PCT){
+        risks.push({ factor: 'BLANKET_POP_EXCEEDS_LIMIT', points: 25, note: `Estimated blanket pop ${round2(blanket_population_pct)}% > §73.24(g) 1% limit: filing cannot proceed without power reduction or DA-N pattern` });
+        total += 25;
+      } else if (blanket_population_pct != null && blanket_population_pct >= 0.8){
+        risks.push({ factor: 'BLANKET_POP_HIGH', points: 10, note: `Estimated blanket pop ${round2(blanket_population_pct)}% approaching §73.24(g) 1% limit: minor power or DA change could trigger non-compliance` });
+        total += 10;
+      } else if (blanket_population_pct != null && blanket_population_pct >= 0.5){
+        risks.push({ factor: 'BLANKET_POP_ELEVATED', points: 5, note: `Estimated blanket pop ${round2(blanket_population_pct)}% in elevated range: monitor but not yet a hard constraint` });
+        total += 5;
+      }
+      if (coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR){
+        const gap = Math.round((COL_COVERAGE_HARD_FLOOR - coverage_pct) * 100);
+        risks.push({ factor: 'COL_COVERAGE_FAILS', points: gap > 20 ? 20 : 10, note: `COL coverage ${(coverage_pct * 100).toFixed(0)}% < §73.24(j) 80% floor (gap ${gap}%): coverage remedy required before filing` });
+        total += gap > 20 ? 20 : 10;
+      }
+      if (!LOCAL_CHANNEL_KHZ.has(frequency_khz)){
+        const nifPoints = CLEAR_CHANNEL_KHZ.has(frequency_khz) ? 20
+          : (fcc_class === 'A' || fcc_class === 'B') ? 10 : 5;
+        const nifNote = CLEAR_CHANNEL_KHZ.has(frequency_khz)
+          ? `Clear channel (${frequency_khz} kHz): §73.182 NIF study most complex — dominant Class A skywave protection applies`
+          : `§73.182 NIF study required for all non-local-channel stations at a new transmitter site`;
+        risks.push({ factor: 'NIF_STUDY_REQUIRED', points: nifPoints, note: nifNote });
+        total += nifPoints;
+      }
+      if (/DA/i.test(pattern_mode)){
+        risks.push({ factor: 'DA_PATTERN_REQUIRED', points: 10, note: `${pattern_mode} operation: §73.150 DA pattern design + antenna range measurement adds 3–6 months to filing timeline` });
+        total += 10;
+      }
+
+      const risk_score = Math.min(100, total);
+      const risk_category = risk_score >= 61 ? 'VERY_HIGH'
+        : risk_score >= 41 ? 'HIGH'
+        : risk_score >= 21 ? 'MODERATE'
+        : 'LOW';
+
+      return {
+        risk_score,
+        risk_category,
+        risk_factors: risks,
+        interpretation: risk_score >= 61
+          ? `VERY HIGH regulatory complexity — multiple blocking issues; recommend deprioritizing unless site has exceptional propagation advantages.`
+          : risk_score >= 41
+          ? `HIGH regulatory risk — at least one major filing barrier present; budget additional time and legal/engineering resources.`
+          : risk_score >= 21
+          ? `MODERATE risk — routine but non-trivial filing requirements; plan for soil survey, ASR, or NIF as applicable.`
+          : `LOW risk — straightforward filing path; standard Form 301-AM process without exceptional barriers.`
       };
     })(),
     field_at_col_centroid_mvm,

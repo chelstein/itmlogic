@@ -2620,3 +2620,109 @@ test('candidate_comparison_table uncertainty_pts matches score_confidence_band.u
       `uncertainty_pts mismatch at rank ${c.rank}: got ${row.uncertainty_pts}, expected ${expected}`);
   }
 });
+
+test('candidate_comparison_table risk_score and risk_category match regulatory_risk_score', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (let i = 0; i < out.candidates.length; i++){
+    const c = out.candidates[i];
+    const row = out.candidate_comparison_table[i];
+    assert.equal(row.risk_score, c.regulatory_risk_score?.risk_score ?? null,
+      `risk_score mismatch at rank ${c.rank}`);
+    assert.equal(row.risk_category, c.regulatory_risk_score?.risk_category ?? null,
+      `risk_category mismatch at rank ${c.rank}`);
+  }
+});
+
+// ---------- regulatory_risk_score ----------
+
+test('regulatory_risk_score is present on every candidate with required shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rrs = c.regulatory_risk_score;
+    assert.ok(rrs != null, `regulatory_risk_score must be present (rank ${c.rank})`);
+    assert.ok(typeof rrs.risk_score === 'number', `risk_score must be a number (rank ${c.rank})`);
+    assert.ok(typeof rrs.risk_category === 'string', `risk_category must be a string (rank ${c.rank})`);
+    assert.ok(Array.isArray(rrs.risk_factors), `risk_factors must be an array (rank ${c.rank})`);
+    assert.ok(typeof rrs.interpretation === 'string', `interpretation must be a string (rank ${c.rank})`);
+  }
+});
+
+test('regulatory_risk_score.risk_score is between 0 and 100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const s = c.regulatory_risk_score.risk_score;
+    assert.ok(s >= 0 && s <= 100,
+      `risk_score must be 0-100; got ${s} at rank ${c.rank}`);
+  }
+});
+
+test('regulatory_risk_score.risk_category is one of LOW, MODERATE, HIGH, VERY_HIGH', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 10 });
+  assert.equal(out.available, true);
+  const VALID = new Set(['LOW', 'MODERATE', 'HIGH', 'VERY_HIGH']);
+  for (const c of out.candidates){
+    assert.ok(VALID.has(c.regulatory_risk_score.risk_category),
+      `risk_category must be valid (rank ${c.rank}); got "${c.regulatory_risk_score.risk_category}"`);
+  }
+});
+
+test('regulatory_risk_score includes NIF_STUDY_REQUIRED for non-local-channel stations', async () => {
+  // KAZM is on 1310 kHz — not a local channel — so NIF risk factor must appear.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const factors = c.regulatory_risk_score.risk_factors.map(f => f.factor);
+    assert.ok(factors.includes('NIF_STUDY_REQUIRED'),
+      `NIF_STUDY_REQUIRED must be in risk_factors for non-local channel (rank ${c.rank}); got [${factors.join(', ')}]`);
+  }
+});
+
+test('regulatory_risk_score does NOT include NIF_STUDY_REQUIRED for local channels', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1230, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const factors = c.regulatory_risk_score.risk_factors.map(f => f.factor);
+    assert.ok(!factors.includes('NIF_STUDY_REQUIRED'),
+      `NIF_STUDY_REQUIRED must NOT appear for local channel 1230 kHz (rank ${c.rank}); got [${factors.join(', ')}]`);
+  }
+});
+
+test('regulatory_risk_score includes ASR_REQUIRED for 540 kHz (lambda/4 >> 60.96 m)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const factors = c.regulatory_risk_score.risk_factors.map(f => f.factor);
+    assert.ok(factors.includes('ASR_REQUIRED'),
+      `ASR_REQUIRED must appear for 540 kHz (rank ${c.rank}); got [${factors.join(', ')}]`);
+  }
+});
+
+test('regulatory_risk_score risk_factors each have factor, points, note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    for (const f of c.regulatory_risk_score.risk_factors){
+      assert.ok(typeof f.factor === 'string' && f.factor.length > 0,
+        `risk factor must have factor string (rank ${c.rank})`);
+      assert.ok(typeof f.points === 'number' && f.points > 0,
+        `risk factor must have positive points (rank ${c.rank})`);
+      assert.ok(typeof f.note === 'string' && f.note.length > 0,
+        `risk factor must have note string (rank ${c.rank})`);
+    }
+  }
+});
+
+test('regulatory_risk_score is consistent: risk_score equals sum of risk_factors points (capped at 100)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates){
+    const rrs = c.regulatory_risk_score;
+    const sumPoints = rrs.risk_factors.reduce((acc, f) => acc + f.points, 0);
+    const expectedScore = Math.min(100, sumPoints);
+    assert.equal(rrs.risk_score, expectedScore,
+      `risk_score must equal min(100, sum of factor points) at rank ${c.rank}: expected ${expectedScore}, got ${rrs.risk_score}`);
+  }
+});
