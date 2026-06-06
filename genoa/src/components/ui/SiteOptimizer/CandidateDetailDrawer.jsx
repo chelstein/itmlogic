@@ -1824,6 +1824,49 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Signal Propagation Profile */}
+        {candidate.signal_propagation_profile && (() => {
+          const sp = candidate.signal_propagation_profile;
+          const contourColors = {
+            DAYTIME_5MVM:    'text-emerald-400',
+            DAYTIME_2MVM:    'text-green-400',
+            DAYTIME_05MVM:   'text-yellow-400',
+            DAYTIME_01MVM:   'text-amber-400',
+            BLANKET_1000MVM: 'text-red-400',
+          };
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Signal Propagation Profile</div>
+              <div className="bg-surface/30 rounded p-2 space-y-2">
+                <div className="grid grid-cols-4 gap-1 text-[9px] font-mono text-textDim/60 uppercase tracking-wide border-b border-white/10 pb-1">
+                  <span className="col-span-2">Contour</span>
+                  <span className="text-right">Distance (km)</span>
+                  <span className="text-right">Area (km²)</span>
+                </div>
+                {Array.isArray(sp.contours) && sp.contours.map(c => (
+                  <div key={c.id} className="grid grid-cols-4 gap-1 items-start">
+                    <span className={`col-span-2 font-mono text-[9px] leading-snug ${contourColors[c.id] ?? 'text-textDim'}`}>{c.label}</span>
+                    <span className="text-right font-mono text-[10px] text-textPrimary">
+                      {c.distance_km != null ? c.distance_km.toFixed(1) : '—'}
+                    </span>
+                    <span className="text-right font-mono text-[10px] text-textDim">
+                      {c.area_km2 != null ? c.area_km2.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '—'}
+                    </span>
+                  </div>
+                ))}
+                {sp.skywave_25uvm_est_km != null && (
+                  <div className="border-t border-white/10 pt-1 grid grid-cols-4 gap-1 items-start">
+                    <span className="col-span-2 font-mono text-[9px] text-purple-300 leading-snug">Skywave 25 µV/m est. (OET-72)</span>
+                    <span className="text-right font-mono text-[10px] text-purple-300">{sp.skywave_25uvm_est_km.toFixed(0)}</span>
+                    <span className="text-right font-mono text-[10px] text-textDim/40">—</span>
+                  </div>
+                )}
+                <p className="text-[8px] text-textDim/40 leading-snug pt-1">{sp.note}</p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Limitations */}
         {Array.isArray(candidate.limitations) && candidate.limitations.length > 0 && (
           <div>

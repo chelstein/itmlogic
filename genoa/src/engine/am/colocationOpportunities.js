@@ -147,7 +147,8 @@ export async function runColocationOpportunities(body = {}){
       regulatory_timeline_estimate: so.regulatory_timeline_estimate ?? null,
       frequency_allocation_context: so.frequency_allocation_context ?? null,
       candidate_set_statistics:     so.candidate_set_statistics ?? null,
-      filing_complexity_score:      so.filing_complexity_score ?? null
+      filing_complexity_score:      so.filing_complexity_score ?? null,
+      geographic_diversity_analysis: so.geographic_diversity_analysis ?? null
     });
   }
 
@@ -365,7 +366,24 @@ export async function runColocationOpportunities(body = {}){
     scoring_time_ms,
     score_histogram,
     top_candidates_summary: buildTopSummary(returned.slice(0, 5), baselineSumm, pool.length),
-    filing_complexity_score: buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: 60.96 })
+    filing_complexity_score: buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: 60.96 }),
+    geographic_diversity_analysis: (() => {
+      const top5 = returned.slice(0, 5);
+      const bearingToQ = b => { const n = ((b % 360) + 360) % 360; return n < 90 ? 'NE' : n < 180 ? 'SE' : n < 270 ? 'SW' : 'NW'; };
+      const qm = { NE: [], SE: [], SW: [], NW: [] };
+      for (const c of top5) qm[bearingToQ(c.bearing_deg ?? 0)].push(c.rank);
+      const covered = Object.values(qm).filter(a => a.length > 0).length;
+      const diversity_score = Math.round((covered / 4) * 100);
+      const diversity_tier = covered === 4 ? 'EXCELLENT' : covered === 3 ? 'GOOD' : covered === 2 ? 'MODERATE' : 'POOR';
+      const LABELS = { NE: 'NE (0–90°)', SE: 'SE (90–180°)', SW: 'SW (180–270°)', NW: 'NW (270–360°)' };
+      return {
+        n_candidates_analyzed: top5.length,
+        quadrants_covered: covered, diversity_score, diversity_tier,
+        quadrant_summary: Object.fromEntries(Object.entries(qm).map(([q, r]) => [q, { label: LABELS[q], candidates: r, covered: r.length > 0 }])),
+        uncovered_quadrants: Object.entries(qm).filter(([, r]) => r.length === 0).map(([q]) => q),
+        median_distance_km: (() => { if (!top5.length) return null; const d = top5.map(c => c.distance_from_current_km ?? 0).sort((a, b) => a - b); const m = Math.floor(d.length / 2); return Math.round((d.length % 2 ? d[m] : (d[m - 1] + d[m]) / 2) * 100) / 100; })()
+      };
+    })()
   });
 }
 
@@ -752,6 +770,7 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
                             frequency_allocation_context = null,
                             candidate_set_statistics = null,
                             filing_complexity_score = null,
+                            geographic_diversity_analysis = null,
                             n_infrastructure_sites,
                             candidate_count_by_status, scoring_time_ms }){
   // Enrich nif_status with station-level skywave risk (same logic as siteOptimizer).
@@ -855,7 +874,8 @@ function composeResponse({ method, candidates, n_candidates_evaluated,
     regulatory_timeline_estimate: regulatory_timeline_estimate ?? null,
     frequency_allocation_context: frequency_allocation_context ?? null,
     candidate_set_statistics:     candidate_set_statistics ?? null,
-    filing_complexity_score:      filing_complexity_score ?? null,
+    filing_complexity_score:       filing_complexity_score ?? null,
+    geographic_diversity_analysis: geographic_diversity_analysis ?? null,
     scoring_time_ms: scoring_time_ms ?? null,
     inputs_echo,
     warnings,

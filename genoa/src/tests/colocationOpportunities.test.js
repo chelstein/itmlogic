@@ -652,7 +652,27 @@ test('colocation response has filing_complexity_score', async () => {
     `complexity_tier "${fcs.complexity_tier}" must be valid`);
 });
 
-// ---------- Test 36 — comparison table has new columns ----------
+// ---------- Test 36 — geographic_diversity_analysis in colocation response ----------
+
+test('colocation response has geographic_diversity_analysis', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 5,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const gd = out.geographic_diversity_analysis;
+  assert.ok(gd != null, 'geographic_diversity_analysis must be present on colocation response');
+  assert.ok(typeof gd.diversity_score === 'number', 'diversity_score must be a number');
+  assert.ok(['EXCELLENT','GOOD','MODERATE','POOR'].includes(gd.diversity_tier), 'diversity_tier must be valid');
+  assert.ok(gd.quadrant_summary != null, 'quadrant_summary must be present');
+  for (const q of ['NE','SE','SW','NW']) {
+    assert.ok(q in gd.quadrant_summary, `quadrant_summary must have entry for ${q}`);
+  }
+});
+
+// ---------- Test 37 — comparison table has new columns ----------
 
 test('colocation comparison table has da_study_recommended and skywave_advisory_level', async () => {
   const out = await runColocationOpportunities({

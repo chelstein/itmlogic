@@ -4356,3 +4356,56 @@ test('signal_propagation_profile.skywave_25uvm_est_km is positive', async () => 
       `skywave_25uvm_est_km must be positive for rank ${c.rank}`);
   }
 });
+
+// ---------- geographic_diversity_analysis ----------
+
+test('geographic_diversity_analysis is present on optimizer response', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 8 });
+  assert.equal(out.available, true);
+  assert.ok(out.geographic_diversity_analysis != null, 'geographic_diversity_analysis must be present');
+});
+
+test('geographic_diversity_analysis has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 8 });
+  const gd = out.geographic_diversity_analysis;
+  assert.ok(typeof gd.n_candidates_analyzed === 'number', 'n_candidates_analyzed must be a number');
+  assert.ok(typeof gd.quadrants_covered === 'number', 'quadrants_covered must be a number');
+  assert.ok([0,1,2,3,4].includes(gd.quadrants_covered), 'quadrants_covered must be 0-4');
+  assert.ok(typeof gd.diversity_score === 'number', 'diversity_score must be a number');
+  assert.ok(['EXCELLENT','GOOD','MODERATE','POOR'].includes(gd.diversity_tier), 'diversity_tier must be a valid tier');
+  assert.ok(gd.quadrant_summary != null, 'quadrant_summary must be present');
+  assert.ok(Array.isArray(gd.uncovered_quadrants), 'uncovered_quadrants must be an array');
+});
+
+test('geographic_diversity_analysis.diversity_score range is 0-100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 8 });
+  const { diversity_score } = out.geographic_diversity_analysis;
+  assert.ok(diversity_score >= 0 && diversity_score <= 100, `diversity_score ${diversity_score} must be 0-100`);
+});
+
+test('geographic_diversity_analysis quadrant_summary covers NE SE SW NW', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 8 });
+  const qs = out.geographic_diversity_analysis.quadrant_summary;
+  for (const q of ['NE', 'SE', 'SW', 'NW']) {
+    assert.ok(qs[q] != null, `quadrant_summary must have entry for ${q}`);
+    assert.ok(Array.isArray(qs[q].candidates), `quadrant_summary[${q}].candidates must be an array`);
+    assert.ok(typeof qs[q].covered === 'boolean', `quadrant_summary[${q}].covered must be a boolean`);
+  }
+});
+
+test('geographic_diversity_analysis uncovered_quadrants consistent with quadrant_summary', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 8 });
+  const gd = out.geographic_diversity_analysis;
+  const qs = gd.quadrant_summary;
+  for (const q of gd.uncovered_quadrants) {
+    assert.equal(qs[q].covered, false, `uncovered_quadrant ${q} must have covered=false in quadrant_summary`);
+  }
+  const coveredCount = Object.values(qs).filter(v => v.covered).length;
+  assert.equal(coveredCount, gd.quadrants_covered, 'quadrants_covered must match count of covered quadrants in summary');
+});
+
+test('geographic_diversity_analysis.median_distance_km is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const { median_distance_km } = out.geographic_diversity_analysis;
+  assert.ok(typeof median_distance_km === 'number' && median_distance_km > 0, `median_distance_km must be positive, got ${median_distance_km}`);
+});

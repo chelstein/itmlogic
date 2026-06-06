@@ -302,6 +302,51 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
                 </div>
               </RackPanel>
             )}
+            {result?.geographic_diversity_analysis && (
+              <RackPanel eyebrow="Geographic Diversity" title="Compass quadrant coverage" dense>
+                {(() => {
+                  const gd = result.geographic_diversity_analysis;
+                  const tierColor = gd.diversity_tier === 'EXCELLENT' ? '#63d471'
+                    : gd.diversity_tier === 'GOOD' ? '#a8e063'
+                    : gd.diversity_tier === 'MODERATE' ? '#f6c90e'
+                    : '#ff9b5a';
+                  const QUADRANTS = ['NE', 'SE', 'SW', 'NW'];
+                  return (
+                    <div className="font-mono text-[10px] space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[9px] uppercase tracking-rack px-1.5 py-0.5 rounded-sm"
+                          style={{ background: tierColor + '22', color: tierColor }}>
+                          {gd.diversity_tier}
+                        </span>
+                        <span className="text-textDim">{gd.quadrants_covered}/4 quadrants · score {gd.diversity_score}/100</span>
+                        {gd.median_distance_km != null && (
+                          <span className="text-textDim/60">med dist {gd.median_distance_km} km</span>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-4 gap-1">
+                        {QUADRANTS.map(q => {
+                          const qs = gd.quadrant_summary?.[q];
+                          const covered = qs?.covered ?? false;
+                          return (
+                            <div key={q} className="flex flex-col items-center rounded p-1"
+                              style={{ background: covered ? '#63d47122' : '#ff9b5a11', border: `1px solid ${covered ? '#63d47144' : '#ff9b5a33'}` }}>
+                              <span className="text-[8px] uppercase tracking-rack" style={{ color: covered ? '#63d471' : '#ff9b5a99' }}>{q}</span>
+                              <span className="text-[8px] text-textDim/60">{qs?.candidates?.length ?? 0} cand.</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {gd.uncovered_quadrants?.length > 0 && (
+                        <div className="text-[9px] text-amber/70">
+                          Uncovered: {gd.uncovered_quadrants.join(', ')} — consider expanding search radius in those directions.
+                        </div>
+                      )}
+                      <div className="text-[9px] text-textDim/60 leading-snug">{gd.interpretation}</div>
+                    </div>
+                  );
+                })()}
+              </RackPanel>
+            )}
             {result?.candidate_set_diversity && result.candidate_set_diversity.n_candidates >= 2 && (
               <RackPanel eyebrow="Diversity" title="Candidate set diversity" dense>
                 <div className="font-mono text-[10px] space-y-1.5">
@@ -426,6 +471,22 @@ const DEMO_RESULT = {
       recommended_next_step: 'Increase TPO to ≥8.5 kW to achieve §73.24(j) compliance, then advance to NIF study.'
     }
   ],
+  geographic_diversity_analysis: {
+    n_candidates_analyzed: 4,
+    quadrants_covered: 4,
+    diversity_score: 100,
+    diversity_tier: 'EXCELLENT',
+    interpretation: 'Top candidates span all 4 compass quadrants — maximum site-selection flexibility regardless of terrain, zoning, or land availability in any single direction.',
+    quadrant_summary: {
+      NE: { label: 'NE (0–90°)',   candidates: [1], covered: true },
+      SE: { label: 'SE (90–180°)', candidates: [2], covered: true },
+      SW: { label: 'SW (180–270°)', candidates: [4], covered: true },
+      NW: { label: 'NW (270–360°)', candidates: [3], covered: true }
+    },
+    uncovered_quadrants: [],
+    median_distance_km: 10.0,
+    note: 'Quadrant analysis based on bearing from current site.'
+  },
   candidate_set_diversity: {
     n_candidates: 4,
     bearing_spread_deg: 283,
@@ -810,6 +871,59 @@ const DEMO_RESULT = {
         key_risk: 'Secondary on §73.25 clear channel — must not increase interference to Class A dominant\'s protected contours (0.5 mV/m groundwave / 25 µV/m skywave)',
         treaty_factor: null,
         rule: '47 CFR §73.25 / §73.182'
+      },
+      transmission_line_analysis: {
+        frequency_khz: 780, tpo_kw: 5, assumed_run_m: 60,
+        feedline_options: [
+          { id: 'EIA_7_8_IN', label: 'EIA 7/8" coax', atten_db_per_100m: 0.32, total_loss_db_at_60m: 0.19, erp_at_antenna_kw: 4.79 },
+          { id: 'EIA_1_5_8_IN', label: 'EIA 1-5/8" coax', atten_db_per_100m: 0.18, total_loss_db_at_60m: 0.11, erp_at_antenna_kw: 4.87 },
+          { id: 'EIA_3_1_8_IN', label: 'EIA 3-1/8" coax', atten_db_per_100m: 0.10, total_loss_db_at_60m: 0.06, erp_at_antenna_kw: 4.93 },
+          { id: 'OPEN_WIRE', label: 'Open wire (600 Ω)', atten_db_per_100m: 0.03, total_loss_db_at_60m: 0.02, erp_at_antenna_kw: 4.98 }
+        ],
+        recommended_feedline_id: 'EIA_7_8_IN',
+        recommendation_rationale: 'At TPO ≤ 25 kW, EIA 7/8" coax provides excellent efficiency with manageable cost and installation complexity.',
+        note: 'Attenuation computed from skin-effect formula (A_cond×√f + A_diel×f) at 0.780 MHz, 60 m assumed run.'
+      },
+      antenna_base_impedance: {
+        frequency_khz: 780, sigma_msm: 5, quarter_wave_m: 96.2, N_radials: 120,
+        quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 7.8, R_total_ohm: 44.4, efficiency_standard_pct: 82.4, R_g_extended_ohm: 3.4, efficiency_extended_pct: 91.5 },
+        five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
+        base_reactance_table: [
+          { height_label: 'λ/4 (electrical 90°)', X_base_j: 0, notes: 'Purely resistive — simplest matching' },
+          { height_label: '5/8λ (electrical 225°)', X_base_j: 45, notes: 'Inductive — series cap or shunt network required' },
+          { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
+        ],
+        matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR to 50 Ω transmitter output; base ATU rarely required beyond coarse trimming.',
+        design_note: 'Standard 120-radial ground system at 96 m length achieves ~82% radiation efficiency at σ=5 mS/m. Extending to 180 radials (144 m) gains ~9 pts efficiency.'
+      },
+      permit_and_engineering_cost_estimate: {
+        cost_tier: 'HIGH',
+        range_label: '$58,000 – $117,000',
+        total_soft_cost_low_usd: 58000, total_soft_cost_high_usd: 117000,
+        line_items: [
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
+          { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
+          { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
+          { item: 'DA_ENGINEERING', label: 'DA-N pattern modeling & §73.316 filing', cost_low_usd: 12000, cost_high_usd: 30000 },
+          { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation (OET Bulletin 65)', cost_low_usd: 2000, cost_high_usd: 4000 },
+          { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 8000, cost_high_usd: 20000 }
+        ],
+        note: 'Soft-cost estimate only (FCC fees, studies, engineering). Tower, land, construction excluded. 2024 USD.'
+      },
+      signal_propagation_profile: {
+        frequency_khz: 780, tpo_kw: 5, sigma_msm: 5,
+        contours: [
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',         target_mvm: 5.0,    distance_km: 6.2,  area_km2: 120.8 },
+          { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',                   target_mvm: 2.0,    distance_km: 14.1, area_km2: 624.8 },
+          { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)',        target_mvm: 0.5,    distance_km: 34.1, area_km2: 3659 },
+          { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',              target_mvm: 0.1,    distance_km: 68.5, area_km2: 14744 },
+          { id: 'BLANKET_1000MVM', label: '1000 mV/m (§73.24(g) blanket contour)',              target_mvm: 1000.0, distance_km: 0.22, area_km2: 0.15 }
+        ],
+        skywave_25uvm_est_km: 120.2,
+        note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
       }
     },
     {
@@ -912,6 +1026,59 @@ const DEMO_RESULT = {
           '§73.182 NIF must demonstrate interference not materially increased from current authorized site.'
         ],
         key_risk: 'Secondary on §73.25 clear channel — delta comparison to current authorized site', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
+      },
+      transmission_line_analysis: {
+        frequency_khz: 780, tpo_kw: 5, assumed_run_m: 60,
+        feedline_options: [
+          { id: 'EIA_7_8_IN', label: 'EIA 7/8" coax', atten_db_per_100m: 0.32, total_loss_db_at_60m: 0.19, erp_at_antenna_kw: 4.79 },
+          { id: 'EIA_1_5_8_IN', label: 'EIA 1-5/8" coax', atten_db_per_100m: 0.18, total_loss_db_at_60m: 0.11, erp_at_antenna_kw: 4.87 },
+          { id: 'EIA_3_1_8_IN', label: 'EIA 3-1/8" coax', atten_db_per_100m: 0.10, total_loss_db_at_60m: 0.06, erp_at_antenna_kw: 4.93 },
+          { id: 'OPEN_WIRE', label: 'Open wire (600 Ω)', atten_db_per_100m: 0.03, total_loss_db_at_60m: 0.02, erp_at_antenna_kw: 4.98 }
+        ],
+        recommended_feedline_id: 'EIA_7_8_IN',
+        recommendation_rationale: 'At TPO ≤ 25 kW, EIA 7/8" coax provides excellent efficiency with manageable cost and installation complexity.',
+        note: 'Attenuation computed from skin-effect formula (A_cond×√f + A_diel×f) at 0.780 MHz, 60 m assumed run.'
+      },
+      antenna_base_impedance: {
+        frequency_khz: 780, sigma_msm: 6, quarter_wave_m: 96.2, N_radials: 120,
+        quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 6.5, R_total_ohm: 43.1, efficiency_standard_pct: 84.9, R_g_extended_ohm: 2.9, efficiency_extended_pct: 92.7 },
+        five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
+        base_reactance_table: [
+          { height_label: 'λ/4 (electrical 90°)', X_base_j: 0, notes: 'Purely resistive — simplest matching' },
+          { height_label: '5/8λ (electrical 225°)', X_base_j: 45, notes: 'Inductive — series cap or shunt network required' },
+          { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
+        ],
+        matching_network_complexity: 'LOW — λ/4 tower presents near-unity VSWR; σ=6 mS/m ground gives slightly better efficiency than rank 1.',
+        design_note: 'Standard 120-radial ground system at 96 m length achieves ~85% radiation efficiency at σ=6 mS/m.'
+      },
+      permit_and_engineering_cost_estimate: {
+        cost_tier: 'HIGH',
+        range_label: '$58,000 – $117,000',
+        total_soft_cost_low_usd: 58000, total_soft_cost_high_usd: 117000,
+        line_items: [
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
+          { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
+          { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 15000, cost_high_usd: 35000 },
+          { item: 'DA_ENGINEERING', label: 'DA-N pattern modeling & §73.316 filing', cost_low_usd: 12000, cost_high_usd: 30000 },
+          { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation (OET Bulletin 65)', cost_low_usd: 2000, cost_high_usd: 4000 },
+          { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 8000, cost_high_usd: 20000 }
+        ],
+        note: 'Soft-cost estimate only. 2024 USD.'
+      },
+      signal_propagation_profile: {
+        frequency_khz: 780, tpo_kw: 5, sigma_msm: 6,
+        contours: [
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',   target_mvm: 5.0,    distance_km: 6.7,  area_km2: 141.0 },
+          { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 15.2, area_km2: 726.0 },
+          { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 37.8, area_km2: 4491 },
+          { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 74.1, area_km2: 17281 },
+          { id: 'BLANKET_1000MVM', label: '1000 mV/m (§73.24(g) blanket contour)',        target_mvm: 1000.0, distance_km: 0.22, area_km2: 0.15 }
+        ],
+        skywave_25uvm_est_km: 120.2,
+        note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
       }
     },
     {
@@ -1052,6 +1219,59 @@ const DEMO_RESULT = {
           'Increasing TPO from 5→8.5 kW significantly increases skywave NIF complexity — must re-study full azimuthal skywave exposure at the higher power level.'
         ],
         key_risk: 'Secondary on §73.25 clear channel — power increase amplifies NIF burden on all bearings', treaty_factor: null, rule: '47 CFR §73.25 / §73.182'
+      },
+      transmission_line_analysis: {
+        frequency_khz: 780, tpo_kw: 8.5, assumed_run_m: 60,
+        feedline_options: [
+          { id: 'EIA_7_8_IN', label: 'EIA 7/8" coax', atten_db_per_100m: 0.32, total_loss_db_at_60m: 0.19, erp_at_antenna_kw: 8.13 },
+          { id: 'EIA_1_5_8_IN', label: 'EIA 1-5/8" coax', atten_db_per_100m: 0.18, total_loss_db_at_60m: 0.11, erp_at_antenna_kw: 8.28 },
+          { id: 'EIA_3_1_8_IN', label: 'EIA 3-1/8" coax', atten_db_per_100m: 0.10, total_loss_db_at_60m: 0.06, erp_at_antenna_kw: 8.38 },
+          { id: 'OPEN_WIRE', label: 'Open wire (600 Ω)', atten_db_per_100m: 0.03, total_loss_db_at_60m: 0.02, erp_at_antenna_kw: 8.46 }
+        ],
+        recommended_feedline_id: 'EIA_7_8_IN',
+        recommendation_rationale: 'At TPO ≤ 25 kW, EIA 7/8" coax provides excellent efficiency with manageable cost and installation complexity.',
+        note: 'Attenuation computed from skin-effect formula at 0.780 MHz, 60 m assumed run. 8.5 kW TPO (power upgrade scenario).'
+      },
+      antenna_base_impedance: {
+        frequency_khz: 780, sigma_msm: 4, quarter_wave_m: 96.2, N_radials: 120,
+        quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 9.7, R_total_ohm: 46.3, efficiency_standard_pct: 79.0, R_g_extended_ohm: 4.3, efficiency_extended_pct: 89.5 },
+        five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
+        base_reactance_table: [
+          { height_label: 'λ/4 (electrical 90°)', X_base_j: 0, notes: 'Purely resistive — simplest matching' },
+          { height_label: '5/8λ (electrical 225°)', X_base_j: 45, notes: 'Inductive — series cap or shunt network required' },
+          { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
+        ],
+        matching_network_complexity: 'MODERATE — σ=4 mS/m raises ground resistance to ~9.7 Ω; consider extended radial system to improve efficiency.',
+        design_note: 'At σ=4 mS/m, efficiency is 79% standard / 89.5% extended. Extending to 180 radials recommended if pursuing power upgrade to 8.5 kW.'
+      },
+      permit_and_engineering_cost_estimate: {
+        cost_tier: 'HIGH',
+        range_label: '$62,000 – $128,000',
+        total_soft_cost_low_usd: 62000, total_soft_cost_high_usd: 128000,
+        line_items: [
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
+          { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
+          { item: 'NIF_STUDY', label: '§73.182 NIF skywave study at 8.5 kW (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 40000 },
+          { item: 'DA_ENGINEERING', label: 'FULL DA STUDY DAY+NIGHT pattern modeling & §73.316 filing', cost_low_usd: 18000, cost_high_usd: 40000 },
+          { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation at upgraded power (OET Bulletin 65)', cost_low_usd: 2500, cost_high_usd: 5000 },
+          { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight)', cost_low_usd: 10000, cost_high_usd: 22000 }
+        ],
+        note: 'Soft-cost estimate only. NIF and DA costs elevated by power upgrade to 8.5 kW. 2024 USD.'
+      },
+      signal_propagation_profile: {
+        frequency_khz: 780, tpo_kw: 8.5, sigma_msm: 4,
+        contours: [
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',   target_mvm: 5.0,    distance_km: 7.5,  area_km2: 176.7 },
+          { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 16.1, area_km2: 814.9 },
+          { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 37.2, area_km2: 4352 },
+          { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 72.8, area_km2: 16638 },
+          { id: 'BLANKET_1000MVM', label: '1000 mV/m (§73.24(g) blanket contour)',        target_mvm: 1000.0, distance_km: 0.29, area_km2: 0.26 }
+        ],
+        skywave_25uvm_est_km: 156.7,
+        note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
       }
     },
     {
@@ -1168,6 +1388,60 @@ const DEMO_RESULT = {
         ],
         key_risk: 'Secondary on §73.25 clear channel IN treaty zone — maximum NIF complexity class; CRITICAL advisory',
         treaty_factor: 'US-MX advisory', rule: '47 CFR §73.25 / §73.182'
+      },
+      transmission_line_analysis: {
+        frequency_khz: 780, tpo_kw: 5, assumed_run_m: 60,
+        feedline_options: [
+          { id: 'EIA_7_8_IN', label: 'EIA 7/8" coax', atten_db_per_100m: 0.32, total_loss_db_at_60m: 0.19, erp_at_antenna_kw: 4.79 },
+          { id: 'EIA_1_5_8_IN', label: 'EIA 1-5/8" coax', atten_db_per_100m: 0.18, total_loss_db_at_60m: 0.11, erp_at_antenna_kw: 4.87 },
+          { id: 'EIA_3_1_8_IN', label: 'EIA 3-1/8" coax', atten_db_per_100m: 0.10, total_loss_db_at_60m: 0.06, erp_at_antenna_kw: 4.93 },
+          { id: 'OPEN_WIRE', label: 'Open wire (600 Ω)', atten_db_per_100m: 0.03, total_loss_db_at_60m: 0.02, erp_at_antenna_kw: 4.98 }
+        ],
+        recommended_feedline_id: 'EIA_7_8_IN',
+        recommendation_rationale: 'At TPO ≤ 25 kW, EIA 7/8" coax provides excellent efficiency with manageable cost and installation complexity.',
+        note: 'Attenuation computed from skin-effect formula at 0.780 MHz, 60 m assumed run.'
+      },
+      antenna_base_impedance: {
+        frequency_khz: 780, sigma_msm: 3, quarter_wave_m: 96.2, N_radials: 120,
+        quarter_wave: { R_r_ohm: 36.6, R_g_standard_ohm: 12.9, R_total_ohm: 49.5, efficiency_standard_pct: 73.9, R_g_extended_ohm: 5.7, efficiency_extended_pct: 86.5 },
+        five_eighths_wave: { R_r_ohm: 49.8, X_base_j: 45, note: 'Matching network required to cancel +j45 Ω reactance' },
+        base_reactance_table: [
+          { height_label: 'λ/4 (electrical 90°)', X_base_j: 0, notes: 'Purely resistive — simplest matching' },
+          { height_label: '5/8λ (electrical 225°)', X_base_j: 45, notes: 'Inductive — series cap or shunt network required' },
+          { height_label: '0.19λ (electrical 68°)', X_base_j: -150, notes: 'Capacitive — series inductor required' }
+        ],
+        matching_network_complexity: 'HIGH — σ=3 mS/m drives ground resistance to ~12.9 Ω; extended radial system strongly recommended before filing.',
+        design_note: 'At σ=3 mS/m, standard efficiency is only 73.9%. Extended 180-radial system improves to 86.5%. Ground system cost may reach $80k+ at this conductivity.'
+      },
+      permit_and_engineering_cost_estimate: {
+        cost_tier: 'VERY_HIGH',
+        range_label: '$95,000 – $195,000',
+        total_soft_cost_low_usd: 95000, total_soft_cost_high_usd: 195000,
+        line_items: [
+          { item: 'FCC_FORM_301', label: 'FCC Form 301-AM application fee', cost_low_usd: 1380, cost_high_usd: 1380 },
+          { item: 'FCC_FORM_302', label: 'FCC Form 302-AM license fee', cost_low_usd: 690, cost_high_usd: 690 },
+          { item: 'FCC_FORM_854_ASR', label: 'FCC Form 854 ASR registration (96 m > 60.96 m)', cost_low_usd: 630, cost_high_usd: 630 },
+          { item: 'FAA_AERO_STUDY', label: 'FAA 7460-1 aeronautical study & marking/lighting', cost_low_usd: 4500, cost_high_usd: 9000 },
+          { item: 'SOIL_RESISTIVITY_SURVEY', label: 'Soil resistivity survey (§73.190 certification)', cost_low_usd: 3500, cost_high_usd: 7000 },
+          { item: 'NIF_STUDY', label: '§73.182 NIF skywave study (OET-72 / LMS)', cost_low_usd: 18000, cost_high_usd: 45000 },
+          { item: 'DA_ENGINEERING', label: 'FULL DA STUDY DAY+NIGHT — COL + treaty pattern modeling', cost_low_usd: 22000, cost_high_usd: 55000 },
+          { item: 'RF_EXPOSURE_STUDY', label: 'RF MPE evaluation (OET Bulletin 65)', cost_low_usd: 2500, cost_high_usd: 5000 },
+          { item: 'TREATY_COORDINATION', label: 'US-MX treaty coordination (FCC IB / Conatel)', cost_low_usd: 25000, cost_high_usd: 55000 },
+          { item: 'FCC_COUNSEL', label: 'Communications counsel (FCC filing oversight + treaty)', cost_low_usd: 15000, cost_high_usd: 35000 }
+        ],
+        note: 'Soft-cost estimate only. Treaty coordination adds $25–55k and 12–52 weeks. 2024 USD.'
+      },
+      signal_propagation_profile: {
+        frequency_khz: 780, tpo_kw: 5, sigma_msm: 3,
+        contours: [
+          { id: 'DAYTIME_5MVM',    label: '5 mV/m (city-grade / §73.24(j) COL floor)',   target_mvm: 5.0,    distance_km: 5.4,  area_km2: 91.6 },
+          { id: 'DAYTIME_2MVM',    label: '2 mV/m (primary service contour)',             target_mvm: 2.0,    distance_km: 11.9, area_km2: 444.7 },
+          { id: 'DAYTIME_05MVM',   label: '0.5 mV/m (secondary daytime / §73.24 reach)', target_mvm: 0.5,    distance_km: 28.1, area_km2: 2479 },
+          { id: 'DAYTIME_01MVM',   label: '0.1 mV/m (daytime interference floor)',        target_mvm: 0.1,    distance_km: 55.8, area_km2: 9785 },
+          { id: 'BLANKET_1000MVM', label: '1000 mV/m (§73.24(g) blanket contour)',        target_mvm: 1000.0, distance_km: 0.22, area_km2: 0.15 }
+        ],
+        skywave_25uvm_est_km: 120.2,
+        note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
       }
     }
   ]

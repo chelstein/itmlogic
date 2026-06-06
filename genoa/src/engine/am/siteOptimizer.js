@@ -894,7 +894,60 @@ export async function runSiteOptimizer(body = {}){
     chanClass, fcc_class, frequency_khz, returned, asr_threshold_m: ASR_THRESHOLD_M
   });
 
-  // ---- 19. Total project cost estimate ----
+  // ---- 19. Geographic diversity analysis ----
+  // Evaluates how well the top candidates spread across compass quadrants.
+  // Diverse coverage of NE/SE/SW/NW quadrants helps ensure at least one
+  // viable site exists regardless of localized land-use or terrain issues.
+  const geographic_diversity_analysis = (() => {
+    const QUADRANT_LABELS = { NE: 'NE (0–90°)', SE: 'SE (90–180°)', SW: 'SW (180–270°)', NW: 'NW (270–360°)' };
+    const bearingToQuadrant = b => {
+      const n = ((b % 360) + 360) % 360;
+      if (n < 90)  return 'NE';
+      if (n < 180) return 'SE';
+      if (n < 270) return 'SW';
+      return 'NW';
+    };
+    const top5 = returned.slice(0, 5);
+    const quadrantMap = { NE: [], SE: [], SW: [], NW: [] };
+    for (const c of top5) {
+      const q = bearingToQuadrant(c.bearing_deg ?? 0);
+      quadrantMap[q].push(c.rank);
+    }
+    const covered = Object.values(quadrantMap).filter(arr => arr.length > 0).length;
+    const diversity_score = Math.round((covered / 4) * 100);
+    const quadrant_summary = Object.fromEntries(
+      Object.entries(quadrantMap).map(([q, ranks]) => [q, {
+        label: QUADRANT_LABELS[q], candidates: ranks, covered: ranks.length > 0
+      }])
+    );
+    const uncovered = Object.entries(quadrantMap).filter(([, ranks]) => ranks.length === 0).map(([q]) => q);
+    const diversity_tier = covered === 4 ? 'EXCELLENT' : covered === 3 ? 'GOOD' : covered === 2 ? 'MODERATE' : 'POOR';
+    const interpretation = {
+      EXCELLENT: 'Top candidates span all 4 compass quadrants — maximum site-selection flexibility regardless of terrain, zoning, or land availability in any single direction.',
+      GOOD:      'Top candidates cover 3 of 4 compass quadrants — good flexibility; consider commissioning a targeted search in the uncovered quadrant.',
+      MODERATE:  'Candidates cluster in 2 quadrants — limited fallback options if local land-use or terrain eliminates both directions. Expand search radius.',
+      POOR:      'All top candidates lie in a single compass direction — strong directional bias in results; consider re-running with larger radius or adjusted search grid.'
+    }[diversity_tier];
+    const median_dist = (() => {
+      if (!top5.length) return null;
+      const dists = top5.map(c => c.distance_from_current_km ?? c.distance_km ?? 0).sort((a, b) => a - b);
+      const mid = Math.floor(dists.length / 2);
+      return round2(dists.length % 2 ? dists[mid] : (dists[mid - 1] + dists[mid]) / 2);
+    })();
+    return {
+      n_candidates_analyzed: top5.length,
+      quadrants_covered: covered,
+      diversity_score,
+      diversity_tier,
+      interpretation,
+      quadrant_summary,
+      uncovered_quadrants: uncovered,
+      median_distance_km: median_dist,
+      note: 'Quadrant analysis based on bearing from current site. A diverse geographic spread reduces project risk from site-specific land-use, zoning, or terrain constraints.'
+    };
+  })();
+
+  // ---- 20. Total project cost estimate ----
   // Response-level summary combining soft costs (filing + engineering) and
   // hard costs (tower + ground + construction) for each top candidate.
   // Enables stakeholder budget conversations before committing to site selection.
@@ -953,6 +1006,7 @@ export async function runSiteOptimizer(body = {}){
     candidate_set_statistics,
     candidate_scoring_audit,
     filing_complexity_score,
+    geographic_diversity_analysis,
     total_project_cost_estimate,
     current_site_baseline:  baselineSummary(baseline),
     candidates: returned,
