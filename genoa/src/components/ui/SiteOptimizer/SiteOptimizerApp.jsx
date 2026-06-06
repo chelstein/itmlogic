@@ -1277,6 +1277,32 @@ const DEMO_RESULT = {
         ],
         reference: '47 CFR §1.1307–§1.1311; NEPA §102(2)(C); NHPA §106; ESA §7; CZMA; AIRFA',
         note: 'Environmental screening matrix is a desktop-level pre-assessment only. Risk levels are site-parameter-driven estimates, NOT actual GIS database results. Each item must be verified with the listed data sources by a qualified environmental professional or FCC counsel before CP filing.'
+      },
+      financial_feasibility_summary: {
+        frequency_khz: 780, fcc_class: 'D', tpo_kw: 5, pattern_mode: 'NDA',
+        quarter_wave_m: 96.2, min_parcel_area_ha: 3.52,
+        total_buy_low_usd: 435000, total_buy_high_usd: 1580000,
+        total_lease_yr1_low_usd: 341000, total_lease_yr1_high_usd: 1009000,
+        annual_lease_low_usd: 6000, annual_lease_high_usd: 24000,
+        annual_power_kwh: 24090000, annual_power_cost_usd: 28908,
+        annual_operating_low_usd: 40908, annual_operating_high_usd: 102908,
+        annual_revenue_est_low_usd: 250000, annual_revenue_est_high_usd: 900000,
+        payback_years_optimistic: 0.4, payback_years_conservative: 11.8,
+        overall_feasibility: 'SIGNIFICANT_INVESTMENT',
+        line_items: [
+          { id: 'LAND_PURCHASE', label: 'Land acquisition', low_usd: 80000, high_usd: 250000, note: '3.52 ha min for 90-radial ground system (105 m radius)' },
+          { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)', low_usd: 80000, high_usd: 300000, note: '96.2 m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.' },
+          { id: 'GROUND_SYSTEM', label: 'Ground system (90 radials × 87 m)', low_usd: 35000, high_usd: 100000, note: '§73.190 buried copper radial system; includes trenching and conductivity survey' },
+          { id: 'TRANSMITTER', label: 'Transmitter (5 kW)', low_usd: 25000, high_usd: 100000, note: 'Primary + backup transmitters; includes installation and initial alignment' },
+          { id: 'TRANSMISSION_LINE', label: 'Transmission line + ATU', low_usd: 6000, high_usd: 25000, note: 'Heliax from transmitter building to tower base + antenna tuning unit' },
+          { id: 'ENGINEERING', label: 'Broadcast + structural engineering', low_usd: 20000, high_usd: 70000, note: '§73.182 NIF study, §73.154 proof design, structural PE' },
+          { id: 'FCC_FILING', label: 'FCC Form 301-AM filing + fees', low_usd: 3000, high_usd: 12000, note: 'FCC application fees + FCC counsel / legal costs' },
+          { id: 'ENVIRONMENTAL', label: 'NEPA/NHPA environmental', low_usd: 5000, high_usd: 30000, note: 'NEPA desktop, §106 SHPO consultation, EA if required' },
+          { id: 'SITE_PREP', label: 'Site preparation', low_usd: 30000, high_usd: 120000, note: 'Grading, access road, fence, electrical service, transmitter building' },
+          { id: 'CONTINGENCY', label: 'Contingency (15%)', low_usd: 26250, high_usd: 96750, note: 'Industry standard 15% contingency on hard construction costs' }
+        ],
+        reference: 'BIA/NRTC AM Station Cost Benchmarks (2023); FCC Form 301-AM fee schedule; IBEW/NECA construction wage data',
+        note: 'All cost estimates are 2024-dollar screening-grade figures. Regional labor, material, and real estate costs vary significantly. Engage a professional broadcast engineer, real estate attorney, and financial advisor for project-specific estimates before any capital commitment.'
       }
     },
     {

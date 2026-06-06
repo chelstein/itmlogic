@@ -830,3 +830,18 @@ test('colocation GRID candidates have environmental_risk_matrix', async () => {
     assert.equal(c.environmental_risk_matrix.items.length, 13, `rank ${c.rank} must have 13 NEPA items`);
   }
 });
+
+test('colocation GRID candidates have financial_feasibility_summary', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.financial_feasibility_summary != null, `rank ${c.rank} missing financial_feasibility_summary`);
+    assert.ok(c.financial_feasibility_summary.total_buy_high_usd > 0, `rank ${c.rank} total must be positive`);
+    assert.ok(Array.isArray(c.financial_feasibility_summary.line_items), `rank ${c.rank} line_items must be array`);
+  }
+});

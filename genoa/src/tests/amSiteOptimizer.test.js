@@ -5109,3 +5109,52 @@ test('environmental_risk_matrix comparison table columns populated', async () =>
     assert.ok('nepa_ea_weeks_worst' in row);
   }
 });
+
+// ---- financial_feasibility_summary ----
+
+test('financial_feasibility_summary is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.financial_feasibility_summary != null, `rank ${c.rank} missing financial_feasibility_summary`);
+  }
+});
+
+test('financial_feasibility_summary has expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 2 });
+  const fin = out.candidates[0].financial_feasibility_summary;
+  assert.ok(typeof fin.total_buy_low_usd === 'number');
+  assert.ok(typeof fin.total_buy_high_usd === 'number');
+  assert.ok(typeof fin.annual_operating_low_usd === 'number');
+  assert.ok(typeof fin.overall_feasibility === 'string');
+  assert.ok(Array.isArray(fin.line_items));
+  assert.ok(typeof fin.annual_power_kwh === 'number');
+});
+
+test('financial_feasibility_summary has 10 line items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const fin = out.candidates[0].financial_feasibility_summary;
+  assert.equal(fin.line_items.length, 10);
+  const ids = fin.line_items.map(l => l.id);
+  assert.ok(ids.includes('TOWER_CONSTRUCTION'));
+  assert.ok(ids.includes('GROUND_SYSTEM'));
+  assert.ok(ids.includes('TRANSMITTER'));
+  assert.ok(ids.includes('CONTINGENCY'));
+});
+
+test('financial_feasibility_summary total_buy_high > total_buy_low', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const fin = out.candidates[0].financial_feasibility_summary;
+  assert.ok(fin.total_buy_high_usd > fin.total_buy_low_usd, 'high must exceed low');
+  assert.ok(fin.total_buy_low_usd > 0, 'total must be positive');
+});
+
+test('financial_feasibility_summary comparison table columns populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const ct  = out.candidate_comparison_table;
+  for (const row of ct) {
+    assert.ok('fin_total_buy_low' in row);
+    assert.ok('fin_total_buy_high' in row);
+    assert.ok('fin_feasibility' in row);
+    assert.ok('fin_payback_optimistic' in row);
+  }
+});

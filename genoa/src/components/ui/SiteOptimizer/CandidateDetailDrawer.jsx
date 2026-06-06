@@ -2129,6 +2129,57 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Financial Feasibility Summary */}
+        {candidate.financial_feasibility_summary && (() => {
+          const fin = candidate.financial_feasibility_summary;
+          const fmtUsd = v => v >= 1000000 ? `$${(v/1000000).toFixed(1)}M` : `$${Math.round(v/1000)}k`;
+          const feasColor = f => f === 'VERY_FEASIBLE' ? 'text-emerald-400' : f === 'FEASIBLE' ? 'text-blue-300' : f === 'SIGNIFICANT_INVESTMENT' ? 'text-amber-400' : 'text-red-400';
+          const feasBg    = f => f === 'VERY_FEASIBLE' ? 'bg-emerald-400/15 border-emerald-400/40' : f === 'FEASIBLE' ? 'bg-blue-300/15 border-blue-300/40' : f === 'SIGNIFICANT_INVESTMENT' ? 'bg-amber-400/15 border-amber-400/40' : 'bg-red-400/15 border-red-400/40';
+          return (
+            <div>
+              <div className="rack-eyebrow mb-1">Financial Feasibility</div>
+              {/* Summary chips */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded border font-bold ${feasBg(fin.overall_feasibility)} ${feasColor(fin.overall_feasibility)}`}>
+                  {fin.overall_feasibility?.replace(/_/g, ' ')}
+                </span>
+                <span className="font-mono text-[9px] text-textDim px-1 py-0.5">
+                  Buy: {fmtUsd(fin.total_buy_low_usd)}–{fmtUsd(fin.total_buy_high_usd)}
+                </span>
+                {fin.payback_years_optimistic != null && (
+                  <span className="font-mono text-[9px] text-blue-300 px-1 py-0.5">
+                    Payback: {fin.payback_years_optimistic}–{fin.payback_years_conservative ?? '?'} yrs
+                  </span>
+                )}
+              </div>
+              {/* Key metrics grid */}
+              <div className="grid grid-cols-3 gap-1 mb-2">
+                {[
+                  { label: 'Lease yr1 (low)', value: fmtUsd(fin.total_lease_yr1_low_usd) },
+                  { label: 'Annual ops (low)', value: fmtUsd(fin.annual_operating_low_usd) },
+                  { label: 'Annual power', value: `${fin.annual_power_cost_usd != null ? fmtUsd(fin.annual_power_cost_usd) : '—'}` }
+                ].map(m => (
+                  <div key={m.label} className="bg-surface rounded p-1 text-center border border-rule">
+                    <div className="font-mono text-[10px] text-textBright font-bold">{m.value}</div>
+                    <div className="font-mono text-[8px] text-textDim mt-0.5">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+              {/* Line items */}
+              <div className="font-mono text-[9px] text-textDim mb-1">Cost Line Items</div>
+              <div className="space-y-0.5 mb-2">
+                {fin.line_items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between px-1.5 py-0.5 rounded border border-rule bg-surface/50">
+                    <span className="font-mono text-[8px] text-textBright">{item.label}</span>
+                    <span className="font-mono text-[8px] text-textDim">{fmtUsd(item.low_usd)}–{fmtUsd(item.high_usd)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{fin.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Environmental Risk Matrix */}
         {candidate.environmental_risk_matrix && (() => {
           const env = candidate.environmental_risk_matrix;

@@ -772,7 +772,11 @@ export async function runSiteOptimizer(body = {}){
     coloc_best_tier:        c.colocation_compatibility_score?.best_host_tier ?? null,
     nepa_risk:              c.environmental_risk_matrix?.overall_nepa_risk ?? null,
     nepa_high_count:        c.environmental_risk_matrix?.high_risk_count ?? null,
-    nepa_ea_weeks_worst:    c.environmental_risk_matrix?.ea_timeline_weeks_worst_case ?? null
+    nepa_ea_weeks_worst:    c.environmental_risk_matrix?.ea_timeline_weeks_worst_case ?? null,
+    fin_total_buy_low:      c.financial_feasibility_summary?.total_buy_low_usd ?? null,
+    fin_total_buy_high:     c.financial_feasibility_summary?.total_buy_high_usd ?? null,
+    fin_feasibility:        c.financial_feasibility_summary?.overall_feasibility ?? null,
+    fin_payback_optimistic: c.financial_feasibility_summary?.payback_years_optimistic ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -5038,6 +5042,151 @@ async function scoreCandidate(pt, ctx, warnings){
         items,
         reference: '47 CFR §1.1307–§1.1311; NEPA §102(2)(C); NHPA §106; ESA §7; CZMA; AIRFA',
         note: 'Environmental screening matrix is a desktop-level pre-assessment only. Risk levels are site-parameter-driven estimates, NOT actual GIS database results. Each item must be verified with the listed data sources by a qualified environmental professional or FCC counsel before CP filing.'
+      };
+    })(),
+
+    // Project financial feasibility summary.
+    // Builds a line-item cost model and payback estimate for constructing or
+    // leasing a new AM transmitter site at this candidate location.
+    // All figures are 2024-dollar screening estimates — actual costs vary
+    // significantly by region, contractor, site conditions, and market.
+    financial_feasibility_summary: (() => {
+      const qwM_ff    = round2((300000 / frequency_khz) / 4);
+      const asrReq_ff = qwM_ff > 60.96;
+      const isClear_ff = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_ff    = /DA/i.test(pattern_mode);
+      const isLocal_ff = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isHighPow_ff = tpo_kw >= 25;
+      const isMedPow_ff  = tpo_kw >= 5 && tpo_kw < 25;
+
+      // Land / Site
+      // Parcel purchase or lease — AM requires significant land for radial system
+      const parcelRadius_m = round2(qwM_ff * 1.1);
+      const parcelArea_ha  = round2(Math.PI * (parcelRadius_m / 100) ** 2);
+      const landLow  = isHighPow_ff ? 150000 : isMedPow_ff ? 80000 : 30000;
+      const landHigh = isHighPow_ff ? 600000 : isMedPow_ff ? 250000 : 120000;
+      // Annual lease alternative
+      const leaseLow  = isHighPow_ff ? 12000 : isMedPow_ff ? 6000 : 2400;
+      const leaseHigh = isHighPow_ff ? 60000 : isMedPow_ff ? 24000 : 9600;
+
+      // Tower
+      const towerLow  = isHighPow_ff ? 200000 : isMedPow_ff ? 80000 : 30000;
+      const towerHigh = isHighPow_ff ? 800000 : isMedPow_ff ? 300000 : 120000;
+      const towerNote = isDA_ff
+        ? `DA array (${pattern_mode}): multiple tower elements — multiply single-tower estimate by number of elements (typically 2–4).`
+        : asrReq_ff ? `${qwM_ff} m guyed monopole exceeds §17.7 200-ft threshold; FAA marking/lighting adds $15–40k.`
+        : `${qwM_ff} m guyed monopole below ASR threshold; standard guyed tower with base insulator.`;
+
+      // Ground system — §73.190 radial copper buried system
+      const nRadials    = isHighPow_ff ? 120 : isMedPow_ff ? 120 : isLocal_ff ? 60 : 90;
+      const radialLen_m = round2(qwM_ff * (isHighPow_ff ? 1.0 : 0.9));
+      const groundLow   = isHighPow_ff ? 80000 : isMedPow_ff ? 35000 : 12000;
+      const groundHigh  = isHighPow_ff ? 250000 : isMedPow_ff ? 100000 : 40000;
+
+      // Transmitter
+      const txLow  = isHighPow_ff ? 80000 : isMedPow_ff ? 25000 : 8000;
+      const txHigh = isHighPow_ff ? 400000 : isMedPow_ff ? 100000 : 35000;
+
+      // Transmission line + ATU
+      const txLineLow  = isHighPow_ff ? 15000 : isMedPow_ff ? 6000 : 2000;
+      const txLineHigh = isHighPow_ff ? 60000 : isMedPow_ff ? 25000 : 10000;
+
+      // Engineering (broadcast + structural)
+      const engLow  = isDA_ff ? 80000 : isHighPow_ff ? 50000 : 20000;
+      const engHigh = isDA_ff ? 200000 : isHighPow_ff ? 150000 : 70000;
+
+      // FCC filing fees (Form 301-AM + §73.3533)
+      // FCC fees: ~$2,500–$15,000 for AM CP depending on class / complexity
+      const fccLow  = isHighPow_ff ? 8000 : 3000;
+      const fccHigh = isHighPow_ff ? 25000 : 12000;
+
+      // Environmental (NEPA desktop + potential EA)
+      const envLow  = isClear_ff || isHighPow_ff ? 15000 : 5000;
+      const envHigh = isClear_ff || isHighPow_ff ? 80000 : 30000;
+
+      // Site prep (grading, road, fence, power, building)
+      const siteLow  = 30000;
+      const siteHigh = isHighPow_ff ? 200000 : 120000;
+
+      // Contingency (15% of hard costs)
+      const totalHardLow  = towerLow  + groundLow  + txLow  + txLineLow  + siteLow;
+      const totalHardHigh = towerHigh + groundHigh + txHigh + txLineHigh + siteHigh;
+      const contingLow    = Math.round(totalHardLow  * 0.15);
+      const contingHigh   = Math.round(totalHardHigh * 0.15);
+
+      // Grand totals (buy land scenario)
+      const totalBuyLow  = landLow  + towerLow  + groundLow  + txLow  + txLineLow  + engLow  + fccLow  + envLow  + siteLow  + contingLow;
+      const totalBuyHigh = landHigh + towerHigh + groundHigh + txHigh + txLineHigh + engHigh + fccHigh + envHigh + siteHigh + contingHigh;
+
+      // Grand totals (lease land scenario — first year)
+      const totalLeaseLow  = leaseLow  + towerLow  + groundLow  + txLow  + txLineLow  + engLow  + fccLow  + envLow  + siteLow  + contingLow;
+      const totalLeaseHigh = leaseHigh + towerHigh + groundHigh + txHigh + txLineHigh + engHigh + fccHigh + envHigh + siteHigh + contingHigh;
+
+      // Annual operating cost (power, maintenance, lease if applicable)
+      const annualPowerKwh = Math.round(tpo_kw * 1000 * 24 * 365 * 0.55);  // ~55% efficiency
+      const annualPowerCost = Math.round(annualPowerKwh * 0.12 / 1000);     // $0.12/kWh
+      const annualMaintLow  = isHighPow_ff ? 15000 : isMedPow_ff ? 6000 : 2500;
+      const annualMaintHigh = isHighPow_ff ? 50000 : isMedPow_ff ? 20000 : 8000;
+      const annualOpLow  = annualPowerCost + annualMaintLow  + leaseLow;
+      const annualOpHigh = annualPowerCost + annualMaintHigh + leaseHigh;
+
+      const lineItems = [
+        { id: 'LAND_PURCHASE',      label: 'Land acquisition',            low_usd: landLow,    high_usd: landHigh,    note: `${parcelArea_ha} ha min for ${nRadials}-radial ground system (${parcelRadius_m} m radius)` },
+        { id: 'TOWER_CONSTRUCTION', label: 'Tower (guyed monopole)',       low_usd: towerLow,   high_usd: towerHigh,   note: towerNote },
+        { id: 'GROUND_SYSTEM',      label: `Ground system (${nRadials} radials × ${radialLen_m} m)`, low_usd: groundLow, high_usd: groundHigh, note: '§73.190 buried copper radial system; includes trenching and conductivity survey' },
+        { id: 'TRANSMITTER',        label: `Transmitter (${tpo_kw} kW)`,  low_usd: txLow,      high_usd: txHigh,      note: 'Primary + backup transmitters; includes installation and initial alignment' },
+        { id: 'TRANSMISSION_LINE',  label: 'Transmission line + ATU',     low_usd: txLineLow,  high_usd: txLineHigh,  note: 'Heliax / rigid line from transmitter building to tower base + antenna tuning unit' },
+        { id: 'ENGINEERING',        label: 'Broadcast + structural engineering', low_usd: engLow, high_usd: engHigh,  note: isDA_ff ? 'DA array engineering + §73.150 pattern design + §73.182 NIF analysis' : '§73.182 NIF study, §73.154 proof design, structural PE' },
+        { id: 'FCC_FILING',         label: 'FCC Form 301-AM filing + fees', low_usd: fccLow,   high_usd: fccHigh,    note: 'FCC application fees + FCC counsel / legal costs; does not include CP grant timeline costs' },
+        { id: 'ENVIRONMENTAL',      label: 'NEPA/NHPA environmental',     low_usd: envLow,     high_usd: envHigh,     note: 'NEPA desktop, §106 SHPO consultation, EA preparation if required; excludes mitigation costs' },
+        { id: 'SITE_PREP',          label: 'Site preparation',            low_usd: siteLow,    high_usd: siteHigh,    note: 'Grading, access road, fence, electrical service connection, transmitter building' },
+        { id: 'CONTINGENCY',        label: 'Contingency (15%)',           low_usd: contingLow, high_usd: contingHigh, note: 'Industry standard 15% contingency on hard construction costs' }
+      ];
+
+      // Payback analysis — rough estimate only
+      // AM radio station revenue: national avg Class B ~$500k–2M/yr; Class D ~$150–600k/yr
+      const annualRevLow  = isHighPow_ff ? 600000 : isMedPow_ff ? 250000 : 80000;
+      const annualRevHigh = isHighPow_ff ? 2500000 : isMedPow_ff ? 900000 : 350000;
+      const netIncLow  = annualRevLow  - annualOpHigh;
+      const netIncHigh = annualRevHigh - annualOpLow;
+      const paybackYrsLow  = netIncHigh > 0 ? round2(totalLeaseLow  / netIncHigh) : null;
+      const paybackYrsHigh = netIncLow  > 0 ? round2(totalLeaseHigh / netIncLow)  : null;
+
+      const feasibility = totalBuyHigh < 500000 ? 'VERY_FEASIBLE'
+                        : totalBuyHigh < 1500000 ? 'FEASIBLE'
+                        : totalBuyHigh < 4000000 ? 'SIGNIFICANT_INVESTMENT'
+                        : 'MAJOR_CAPITAL_PROJECT';
+
+      return {
+        frequency_khz,
+        fcc_class,
+        tpo_kw,
+        pattern_mode,
+        quarter_wave_m: qwM_ff,
+        min_parcel_area_ha: parcelArea_ha,
+        line_items: lineItems,
+        // Land purchase scenario
+        total_buy_low_usd:      totalBuyLow,
+        total_buy_high_usd:     totalBuyHigh,
+        // Lease land scenario (first-year + capital)
+        total_lease_yr1_low_usd:  totalLeaseLow,
+        total_lease_yr1_high_usd: totalLeaseHigh,
+        // Annual lease option
+        annual_lease_low_usd:   leaseLow,
+        annual_lease_high_usd:  leaseHigh,
+        // Operating costs
+        annual_power_kwh:       annualPowerKwh,
+        annual_power_cost_usd:  annualPowerCost,
+        annual_operating_low_usd:  annualOpLow,
+        annual_operating_high_usd: annualOpHigh,
+        // Revenue / payback
+        annual_revenue_est_low_usd:  annualRevLow,
+        annual_revenue_est_high_usd: annualRevHigh,
+        payback_years_optimistic:    paybackYrsLow,
+        payback_years_conservative:  paybackYrsHigh,
+        overall_feasibility:         feasibility,
+        reference: 'BIA/NRTC AM Station Cost Benchmarks (2023); FCC Form 301-AM fee schedule; IBEW/NECA construction wage data; NAB Radio Revenue Database',
+        note: 'All cost estimates are 2024-dollar screening-grade figures. Regional labor, material, and real estate costs vary significantly. Engage a professional broadcast engineer, real estate attorney, and financial advisor for project-specific estimates before any capital commitment.'
       };
     })(),
 
