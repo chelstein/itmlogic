@@ -1615,6 +1615,49 @@ async function scoreCandidate(pt, ctx, warnings){
     };
   })();
 
+  // --- signal propagation profile (key contour distances) ---
+  // Computes field strength at specific regulatory and operational distances:
+  //   0.5 mV/m daytime secondary service contour (§73.24 reach metric)
+  //   5.0 mV/m principal community 5-mV/m city grade signal
+  //   0.1 mV/m interfering contour (DAYTIME I-contour protection boundary)
+  //   25 µV/m skywave protected contour radius (OET-72 approximation)
+  //   1000 mV/m blanket interference contour radius
+  // All distances in km from the candidate transmitter site.
+  const signal_propagation_profile = (() => {
+    const targets = [
+      { id: 'DAYTIME_5MVM',    mvm: 5.0,    label: '5 mV/m (city-grade / §73.24(j) COL floor)' },
+      { id: 'DAYTIME_2MVM',    mvm: 2.0,    label: '2 mV/m (primary service contour)' },
+      { id: 'DAYTIME_05MVM',   mvm: 0.5,    label: '0.5 mV/m (secondary daytime / §73.24 reach)' },
+      { id: 'DAYTIME_01MVM',   mvm: 0.1,    label: '0.1 mV/m (daytime interference floor)' },
+      { id: 'BLANKET_1000MVM', mvm: 1000.0, label: '1000 mV/m (§73.24(g) blanket contour)' },
+    ];
+    const contours = [];
+    for (const t of targets){
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: t.mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        contours.push({
+          id:           t.id,
+          label:        t.label,
+          target_mvm:   t.mvm,
+          distance_km:  r?.distance_km != null ? round2(r.distance_km) : null,
+          area_km2:     r?.distance_km != null ? round2(Math.PI * r.distance_km * r.distance_km) : null
+        });
+      } catch(_) {
+        contours.push({ id: t.id, label: t.label, target_mvm: t.mvm, distance_km: null, area_km2: null });
+      }
+    }
+    // Skywave 25 µV/m OET-72 approximation (textbook; not FCC software).
+    const sky_km = round2(1700 * Math.sqrt(Math.min(50, tpo_kw) / 1000));
+    return {
+      frequency_khz,
+      tpo_kw,
+      sigma_msm,
+      contours,
+      skywave_25uvm_est_km: sky_km,
+      note: 'Groundwave contours use FCC gwave curves (§73.184) at this σ and TPO. Skywave 25 µV/m estimate uses OET-72 textbook approximation — actual NIF requires FCC skywave propagation software.'
+    };
+  })();
+
   // --- ranking_rationale sentence ---
   const rationale = buildRationale({
     coverage_pct, daytime_reach_km, blanket_population_pct,
@@ -1633,6 +1676,7 @@ async function scoreCandidate(pt, ctx, warnings){
     cardinal_direction:  cardinalDir(pt.bearing_deg ?? null),
     score: score_final,
     candidate_narrative_summary,
+    signal_propagation_profile,
     col_coverage_pct:        coverage_pct == null ? null : round2(coverage_pct),
     principal_community_5mvm_km,
     nif_status,

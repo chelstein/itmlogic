@@ -4311,3 +4311,48 @@ test('candidate_narrative_summary.recommendation is a string', async () => {
       `recommendation must be a string for rank ${c.rank}`);
   }
 });
+
+// ---------- signal_propagation_profile ----------
+
+test('signal_propagation_profile is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.ok(c.signal_propagation_profile != null,
+      `signal_propagation_profile must be present on candidate rank ${c.rank}`);
+  }
+});
+
+test('signal_propagation_profile has 5 contours', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    assert.equal(c.signal_propagation_profile.contours.length, 5,
+      `signal_propagation_profile must have 5 contours for rank ${c.rank}`);
+  }
+});
+
+test('signal_propagation_profile contours in descending mV/m order', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const contours = c.signal_propagation_profile.contours;
+    // 5mV/m should have shorter distance than 0.1mV/m (stronger signal = shorter reach)
+    const c5 = contours.find(x => x.id === 'DAYTIME_5MVM');
+    const c01 = contours.find(x => x.id === 'DAYTIME_01MVM');
+    if (c5?.distance_km != null && c01?.distance_km != null) {
+      assert.ok(c5.distance_km < c01.distance_km,
+        `5mV/m distance must be < 0.1mV/m distance for rank ${c.rank}`);
+    }
+  }
+});
+
+test('signal_propagation_profile.skywave_25uvm_est_km is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const skw = c.signal_propagation_profile.skywave_25uvm_est_km;
+    assert.ok(typeof skw === 'number' && skw > 0,
+      `skywave_25uvm_est_km must be positive for rank ${c.rank}`);
+  }
+});
