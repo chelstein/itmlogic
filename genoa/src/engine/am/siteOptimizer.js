@@ -1317,7 +1317,10 @@ export async function runSiteOptimizer(body = {}){
     dcom_num_towers:            c.am_transmitter_decommission_and_site_remediation_guide?.num_towers ?? null,
     ipc_du_cochannel_db:        c.am_interference_protection_contour_guide?.du_cochannel_db ?? null,
     ipc_study_low_usd:          c.am_interference_protection_contour_guide?.study_low_usd ?? null,
-    ipc_is_clear_channel:       c.am_interference_protection_contour_guide?.is_clear_channel ?? null
+    ipc_is_clear_channel:       c.am_interference_protection_contour_guide?.is_clear_channel ?? null,
+    tpm_requires_painting:      c.am_tower_painting_and_marking_guide?.requires_painting ?? null,
+    tpm_paint_low_usd:          c.am_tower_painting_and_marking_guide?.paint_low_usd ?? null,
+    tpm_num_bands:              c.am_tower_painting_and_marking_guide?.num_bands ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7052,6 +7055,57 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_painting_and_marking_guide: (() => {
+      // 47 CFR §17.21–§17.25 and FAA AC 70/7460-1M specify tower painting and marking.
+      // Towers > 200 ft AGL: required to display aviation orange/white paint bands
+      // and obstruction lighting per FAA standards.
+      // Shorter towers near airports may also need marking.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd_tp = /^[CD]$/i.test(fcc_class);
+      const tower_h_m      = round2(is_class_cd_tp ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_h_ft     = round2(tower_h_m * 3.28084);
+      // Painting requirements per §17.23:
+      // Towers ≤200 ft: no paint required (unless near airport)
+      // Towers 201–500 ft: aviation orange/white bands (per §17.23(a))
+      // Towers >500 ft: red/white paint AND medium intensity strobes
+      const requires_painting    = tower_h_ft > 200;
+      const requires_red_white   = tower_h_ft > 500;
+      // Paint band specification (§17.23): alternating aviation orange and white bands;
+      // band width = 1/7 of total height, rounded to nearest foot; minimum 3 complete bands.
+      const num_bands            = requires_painting ? 7 : 0;
+      const band_height_ft       = requires_painting ? round2(tower_h_ft / num_bands) : 0;
+      // Cost of painting (per foot of tower surface area, including scaffolding or climbing):
+      // $10–$25/LF for touch-up; full repaint: $20–$60/LF
+      const paint_low_per_lf     = 20;
+      const paint_high_per_lf    = 60;
+      const paint_low_usd        = requires_painting ? round2(tower_h_ft * paint_low_per_lf) : 0;
+      const paint_high_usd       = requires_painting ? round2(tower_h_ft * paint_high_per_lf) : 0;
+      // Annual repainting maintenance cycle: every 2–3 years (§17.56)
+      const repaint_cycle_years  = 3;
+      const annual_repaint_low   = requires_painting ? round2(paint_low_usd  / repaint_cycle_years) : 0;
+      const annual_repaint_high  = requires_painting ? round2(paint_high_usd / repaint_cycle_years) : 0;
+      // Lighting inspection (annual per §17.47): $500–$2,000
+      const lighting_inspection_low_usd  = 500;
+      const lighting_inspection_high_usd = 2000;
+      const total_initial_low_usd  = round2(paint_low_usd  + lighting_inspection_low_usd);
+      const total_initial_high_usd = round2(paint_high_usd + lighting_inspection_high_usd);
+      return {
+        frequency_khz, fcc_class,
+        tower_height_ft: tower_h_ft,
+        requires_painting, requires_red_white,
+        num_bands, band_height_ft,
+        paint_low_usd, paint_high_usd,
+        repaint_cycle_years,
+        annual_repaint_low_usd: annual_repaint_low,
+        annual_repaint_high_usd: annual_repaint_high,
+        lighting_inspection_low_usd, lighting_inspection_high_usd,
+        total_initial_low_usd, total_initial_high_usd,
+        reference: '47 CFR §17.21–§17.25 (tower painting and marking); §17.47 (periodic inspection); §17.56 (painting specifications); FAA AC 70/7460-1M (obstruction marking and lighting); FAA Form 7460-2 (notice of construction completion)',
+        note: `${tower_h_ft.toFixed(0)} ft tower: ${requires_painting ? `${num_bands} orange/white bands (${band_height_ft.toFixed(0)} ft/band). Initial paint: $${paint_low_usd.toLocaleString()}–$${paint_high_usd.toLocaleString()}; repaint every ${repaint_cycle_years} yr.` : 'No FAA paint required (≤200 ft).'}`
       };
     })(),
 

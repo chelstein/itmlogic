@@ -3215,3 +3215,16 @@ test('am_interference_protection_contour_guide present across colocation candida
     assert.ok(typeof g.is_clear_channel === 'boolean', `rank ${c.rank}: is_clear_channel must be boolean`);
   }
 });
+
+test('am_tower_painting_and_marking_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tower_painting_and_marking_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_painting_and_marking_guide missing`);
+    assert.ok(typeof g.requires_painting === 'boolean', `rank ${c.rank}: requires_painting must be boolean`);
+    assert.ok(g.total_initial_low_usd > 0, `rank ${c.rank}: total_initial_low_usd must be positive`);
+    if (g.requires_painting) {
+      assert.ok(g.num_bands > 0, `rank ${c.rank}: num_bands must be > 0 when painting required`);
+    }
+  }
+});

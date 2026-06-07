@@ -13672,3 +13672,48 @@ test('am_interference_protection_contour_guide comparison table columns present'
   assert.strictEqual(r0.ipc_study_low_usd,    3000, 'rank-1 ipc_study_low_usd should be 3000');
   assert.strictEqual(r0.ipc_is_clear_channel, true, 'rank-1 ipc_is_clear_channel should be true');
 });
+
+test('am_tower_painting_and_marking_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_marking_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_painting_and_marking_guide missing');
+  assert.ok(typeof g.requires_painting === 'boolean', 'requires_painting must be boolean');
+  assert.ok(g.total_initial_low_usd > 0, 'total_initial_low_usd must be positive');
+});
+
+test('KAZM 315 ft tower requires painting with 7 bands', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_marking_guide;
+  assert.strictEqual(g.tower_height_ft,   315.26, 'KAZM tower_height_ft should be 315.26');
+  assert.strictEqual(g.requires_painting,  true,  '315 ft tower requires FAA painting');
+  assert.strictEqual(g.num_bands,          7,     'should have 7 orange/white bands');
+  assert.strictEqual(g.band_height_ft,     45.04, 'band_height_ft should be 45.04');
+});
+
+test('KAZM tower paint cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_marking_guide;
+  assert.strictEqual(g.paint_low_usd,         6305.2, 'KAZM paint_low_usd should be 6305.2');
+  assert.strictEqual(g.total_initial_low_usd, 6805.2, 'KAZM total_initial_low should be 6805.2');
+  assert.strictEqual(g.repaint_cycle_years,   3,      'repaint cycle should be 3 years');
+});
+
+test('KAZM tower painting reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_marking_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§17.23'), 'reference must cite §17.23');
+  assert.ok(typeof g.note === 'string' && g.note.includes('orange/white'), 'note must mention orange/white bands');
+});
+
+test('am_tower_painting_and_marking_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tpm_requires_painting' in row, 'tpm_requires_painting missing from comparison table');
+    assert.ok('tpm_paint_low_usd'     in row, 'tpm_paint_low_usd missing from comparison table');
+    assert.ok('tpm_num_bands'         in row, 'tpm_num_bands missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.tpm_requires_painting, true,   'rank-1 tpm_requires_painting should be true');
+  assert.strictEqual(r0.tpm_paint_low_usd,     6305.2, 'rank-1 tpm_paint_low_usd should be 6305.2');
+  assert.strictEqual(r0.tpm_num_bands,         7,      'rank-1 tpm_num_bands should be 7');
+});

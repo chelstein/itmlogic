@@ -2226,6 +2226,31 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Painting and Marking Guide */}
+        {candidate.am_tower_painting_and_marking_guide && (() => {
+          const g = candidate.am_tower_painting_and_marking_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="tpm-guide" style={{ marginBottom: 16, padding: 12, background: '#fff3cd', borderRadius: 8, border: '2px solid #f59e0b' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; FAA Marking (§17.21–§17.25)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>FAA painting required:</span>
+                <span style={{ fontWeight: 600, color: g.requires_painting ? '#d97706' : '#15803d' }}>{g.requires_painting ? 'Yes (>200 ft)' : 'No (≤200 ft)'}</span>
+                {g.requires_painting && (<>
+                  <span>Paint bands:</span><span>{g.num_bands} alternating orange/white ({g.band_height_ft != null ? `${g.band_height_ft.toFixed(0)} ft/band` : '—'})</span>
+                  <span>Initial paint cost:</span><span>{fmt(g.paint_low_usd)} – {fmt(g.paint_high_usd)}</span>
+                  <span>Repaint cycle:</span><span>Every {g.repaint_cycle_years} years ({fmt(g.annual_repaint_low_usd)} – {fmt(g.annual_repaint_high_usd)}/yr)</span>
+                </>)}
+                <span>Annual inspection:</span><span>{fmt(g.lighting_inspection_low_usd)} – {fmt(g.lighting_inspection_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total initial:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_initial_low_usd)} – {fmt(g.total_initial_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Interference Protection Contour Guide */}
         {candidate.am_interference_protection_contour_guide && (() => {
           const g = candidate.am_interference_protection_contour_guide;
