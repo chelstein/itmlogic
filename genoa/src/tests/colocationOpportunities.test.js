@@ -2485,3 +2485,20 @@ test('am_daytime_interference_and_protection_guide present across colocation can
     assert.ok(g.service_radius_05_mvpm_km > 0, `rank ${c.rank}: service_radius must be positive`);
   }
 });
+
+test('am_studio_to_transmitter_link_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_studio_to_transmitter_link_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_studio_to_transmitter_link_guide`);
+    assert.ok(['IP_INTERNET','LICENSED_950MHZ','DIGITAL_MICROWAVE'].includes(g.stl_technology), `rank ${c.rank}: invalid stl_technology`);
+    assert.ok(g.total_stl_cost_low_usd >= 0, `rank ${c.rank}: total_stl_cost_low_usd must be non-negative`);
+    assert.ok(g.stl_latency_ms > 0, `rank ${c.rank}: stl_latency_ms must be positive`);
+  }
+});

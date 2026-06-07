@@ -2226,6 +2226,50 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Studio-to-Transmitter Link Guide */}
+        {candidate.am_studio_to_transmitter_link_guide && (() => {
+          const g = candidate.am_studio_to_transmitter_link_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const techLabel = { IP_INTERNET: 'IP / Internet', LICENSED_950MHZ: '950 MHz Licensed STL', DIGITAL_MICROWAVE: 'Digital Microwave' };
+          const techColor = { IP_INTERNET: '#166534', LICENSED_950MHZ: '#92400e', DIGITAL_MICROWAVE: '#1e40af' };
+          return (
+            <div style={{ background: '#fdf4ff', border: '1px solid #a855f7', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#581c87', marginBottom: 8, fontSize: 13 }}>
+                Studio-to-Transmitter Link (FCC Part 74 / §74.550)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#6b21a8' }}>
+                <span>STL distance</span>
+                <span style={{ fontWeight: 600 }}>{g.stl_distance_km}km ({g.stl_distance_mi}mi)</span>
+                <span>Technology</span>
+                <span style={{ fontWeight: 700, color: techColor[g.stl_technology] ?? '#6b21a8' }}>{techLabel[g.stl_technology] ?? g.stl_technology}</span>
+                <span>FCC Part 74 license</span>
+                <span style={{ fontWeight: 600, color: g.fcc_part_74_license_required ? '#b45309' : '#166534' }}>
+                  {g.fcc_part_74_license_required ? `Required — ${fmt(g.fcc_license_fee_usd)}` : 'Not required'}
+                </span>
+                <span>Audio latency</span>
+                <span style={{ fontWeight: 600 }}>{g.stl_latency_ms}ms</span>
+                <span>Backup technology</span>
+                <span style={{ fontWeight: 600 }}>{g.backup_technology ? techLabel[g.backup_technology] ?? g.backup_technology : 'Dual-path IP recommended'}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #e9d5ff', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#6b21a8' }}>
+                <span>STL equipment</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.stl_equip_low_usd)} – {fmt(g.stl_equip_high_usd)}</span>
+                <span>Backup STL equipment</span>
+                <span style={{ fontWeight: 600 }}>{g.backup_equip_low_usd > 0 ? `${fmt(g.backup_equip_low_usd)} – ${fmt(g.backup_equip_high_usd)}` : 'N/A'}</span>
+                <span style={{ fontWeight: 700, color: '#581c87' }}>Total STL (one-time)</span>
+                <span style={{ fontWeight: 700, color: '#581c87' }}>{fmt(g.total_stl_cost_low_usd)} – {fmt(g.total_stl_cost_high_usd)}</span>
+                <span>Annual operating cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.stl_annual_low_usd)} – {fmt(g.stl_annual_high_usd)}/yr</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#581c87', borderTop: '1px solid #e9d5ff', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Daytime Interference & Protection Guide */}
         {candidate.am_daytime_interference_and_protection_guide && (() => {
           const g = candidate.am_daytime_interference_and_protection_guide;

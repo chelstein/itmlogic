@@ -1125,7 +1125,10 @@ export async function runSiteOptimizer(body = {}){
     zon_total_cost_low_usd:     c.am_local_zoning_and_land_use_compatibility_guide?.total_zoning_cost_low_usd ?? null,
     int_channel_type:           c.am_daytime_interference_and_protection_guide?.channel_type ?? null,
     int_co_channel_risk:        c.am_daytime_interference_and_protection_guide?.co_channel_risk ?? null,
-    int_service_radius_05_km:   c.am_daytime_interference_and_protection_guide?.service_radius_05_mvpm_km ?? null
+    int_service_radius_05_km:   c.am_daytime_interference_and_protection_guide?.service_radius_05_mvpm_km ?? null,
+    stl_technology:             c.am_studio_to_transmitter_link_guide?.stl_technology ?? null,
+    stl_distance_km:            c.am_studio_to_transmitter_link_guide?.stl_distance_km ?? null,
+    stl_total_cost_low_usd:     c.am_studio_to_transmitter_link_guide?.total_stl_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6860,6 +6863,84 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_studio_to_transmitter_link_guide: (() => {
+      // Models the studio-to-transmitter link (STL) technology, FCC licensing
+      // (Part 74 Subpart H / §74.550), cost, and backup path requirements.
+      // STL distance is approximated from the candidate-to-current-site offset
+      // (proxy for studio-to-transmitter run assuming studio near current site).
+
+      const stl_distance_km = round2(pt.distance_from_current_km ?? 0);
+      const stl_distance_mi = round2(stl_distance_km * 0.621371);
+
+      // STL technology by distance
+      // < 5 km: IP/internet or local fiber (no FCC STL license)
+      // 5–30 km: licensed 950 MHz studio link (FCC §74.550)
+      // > 30 km: licensed digital microwave (7/13/18 GHz) or satellite
+      let stl_technology = 'IP_INTERNET';
+      if      (stl_distance_km > 30) stl_technology = 'DIGITAL_MICROWAVE';
+      else if (stl_distance_km >  5) stl_technology = 'LICENSED_950MHZ';
+
+      // FCC Part 74 license required for 950 MHz and microwave STLs
+      const fcc_part_74_license_required = stl_technology !== 'IP_INTERNET';
+      const fcc_license_fee_usd          = fcc_part_74_license_required ? 625 : 0;
+
+      // Equipment and installation costs (TX side + RX side)
+      const STL_EQUIP = {
+        IP_INTERNET:       { low:  2000, high:  8000 },
+        LICENSED_950MHZ:   { low:  8000, high: 25000 },
+        DIGITAL_MICROWAVE: { low: 25000, high: 80000 }
+      };
+      const stl_equip_low_usd  = STL_EQUIP[stl_technology].low;
+      const stl_equip_high_usd = STL_EQUIP[stl_technology].high;
+
+      // Annual operating cost
+      const STL_ANNUAL = {
+        IP_INTERNET:       { low:  500, high:  3000 },
+        LICENSED_950MHZ:   { low: 1000, high:  4000 },
+        DIGITAL_MICROWAVE: { low: 3000, high: 12000 }
+      };
+      const stl_annual_low_usd  = STL_ANNUAL[stl_technology].low;
+      const stl_annual_high_usd = STL_ANNUAL[stl_technology].high;
+
+      // Backup STL: one technology tier below primary (per §73.1740 continuity)
+      const BACKUP_TECH = {
+        IP_INTERNET:       null,
+        LICENSED_950MHZ:   'IP_INTERNET',
+        DIGITAL_MICROWAVE: 'LICENSED_950MHZ'
+      };
+      const backup_technology   = BACKUP_TECH[stl_technology] ?? null;
+      const backup_equip_low_usd  = backup_technology ? STL_EQUIP[backup_technology].low  : 0;
+      const backup_equip_high_usd = backup_technology ? STL_EQUIP[backup_technology].high : 0;
+
+      // Typical end-to-end audio latency
+      const STL_LATENCY_MS = {
+        IP_INTERNET: 50, LICENSED_950MHZ: 5, DIGITAL_MICROWAVE: 2
+      };
+      const stl_latency_ms = STL_LATENCY_MS[stl_technology] ?? 10;
+
+      const total_stl_cost_low_usd  = stl_equip_low_usd  + backup_equip_low_usd  + fcc_license_fee_usd;
+      const total_stl_cost_high_usd = stl_equip_high_usd + backup_equip_high_usd + fcc_license_fee_usd;
+
+      return {
+        stl_distance_km,
+        stl_distance_mi,
+        stl_technology,
+        fcc_part_74_license_required,
+        fcc_license_fee_usd,
+        stl_equip_low_usd,
+        stl_equip_high_usd,
+        stl_annual_low_usd,
+        stl_annual_high_usd,
+        backup_technology,
+        backup_equip_low_usd,
+        backup_equip_high_usd,
+        stl_latency_ms,
+        total_stl_cost_low_usd,
+        total_stl_cost_high_usd,
+        note: `STL run: ${stl_distance_km}km (${stl_distance_mi}mi). Technology: ${stl_technology.replace(/_/g, ' ')}${fcc_part_74_license_required ? ` — FCC Part 74.550 license required ($${fcc_license_fee_usd.toLocaleString()})` : ' — no FCC STL license needed'}; latency: ${stl_latency_ms}ms. Backup: ${backup_technology ? backup_technology.replace(/_/g, ' ') : 'dual-path IP recommended'}. Total: $${total_stl_cost_low_usd.toLocaleString()}–$${total_stl_cost_high_usd.toLocaleString()}; annual: $${stl_annual_low_usd.toLocaleString()}–$${stl_annual_high_usd.toLocaleString()}.`
       };
     })(),
 

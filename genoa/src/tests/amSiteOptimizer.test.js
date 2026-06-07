@@ -10752,3 +10752,56 @@ test('am_daytime_interference_and_protection_guide comparison table columns pres
     assert.ok('int_service_radius_05_km' in row, 'int_service_radius_05_km missing from comparison table');
   }
 });
+
+test('am_studio_to_transmitter_link_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_studio_to_transmitter_link_guide;
+  assert.ok(g != null, 'am_studio_to_transmitter_link_guide must be present');
+  assert.ok(['IP_INTERNET','LICENSED_950MHZ','DIGITAL_MICROWAVE'].includes(g.stl_technology), `invalid stl_technology: ${g.stl_technology}`);
+  assert.ok(typeof g.total_stl_cost_low_usd === 'number', 'total_stl_cost_low_usd must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_studio_to_transmitter_link_guide rank 1 KAZM uses IP at 0km distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_studio_to_transmitter_link_guide;
+  // Rank 1 at current site (0km) → IP_INTERNET
+  assert.strictEqual(g.stl_distance_km, 0, 'rank 1 should have 0km STL distance');
+  assert.strictEqual(g.stl_technology, 'IP_INTERNET', '0km STL should use IP_INTERNET');
+  assert.strictEqual(g.fcc_part_74_license_required, false, 'IP STL does not require Part 74 license');
+  assert.strictEqual(g.fcc_license_fee_usd, 0, 'IP STL license fee should be $0');
+});
+
+test('am_studio_to_transmitter_link_guide STL technology scales with distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_studio_to_transmitter_link_guide;
+    if (g.stl_distance_km <= 5) {
+      assert.strictEqual(g.stl_technology, 'IP_INTERNET', `${g.stl_distance_km}km should use IP`);
+    } else if (g.stl_distance_km <= 30) {
+      assert.strictEqual(g.stl_technology, 'LICENSED_950MHZ', `${g.stl_distance_km}km should use 950MHz`);
+    } else {
+      assert.strictEqual(g.stl_technology, 'DIGITAL_MICROWAVE', `${g.stl_distance_km}km should use microwave`);
+    }
+  }
+});
+
+test('am_studio_to_transmitter_link_guide total cost is sum of equipment + backup + license', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_studio_to_transmitter_link_guide;
+    const expected_low = g.stl_equip_low_usd + g.backup_equip_low_usd + g.fcc_license_fee_usd;
+    assert.strictEqual(g.total_stl_cost_low_usd, expected_low,
+      `rank ${c.rank}: total_stl_cost_low should equal equip + backup + license`);
+    assert.ok(g.total_stl_cost_high_usd >= g.total_stl_cost_low_usd, 'high must be >= low');
+  }
+});
+
+test('am_studio_to_transmitter_link_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('stl_technology'         in row, 'stl_technology missing from comparison table');
+    assert.ok('stl_distance_km'        in row, 'stl_distance_km missing from comparison table');
+    assert.ok('stl_total_cost_low_usd' in row, 'stl_total_cost_low_usd missing from comparison table');
+  }
+});
