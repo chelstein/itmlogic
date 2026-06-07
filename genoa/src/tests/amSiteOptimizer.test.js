@@ -15202,3 +15202,47 @@ it('candidate_comparison_table nfl columns are present and valid for KAZM', asyn
   assert.ok(typeof r0.nfl_snr_day_dB === 'number', 'nfl_snr_day_dB must be a number');
   assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(r0.nfl_noise_risk_level), 'nfl_noise_risk_level must be LOW/ELEVATED/HIGH');
 });
+
+it('am_fm_translator_and_signal_booster_filing_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_fm_translator_and_signal_booster_filing_guide !== undefined &&
+      c.am_fm_translator_and_signal_booster_filing_guide !== null,
+      `rank ${c.rank}: am_fm_translator_and_signal_booster_filing_guide must be present`
+    );
+  }
+});
+
+it('KAZM translator eligibility and ERP limit per §74.1201(g) and §74.1235(a)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_fm_translator_and_signal_booster_filing_guide;
+  assert.strictEqual(g.translator_eligible, true, 'all AM stations eligible per §74.1201(g)');
+  assert.strictEqual(g.translator_max_erp_w, 250, 'FM translator limited to 250 W ERP per §74.1235(a)');
+  assert.ok(Math.abs(g.translator_max_erp_kw - 0.25) < 0.001, 'translator_max_erp_kw must be 0.25 kW');
+});
+
+it('KAZM translator coverage radius and elevated site flag', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_fm_translator_and_signal_booster_filing_guide;
+  assert.ok(g.translator_coverage_km >= 20, 'translator coverage radius must be ≥20 km');
+  assert.ok(g.translator_coverage_km <= 35, 'translator coverage radius must be ≤35 km');
+  assert.ok(typeof g.elevated_site_likely === 'boolean', 'elevated_site_likely must be a boolean');
+});
+
+it('KAZM translator modification requirement on relocation and audience uplift', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_fm_translator_and_signal_booster_filing_guide;
+  assert.strictEqual(g.translator_modification_required_on_relocation, true, 'translator must be modified on AM relocation');
+  assert.strictEqual(g.translator_modification_form, 'FCC Form 349 (minor change)', 'modification form must be FCC Form 349');
+  assert.strictEqual(g.audience_reach_uplift_pct_low, 15, 'audience uplift low must be 15%');
+  assert.strictEqual(g.audience_reach_uplift_pct_high, 35, 'audience uplift high must be 35%');
+});
+
+it('candidate_comparison_table xltr columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.xltr_eligible, true, 'xltr_eligible must be true');
+  assert.ok(r0.xltr_coverage_km >= 20, 'xltr_coverage_km must be ≥20 km');
+  assert.ok(r0.xltr_total_low_usd > 0, 'xltr_total_low_usd must be positive');
+});

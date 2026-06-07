@@ -2226,6 +2226,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM FM Translator and Signal Booster Filing Guide */}
+        {candidate.am_fm_translator_and_signal_booster_filing_guide && (() => {
+          const g = candidate.am_fm_translator_and_signal_booster_filing_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#6d28d9', marginBottom: 8 }}>
+                FM Translator Filing Opportunity (§74.1201 / AM Revitalization)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#4c1d95' }}>
+                <div><b>Eligible:</b> {g.translator_eligible ? 'Yes — §74.1201(g)' : 'No'}</div>
+                <div><b>Max ERP:</b> {g.translator_max_erp_w} W ({g.translator_max_erp_kw} kW) per §74.1235(a)</div>
+                <div><b>Coverage Radius:</b> ~{fmtF(g.translator_coverage_km)} km {g.elevated_site_likely ? '(elevated site benefit)' : '(flat terrain)'}</div>
+                <div><b>Elevated Site:</b> {g.elevated_site_likely ? 'Yes — broader coverage' : 'No'}</div>
+                <div><b>Audience Uplift:</b> {g.audience_reach_uplift_pct_low}–{g.audience_reach_uplift_pct_high}% with translator</div>
+                <div><b>On Relocation:</b> {g.translator_modification_form}</div>
+                <div><b>FCC Fee:</b> ${fmt(g.fcc_fee_usd)}</div>
+                <div><b>AM Contour:</b> within {g.am_primary_contour_mv_m} mV/m daytime (§74.1237)</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #c4b5fd', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>Equipment:</b> ${fmt(g.equipment_low_usd)}–${fmt(g.equipment_high_usd)}</span>
+                  <span><b>Engineering:</b> ${fmt(g.engineering_low_usd)}–${fmt(g.engineering_high_usd)}</span>
+                  <span><b>Total:</b> ${fmt(g.total_translator_low_usd)}–${fmt(g.total_translator_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Noise Floor and RF Interference Environment Guide */}
         {candidate.am_noise_floor_and_rf_interference_environment_guide && (() => {
           const g = candidate.am_noise_floor_and_rf_interference_environment_guide;

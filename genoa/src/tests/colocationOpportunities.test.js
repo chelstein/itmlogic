@@ -3836,3 +3836,14 @@ test('am_noise_floor_and_rf_interference_environment_guide present across coloca
     assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(g.noise_risk_level), 'noise_risk_level must be LOW/ELEVATED/HIGH');
   }
 });
+
+test('am_fm_translator_and_signal_booster_filing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fm_translator_and_signal_booster_filing_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_fm_translator_and_signal_booster_filing_guide`);
+    assert.strictEqual(g.translator_eligible, true, 'all AM stations eligible for FM translator per §74.1201(g)');
+    assert.strictEqual(g.translator_max_erp_w, 250, 'FM translator max ERP is 250 W per §74.1235(a)');
+    assert.ok(g.total_translator_low_usd > 0, 'total_translator_low_usd must be positive');
+  }
+});
