@@ -30,7 +30,9 @@ import ShortSpacingShowingPanel from '@components/ui/ShortSpacingShowingPanel.js
 import FilingPackagePanel from '@components/ui/FilingPackagePanel.jsx';
 import FieldLineagePanel  from '@components/ui/FieldLineagePanel.jsx';
 import TrustDashboard     from '@components/ui/TrustDashboard.jsx';
-import SiteOptimizerApp from '@components/ui/SiteOptimizer/SiteOptimizerApp.jsx';
+// Lazy — SiteOptimizerApp embeds large demo-data constants and should
+// not block the initial Contour Studio or /map bundle.
+const SiteOptimizerApp = React.lazy(() => import('@components/ui/SiteOptimizer/SiteOptimizerApp.jsx'));
 
 // Routes — a minimal client-side dispatch.  The default Contour
 // Studio lives at '/' and any /am-... legacy URL; the standalone AM
@@ -187,6 +189,36 @@ export default function App(){
   return <AuthedRouter onLogout={logout} />;
 }
 
+// Error boundary — catches React render errors in a subtree and shows
+// a diagnostic panel instead of a white screen.  Lets the studio and
+// map pages keep working if the optimizer crashes.
+class RouteErrorBoundary extends React.Component {
+  constructor(props){ super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(e){ return { error: e }; }
+  render(){
+    if (this.state.error){
+      const msg = this.state.error?.message || String(this.state.error);
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-black p-8 font-mono">
+          <div className="max-w-xl w-full border border-red/60 bg-red/10 rounded-lg p-6">
+            <div className="text-red font-bold text-sm uppercase tracking-widest mb-3">
+              Page Error — {this.props.label || 'component crashed'}
+            </div>
+            <pre className="text-amber text-xs whitespace-pre-wrap break-all mb-4">{msg}</pre>
+            <button
+              onClick={() => { this.setState({ error: null }); if (this.props.onReset) this.props.onReset(); }}
+              className="px-3 py-1.5 border border-gold/60 text-gold text-xs rounded hover:bg-gold/10"
+            >
+              ← Back to Studio
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // AuthedRouter — picks the right top-level page for the current URL.
 // MainApp (Contour Studio) and SiteOptimizerApp (AM Relocation
 // Optimizer) are siblings — neither is mounted inside the other so
@@ -206,11 +238,19 @@ function AuthedRouter({ onLogout }){
   }
   if (path === ROUTE_OPTIMIZER){
     return (
-      <SiteOptimizerApp
-        onSwitchToContourStudio={() => navigateTo('/')}
-        onNavigate={navigateTo}
-        onLogout={onLogout}
-      />
+      <RouteErrorBoundary label="AM Relocation Optimizer" onReset={() => navigateTo('/')}>
+        <React.Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-black font-mono text-textDim text-[12px] tracking-rack uppercase">
+            Loading optimizer…
+          </div>
+        }>
+          <SiteOptimizerApp
+            onSwitchToContourStudio={() => navigateTo('/')}
+            onNavigate={navigateTo}
+            onLogout={onLogout}
+          />
+        </React.Suspense>
+      </RouteErrorBoundary>
     );
   }
   if (path === ROUTE_LINEAGE){
