@@ -1302,7 +1302,10 @@ export async function runSiteOptimizer(body = {}){
     cov_area_5mvm_km2:          c.am_signal_contour_and_coverage_area_guide?.area_5mvm_km2 ?? null,
     sky_is_clear_channel:       c.am_nighttime_skywave_interference_guide?.is_clear_channel ?? null,
     sky_total_study_low_usd:    c.am_nighttime_skywave_interference_guide?.total_study_low_usd ?? null,
-    sky_skywave_reach_km_high:  c.am_nighttime_skywave_interference_guide?.skywave_reach_km_high ?? null
+    sky_skywave_reach_km_high:  c.am_nighttime_skywave_interference_guide?.skywave_reach_km_high ?? null,
+    re_min_acres:               c.am_real_estate_and_land_acquisition_guide?.min_acres ?? null,
+    re_total_purchase_low_usd:  c.am_real_estate_and_land_acquisition_guide?.total_purchase_low_usd ?? null,
+    re_lease_low_per_month:     c.am_real_estate_and_land_acquisition_guide?.lease_low_per_month ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7037,6 +7040,55 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_real_estate_and_land_acquisition_guide: (() => {
+      // AM tower sites require land for the tower base, ground system, and
+      // a safety exclusion zone mandated by FCC RF exposure rules (§1.1310/OET-65).
+      // Land options: purchase or long-term lease (20–40 yr preferred for broadcast).
+      // Site acreage needed: ground radials extend up to 1/4 wavelength = ~96 m (315 ft).
+      // Minimum site: ~1–2 acres for NDA; ~2–5 acres for DA array (multiple towers).
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const isDA_re        = /^DA/i.test(pattern_mode);
+      const radial_m       = round2(wavelength_m / 4);    // ground system reach
+      const radial_ft      = round2(radial_m * 3.28084);
+      const min_acres_nda  = 2;
+      const min_acres_da   = 5;
+      const min_acres      = isDA_re ? min_acres_da : min_acres_nda;
+      // Land cost varies enormously by location; use per-acre rural range:
+      const land_low_per_acre  = 5000;   // rural agricultural land ($5k–$30k/acre)
+      const land_high_per_acre = 30000;
+      const purchase_low_usd  = round2(min_acres * land_low_per_acre);
+      const purchase_high_usd = round2(min_acres * land_high_per_acre);
+      // Lease alternative: $500–$3,000/month for broadcast tower site
+      const lease_low_per_month  = 500;
+      const lease_high_per_month = 3000;
+      const lease_low_annual_usd  = round2(lease_low_per_month  * 12);
+      const lease_high_annual_usd = round2(lease_high_per_month * 12);
+      const lease_20yr_low_usd    = round2(lease_low_annual_usd  * 20);
+      const lease_20yr_high_usd   = round2(lease_high_annual_usd * 20);
+      // Title search and closing costs (purchase): $2,000–$8,000
+      const closing_low_usd  = 2000;
+      const closing_high_usd = 8000;
+      // Total purchase option:
+      const total_purchase_low_usd  = round2(purchase_low_usd  + closing_low_usd);
+      const total_purchase_high_usd = round2(purchase_high_usd + closing_high_usd);
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        isDA: isDA_re,
+        wavelength_m, radial_m, radial_ft,
+        min_acres,
+        land_low_per_acre, land_high_per_acre,
+        purchase_low_usd, purchase_high_usd,
+        closing_low_usd, closing_high_usd,
+        total_purchase_low_usd, total_purchase_high_usd,
+        lease_low_per_month, lease_high_per_month,
+        lease_low_annual_usd, lease_high_annual_usd,
+        lease_20yr_low_usd, lease_20yr_high_usd,
+        reference: 'FCC OET Bulletin 65 (RF exclusion zone); 47 CFR §1.1310 (MPE); broadcast industry land acquisition practice; USDA land value data; NAR commercial real estate guidelines',
+        note: `${isDA_re ? 'DA' : 'NDA'} site: ~${min_acres} acres minimum (ground radial reach: ${radial_ft.toFixed(0)} ft). Purchase: $${total_purchase_low_usd.toLocaleString()}–$${total_purchase_high_usd.toLocaleString()}. Lease: $${lease_low_per_month}–$${lease_high_per_month}/mo ($${lease_20yr_low_usd.toLocaleString()}–$${lease_20yr_high_usd.toLocaleString()} over 20 yr)`
       };
     })(),
 

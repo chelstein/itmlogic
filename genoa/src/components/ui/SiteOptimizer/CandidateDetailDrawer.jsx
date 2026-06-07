@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Real Estate and Land Acquisition Guide */}
+        {candidate.am_real_estate_and_land_acquisition_guide && (() => {
+          const g = candidate.am_real_estate_and_land_acquisition_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="re-guide" style={{ marginBottom: 16, padding: 12, background: '#fffbeb', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Real Estate &amp; Land Acquisition</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Site type:</span><span>{g.isDA ? 'DA (multi-tower array)' : 'NDA (single tower)'}</span>
+                <span>Min. acreage:</span><span>{g.min_acres != null ? `${g.min_acres} acres` : '—'}</span>
+                <span>Ground radial:</span><span>{g.radial_ft != null ? `${g.radial_ft.toFixed(0)} ft (${g.radial_m != null ? `${g.radial_m} m` : '—'})` : '—'}</span>
+                <span>Land purchase:</span><span>{fmt(g.purchase_low_usd)} – {fmt(g.purchase_high_usd)}</span>
+                <span>Closing costs:</span><span>{fmt(g.closing_low_usd)} – {fmt(g.closing_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total purchase:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_purchase_low_usd)} – {fmt(g.total_purchase_high_usd)}</span>
+                <span>Lease (monthly):</span><span>{fmt(g.lease_low_per_month)} – {fmt(g.lease_high_per_month)}/mo</span>
+                <span>Lease (20-year):</span><span>{fmt(g.lease_20yr_low_usd)} – {fmt(g.lease_20yr_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Nighttime Skywave Interference Guide */}
         {candidate.am_nighttime_skywave_interference_guide && (() => {
           const g = candidate.am_nighttime_skywave_interference_guide;

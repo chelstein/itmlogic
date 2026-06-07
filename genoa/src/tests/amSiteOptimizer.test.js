@@ -13454,3 +13454,47 @@ test('am_nighttime_skywave_interference_guide comparison table columns present',
   assert.strictEqual(r0.sky_total_study_low_usd,   3000,  'rank-1 sky_total_study_low_usd should be 3000');
   assert.strictEqual(r0.sky_skywave_reach_km_high,  2500, 'rank-1 sky_skywave_reach_km_high should be 2500');
 });
+
+test('am_real_estate_and_land_acquisition_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
+  assert.ok(g !== undefined && g !== null, 'am_real_estate_and_land_acquisition_guide missing');
+  assert.ok(g.total_purchase_low_usd > 0, 'total_purchase_low_usd must be positive');
+  assert.ok(g.total_purchase_high_usd >= g.total_purchase_low_usd, 'total_purchase_high must be >= low');
+});
+
+test('KAZM NDA site requires 2 acres minimum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
+  assert.strictEqual(g.isDA,      false, 'KAZM NDA so isDA should be false');
+  assert.strictEqual(g.min_acres, 2,     'NDA requires 2 acres minimum');
+  assert.strictEqual(g.radial_ft, 315.26, 'KAZM radial_ft should be 315.26');
+});
+
+test('KAZM land purchase total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
+  assert.strictEqual(g.total_purchase_low_usd,  12000, 'KAZM total_purchase_low should be 12000');
+  assert.strictEqual(g.purchase_low_usd,         10000, 'KAZM purchase_low should be 10000');
+});
+
+test('KAZM lease cost reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_real_estate_and_land_acquisition_guide;
+  assert.strictEqual(g.lease_low_per_month,   500,    'lease_low_per_month should be 500');
+  assert.strictEqual(g.lease_20yr_low_usd,    120000, 'lease_20yr_low should be 120000');
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('OET Bulletin 65'), 'reference must cite OET-65');
+});
+
+test('am_real_estate_and_land_acquisition_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('re_min_acres'              in row, 're_min_acres missing from comparison table');
+    assert.ok('re_total_purchase_low_usd' in row, 're_total_purchase_low_usd missing from comparison table');
+    assert.ok('re_lease_low_per_month'    in row, 're_lease_low_per_month missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.re_min_acres,              2,     'rank-1 re_min_acres should be 2');
+  assert.strictEqual(r0.re_total_purchase_low_usd, 12000, 'rank-1 re_total_purchase_low should be 12000');
+  assert.strictEqual(r0.re_lease_low_per_month,    500,   'rank-1 re_lease_low_per_month should be 500');
+});

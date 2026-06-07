@@ -3160,3 +3160,14 @@ test('am_nighttime_skywave_interference_guide present across colocation candidat
     assert.ok(typeof g.nighttime_power_note === 'string', `rank ${c.rank}: nighttime_power_note must be string`);
   }
 });
+
+test('am_real_estate_and_land_acquisition_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_real_estate_and_land_acquisition_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_real_estate_and_land_acquisition_guide missing`);
+    assert.ok(g.total_purchase_low_usd > 0, `rank ${c.rank}: total_purchase_low_usd must be positive`);
+    assert.ok(g.min_acres >= 2, `rank ${c.rank}: min_acres must be >= 2`);
+    assert.ok(g.radial_ft > 0, `rank ${c.rank}: radial_ft must be positive`);
+  }
+});
