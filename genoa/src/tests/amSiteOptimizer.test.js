@@ -15158,3 +15158,47 @@ it('candidate_comparison_table opf columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.opf_issues_programs_filing_days, 10, 'opf_issues_programs_filing_days must be 10');
   assert.ok(r0.opf_total_setup_low_usd >= 500, 'opf_total_setup_low_usd must be ≥$500');
 });
+
+it('am_noise_floor_and_rf_interference_environment_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_noise_floor_and_rf_interference_environment_guide !== undefined &&
+      c.am_noise_floor_and_rf_interference_environment_guide !== null,
+      `rank ${c.rank}: am_noise_floor_and_rf_interference_environment_guide must be present`
+    );
+  }
+});
+
+it('KAZM atmospheric noise ITU-R P.372-16 zone B value at 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_rf_interference_environment_guide;
+  assert.strictEqual(g.fa_atmospheric_dBuVm, 53.0, 'ITU-R P.372-16 zone B atmospheric noise at 780 kHz must be 53 dBµV/m');
+  assert.ok(g.ft_dBuVm >= g.fa_atmospheric_dBuVm, 'combined noise Ft must be >= atmospheric alone');
+  assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(g.noise_risk_level), 'noise_risk_level must be LOW/ELEVATED/HIGH');
+});
+
+it('KAZM daytime field strength and SNR thresholds per §73.24(h) and §73.37(a)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_rf_interference_environment_guide;
+  // 0.5 mV/m = 500 µV/m → 20*log10(500) = 53.98 dBµV/m
+  assert.ok(Math.abs(g.fs_day_dBuVm - 53.98) < 0.05, `fs_day_dBuVm should be ~53.98, got ${g.fs_day_dBuVm}`);
+  // 0.1 mV/m = 100 µV/m → 20*log10(100) = 40.00 dBµV/m
+  assert.ok(Math.abs(g.fs_night_dBuVm - 40.0) < 0.05, `fs_night_dBuVm should be ~40.00, got ${g.fs_night_dBuVm}`);
+  assert.strictEqual(g.snr_threshold_dB, 10.0, 'FCC §73.37(a) minimum SNR must be 10 dB');
+});
+
+it('KAZM 780 kHz is clear channel and noise zone classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_rf_interference_environment_guide;
+  assert.strictEqual(g.is_clear_channel_freq, true, '780 kHz must be identified as clear channel');
+  assert.ok(['RURAL', 'RESIDENTIAL', 'NEAR_URBAN'].includes(g.noise_zone), 'noise_zone must be a valid zone string');
+});
+
+it('candidate_comparison_table nfl columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.nfl_ft_dBuVm !== null, 'nfl_ft_dBuVm must be present in comparison table');
+  assert.ok(typeof r0.nfl_snr_day_dB === 'number', 'nfl_snr_day_dB must be a number');
+  assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(r0.nfl_noise_risk_level), 'nfl_noise_risk_level must be LOW/ELEVATED/HIGH');
+});

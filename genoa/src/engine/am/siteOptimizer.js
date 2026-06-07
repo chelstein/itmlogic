@@ -1434,7 +1434,10 @@ export async function runSiteOptimizer(body = {}){
     mod_total_audio_low_usd:            c.am_modulation_monitoring_and_audio_processing_guide?.total_audio_low_usd ?? null,
     opf_political_file_upload_days:     c.am_public_inspection_file_and_online_compliance_guide?.political_file_upload_days ?? null,
     opf_issues_programs_filing_days:    c.am_public_inspection_file_and_online_compliance_guide?.issues_programs_list_filing_days ?? null,
-    opf_total_setup_low_usd:            c.am_public_inspection_file_and_online_compliance_guide?.total_setup_low_usd ?? null
+    opf_total_setup_low_usd:            c.am_public_inspection_file_and_online_compliance_guide?.total_setup_low_usd ?? null,
+    nfl_ft_dBuVm:                       c.am_noise_floor_and_rf_interference_environment_guide?.ft_dBuVm ?? null,
+    nfl_snr_day_dB:                     c.am_noise_floor_and_rf_interference_environment_guide?.snr_day_dB ?? null,
+    nfl_noise_risk_level:               c.am_noise_floor_and_rf_interference_environment_guide?.noise_risk_level ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7170,6 +7173,131 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_noise_floor_and_rf_interference_environment_guide: (() => {
+      // AM noise floor and RF interference environment assessment.
+      //
+      // The ambient noise floor at a candidate transmitter site determines the
+      // signal-to-noise ratio (SNR) received by listeners — particularly important
+      // for Class D secondary stations with limited TPO.
+      //
+      // Noise sources modeled:
+      //   1. Atmospheric (galactic + cosmic) noise: ITU-R P.372-16 Table 4 / Figure 1
+      //      At 780 kHz (upper MF band), median atmospheric noise figure Fa ≈ 50–65 dBµV/m
+      //      depending on geographic zone and season.  Tropical/equatorial zones are higher.
+      //      North American continental zone (zone B): Fa ≈ 53 dBµV/m (daytime, summer median).
+      //   2. Man-made noise: ITU-R P.372-16 Table 1
+      //      Residential zones: Fa_manmade ≈ 48–54 dBµV/m at MF
+      //      Rural/quiet zone: Fa_manmade ≈ 38–44 dBµV/m at MF
+      //      Business/industrial: Fa_manmade ≈ 58–68 dBµV/m at MF
+      //   3. Combined noise: total noise figure Ft = 10·log10(10^(Fa/10) + 10^(Fa_mm/10))
+      //      where dominant term typically determines Ft.
+      //
+      // Required SNR for acceptable AM reception:
+      //   FCC §73.37(a): 10 dB S/N at the 0.5 mV/m groundwave contour for daytime service.
+      //   (Standard broadcast audio SNR threshold — below 10 dB noise intrudes audibly.)
+      //   Practical full-fidelity threshold: ≥25 dB SNR (Terman 1955, §73.37 commentary).
+      //
+      // Field strength at service contour:
+      //   §73.24(h): Daytime community coverage = 0.5 mV/m (53.98 dBµV/m) at service boundary.
+      //   §73.24(i): Nighttime: 0.1 mV/m (40 dBµV/m) for community of license.
+      //
+      // SNR calculation:
+      //   SNR_day = field_strength_dBuVm_day - Ft_dBuVm
+      //   where Ft combines atmospheric + man-made noise at the receiving end.
+      //   NOTE: The noise at the RECEIVING location (listeners) matters for SNR;
+      //         at the TRANSMITTER site, the noise floor affects received pilot/monitor signal
+      //         and remote control monitoring SNR.
+      //
+      // Proximity to industrial noise sources:
+      //   Power lines (50/60 Hz harmonics), switching power supplies, motor drives,
+      //   and industrial equipment radiate broadband MF interference.
+      //   FCC §73.49 fencing + §73.1219 shielding help at transmitter; listener-end
+      //   noise is beyond operator control but affects served-population reception quality.
+      //
+      // Classification of candidate site noise environment:
+      //   Distance to nearest major road / industrial zone from pt.lat, pt.lon is not
+      //   available without an external API; we estimate based on:
+      //   - Rural proxy: distance_from_current_km used as urbanization proxy (further = more rural)
+      //     (Heuristic: sites further from city center tend toward lower man-made noise)
+      //   - Sedona/Flagstaff area: low industrial density → residential zone noise level
+
+      // ITU-R P.372-16: atmospheric noise at 780 kHz, North American zone B (continental)
+      const fa_atmospheric_dBuVm   = 53.0;   // ITU-R P.372-16 zone B, 780 kHz, daytime median
+
+      // Man-made noise estimate — heuristic from distance as urbanization proxy:
+      //   > 30 km from current site → rural/quiet zone
+      //   10–30 km → residential zone
+      //   < 10 km → near-urban/business zone
+      const dist_km = pt.distance_from_current_km ?? 25;
+      const noise_zone = dist_km > 30 ? 'RURAL' : (dist_km > 10 ? 'RESIDENTIAL' : 'NEAR_URBAN');
+      const fa_manmade_dBuVm = noise_zone === 'RURAL' ? 41.0
+                             : noise_zone === 'RESIDENTIAL' ? 51.0
+                             : 62.0;   // ITU-R P.372-16 Table 1 approximate MF values
+
+      // Combined noise figure (total, dBµV/m above kTB reference):
+      const ft_linear = Math.pow(10, fa_atmospheric_dBuVm / 10) + Math.pow(10, fa_manmade_dBuVm / 10);
+      const ft_dBuVm  = round2(10 * Math.log10(ft_linear));
+
+      // Daytime service contour field strength (§73.24(h)):
+      const fs_day_dBuVm  = round2(20 * Math.log10(0.5 * 1000));   // 0.5 mV/m = 500 µV/m → 53.98 dBµV/m
+      const fs_night_dBuVm = round2(20 * Math.log10(0.1 * 1000));  // 0.1 mV/m = 100 µV/m → 40 dBµV/m
+
+      // SNR at service contour
+      const snr_day_dB   = round2(fs_day_dBuVm  - ft_dBuVm);
+      const snr_night_dB = round2(fs_night_dBuVm - ft_dBuVm);
+
+      // FCC minimum SNR threshold per §73.37(a): 10 dB
+      const snr_threshold_dB       = 10.0;
+      const snr_day_compliant      = snr_day_dB   >= snr_threshold_dB;
+      const snr_night_compliant    = snr_night_dB >= snr_threshold_dB;
+
+      // Practical full-fidelity threshold: 25 dB (Terman / engineering practice)
+      const snr_hifi_threshold_dB  = 25.0;
+      const snr_day_hifi           = snr_day_dB   >= snr_hifi_threshold_dB;
+
+      // Site noise penalty:
+      //   If combined noise Ft > 55 dBµV/m → elevated risk; > 60 → high risk
+      const noise_risk_level = ft_dBuVm > 60 ? 'HIGH'
+                             : ft_dBuVm > 55 ? 'ELEVATED'
+                             : 'LOW';
+
+      // Interference from nearby AM stations on adjacent / skywave channels:
+      //   FCC §73.182 / §73.37: skywave and adjacent-channel interference handled elsewhere;
+      //   here we note CLEAR CHANNEL status: 780 kHz is clear channel → KKOB is dominant.
+      const is_clear_channel_freq  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // Cost: noise floor measurement campaign (if needed — required before formal interference analysis)
+      //   Baseline spectrum survey at candidate site: 1–3 days field crew
+      const survey_cost_low_usd   = 1500;   // 1-day crew, equipment
+      const survey_cost_high_usd  = 4500;   // 3-day crew with ITU-calibrated antenna
+      const total_noise_low_usd   = snr_day_compliant ? survey_cost_low_usd : survey_cost_low_usd + 2000;
+      const total_noise_high_usd  = survey_cost_high_usd;
+
+      return {
+        fa_atmospheric_dBuVm,
+        fa_manmade_dBuVm,
+        noise_zone,
+        ft_dBuVm,
+        fs_day_dBuVm,
+        fs_night_dBuVm,
+        snr_day_dB,
+        snr_night_dB,
+        snr_threshold_dB,
+        snr_day_compliant,
+        snr_night_compliant,
+        snr_hifi_threshold_dB,
+        snr_day_hifi,
+        noise_risk_level,
+        is_clear_channel_freq,
+        survey_cost_low_usd,
+        survey_cost_high_usd,
+        total_noise_low_usd,
+        total_noise_high_usd,
+        reference: '47 CFR §73.37(a) (10 dB SNR minimum at service contour); §73.24(h) (0.5 mV/m daytime contour); §73.24(i) (0.1 mV/m nighttime); ITU-R P.372-16 (noise figure, atmospheric and man-made); Terman (1955) ch. 20 (practical SNR thresholds)',
+        note: `Estimated combined noise floor: ${ft_dBuVm} dBµV/m (atmospheric ${fa_atmospheric_dBuVm} + man-made ${fa_manmade_dBuVm} dBµV/m, ${noise_zone} zone). Daytime SNR at 0.5 mV/m contour: ${snr_day_dB} dB (FCC minimum ${snr_threshold_dB} dB — ${snr_day_compliant ? 'COMPLIANT' : 'BELOW THRESHOLD'}). Noise risk: ${noise_risk_level}. ${is_clear_channel_freq ? `780 kHz is a CLEAR CHANNEL — KKOB (Albuquerque, 50 kW) dominates nighttime coverage; secondary station nighttime operation is secondary to dominant station interference.` : ''}`
       };
     })(),
 

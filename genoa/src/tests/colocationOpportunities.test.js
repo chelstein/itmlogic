@@ -3825,3 +3825,14 @@ test('am_public_inspection_file_and_online_compliance_guide present across coloc
     assert.ok(g.total_setup_low_usd > 0, 'total_setup_low_usd must be positive');
   }
 });
+
+test('am_noise_floor_and_rf_interference_environment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_noise_floor_and_rf_interference_environment_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_noise_floor_and_rf_interference_environment_guide`);
+    assert.strictEqual(g.fa_atmospheric_dBuVm, 53.0, 'ITU-R P.372-16 zone B atmospheric noise must be 53 dBµV/m');
+    assert.ok(g.ft_dBuVm >= g.fa_atmospheric_dBuVm, 'combined noise Ft must be >= atmospheric alone');
+    assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(g.noise_risk_level), 'noise_risk_level must be LOW/ELEVATED/HIGH');
+  }
+});

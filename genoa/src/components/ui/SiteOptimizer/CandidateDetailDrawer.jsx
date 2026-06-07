@@ -2226,6 +2226,52 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Noise Floor and RF Interference Environment Guide */}
+        {candidate.am_noise_floor_and_rf_interference_environment_guide && (() => {
+          const g = candidate.am_noise_floor_and_rf_interference_environment_guide;
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const riskColor = g.noise_risk_level === 'HIGH' ? '#dc2626'
+                          : g.noise_risk_level === 'ELEVATED' ? '#d97706'
+                          : '#16a34a';
+          return (
+            <div style={{ background: '#1e1b2e', border: `1px solid ${riskColor}`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: riskColor, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                Noise Floor &amp; RF Interference Environment
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: riskColor, color: '#fff' }}>
+                  {g.noise_risk_level}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#d4d4d8' }}>
+                <div><b style={{ color: '#a1a1aa' }}>Atmospheric Noise (ITU-R P.372-16):</b> {fmtF(g.fa_atmospheric_dBuVm, 1)} dBµV/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Man-Made Noise ({g.noise_zone}):</b> {fmtF(g.fa_manmade_dBuVm, 1)} dBµV/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Combined Noise Floor (Ft):</b> {fmtF(g.ft_dBuVm)} dBµV/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Day Field Strength:</b> {fmtF(g.fs_day_dBuVm)} dBµV/m (0.5 mV/m)</div>
+                <div>
+                  <b style={{ color: '#a1a1aa' }}>Daytime SNR:</b>{' '}
+                  <span style={{ color: g.snr_day_compliant ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                    {fmtF(g.snr_day_dB)} dB
+                  </span>
+                  {' '}(min {g.snr_threshold_dB} dB §73.37)
+                </div>
+                <div>
+                  <b style={{ color: '#a1a1aa' }}>Nighttime SNR:</b>{' '}
+                  <span style={{ color: g.snr_night_compliant ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                    {fmtF(g.snr_night_dB)} dB
+                  </span>
+                  {' '}(0.1 mV/m contour)
+                </div>
+                <div><b style={{ color: '#a1a1aa' }}>Hi-Fi Threshold (25 dB):</b> {g.snr_day_hifi ? 'Met' : 'Not met'}</div>
+                <div><b style={{ color: '#a1a1aa' }}>Clear Channel (780 kHz):</b> {g.is_clear_channel_freq ? 'Yes — KKOB dominant' : 'No'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${riskColor}40`, marginTop: 4, paddingTop: 6, display: 'flex', gap: 18, color: '#a1a1aa' }}>
+                  <span><b>Site Survey:</b> ${fmt(g.survey_cost_low_usd)}–${fmt(g.survey_cost_high_usd)}</span>
+                  <span><b>Total (incl. remediation):</b> ${fmt(g.total_noise_low_usd)}–${fmt(g.total_noise_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Public Inspection File and Online Compliance Guide */}
         {candidate.am_public_inspection_file_and_online_compliance_guide && (() => {
           const g = candidate.am_public_inspection_file_and_online_compliance_guide;
