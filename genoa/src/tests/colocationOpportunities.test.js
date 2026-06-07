@@ -3599,3 +3599,20 @@ test('colocation candidates include am_broadcast_tower_grounding_and_cathodic_pr
     assert.ok(g.cp_recommended != null, `cp_recommended must be defined`);
   }
 });
+
+test('colocation candidates include am_tower_structural_load_and_wind_survival_guide with TIA-222-H wind data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_load_and_wind_survival_guide;
+    assert.ok(g, `candidate missing am_tower_structural_load_and_wind_survival_guide`);
+    assert.strictEqual(g.wind_design_mph, 90, 'design wind speed must be 90 mph per ASCE 7-22 Risk Cat II');
+    assert.ok(g.wind_force_kn > 0, `wind_force_kn must be positive`);
+    assert.ok(g.total_structural_low_usd > 0, `total_structural_low_usd must be positive`);
+  }
+});

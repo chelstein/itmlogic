@@ -14646,3 +14646,39 @@ it('candidate_comparison_table gcp columns are present and valid for KAZM', asyn
   assert.ok(r0.gcp_total_ground_low_usd > 0, 'gcp_total_ground_low_usd must be positive');
   assert.ok(r0.gcp_cp_recommended != null, 'gcp_cp_recommended must not be null');
 });
+
+it('am_tower_structural_load_and_wind_survival_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_tower_structural_load_and_wind_survival_guide, `candidate missing am_tower_structural_load_and_wind_survival_guide`);
+  }
+});
+
+it('am_tower_structural_load_and_wind_survival_guide tower_height_m matches λ/4 for 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_load_and_wind_survival_guide;
+  // λ/4 at 780 kHz = 300000/780/4 ≈ 96.15 m
+  assert.ok(Math.abs(g.tower_height_m - 96.15) < 0.1, `tower_height_m ${g.tower_height_m} should be ~96.15 m`);
+});
+
+it('am_tower_structural_load_and_wind_survival_guide wind_force_kn > 0 and base_moment_knm > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_load_and_wind_survival_guide;
+  assert.ok(g.wind_force_kn > 0, `wind_force_kn must be positive`);
+  assert.ok(g.base_moment_knm > 0, `base_moment_knm must be positive`);
+  assert.ok(g.foundation_capacity_req_knm > g.base_moment_knm, `capacity must exceed raw moment (1.5× SF)`);
+});
+
+it('am_tower_structural_load_and_wind_survival_guide compliance_tier is FULL_SE_ANALYSIS for 96m tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_load_and_wind_survival_guide;
+  assert.strictEqual(g.compliance_tier, 'FULL_SE_ANALYSIS', '96 m tower > 60 m requires full SE analysis');
+});
+
+it('candidate_comparison_table tsw columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.tsw_tower_height_m > 0, 'tsw_tower_height_m must be positive');
+  assert.ok(r0.tsw_wind_force_kn > 0, 'tsw_wind_force_kn must be positive');
+  assert.ok(r0.tsw_total_structural_low_usd > 0, 'tsw_total_structural_low_usd must be positive');
+});

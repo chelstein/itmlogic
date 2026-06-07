@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Structural Load and Wind Survival Guide */}
+        {candidate.am_tower_structural_load_and_wind_survival_guide && (() => {
+          const g = candidate.am_tower_structural_load_and_wind_survival_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const tierColor = g.compliance_tier === 'FULL_SE_ANALYSIS' ? '#b91c1c' : g.compliance_tier === 'STANDARD_ANALYSIS' ? '#b45309' : '#15803d';
+          return (
+            <div key="tsw-guide" style={{ marginBottom: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, border: '2px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Tower Structural Load &amp; Wind Survival — TIA-222-H / ASCE 7-22</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#1e293b', marginBottom: 8 }}>
+                <span style={{ color: '#475569' }}>Tower height:</span><span>{fmtF(g.tower_height_m, 1)} m ({g.tower_height_m != null ? (g.tower_height_m * 3.281).toFixed(0) : '—'} ft)</span>
+                <span style={{ color: '#475569' }}>Design wind:</span><span>{g.wind_design_mph} mph (90 mph 3-s gust)</span>
+                <span style={{ color: '#475569' }}>Wind force:</span><span>{fmtF(g.wind_force_kn, 1)} kN</span>
+                <span style={{ color: '#475569' }}>Base moment:</span><span>{fmtF(g.base_moment_knm, 0)} kN·m</span>
+                <span style={{ color: '#475569' }}>Fdn capacity req:</span><span>{fmtF(g.foundation_capacity_req_knm, 0)} kN·m (1.5× SF)</span>
+                <span style={{ color: '#475569' }}>Compliance tier:</span>
+                <span style={{ fontWeight: 700, color: tierColor }}>{g.compliance_tier?.replace(/_/g, ' ')}</span>
+              </div>
+              {g.compliance_tier === 'FULL_SE_ANALYSIS' && (
+                <div style={{ fontSize: 11, color: '#7c3aed', background: '#f5f3ff', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Tower height &gt;60 m requires full SE-stamped TIA-222-H analysis + FAA lighting inspection (§17.50).
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#1e293b', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#475569' }}>Struct review:</span><span>${fmt(g.struct_review_low_usd)} – ${fmt(g.struct_review_high_usd)}</span>
+                <span style={{ color: '#475569' }}>Foundation insp:</span><span>${fmt(g.foundation_low_usd)} – ${fmt(g.foundation_high_usd)}</span>
+                {g.faa_lighting_low_usd > 0 && <><span style={{ color: '#475569' }}>FAA lighting:</span><span>${fmt(g.faa_lighting_low_usd)} – ${fmt(g.faa_lighting_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#475569', fontWeight: 600 }}>Total structural:</span>
+                <span style={{ color: '#1e293b', fontWeight: 700 }}>${fmt(g.total_structural_low_usd)} – ${fmt(g.total_structural_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#64748b' }}>Ref: EIA/TIA-222-H, ASCE 7-22, 47 CFR §17.50</div>
+            </div>
+          );
+        })()}
+
         {/* AM Broadcast Tower Grounding and Cathodic Protection Guide */}
         {candidate.am_broadcast_tower_grounding_and_cathodic_protection_guide && (() => {
           const g = candidate.am_broadcast_tower_grounding_and_cathodic_protection_guide;

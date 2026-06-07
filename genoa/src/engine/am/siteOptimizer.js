@@ -1392,7 +1392,10 @@ export async function runSiteOptimizer(body = {}){
     bcim_calibration_interval_months:   c.am_antenna_base_current_and_impedance_monitoring_guide?.calibration_interval_months ?? null,
     gcp_total_copper_wire_m:            c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.total_copper_wire_m ?? null,
     gcp_total_ground_low_usd:           c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.total_ground_low_usd ?? null,
-    gcp_cp_recommended:                 c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.cp_recommended ?? null
+    gcp_cp_recommended:                 c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.cp_recommended ?? null,
+    tsw_tower_height_m:                 c.am_tower_structural_load_and_wind_survival_guide?.tower_height_m ?? null,
+    tsw_wind_force_kn:                  c.am_tower_structural_load_and_wind_survival_guide?.wind_force_kn ?? null,
+    tsw_total_structural_low_usd:       c.am_tower_structural_load_and_wind_survival_guide?.total_structural_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7127,6 +7130,81 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_structural_load_and_wind_survival_guide: (() => {
+      // EIA/TIA-222-H wind load on a self-supporting AM tower.
+      // Tower height: λ/4 at the station frequency is the "standard" electrical height; real towers
+      //   range ±10% but λ/4 is the design reference.
+      // Design wind speed: 90 mph basic (ASCE 7-22 Risk Category II, Exposure C for open terrain).
+      //   3-second gust → mean-hourly adjustment factor ≈ 0.85 → V_mean ≈ 76.5 mph.
+      //   EIA/TIA-222-H specifies 3-second gust, so we use V_3s = 90 mph directly.
+      // Wind pressure (Pa): q = ½ × ρ_air × V² with V in m/s.
+      //   90 mph = 40.23 m/s; q = 0.5 × 1.225 × 40.23² = 991 Pa ≈ 20.7 lbf/ft².
+      // Lattice tower drag: C_d = 2.0 (solid face area equivalent, per TIA-222-H Table 2-5).
+      // Effective face area: for a typical 4-leg lattice, face width ≈ 0.35 m per metre of height
+      //   → A_face = 0.35 × H.  Ice loading (0.5" radial) adds ~18% to effective area.
+      // Horizontal wind force: F_wind = q × C_d × A_face × G_f (gust factor 0.85 for flexible structure).
+      // Overturning moment at base: M = F_wind × H_eff (centroid of distributed load at ~0.6 × H for
+      //   tapered lattice towers).
+      // Anchor/foundation design: moment capacity M_c > M × safety_factor (1.5 per TIA-222-H §2.4).
+      // Structural review / compliance costs (2024 market):
+      //   TIA-222-H analysis report: $8,000–$25,000 (licensed PE, SE stamp)
+      //   Foundation/anchor inspection: $3,000–$8,000
+      //   FAA paint/lighting inspection: $2,000–$5,000 (if applicable per 47 CFR §17.50)
+      const f_khz        = frequency_khz;
+      const lambda_m     = 300000 / f_khz;                       // free-space wavelength, metres
+      const H_m          = round2(lambda_m / 4);                 // λ/4 tower height (design reference)
+      const V_mph        = 90;                                    // 3-sec gust, ASCE 7-22 Risk Cat II
+      const V_ms         = round2(V_mph * 0.44704);              // m/s
+      const rho_air      = 1.225;                                 // kg/m³ at sea level
+      const q_pa         = round2(0.5 * rho_air * V_ms * V_ms);  // dynamic pressure, Pa
+      const C_d          = 2.0;                                   // lattice tower drag coefficient
+      const face_width_per_m = 0.35;                             // m² of effective face per m height
+      const ice_factor   = 1.18;                                  // 0.5" radial ice area penalty
+      const A_face_m2    = round2(face_width_per_m * H_m * ice_factor);
+      const G_f          = 0.85;                                  // gust factor (flexible structure)
+      const F_wind_n     = round2(q_pa * C_d * A_face_m2 * G_f); // net horizontal wind force, N
+      const F_wind_kn    = round2(F_wind_n / 1000);
+      const H_centroid   = round2(H_m * 0.60);                   // load centroid for tapered lattice
+      const M_base_knm   = round2((F_wind_n * H_centroid) / 1000);
+      const M_capacity_knm = round2(M_base_knm * 1.5);           // required foundation capacity (×1.5 SF)
+      // Structural compliance rating: simple flag based on height vs. ASCE 7-22 thresholds
+      // Towers > 60 m in Exposure C require full SE-stamped TIA-222-H analysis (high)
+      // 30–60 m: standard analysis (medium)
+      // < 30 m: simplified procedure (low)
+      const compliance_tier = H_m > 60 ? 'FULL_SE_ANALYSIS' : H_m > 30 ? 'STANDARD_ANALYSIS' : 'SIMPLIFIED';
+      const struct_review_low_usd  = H_m > 60 ? 15000 : H_m > 30 ? 8000  : 4000;
+      const struct_review_high_usd = H_m > 60 ? 25000 : H_m > 30 ? 15000 : 8000;
+      const foundation_low_usd     = 3000;
+      const foundation_high_usd    = 8000;
+      const faa_lighting_low_usd   = H_m > 60 ? 2000  : 0;
+      const faa_lighting_high_usd  = H_m > 60 ? 5000  : 0;
+      const total_structural_low_usd  = struct_review_low_usd  + foundation_low_usd  + faa_lighting_low_usd;
+      const total_structural_high_usd = struct_review_high_usd + foundation_high_usd + faa_lighting_high_usd;
+      return {
+        tower_height_m:               H_m,
+        wind_design_mph:              V_mph,
+        wind_design_ms:               V_ms,
+        dynamic_pressure_pa:          q_pa,
+        drag_coefficient:             C_d,
+        effective_face_area_m2:       A_face_m2,
+        gust_factor:                  G_f,
+        wind_force_kn:                F_wind_kn,
+        base_moment_knm:              M_base_knm,
+        foundation_capacity_req_knm:  M_capacity_knm,
+        compliance_tier,
+        struct_review_low_usd,
+        struct_review_high_usd,
+        foundation_low_usd,
+        foundation_high_usd,
+        faa_lighting_low_usd,
+        faa_lighting_high_usd,
+        total_structural_low_usd,
+        total_structural_high_usd,
+        reference: '47 CFR §17.50 (tower lighting); EIA/TIA-222-H (structural standard); ASCE 7-22 (wind loads); 47 CFR §73.49 (antenna enclosure)',
+        note: `${H_m} m tower (λ/4 at ${f_khz} kHz); ${V_mph} mph 3-sec gust → ${F_wind_kn} kN wind force, ${M_base_knm} kN·m base moment. Compliance tier: ${compliance_tier}. Foundation must resist ${M_capacity_knm} kN·m (1.5× safety factor per TIA-222-H §2.4). ${H_m > 60 ? 'Tower height >60 m requires full SE-stamped TIA-222-H analysis and FAA lighting inspection per §17.50.' : 'Standard structural analysis sufficient.'}`
       };
     })(),
 
