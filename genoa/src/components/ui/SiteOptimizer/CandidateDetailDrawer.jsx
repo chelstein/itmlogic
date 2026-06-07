@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Zoning and Land Use Approval Guide */}
+        {candidate.am_zoning_and_land_use_approval_guide && (() => {
+          const g = candidate.am_zoning_and_land_use_approval_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="zon-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #9333ea' }}>
+              <div style={{ fontWeight: 700, color: '#581c87', marginBottom: 6, fontSize: 13 }}>Zoning &amp; Land Use Approval</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7e22ce' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Setback (typical 1×h):</span><span>{g.setback_ft_typical != null ? `${fmt(g.setback_ft_typical)} ft (${g.setback_m_typical} m)` : '—'}</span>
+                <span>Setback (strict 1.5×h):</span><span>{g.setback_ft_strict != null ? `${fmt(g.setback_ft_strict)} ft` : '—'}</span>
+                <span>Min. parcel size:</span><span style={{ color: '#dc2626' }}>{g.min_parcel_acres != null ? `~${g.min_parcel_acres} acres` : '—'}</span>
+                <span>CUP/SUP application:</span><span>{g.cup_application_low_usd != null ? `$${fmt(g.cup_application_low_usd)} – $${fmt(g.cup_application_high_usd)}` : '—'}</span>
+                <span>Zoning legal fees:</span><span>{g.zoning_attorney_low_usd != null ? `$${fmt(g.zoning_attorney_low_usd)} – $${fmt(g.zoning_attorney_high_usd)}` : '—'}</span>
+                <span>Total zoning cost:</span><span style={{ fontWeight: 600 }}>{g.total_zoning_low_usd != null ? `$${fmt(g.total_zoning_low_usd)} – $${fmt(g.total_zoning_high_usd)}` : '—'}</span>
+                <span>Timeline:</span><span>{g.zoning_timeline_weeks_low != null ? `${g.zoning_timeline_weeks_low}–${g.zoning_timeline_weeks_high} weeks` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#a21caf', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Environmental and NEPA Compliance Guide */}
         {candidate.am_environmental_and_nepa_compliance_guide && (() => {
           const g = candidate.am_environmental_and_nepa_compliance_guide;

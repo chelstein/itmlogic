@@ -3361,3 +3361,20 @@ test('am_environmental_and_nepa_compliance_guide colocation: all colocation cand
     assert.ok(g.phase1_esa_low_usd > 0, `phase1_esa_low_usd must be positive`);
   }
 });
+
+test('am_zoning_and_land_use_approval_guide colocation: all colocation candidates have valid zoning data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_zoning_and_land_use_approval_guide;
+    assert.ok(g, `candidate missing am_zoning_and_land_use_approval_guide`);
+    assert.ok(g.setback_ft_typical > 0, `setback_ft_typical must be positive`);
+    assert.ok(g.min_parcel_acres > 0, `min_parcel_acres must be positive`);
+    assert.ok(g.total_zoning_low_usd > 0, `total_zoning_low_usd must be positive`);
+  }
+});

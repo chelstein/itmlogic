@@ -1350,7 +1350,10 @@ export async function runSiteOptimizer(body = {}){
     faa_study_cost_low_usd:             c.am_faa_aeronautical_study_and_airspace_guide?.faa_study_cost_low_usd ?? null,
     nepa_category:                      c.am_environmental_and_nepa_compliance_guide?.nepa_category ?? null,
     nepa_total_env_cost_low_usd:        c.am_environmental_and_nepa_compliance_guide?.total_env_cost_low_usd ?? null,
-    nepa_timeline_weeks_low:            c.am_environmental_and_nepa_compliance_guide?.nepa_timeline_weeks_low ?? null
+    nepa_timeline_weeks_low:            c.am_environmental_and_nepa_compliance_guide?.nepa_timeline_weeks_low ?? null,
+    zon_setback_ft_typical:             c.am_zoning_and_land_use_approval_guide?.setback_ft_typical ?? null,
+    zon_min_parcel_acres:               c.am_zoning_and_land_use_approval_guide?.min_parcel_acres ?? null,
+    zon_total_zoning_low_usd:           c.am_zoning_and_land_use_approval_guide?.total_zoning_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7085,6 +7088,55 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_zoning_and_land_use_approval_guide: (() => {
+      // AM broadcast towers require local/county zoning approval separate from FCC licensing.
+      // Typical process: conditional use permit (CUP), special use permit (SUP), or variance.
+      // Tower height and setbacks: most jurisdictions require setback = tower height × 1.0–1.5
+      // from property lines; some require setback from residences.
+      const freq_mhz_z = frequency_khz / 1000;
+      const lambda_m_z = 299.792458 / freq_mhz_z;
+      const isHighClass_z = /^[AB]/i.test(fcc_class);
+      const tower_height_m_z = round2(isHighClass_z ? lambda_m_z / 2 : lambda_m_z / 4);
+      const tower_height_ft_z = round2(tower_height_m_z * 3.28084);
+      // Setback requirement: 1.0× tower height (most common), 1.5× in some jurisdictions
+      const setback_factor_typical = 1.0;
+      const setback_factor_strict   = 1.5;
+      const setback_ft_typical = round2(tower_height_ft_z * setback_factor_typical);
+      const setback_ft_strict   = round2(tower_height_ft_z * setback_factor_strict);
+      const setback_m_typical   = round2(tower_height_m_z * setback_factor_typical);
+      // Minimum parcel size: for a 315 ft tower with 1.5× setback, need at least 315*2*1.5 ft diameter
+      const min_parcel_diameter_ft = round2(tower_height_ft_z * 2 * setback_factor_strict);
+      const min_parcel_acres = round2((min_parcel_diameter_ft * min_parcel_diameter_ft) / 43560);
+      // Zoning permit costs
+      const cup_application_low_usd  = 2000;
+      const cup_application_high_usd = 15000;
+      const zoning_attorney_low_usd  = 5000;
+      const zoning_attorney_high_usd = 25000;
+      const zoning_timeline_weeks_low  = 8;
+      const zoning_timeline_weeks_high = 52;
+      const total_zoning_low_usd  = cup_application_low_usd + zoning_attorney_low_usd;
+      const total_zoning_high_usd = cup_application_high_usd + zoning_attorney_high_usd;
+      return {
+        tower_height_ft: tower_height_ft_z,
+        tower_height_m: tower_height_m_z,
+        setback_ft_typical,
+        setback_ft_strict,
+        setback_m_typical,
+        min_parcel_diameter_ft,
+        min_parcel_acres,
+        cup_application_low_usd,
+        cup_application_high_usd,
+        zoning_attorney_low_usd,
+        zoning_attorney_high_usd,
+        zoning_timeline_weeks_low,
+        zoning_timeline_weeks_high,
+        total_zoning_low_usd,
+        total_zoning_high_usd,
+        reference: 'Telecommunications Act of 1996 §704 (federal preemption of local zoning for telecom facilities); FCC WT Docket 13-238 (shot clock rules); IBC 2021 §3108 (antenna towers); local jurisdiction zoning codes vary by county/municipality',
+        note: `Class ${fcc_class} tower: ${tower_height_ft_z} ft. Typical setback: ${setback_ft_typical} ft (1×h); strict: ${setback_ft_strict} ft (1.5×h). Min. parcel: ~${min_parcel_acres} acres. CUP/SUP: $${cup_application_low_usd.toLocaleString()}–$${cup_application_high_usd.toLocaleString()} + legal fees. Timeline: ${zoning_timeline_weeks_low}–${zoning_timeline_weeks_high} weeks.`
       };
     })(),
 

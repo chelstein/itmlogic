@@ -14125,3 +14125,39 @@ it('candidate_comparison_table nepa columns are present and valid for KAZM', asy
   assert.ok(r0.nepa_total_env_cost_low_usd > 0, 'nepa_total_env_cost_low_usd must be positive');
   assert.ok(r0.nepa_timeline_weeks_low > 0, 'nepa_timeline_weeks_low must be positive');
 });
+
+// ── am_zoning_and_land_use_approval_guide ────────────────────────────────────
+
+it('am_zoning_and_land_use_approval_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_zoning_and_land_use_approval_guide, 'zoning guide missing on candidate');
+  }
+});
+
+it('am_zoning_and_land_use_approval_guide setback_ft_typical equals tower_height_ft for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_approval_guide;
+  assert.ok(Math.abs(g.setback_ft_typical - g.tower_height_ft) < 0.1, `setback_ft_typical (${g.setback_ft_typical}) should equal tower_height_ft (${g.tower_height_ft}) at 1× factor`);
+});
+
+it('am_zoning_and_land_use_approval_guide min_parcel_acres is positive and reasonable for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_approval_guide;
+  assert.ok(g.min_parcel_acres > 5, `min_parcel_acres for 315 ft tower should be > 5 acres, got ${g.min_parcel_acres}`);
+  assert.ok(g.min_parcel_acres < 100, `min_parcel_acres should be < 100 acres for reasonable tower, got ${g.min_parcel_acres}`);
+});
+
+it('am_zoning_and_land_use_approval_guide reference cites Telecom Act §704', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_approval_guide;
+  assert.ok(g.reference.includes('§704'), 'reference must cite Telecom Act §704');
+});
+
+it('candidate_comparison_table zon columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.zon_setback_ft_typical > 0, 'zon_setback_ft_typical must be positive');
+  assert.ok(r0.zon_min_parcel_acres > 0, 'zon_min_parcel_acres must be positive');
+  assert.strictEqual(r0.zon_total_zoning_low_usd, 7000, 'zon_total_zoning_low_usd should be 7000');
+});
