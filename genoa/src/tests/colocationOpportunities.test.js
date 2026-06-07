@@ -3003,3 +3003,14 @@ test('am_colocation_sharing_and_tower_lease_guide present across colocation cand
     assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
   }
 });
+
+test('am_operating_cost_and_annual_expense_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_operating_cost_and_annual_expense_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_operating_cost_and_annual_expense_guide missing`);
+    assert.ok(g.annual_total_low > 0, `rank ${c.rank}: annual_total_low must be positive`);
+    assert.ok(g.annual_total_high >= g.annual_total_low, `rank ${c.rank}: high must be >= low`);
+    assert.ok(g.annual_power_kw_input > 0, `rank ${c.rank}: annual_power_kw_input must be positive`);
+  }
+});

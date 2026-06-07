@@ -12836,3 +12836,46 @@ test('am_colocation_sharing_and_tower_lease_guide comparison table columns prese
   assert.strictEqual(r0.cot_annual_low_usd,      6000,  'rank-1 cot_annual_low_usd should be $6,000');
   assert.strictEqual(r0.cot_10yr_low_usd,        60000, 'rank-1 cot_10yr_low_usd should be $60,000');
 });
+
+test('am_operating_cost_and_annual_expense_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
+  assert.ok(g !== undefined && g !== null, 'am_operating_cost_and_annual_expense_guide missing');
+  assert.ok(g.annual_total_low > 0, 'annual_total_low must be positive');
+  assert.ok(g.annual_total_high >= g.annual_total_low, 'annual_total_high must be >= low');
+});
+
+test('KAZM operating cost power calculation (5 kW / 65% efficiency)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
+  assert.strictEqual(g.annual_power_kw_input, 7.69,       'KAZM 5 kW / 0.65 efficiency = 7.69 kW input');
+  assert.strictEqual(g.annual_kwh,            67364.4,    '7.69 kW × 8760 hrs = 67364.4 kWh');
+  assert.strictEqual(g.power_rate_per_kwh,    0.12,       'power rate should be $0.12/kWh');
+});
+
+test('KAZM annual power cost range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
+  assert.strictEqual(g.annual_power_cost_low,  6466.98, 'annual_power_cost_low should be $6,466.98');
+  assert.strictEqual(g.annual_power_cost_high, 9700.47, 'annual_power_cost_high should be $9,700.47');
+});
+
+test('KAZM annual operating total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_cost_and_annual_expense_guide;
+  assert.strictEqual(g.annual_total_low,  11466.98, 'annual_total_low should be $11,466.98');
+  assert.strictEqual(g.annual_total_high, 31700.47, 'annual_total_high should be $31,700.47');
+});
+
+test('am_operating_cost_and_annual_expense_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('opc_annual_power_cost_low' in row, 'opc_annual_power_cost_low missing from comparison table');
+    assert.ok('opc_annual_total_low'      in row, 'opc_annual_total_low missing from comparison table');
+    assert.ok('opc_annual_power_kw_input' in row, 'opc_annual_power_kw_input missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.opc_annual_power_cost_low,  6466.98, 'rank-1 opc_annual_power_cost_low should be $6,466.98');
+  assert.strictEqual(r0.opc_annual_total_low,        11466.98,'rank-1 opc_annual_total_low should be $11,466.98');
+  assert.strictEqual(r0.opc_annual_power_kw_input,   7.69,    'rank-1 opc_annual_power_kw_input should be 7.69');
+});

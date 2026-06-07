@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Operating Cost and Annual Expense Guide */}
+        {candidate.am_operating_cost_and_annual_expense_guide && (() => {
+          const g = candidate.am_operating_cost_and_annual_expense_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="opc-guide" style={{ marginBottom: 16, padding: 12, background: '#e0f2fe', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Annual Operating Costs</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
+                <span>Power input:</span><span>{g.annual_power_kw_input != null ? `${g.annual_power_kw_input} kW` : '—'} ({g.tpo_kw} kW TPO)</span>
+                <span>Annual kWh:</span><span>{g.annual_kwh != null ? g.annual_kwh.toLocaleString() : '—'}</span>
+                <span>Power cost:</span><span>{fmt(g.annual_power_cost_low)} – {fmt(g.annual_power_cost_high)}/yr</span>
+                <span>Tower maint:</span><span>{fmt(g.annual_tower_maint_low)} – {fmt(g.annual_tower_maint_high)}/yr</span>
+                <span>Monitoring:</span><span>{fmt(g.annual_monitoring_low)} – {fmt(g.annual_monitoring_high)}/yr</span>
+                <span>Engineering:</span><span>{fmt(g.annual_engineering_low)} – {fmt(g.annual_engineering_high)}/yr</span>
+                <span style={{ fontWeight: 600 }}>Annual total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_total_low)} – {fmt(g.annual_total_high)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0284c7', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Colocation Sharing and Tower Lease Guide */}
         {candidate.am_colocation_sharing_and_tower_lease_guide && (() => {
           const g = candidate.am_colocation_sharing_and_tower_lease_guide;

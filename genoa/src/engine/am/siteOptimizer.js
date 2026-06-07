@@ -1260,7 +1260,10 @@ export async function runSiteOptimizer(body = {}){
     zon_typical_weeks_max:      c.am_zoning_and_land_use_permit_guide?.typical_weeks_max ?? null,
     cot_standalone_low_usd:     c.am_colocation_sharing_and_tower_lease_guide?.standalone_tower_low_usd ?? null,
     cot_annual_low_usd:         c.am_colocation_sharing_and_tower_lease_guide?.colocation_annual_low ?? null,
-    cot_10yr_low_usd:           c.am_colocation_sharing_and_tower_lease_guide?.colocation_10yr_low ?? null
+    cot_10yr_low_usd:           c.am_colocation_sharing_and_tower_lease_guide?.colocation_10yr_low ?? null,
+    opc_annual_power_cost_low:  c.am_operating_cost_and_annual_expense_guide?.annual_power_cost_low ?? null,
+    opc_annual_total_low:       c.am_operating_cost_and_annual_expense_guide?.annual_total_low ?? null,
+    opc_annual_power_kw_input:  c.am_operating_cost_and_annual_expense_guide?.annual_power_kw_input ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6995,6 +6998,38 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_operating_cost_and_annual_expense_guide: (() => {
+      // Annual operating costs: power, maintenance, monitoring, engineering.
+      // Power dominates for high-TPO stations; AC-to-RF efficiency ~65% means
+      // actual wall-power draw is higher than TPO.
+      const power_rate_per_kwh = 0.12; // $/kWh, typical US commercial rate
+      const power_factor       = 0.65; // typical solid-state AM transmitter efficiency
+      const annual_power_kw_input = round2(tpo_kw / power_factor);
+      const annual_kwh        = round2(annual_power_kw_input * 8760);
+      const annual_power_cost_low  = round2(annual_kwh * power_rate_per_kwh * 0.8);
+      const annual_power_cost_high = round2(annual_kwh * power_rate_per_kwh * 1.2);
+      const annual_tower_maint_low  = 2000;
+      const annual_tower_maint_high = 8000;
+      const annual_monitoring_low   = 1000;
+      const annual_monitoring_high  = 4000;
+      const annual_engineering_low  = 2000;
+      const annual_engineering_high = 10000;
+      const annual_total_low  = round2(annual_power_cost_low  + annual_tower_maint_low  + annual_monitoring_low  + annual_engineering_low);
+      const annual_total_high = round2(annual_power_cost_high + annual_tower_maint_high + annual_monitoring_high + annual_engineering_high);
+      return {
+        tpo_kw, power_rate_per_kwh, power_factor,
+        annual_power_kw_input,
+        annual_kwh,
+        annual_power_cost_low, annual_power_cost_high,
+        annual_tower_maint_low, annual_tower_maint_high,
+        annual_monitoring_low, annual_monitoring_high,
+        annual_engineering_low, annual_engineering_high,
+        annual_total_low, annual_total_high,
+        reference: 'EIA commercial electricity rate data; NAB operating cost benchmarks; FCC AM station engineering',
+        note: `${tpo_kw} kW: ${annual_power_kw_input} kW input, ${annual_kwh.toLocaleString()} kWh/yr; annual total ${annual_total_low.toLocaleString()}–${annual_total_high.toLocaleString()}`
       };
     })(),
 
