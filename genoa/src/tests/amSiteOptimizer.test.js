@@ -10510,3 +10510,49 @@ test('am_site_acquisition_and_real_property_guide comparison table columns prese
     assert.ok('acq_annual_lease_low_usd' in row, 'acq_annual_lease_low_usd missing from comparison table');
   }
 });
+
+test('am_construction_permit_and_buildout_timeline_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_permit_and_buildout_timeline_guide;
+  assert.ok(g != null, 'am_construction_permit_and_buildout_timeline_guide must be present');
+  assert.ok(typeof g.total_months_low === 'number', 'total_months_low must be a number');
+  assert.ok(typeof g.cp_expiration_risk === 'string', 'cp_expiration_risk must be a string');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_construction_permit_and_buildout_timeline_guide KAZM NDA filing type and CP timing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_permit_and_buildout_timeline_guide;
+  assert.strictEqual(g.filing_type, 'NON_DIRECTIONAL', 'NDA station should have NON_DIRECTIONAL filing type');
+  assert.strictEqual(g.fcc_form, 'FCC Form 301-AM', 'AM CP should be on FCC Form 301-AM');
+  assert.ok(g.cp_processing_months_low >= 6, 'NDA CP processing should take at least 6 months');
+  assert.ok(g.cp_processing_months_high <= 12, 'NDA CP processing should be at most 12 months');
+  assert.strictEqual(g.cp_validity_years, 3, 'CP validity must be 3 years per §73.67');
+});
+
+test('am_construction_permit_and_buildout_timeline_guide total timeline is sum of phases', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_permit_and_buildout_timeline_guide;
+  const expected_post_cp = g.tower_const_months_low + g.ground_install_months_low + g.equip_months_low + g.proof_months_low + g.license_months_low;
+  assert.strictEqual(g.post_cp_months_low, expected_post_cp, 'post_cp_months_low should sum correctly');
+  assert.strictEqual(g.total_months_low, g.cp_processing_months_low + g.post_cp_months_low, 'total should equal CP + post-CP');
+  assert.ok(g.total_months_high > g.total_months_low, 'high total must exceed low total');
+});
+
+test('am_construction_permit_and_buildout_timeline_guide CP expiration risk is valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_permit_and_buildout_timeline_guide;
+  assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(g.cp_expiration_risk), `cp_expiration_risk "${g.cp_expiration_risk}" must be LOW/MEDIUM/HIGH`);
+  // KAZM Class D NDA: post_cp is short → margin is large → LOW risk
+  assert.strictEqual(g.cp_expiration_risk, 'LOW', 'KAZM Class D NDA should have LOW CP expiration risk');
+  assert.ok(g.construction_margin_months_low > 0, 'construction margin should be positive');
+});
+
+test('am_construction_permit_and_buildout_timeline_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cp_total_months_low'     in row, 'cp_total_months_low missing from comparison table');
+    assert.ok('cp_expiration_risk'      in row, 'cp_expiration_risk missing from comparison table');
+    assert.ok('cp_engineering_cost_low' in row, 'cp_engineering_cost_low missing from comparison table');
+  }
+});

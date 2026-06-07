@@ -1110,7 +1110,10 @@ export async function runSiteOptimizer(body = {}){
     ltg_total_initial_cost_low: c.am_antenna_tower_lighting_and_faa_guide?.total_initial_cost_low_usd ?? null,
     acq_site_class:             c.am_site_acquisition_and_real_property_guide?.site_class ?? null,
     acq_purchase_low_usd:       c.am_site_acquisition_and_real_property_guide?.total_purchase_low_usd ?? null,
-    acq_annual_lease_low_usd:   c.am_site_acquisition_and_real_property_guide?.annual_lease_low_usd ?? null
+    acq_annual_lease_low_usd:   c.am_site_acquisition_and_real_property_guide?.annual_lease_low_usd ?? null,
+    cp_total_months_low:        c.am_construction_permit_and_buildout_timeline_guide?.total_months_low ?? null,
+    cp_expiration_risk:         c.am_construction_permit_and_buildout_timeline_guide?.cp_expiration_risk ?? null,
+    cp_engineering_cost_low:    c.am_construction_permit_and_buildout_timeline_guide?.engineering_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6845,6 +6848,114 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_construction_permit_and_buildout_timeline_guide: (() => {
+      // Models the FCC Construction Permit (CP) lifecycle (§73.67) and the
+      // full buildout milestone schedule from site decision to license grant.
+      // Covers CP processing time, post-grant construction phases, 3-year CP
+      // expiration risk, and engineering/filing cost estimates.
+
+      const isDA_cp        = /^DA/i.test(pattern_mode);
+
+      // CP filing type and application form
+      const filing_type = isDA_cp ? 'DIRECTIONAL' : 'NON_DIRECTIONAL';
+      const fcc_form    = 'FCC Form 301-AM';
+
+      // CP processing time: NDA modification 6–12 months; DA more exhibits
+      const cp_processing_months_low  = isDA_cp ?  8 :  6;
+      const cp_processing_months_high = isDA_cp ? 18 : 12;
+
+      // CP validity: 3 years from grant per §73.67
+      const cp_validity_years = 3;
+
+      // ---- Milestone durations (months) ----
+      // 1. Site acquisition (can run in parallel with steps 2–3)
+      const site_acq_months_low  = 3;
+      const site_acq_months_high = 9;
+
+      // 2. Engineering / tower design (ATU, ground system, structural)
+      const engineering_months_low  = 2;
+      const engineering_months_high = 4;
+
+      // 3. FCC CP preparation and filing
+      const cp_prep_months_low  = 1;
+      const cp_prep_months_high = 3;
+
+      // 4. Tower construction: foundation, erection, painting
+      const tower_const_months_low  = fcc_class === 'A' ? 6 : (fcc_class === 'B' ? 4 : 3);
+      const tower_const_months_high = fcc_class === 'A' ? 12 : (fcc_class === 'B' ? 8 : 6);
+
+      // 5. Ground system installation
+      const ground_install_months_low  = 1;
+      const ground_install_months_high = 3;
+
+      // 6. Transmitter / ATU / equipment commissioning
+      const equip_months_low  = 1;
+      const equip_months_high = 2;
+
+      // 7. Proof of performance (§73.154); DA requires more measurements
+      const proof_months_low  = isDA_cp ? 2 : 1;
+      const proof_months_high = isDA_cp ? 4 : 2;
+
+      // 8. FCC license to cover (Form 302-AM) processing
+      const license_months_low  = 3;
+      const license_months_high = 6;
+
+      // Critical-path post-CP total (sequential after CP grant)
+      const post_cp_months_low  = tower_const_months_low  + ground_install_months_low  + equip_months_low  + proof_months_low  + license_months_low;
+      const post_cp_months_high = tower_const_months_high + ground_install_months_high + equip_months_high + proof_months_high + license_months_high;
+
+      // Total decision-to-on-air (CP processing + post-CP construction)
+      const total_months_low  = cp_processing_months_low  + post_cp_months_low;
+      const total_months_high = cp_processing_months_high + post_cp_months_high;
+
+      // Construction margin within 3-year CP validity window
+      const construction_margin_months_low  = (cp_validity_years * 12) - post_cp_months_low;
+      const construction_margin_months_high = (cp_validity_years * 12) - post_cp_months_high;
+      const cp_expiration_risk = construction_margin_months_high < 6
+        ? 'HIGH'
+        : (construction_margin_months_high < 12 ? 'MEDIUM' : 'LOW');
+
+      // Engineering and FCC filing costs
+      const engineering_cost_low_usd  = fcc_class === 'A' ? 25000 : (fcc_class === 'B' ? 15000 : 8000);
+      const engineering_cost_high_usd = fcc_class === 'A' ? 75000 : (fcc_class === 'B' ? 40000 : 20000);
+      const fcc_filing_fee_usd = 1055; // FCC schedule of fees (AM modification, 2024)
+
+      return {
+        filing_type,
+        fcc_form,
+        cp_processing_months_low,
+        cp_processing_months_high,
+        cp_validity_years,
+        site_acq_months_low,
+        site_acq_months_high,
+        engineering_months_low,
+        engineering_months_high,
+        cp_prep_months_low,
+        cp_prep_months_high,
+        tower_const_months_low,
+        tower_const_months_high,
+        ground_install_months_low,
+        ground_install_months_high,
+        equip_months_low,
+        equip_months_high,
+        proof_months_low,
+        proof_months_high,
+        license_months_low,
+        license_months_high,
+        post_cp_months_low,
+        post_cp_months_high,
+        total_months_low,
+        total_months_high,
+        construction_margin_months_low,
+        construction_margin_months_high,
+        cp_expiration_risk,
+        engineering_cost_low_usd,
+        engineering_cost_high_usd,
+        fcc_filing_fee_usd,
+        note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.67; construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`
       };
     })(),
 

@@ -2226,6 +2226,57 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Construction Permit & Buildout Timeline Guide */}
+        {candidate.am_construction_permit_and_buildout_timeline_guide && (() => {
+          const g = candidate.am_construction_permit_and_buildout_timeline_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const riskColor = { LOW: '#166534', MEDIUM: '#92400e', HIGH: '#991b1b' };
+          return (
+            <div style={{ background: '#eef2ff', border: '1px solid #818cf8', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 8, fontSize: 13 }}>
+                Construction Permit &amp; Buildout Timeline (§73.67)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3730a3' }}>
+                <span>Filing type</span>
+                <span style={{ fontWeight: 600 }}>{g.filing_type} — {g.fcc_form}</span>
+                <span>CP processing</span>
+                <span style={{ fontWeight: 600 }}>{g.cp_processing_months_low}–{g.cp_processing_months_high} months</span>
+                <span>CP validity</span>
+                <span style={{ fontWeight: 600 }}>{g.cp_validity_years} years from grant (§73.67)</span>
+                <span>CP expiration risk</span>
+                <span style={{ fontWeight: 700, color: riskColor[g.cp_expiration_risk] ?? '#3730a3' }}>{g.cp_expiration_risk}</span>
+                <span>FCC filing fee</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.fcc_filing_fee_usd)}</span>
+                <span>Engineering cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.engineering_cost_low_usd)} – {fmt(g.engineering_cost_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #c7d2fe', paddingTop: 8, fontSize: 12, color: '#3730a3' }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Post-grant milestones:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 12px' }}>
+                  <span>Tower construction</span><span style={{ fontWeight: 600 }}>{g.tower_const_months_low}–{g.tower_const_months_high} mo</span>
+                  <span>Ground system install</span><span style={{ fontWeight: 600 }}>{g.ground_install_months_low}–{g.ground_install_months_high} mo</span>
+                  <span>Equipment commissioning</span><span style={{ fontWeight: 600 }}>{g.equip_months_low}–{g.equip_months_high} mo</span>
+                  <span>Proof of performance</span><span style={{ fontWeight: 600 }}>{g.proof_months_low}–{g.proof_months_high} mo</span>
+                  <span>License to cover (Form 302-AM)</span><span style={{ fontWeight: 600 }}>{g.license_months_low}–{g.license_months_high} mo</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #c7d2fe', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3730a3' }}>
+                <span>Post-CP construction total</span>
+                <span style={{ fontWeight: 600 }}>{g.post_cp_months_low}–{g.post_cp_months_high} months</span>
+                <span>Construction margin in CP window</span>
+                <span style={{ fontWeight: 600 }}>{g.construction_margin_months_low}–{g.construction_margin_months_high} months</span>
+                <span style={{ fontWeight: 700, color: '#312e81' }}>Total decision-to-on-air</span>
+                <span style={{ fontWeight: 700, color: '#312e81' }}>{g.total_months_low}–{g.total_months_high} months</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#312e81', borderTop: '1px solid #c7d2fe', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Site Acquisition & Real Property Guide */}
         {candidate.am_site_acquisition_and_real_property_guide && (() => {
           const g = candidate.am_site_acquisition_and_real_property_guide;

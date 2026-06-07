@@ -2402,3 +2402,20 @@ test('am_site_acquisition_and_real_property_guide present across colocation cand
     assert.ok(g.annual_lease_low_usd > 0, `rank ${c.rank}: annual_lease_low_usd must be positive`);
   }
 });
+
+test('am_construction_permit_and_buildout_timeline_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_construction_permit_and_buildout_timeline_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_construction_permit_and_buildout_timeline_guide`);
+    assert.ok(g.total_months_low > 0, `rank ${c.rank}: total_months_low must be positive`);
+    assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(g.cp_expiration_risk), `rank ${c.rank}: invalid cp_expiration_risk`);
+    assert.ok(g.fcc_filing_fee_usd > 0, `rank ${c.rank}: fcc_filing_fee_usd must be positive`);
+  }
+});
