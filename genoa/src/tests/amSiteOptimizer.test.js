@@ -15385,3 +15385,49 @@ it('candidate_comparison_table nif columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.nif_kkob_compliant, true, 'nif_kkob_compliant must be true for KAZM area candidates');
   assert.ok(r0.nif_fraction_pct_low >= 10, 'nif_fraction_pct_low must be ≥10%');
 });
+
+it('am_transmitter_power_efficiency_and_operating_cost_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_transmitter_power_efficiency_and_operating_cost_guide !== undefined &&
+      c.am_transmitter_power_efficiency_and_operating_cost_guide !== null,
+      `rank ${c.rank}: am_transmitter_power_efficiency_and_operating_cost_guide must be present`
+    );
+  }
+});
+
+it('KAZM transmitter efficiency and AC input power physics', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_efficiency_and_operating_cost_guide;
+  // 5 kW / 0.72 = 6.944 kW AC
+  assert.ok(Math.abs(g.ac_input_kw - 6.94) < 0.05, `ac_input_kw should be ~6.94 kW, got ${g.ac_input_kw}`);
+  assert.strictEqual(g.overall_efficiency_pct, 72, 'overall efficiency must be 72% for modern solid-state');
+  assert.strictEqual(g.plate_efficiency_pct, 85, 'plate efficiency must be 85% for solid-state AM TX');
+});
+
+it('KAZM annual electricity cost at 14 hrs/day AZ rate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_efficiency_and_operating_cost_guide;
+  assert.strictEqual(g.operating_hrs_per_day, 14, 'operating hours per day must be 14 for Class D clear channel');
+  assert.strictEqual(g.operating_hrs_per_year, 14 * 365, 'operating hours per year must be 14*365=5110');
+  assert.ok(Math.abs(g.electricity_rate_usd_kwh - 0.115) < 0.001, 'AZ commercial rate must be $0.115/kWh');
+  assert.ok(g.annual_electric_usd > 3000 && g.annual_electric_usd < 7000, `annual_electric_usd should be $3,000–$7,000, got ${g.annual_electric_usd}`);
+});
+
+it('KAZM waste heat and cooling type for 5 kW station', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_power_efficiency_and_operating_cost_guide;
+  // 6.94 - 5.0 = 1.94 kW waste heat
+  assert.ok(g.waste_heat_kw > 1.5 && g.waste_heat_kw < 2.5, `waste_heat_kw should be ~1.94, got ${g.waste_heat_kw}`);
+  assert.strictEqual(g.cooling_required_type, 'FORCED_AIR', '5 kW station with <5 kW waste heat uses forced air cooling');
+  assert.ok(g.annual_50pct_usd > 1000 && g.annual_50pct_usd < 4000, '50% power annual cost should be $1,000–$4,000');
+});
+
+it('candidate_comparison_table pwe columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(Math.abs(r0.pwe_ac_input_kw - 6.94) < 0.05, 'pwe_ac_input_kw should be ~6.94 kW');
+  assert.ok(r0.pwe_annual_electric_usd > 3000, 'pwe_annual_electric_usd must be >$3,000');
+  assert.strictEqual(r0.pwe_overall_efficiency_pct, 72, 'pwe_overall_efficiency_pct must be 72');
+});

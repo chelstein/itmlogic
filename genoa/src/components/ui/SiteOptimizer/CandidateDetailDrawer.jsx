@@ -2226,6 +2226,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Power Efficiency and Operating Cost Guide */}
+        {candidate.am_transmitter_power_efficiency_and_operating_cost_guide && (() => {
+          const g = candidate.am_transmitter_power_efficiency_and_operating_cost_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c2410c', marginBottom: 8 }}>
+                Transmitter Power Efficiency &amp; Annual Operating Cost
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#7c2d12' }}>
+                <div><b>TX Type:</b> {g.tx_type?.replace(/_/g, ' ')}</div>
+                <div><b>Plate Efficiency:</b> {g.plate_efficiency_pct}%</div>
+                <div><b>Overall Efficiency:</b> {g.overall_efficiency_pct}%</div>
+                <div><b>AC Input (at TPO):</b> {fmtF(g.ac_input_kw)} kW</div>
+                <div><b>Avg Power (w/modulation):</b> {fmtF(g.avg_power_kw)} kW</div>
+                <div><b>Modulation Factor:</b> ×{g.modulation_avg_factor} (10% uplift)</div>
+                <div><b>Operating Hours:</b> {g.operating_hrs_per_day} hrs/day × 365 = {fmt(g.operating_hrs_per_year)} hrs/yr</div>
+                <div><b>AZ Electric Rate:</b> ${g.electricity_rate_usd_kwh}/kWh</div>
+                <div><b>Annual TX Electricity:</b> ${fmt(Math.round(g.annual_electric_usd))}/yr</div>
+                <div><b>Full Site Load:</b> {fmtF(g.total_site_load_kw)} kW → ${fmt(Math.round(g.annual_total_electric_usd))}/yr</div>
+                <div><b>Waste Heat:</b> {fmtF(g.waste_heat_kw)} kW → {g.cooling_required_type?.replace(/_/g, ' ')}</div>
+                <div><b>At 50% Power ({fmtF(g.power_50pct_kw)} kW):</b> ${fmt(Math.round(g.annual_50pct_usd))}/yr</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Nighttime NIF Service Contour Analysis Guide */}
         {candidate.am_nighttime_nif_service_contour_analysis_guide && (() => {
           const g = candidate.am_nighttime_nif_service_contour_analysis_guide;

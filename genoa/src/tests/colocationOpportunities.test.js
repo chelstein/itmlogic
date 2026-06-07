@@ -3880,3 +3880,14 @@ test('am_nighttime_nif_service_contour_analysis_guide present across colocation 
     assert.ok(g.total_nif_low_usd >= 2000, 'NIF study cost must be ≥$2,000');
   }
 });
+
+test('am_transmitter_power_efficiency_and_operating_cost_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_power_efficiency_and_operating_cost_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_transmitter_power_efficiency_and_operating_cost_guide`);
+    assert.strictEqual(g.overall_efficiency_pct, 72, 'solid-state AM transmitter overall efficiency must be 72%');
+    assert.ok(g.ac_input_kw > 0, 'ac_input_kw must be positive');
+    assert.ok(g.annual_electric_usd > 0, 'annual_electric_usd must be positive');
+  }
+});

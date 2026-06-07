@@ -1449,7 +1449,10 @@ export async function runSiteOptimizer(body = {}){
     rc_total_rc_low_usd:                c.am_remote_control_and_unattended_operation_guide?.total_rc_low_usd ?? null,
     nif_dist_to_kkob_km:                c.am_nighttime_nif_service_contour_analysis_guide?.dist_to_kkob_km ?? null,
     nif_kkob_compliant:                 c.am_nighttime_nif_service_contour_analysis_guide?.kkob_interference_compliant ?? null,
-    nif_fraction_pct_low:               c.am_nighttime_nif_service_contour_analysis_guide?.nif_fraction_pct_low ?? null
+    nif_fraction_pct_low:               c.am_nighttime_nif_service_contour_analysis_guide?.nif_fraction_pct_low ?? null,
+    pwe_ac_input_kw:                    c.am_transmitter_power_efficiency_and_operating_cost_guide?.ac_input_kw ?? null,
+    pwe_annual_electric_usd:            c.am_transmitter_power_efficiency_and_operating_cost_guide?.annual_electric_usd ?? null,
+    pwe_overall_efficiency_pct:         c.am_transmitter_power_efficiency_and_operating_cost_guide?.overall_efficiency_pct ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7185,6 +7188,115 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_power_efficiency_and_operating_cost_guide: (() => {
+      // AM transmitter power efficiency and annual operating cost guide.
+      //
+      // AM transmitters have two major efficiency metrics:
+      //   1. Plate efficiency (ηp): RF output power / DC plate power input
+      //      - Class AB (solid state): ηp ≈ 70–85%
+      //      - Class B (solid state): ηp ≈ 75–90%
+      //      - Class D (switching, DX/digital): ηp ≈ 85–95% (e.g., Nautel NX series)
+      //      - Tube transmitters (legacy): ηp ≈ 60–75%
+      //   2. Overall efficiency (ηt): RF output power / AC input power
+      //      - Includes power supply, cooling, ventilation losses
+      //      - Solid-state (modern): ηt ≈ 60–80%
+      //      - Tube (legacy): ηt ≈ 40–60%
+      //
+      // Electricity cost model:
+      //   Annual electricity cost = (TPO_kW / ηt) × hours_per_year × $/kWh
+      //   Hours per year (full-time operation): 8,760 hrs
+      //   Hours if daytime-only (sunset to sunrise exclusions):
+      //     Average daytime in US ≈ 12.5 hrs/day → 4,563 hrs/yr (daytime only)
+      //   For Class D secondary on 780 kHz (clear channel): nighttime sign-off often required
+      //     or power reduction → effective hours ≈ 12–16 hrs/day average.
+      //
+      // US commercial electricity rates (2024 EIA data):
+      //   National average commercial rate: $0.118/kWh
+      //   Western US (AZ): $0.108–$0.124/kWh
+      //   Southwest AZ commercial: ≈ $0.115/kWh
+      //
+      // Modulation effect on efficiency:
+      //   AM modulation increases power during positive peaks.
+      //   Average power = carrier power × (1 + m²/2) where m = modulation index
+      //   At 100% positive modulation (m=1.0): average power = P_carrier × 1.5
+      //   Typical program material: m_avg ≈ 0.3–0.5 → average power ≈ P × 1.05–1.13
+      //   Conservative estimate: use average_power_factor = 1.1 (10% above carrier)
+
+      // Transmitter type assumption: modern solid-state
+      const tx_type                  = 'SOLID_STATE';
+      const plate_efficiency_pct     = 85;   // modern solid-state (Nautel, GatesAir NX-series)
+      const overall_efficiency_pct   = 72;   // includes PSU + cooling losses
+      const overall_efficiency       = overall_efficiency_pct / 100;
+
+      // AC input power required to produce licensed TPO:
+      const ac_input_kw              = round2(tpo_kw / overall_efficiency);
+
+      // Modulation uplift factor for power calculation:
+      const modulation_avg_factor    = 1.10;   // 10% above carrier for typical program material
+      const avg_power_kw             = round2(ac_input_kw * modulation_avg_factor);
+
+      // Operating hours model:
+      //   Class D on clear channel (780 kHz): nighttime often signed off or reduced
+      //   Assume: 14 hrs/day average (daytime + some nighttime if NIF area permits)
+      const operating_hrs_per_day    = 14;
+      const operating_hrs_per_year   = operating_hrs_per_day * 365;
+
+      // Electricity rate:
+      const electricity_rate_usd_kwh = 0.115;   // AZ commercial rate (EIA 2024)
+
+      // Annual electricity cost:
+      const annual_electric_usd      = round2(avg_power_kw * operating_hrs_per_year * electricity_rate_usd_kwh);
+
+      // Cost at different power levels (useful for optimization):
+      //   FCC Class D allows reduction to 100 W minimum
+      //   10% power → 0.5 kW: electricity at 72% eff = 0.69 kW AC
+      const power_50pct_kw   = round2(tpo_kw * 0.5);
+      const power_10pct_kw   = round2(tpo_kw * 0.1);
+      const ac_50pct_kw      = round2(power_50pct_kw / overall_efficiency * modulation_avg_factor);
+      const ac_10pct_kw      = round2(power_10pct_kw / overall_efficiency * modulation_avg_factor);
+      const annual_50pct_usd = round2(ac_50pct_kw * operating_hrs_per_year * electricity_rate_usd_kwh);
+      const annual_10pct_usd = round2(ac_10pct_kw * operating_hrs_per_year * electricity_rate_usd_kwh);
+
+      // Cooling requirements:
+      //   Modern solid-state transmitters: forced air cooling
+      //   Heat rejection = AC_input_kW - TPO_kW = waste heat (kW)
+      const waste_heat_kw            = round2(ac_input_kw - tpo_kw);
+      //   AC cooling (if needed): approx 3.5 kW cooling per kW waste heat for BTU/COP
+      //   For small transmitter (< 10 kW waste heat): forced air ventilation usually sufficient
+      const cooling_required_type    = waste_heat_kw < 5 ? 'FORCED_AIR' : 'HVAC';
+      const cooling_power_kw         = cooling_required_type === 'HVAC' ? round2(waste_heat_kw * 0.4) : 0;
+
+      // Total site electrical load:
+      const total_site_load_kw       = round2(avg_power_kw + cooling_power_kw + 0.5);  // +0.5 kW base load
+
+      // Annual electricity full site:
+      const annual_total_electric_usd = round2(total_site_load_kw * operating_hrs_per_year * electricity_rate_usd_kwh);
+
+      return {
+        tx_type,
+        plate_efficiency_pct,
+        overall_efficiency_pct,
+        ac_input_kw,
+        modulation_avg_factor,
+        avg_power_kw,
+        operating_hrs_per_day,
+        operating_hrs_per_year,
+        electricity_rate_usd_kwh,
+        annual_electric_usd,
+        power_50pct_kw,
+        power_10pct_kw,
+        annual_50pct_usd,
+        annual_10pct_usd,
+        waste_heat_kw,
+        cooling_required_type,
+        cooling_power_kw,
+        total_site_load_kw,
+        annual_total_electric_usd,
+        reference: '47 CFR §73.1560(a) (TPO tolerance ±2%); EIA 2024 commercial electricity rates; Nautel NX series specs (solid-state AM, 85%+ plate efficiency); Terman (1955) ch. 14 (plate efficiency); §73.21 (Class D power limits 5 kW daytime)',
+        note: `${tx_type} transmitter at ${tpo_kw} kW: ${overall_efficiency_pct}% overall efficiency → ${ac_input_kw} kW AC input, avg ${avg_power_kw} kW (incl. 10% modulation uplift). Annual electricity at ${operating_hrs_per_day} hrs/day: ~$${annual_electric_usd.toLocaleString()} (at $${electricity_rate_usd_kwh}/kWh AZ rate). Full site load: ${total_site_load_kw} kW (~$${annual_total_electric_usd.toLocaleString()}/yr). Waste heat: ${waste_heat_kw} kW → ${cooling_required_type} cooling. At 50% power (${power_50pct_kw} kW): ~$${annual_50pct_usd.toLocaleString()}/yr.`
       };
     })(),
 
