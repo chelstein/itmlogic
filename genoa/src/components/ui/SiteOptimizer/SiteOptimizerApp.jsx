@@ -1717,6 +1717,22 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      electrical_power_consumption_guide: {
+        frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
+        electricity_rate_low_usd_per_kwh: 0.10, electricity_rate_high_usd_per_kwh: 0.16,
+        auxiliary_load_kw: 1.0, n_transmitter_models: 3,
+        transmitter_models: [
+          { type: 'TUBE',        label: 'Vacuum tube (legacy)',  example_models: 'Harris MW-5, RCA BTA-5R',     efficiency_low_pct: 50, efficiency_high_pct: 55, input_power_low_kw: 9.09,  input_power_high_kw: 10.0,  hvac_load_est_kw: 3.64, total_facility_low_kw: 11.09, total_facility_high_kw: 14.99, annual_kwh_low: 97147, annual_kwh_high: 131312, annual_cost_low_usd: 9715, annual_cost_high_usd: 21010 },
+          { type: 'HYBRID',      label: 'Hybrid solid-state',   example_models: 'Harris DX-5, early Nautel NA', efficiency_low_pct: 58, efficiency_high_pct: 62, input_power_low_kw: 8.06,  input_power_high_kw: 8.62,  hvac_load_est_kw: 1.54, total_facility_low_kw: 9.29,  total_facility_high_kw: 10.35, annual_kwh_low: 81381, annual_kwh_high: 90666, annual_cost_low_usd: 8138, annual_cost_high_usd: 14507 },
+          { type: 'SOLID_STATE', label: 'Modern solid-state',   example_models: 'Nautel NX5, GatesAir FAX-5',  efficiency_low_pct: 65, efficiency_high_pct: 72, input_power_low_kw: 6.94,  input_power_high_kw: 7.69,  hvac_load_est_kw: 0.46, total_facility_low_kw: 8.31,  total_facility_high_kw: 9.25, annual_kwh_low: 72797, annual_kwh_high: 81030, annual_cost_low_usd: 7280, annual_cost_high_usd: 12965 }
+        ],
+        recommended_type: 'SOLID_STATE',
+        solid_state_annual_cost_low_usd: 7280, solid_state_annual_cost_high_usd: 12965,
+        annual_savings_vs_tube_usd: 6337, solid_state_tx_upgrade_cost_usd: 18000, upgrade_payback_years: 2.8,
+        power_factor_uncorrected: 0.78, apparent_power_kva: 10.65,
+        reference: '47 CFR §73.1590; DOE EIA Commercial Electricity Rates (2024); Nautel NX5 spec; GatesAir FAX-5 spec; ITU-R BS.2101',
+        note: '780 kHz 5 kW facility (modern solid-state): total load ~8.31–9.25 kW; estimated annual electricity $7,280–$12,965 at 2024 commercial rates. Tube-to-solid-state upgrade saves ~$6,337/yr; payback ≈ 2.8 yr on a $18,000 transmitter.'
+      },
       antenna_base_impedance_and_atu_design_guide: {
         frequency_khz: 780, f_hz: 780000, lambda_m: 384.6, lambda_quarter_m: 96, tpo_kw: 5, pattern_mode: 'NDA',
         feedline_impedance_ohm: 50, rr_ohm: 36.6, rg_low_ohm: 2.0, rg_high_ohm: 5.0, rcond_ohm: 0.4,

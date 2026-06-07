@@ -2102,3 +2102,19 @@ test('colocation GRID candidates have antenna_base_impedance_and_atu_design_guid
     assert.ok(g.bw_adequate, `rank ${c.rank} bw_adequate must be true`);
   }
 });
+
+test('colocation GRID candidates have electrical_power_consumption_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.electrical_power_consumption_guide;
+    assert.ok(g != null, `rank ${c.rank} missing electrical_power_consumption_guide`);
+    assert.strictEqual(g.n_transmitter_models, 3, `rank ${c.rank} must have 3 transmitter models`);
+    assert.ok(g.annual_savings_vs_tube_usd > 0, `rank ${c.rank} annual savings must be positive`);
+  }
+});

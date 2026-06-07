@@ -9699,3 +9699,48 @@ test('antenna_base_impedance_and_atu_design_guide comparison table columns prese
     assert.ok('atu_bw_3db_khz'     in row, 'atu_bw_3db_khz missing from comparison table');
   }
 });
+
+// ---- electrical_power_consumption_guide ----
+
+test('electrical_power_consumption_guide present with 3 transmitter models', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].electrical_power_consumption_guide;
+  assert.ok(g != null, 'electrical_power_consumption_guide must be present');
+  assert.strictEqual(g.n_transmitter_models, 3, 'must have 3 transmitter technology models');
+  assert.strictEqual(g.recommended_type, 'SOLID_STATE', 'recommended type must be SOLID_STATE');
+});
+
+test('electrical_power_consumption_guide solid-state annual cost plausible for 5 kW', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].electrical_power_consumption_guide;
+  assert.ok(g.solid_state_annual_cost_low_usd > 5000,  `SS annual cost low must be > $5k, got ${g.solid_state_annual_cost_low_usd}`);
+  assert.ok(g.solid_state_annual_cost_high_usd < 20000, `SS annual cost high must be < $20k, got ${g.solid_state_annual_cost_high_usd}`);
+  assert.ok(g.solid_state_annual_cost_high_usd > g.solid_state_annual_cost_low_usd, 'high must exceed low');
+});
+
+test('electrical_power_consumption_guide tube costs more than solid-state', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].electrical_power_consumption_guide;
+  const tube = g.transmitter_models.find(m => m.type === 'TUBE');
+  const ss   = g.transmitter_models.find(m => m.type === 'SOLID_STATE');
+  assert.ok(tube != null && ss != null, 'must have both TUBE and SOLID_STATE models');
+  assert.ok(tube.annual_cost_low_usd > ss.annual_cost_low_usd, 'tube must cost more electricity than solid-state');
+  assert.ok(g.annual_savings_vs_tube_usd > 0, 'upgrade savings must be positive');
+});
+
+test('electrical_power_consumption_guide payback years reasonable for 5 kW', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].electrical_power_consumption_guide;
+  assert.ok(g.upgrade_payback_years > 0 && g.upgrade_payback_years < 15,
+    `payback must be 0–15 years, got ${g.upgrade_payback_years}`);
+  assert.ok(g.solid_state_tx_upgrade_cost_usd > 0, 'solid_state_tx_upgrade_cost must be positive');
+});
+
+test('electrical_power_consumption_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('epcg_ss_cost_low_usd'     in row, 'epcg_ss_cost_low_usd missing from comparison table');
+    assert.ok('epcg_savings_vs_tube_usd' in row, 'epcg_savings_vs_tube_usd missing from comparison table');
+    assert.ok('epcg_payback_years'       in row, 'epcg_payback_years missing from comparison table');
+  }
+});

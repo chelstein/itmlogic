@@ -1056,7 +1056,10 @@ export async function runSiteOptimizer(body = {}){
     pfg_n_cost_categories:      c.station_total_project_cost_pro_forma_guide?.n_cost_categories ?? null,
     atu_r_base_typ_ohm:         c.antenna_base_impedance_and_atu_design_guide?.r_base_typ_ohm ?? null,
     atu_l_shunt_uh:             c.antenna_base_impedance_and_atu_design_guide?.l_shunt_uh ?? null,
-    atu_bw_3db_khz:             c.antenna_base_impedance_and_atu_design_guide?.bw_3db_khz ?? null
+    atu_bw_3db_khz:             c.antenna_base_impedance_and_atu_design_guide?.bw_3db_khz ?? null,
+    epcg_ss_cost_low_usd:       c.electrical_power_consumption_guide?.solid_state_annual_cost_low_usd ?? null,
+    epcg_savings_vs_tube_usd:   c.electrical_power_consumption_guide?.annual_savings_vs_tube_usd ?? null,
+    epcg_payback_years:         c.electrical_power_consumption_guide?.upgrade_payback_years ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6791,6 +6794,108 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    electrical_power_consumption_guide: (() => {
+      // AM transmitter facility power consumption model.
+      // Three transmitter technology tiers (tube, hybrid, solid-state) are compared
+      // to estimate annual kWh, electricity cost, and solid-state upgrade ROI.
+      //
+      // Transmitter efficiency by tier (plate/drain efficiency at rated output):
+      //   TUBE:         50–55 % (legacy Harris MW-5, RCA BTA series)
+      //   HYBRID:       58–62 % (first-gen solid-state: Harris DX-5, early Nautel NA)
+      //   SOLID_STATE:  65–72 % (modern: Nautel NX, GatesAir Flexiva, Elenos ETG)
+      //
+      // Facility total load = transmitter input + HVAC (scales with heat rejected) + aux.
+      // Aux loads (controls, monitoring, STL, lighting): ~1 kW fixed.
+      // HVAC load factor varies by tier: tube wastes more heat → larger HVAC.
+      //
+      // Annual cost = facility kW × 8760 hr × electricity rate ($/kWh).
+      // Commercial rate range (2024 EIA national average): $0.10–$0.16/kWh.
+
+      const p_rf_kw          = tpo_kw;
+      const hours_per_year   = 8760;
+      const rate_low         = 0.10;   // $/kWh — low-cost region (hydro, etc.)
+      const rate_high        = 0.16;   // $/kWh — high-cost region (CA, NE)
+      const aux_kw           = 1.0;    // fixed auxiliary load
+
+      const TIER_DEFS = [
+        { type: 'TUBE',         label: 'Vacuum tube (legacy)',  eff_lo: 0.50, eff_hi: 0.55, hvac_factor: 1.8, example: 'Harris MW-5, RCA BTA-5R, Gates BC-5P' },
+        { type: 'HYBRID',       label: 'Hybrid solid-state',   eff_lo: 0.58, eff_hi: 0.62, hvac_factor: 1.4, example: 'Harris DX-5, early Nautel NA-5, Continental 816R-5' },
+        { type: 'SOLID_STATE',  label: 'Modern solid-state',   eff_lo: 0.65, eff_hi: 0.72, hvac_factor: 1.2, example: 'Nautel NX5, GatesAir FAX-5, Elenos ETG5000' },
+      ];
+
+      const transmitter_models = TIER_DEFS.map(t => {
+        const p_in_lo  = p_rf_kw / t.eff_hi;  // best efficiency → lower input power
+        const p_in_hi  = p_rf_kw / t.eff_lo;  // worst efficiency → higher input power
+        const p_in_typ = (p_in_lo + p_in_hi) / 2;
+        const heat_kw  = p_in_typ - p_rf_kw;          // heat rejected by transmitter
+        const hvac_kw  = heat_kw * (t.hvac_factor - 1); // HVAC above minimum (residual)
+        const fac_lo   = p_in_lo  + hvac_kw * 0.8 + aux_kw;
+        const fac_hi   = p_in_hi  + hvac_kw * 1.2 + aux_kw;
+        const kwh_lo   = Math.round(fac_lo * hours_per_year);
+        const kwh_hi   = Math.round(fac_hi * hours_per_year);
+        const cost_lo  = Math.round(kwh_lo * rate_low);
+        const cost_hi  = Math.round(kwh_hi * rate_high);
+        return {
+          type:                        t.type,
+          label:                       t.label,
+          example_models:              t.example,
+          efficiency_low_pct:          Math.round(t.eff_lo * 100),
+          efficiency_high_pct:         Math.round(t.eff_hi * 100),
+          input_power_low_kw:          parseFloat(p_in_lo.toFixed(2)),
+          input_power_high_kw:         parseFloat(p_in_hi.toFixed(2)),
+          hvac_load_est_kw:            parseFloat(hvac_kw.toFixed(2)),
+          total_facility_low_kw:       parseFloat(fac_lo.toFixed(2)),
+          total_facility_high_kw:      parseFloat(fac_hi.toFixed(2)),
+          annual_kwh_low:              kwh_lo,
+          annual_kwh_high:             kwh_hi,
+          annual_cost_low_usd:         cost_lo,
+          annual_cost_high_usd:        cost_hi,
+        };
+      });
+
+      const tube_model = transmitter_models.find(m => m.type === 'TUBE');
+      const ss_model   = transmitter_models.find(m => m.type === 'SOLID_STATE');
+
+      const tube_avg_cost = tube_model
+        ? Math.round((tube_model.annual_cost_low_usd + tube_model.annual_cost_high_usd) / 2) : null;
+      const ss_avg_cost   = ss_model
+        ? Math.round((ss_model.annual_cost_low_usd   + ss_model.annual_cost_high_usd)   / 2) : null;
+      const annual_savings_vs_tube = (tube_avg_cost != null && ss_avg_cost != null)
+        ? Math.max(0, tube_avg_cost - ss_avg_cost) : null;
+
+      // ROI: cost of a new 5 kW solid-state transmitter vs annual electricity savings.
+      // Transmitter acquisition cost scales roughly with TPO.
+      const ss_tx_cost_usd = Math.round(tpo_kw * 3600);  // ~$3,600/kW for mid-range SS (2024)
+      const payback_years  = (annual_savings_vs_tube && annual_savings_vs_tube > 0)
+        ? parseFloat((ss_tx_cost_usd / annual_savings_vs_tube).toFixed(1)) : null;
+
+      // Power factor: AM transmitters typically PF ≈ 0.75–0.85 without correction.
+      // PFC capacitors reduce kVA and may avoid utility demand charges.
+      const pf_uncorrected  = 0.78;
+      const kva_uncorrected = ss_model
+        ? parseFloat((ss_model.total_facility_low_kw / pf_uncorrected).toFixed(2)) : null;
+
+      return {
+        frequency_khz, tpo_kw,
+        hours_per_year,
+        electricity_rate_low_usd_per_kwh:  rate_low,
+        electricity_rate_high_usd_per_kwh: rate_high,
+        auxiliary_load_kw:                 aux_kw,
+        n_transmitter_models:              transmitter_models.length,
+        transmitter_models,
+        recommended_type:                  'SOLID_STATE',
+        solid_state_annual_cost_low_usd:   ss_model?.annual_cost_low_usd ?? null,
+        solid_state_annual_cost_high_usd:  ss_model?.annual_cost_high_usd ?? null,
+        annual_savings_vs_tube_usd:        annual_savings_vs_tube,
+        solid_state_tx_upgrade_cost_usd:   ss_tx_cost_usd,
+        upgrade_payback_years:             payback_years,
+        power_factor_uncorrected:          pf_uncorrected,
+        apparent_power_kva:                kva_uncorrected,
+        reference: '47 CFR §73.1590 (equipment inspection); DOE EIA Commercial Electricity Rates (2024); Nautel NX5 spec sheet; GatesAir FAX-5 spec; ITU-R BS.2101 (energy efficiency in broadcasting)',
+        note: `${frequency_khz} kHz ${tpo_kw} kW facility (modern solid-state): total load ~${ss_model?.total_facility_low_kw}–${ss_model?.total_facility_high_kw} kW; estimated annual electricity $${ss_model?.annual_cost_low_usd?.toLocaleString()}–$${ss_model?.annual_cost_high_usd?.toLocaleString()} at 2024 commercial rates. Tube-to-solid-state upgrade saves ~$${annual_savings_vs_tube?.toLocaleString()}/yr; payback ≈ ${payback_years} yr on a $${ss_tx_cost_usd.toLocaleString()} transmitter.`
       };
     })(),
 

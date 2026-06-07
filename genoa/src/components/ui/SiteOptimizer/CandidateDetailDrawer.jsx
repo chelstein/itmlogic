@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Electrical Power Consumption Guide */}
+        {candidate.electrical_power_consumption_guide && (() => {
+          const g = candidate.electrical_power_consumption_guide;
+          const ss   = g.transmitter_models?.find(m => m.type === 'SOLID_STATE');
+          const tube = g.transmitter_models?.find(m => m.type === 'TUBE');
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff1f2', borderRadius: 8, border: '1px solid #fda4af' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#9f1239', marginBottom: 8 }}>
+                Electrical Power Consumption — Transmitter Efficiency &amp; Electricity Cost
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>TPO / frequency:</span> <strong>{g.tpo_kw} kW @ {g.frequency_khz} kHz</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Electricity rate:</span> <strong>${g.electricity_rate_low_usd_per_kwh}–${g.electricity_rate_high_usd_per_kwh}/kWh</strong></div>
+                <div><span style={{ color: '#6b7280' }}>SS annual cost:</span> <strong style={{ color: '#15803d' }}>${ss?.annual_cost_low_usd?.toLocaleString()}–${ss?.annual_cost_high_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tube annual cost:</span> <strong style={{ color: '#b45309' }}>${tube?.annual_cost_low_usd?.toLocaleString()}–${tube?.annual_cost_high_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Annual savings (SS vs tube):</span> <strong style={{ color: '#15803d' }}>${g.annual_savings_vs_tube_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Upgrade payback:</span> <strong>{g.upgrade_payback_years} yr on ${g.solid_state_tx_upgrade_cost_usd?.toLocaleString()} tx</strong></div>
+              </div>
+              {g.transmitter_models && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#9f1239', marginBottom: 4 }}>Transmitter Technology Comparison</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fecdd3' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Type</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Eff %</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Input kW</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Annual Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.transmitter_models.map((m, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #fda4af', background: m.type === 'SOLID_STATE' ? '#fff1f2' : 'transparent' }}>
+                          <td style={{ padding: '3px 6px', fontWeight: m.type === 'SOLID_STATE' ? 700 : 400 }}>{m.label}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.efficiency_low_pct}–{m.efficiency_high_pct}%</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.input_power_low_kw}–{m.input_power_high_kw}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${m.annual_cost_low_usd?.toLocaleString()}–${m.annual_cost_high_usd?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#9f1239' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Antenna Base Impedance & ATU Design Guide */}
         {candidate.antenna_base_impedance_and_atu_design_guide && (() => {
           const g = candidate.antenna_base_impedance_and_atu_design_guide;
