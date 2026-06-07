@@ -2932,3 +2932,15 @@ test('am_rf_radiation_safety_and_compliance_guide present across colocation cand
       `rank ${c.rank}: unexpected evaluation_type: ${g.evaluation_type}`);
   }
 });
+
+test('am_antenna_array_and_phasor_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_antenna_array_and_phasor_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_antenna_array_and_phasor_guide missing`);
+    assert.ok(g.tower_count >= 1, `rank ${c.rank}: tower_count must be >= 1`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['single_tower_nda','two_tower_da','three_tower_da'].includes(g.array_type),
+      `rank ${c.rank}: unexpected array_type: ${g.array_type}`);
+  }
+});

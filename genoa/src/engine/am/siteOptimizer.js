@@ -1242,7 +1242,10 @@ export async function runSiteOptimizer(body = {}){
     gnd_recommended_radials:    c.am_ground_system_installation_and_maintenance_guide?.recommended_radials ?? null,
     rfr_exclusion_zone_m:       c.am_rf_radiation_safety_and_compliance_guide?.exclusion_zone_m ?? null,
     rfr_total_compliance_low:   c.am_rf_radiation_safety_and_compliance_guide?.total_compliance_low_usd ?? null,
-    rfr_evaluation_type:        c.am_rf_radiation_safety_and_compliance_guide?.evaluation_type ?? null
+    rfr_evaluation_type:        c.am_rf_radiation_safety_and_compliance_guide?.evaluation_type ?? null,
+    ant_array_type:             c.am_antenna_array_and_phasor_guide?.array_type ?? null,
+    ant_total_low_usd:          c.am_antenna_array_and_phasor_guide?.total_low_usd ?? null,
+    ant_tower_count:            c.am_antenna_array_and_phasor_guide?.tower_count ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6977,6 +6980,44 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_array_and_phasor_guide: (() => {
+      // DA (directional antenna) systems require a phasor cabinet and multi-tower array.
+      // NDA (non-directional) uses a single tower with only an ATU.
+      // Tower count: 2 for Class C/D DA, 3 for Class A/B DA.
+      const is_da = /^DA/i.test(pattern_mode);
+      let array_type, tower_count, phasor_cost_low_usd, phasor_cost_high_usd;
+      if (is_da) {
+        if (/^[AB]$/i.test(fcc_class)) {
+          tower_count = 3; array_type = 'three_tower_da';
+          phasor_cost_low_usd = 25000; phasor_cost_high_usd = 75000;
+        } else {
+          tower_count = 2; array_type = 'two_tower_da';
+          phasor_cost_low_usd = 15000; phasor_cost_high_usd = 45000;
+        }
+      } else {
+        tower_count = 1; array_type = 'single_tower_nda';
+        phasor_cost_low_usd = 0; phasor_cost_high_usd = 0;
+      }
+      const tower_additional_count    = tower_count - 1;
+      const tower_foundation_low_usd  = tower_additional_count * 8000;
+      const tower_foundation_high_usd = tower_additional_count * 25000;
+      const atu_low_usd  = 2000; // antenna tuning unit, required for all AM
+      const atu_high_usd = 8000;
+      const total_low_usd  = round2(phasor_cost_low_usd  + atu_low_usd  + tower_foundation_low_usd);
+      const total_high_usd = round2(phasor_cost_high_usd + atu_high_usd + tower_foundation_high_usd);
+      return {
+        pattern_mode, fcc_class, is_da, array_type, tower_count,
+        phasor_needed: is_da,
+        tower_additional_count,
+        phasor_cost_low_usd, phasor_cost_high_usd,
+        atu_low_usd, atu_high_usd,
+        tower_foundation_low_usd, tower_foundation_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'NAB Engineering Handbook; 47 CFR §73.151-73.160; phasor vendor pricing (Kintronic, Kintronics, LBA)',
+        note: `${pattern_mode} Class ${fcc_class}: ${array_type}, ${tower_count} tower(s); array system total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 

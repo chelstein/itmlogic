@@ -2226,6 +2226,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna Array and Phasor Guide */}
+        {candidate.am_antenna_array_and_phasor_guide && (() => {
+          const g = candidate.am_antenna_array_and_phasor_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const arrayLabel = {
+            single_tower_nda: 'Single Tower (NDA)',
+            two_tower_da:     '2-Tower Directional',
+            three_tower_da:   '3-Tower Directional',
+          }[g.array_type] ?? g.array_type ?? '—';
+          return (
+            <div key="ant-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: '2px solid #e11d48' }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Antenna Array &amp; Phasor System</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9f1239' }}>
+                <span>Array type:</span><span>{arrayLabel}</span>
+                <span>Towers:</span><span>{g.tower_count ?? '—'}</span>
+                <span>Phasor needed:</span><span>{g.phasor_needed ? 'Yes' : 'No'}</span>
+                {g.phasor_needed && <>
+                  <span>Phasor cabinet:</span><span>{fmt(g.phasor_cost_low_usd)} – {fmt(g.phasor_cost_high_usd)}</span>
+                  <span>Extra foundations:</span><span>{fmt(g.tower_foundation_low_usd)} – {fmt(g.tower_foundation_high_usd)}</span>
+                </>}
+                <span>ATU:</span><span>{fmt(g.atu_low_usd)} – {fmt(g.atu_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#be123c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM RF Radiation Safety and Compliance Guide */}
         {candidate.am_rf_radiation_safety_and_compliance_guide && (() => {
           const g = candidate.am_rf_radiation_safety_and_compliance_guide;

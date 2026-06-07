@@ -12572,3 +12572,47 @@ test('am_rf_radiation_safety_and_compliance_guide comparison table columns prese
   assert.strictEqual(r0.rfr_total_compliance_low,  2000,                                 'rank-1 rfr_total_compliance_low should be $2,000');
   assert.strictEqual(r0.rfr_evaluation_type,       'computational_evaluation_required',  'rank-1 rfr_evaluation_type mismatch');
 });
+
+test('am_antenna_array_and_phasor_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_array_and_phasor_guide;
+  assert.ok(g !== undefined && g !== null, 'am_antenna_array_and_phasor_guide missing');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM antenna array type and tower count', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_array_and_phasor_guide;
+  assert.strictEqual(g.array_type,   'single_tower_nda', 'NDA pattern should be single_tower_nda');
+  assert.strictEqual(g.tower_count,  1,                  'NDA should have 1 tower');
+  assert.strictEqual(g.is_da,        false,              'NDA pattern_mode should set is_da=false');
+  assert.strictEqual(g.phasor_needed, false,             'NDA station should not need phasor');
+});
+
+test('KAZM antenna phasor and ATU costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_array_and_phasor_guide;
+  assert.strictEqual(g.phasor_cost_low_usd, 0,    'NDA phasor_cost_low should be $0');
+  assert.strictEqual(g.atu_low_usd,         2000, 'atu_low should be $2,000');
+  assert.strictEqual(g.atu_high_usd,        8000, 'atu_high should be $8,000');
+});
+
+test('KAZM antenna array total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_array_and_phasor_guide;
+  assert.strictEqual(g.total_low_usd,  2000, 'NDA total_low should be $2,000 (ATU only)');
+  assert.strictEqual(g.total_high_usd, 8000, 'NDA total_high should be $8,000 (ATU only)');
+});
+
+test('am_antenna_array_and_phasor_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ant_array_type'    in row, 'ant_array_type missing from comparison table');
+    assert.ok('ant_total_low_usd' in row, 'ant_total_low_usd missing from comparison table');
+    assert.ok('ant_tower_count'   in row, 'ant_tower_count missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ant_array_type,    'single_tower_nda', 'rank-1 ant_array_type should be single_tower_nda');
+  assert.strictEqual(r0.ant_total_low_usd, 2000,               'rank-1 ant_total_low_usd should be $2,000');
+  assert.strictEqual(r0.ant_tower_count,   1,                  'rank-1 ant_tower_count should be 1');
+});
