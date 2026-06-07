@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Zoning and Land Use Permit Guide */}
+        {candidate.am_zoning_and_land_use_permit_guide && (() => {
+          const g = candidate.am_zoning_and_land_use_permit_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const tierLabel = { small: 'Small Market', medium: 'Medium Market', large: 'Large Market' }[g.market_tier] ?? g.market_tier ?? '—';
+          return (
+            <div key="zon-guide" style={{ marginBottom: 16, padding: 12, background: '#fafaf9', borderRadius: 8, border: '2px solid #57534e' }}>
+              <div style={{ fontWeight: 700, color: '#1c1917', marginBottom: 6, fontSize: 13 }}>Zoning &amp; Land Use Permit</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#292524' }}>
+                <span>Market:</span><span>{tierLabel}</span>
+                <span>Reach est.:</span><span>{g.reach_scale_km != null ? `${g.reach_scale_km.toFixed(0)} km` : '—'}</span>
+                <span>Timeline:</span><span>{g.typical_weeks_min ?? '—'}–{g.typical_weeks_max ?? '—'} weeks</span>
+                <span>Permit fee:</span><span>{fmt(g.permit_low_usd)} – {fmt(g.permit_high_usd)}</span>
+                <span>Legal:</span><span>{fmt(g.legal_low_usd)} – {fmt(g.legal_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#78716c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Soil Conductivity and Ground Loss Assessment Guide */}
         {candidate.am_soil_conductivity_and_ground_loss_assessment_guide && (() => {
           const g = candidate.am_soil_conductivity_and_ground_loss_assessment_guide;

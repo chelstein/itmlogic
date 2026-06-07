@@ -12748,3 +12748,47 @@ test('am_soil_conductivity_and_ground_loss_assessment_guide comparison table col
   assert.strictEqual(r0.gsc_sigma_est_ms_m,    2,          'rank-1 gsc_sigma_est_ms_m should be 2');
   assert.strictEqual(r0.gsc_total_low_usd,     10000,      'rank-1 gsc_total_low_usd should be $10,000');
 });
+
+test('am_zoning_and_land_use_permit_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_permit_guide;
+  assert.ok(g !== undefined && g !== null, 'am_zoning_and_land_use_permit_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM zoning market tier (reach 88 km → medium)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_permit_guide;
+  assert.strictEqual(g.market_tier,         'medium', 'KAZM reach_scale_km ~88 km should be medium market');
+  assert.strictEqual(g.typical_weeks_min,    8,        'medium market typical_weeks_min should be 8');
+  assert.strictEqual(g.typical_weeks_max,    24,       'medium market typical_weeks_max should be 24');
+});
+
+test('KAZM zoning permit and legal costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_permit_guide;
+  assert.strictEqual(g.permit_low_usd,  1500, 'medium market permit_low should be $1,500');
+  assert.strictEqual(g.legal_low_usd,   5000, 'medium market legal_low should be $5,000');
+  assert.strictEqual(g.local_env_low_usd, 0,  'local_env_low should be $0');
+});
+
+test('KAZM zoning total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_zoning_and_land_use_permit_guide;
+  assert.strictEqual(g.total_low_usd,  6500,  'total_low should be $6,500');
+  assert.strictEqual(g.total_high_usd, 38000, 'total_high should be $38,000');
+});
+
+test('am_zoning_and_land_use_permit_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('zon_market_tier'       in row, 'zon_market_tier missing from comparison table');
+    assert.ok('zon_total_low_usd'     in row, 'zon_total_low_usd missing from comparison table');
+    assert.ok('zon_typical_weeks_max' in row, 'zon_typical_weeks_max missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.zon_market_tier,       'medium', 'rank-1 zon_market_tier should be medium');
+  assert.strictEqual(r0.zon_total_low_usd,      6500,    'rank-1 zon_total_low_usd should be $6,500');
+  assert.strictEqual(r0.zon_typical_weeks_max,  24,      'rank-1 zon_typical_weeks_max should be 24');
+});

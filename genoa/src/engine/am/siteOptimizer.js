@@ -1254,7 +1254,10 @@ export async function runSiteOptimizer(body = {}){
     lit_lighting_type:          c.am_tower_lighting_and_aviation_compliance_guide?.lighting_type ?? null,
     gsc_conductivity_tier:      c.am_soil_conductivity_and_ground_loss_assessment_guide?.conductivity_tier ?? null,
     gsc_sigma_est_ms_m:         c.am_soil_conductivity_and_ground_loss_assessment_guide?.sigma_est_ms_m ?? null,
-    gsc_total_low_usd:          c.am_soil_conductivity_and_ground_loss_assessment_guide?.total_low_usd ?? null
+    gsc_total_low_usd:          c.am_soil_conductivity_and_ground_loss_assessment_guide?.total_low_usd ?? null,
+    zon_market_tier:            c.am_zoning_and_land_use_permit_guide?.market_tier ?? null,
+    zon_total_low_usd:          c.am_zoning_and_land_use_permit_guide?.total_low_usd ?? null,
+    zon_typical_weeks_max:      c.am_zoning_and_land_use_permit_guide?.typical_weeks_max ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6989,6 +6992,42 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_zoning_and_land_use_permit_guide: (() => {
+      // 47 U.S.C. §332(c)(7): local zoning authority cannot effectively prohibit towers
+      // but may impose reasonable requirements.  FCC Shot Clock: 150 days to act.
+      // Costs and timelines scale with market size; rural small markets are fastest.
+      const market_tier = reach_scale_km < 50 ? 'small' : reach_scale_km < 150 ? 'medium' : 'large';
+      let permit_low_usd, permit_high_usd, legal_low_usd, legal_high_usd;
+      let typical_weeks_min, typical_weeks_max;
+      if (market_tier === 'small') {
+        permit_low_usd = 500;  permit_high_usd = 3000;
+        legal_low_usd  = 2000; legal_high_usd  = 10000;
+        typical_weeks_min = 4; typical_weeks_max = 16;
+      } else if (market_tier === 'medium') {
+        permit_low_usd = 1500; permit_high_usd = 8000;
+        legal_low_usd  = 5000; legal_high_usd  = 25000;
+        typical_weeks_min = 8; typical_weeks_max = 24;
+      } else {
+        permit_low_usd = 3000;  permit_high_usd = 15000;
+        legal_low_usd  = 10000; legal_high_usd  = 50000;
+        typical_weeks_min = 12; typical_weeks_max = 52;
+      }
+      const local_env_low_usd  = 0;
+      const local_env_high_usd = 5000;
+      const total_low_usd  = round2(permit_low_usd  + legal_low_usd  + local_env_low_usd);
+      const total_high_usd = round2(permit_high_usd + legal_high_usd + local_env_high_usd);
+      return {
+        market_tier, reach_scale_km,
+        permit_low_usd, permit_high_usd,
+        legal_low_usd, legal_high_usd,
+        local_env_low_usd, local_env_high_usd,
+        typical_weeks_min, typical_weeks_max,
+        total_low_usd, total_high_usd,
+        reference: '47 U.S.C. §332(c)(7); Telecom Act zoning provisions; FCC Shot Clock (150 days)',
+        note: `${market_tier} market (reach ≈${reach_scale_km} km): ${typical_weeks_min}-${typical_weeks_max} wk; total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 
