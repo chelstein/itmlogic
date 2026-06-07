@@ -3127,3 +3127,14 @@ test('am_transmitter_building_and_studio_link_guide present across colocation ca
       `rank ${c.rank}: unexpected stl_type: ${g.stl_type}`);
   }
 });
+
+test('am_fcc_construction_permit_and_license_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_fcc_construction_permit_and_license_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_construction_permit_and_license_guide missing`);
+    assert.ok(g.total_nonrecurring_low_usd > 0, `rank ${c.rank}: total_nonrecurring_low_usd must be positive`);
+    assert.ok(typeof g.isDA === 'boolean', `rank ${c.rank}: isDA must be boolean`);
+    assert.ok(Array.isArray(g.filing_forms), `rank ${c.rank}: filing_forms must be array`);
+  }
+});

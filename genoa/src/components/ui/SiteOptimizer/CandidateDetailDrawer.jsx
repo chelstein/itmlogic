@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM FCC Construction Permit and License Guide */}
+        {candidate.am_fcc_construction_permit_and_license_guide && (() => {
+          const g = candidate.am_fcc_construction_permit_and_license_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="cp-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>FCC Construction Permit &amp; License</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
+                <span>Antenna type:</span><span>{g.isDA ? `DA (${g.pattern_mode})` : 'NDA'}</span>
+                <span>FCC filing fee:</span><span>{fmt(g.fcc_filing_fee_usd)}</span>
+                <span>Engineering:</span><span>{fmt(g.engineering_low_usd)} – {fmt(g.engineering_high_usd)}</span>
+                <span>FCC attorney:</span><span>{fmt(g.attorney_low_usd)} – {fmt(g.attorney_high_usd)}</span>
+                <span>NEPA review:</span><span>{fmt(g.nepa_low_usd)} – {fmt(g.nepa_high_usd)}</span>
+                <span>§106 review:</span><span>{fmt(g.section106_low_usd)} – {fmt(g.section106_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total (non-recurring):</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_nonrecurring_low_usd)} – {fmt(g.total_nonrecurring_high_usd)}</span>
+                <span>Annual reg. fee:</span><span>{fmt(g.annual_reg_fee_low_usd)} – {fmt(g.annual_reg_fee_high_usd)}/yr</span>
+                <span>FCC review time:</span><span>{g.cp_review_months_low}–{g.cp_review_months_high} months</span>
+                <span>CP build window:</span><span>{g.construction_period_years} years</span>
+                <span>Proof → license:</span><span>{g.proof_to_license_months_low}–{g.proof_to_license_months_high} months</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0369a1', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Building and Studio Link Guide */}
         {candidate.am_transmitter_building_and_studio_link_guide && (() => {
           const g = candidate.am_transmitter_building_and_studio_link_guide;

@@ -1293,7 +1293,10 @@ export async function runSiteOptimizer(body = {}){
     pwr_generator_low_usd:      c.am_utility_power_and_backup_systems_guide?.generator_low_usd ?? null,
     bld_total_low_usd:          c.am_transmitter_building_and_studio_link_guide?.total_low_usd ?? null,
     bld_stl_type:               c.am_transmitter_building_and_studio_link_guide?.stl_type ?? null,
-    bld_stl_low_usd:            c.am_transmitter_building_and_studio_link_guide?.stl_low_usd ?? null
+    bld_stl_low_usd:            c.am_transmitter_building_and_studio_link_guide?.stl_low_usd ?? null,
+    cp_total_nonrecurring_low:  c.am_fcc_construction_permit_and_license_guide?.total_nonrecurring_low_usd ?? null,
+    cp_fcc_filing_fee:          c.am_fcc_construction_permit_and_license_guide?.fcc_filing_fee_usd ?? null,
+    cp_review_months_high:      c.am_fcc_construction_permit_and_license_guide?.cp_review_months_high ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7028,6 +7031,59 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_fcc_construction_permit_and_license_guide: (() => {
+      // Relocating an AM transmitter requires a new Construction Permit (CP) from the FCC.
+      // Process: file FCC Form 301-AM → receive CP → build → file Form 302-AM (license to cover).
+      // Directional arrays also require antenna proof (§73.154) before license is granted.
+      const isDA_cp    = /^DA/i.test(pattern_mode);
+      // FCC filing fee for AM CP modification: Schedule of Regulatory Fees (approximate 2024 values)
+      const fcc_filing_fee_usd = isDA_cp ? 1560 : 1310;  // DA filings slightly higher due to complexity
+      // FCC license fee (annual regulatory fee, not filing fee): ~$1,050–$2,200 depending on class
+      const annual_reg_fee_low  = 1050;
+      const annual_reg_fee_high = 2200;
+      // Engineering consultant (CP preparation, technical exhibits, FCC Form 301-AM):
+      // $5,000–$20,000 for NDA; $10,000–$40,000 for DA (complex directional exhibits)
+      const engineering_low_usd  = isDA_cp ? 10000 : 5000;
+      const engineering_high_usd = isDA_cp ? 40000 : 20000;
+      // Communications attorney (FCC counsel): $3,000–$15,000
+      const attorney_low_usd  = 3000;
+      const attorney_high_usd = 15000;
+      // Environmental/NEPA consultant (required with CP): $2,000–$8,000
+      const nepa_low_usd  = 2000;
+      const nepa_high_usd = 8000;
+      // Section 106 historic preservation review: $1,000–$5,000
+      const section106_low_usd  = 1000;
+      const section106_high_usd = 5000;
+      // Timeline: CP application → FCC review → grant: 6–18 months
+      // Construction period after grant: 3 years (AM standard)
+      // Proof of performance → license: 3–6 months after construction
+      const cp_review_months_low  = 6;
+      const cp_review_months_high = 18;
+      const construction_period_years = 3;
+      const proof_to_license_months_low  = 3;
+      const proof_to_license_months_high = 6;
+      const total_nonrecurring_low_usd  = round2(fcc_filing_fee_usd + engineering_low_usd  + attorney_low_usd  + nepa_low_usd  + section106_low_usd);
+      const total_nonrecurring_high_usd = round2(fcc_filing_fee_usd + engineering_high_usd + attorney_high_usd + nepa_high_usd + section106_high_usd);
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        isDA: isDA_cp,
+        fcc_filing_fee_usd,
+        annual_reg_fee_low_usd: annual_reg_fee_low,
+        annual_reg_fee_high_usd: annual_reg_fee_high,
+        engineering_low_usd, engineering_high_usd,
+        attorney_low_usd, attorney_high_usd,
+        nepa_low_usd, nepa_high_usd,
+        section106_low_usd, section106_high_usd,
+        total_nonrecurring_low_usd, total_nonrecurring_high_usd,
+        cp_review_months_low, cp_review_months_high,
+        construction_period_years,
+        proof_to_license_months_low, proof_to_license_months_high,
+        filing_forms: ['FCC Form 301-AM (CP application)', 'FCC Form 302-AM (license to cover)', ...(isDA_cp ? ['Directional antenna proof exhibit'] : [])],
+        reference: '47 CFR §73.3700 (AM revitalization); §73.24 (CP standards); §73.154 (DA proof); FCC Form 301-AM instructions; FCC Schedule of Regulatory Fees (2024); NEPA §106; 36 CFR §800',
+        note: `${isDA_cp ? 'DA' : 'NDA'} CP: $${fcc_filing_fee_usd} FCC fee + $${total_nonrecurring_low_usd.toLocaleString()}–$${total_nonrecurring_high_usd.toLocaleString()} total. Timeline: ${cp_review_months_low}–${cp_review_months_high} mo FCC review → ${construction_period_years}-yr build window → ${proof_to_license_months_low}–${proof_to_license_months_high} mo proof-to-license`
       };
     })(),
 

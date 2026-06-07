@@ -13322,3 +13322,48 @@ test('am_transmitter_building_and_studio_link_guide comparison table columns pre
   assert.strictEqual(r0.bld_stl_type,      'licensed_950mhz_microwave', 'rank-1 bld_stl_type should be microwave');
   assert.strictEqual(r0.bld_stl_low_usd,   8000,   'rank-1 bld_stl_low_usd should be 8000');
 });
+
+test('am_fcc_construction_permit_and_license_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
+  assert.ok(g !== undefined && g !== null, 'am_fcc_construction_permit_and_license_guide missing');
+  assert.ok(g.total_nonrecurring_low_usd > 0, 'total_nonrecurring_low_usd must be positive');
+  assert.ok(g.total_nonrecurring_high_usd >= g.total_nonrecurring_low_usd, 'total high must be >= low');
+});
+
+test('KAZM NDA CP: correct FCC fee and engineering cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
+  assert.strictEqual(g.isDA,              false, 'KAZM pattern_mode NDA so isDA should be false');
+  assert.strictEqual(g.fcc_filing_fee_usd, 1310, 'NDA CP FCC fee should be 1310');
+  assert.strictEqual(g.engineering_low_usd, 5000, 'NDA engineering low should be 5000');
+});
+
+test('KAZM CP total nonrecurring cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
+  assert.strictEqual(g.total_nonrecurring_low_usd,  12310, 'KAZM total_nonrecurring_low should be 12310');
+  assert.strictEqual(g.total_nonrecurring_high_usd, 49310, 'KAZM total_nonrecurring_high should be 49310');
+});
+
+test('KAZM CP timeline values correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_construction_permit_and_license_guide;
+  assert.strictEqual(g.cp_review_months_low,  6,  'cp_review_months_low should be 6');
+  assert.strictEqual(g.cp_review_months_high, 18, 'cp_review_months_high should be 18');
+  assert.strictEqual(g.construction_period_years, 3, 'construction_period_years should be 3');
+  assert.ok(Array.isArray(g.filing_forms) && g.filing_forms.length >= 2, 'filing_forms must have >= 2 entries');
+});
+
+test('am_fcc_construction_permit_and_license_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cp_total_nonrecurring_low' in row, 'cp_total_nonrecurring_low missing from comparison table');
+    assert.ok('cp_fcc_filing_fee'         in row, 'cp_fcc_filing_fee missing from comparison table');
+    assert.ok('cp_review_months_high'     in row, 'cp_review_months_high missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cp_total_nonrecurring_low, 12310, 'rank-1 cp_total_nonrecurring_low should be 12310');
+  assert.strictEqual(r0.cp_fcc_filing_fee,          1310, 'rank-1 cp_fcc_filing_fee should be 1310');
+  assert.strictEqual(r0.cp_review_months_high,         18, 'rank-1 cp_review_months_high should be 18');
+});
