@@ -12527,3 +12527,48 @@ test('am_ground_system_installation_and_maintenance_guide comparison table colum
   assert.strictEqual(r0.gnd_total_low_usd,        31764.96, 'rank-1 gnd_total_low_usd should be 31764.96');
   assert.strictEqual(r0.gnd_recommended_radials,  120,      'rank-1 gnd_recommended_radials should be 120');
 });
+
+test('am_rf_radiation_safety_and_compliance_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_radiation_safety_and_compliance_guide;
+  assert.ok(g !== undefined && g !== null, 'am_rf_radiation_safety_and_compliance_guide missing');
+  assert.ok(g.exclusion_zone_m >= 0, 'exclusion_zone_m must be non-negative');
+  assert.ok(g.total_compliance_high_usd >= g.total_compliance_low_usd, 'high must be >= low');
+});
+
+test('KAZM RF radiation exclusion zone and MPE limits', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_radiation_safety_and_compliance_guide;
+  assert.strictEqual(g.e_limit_vm,       274,   'uncontrolled E-field limit should be 274 V/m');
+  assert.strictEqual(g.mpe_limit_mw_cm2, 20,    'uncontrolled MPE limit should be 20 mW/cm²');
+  assert.strictEqual(g.exclusion_zone_m, 2,     'KAZM 5 kW exclusion zone should be 2 m');
+});
+
+test('KAZM RF radiation evaluation type', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_radiation_safety_and_compliance_guide;
+  assert.strictEqual(g.evaluation_type, 'computational_evaluation_required',
+    'KAZM 5 kW should require computational evaluation');
+  assert.strictEqual(g.evaluation_cost_low_usd, 1500, 'evaluation_cost_low should be $1,500');
+});
+
+test('KAZM RF radiation compliance costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_radiation_safety_and_compliance_guide;
+  assert.strictEqual(g.signage_low_usd,          500,  'signage_low_usd should be $500');
+  assert.strictEqual(g.total_compliance_low_usd,  2000, 'total_compliance_low should be $2,000');
+  assert.strictEqual(g.total_compliance_high_usd, 6000, 'total_compliance_high should be $6,000');
+});
+
+test('am_rf_radiation_safety_and_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rfr_exclusion_zone_m'    in row, 'rfr_exclusion_zone_m missing from comparison table');
+    assert.ok('rfr_total_compliance_low' in row, 'rfr_total_compliance_low missing from comparison table');
+    assert.ok('rfr_evaluation_type'      in row, 'rfr_evaluation_type missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.rfr_exclusion_zone_m,     2,                                    'rank-1 rfr_exclusion_zone_m should be 2');
+  assert.strictEqual(r0.rfr_total_compliance_low,  2000,                                 'rank-1 rfr_total_compliance_low should be $2,000');
+  assert.strictEqual(r0.rfr_evaluation_type,       'computational_evaluation_required',  'rank-1 rfr_evaluation_type mismatch');
+});

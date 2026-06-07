@@ -2226,6 +2226,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM RF Radiation Safety and Compliance Guide */}
+        {candidate.am_rf_radiation_safety_and_compliance_guide && (() => {
+          const g = candidate.am_rf_radiation_safety_and_compliance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const evalLabel = {
+            desktop_calculation_required:       'Desktop Calculation',
+            computational_evaluation_required:  'Computational Evaluation',
+            field_measurement_required:         'Field Measurement',
+          }[g.evaluation_type] ?? g.evaluation_type ?? '—';
+          return (
+            <div key="rfr-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>RF Radiation Safety &amp; MPE Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Power:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'}</span>
+                <span>E-field limit:</span><span>{g.e_limit_vm != null ? `${g.e_limit_vm} V/m` : '—'} (uncontrolled)</span>
+                <span>MPE limit:</span><span>{g.mpe_limit_mw_cm2 != null ? `${g.mpe_limit_mw_cm2} mW/cm²` : '—'}</span>
+                <span>Exclusion zone:</span><span>{g.exclusion_zone_m != null ? `≈ ${g.exclusion_zone_m} m` : '—'}</span>
+                <span>Evaluation:</span><span>{evalLabel}</span>
+                <span>Evaluation cost:</span><span>{fmt(g.evaluation_cost_low_usd)} – {fmt(g.evaluation_cost_high_usd)}</span>
+                <span>Signage:</span><span>{fmt(g.signage_low_usd)} – {fmt(g.signage_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_compliance_low_usd)} – {fmt(g.total_compliance_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Ground System Installation and Maintenance Guide */}
         {candidate.am_ground_system_installation_and_maintenance_guide && (() => {
           const g = candidate.am_ground_system_installation_and_maintenance_guide;

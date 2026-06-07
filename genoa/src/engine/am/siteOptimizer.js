@@ -1239,7 +1239,10 @@ export async function runSiteOptimizer(body = {}){
     txp_tx_cost_low_usd:        c.am_transmitter_procurement_and_upgrade_guide?.tx_cost_low_usd ?? null,
     gnd_radial_length_ft:       c.am_ground_system_installation_and_maintenance_guide?.radial_length_ft ?? null,
     gnd_total_low_usd:          c.am_ground_system_installation_and_maintenance_guide?.total_low_usd ?? null,
-    gnd_recommended_radials:    c.am_ground_system_installation_and_maintenance_guide?.recommended_radials ?? null
+    gnd_recommended_radials:    c.am_ground_system_installation_and_maintenance_guide?.recommended_radials ?? null,
+    rfr_exclusion_zone_m:       c.am_rf_radiation_safety_and_compliance_guide?.exclusion_zone_m ?? null,
+    rfr_total_compliance_low:   c.am_rf_radiation_safety_and_compliance_guide?.total_compliance_low_usd ?? null,
+    rfr_evaluation_type:        c.am_rf_radiation_safety_and_compliance_guide?.evaluation_type ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6974,6 +6977,45 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_rf_radiation_safety_and_compliance_guide: (() => {
+      // 47 CFR §1.1310 / OET Bulletin 65 Ed. 97-01 MPE compliance for AM broadcast.
+      // Uncontrolled (general population) E-field limit at 0.3–3 MHz: 274 V/m.
+      // Exclusion zone uses the simplified far-field approximation: r = sqrt(30 P G) / E_limit.
+      // For AM vertical monopole, gain G ≈ 2 (omnidirectional reference dipole).
+      const e_limit_vm     = 274;   // V/m uncontrolled, 0.3-3 MHz
+      const h_limit_am     = 0.728; // A/m uncontrolled
+      const mpe_limit_mw_cm2 = 20;  // mW/cm² uncontrolled general population
+      const power_w        = tpo_kw * 1000;
+      const gain_linear    = 2.0;   // omnidirectional AM vertical
+      const exclusion_zone_m = round2(Math.sqrt(30 * power_w * gain_linear) / e_limit_vm);
+      let evaluation_type, evaluation_cost_low_usd, evaluation_cost_high_usd;
+      if (tpo_kw >= 25) {
+        evaluation_type = 'field_measurement_required';
+        evaluation_cost_low_usd = 3000; evaluation_cost_high_usd = 8000;
+      } else if (tpo_kw >= 5) {
+        evaluation_type = 'computational_evaluation_required';
+        evaluation_cost_low_usd = 1500; evaluation_cost_high_usd = 4000;
+      } else {
+        evaluation_type = 'desktop_calculation_required';
+        evaluation_cost_low_usd = 500; evaluation_cost_high_usd = 2000;
+      }
+      const signage_low_usd  = 500;
+      const signage_high_usd = 2000;
+      const total_compliance_low_usd  = round2(evaluation_cost_low_usd  + signage_low_usd);
+      const total_compliance_high_usd = round2(evaluation_cost_high_usd + signage_high_usd);
+      return {
+        frequency_khz, tpo_kw,
+        e_limit_vm, h_limit_am, mpe_limit_mw_cm2,
+        exclusion_zone_m,
+        evaluation_type,
+        evaluation_cost_low_usd, evaluation_cost_high_usd,
+        signage_low_usd, signage_high_usd,
+        total_compliance_low_usd, total_compliance_high_usd,
+        reference: 'FCC OET Bulletin 65 Ed. 97-01; 47 CFR §1.1310; FCC online MPE calculator',
+        note: `${tpo_kw} kW AM: exclusion zone ≈ ${exclusion_zone_m} m; ${evaluation_type}; compliance total ${total_compliance_low_usd.toLocaleString()}–${total_compliance_high_usd.toLocaleString()}`
       };
     })(),
 

@@ -2920,3 +2920,15 @@ test('am_ground_system_installation_and_maintenance_guide present across colocat
     assert.ok([120, 160].includes(g.recommended_radials), `rank ${c.rank}: recommended_radials must be 120 or 160`);
   }
 });
+
+test('am_rf_radiation_safety_and_compliance_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_rf_radiation_safety_and_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_rf_radiation_safety_and_compliance_guide missing`);
+    assert.ok(g.exclusion_zone_m >= 0, `rank ${c.rank}: exclusion_zone_m must be non-negative`);
+    assert.ok(g.total_compliance_high_usd >= g.total_compliance_low_usd, `rank ${c.rank}: high must be >= low`);
+    assert.ok(['desktop_calculation_required','computational_evaluation_required','field_measurement_required'].includes(g.evaluation_type),
+      `rank ${c.rank}: unexpected evaluation_type: ${g.evaluation_type}`);
+  }
+});
