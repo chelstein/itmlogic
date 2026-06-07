@@ -2226,6 +2226,60 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Local Zoning & Land Use Compatibility Guide */}
+        {candidate.am_local_zoning_and_land_use_compatibility_guide && (() => {
+          const g = candidate.am_local_zoning_and_land_use_compatibility_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const riskColor = { LOW: '#166534', MEDIUM: '#92400e', HIGH: '#991b1b' };
+          const znColor = { URBAN_COMMERCIAL: '#991b1b', SUBURBAN_RESIDENTIAL: '#92400e', MIXED_INDUSTRIAL: '#1e40af', AGRICULTURAL_RURAL: '#166534' };
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #4ade80', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 8, fontSize: 13 }}>
+                Local Zoning &amp; Land Use Compatibility
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#166534' }}>
+                <span>Zoning class</span>
+                <span style={{ fontWeight: 700, color: znColor[g.zoning_class] ?? '#166534' }}>{g.zoning_class.replace(/_/g, ' ')} ({g.dist_from_col_km}km from COL)</span>
+                <span>Tower height</span>
+                <span style={{ fontWeight: 600 }}>{g.tower_height_ft}ft ({g.tower_height_m}m)</span>
+                <span>Zoning height limit</span>
+                <span style={{ fontWeight: 600 }}>{g.zoning_height_limit_ft}ft</span>
+                <span>Height variance</span>
+                <span style={{ fontWeight: 600, color: g.height_variance_required ? '#991b1b' : '#166534' }}>
+                  {g.height_variance_required ? 'Required' : 'Not required'}
+                </span>
+                <span>CUP probability</span>
+                <span style={{ fontWeight: 600 }}>{Math.round(g.cup_probability * 100)}%</span>
+                <span>Setback from residential</span>
+                <span style={{ fontWeight: 600 }}>{g.setback_required_ft}ft min</span>
+                <span>Min. lot width</span>
+                <span style={{ fontWeight: 600 }}>{g.min_lot_width_ft}ft</span>
+                <span>SHPO review</span>
+                <span style={{ fontWeight: 600, color: g.shpo_review_required ? '#b45309' : '#166534' }}>
+                  {g.shpo_review_required ? `Required (${g.shpo_review_weeks_low}–${g.shpo_review_weeks_high} weeks)` : 'Not triggered'}
+                </span>
+                <span>Opposition risk</span>
+                <span style={{ fontWeight: 700, color: riskColor[g.opposition_risk] ?? '#166534' }}>{g.opposition_risk}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #bbf7d0', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#166534' }}>
+                <span>CUP application</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.cup_cost_low_usd)} – {fmt(g.cup_cost_high_usd)}</span>
+                <span>Height variance</span>
+                <span style={{ fontWeight: 600 }}>{g.variance_cost_low_usd > 0 ? `${fmt(g.variance_cost_low_usd)} – ${fmt(g.variance_cost_high_usd)}` : 'N/A'}</span>
+                <span>Legal fees (opposition)</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.legal_fees_low_usd)} – {fmt(g.legal_fees_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>Total zoning costs</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>{fmt(g.total_zoning_cost_low_usd)} – {fmt(g.total_zoning_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#14532d', borderTop: '1px solid #bbf7d0', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Building & Utilities Guide */}
         {candidate.am_transmitter_building_and_utilities_guide && (() => {
           const g = candidate.am_transmitter_building_and_utilities_guide;

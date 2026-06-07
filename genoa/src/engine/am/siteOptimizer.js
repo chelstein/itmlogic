@@ -1119,7 +1119,10 @@ export async function runSiteOptimizer(body = {}){
     tx_annual_maint_low_usd:    c.am_transmitter_and_equipment_selection_guide?.annual_maint_low_usd ?? null,
     bld_sqft_low:               c.am_transmitter_building_and_utilities_guide?.bld_sqft_low ?? null,
     bld_generator_kw:           c.am_transmitter_building_and_utilities_guide?.generator_kw ?? null,
-    bld_total_infra_low_usd:    c.am_transmitter_building_and_utilities_guide?.total_infrastructure_low_usd ?? null
+    bld_total_infra_low_usd:    c.am_transmitter_building_and_utilities_guide?.total_infrastructure_low_usd ?? null,
+    zon_class:                  c.am_local_zoning_and_land_use_compatibility_guide?.zoning_class ?? null,
+    zon_opposition_risk:        c.am_local_zoning_and_land_use_compatibility_guide?.opposition_risk ?? null,
+    zon_total_cost_low_usd:     c.am_local_zoning_and_land_use_compatibility_guide?.total_zoning_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6854,6 +6857,114 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_local_zoning_and_land_use_compatibility_guide: (() => {
+      // Assesses local zoning compatibility for the candidate AM tower site.
+      // Uses distance from COL centroid as a proxy for urbanization to classify
+      // the likely zoning category, CUP/variance requirements, SHPO review
+      // obligation (FCC/ACHP Nationwide Programmatic Agreement; §1.1307(a)(4)),
+      // and local opposition risk.
+
+      // Wavelength and estimated tower height
+      const lambda_m        = round2(300000 / frequency_khz);
+      const tower_height_m  = round2(lambda_m * 0.25);
+      const tower_height_ft = round2(tower_height_m * 3.28084);
+
+      // Distance from COL centroid (urbanization proxy)
+      const dist_from_col_km = (() => {
+        if (col_centroid) {
+          const dLat = pt.lat - col_centroid.lat;
+          const dLon = pt.lon - col_centroid.lon;
+          return round2(Math.sqrt(dLat * dLat + dLon * dLon) * 111);
+        }
+        return round2(pt.distance_from_current_km ?? 20);
+      })();
+
+      // Zoning class by distance from urban core (proxy)
+      let zoning_class = 'AGRICULTURAL_RURAL';
+      if      (dist_from_col_km <  3) zoning_class = 'URBAN_COMMERCIAL';
+      else if (dist_from_col_km < 10) zoning_class = 'SUBURBAN_RESIDENTIAL';
+      else if (dist_from_col_km < 20) zoning_class = 'MIXED_INDUSTRIAL';
+
+      // CUP probability by zoning (AM towers are a conditional use in most zones)
+      const CUP_PROBABILITY = {
+        URBAN_COMMERCIAL:     0.90,
+        SUBURBAN_RESIDENTIAL: 0.95,
+        MIXED_INDUSTRIAL:     0.60,
+        AGRICULTURAL_RURAL:   0.40
+      };
+      const cup_probability = CUP_PROBABILITY[zoning_class] ?? 0.70;
+
+      // Typical zoning height limits (ft) — variance required if tower exceeds
+      const HEIGHT_LIMIT_FT = {
+        URBAN_COMMERCIAL:     50,
+        SUBURBAN_RESIDENTIAL: 35,
+        MIXED_INDUSTRIAL:     100,
+        AGRICULTURAL_RURAL:   250
+      };
+      const zoning_height_limit_ft   = HEIGHT_LIMIT_FT[zoning_class] ?? 100;
+      const height_variance_required = tower_height_ft > zoning_height_limit_ft;
+
+      // Residential setback (1:1 tower height ratio is a common local requirement)
+      const setback_required_ft = Math.round(tower_height_ft);
+      const min_lot_width_ft    = Math.round(tower_height_ft * 2.5);
+
+      // SHPO review per FCC/ACHP Nationwide Programmatic Agreement (2005, amended 2012)
+      // Required for towers > 200 ft AGL or within ½ mile of historic property
+      const shpo_review_required   = tower_height_ft > 200;
+      const shpo_review_weeks_low  = shpo_review_required ?  8 : 0;
+      const shpo_review_weeks_high = shpo_review_required ? 20 : 0;
+
+      // Local opposition risk (proximity to population centers)
+      const opposition_risk = dist_from_col_km < 5
+        ? 'HIGH'
+        : (dist_from_col_km < 15 ? 'MEDIUM' : 'LOW');
+
+      // CUP application costs
+      const cup_cost_low_usd  = 3000;
+      const cup_cost_high_usd = 15000;
+
+      // Height variance / appeal costs
+      const variance_cost_low_usd  = height_variance_required ? 5000  : 0;
+      const variance_cost_high_usd = height_variance_required ? 25000 : 0;
+
+      // Legal fees for opposition proceedings
+      const LEGAL_FEES = {
+        HIGH:   { low: 20000, high: 80000 },
+        MEDIUM: { low:  5000, high: 25000 },
+        LOW:    { low:  1000, high:  8000 }
+      };
+      const legal_fees_low_usd  = LEGAL_FEES[opposition_risk].low;
+      const legal_fees_high_usd = LEGAL_FEES[opposition_risk].high;
+
+      const total_zoning_cost_low_usd  = cup_cost_low_usd  + variance_cost_low_usd  + legal_fees_low_usd;
+      const total_zoning_cost_high_usd = cup_cost_high_usd + variance_cost_high_usd + legal_fees_high_usd;
+
+      return {
+        tower_height_ft,
+        tower_height_m,
+        dist_from_col_km,
+        zoning_class,
+        cup_probability,
+        zoning_height_limit_ft,
+        height_variance_required,
+        setback_required_ft,
+        min_lot_width_ft,
+        shpo_review_required,
+        shpo_review_weeks_low,
+        shpo_review_weeks_high,
+        opposition_risk,
+        cup_cost_low_usd,
+        cup_cost_high_usd,
+        variance_cost_low_usd,
+        variance_cost_high_usd,
+        legal_fees_low_usd,
+        legal_fees_high_usd,
+        total_zoning_cost_low_usd,
+        total_zoning_cost_high_usd,
+        note: `Tower est. ${tower_height_ft}ft (λ/4 @ ${frequency_khz} kHz). Zoning: ${zoning_class} (${dist_from_col_km}km from COL); CUP probability ${Math.round(cup_probability * 100)}%${height_variance_required ? `; height variance required (limit: ${zoning_height_limit_ft}ft)` : ''}. Setback: ${setback_required_ft}ft from residential. SHPO review: ${shpo_review_required ? `required per FCC/ACHP NPA (${shpo_review_weeks_low}–${shpo_review_weeks_high} weeks)` : 'not triggered (<200ft)'}. Opposition risk: ${opposition_risk}. Zoning total: $${total_zoning_cost_low_usd.toLocaleString()}–$${total_zoning_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

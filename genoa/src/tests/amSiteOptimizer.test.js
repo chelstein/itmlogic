@@ -10651,3 +10651,56 @@ test('am_transmitter_building_and_utilities_guide comparison table columns prese
     assert.ok('bld_total_infra_low_usd' in row, 'bld_total_infra_low_usd missing from comparison table');
   }
 });
+
+test('am_local_zoning_and_land_use_compatibility_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_local_zoning_and_land_use_compatibility_guide;
+  assert.ok(g != null, 'am_local_zoning_and_land_use_compatibility_guide must be present');
+  assert.ok(['URBAN_COMMERCIAL','SUBURBAN_RESIDENTIAL','MIXED_INDUSTRIAL','AGRICULTURAL_RURAL'].includes(g.zoning_class), `invalid zoning_class: ${g.zoning_class}`);
+  assert.ok(['LOW','MEDIUM','HIGH'].includes(g.opposition_risk), `invalid opposition_risk: ${g.opposition_risk}`);
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_local_zoning_and_land_use_compatibility_guide KAZM tower height triggers SHPO', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_local_zoning_and_land_use_compatibility_guide;
+  // 780 kHz λ/4 ≈ 315 ft → > 200 ft → SHPO required
+  assert.ok(g.tower_height_ft > 200, `tower ${g.tower_height_ft}ft should exceed 200ft SHPO threshold`);
+  assert.strictEqual(g.shpo_review_required, true, 'KAZM 315ft tower requires SHPO review');
+  assert.ok(g.shpo_review_weeks_low >= 8, 'SHPO review should take at least 8 weeks');
+  assert.ok(g.shpo_review_weeks_high <= 20, 'SHPO review should not exceed 20 weeks in estimate');
+});
+
+test('am_local_zoning_and_land_use_compatibility_guide zoning cost is sum of components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const g = c.am_local_zoning_and_land_use_compatibility_guide;
+    const expected_low = g.cup_cost_low_usd + g.variance_cost_low_usd + g.legal_fees_low_usd;
+    assert.strictEqual(g.total_zoning_cost_low_usd, expected_low,
+      `rank ${c.rank}: total_zoning_cost_low should be sum of CUP + variance + legal`);
+    assert.ok(g.total_zoning_cost_high_usd > g.total_zoning_cost_low_usd,
+      `rank ${c.rank}: high cost must exceed low`);
+  }
+});
+
+test('am_local_zoning_and_land_use_compatibility_guide setback and lot width are positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_local_zoning_and_land_use_compatibility_guide;
+  assert.ok(g.setback_required_ft > 0, 'setback_required_ft must be positive');
+  assert.ok(g.min_lot_width_ft > g.setback_required_ft, 'min_lot_width should exceed setback');
+  assert.ok(g.cup_probability > 0 && g.cup_probability <= 1, 'cup_probability must be 0–1');
+  // Height variance required when tower exceeds zoning limit
+  if (g.tower_height_ft > g.zoning_height_limit_ft) {
+    assert.strictEqual(g.height_variance_required, true, 'height_variance_required when tower > limit');
+    assert.ok(g.variance_cost_low_usd > 0, 'variance cost must be positive when variance required');
+  }
+});
+
+test('am_local_zoning_and_land_use_compatibility_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('zon_class'            in row, 'zon_class missing from comparison table');
+    assert.ok('zon_opposition_risk'  in row, 'zon_opposition_risk missing from comparison table');
+    assert.ok('zon_total_cost_low_usd' in row, 'zon_total_cost_low_usd missing from comparison table');
+  }
+});
