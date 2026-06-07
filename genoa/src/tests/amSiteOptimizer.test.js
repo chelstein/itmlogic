@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_tower_base_insulator_and_rf_isolation_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_base_insulator_and_rf_isolation_guide missing');
+  assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+  assert.ok(g.total_rf_isolation_low_usd > 0, 'total_rf_isolation_low_usd must be positive');
+});
+
+test('am_tower_base_insulator_and_rf_isolation_guide KAZM tower geometry', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
+  assert.strictEqual(g.wavelength_m,      384.62, 'KAZM 780 kHz wavelength_m should be 384.62');
+  assert.strictEqual(g.tower_height_ft,   315.49, 'KAZM Class D tower_height_ft should be 315.49 (λ/4)');
+  assert.strictEqual(g.n_guy_levels,      3,      'KAZM 315-ft tower should have 3 guy levels');
+});
+
+test('am_tower_base_insulator_and_rf_isolation_guide KAZM insulator type and cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
+  assert.strictEqual(g.base_insulator_type,    'standard_porcelain', 'KAZM Class D should use standard_porcelain');
+  assert.strictEqual(g.base_insulator_low_usd, 500,  'KAZM base_insulator_low_usd should be $500');
+  assert.strictEqual(g.rf_choke_total_low_usd, 600,  'KAZM rf_choke_total_low_usd should be $600 (3 × $200)');
+});
+
+test('am_tower_base_insulator_and_rf_isolation_guide KAZM total costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
+  assert.strictEqual(g.total_rf_isolation_low_usd,  2100, 'KAZM total_rf_isolation_low_usd should be $2,100');
+  assert.strictEqual(g.total_rf_isolation_high_usd, 7900, 'KAZM total_rf_isolation_high_usd should be $7,900');
+});
+
+test('am_tower_base_insulator_and_rf_isolation_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rfi_tower_height_ft' in row, 'rfi_tower_height_ft missing from comparison table');
+    assert.ok('rfi_total_low_usd'   in row, 'rfi_total_low_usd missing from comparison table');
+    assert.ok('rfi_n_guy_levels'    in row, 'rfi_n_guy_levels missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.rfi_tower_height_ft, 315.49, 'rank-1 rfi_tower_height_ft should be 315.49');
+  assert.strictEqual(r0.rfi_total_low_usd,   2100,   'rank-1 rfi_total_low_usd should be $2,100');
+  assert.strictEqual(r0.rfi_n_guy_levels,    3,      'rank-1 rfi_n_guy_levels should be 3');
+});
+
 test('am_emergency_alert_system_equipment_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_emergency_alert_system_equipment_guide;

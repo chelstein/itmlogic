@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_tower_base_insulator_and_rf_isolation_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tower_base_insulator_and_rf_isolation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_base_insulator_and_rf_isolation_guide missing`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_rf_isolation_low_usd > 0, `rank ${c.rank}: total_rf_isolation_low_usd must be positive`);
+    assert.ok(g.total_rf_isolation_high_usd >= g.total_rf_isolation_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
 test('am_emergency_alert_system_equipment_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

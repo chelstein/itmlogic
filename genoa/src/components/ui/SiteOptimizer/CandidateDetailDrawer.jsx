@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Base Insulator and RF Isolation Guide */}
+        {candidate.am_tower_base_insulator_and_rf_isolation_guide && (() => {
+          const g = candidate.am_tower_base_insulator_and_rf_isolation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="rfi-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf6ec', borderRadius: 8, border: '2px solid #c2410c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Tower Base Insulator &amp; RF Isolation (§73.49 / §73.1213)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span style={{ color: '#c2410c' }}>Tower / Wavelength:</span><span>{g.tower_height_ft} ft (λ={g.wavelength_m} m at {g.frequency_khz} kHz)</span>
+                <span style={{ color: '#c2410c' }}>Base Insulator:</span><span style={{ fontWeight: 600 }}>{g.base_insulator_type} — {fmt(g.base_insulator_low_usd)} – {fmt(g.base_insulator_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Lightning Gap:</span><span>{fmt(g.lightning_gap_low_usd)} – {fmt(g.lightning_gap_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Guy RF Chokes ({g.n_guy_levels} levels):</span><span>{fmt(g.rf_choke_total_low_usd)} – {fmt(g.rf_choke_total_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Lighting Isolation:</span><span>{fmt(g.lighting_isolation_low_usd)} – {fmt(g.lighting_isolation_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Total RF Isolation:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_rf_isolation_low_usd)} – {fmt(g.total_rf_isolation_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#7c2d12' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Emergency Alert System Equipment Guide */}
         {candidate.am_emergency_alert_system_equipment_guide && (() => {
           const g = candidate.am_emergency_alert_system_equipment_guide;

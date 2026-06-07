@@ -1212,7 +1212,10 @@ export async function runSiteOptimizer(body = {}){
     bkp_annual_maint_low_usd:   c.am_auxiliary_transmitter_and_backup_power_guide?.annual_maint_low_usd ?? null,
     eas_total_equipment_low_usd: c.am_emergency_alert_system_equipment_guide?.total_eas_equipment_low_usd ?? null,
     eas_annual_monitoring_low:  c.am_emergency_alert_system_equipment_guide?.annual_monitoring_low_usd ?? null,
-    eas_n_required_sources:     c.am_emergency_alert_system_equipment_guide?.n_required_sources ?? null
+    eas_n_required_sources:     c.am_emergency_alert_system_equipment_guide?.n_required_sources ?? null,
+    rfi_tower_height_ft:        c.am_tower_base_insulator_and_rf_isolation_guide?.tower_height_ft ?? null,
+    rfi_total_low_usd:          c.am_tower_base_insulator_and_rf_isolation_guide?.total_rf_isolation_low_usd ?? null,
+    rfi_n_guy_levels:           c.am_tower_base_insulator_and_rf_isolation_guide?.n_guy_levels ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6947,6 +6950,67 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_base_insulator_and_rf_isolation_guide: (() => {
+      // All standard series-fed AM broadcast towers require a base insulator (the tower IS the antenna).
+      // RF isolation hardware includes: base insulator, base lightning gap/arrestor, guy wire RF chokes,
+      // and an aviation lighting isolation transformer/choke. These are site-specific costs.
+      const wavelength_m   = round2(300000 / frequency_khz);
+      const is_cd = /^[CD]$/i.test(fcc_class);
+      const tower_height_m  = round2(is_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_ft = round2(tower_height_m * 3.28084);
+
+      // Guy wire levels (typically spaced every ~100 ft)
+      const n_guy_levels = tower_height_ft > 400 ? 4 : 3;
+      const n_guy_wires_per_level = 3;
+
+      // Base insulator: standard porcelain for Class C/D; high-voltage HDPE for Class A/B
+      const base_insulator_type = is_cd ? 'standard_porcelain' : 'high_voltage_hdpe';
+      const base_insulator_low_usd  = is_cd ? 500  : 2000;
+      const base_insulator_high_usd = is_cd ? 2000 : 8000;
+
+      // Base lightning gap/spark gap arrestor
+      const lightning_gap_low_usd  = 500;
+      const lightning_gap_high_usd = 1500;
+
+      // Guy wire RF chokes (one per wire per level)
+      const rf_choke_cost_low_per_level  = 200;
+      const rf_choke_cost_high_per_level = 800;
+      const rf_choke_total_low_usd  = round2(n_guy_levels * rf_choke_cost_low_per_level);
+      const rf_choke_total_high_usd = round2(n_guy_levels * rf_choke_cost_high_per_level);
+
+      // Aviation lighting isolation transformer (prevents RF from flowing on lighting wires)
+      const lighting_isolation_low_usd  = 500;
+      const lighting_isolation_high_usd = 2000;
+
+      const total_rf_isolation_low_usd  = round2(
+        base_insulator_low_usd  + lightning_gap_low_usd  + rf_choke_total_low_usd  + lighting_isolation_low_usd);
+      const total_rf_isolation_high_usd = round2(
+        base_insulator_high_usd + lightning_gap_high_usd + rf_choke_total_high_usd + lighting_isolation_high_usd);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        wavelength_m,
+        tower_height_m,
+        tower_height_ft,
+        n_guy_levels,
+        n_guy_wires_per_level,
+        base_insulator_type,
+        base_insulator_low_usd,
+        base_insulator_high_usd,
+        lightning_gap_low_usd,
+        lightning_gap_high_usd,
+        rf_choke_total_low_usd,
+        rf_choke_total_high_usd,
+        lighting_isolation_low_usd,
+        lighting_isolation_high_usd,
+        total_rf_isolation_low_usd,
+        total_rf_isolation_high_usd,
+        reference: '47 CFR §73.49 (base insulator); §73.1213 (guy wire RF isolation); TIA-222 guy wire standards; IEEE 100 (RF choke sizing)',
+        note: `${tower_height_ft} ft ${base_insulator_type} base insulator $${base_insulator_low_usd.toLocaleString()}–$${base_insulator_high_usd.toLocaleString()} + ${n_guy_levels}-level guy RF chokes $${rf_choke_total_low_usd.toLocaleString()}–$${rf_choke_total_high_usd.toLocaleString()} + lightning gap + lighting isolation; total $${total_rf_isolation_low_usd.toLocaleString()}–$${total_rf_isolation_high_usd.toLocaleString()}`
       };
     })(),
 
