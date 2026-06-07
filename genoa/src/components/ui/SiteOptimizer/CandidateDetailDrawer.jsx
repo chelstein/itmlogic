@@ -2226,6 +2226,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Grounding System & RF Safety Guide */}
+        {candidate.am_grounding_system_and_rf_safety_guide && (() => {
+          const g = candidate.am_grounding_system_and_rf_safety_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8, fontSize: 13 }}>
+                Ground System &amp; RF Safety (§73.54 / OET-65)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#78350f' }}>
+                <span>Radials</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} × {g.radial_length_m}m (λ/4 = {g.radial_length_m}m)</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
+                <span>Wire gauge</span>
+                <span style={{ fontWeight: 600 }}>#{g.wire_gauge_awg} AWG bare copper</span>
+                <span>Total copper</span>
+                <span style={{ fontWeight: 600 }}>{g.total_radial_length_m.toLocaleString()}m buried</span>
+                <span>Radial install cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.radial_install_cost_low_usd)} – {fmt(g.radial_install_cost_high_usd)}</span>
+                <span>ATU / bonding</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.atu_cost_low_usd)} – {fmt(g.atu_cost_high_usd)}</span>
+                <span>Ground system total</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.ground_system_total_low_usd)} – {fmt(g.ground_system_total_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #fde68a', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#78350f' }}>
+                <span>MPE eval required</span>
+                <span style={{ fontWeight: 600 }}>{g.mpe_evaluation_required ? 'Yes (§1.1307)' : 'No'}</span>
+                <span>Uncontrolled MPE</span>
+                <span style={{ fontWeight: 600 }}>{g.mpe_uncontrolled_mw_cm2} mW/cm²</span>
+                <span>Exclusion zone</span>
+                <span style={{ fontWeight: 600 }}>{g.exclusion_zone_m}m (uncontrolled) / {g.controlled_zone_m}m (controlled)</span>
+                <span>RF fence</span>
+                <span style={{ fontWeight: 600, color: g.rf_fence_required ? '#b45309' : '#166534' }}>
+                  {g.rf_fence_required ? `Required — ${Math.round(g.fence_perimeter_ft)} linear ft` : 'Not required'}
+                </span>
+                {g.rf_fence_required && <>
+                  <span>Fence cost</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(g.fence_cost_low_usd)} – {fmt(g.fence_cost_high_usd)}</span>
+                </>}
+                <span style={{ fontWeight: 700, color: '#92400e' }}>Total (ground + fence)</span>
+                <span style={{ fontWeight: 700, color: '#92400e' }}>{fmt(g.total_cost_low_usd)} – {fmt(g.total_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#92400e', borderTop: '1px solid #fde68a', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Station Insurance & Bonding Guide */}
         {candidate.am_station_insurance_and_bonding_guide && (() => {
           const g = candidate.am_station_insurance_and_bonding_guide;

@@ -10349,3 +10349,63 @@ test('am_station_insurance_and_bonding_guide comparison table columns present', 
     assert.ok('ins_bond_amount_usd'     in row, 'ins_bond_amount_usd missing from comparison table');
   }
 });
+
+test('am_grounding_system_and_rf_safety_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_system_and_rf_safety_guide;
+  assert.ok(g != null, 'am_grounding_system_and_rf_safety_guide must be present');
+  assert.ok(typeof g.n_radials === 'number', 'n_radials must be a number');
+  assert.ok(typeof g.total_cost_low_usd === 'number', 'total_cost_low_usd must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be a non-empty string');
+});
+
+test('am_grounding_system_and_rf_safety_guide KAZM Class D ground system parameters', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_system_and_rf_safety_guide;
+  // Class D, clear channel (780 kHz) → 90 radials, 1 element, #10 AWG
+  assert.strictEqual(g.n_radials, 90, 'KAZM Class D clear-channel should use 90 radials');
+  assert.strictEqual(g.n_tower_elements, 1, 'NDA station should have 1 tower element');
+  assert.strictEqual(g.wire_gauge_awg, 10, '5 kW station should use #10 AWG wire');
+  // 780 kHz: λ/4 ≈ 96m
+  assert.ok(g.radial_length_m > 90 && g.radial_length_m < 100, `radial_length_m ${g.radial_length_m} should be ~96m`);
+  assert.ok(g.total_radial_length_m > 8000, `total_radial_length_m ${g.total_radial_length_m} should be >8000m`);
+});
+
+test('am_grounding_system_and_rf_safety_guide KAZM RF safety fence required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_system_and_rf_safety_guide;
+  // 5 kW ≥ 5 kW threshold → MPE evaluation required
+  assert.strictEqual(g.mpe_evaluation_required, true, '5 kW station requires MPE evaluation');
+  assert.strictEqual(g.rf_fence_required, true, 'exclusion zone >5m requires RF fence');
+  // 780 kHz uncontrolled MPE: 0.78/1.5 = 0.52 mW/cm²
+  assert.strictEqual(g.mpe_uncontrolled_mw_cm2, 0.52, 'uncontrolled MPE should be 0.52 mW/cm²');
+  assert.ok(g.exclusion_zone_m > 0, 'exclusion zone must be positive');
+  assert.ok(g.controlled_zone_m < g.exclusion_zone_m, 'controlled zone must be less than uncontrolled zone');
+});
+
+test('am_grounding_system_and_rf_safety_guide cost structure is internally consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_system_and_rf_safety_guide;
+  // Ground system total = radial install + ATU
+  assert.strictEqual(
+    g.ground_system_total_low_usd,
+    g.radial_install_cost_low_usd + g.atu_cost_low_usd,
+    'ground_system_total_low should equal radial + ATU costs'
+  );
+  // Total = ground system + fence
+  assert.strictEqual(
+    g.total_cost_low_usd,
+    g.ground_system_total_low_usd + g.fence_cost_low_usd,
+    'total_cost_low should equal ground_system + fence costs'
+  );
+  assert.ok(g.total_cost_high_usd > g.total_cost_low_usd, 'high cost must exceed low cost');
+});
+
+test('am_grounding_system_and_rf_safety_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gnd_n_radials'          in row, 'gnd_n_radials missing from comparison table');
+    assert.ok('gnd_total_cost_low_usd' in row, 'gnd_total_cost_low_usd missing from comparison table');
+    assert.ok('gnd_exclusion_zone_m'   in row, 'gnd_exclusion_zone_m missing from comparison table');
+  }
+});

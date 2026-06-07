@@ -2351,3 +2351,20 @@ test('am_station_insurance_and_bonding_guide present across colocation candidate
     assert.ok(g.n_required_categories >= 5, `rank ${c.rank}: must have >= 5 required coverage categories`);
   }
 });
+
+test('am_grounding_system_and_rf_safety_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_grounding_system_and_rf_safety_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_grounding_system_and_rf_safety_guide`);
+    assert.ok(g.n_radials >= 60, `rank ${c.rank}: n_radials must be >= 60`);
+    assert.ok(g.total_cost_low_usd > 0, `rank ${c.rank}: total_cost_low_usd must be positive`);
+    assert.ok(g.exclusion_zone_m > 0, `rank ${c.rank}: exclusion_zone_m must be positive`);
+  }
+});

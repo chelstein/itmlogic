@@ -1101,7 +1101,10 @@ export async function runSiteOptimizer(body = {}){
     pop_cost_low_usd:           c.fcc_proof_of_performance_measurement_guide?.total_proof_cost_low_usd ?? null,
     ins_annual_low_usd:         c.am_station_insurance_and_bonding_guide?.annual_premium_low_usd ?? null,
     ins_tower_value_low_usd:    c.am_station_insurance_and_bonding_guide?.tower_replacement_value_low_usd ?? null,
-    ins_bond_amount_usd:        c.am_station_insurance_and_bonding_guide?.performance_bond_amount_usd ?? null
+    ins_bond_amount_usd:        c.am_station_insurance_and_bonding_guide?.performance_bond_amount_usd ?? null,
+    gnd_n_radials:              c.am_grounding_system_and_rf_safety_guide?.n_radials ?? null,
+    gnd_total_cost_low_usd:     c.am_grounding_system_and_rf_safety_guide?.total_cost_low_usd ?? null,
+    gnd_exclusion_zone_m:       c.am_grounding_system_and_rf_safety_guide?.exclusion_zone_m ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6836,6 +6839,114 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_grounding_system_and_rf_safety_guide: (() => {
+      // Models the §73.54 buried-radial ground system and RF safety fence
+      // requirements (47 CFR §1.1310 / OET Bulletin 65 Supplement B) for the
+      // candidate site.  Covers design parameters, material/labour costs, and
+      // the MPE exclusion zone that dictates fence placement.
+
+      const isDA_gnd        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_gnd = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_gnd = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // ---- §73.54 Ground radial system ----
+      // Wavelength and standard λ/4 radial length
+      const lambda_m        = round2(300000 / frequency_khz);
+      const radial_length_m = round2(lambda_m / 4);
+
+      // Number of buried radials per FCC/industry practice.
+      // §73.54 requires an "adequate" ground system; 120 buried radials is the
+      // standard for Class A/B; fewer are acceptable for lower-power classes.
+      const N_RADIALS = { A: 120, B: 120, C: 90, D: is_local_ch_gnd ? 60 : 90 };
+      const n_radials = N_RADIALS[fcc_class] ?? 90;
+
+      // DA arrays need independent ground systems per tower element
+      const n_tower_elements = isDA_gnd
+        ? ((fcc_class === 'A' || fcc_class === 'B') ? 4 : 3)
+        : 1;
+      const total_radial_length_m = round2(n_radials * radial_length_m * n_tower_elements);
+
+      // Wire gauge: heavier copper for higher-power stations to handle RF current
+      const wire_gauge_awg = tpo_kw >= 50 ? 6 : (tpo_kw >= 10 ? 8 : 10);
+
+      // Installation cost: burial + copper wire
+      // $8/m (open/sandy) to $20/m (rocky/urban terrain)
+      const radial_install_cost_low_usd  = Math.round(total_radial_length_m * 8);
+      const radial_install_cost_high_usd = Math.round(total_radial_length_m * 20);
+
+      // ATU / antenna tuning unit + ground bonding hardware (varies by class)
+      const atu_cost_low_usd  = fcc_class === 'A' ? 15000 : (fcc_class === 'B' ? 8000  : 3000);
+      const atu_cost_high_usd = fcc_class === 'A' ? 40000 : (fcc_class === 'B' ? 20000 : 8000);
+
+      const ground_system_total_low_usd  = radial_install_cost_low_usd  + atu_cost_low_usd;
+      const ground_system_total_high_usd = radial_install_cost_high_usd + atu_cost_high_usd;
+
+      // ---- RF Safety (47 CFR §1.1310 / OET Bulletin 65 Supplement B) ----
+      // Uncontrolled (general population) MPE limit in 0.3–3 MHz band:
+      //   f(MHz) / 1.5 mW/cm²
+      // Controlled (occupational) MPE limit:
+      //   f(MHz) / 0.3 mW/cm²
+      const f_mhz                   = round2(frequency_khz / 1000);
+      const mpe_uncontrolled_mw_cm2  = round2(f_mhz / 1.5);
+      const mpe_controlled_mw_cm2    = round2(f_mhz / 0.3);
+
+      // MPE evaluation required at ≥5 kW TPO per §1.1307 categorical exclusion
+      const mpe_evaluation_required = tpo_kw >= 5;
+
+      // Uncontrolled exclusion zone at base of tower (OET-65 Supplement B, AM
+      // ground-wave near-field; induction-zone dominance reduces far-field estimate)
+      let exclusion_zone_m = 10;
+      if      (tpo_kw >= 50) exclusion_zone_m = 100;
+      else if (tpo_kw >= 25) exclusion_zone_m =  60;
+      else if (tpo_kw >= 5 ) exclusion_zone_m =  35;
+      else if (tpo_kw >= 1 ) exclusion_zone_m =  20;
+
+      // Controlled zone ≈ uncontrolled / √5 (MPE ratio of 5:1)
+      const controlled_zone_m = Math.round(exclusion_zone_m / Math.sqrt(5));
+
+      // RF safety fence is required whenever the exclusion zone exceeds 5 m
+      const rf_fence_required  = exclusion_zone_m > 5;
+      const fence_perimeter_m  = round2(2 * Math.PI * exclusion_zone_m);
+      const fence_perimeter_ft = round2(fence_perimeter_m * 3.28084);
+
+      // Chain-link RF safety fence: $50–$100/linear ft installed
+      const fence_cost_low_usd  = rf_fence_required ? Math.round(fence_perimeter_ft * 50)  : 0;
+      const fence_cost_high_usd = rf_fence_required ? Math.round(fence_perimeter_ft * 100) : 0;
+
+      const total_cost_low_usd  = ground_system_total_low_usd  + fence_cost_low_usd;
+      const total_cost_high_usd = ground_system_total_high_usd + fence_cost_high_usd;
+
+      return {
+        // Grounding
+        n_radials,
+        n_tower_elements,
+        radial_length_m,
+        total_radial_length_m,
+        wire_gauge_awg,
+        radial_install_cost_low_usd,
+        radial_install_cost_high_usd,
+        atu_cost_low_usd,
+        atu_cost_high_usd,
+        ground_system_total_low_usd,
+        ground_system_total_high_usd,
+        // RF safety
+        mpe_evaluation_required,
+        mpe_uncontrolled_mw_cm2,
+        mpe_controlled_mw_cm2,
+        exclusion_zone_m,
+        controlled_zone_m,
+        rf_fence_required,
+        fence_perimeter_m,
+        fence_perimeter_ft,
+        fence_cost_low_usd,
+        fence_cost_high_usd,
+        // Grand total (ground system + fence)
+        total_cost_low_usd,
+        total_cost_high_usd,
+        note: `Ground system: ${n_radials} buried #${wire_gauge_awg} AWG copper radials at λ/4 = ${radial_length_m}m (λ = ${lambda_m}m @ ${frequency_khz} kHz) per §73.54${isDA_gnd ? ` — ${n_tower_elements}-tower DA array` : ''}; total copper: ${total_radial_length_m}m. RF safety per OET-65 Supplement B and §1.1310: uncontrolled MPE = ${mpe_uncontrolled_mw_cm2} mW/cm² at ${f_mhz} MHz; uncontrolled exclusion zone ${exclusion_zone_m}m, controlled zone ${controlled_zone_m}m${rf_fence_required ? `; RF safety fence required (${Math.round(fence_perimeter_ft)} linear ft, $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()})` : ''}.`
       };
     })(),
 
