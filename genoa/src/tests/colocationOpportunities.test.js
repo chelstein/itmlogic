@@ -3138,3 +3138,14 @@ test('am_fcc_construction_permit_and_license_guide present across colocation can
     assert.ok(Array.isArray(g.filing_forms), `rank ${c.rank}: filing_forms must be array`);
   }
 });
+
+test('am_signal_contour_and_coverage_area_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_signal_contour_and_coverage_area_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_signal_contour_and_coverage_area_guide missing`);
+    assert.ok(g.r_5mvm_km > 0, `rank ${c.rank}: r_5mvm_km must be positive`);
+    assert.ok(g.r_05mvm_km > g.r_5mvm_km, `rank ${c.rank}: r_05mvm_km must be > r_5mvm_km`);
+    assert.ok(g.area_5mvm_km2 > 0, `rank ${c.rank}: area_5mvm_km2 must be positive`);
+  }
+});

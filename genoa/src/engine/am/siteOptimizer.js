@@ -1296,7 +1296,10 @@ export async function runSiteOptimizer(body = {}){
     bld_stl_low_usd:            c.am_transmitter_building_and_studio_link_guide?.stl_low_usd ?? null,
     cp_total_nonrecurring_low:  c.am_fcc_construction_permit_and_license_guide?.total_nonrecurring_low_usd ?? null,
     cp_fcc_filing_fee:          c.am_fcc_construction_permit_and_license_guide?.fcc_filing_fee_usd ?? null,
-    cp_review_months_high:      c.am_fcc_construction_permit_and_license_guide?.cp_review_months_high ?? null
+    cp_review_months_high:      c.am_fcc_construction_permit_and_license_guide?.cp_review_months_high ?? null,
+    cov_r_5mvm_km:              c.am_signal_contour_and_coverage_area_guide?.r_5mvm_km ?? null,
+    cov_r_05mvm_km:             c.am_signal_contour_and_coverage_area_guide?.r_05mvm_km ?? null,
+    cov_area_5mvm_km2:          c.am_signal_contour_and_coverage_area_guide?.area_5mvm_km2 ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7031,6 +7034,47 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_signal_contour_and_coverage_area_guide: (() => {
+      // Simplified inverse-distance ground-wave formula for AM:
+      //   E(mV/m) = (k * sqrt(P_kW)) / d_km   (very rough; actual uses M3 map tables / Groundwave Assistant)
+      // FCC §73.183 uses M3 ground conductivity maps; here we use theoretical free-space approximation
+      // suitable only for planning comparison. k ≈ 1000 * sqrt(1) for 1 kW at 1 km reference.
+      // More accurately: E_1kW_1km ≈ 300 mV/m for AM ground wave (ITU-R P.368).
+      // Radiated power: apply efficiency for ground system (typ. 80–95% for NDA, 70–85% for DA base).
+      const isDA_sc    = /^DA/i.test(pattern_mode);
+      const ground_eff = isDA_sc ? 0.77 : 0.87;         // approximate ground system efficiency
+      const radiated_kw = round2(tpo_kw * ground_eff);
+      const sqrt_radiated = Math.sqrt(radiated_kw);
+      // E_ref = 300 mV/m at 1 km for 1 kW (ITU-R P.368 reference for average ground)
+      const e_ref_mvm_per_km = 300;
+      // Contour radii (km) at standard FCC service levels:
+      //   5 mV/m = primary service (§73.182)
+      //   0.5 mV/m = secondary/nighttime service
+      //   0.025 mV/m = interference-free groundwave
+      const r_5mvm_km     = round2((e_ref_mvm_per_km * sqrt_radiated) / 5);
+      const r_05mvm_km    = round2((e_ref_mvm_per_km * sqrt_radiated) / 0.5);
+      const r_0025mvm_km  = round2((e_ref_mvm_per_km * sqrt_radiated) / 0.025);
+      const r_5mvm_mi     = round2(r_5mvm_km    * 0.621371);
+      const r_05mvm_mi    = round2(r_05mvm_km   * 0.621371);
+      const r_0025mvm_mi  = round2(r_0025mvm_km * 0.621371);
+      // Coverage area (circular approximation in km²):
+      const area_5mvm_km2    = round2(Math.PI * r_5mvm_km    * r_5mvm_km);
+      const area_05mvm_km2   = round2(Math.PI * r_05mvm_km   * r_05mvm_km);
+      return {
+        frequency_khz, fcc_class, tpo_kw, pattern_mode,
+        isDA: isDA_sc,
+        ground_efficiency: ground_eff,
+        radiated_kw,
+        e_ref_mvm_per_km,
+        r_5mvm_km,     r_5mvm_mi,
+        r_05mvm_km,    r_05mvm_mi,
+        r_0025mvm_km,  r_0025mvm_mi: round2(r_0025mvm_km * 0.621371),
+        area_5mvm_km2, area_05mvm_km2,
+        reference: 'ITU-R P.368 (ground-wave propagation); 47 CFR §73.182 (AM service contours); §73.183 (groundwave field strength tables); FCC M3 ground conductivity map; simplified planning formula only — use Groundwave Assistant for precise contours',
+        note: `${tpo_kw} kW ${isDA_sc ? 'DA' : 'NDA'}: 5 mV/m radius ≈ ${r_5mvm_km} km (${r_5mvm_mi} mi); 0.5 mV/m ≈ ${r_05mvm_km} km (${r_05mvm_mi} mi). Simplified planning estimate only.`
       };
     })(),
 

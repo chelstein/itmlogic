@@ -13367,3 +13367,46 @@ test('am_fcc_construction_permit_and_license_guide comparison table columns pres
   assert.strictEqual(r0.cp_fcc_filing_fee,          1310, 'rank-1 cp_fcc_filing_fee should be 1310');
   assert.strictEqual(r0.cp_review_months_high,         18, 'rank-1 cp_review_months_high should be 18');
 });
+
+test('am_signal_contour_and_coverage_area_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_signal_contour_and_coverage_area_guide;
+  assert.ok(g !== undefined && g !== null, 'am_signal_contour_and_coverage_area_guide missing');
+  assert.ok(g.r_5mvm_km > 0, 'r_5mvm_km must be positive');
+  assert.ok(g.r_05mvm_km > g.r_5mvm_km, 'r_05mvm_km must be > r_5mvm_km');
+});
+
+test('KAZM NDA 5 kW signal contour radii', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_signal_contour_and_coverage_area_guide;
+  assert.strictEqual(g.radiated_kw,    4.35,    'KAZM radiated_kw should be 4.35');
+  assert.strictEqual(g.r_5mvm_km,     125.14,  'KAZM r_5mvm_km should be 125.14');
+  assert.strictEqual(g.r_05mvm_km,   1251.4,   'KAZM r_05mvm_km should be 1251.4');
+});
+
+test('KAZM signal coverage area', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_signal_contour_and_coverage_area_guide;
+  assert.strictEqual(g.area_5mvm_km2, 49197.4, 'KAZM area_5mvm_km2 should be 49197.4');
+  assert.ok(g.area_05mvm_km2 > g.area_5mvm_km2, 'area_05mvm_km2 must be > area_5mvm_km2');
+});
+
+test('KAZM signal contour reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_signal_contour_and_coverage_area_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.182'), 'reference must cite §73.182');
+  assert.ok(typeof g.note === 'string' && g.note.includes('5 mV/m'), 'note must mention 5 mV/m');
+});
+
+test('am_signal_contour_and_coverage_area_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cov_r_5mvm_km'     in row, 'cov_r_5mvm_km missing from comparison table');
+    assert.ok('cov_r_05mvm_km'    in row, 'cov_r_05mvm_km missing from comparison table');
+    assert.ok('cov_area_5mvm_km2' in row, 'cov_area_5mvm_km2 missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cov_r_5mvm_km,     125.14,   'rank-1 cov_r_5mvm_km should be 125.14');
+  assert.strictEqual(r0.cov_r_05mvm_km,    1251.4,   'rank-1 cov_r_05mvm_km should be 1251.4');
+  assert.strictEqual(r0.cov_area_5mvm_km2, 49197.4,  'rank-1 cov_area_5mvm_km2 should be 49197.4');
+});

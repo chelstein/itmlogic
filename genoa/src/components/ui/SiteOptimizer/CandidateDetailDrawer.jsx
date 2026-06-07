@@ -2226,6 +2226,25 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Signal Contour and Coverage Area Guide */}
+        {candidate.am_signal_contour_and_coverage_area_guide && (() => {
+          const g = candidate.am_signal_contour_and_coverage_area_guide;
+          return (
+            <div key="cov-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#581c87', marginBottom: 6, fontSize: 13 }}>Signal Contour &amp; Coverage (Planning Est.)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#6b21a8' }}>
+                <span>Radiated power:</span><span>{g.radiated_kw != null ? `${g.radiated_kw} kW` : '—'} ({g.isDA ? 'DA' : 'NDA'}, {g.ground_efficiency != null ? `${(g.ground_efficiency*100).toFixed(0)}% eff.` : '—'})</span>
+                <span>5 mV/m radius:</span><span>{g.r_5mvm_km != null ? `${g.r_5mvm_km} km (${g.r_5mvm_mi} mi)` : '—'}</span>
+                <span>0.5 mV/m radius:</span><span>{g.r_05mvm_km != null ? `${g.r_05mvm_km} km (${g.r_05mvm_mi} mi)` : '—'}</span>
+                <span>0.025 mV/m radius:</span><span>{g.r_0025mvm_km != null ? `${g.r_0025mvm_km} km` : '—'}</span>
+                <span>5 mV/m area:</span><span>{g.area_5mvm_km2 != null ? `${Number(g.area_5mvm_km2).toLocaleString()} km²` : '—'}</span>
+                <span>0.5 mV/m area:</span><span>{g.area_05mvm_km2 != null ? `${Number(g.area_05mvm_km2).toLocaleString()} km²` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7e22ce', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM FCC Construction Permit and License Guide */}
         {candidate.am_fcc_construction_permit_and_license_guide && (() => {
           const g = candidate.am_fcc_construction_permit_and_license_guide;
