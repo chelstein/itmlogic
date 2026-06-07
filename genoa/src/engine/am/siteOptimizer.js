@@ -1149,7 +1149,10 @@ export async function runSiteOptimizer(body = {}){
     es_total_utility_low_usd:   c.am_electrical_service_and_power_infrastructure_guide?.total_utility_low_usd ?? null,
     sc_sigma_ms_m:              c.am_soil_conductivity_and_groundwave_coverage_guide?.sigma_ms ?? null,
     sc_d_05_mvm_km:             c.am_soil_conductivity_and_groundwave_coverage_guide?.d_05_mvm_km ?? null,
-    sc_coverage_area_km2:       c.am_soil_conductivity_and_groundwave_coverage_guide?.coverage_area_km2 ?? null
+    sc_coverage_area_km2:       c.am_soil_conductivity_and_groundwave_coverage_guide?.coverage_area_km2 ?? null,
+    lp_N_g_adj:                 c.am_lightning_protection_and_surge_suppression_guide?.N_g_adj ?? null,
+    lp_N_s:                     c.am_lightning_protection_and_surge_suppression_guide?.N_s ?? null,
+    lp_total_cost_low_usd:      c.am_lightning_protection_and_surge_suppression_guide?.total_lp_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6884,6 +6887,67 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_lightning_protection_and_surge_suppression_guide: (() => {
+      // Models lightning strike risk at the candidate site per NFPA 780-2020 and
+      // specifies the surge protection system for the AM tower and station equipment.
+      // Lightning is a primary cause of AM transmitter failure; proper SPD selection
+      // is critical for operational continuity and insurance compliance.
+
+      // ---- Lightning flash density N_g (flashes/km²/yr) by latitude ----
+      // Source: NOAA lightning climatology (VAISALA/NASA LIS values, CONUS)
+      const lat_lp  = pt.lat;
+      const lon_lp  = pt.lon;
+      const N_g     = lat_lp < 28 ? 12
+                    : lat_lp < 33 ? 8
+                    : lat_lp < 38 ? 5
+                    : lat_lp < 45 ? 3
+                                  : 1.5;
+      // Southwest US monsoon season (July–Sept) significantly raises flash density
+      const is_monsoon = lat_lp >= 28 && lat_lp <= 38 && lon_lp >= -114 && lon_lp <= -103;
+      const N_g_adj    = is_monsoon ? round2(N_g * 1.5) : N_g;
+
+      // ---- Tower effective collection area (NFPA 780 Annex A) ----
+      const lambda_m_lp     = round2(299792.458 / frequency_khz);
+      const tower_h_m_lp    = round2(lambda_m_lp * (fcc_class === 'D' ? 0.25 : fcc_class === 'A' ? 0.525 : 0.375));
+      const tower_h_ft_lp   = Math.round(tower_h_m_lp * 3.28084);
+      // A_e = π × (3H)² per NFPA 780 simplified model (H in km)
+      const A_e_km2         = round2(Math.PI * Math.pow(tower_h_m_lp * 3 / 1000, 2));
+      const N_s             = round2(N_g_adj * A_e_km2); // expected strikes/yr
+      const lps_required    = N_s > 0.1; // NFPA 780 §4.1: LPS required if N_s > threshold
+
+      // ---- Surge protection components ----
+      // Base insulator discharge gap / RF surge arrestor (AM monopole–specific)
+      const base_arrestor_cost_low_usd  = 1500;
+      const base_arrestor_cost_high_usd = 4000;
+      // AC SPD (Type 1+2, whole-station panel; IEEE C62.41 Category C)
+      const ac_spd_cost_low_usd  = 800;
+      const ac_spd_cost_high_usd = 2500;
+      // RF/data/control line SPDs (coax+telemetry entry points)
+      const rf_spd_cost_low_usd  = 500;
+      const rf_spd_cost_high_usd = 1500;
+      // NFPA 780 structural LPS: air terminals + down conductors + ground ring
+      // (Much of this overlaps with the AM radial ground system)
+      const structural_lps_cost_low_usd  = 3000;
+      const structural_lps_cost_high_usd = 8000;
+      const total_lp_cost_low_usd  = base_arrestor_cost_low_usd + ac_spd_cost_low_usd
+                                   + rf_spd_cost_low_usd + structural_lps_cost_low_usd;
+      const total_lp_cost_high_usd = base_arrestor_cost_high_usd + ac_spd_cost_high_usd
+                                   + rf_spd_cost_high_usd + structural_lps_cost_high_usd;
+      // Annual inspection + SPD replacement reserve
+      const annual_lp_maint_usd = Math.round(total_lp_cost_low_usd * 0.08);
+      return {
+        lat_lp, lon_lp, N_g, is_monsoon, N_g_adj,
+        tower_h_ft_lp, A_e_km2, N_s, lps_required,
+        base_arrestor_cost_low_usd, base_arrestor_cost_high_usd,
+        ac_spd_cost_low_usd, ac_spd_cost_high_usd,
+        rf_spd_cost_low_usd, rf_spd_cost_high_usd,
+        structural_lps_cost_low_usd, structural_lps_cost_high_usd,
+        total_lp_cost_low_usd, total_lp_cost_high_usd, annual_lp_maint_usd,
+        reference: 'NFPA 780-2020 (lightning protection standard); IEEE C62.41.2 (surge environment); IEC 62305-3:2011 (structure protection); 47 CFR §73.1870 (station maintenance records)',
+        note: `Site: lat ${lat_lp.toFixed(2)}, ${is_monsoon ? 'SW monsoon zone — ' : ''}N_g=${N_g_adj} flashes/km²/yr. Tower ${tower_h_ft_lp} ft → A_e=${A_e_km2} km², ~${N_s} strikes/yr expected. ${lps_required ? 'NFPA 780 LPS required.' : 'LPS optional but recommended.'} Capital: $${total_lp_cost_low_usd.toLocaleString()}–$${total_lp_cost_high_usd.toLocaleString()}; annual PM: $${annual_lp_maint_usd.toLocaleString()}.`
       };
     })(),
 

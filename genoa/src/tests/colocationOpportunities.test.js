@@ -2591,3 +2591,14 @@ test('am_soil_conductivity_and_groundwave_coverage_guide present across colocati
     assert.ok(g.coverage_area_km2 > 0, `rank ${c.rank}: coverage_area_km2 must be positive`);
   }
 });
+
+test('am_lightning_protection_and_surge_suppression_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_lightning_protection_and_surge_suppression_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_lightning_protection_and_surge_suppression_guide missing`);
+    assert.ok(g.N_g > 0, `rank ${c.rank}: N_g must be positive`);
+    assert.ok(g.total_lp_cost_low_usd > 0, `rank ${c.rank}: total_lp_cost_low_usd must be positive`);
+    assert.ok(g.N_s > 0, `rank ${c.rank}: N_s must be positive`);
+  }
+});

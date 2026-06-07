@@ -11159,3 +11159,51 @@ test('am_soil_conductivity_and_groundwave_coverage_guide comparison table column
   assert.strictEqual(r0.sc_d_05_mvm_km, 38.72, 'rank-1 sc_d_05_mvm_km should be 38.72 km');
   assert.strictEqual(r0.sc_coverage_area_km2, 4710, 'rank-1 sc_coverage_area_km2 should be 4710');
 });
+
+test('am_lightning_protection_and_surge_suppression_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_lightning_protection_and_surge_suppression_guide;
+  assert.ok(g !== undefined && g !== null, 'am_lightning_protection_and_surge_suppression_guide should be present');
+  assert.ok(typeof g.N_s === 'number', 'N_s should be a number');
+  assert.ok(g.lps_required === true, 'KAZM monsoon zone with 1.95 strikes/yr must require LPS');
+});
+
+test('am_lightning_protection_and_surge_suppression_guide KAZM monsoon zone classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_lightning_protection_and_surge_suppression_guide;
+  // Sedona AZ (lat 34.86, lon -111.82): monsoon zone (lat 28-38, lon -114 to -103)
+  assert.strictEqual(g.N_g, 5, 'N_g base should be 5 for lat 33-38');
+  assert.strictEqual(g.is_monsoon, true, 'Sedona AZ should be in SW monsoon zone');
+  assert.strictEqual(g.N_g_adj, 7.5, 'N_g_adj = 5 × 1.5 = 7.5 for monsoon zone');
+});
+
+test('am_lightning_protection_and_surge_suppression_guide KAZM collection area and strikes', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_lightning_protection_and_surge_suppression_guide;
+  // 315 ft = 96.09 m tower; A_e = π×(3×96.09/1000)² = π×0.08311 = 0.261 → round2 = 0.26
+  assert.strictEqual(g.tower_h_ft_lp, 315, 'tower_h_ft_lp should be 315 ft');
+  assert.strictEqual(g.A_e_km2, 0.26, 'A_e_km2 should be 0.26 km²');
+  assert.strictEqual(g.N_s, 1.95, 'N_s should be 1.95 strikes/yr for KAZM');
+});
+
+test('am_lightning_protection_and_surge_suppression_guide KAZM protection costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_lightning_protection_and_surge_suppression_guide;
+  // 1500+800+500+3000 = $5,800 low; 4000+2500+1500+8000 = $16,000 high
+  assert.strictEqual(g.total_lp_cost_low_usd, 5800, 'total_lp_cost_low_usd should be $5,800');
+  assert.strictEqual(g.total_lp_cost_high_usd, 16000, 'total_lp_cost_high_usd should be $16,000');
+  assert.ok(g.annual_lp_maint_usd > 0, 'annual_lp_maint_usd must be positive');
+});
+
+test('am_lightning_protection_and_surge_suppression_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lp_N_g_adj'           in row, 'lp_N_g_adj missing from comparison table');
+    assert.ok('lp_N_s'               in row, 'lp_N_s missing from comparison table');
+    assert.ok('lp_total_cost_low_usd' in row, 'lp_total_cost_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.lp_N_g_adj, 7.5, 'rank-1 lp_N_g_adj should be 7.5');
+  assert.strictEqual(r0.lp_N_s, 1.95, 'rank-1 lp_N_s should be 1.95');
+  assert.strictEqual(r0.lp_total_cost_low_usd, 5800, 'rank-1 lp_total_cost_low_usd should be $5,800');
+});

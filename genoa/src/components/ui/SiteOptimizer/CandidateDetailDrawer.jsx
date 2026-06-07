@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Lightning Protection and Surge Suppression Guide */}
+        {candidate.am_lightning_protection_and_surge_suppression_guide && (() => {
+          const g = candidate.am_lightning_protection_and_surge_suppression_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="lp-guide" style={{ marginBottom: 16, padding: 12, background: '#fef6ee', borderRadius: 8, border: '1px solid #f97316' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Lightning Protection &amp; Surge Suppression</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Flash Density (N_g):</span><span>{g.N_g} flashes/km²/yr{g.is_monsoon ? ' (SW monsoon × 1.5 → ' + g.N_g_adj + ')' : ''}</span>
+                <span style={{ color: '#6b7280' }}>Tower Height:</span><span>{g.tower_h_ft_lp} ft → A_e = {g.A_e_km2} km²</span>
+                <span style={{ color: '#6b7280' }}>Expected Strikes:</span><span style={{ fontWeight: 600, color: g.N_s > 1 ? '#dc2626' : '#374151' }}>{g.N_s}/yr — LPS {g.lps_required ? '✓ Required' : 'Optional'}</span>
+                <span style={{ color: '#6b7280' }}>Base Arrestor:</span><span>{fmt(g.base_arrestor_cost_low_usd)} – {fmt(g.base_arrestor_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>AC SPD:</span><span>{fmt(g.ac_spd_cost_low_usd)} – {fmt(g.ac_spd_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>RF/Control SPDs:</span><span>{fmt(g.rf_spd_cost_low_usd)} – {fmt(g.rf_spd_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Structural LPS:</span><span>{fmt(g.structural_lps_cost_low_usd)} – {fmt(g.structural_lps_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_lp_cost_low_usd)} – {fmt(g.total_lp_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual PM:</span><span>{fmt(g.annual_lp_maint_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7c2d12', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Soil Conductivity and Groundwave Coverage Guide */}
         {candidate.am_soil_conductivity_and_groundwave_coverage_guide && (() => {
           const g = candidate.am_soil_conductivity_and_groundwave_coverage_guide;
