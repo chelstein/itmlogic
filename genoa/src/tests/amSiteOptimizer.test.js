@@ -11393,6 +11393,52 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_fcc_application_engineering_report_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_engineering_report_guide;
+  assert.ok(g !== undefined && g !== null, 'am_fcc_application_engineering_report_guide missing');
+  assert.ok(typeof g.fcc_filing_fee_usd === 'number', 'fcc_filing_fee_usd should be a number');
+  assert.ok(typeof g.n_stations_to_study === 'number', 'n_stations_to_study should be a number');
+});
+
+test('am_fcc_application_engineering_report_guide KAZM clear channel classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_engineering_report_guide;
+  assert.strictEqual(g.is_clear_channel, true, '780 kHz must be identified as clear channel');
+  assert.strictEqual(g.is_da, false, 'KAZM NDA pattern should not be flagged as DA');
+  assert.strictEqual(g.fcc_filing_fee_usd, 610, 'Class D filing fee should be $610');
+  assert.strictEqual(g.study_radius_km, 500, 'Clear channel study radius should be 500 km');
+});
+
+test('am_fcc_application_engineering_report_guide KAZM station count and cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_engineering_report_guide;
+  assert.strictEqual(g.n_stations_to_study, 35, 'Clear channel NDA should require studying 35 stations');
+  assert.strictEqual(g.eng_cost_low_usd, 10000, 'Clear channel NDA engineering cost low should be $10,000');
+  assert.strictEqual(g.total_application_low_usd, 10610, 'Total application low should be filing_fee + eng_cost_low');
+});
+
+test('am_fcc_application_engineering_report_guide KAZM processing timeline', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_engineering_report_guide;
+  assert.strictEqual(g.processing_months_low, 6, 'Processing time low should be 6 months');
+  assert.strictEqual(g.processing_months_high, 18, 'Clear channel processing time high should be 18 months');
+  assert.ok(g.total_application_high_usd > g.total_application_low_usd, 'High cost must exceed low');
+});
+
+test('am_fcc_application_engineering_report_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fca_n_stations'        in row, 'fca_n_stations missing from comparison table');
+    assert.ok('fca_eng_cost_low_usd'  in row, 'fca_eng_cost_low_usd missing from comparison table');
+    assert.ok('fca_total_app_low_usd' in row, 'fca_total_app_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.fca_n_stations,        35,    'rank-1 fca_n_stations should be 35');
+  assert.strictEqual(r0.fca_eng_cost_low_usd,  10000, 'rank-1 fca_eng_cost_low_usd should be $10,000');
+  assert.strictEqual(r0.fca_total_app_low_usd, 10610, 'rank-1 fca_total_app_low_usd should be $10,610');
+});
+
 test('am_site_access_road_and_security_guide comparison table columns present', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
   for (const row of out.candidate_comparison_table) {

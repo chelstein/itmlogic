@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM FCC Application Engineering Report Guide */}
+        {candidate.am_fcc_application_engineering_report_guide && (() => {
+          const g = candidate.am_fcc_application_engineering_report_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="fca-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 6, fontSize: 13 }}>FCC Form 301-AM Application &amp; Engineering</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#78350f' }}>
+                <span style={{ color: '#b45309' }}>Channel Type:</span><span>{g.is_clear_channel ? 'Clear Channel' : 'Regional/Local'} — {g.frequency_khz} kHz</span>
+                <span style={{ color: '#b45309' }}>Antenna Pattern:</span><span>{g.is_da ? 'Directional (DA)' : 'Non-Directional (NDA)'}</span>
+                <span style={{ color: '#b45309' }}>FCC Filing Fee:</span><span>{fmt(g.fcc_filing_fee_usd)} (Form 301-AM)</span>
+                <span style={{ color: '#b45309' }}>Stations to Study:</span><span>~{g.n_stations_to_study} within {g.study_radius_km} km</span>
+                <span style={{ color: '#b45309' }}>Engineering Cost:</span><span>{fmt(g.eng_cost_low_usd)} – {fmt(g.eng_cost_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Total App Cost:</span><span>{fmt(g.total_application_low_usd)} – {fmt(g.total_application_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Processing Time:</span><span>{g.processing_months_low}–{g.processing_months_high} months</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#92400e' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Site Access Road and Security Guide */}
         {candidate.am_site_access_road_and_security_guide && (() => {
           const g = candidate.am_site_access_road_and_security_guide;

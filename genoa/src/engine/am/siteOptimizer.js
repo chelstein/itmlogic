@@ -1164,7 +1164,10 @@ export async function runSiteOptimizer(body = {}){
     gt_total_geotech_low_usd:   c.am_geotechnical_and_soil_investigation_guide?.total_geotech_low_usd ?? null,
     sec_fence_perim_ft:         c.am_site_access_road_and_security_guide?.fence_perim_ft ?? null,
     sec_total_security_low_usd: c.am_site_access_road_and_security_guide?.total_security_low_usd ?? null,
-    sec_annual_monitoring_usd:  c.am_site_access_road_and_security_guide?.annual_security_maint_usd ?? null
+    sec_annual_monitoring_usd:  c.am_site_access_road_and_security_guide?.annual_security_maint_usd ?? null,
+    fca_n_stations:             c.am_fcc_application_engineering_report_guide?.n_stations_to_study ?? null,
+    fca_eng_cost_low_usd:       c.am_fcc_application_engineering_report_guide?.eng_cost_low_usd ?? null,
+    fca_total_app_low_usd:      c.am_fcc_application_engineering_report_guide?.total_application_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6899,6 +6902,63 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_fcc_application_engineering_report_guide: (() => {
+      // FCC Form 301-AM construction permit application engineering requirements.
+      // §73.37 mandates an interference study for all AM modifications.
+      // Cost and processing time scale with channel class, power, and antenna pattern.
+
+      const isClearApp = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocalApp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_app   = /^DA/i.test(pattern_mode);
+
+      // FCC Schedule of Fees (FY 2024) — AM construction permit (Form 301-AM)
+      // Class A/B: $650; Class C/D: $610
+      const fcc_filing_fee_usd = ['A', 'B'].includes(fcc_class) ? 650 : 610;
+
+      // Number of co-channel / adjacent-channel stations requiring interference check.
+      // Clear channel: dominant (Class A) nighttime 0.1 mV/m skywave can span 500 km.
+      // Regional: 300 km study radius.
+      // Local: 150 km study radius.
+      const base_study_stations = isClearApp ? 35 : isLocalApp ? 10 : 20;
+      // DA pattern requires ~50% more stations to assess shaped interference lobes.
+      const n_stations_to_study = isDA_app
+        ? Math.round(base_study_stations * 1.5)
+        : base_study_stations;
+
+      // Engineering consulting cost (interference study + report preparation)
+      const eng_cost_low_usd  = isClearApp ? (isDA_app ? 15000 : 10000) : (isDA_app ? 8000 : 5000);
+      const eng_cost_high_usd = isClearApp ? (isDA_app ? 35000 : 20000) : (isDA_app ? 18000 : 12000);
+
+      // FCC processing timeline (months, informal target; contested cases longer)
+      const processing_months_low  = 6;
+      const processing_months_high = isClearApp ? 18 : 12;
+
+      // §73.37 study radius depends on channel class and the reach of groundwave/skywave
+      const study_radius_km = isClearApp ? 500 : isLocalApp ? 150 : 300;
+
+      const total_application_low_usd  = fcc_filing_fee_usd + eng_cost_low_usd;
+      const total_application_high_usd = fcc_filing_fee_usd + eng_cost_high_usd;
+
+      return {
+        fcc_class,
+        frequency_khz,
+        tpo_kw,
+        is_clear_channel:           isClearApp,
+        is_da:                      isDA_app,
+        fcc_filing_fee_usd,
+        n_stations_to_study,
+        eng_cost_low_usd,
+        eng_cost_high_usd,
+        processing_months_low,
+        processing_months_high,
+        study_radius_km,
+        total_application_low_usd,
+        total_application_high_usd,
+        reference: '47 CFR §73.37 (interference study requirements); FCC Schedule of Fees FY 2024 (Form 301-AM: $610/$650); §73.21 (channel classes); §73.25 (clear channel dominant station protection); §73.37(a)(1) co-channel; §73.37(b) adj-channel; OET Bulletin 69 (AM interference analysis methodology)',
+        note: `FCC Form 301-AM engineering: ${isClearApp ? 'clear channel' : isLocalApp ? 'local' : 'regional'} Class ${fcc_class} at ${frequency_khz} kHz, ${tpo_kw} kW ${isDA_app ? 'DA' : 'NDA'}. Interference study: ~${n_stations_to_study} stations within ${study_radius_km} km. Engineering $${eng_cost_low_usd.toLocaleString()}–$${eng_cost_high_usd.toLocaleString()}; FCC filing fee $${fcc_filing_fee_usd}. Estimated processing ${processing_months_low}–${processing_months_high} months from acceptance.`
       };
     })(),
 

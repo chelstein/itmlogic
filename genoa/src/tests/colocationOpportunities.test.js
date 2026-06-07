@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_fcc_application_engineering_report_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_fcc_application_engineering_report_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_application_engineering_report_guide missing`);
+    assert.ok(g.fcc_filing_fee_usd > 0, `rank ${c.rank}: fcc_filing_fee_usd must be positive`);
+    assert.ok(g.n_stations_to_study > 0, `rank ${c.rank}: n_stations_to_study must be positive`);
+    assert.ok(g.total_application_low_usd > 0, `rank ${c.rank}: total_application_low_usd must be positive`);
+  }
+});
+
 test('am_site_access_road_and_security_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {
