@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Phase I Environmental Site Assessment Guide */}
+        {candidate.am_phase_i_environmental_site_assessment_guide && (() => {
+          const g = candidate.am_phase_i_environmental_site_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="esa-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Phase I Environmental Site Assessment (ASTM E1527-21)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span style={{ color: '#16a34a' }}>Site Area:</span><span>{g.site_acres} acres (Class {g.fcc_class})</span>
+                <span style={{ color: '#16a34a' }}>Phase I Cost:</span><span>{fmt(g.phase1_cost_low_usd)} – {fmt(g.phase1_cost_high_usd)}</span>
+                <span style={{ color: '#16a34a' }}>Phase I Timeline:</span><span>{g.phase1_weeks} weeks</span>
+                <span style={{ color: '#16a34a' }}>REC Probability:</span><span>{g.rec_probability_pct}% (rural AM site)</span>
+                <span style={{ color: '#16a34a' }}>Phase II (if RECs):</span><span>{fmt(g.phase2_cost_low_usd)} – {fmt(g.phase2_cost_high_usd)}</span>
+                <span style={{ color: '#16a34a' }}>Total High:</span><span>{fmt(g.total_esa_high_usd)} (incl. vapor intrusion)</span>
+                <span style={{ color: '#16a34a' }}>Phase II Timeline:</span><span>+{g.phase2_weeks_low}–{g.phase2_weeks_high} weeks if triggered</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#14532d' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM FCC Application Engineering Report Guide */}
         {candidate.am_fcc_application_engineering_report_guide && (() => {
           const g = candidate.am_fcc_application_engineering_report_guide;

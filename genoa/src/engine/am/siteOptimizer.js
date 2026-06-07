@@ -1167,7 +1167,10 @@ export async function runSiteOptimizer(body = {}){
     sec_annual_monitoring_usd:  c.am_site_access_road_and_security_guide?.annual_security_maint_usd ?? null,
     fca_n_stations:             c.am_fcc_application_engineering_report_guide?.n_stations_to_study ?? null,
     fca_eng_cost_low_usd:       c.am_fcc_application_engineering_report_guide?.eng_cost_low_usd ?? null,
-    fca_total_app_low_usd:      c.am_fcc_application_engineering_report_guide?.total_application_low_usd ?? null
+    fca_total_app_low_usd:      c.am_fcc_application_engineering_report_guide?.total_application_low_usd ?? null,
+    esa_phase1_cost_low_usd:    c.am_phase_i_environmental_site_assessment_guide?.phase1_cost_low_usd ?? null,
+    esa_rec_probability_pct:    c.am_phase_i_environmental_site_assessment_guide?.rec_probability_pct ?? null,
+    esa_total_high_usd:         c.am_phase_i_environmental_site_assessment_guide?.total_esa_high_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6902,6 +6905,61 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_phase_i_environmental_site_assessment_guide: (() => {
+      // ASTM E1527-21 Phase I Environmental Site Assessment (ESA).
+      // Required by lenders (SBA, USDA RUS, commercial bank) before site acquisition
+      // or construction financing.  Identifies Recognized Environmental Conditions (RECs)
+      // from prior property use.  Phase II sampling/testing is triggered only if RECs found.
+
+      // Estimated transmitter site acreage by FCC class
+      const SITE_ACRES_BY_CLASS = { A: 10, B: 5, C: 2, D: 1.5 };
+      const site_acres = SITE_ACRES_BY_CLASS[fcc_class] ?? 1.5;
+
+      // Phase I ESA cost (flat base + minor acreage scaling)
+      const phase1_cost_low_usd  = Math.round(1500 + site_acres * 100);
+      const phase1_cost_high_usd = Math.round(4000 + site_acres * 200);
+
+      // REC probability: rural AM transmitter sites are typically agricultural/open land.
+      // Low prior industrial use → ~20% probability of a REC requiring Phase II.
+      const rec_probability_pct = 20;
+
+      // Phase II ESA costs if RECs are identified (soil/groundwater sampling)
+      const phase2_cost_low_usd  = 5000;
+      const phase2_cost_high_usd = 50000;
+
+      // Vapor intrusion assessment (optional; required near industrial corridors)
+      const vapor_intrusion_cost_low_usd  = 2000;
+      const vapor_intrusion_cost_high_usd = 10000;
+
+      // Timelines
+      const phase1_weeks      = 3;   // ASTM E1527-21 typical turnaround
+      const phase2_weeks_low  = 6;
+      const phase2_weeks_high = 14;
+
+      // Planning totals: low = Phase I only; high = Phase I + Phase II + vapor intrusion
+      const total_esa_low_usd  = phase1_cost_low_usd;
+      const total_esa_high_usd = phase1_cost_high_usd + phase2_cost_high_usd + vapor_intrusion_cost_high_usd;
+
+      return {
+        fcc_class,
+        site_acres,
+        phase1_cost_low_usd,
+        phase1_cost_high_usd,
+        rec_probability_pct,
+        phase2_cost_low_usd,
+        phase2_cost_high_usd,
+        vapor_intrusion_cost_low_usd,
+        vapor_intrusion_cost_high_usd,
+        phase1_weeks,
+        phase2_weeks_low,
+        phase2_weeks_high,
+        total_esa_low_usd,
+        total_esa_high_usd,
+        reference: 'ASTM E1527-21 (Phase I ESA Standard Practice); ASTM E1903 (Phase II ESA); EPA All Appropriate Inquiry Rule 40 CFR §312; SBA SOP 50 10 6 (Phase I lender requirement); USDA RUS Bulletin 1726E-300 (environmental review)',
+        note: `Phase I ESA (ASTM E1527-21) required before site acquisition and lender financing. Estimated ${site_acres}-acre transmitter site. Phase I: $${phase1_cost_low_usd.toLocaleString()}–$${phase1_cost_high_usd.toLocaleString()} / ${phase1_weeks} weeks. Phase II (if RECs identified, ~${rec_probability_pct}% probability for rural AM sites): $${phase2_cost_low_usd.toLocaleString()}–$${phase2_cost_high_usd.toLocaleString()} / ${phase2_weeks_low}–${phase2_weeks_high} additional weeks.`
       };
     })(),
 

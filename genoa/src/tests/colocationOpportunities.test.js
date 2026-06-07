@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_phase_i_environmental_site_assessment_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_phase_i_environmental_site_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_phase_i_environmental_site_assessment_guide missing`);
+    assert.ok(g.site_acres > 0, `rank ${c.rank}: site_acres must be positive`);
+    assert.ok(g.phase1_cost_low_usd > 0, `rank ${c.rank}: phase1_cost_low_usd must be positive`);
+    assert.ok(g.total_esa_high_usd >= g.total_esa_low_usd, `rank ${c.rank}: high ESA cost must be >= low`);
+  }
+});
+
 test('am_fcc_application_engineering_report_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

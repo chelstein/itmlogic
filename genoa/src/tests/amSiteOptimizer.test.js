@@ -11393,6 +11393,52 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_phase_i_environmental_site_assessment_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_phase_i_environmental_site_assessment_guide;
+  assert.ok(g !== undefined && g !== null, 'am_phase_i_environmental_site_assessment_guide missing');
+  assert.ok(typeof g.phase1_cost_low_usd === 'number', 'phase1_cost_low_usd should be a number');
+  assert.ok(typeof g.site_acres === 'number', 'site_acres should be a number');
+});
+
+test('am_phase_i_environmental_site_assessment_guide KAZM Class D site sizing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_phase_i_environmental_site_assessment_guide;
+  assert.strictEqual(g.site_acres, 1.5, 'Class D site should be 1.5 acres');
+  assert.strictEqual(g.phase1_cost_low_usd, 1650, 'Phase I low cost should be $1,650');
+  assert.strictEqual(g.phase1_cost_high_usd, 4300, 'Phase I high cost should be $4,300');
+  assert.strictEqual(g.phase1_weeks, 3, 'Phase I timeline should be 3 weeks');
+});
+
+test('am_phase_i_environmental_site_assessment_guide KAZM REC and Phase II values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_phase_i_environmental_site_assessment_guide;
+  assert.strictEqual(g.rec_probability_pct, 20, 'REC probability should be 20% for rural AM sites');
+  assert.strictEqual(g.phase2_cost_low_usd, 5000, 'Phase II low cost should be $5,000');
+  assert.strictEqual(g.phase2_cost_high_usd, 50000, 'Phase II high cost should be $50,000');
+});
+
+test('am_phase_i_environmental_site_assessment_guide KAZM total ESA costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_phase_i_environmental_site_assessment_guide;
+  assert.strictEqual(g.total_esa_low_usd, 1650, 'Total ESA low (Phase I only) should be $1,650');
+  assert.strictEqual(g.total_esa_high_usd, 64300, 'Total ESA high (Phase I+II+vapor) should be $64,300');
+  assert.ok(g.total_esa_high_usd > g.total_esa_low_usd, 'High total must exceed low total');
+});
+
+test('am_phase_i_environmental_site_assessment_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('esa_phase1_cost_low_usd' in row, 'esa_phase1_cost_low_usd missing from comparison table');
+    assert.ok('esa_rec_probability_pct' in row, 'esa_rec_probability_pct missing from comparison table');
+    assert.ok('esa_total_high_usd'      in row, 'esa_total_high_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.esa_phase1_cost_low_usd, 1650,  'rank-1 esa_phase1_cost_low_usd should be $1,650');
+  assert.strictEqual(r0.esa_rec_probability_pct, 20,    'rank-1 esa_rec_probability_pct should be 20');
+  assert.strictEqual(r0.esa_total_high_usd,      64300, 'rank-1 esa_total_high_usd should be $64,300');
+});
+
 test('am_fcc_application_engineering_report_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_fcc_application_engineering_report_guide;
