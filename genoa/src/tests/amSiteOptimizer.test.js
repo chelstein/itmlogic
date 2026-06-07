@@ -13149,3 +13149,47 @@ test('am_grounding_and_lightning_protection_guide comparison table columns prese
   assert.strictEqual(r0.ltp_ground_ring_ft,   94.25, 'rank-1 ltp_ground_ring_ft should be 94.25');
   assert.strictEqual(r0.ltp_num_ground_rods,  10,    'rank-1 ltp_num_ground_rods should be 10');
 });
+
+test('am_fcc_asr_tower_registration_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
+  assert.ok(g !== undefined && g !== null, 'am_fcc_asr_tower_registration_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM 315 ft tower requires ASR and FAA notice', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
+  assert.strictEqual(g.tower_height_ft,    315.26, 'KAZM tower_height_ft should be 315.26');
+  assert.strictEqual(g.requires_asr,        true,  'KAZM 315 ft tower requires ASR');
+  assert.strictEqual(g.requires_faa_notice, true,  'KAZM 315 ft tower requires FAA notice');
+});
+
+test('KAZM ASR regulatory cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
+  assert.strictEqual(g.total_low_usd,  5130,  'KAZM total_low_usd should be 5130');
+  assert.strictEqual(g.total_high_usd, 18130, 'KAZM total_high_usd should be 18130');
+  assert.strictEqual(g.asr_fee_usd,    130,   'ASR fee should be $130');
+});
+
+test('KAZM ASR reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_asr_tower_registration_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§17.7'), 'reference must cite §17.7');
+  assert.ok(typeof g.note === 'string' && g.note.includes('REQUIRES'), 'note must say REQUIRES for tall tower');
+});
+
+test('am_fcc_asr_tower_registration_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('asr_requires_asr'    in row, 'asr_requires_asr missing from comparison table');
+    assert.ok('asr_total_low_usd'   in row, 'asr_total_low_usd missing from comparison table');
+    assert.ok('asr_tower_height_ft' in row, 'asr_tower_height_ft missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.asr_requires_asr,    true,   'rank-1 asr_requires_asr should be true');
+  assert.strictEqual(r0.asr_total_low_usd,   5130,   'rank-1 asr_total_low_usd should be 5130');
+  assert.strictEqual(r0.asr_tower_height_ft, 315.26, 'rank-1 asr_tower_height_ft should be 315.26');
+});

@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM FCC ASR Tower Registration Guide */}
+        {candidate.am_fcc_asr_tower_registration_guide && (() => {
+          const g = candidate.am_fcc_asr_tower_registration_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="asr-guide" style={{ marginBottom: 16, padding: 12, background: '#fef3c7', borderRadius: 8, border: `2px solid ${g.requires_asr ? '#d97706' : '#6b7280'}` }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>FCC ASR Tower Registration</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft (${g.tower_height_m != null ? `${g.tower_height_m.toFixed(1)} m` : '—'})` : '—'}</span>
+                <span>ASR threshold:</span><span>{g.asr_threshold_ft != null ? `${g.asr_threshold_ft} ft AGL` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>Requires ASR:</span>
+                <span style={{ fontWeight: 600, color: g.requires_asr ? '#b91c1c' : '#15803d' }}>{g.requires_asr ? 'YES — file before construction' : 'No (≤200 ft)'}</span>
+                <span>FAA Form 7460-1:</span><span>{g.requires_faa_notice ? 'Required' : 'Not required'}</span>
+                <span>Lighting type:</span><span>{g.lighting_type ?? '—'}</span>
+                <span>ASR fee:</span><span>{fmt(g.asr_fee_usd)}</span>
+                <span>Structural study:</span><span>{fmt(g.structural_study_low_usd)} – {fmt(g.structural_study_high_usd)}</span>
+                <span>NEPA / §106 review:</span><span>{fmt(g.environmental_review_low_usd)} – {fmt(g.environmental_review_high_usd)}</span>
+                <span>Legal counsel:</span><span>{fmt(g.legal_counsel_low_usd)} – {fmt(g.legal_counsel_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Grounding and Lightning Protection Guide */}
         {candidate.am_grounding_and_lightning_protection_guide && (() => {
           const g = candidate.am_grounding_and_lightning_protection_guide;

@@ -1281,7 +1281,10 @@ export async function runSiteOptimizer(body = {}){
     txl_coax_run_ft:            c.am_transmission_loss_budget_guide?.coax_run_ft ?? null,
     ltp_total_low_usd:          c.am_grounding_and_lightning_protection_guide?.total_low_usd ?? null,
     ltp_ground_ring_ft:         c.am_grounding_and_lightning_protection_guide?.ground_ring_ft ?? null,
-    ltp_num_ground_rods:        c.am_grounding_and_lightning_protection_guide?.num_ground_rods ?? null
+    ltp_num_ground_rods:        c.am_grounding_and_lightning_protection_guide?.num_ground_rods ?? null,
+    asr_requires_asr:           c.am_fcc_asr_tower_registration_guide?.requires_asr ?? null,
+    asr_total_low_usd:          c.am_fcc_asr_tower_registration_guide?.total_low_usd ?? null,
+    asr_tower_height_ft:        c.am_fcc_asr_tower_registration_guide?.tower_height_ft ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7016,6 +7019,51 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_fcc_asr_tower_registration_guide: (() => {
+      // 47 CFR §17.7: structures > 60.96 m (200 ft) AGL require FCC ASR registration.
+      // Antenna Structure Registration (ASR) is required BEFORE construction or modification.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd     = /^[CD]$/i.test(fcc_class);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_ft = round2(tower_height_m * 3.28084);
+      const asr_threshold_m  = 60.96;   // 47 CFR §17.7 height trigger
+      const asr_threshold_ft = 200;
+      const requires_asr    = tower_height_m > asr_threshold_m;
+      // Aviation obstruction lighting: FAA Form 7460-1 (Notice of Proposed Construction)
+      // required for structures > 200 ft AGL or within airport approach zones.
+      const requires_faa_notice = tower_height_ft > 200;
+      // FAA lighting type per AC 70/7460-1M: red obstruction light (L-810) up to 500 ft;
+      // white/red strobes (L-856/L-864) for taller structures.
+      const lighting_type   = tower_height_ft > 500 ? 'L-856/L-864 (red/white strobe)' : 'L-810 (steady red)';
+      // ASR filing fee and engineering costs
+      const asr_fee_usd          = 130;   // FCC Schedule of Regulatory Fees (approximate)
+      const structural_study_low  = 2500;
+      const structural_study_high = 8000;
+      const environmental_review_low  = 1500;  // NEPA / Section 106 review
+      const environmental_review_high = 6000;
+      const legal_counsel_low  = 1000;
+      const legal_counsel_high = 4000;
+      const total_low_usd  = round2(asr_fee_usd + structural_study_low  + environmental_review_low  + legal_counsel_low);
+      const total_high_usd = round2(asr_fee_usd + structural_study_high + environmental_review_high + legal_counsel_high);
+      return {
+        frequency_khz, fcc_class, tower_height_m, tower_height_ft,
+        asr_threshold_m, asr_threshold_ft,
+        requires_asr, requires_faa_notice,
+        lighting_type,
+        asr_fee_usd,
+        structural_study_low_usd:  structural_study_low,
+        structural_study_high_usd: structural_study_high,
+        environmental_review_low_usd:  environmental_review_low,
+        environmental_review_high_usd: environmental_review_high,
+        legal_counsel_low_usd:  legal_counsel_low,
+        legal_counsel_high_usd: legal_counsel_high,
+        total_low_usd, total_high_usd,
+        reference: '47 CFR §17.7 (ASR registration threshold); 47 CFR §17.4 (ASR application); FAA AC 70/7460-1M (obstruction lighting); FAA Form 7460-1 (Notice of Proposed Construction); NEPA § 106 historic review',
+        note: `${tower_height_ft.toFixed(0)} ft tower ${requires_asr ? 'REQUIRES FCC ASR registration (>200 ft AGL). File before construction.' : 'does not trigger FCC ASR (≤200 ft AGL)'}. ${requires_faa_notice ? 'FAA Form 7460-1 required. Lighting: ' + lighting_type + '.' : ''} Total regulatory cost: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 
