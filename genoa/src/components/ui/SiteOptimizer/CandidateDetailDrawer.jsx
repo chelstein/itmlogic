@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Nighttime Skywave Interference Guide */}
+        {candidate.am_nighttime_skywave_interference_guide && (() => {
+          const g = candidate.am_nighttime_skywave_interference_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="sky-guide" style={{ marginBottom: 16, padding: 12, background: '#1e1b4b', borderRadius: 8, border: '2px solid #6366f1' }}>
+              <div style={{ fontWeight: 700, color: '#e0e7ff', marginBottom: 6, fontSize: 13 }}>Nighttime Skywave Interference</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#c7d2fe' }}>
+                <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear channel' : g.is_local_channel ? 'Local channel' : 'Regional channel'}</span>
+                <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.is_class_cd ? 'secondary at night' : 'has nighttime protection'})</span>
+                <span>Skywave reach:</span><span>{g.skywave_reach_km_low != null ? `${g.skywave_reach_km_low}–${g.skywave_reach_km_high} km` : '—'}</span>
+                <span>Engineering study:</span><span>{fmt(g.skywave_study_low_usd)} – {fmt(g.skywave_study_high_usd)}</span>
+                {g.da_night_system_low_usd > 0 && (<><span>Night DA system:</span><span>{fmt(g.da_night_system_low_usd)} – {fmt(g.da_night_system_high_usd)}</span></>)}
+                <span style={{ fontWeight: 600 }}>Total study cost:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_study_low_usd)} – {fmt(g.total_study_high_usd)}</span>
+              </div>
+              {g.nighttime_power_note && <div style={{ marginTop: 6, fontSize: 11, color: '#a5b4fc', fontStyle: 'italic' }}>{g.nighttime_power_note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Signal Contour and Coverage Area Guide */}
         {candidate.am_signal_contour_and_coverage_area_guide && (() => {
           const g = candidate.am_signal_contour_and_coverage_area_guide;

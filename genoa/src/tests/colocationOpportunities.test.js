@@ -3149,3 +3149,14 @@ test('am_signal_contour_and_coverage_area_guide present across colocation candid
     assert.ok(g.area_5mvm_km2 > 0, `rank ${c.rank}: area_5mvm_km2 must be positive`);
   }
 });
+
+test('am_nighttime_skywave_interference_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_nighttime_skywave_interference_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nighttime_skywave_interference_guide missing`);
+    assert.ok(g.total_study_low_usd > 0, `rank ${c.rank}: total_study_low_usd must be positive`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', `rank ${c.rank}: is_clear_channel must be boolean`);
+    assert.ok(typeof g.nighttime_power_note === 'string', `rank ${c.rank}: nighttime_power_note must be string`);
+  }
+});

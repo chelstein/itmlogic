@@ -1299,7 +1299,10 @@ export async function runSiteOptimizer(body = {}){
     cp_review_months_high:      c.am_fcc_construction_permit_and_license_guide?.cp_review_months_high ?? null,
     cov_r_5mvm_km:              c.am_signal_contour_and_coverage_area_guide?.r_5mvm_km ?? null,
     cov_r_05mvm_km:             c.am_signal_contour_and_coverage_area_guide?.r_05mvm_km ?? null,
-    cov_area_5mvm_km2:          c.am_signal_contour_and_coverage_area_guide?.area_5mvm_km2 ?? null
+    cov_area_5mvm_km2:          c.am_signal_contour_and_coverage_area_guide?.area_5mvm_km2 ?? null,
+    sky_is_clear_channel:       c.am_nighttime_skywave_interference_guide?.is_clear_channel ?? null,
+    sky_total_study_low_usd:    c.am_nighttime_skywave_interference_guide?.total_study_low_usd ?? null,
+    sky_skywave_reach_km_high:  c.am_nighttime_skywave_interference_guide?.skywave_reach_km_high ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7034,6 +7037,58 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_nighttime_skywave_interference_guide: (() => {
+      // §73.182(k): For Class D stations, nighttime operation is secondary.
+      // Class D stations may operate at night only if they do not cause interference to
+      // dominant (Class A/B/C) co-channel or adjacent-channel stations' nighttime contours.
+      // The FCC uses skywave field-strength curves (M3 method) and the 50% skywave formula.
+      // Key thresholds per §73.182:
+      //   - Dominant station 0.1 mV/m daytime protected contour
+      //   - Nighttime: Class D must not increase ambient level by > 2 mV/m (§73.182(k)(1))
+      // Class D stations on clear channels (§73.25) operate as secondary during nighttime.
+      const is_clear    = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local    = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const is_class_cd = /^[CD]$/i.test(fcc_class);
+      const isDA_sky    = /^DA/i.test(pattern_mode);
+      // Nighttime operating power: §73.25 — Class D on clear channels must reduce to
+      // 50% daytime power or to a level that prevents co-channel interference.
+      // For Class D: typical nighttime authorization is 25–100W (or no nighttime operation).
+      const nighttime_power_note = is_clear && is_class_cd
+        ? 'Class D on clear channel: nighttime operation likely limited or prohibited (§73.25)'
+        : is_local && is_class_cd
+          ? 'Class D on local channel: no nighttime protection expected; daytime-only operation common'
+          : `Class ${fcc_class}: nighttime operation evaluated case-by-case per §73.182(k)`;
+      // Skywave interference protection distance (rough estimate):
+      // At 1 kW skywave ERP, ~50% skywave signal reaches ~1,000–2,000 km at night.
+      // Class D stations on clear channels typically need to demonstrate no interference
+      // to dominant station at its 0.1 mV/m daytime contour radius.
+      const skywave_reach_km_low  = 1000;
+      const skywave_reach_km_high = 2500;
+      // Engineering study cost for nighttime skywave interference analysis:
+      // Requires MWAA (Medium Wave Antenna Analysis) or FCC Skywave Interference Calculator
+      const skywave_study_low_usd  = 3000;
+      const skywave_study_high_usd = 12000;
+      // If nighttime operation requires a directional antenna system or power reduction:
+      const da_night_system_low_usd  = is_class_cd ? 0 : 15000;
+      const da_night_system_high_usd = is_class_cd ? 0 : 60000;
+      const total_study_low_usd  = round2(skywave_study_low_usd  + da_night_system_low_usd);
+      const total_study_high_usd = round2(skywave_study_high_usd + da_night_system_high_usd);
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        is_clear_channel: is_clear,
+        is_local_channel: is_local,
+        is_class_cd,
+        isDA: isDA_sky,
+        nighttime_power_note,
+        skywave_reach_km_low, skywave_reach_km_high,
+        skywave_study_low_usd, skywave_study_high_usd,
+        da_night_system_low_usd, da_night_system_high_usd,
+        total_study_low_usd, total_study_high_usd,
+        reference: '47 CFR §73.25 (clear channel nighttime); §73.182(k) (nighttime interference); §73.26 (dominant station protection); FCC Skywave Interference Calculator; NRSC AM Improvement Program guidelines',
+        note: `${frequency_khz} kHz ${is_clear ? 'clear channel' : is_local ? 'local channel' : 'regional channel'} — ${nighttime_power_note}. Skywave reach: ${skywave_reach_km_low}–${skywave_reach_km_high} km. Study cost: $${total_study_low_usd.toLocaleString()}–$${total_study_high_usd.toLocaleString()}`
       };
     })(),
 

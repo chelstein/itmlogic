@@ -13410,3 +13410,47 @@ test('am_signal_contour_and_coverage_area_guide comparison table columns present
   assert.strictEqual(r0.cov_r_05mvm_km,    1251.4,   'rank-1 cov_r_05mvm_km should be 1251.4');
   assert.strictEqual(r0.cov_area_5mvm_km2, 49197.4,  'rank-1 cov_area_5mvm_km2 should be 49197.4');
 });
+
+test('am_nighttime_skywave_interference_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_skywave_interference_guide;
+  assert.ok(g !== undefined && g !== null, 'am_nighttime_skywave_interference_guide missing');
+  assert.ok(g.total_study_low_usd > 0, 'total_study_low_usd must be positive');
+  assert.ok(g.total_study_high_usd >= g.total_study_low_usd, 'total_study_high must be >= low');
+});
+
+test('KAZM 780 kHz is clear channel and Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_skywave_interference_guide;
+  assert.strictEqual(g.is_clear_channel, true,  '780 kHz should be clear channel');
+  assert.strictEqual(g.is_class_cd,      true,  'KAZM Class D should set is_class_cd');
+  assert.strictEqual(g.isDA,             false, 'KAZM NDA should set isDA=false');
+});
+
+test('KAZM skywave study cost (Class D: no nighttime DA system)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_skywave_interference_guide;
+  assert.strictEqual(g.total_study_low_usd,         3000, 'Class D total_study_low should be 3000');
+  assert.strictEqual(g.total_study_high_usd,        12000, 'Class D total_study_high should be 12000');
+  assert.strictEqual(g.da_night_system_low_usd,     0,    'Class D da_night_system_low should be 0');
+});
+
+test('KAZM skywave reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_skywave_interference_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.182'), 'reference must cite §73.182');
+  assert.ok(typeof g.note === 'string' && g.note.includes('clear channel'), 'note must mention channel type');
+});
+
+test('am_nighttime_skywave_interference_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sky_is_clear_channel'      in row, 'sky_is_clear_channel missing from comparison table');
+    assert.ok('sky_total_study_low_usd'   in row, 'sky_total_study_low_usd missing from comparison table');
+    assert.ok('sky_skywave_reach_km_high' in row, 'sky_skywave_reach_km_high missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.sky_is_clear_channel,      true,  'rank-1 sky_is_clear_channel should be true');
+  assert.strictEqual(r0.sky_total_study_low_usd,   3000,  'rank-1 sky_total_study_low_usd should be 3000');
+  assert.strictEqual(r0.sky_skywave_reach_km_high,  2500, 'rank-1 sky_skywave_reach_km_high should be 2500');
+});
