@@ -1122,7 +1122,10 @@ export async function runSiteOptimizer(body = {}){
     bld_total_infra_low_usd:    c.am_transmitter_building_and_utilities_guide?.total_infrastructure_low_usd ?? null,
     zon_class:                  c.am_local_zoning_and_land_use_compatibility_guide?.zoning_class ?? null,
     zon_opposition_risk:        c.am_local_zoning_and_land_use_compatibility_guide?.opposition_risk ?? null,
-    zon_total_cost_low_usd:     c.am_local_zoning_and_land_use_compatibility_guide?.total_zoning_cost_low_usd ?? null
+    zon_total_cost_low_usd:     c.am_local_zoning_and_land_use_compatibility_guide?.total_zoning_cost_low_usd ?? null,
+    int_channel_type:           c.am_daytime_interference_and_protection_guide?.channel_type ?? null,
+    int_co_channel_risk:        c.am_daytime_interference_and_protection_guide?.co_channel_risk ?? null,
+    int_service_radius_05_km:   c.am_daytime_interference_and_protection_guide?.service_radius_05_mvpm_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6857,6 +6860,66 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_daytime_interference_and_protection_guide: (() => {
+      // Models daytime co-channel and adjacent-channel interference and protection
+      // obligations under 47 CFR §73.182.  Includes channel classification,
+      // primary/secondary status, FCC protection ratios, and estimated daytime
+      // service radius based on simplified Carey-curve ground-wave propagation.
+
+      const isDA_int        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_int = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_int = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Channel class type for the operator's frequency
+      const channel_type = is_clear_ch_int ? 'CLEAR_CHANNEL'
+                         : is_local_ch_int ? 'LOCAL_CHANNEL'
+                         :                   'REGIONAL_CHANNEL';
+
+      // Secondary status: Class D/C on a clear channel must not cause interference
+      // to Class A/B dominant stations (§73.21, §73.22)
+      const is_secondary = (fcc_class === 'D' || fcc_class === 'C') && is_clear_ch_int;
+
+      // Nighttime power limit for secondary Class D on clear channel: 250 W per §73.21
+      const night_power_limit_kw = (fcc_class === 'D' && is_clear_ch_int) ? 0.25 : null;
+
+      // Co-channel D/U protection ratios per §73.182 (daytime)
+      // Class A ↔ Class A: 20 dB; Class D secondary → cannot raise interference
+      const co_channel_D_U_daytime_db = is_clear_ch_int ? 6
+                                       : (fcc_class === 'A' ? 20 : 6);
+
+      // Adjacent-channel protection (AM channels are 10 kHz apart)
+      const first_adjacent_protection_db  = 6;  // 4:1 D/U ratio at ±10 kHz
+      const second_adjacent_protection_db = 0;  // ±20 kHz: no protection required
+
+      // Simplified Carey-method service radius estimate
+      // 0.5 mV/m radius: sqrt(TPO_kW × F) where F scales with inverse frequency
+      const F_FACTOR = frequency_khz <= 600  ? 350
+                     : frequency_khz <= 900  ? 250
+                     : frequency_khz <= 1200 ? 200
+                     :                         150;
+      const service_radius_05_mvpm_km  = round2(Math.sqrt(tpo_kw * F_FACTOR));
+      // 0.15 mV/m (secondary service): approx 1.8× primary radius
+      const service_radius_015_mvpm_km = round2(service_radius_05_mvpm_km * 1.8);
+
+      // Co-channel interference risk assessment
+      let co_channel_risk = 'LOW';
+      if (is_clear_ch_int && (fcc_class === 'D' || fcc_class === 'C')) co_channel_risk = 'HIGH';
+      else if (is_clear_ch_int) co_channel_risk = 'MEDIUM';
+
+      return {
+        channel_type,
+        is_secondary,
+        night_power_limit_kw,
+        co_channel_D_U_daytime_db,
+        first_adjacent_protection_db,
+        second_adjacent_protection_db,
+        service_radius_05_mvpm_km,
+        service_radius_015_mvpm_km,
+        co_channel_risk,
+        note: `${channel_type} (${frequency_khz} kHz), ${fcc_class} class, ${isDA_int ? 'DA' : 'NDA'}. ${is_secondary ? `SECONDARY status (§73.21): may not raise interference to dominant Class A/B; nighttime TPO limited to ${night_power_limit_kw} kW. ` : 'PRIMARY status. '}Daytime co-channel D/U protection: ${co_channel_D_U_daytime_db} dB per §73.182; 1st adjacent (±10 kHz): ${first_adjacent_protection_db} dB. Est. daytime 0.5 mV/m primary radius: ~${service_radius_05_mvpm_km}km (simplified Carey; actual varies with ground conductivity). Co-channel risk: ${co_channel_risk}.`
       };
     })(),
 

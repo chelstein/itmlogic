@@ -10704,3 +10704,51 @@ test('am_local_zoning_and_land_use_compatibility_guide comparison table columns 
     assert.ok('zon_total_cost_low_usd' in row, 'zon_total_cost_low_usd missing from comparison table');
   }
 });
+
+test('am_daytime_interference_and_protection_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_interference_and_protection_guide;
+  assert.ok(g != null, 'am_daytime_interference_and_protection_guide must be present');
+  assert.ok(typeof g.channel_type === 'string', 'channel_type must be a string');
+  assert.ok(typeof g.service_radius_05_mvpm_km === 'number', 'service_radius_05_mvpm_km must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_daytime_interference_and_protection_guide KAZM clear channel secondary status', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_interference_and_protection_guide;
+  // 780 kHz is a clear channel; Class D → secondary status
+  assert.strictEqual(g.channel_type, 'CLEAR_CHANNEL', '780 kHz should be CLEAR_CHANNEL');
+  assert.strictEqual(g.is_secondary, true, 'Class D on clear channel should be secondary');
+  assert.strictEqual(g.night_power_limit_kw, 0.25, 'Class D clear-channel night limit should be 0.25 kW');
+  assert.strictEqual(g.co_channel_risk, 'HIGH', 'Class D on clear channel has HIGH co-channel risk');
+});
+
+test('am_daytime_interference_and_protection_guide service radius is physically plausible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_interference_and_protection_guide;
+  // 5 kW at 780 kHz: expect 0.5 mV/m radius ~30-60 km
+  assert.ok(g.service_radius_05_mvpm_km > 20, `service radius ${g.service_radius_05_mvpm_km}km should be >20km`);
+  assert.ok(g.service_radius_05_mvpm_km < 100, `service radius ${g.service_radius_05_mvpm_km}km should be <100km`);
+  assert.ok(g.service_radius_015_mvpm_km > g.service_radius_05_mvpm_km,
+    '0.15 mV/m radius should exceed 0.5 mV/m radius');
+});
+
+test('am_daytime_interference_and_protection_guide protection ratios are valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_interference_and_protection_guide;
+  // Clear-channel daytime D/U: 6 dB
+  assert.strictEqual(g.co_channel_D_U_daytime_db, 6, 'clear-channel D/U protection should be 6 dB');
+  // 1st adjacent: 6 dB; 2nd adjacent: 0 dB
+  assert.strictEqual(g.first_adjacent_protection_db, 6, '1st adjacent protection should be 6 dB');
+  assert.strictEqual(g.second_adjacent_protection_db, 0, '2nd adjacent protection should be 0 dB');
+});
+
+test('am_daytime_interference_and_protection_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('int_channel_type'         in row, 'int_channel_type missing from comparison table');
+    assert.ok('int_co_channel_risk'      in row, 'int_co_channel_risk missing from comparison table');
+    assert.ok('int_service_radius_05_km' in row, 'int_service_radius_05_km missing from comparison table');
+  }
+});

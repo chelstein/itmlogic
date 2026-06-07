@@ -2469,3 +2469,19 @@ test('am_local_zoning_and_land_use_compatibility_guide present across colocation
     assert.ok(g.total_zoning_cost_low_usd >= 0, `rank ${c.rank}: total_zoning_cost_low_usd must be non-negative`);
   }
 });
+
+test('am_daytime_interference_and_protection_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_daytime_interference_and_protection_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_daytime_interference_and_protection_guide`);
+    assert.ok(['CLEAR_CHANNEL','REGIONAL_CHANNEL','LOCAL_CHANNEL'].includes(g.channel_type), `rank ${c.rank}: invalid channel_type`);
+    assert.ok(g.service_radius_05_mvpm_km > 0, `rank ${c.rank}: service_radius must be positive`);
+  }
+});

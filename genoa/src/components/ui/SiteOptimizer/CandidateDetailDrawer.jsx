@@ -2226,6 +2226,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Daytime Interference & Protection Guide */}
+        {candidate.am_daytime_interference_and_protection_guide && (() => {
+          const g = candidate.am_daytime_interference_and_protection_guide;
+          const riskColor = { LOW: '#166534', MEDIUM: '#92400e', HIGH: '#991b1b' };
+          const ctColor = { CLEAR_CHANNEL: '#1e40af', REGIONAL_CHANNEL: '#6d28d9', LOCAL_CHANNEL: '#0e7490' };
+          return (
+            <div style={{ background: '#eff6ff', border: '1px solid #60a5fa', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 8, fontSize: 13 }}>
+                Daytime Interference &amp; Protection (§73.182)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#1e40af' }}>
+                <span>Channel type</span>
+                <span style={{ fontWeight: 700, color: ctColor[g.channel_type] ?? '#1e40af' }}>{g.channel_type.replace(/_/g, ' ')}</span>
+                <span>Station status</span>
+                <span style={{ fontWeight: 600, color: g.is_secondary ? '#991b1b' : '#166534' }}>
+                  {g.is_secondary ? 'SECONDARY (§73.21)' : 'PRIMARY'}
+                </span>
+                {g.night_power_limit_kw != null && <>
+                  <span>Night power limit</span>
+                  <span style={{ fontWeight: 600, color: '#991b1b' }}>{g.night_power_limit_kw} kW (§73.21)</span>
+                </>}
+                <span>Co-channel risk</span>
+                <span style={{ fontWeight: 700, color: riskColor[g.co_channel_risk] ?? '#1e40af' }}>{g.co_channel_risk}</span>
+                <span>Co-channel D/U (daytime)</span>
+                <span style={{ fontWeight: 600 }}>{g.co_channel_D_U_daytime_db} dB</span>
+                <span>1st adjacent D/U</span>
+                <span style={{ fontWeight: 600 }}>{g.first_adjacent_protection_db} dB (±10 kHz)</span>
+                <span>2nd adjacent D/U</span>
+                <span style={{ fontWeight: 600 }}>{g.second_adjacent_protection_db} dB (±20 kHz)</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #bfdbfe', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#1e40af' }}>
+                <span>0.5 mV/m service radius</span>
+                <span style={{ fontWeight: 600 }}>{g.service_radius_05_mvpm_km} km (primary)</span>
+                <span>0.15 mV/m service radius</span>
+                <span style={{ fontWeight: 600 }}>{g.service_radius_015_mvpm_km} km (secondary)</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#1e3a8a', borderTop: '1px solid #bfdbfe', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Local Zoning & Land Use Compatibility Guide */}
         {candidate.am_local_zoning_and_land_use_compatibility_guide && (() => {
           const g = candidate.am_local_zoning_and_land_use_compatibility_guide;
