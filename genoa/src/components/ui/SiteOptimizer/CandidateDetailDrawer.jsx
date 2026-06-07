@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Environmental and NEPA Compliance Guide */}
+        {candidate.am_environmental_and_nepa_compliance_guide && (() => {
+          const g = candidate.am_environmental_and_nepa_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const isCE = g.nepa_category === 'CATEGORICAL_EXCLUSION';
+          return (
+            <div key="nepa-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #ca8a04' }}>
+              <div style={{ fontWeight: 700, color: '#713f12', marginBottom: 6, fontSize: 13 }}>Environmental &amp; NEPA Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>NEPA category:</span><span style={{ fontWeight: 600, color: isCE ? '#16a34a' : '#dc2626' }}>{g.nepa_category ?? '—'}</span>
+                <span>Phase I ESA:</span><span>{g.phase1_esa_low_usd != null ? `$${fmt(g.phase1_esa_low_usd)} – $${fmt(g.phase1_esa_high_usd)}` : '—'}</span>
+                <span>Section 106 review:</span><span>{g.section106_review_low_usd != null ? `$${fmt(g.section106_review_low_usd)} – $${fmt(g.section106_review_high_usd)}` : '—'}</span>
+                {!isCE && <><span>Full EA cost:</span><span style={{ color: '#dc2626' }}>{g.full_ea_low_usd != null ? `$${fmt(g.full_ea_low_usd)} – $${fmt(g.full_ea_high_usd)}` : '—'}</span></>}
+                <span>Total env. compliance:</span><span style={{ fontWeight: 600 }}>{g.total_env_cost_low_usd != null ? `$${fmt(g.total_env_cost_low_usd)} – $${fmt(g.total_env_cost_high_usd)}` : '—'}</span>
+                <span>NEPA timeline:</span><span>{g.nepa_timeline_weeks_low != null ? `${g.nepa_timeline_weeks_low}–${g.nepa_timeline_weeks_high} weeks` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#a16207', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM FAA Aeronautical Study and Airspace Guide */}
         {candidate.am_faa_aeronautical_study_and_airspace_guide && (() => {
           const g = candidate.am_faa_aeronautical_study_and_airspace_guide;

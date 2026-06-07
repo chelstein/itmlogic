@@ -14088,3 +14088,40 @@ it('candidate_comparison_table faa columns are correct for KAZM Class D', async 
   assert.ok(Math.abs(r0.faa_tower_height_ft - 315.26) < 0.5, `faa_tower_height_ft expected ~315.26, got ${r0.faa_tower_height_ft}`);
   assert.strictEqual(r0.faa_study_cost_low_usd, 3500, 'faa_study_cost_low_usd should be 3500');
 });
+
+// ── am_environmental_and_nepa_compliance_guide ───────────────────────────────
+
+it('am_environmental_and_nepa_compliance_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_environmental_and_nepa_compliance_guide, 'nepa guide missing on candidate');
+  }
+});
+
+it('am_environmental_and_nepa_compliance_guide nepa_category is CATEGORICAL_EXCLUSION for KAZM (non-wetland site)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_and_nepa_compliance_guide;
+  assert.strictEqual(g.nepa_category, 'CATEGORICAL_EXCLUSION', 'KAZM (Sedona area) should be CE, not full EA');
+});
+
+it('am_environmental_and_nepa_compliance_guide total_env_cost_low_usd includes Phase I + Section 106', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_and_nepa_compliance_guide;
+  const expected_min = g.phase1_esa_low_usd + g.section106_review_low_usd;
+  assert.ok(g.total_env_cost_low_usd >= expected_min, `total_env_cost_low_usd (${g.total_env_cost_low_usd}) must be >= Phase I + §106 (${expected_min})`);
+});
+
+it('am_environmental_and_nepa_compliance_guide reference cites 47 CFR §1.1307 and NEPA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_and_nepa_compliance_guide;
+  assert.ok(g.reference.includes('§1.1307'), 'reference must cite §1.1307');
+  assert.ok(g.reference.includes('NEPA'), 'reference must cite NEPA');
+});
+
+it('candidate_comparison_table nepa columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.nepa_category, 'CATEGORICAL_EXCLUSION', 'nepa_category should be CATEGORICAL_EXCLUSION');
+  assert.ok(r0.nepa_total_env_cost_low_usd > 0, 'nepa_total_env_cost_low_usd must be positive');
+  assert.ok(r0.nepa_timeline_weeks_low > 0, 'nepa_timeline_weeks_low must be positive');
+});

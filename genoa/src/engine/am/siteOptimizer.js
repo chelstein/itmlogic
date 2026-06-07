@@ -1347,7 +1347,10 @@ export async function runSiteOptimizer(body = {}){
     rf65_evaluation_cost_low_usd:       c.am_rf_exposure_and_oet65_compliance_guide?.evaluation_cost_low_usd ?? null,
     faa_notice_required:                c.am_faa_aeronautical_study_and_airspace_guide?.notice_required ?? null,
     faa_tower_height_ft:                c.am_faa_aeronautical_study_and_airspace_guide?.tower_height_ft ?? null,
-    faa_study_cost_low_usd:             c.am_faa_aeronautical_study_and_airspace_guide?.faa_study_cost_low_usd ?? null
+    faa_study_cost_low_usd:             c.am_faa_aeronautical_study_and_airspace_guide?.faa_study_cost_low_usd ?? null,
+    nepa_category:                      c.am_environmental_and_nepa_compliance_guide?.nepa_category ?? null,
+    nepa_total_env_cost_low_usd:        c.am_environmental_and_nepa_compliance_guide?.total_env_cost_low_usd ?? null,
+    nepa_timeline_weeks_low:            c.am_environmental_and_nepa_compliance_guide?.nepa_timeline_weeks_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7082,6 +7085,53 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_environmental_and_nepa_compliance_guide: (() => {
+      // 47 CFR §1.1307: FCC requires environmental assessment (EA) for antenna structures in
+      // wilderness areas, wildlife refuges, floodplains, wetlands, historical sites, etc.
+      // NEPA (42 USC §4321): federal nexus from FCC license triggers NEPA review.
+      // Section 106, NHPA (54 USC §306108): FCC tower registration triggers historic preservation review.
+      // Categorical exclusion (CE): most AM sites qualify unless triggering conditions apply.
+      const candidate_lat = pt.lat;
+      const candidate_lon = pt.lon;
+      // Southwest US (lat 30–38, lon -115 to -103): arid/desert, generally low wetland probability
+      // Wetland flag: rough heuristic based on lat/lon region
+      const probable_wetland = candidate_lat > 36 && candidate_lat < 38 && candidate_lon > -112 && candidate_lon < -110;
+      const nepa_category = probable_wetland ? 'EA_REQUIRED' : 'CATEGORICAL_EXCLUSION';
+      const ea_required = nepa_category === 'EA_REQUIRED';
+      // Phase 1 ESA: environmental site assessment (ASTM E1527-21)
+      const phase1_esa_low_usd  = 2500;
+      const phase1_esa_high_usd = 5500;
+      // Section 106 historic review (typical FCC tower filing)
+      const section106_review_low_usd  = 1500;
+      const section106_review_high_usd = 8000;
+      // Full EA cost if triggered
+      const full_ea_low_usd  = 15000;
+      const full_ea_high_usd = 60000;
+      const nepa_timeline_weeks_low  = ea_required ? 12 : 4;
+      const nepa_timeline_weeks_high = ea_required ? 52 : 10;
+      const total_env_cost_low_usd  = round2(phase1_esa_low_usd + section106_review_low_usd + (ea_required ? full_ea_low_usd : 0));
+      const total_env_cost_high_usd = round2(phase1_esa_high_usd + section106_review_high_usd + (ea_required ? full_ea_high_usd : 0));
+      return {
+        candidate_lat: round2(candidate_lat),
+        candidate_lon: round2(candidate_lon),
+        nepa_category,
+        ea_required,
+        probable_wetland,
+        phase1_esa_low_usd,
+        phase1_esa_high_usd,
+        section106_review_low_usd,
+        section106_review_high_usd,
+        full_ea_low_usd,
+        full_ea_high_usd,
+        nepa_timeline_weeks_low,
+        nepa_timeline_weeks_high,
+        total_env_cost_low_usd,
+        total_env_cost_high_usd,
+        reference: '47 CFR §1.1307 (FCC environmental review); NEPA 42 USC §4321 (National Environmental Policy Act); 54 USC §306108 / 36 CFR Part 800 (Section 106 NHPA historic review); ASTM E1527-21 (Phase I ESA standard); Executive Order 11990 (wetlands protection)',
+        note: `NEPA category: ${nepa_category}. Phase I ESA: $${phase1_esa_low_usd.toLocaleString()}–$${phase1_esa_high_usd.toLocaleString()}. Section 106: $${section106_review_low_usd.toLocaleString()}–$${section106_review_high_usd.toLocaleString()}. Total env. compliance: $${total_env_cost_low_usd.toLocaleString()}–$${total_env_cost_high_usd.toLocaleString()} over ${nepa_timeline_weeks_low}–${nepa_timeline_weeks_high} weeks.`
       };
     })(),
 

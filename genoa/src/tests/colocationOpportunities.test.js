@@ -3344,3 +3344,20 @@ test('am_faa_aeronautical_study_and_airspace_guide colocation: all colocation ca
     assert.ok(g.faa_study_cost_low_usd > 0, `faa_study_cost_low_usd must be positive`);
   }
 });
+
+test('am_environmental_and_nepa_compliance_guide colocation: all colocation candidates have valid NEPA data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_environmental_and_nepa_compliance_guide;
+    assert.ok(g, `candidate missing am_environmental_and_nepa_compliance_guide`);
+    assert.ok(g.total_env_cost_low_usd > 0, `total_env_cost_low_usd must be positive`);
+    assert.ok(['CATEGORICAL_EXCLUSION','EA_REQUIRED'].includes(g.nepa_category), `nepa_category must be valid`);
+    assert.ok(g.phase1_esa_low_usd > 0, `phase1_esa_low_usd must be positive`);
+  }
+});
