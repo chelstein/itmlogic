@@ -1717,6 +1717,46 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      fcc_form_301_exhibit_checklist_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
+        is_directional: false, is_clear_channel: true, tower_height_ft: 315, asr_required: true,
+        n_exhibits_total: 24, n_exhibits_required: 22, n_exhibits_da_specific: 0,
+        filing_fee_usd: 4200, filing_system: 'FCC LMS (Licensing Management System)',
+        n_deficiency_risks: 5,
+        deficiency_triggers: [
+          { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
+          { rank: 2, issue: 'Incomplete NEPA checklist (§1.1306)', cfr: '§1.1306', how_to_avoid: 'Complete all 13 NEPA categories; consult environmental attorney if any "yes" — EA may be required' },
+          { rank: 3, issue: 'ASR number missing for tower ≥ 200 ft', cfr: '§17.4; §17.7', how_to_avoid: 'Register ASR in FCC ASR system before filing Form 301' },
+          { rank: 4, issue: 'Site coordinates not in NAD83', cfr: '§73.1020(c)', how_to_avoid: 'Convert all GPS coordinates to NAD83 using NGS NADCON5 tool' },
+          { rank: 5, issue: 'RF exposure (MPE) exhibit missing', cfr: '§1.1310; OET-65', how_to_avoid: 'Calculate MPE per OET Bulletin 65; include calculation exhibit' }
+        ],
+        required_exhibits: [
+          { id: 'A1', section: 'A', title: 'FCC Form 301 main application (fully completed)', required: true, cfr: '§73.3533; §73.3536' },
+          { id: 'A2', section: 'A', title: 'Legal name and entity documentation', required: true, cfr: '§73.1020; §73.3533' },
+          { id: 'A3', section: 'A', title: 'Ownership disclosure (FCC Form 323)', required: true, cfr: '§73.3615' },
+          { id: 'A4', section: 'A', title: 'CORES entity registration', required: true, cfr: '§1.8001' },
+          { id: 'B1', section: 'B', title: 'Site coordinates — FCC datum (NAD83)', required: true, cfr: '§73.1020(c)' },
+          { id: 'B2', section: 'B', title: 'Proposed ERP and TPO (kW)', required: true, cfr: '§73.21; §73.51' },
+          { id: 'B3', section: 'B', title: 'Antenna height data (AMSL and AGL)', required: true, cfr: '§73.1020(b)' },
+          { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.190' },
+          { id: 'B5', section: 'B', title: 'Soil conductivity (M3 value or measured)', required: true, cfr: '§73.184; §73.150' },
+          { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: true, cfr: '§73.99; §73.1740' },
+          { id: 'C1', section: 'C', title: 'Co-channel groundwave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24' },
+          { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.187; §73.188' },
+          { id: 'C3', section: 'C', title: 'Blanket interference analysis (§73.24(g))', required: true, cfr: '§73.24(g)' },
+          { id: 'C4', section: 'C', title: 'Nighttime skywave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24(g)' },
+          { id: 'D1', section: 'D', title: 'NEPA Environmental Checklist (§1.1307)', required: true, cfr: '§1.1306; §1.1307' },
+          { id: 'D2', section: 'D', title: 'RF Exposure (MPE) evaluation — OET Bulletin 65', required: true, cfr: '§1.1310; OET Bulletin 65' },
+          { id: 'D4', section: 'D', title: 'NHPA §106 / cultural resources desktop survey', required: true, cfr: 'NHPA §106; §1.1307(a)(4)' },
+          { id: 'E1', section: 'E', title: 'ASR registration number', required: true, cfr: '47 CFR §17.4; §17.7' },
+          { id: 'E2', section: 'E', title: 'FAA aeronautical study (Form 7460-1)', required: true, cfr: '14 CFR §77; §17.23' },
+          { id: 'F1', section: 'F', title: 'Engineer certification', required: true, cfr: '§73.1870; §73.3536(a)(2)' },
+          { id: 'F2', section: 'F', title: 'Applicant signature and certification', required: true, cfr: '§73.3533(a)(7)' },
+          { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102' }
+        ],
+        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65',
+        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315 ft). Filing fee: $4,200.'
+      },
       electrical_power_consumption_guide: {
         frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
         electricity_rate_low_usd_per_kwh: 0.10, electricity_rate_high_usd_per_kwh: 0.16,

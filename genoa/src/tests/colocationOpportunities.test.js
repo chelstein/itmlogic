@@ -2118,3 +2118,19 @@ test('colocation GRID candidates have electrical_power_consumption_guide', async
     assert.ok(g.annual_savings_vs_tube_usd > 0, `rank ${c.rank} annual savings must be positive`);
   }
 });
+
+test('colocation GRID candidates have fcc_form_301_exhibit_checklist_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.fcc_form_301_exhibit_checklist_guide;
+    assert.ok(g != null, `rank ${c.rank} missing fcc_form_301_exhibit_checklist_guide`);
+    assert.strictEqual(g.n_exhibits_da_specific, 0, `rank ${c.rank} NDA must have 0 DA exhibits`);
+    assert.strictEqual(g.filing_fee_usd, 4200, `rank ${c.rank} filing fee must be $4,200`);
+  }
+});

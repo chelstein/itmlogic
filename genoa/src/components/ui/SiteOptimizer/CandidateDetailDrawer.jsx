@@ -2226,6 +2226,59 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FCC Form 301 Exhibit Checklist Guide */}
+        {candidate.fcc_form_301_exhibit_checklist_guide && (() => {
+          const g = candidate.fcc_form_301_exhibit_checklist_guide;
+          const topDeficiency = g.deficiency_triggers?.[0];
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #c4b5fd' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#4c1d95', marginBottom: 8 }}>
+                FCC Form 301-AM Exhibit Checklist — Construction Permit Application
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Pattern mode:</span> <strong>{g.pattern_mode} ({g.is_directional ? 'Directional' : 'Non-Directional'})</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total exhibits:</span> <strong>{g.n_exhibits_total}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Required exhibits:</span> <strong style={{ color: '#7c3aed' }}>{g.n_exhibits_required}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>DA-specific exhibits:</span> <strong>{g.n_exhibits_da_specific} {g.is_directional ? '(required)' : '(not needed — NDA)'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: g.asr_required ? '#dc2626' : '#16a34a' }}>{g.asr_required ? `Yes — tower ${g.tower_height_ft} ft (§17.7)` : 'No'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Filing fee:</span> <strong>${g.filing_fee_usd?.toLocaleString()} (Form 301)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Filing system:</span> <strong>{g.filing_system}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Deficiency risks:</span> <strong>{g.n_deficiency_risks} identified</strong></div>
+              </div>
+              {topDeficiency && (
+                <div style={{ marginBottom: 8, padding: '8px 10px', background: '#ede9fe', borderRadius: 6, border: '1px solid #c4b5fd' }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#4c1d95', marginBottom: 3 }}>Top Deficiency Risk #{topDeficiency.rank}: {topDeficiency.issue}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>{topDeficiency.cfr} — {topDeficiency.how_to_avoid}</div>
+                </div>
+              )}
+              {g.required_exhibits && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#4c1d95', marginBottom: 4 }}>Required Exhibits ({g.n_exhibits_required})</div>
+                  <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#ddd6fe' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>ID</th>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Exhibit</th>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>CFR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.required_exhibits.map((e, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #c4b5fd' }}>
+                          <td style={{ padding: '2px 6px', fontWeight: 700, color: '#4c1d95', whiteSpace: 'nowrap' }}>{e.id}</td>
+                          <td style={{ padding: '2px 6px' }}>{e.title}</td>
+                          <td style={{ padding: '2px 6px', color: '#6b7280', whiteSpace: 'nowrap' }}>{e.cfr}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#4c1d95' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Electrical Power Consumption Guide */}
         {candidate.electrical_power_consumption_guide && (() => {
           const g = candidate.electrical_power_consumption_guide;

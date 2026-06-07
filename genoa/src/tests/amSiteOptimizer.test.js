@@ -9744,3 +9744,45 @@ test('electrical_power_consumption_guide comparison table columns present', asyn
     assert.ok('epcg_payback_years'       in row, 'epcg_payback_years missing from comparison table');
   }
 });
+
+// ---- fcc_form_301_exhibit_checklist_guide ----
+
+test('fcc_form_301_exhibit_checklist_guide present and structured correctly', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_form_301_exhibit_checklist_guide;
+  assert.ok(g != null, 'fcc_form_301_exhibit_checklist_guide must be present');
+  assert.ok(g.n_exhibits_total > 15, 'must have at least 15 total exhibits');
+  assert.ok(g.n_exhibits_required <= g.n_exhibits_total, 'required must be ≤ total');
+  assert.strictEqual(g.filing_fee_usd, 4200, 'Form 301 filing fee must be $4,200');
+});
+
+test('fcc_form_301_exhibit_checklist_guide KAZM NDA has 0 DA-specific exhibits', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_form_301_exhibit_checklist_guide;
+  assert.strictEqual(g.is_directional, false, 'NDA station must not be directional');
+  assert.strictEqual(g.n_exhibits_da_specific, 0, 'NDA must have 0 DA-specific exhibits');
+});
+
+test('fcc_form_301_exhibit_checklist_guide KAZM 780 kHz ASR required (tower > 61m)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_form_301_exhibit_checklist_guide;
+  assert.strictEqual(g.asr_required, true, 'ASR required for 96m tower (> 61m threshold)');
+  assert.strictEqual(g.tower_height_ft, 315, 'tower must be 315 ft (λ/4 at 780 kHz)');
+});
+
+test('fcc_form_301_exhibit_checklist_guide deficiency triggers populated', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_form_301_exhibit_checklist_guide;
+  assert.ok(g.n_deficiency_risks >= 5, 'must have at least 5 deficiency risk triggers');
+  assert.ok(g.deficiency_triggers[0].issue.length > 5, 'first deficiency trigger must have text');
+  assert.ok(g.deficiency_triggers.every(d => d.cfr), 'every deficiency must have a CFR reference');
+});
+
+test('fcc_form_301_exhibit_checklist_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('f301_n_required'   in row, 'f301_n_required missing from comparison table');
+    assert.ok('f301_n_da_specific' in row, 'f301_n_da_specific missing from comparison table');
+    assert.ok('f301_asr_required' in row, 'f301_asr_required missing from comparison table');
+  }
+});

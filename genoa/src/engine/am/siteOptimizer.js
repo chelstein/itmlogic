@@ -1059,7 +1059,10 @@ export async function runSiteOptimizer(body = {}){
     atu_bw_3db_khz:             c.antenna_base_impedance_and_atu_design_guide?.bw_3db_khz ?? null,
     epcg_ss_cost_low_usd:       c.electrical_power_consumption_guide?.solid_state_annual_cost_low_usd ?? null,
     epcg_savings_vs_tube_usd:   c.electrical_power_consumption_guide?.annual_savings_vs_tube_usd ?? null,
-    epcg_payback_years:         c.electrical_power_consumption_guide?.upgrade_payback_years ?? null
+    epcg_payback_years:         c.electrical_power_consumption_guide?.upgrade_payback_years ?? null,
+    f301_n_required:            c.fcc_form_301_exhibit_checklist_guide?.n_exhibits_required ?? null,
+    f301_n_da_specific:         c.fcc_form_301_exhibit_checklist_guide?.n_exhibits_da_specific ?? null,
+    f301_asr_required:          c.fcc_form_301_exhibit_checklist_guide?.asr_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6794,6 +6797,129 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    fcc_form_301_exhibit_checklist_guide: (() => {
+      // Complete checklist of exhibits required in FCC Form 301-AM (Application for
+      // Construction Permit — Commercial AM Station), as of 2024.  Missing exhibits
+      // are the #1 cause of deficiency letters, which add 6–18 months to CP processing.
+      //
+      // Two tracks:
+      //   NDA (Non-Directional Antenna): simpler engineering exhibits; no pattern proof.
+      //   DA (Directional Antenna): adds full pattern specification, moment method study,
+      //       DA proof-of-performance exhibits (§73.154(a)), and §73.182 nighttime analysis.
+      //
+      // Exhibits are grouped into 7 sections:
+      //   A. Station identification and ownership
+      //   B. Technical specifications
+      //   C. Interference analysis
+      //   D. Environmental compliance (NEPA / §1.1306)
+      //   E. Antenna structure (FAA / ASR)
+      //   F. Site certification (signed by engineer and applicant)
+      //   G. DA-specific exhibits (omit for NDA)
+      //
+      // Source: FCC Form 301 instructions (rev. 2024-01); 47 CFR §73.1 et seq.
+
+      const isDA_ch = /^DA/i.test(pattern_mode);
+      const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const lambda_m_ch  = 300000 / frequency_khz;
+      const lambda_q_m_ch = lambda_m_ch / 4;
+      const tower_ft_ch   = Math.round(lambda_q_m_ch * 3.28084);
+      const asr_required_ch = lambda_q_m_ch > 61;   // §17.7: >200 ft AGL
+
+      const exhibits_A = [
+        { id: 'A1', section: 'A', title: 'FCC Form 301 main application (fully completed)', required: true, cfr: '§73.3533; §73.3536', notes: 'All sections completed; signed by applicant; Section I: ownership, Section III: technical specs' },
+        { id: 'A2', section: 'A', title: 'Legal name and entity documentation', required: true, cfr: '§73.1020; §73.3533', notes: 'Operating company name, state of incorporation, list of officers/principals with FCC 47 ID' },
+        { id: 'A3', section: 'A', title: 'Ownership disclosure (FCC Form 323)', required: true, cfr: '§73.3615', notes: 'Biennial ownership filing must be current; ownership changes require Form 316 or 314 separately' },
+        { id: 'A4', section: 'A', title: 'CORES entity registration', required: true, cfr: '§1.8001', notes: 'All entities named in application must have a valid CORES FRN (FCC Registration Number)' },
+      ];
+
+      const exhibits_B = [
+        { id: 'B1', section: 'B', title: 'Site coordinates — FCC datum (NAD83)', required: true, cfr: '§73.1020(c)', notes: 'Latitude/longitude to 1-second accuracy; must match ASR registration if tower already registered' },
+        { id: 'B2', section: 'B', title: 'Proposed ERP and TPO (kW)', required: true, cfr: '§73.21; §73.51', notes: 'Separate day/night values for Class D on clear channel; transmitter type and model number' },
+        { id: 'B3', section: 'B', title: 'Antenna height data (AMSL and AGL)', required: true, cfr: '§73.1020(b)', notes: 'Ground elevation AMSL + structure height AGL + radiation center AGL; must agree with ASR data' },
+        { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.190', notes: 'Number of radials, length, burial depth, wire gauge; minimum 120 radials for Class A, 60 for Class D screened as adequate' },
+        { id: 'B5', section: 'B', title: 'Soil conductivity (§73.184 M3 value or measured)', required: true, cfr: '§73.184; §73.150', notes: 'If using FCC M3 table value, state zone; if measured, include ASTM G57 or Wenner 4-electrode test data' },
+        { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: isDA_ch || is_clear_ch, cfr: '§73.99; §73.1740', notes: 'For Class D on clear channel: sunrise/sunset hours; operating schedule changes if moving from current site' },
+      ];
+
+      const exhibits_C = [
+        { id: 'C1', section: 'C', title: 'Co-channel groundwave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24', notes: 'FCC gwave.js or ITU-R P.368 method; 25 mV/m contour must not violate co-channel station 0.1 mV/m' },
+        { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.187; §73.188', notes: 'Adjacent channel stations within 320 km; 0.025 mV/m protection threshold' },
+        { id: 'C3', section: 'C', title: 'Blanket interference analysis (§73.24(g))', required: true, cfr: '§73.24(g)', notes: '1000 mV/m contour population < 1% of US population; disc approximation or USGS population data acceptable' },
+        { id: 'C4', section: 'C', title: 'Nighttime skywave interference analysis (§73.182)', required: is_clear_ch || (fcc_class === 'B'), cfr: '§73.182; §73.24(g)', notes: 'Required for Class A, B, and D on clear/regional channels; NIF contour must not violate protected stations' },
+      ];
+
+      const exhibits_D_nepa = [
+        { id: 'D1', section: 'D', title: 'NEPA Environmental Checklist (§1.1307 13-item checklist)', required: true, cfr: '§1.1306; §1.1307', notes: 'All 13 environmental categories checked; if any "yes" → Environmental Assessment (EA) required before grant' },
+        { id: 'D2', section: 'D', title: 'RF Exposure (MPE) evaluation — OET Bulletin 65', required: tpo_kw >= 5, cfr: '§1.1310; OET Bulletin 65', notes: `Required for TPO ≥ 5 kW at MF frequencies; general population (uncontrolled) MPE limit applies; ${tpo_kw} kW → required` },
+        { id: 'D3', section: 'D', title: 'Phase I Environmental Site Assessment (ESA)', required: false, cfr: '§1.1307(a)(5)', notes: 'Required if site is former industrial land, gas station, dry cleaner, etc.; ASTM E1527-21 standard' },
+        { id: 'D4', section: 'D', title: 'NHPA §106 / cultural resources desktop survey', required: true, cfr: 'NHPA §106; §1.1307(a)(4)', notes: 'Historic properties check within area of potential effect (APE); SHPO concurrence may be required' },
+      ];
+
+      const exhibits_E_asr = [
+        { id: 'E1', section: 'E', title: 'ASR registration number', required: asr_required_ch, cfr: '47 CFR §17.4; §17.7', notes: `Towers ≥ 61 m AGL (200 ft) require FAA ASR; proposed tower = λ/4 ≈ ${Math.round(lambda_q_m_ch)} m (${tower_ft_ch} ft) → ${asr_required_ch ? 'REQUIRED' : 'not required'}` },
+        { id: 'E2', section: 'E', title: 'FAA aeronautical study (Form 7460-1)', required: asr_required_ch, cfr: '14 CFR §77; §17.23', notes: `FAA no-hazard determination or equivalent required for towers ≥ 61 m; painting/lighting per AC 70/7460-1M` },
+        { id: 'E3', section: 'E', title: 'Tower owner authorization / co-location agreement', required: false, cfr: '§73.1020', notes: 'If antenna is on a shared tower (co-location): lease or authorization letter from tower owner required as exhibit' },
+      ];
+
+      const exhibits_F = [
+        { id: 'F1', section: 'F', title: 'Engineer certification (PE stamp if required by state)', required: true, cfr: '§73.1870; §73.3536(a)(2)', notes: 'Licensed broadcast engineer (SBE CSRE or CPBE) certifies technical data; some states require PE stamp' },
+        { id: 'F2', section: 'F', title: 'Applicant signature and certification', required: true, cfr: '§73.3533(a)(7)', notes: 'Authorized representative of licensee signs; false statements subject to 18 USC §1001 felony penalties' },
+        { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102', notes: `AM major change CP: $4,200 (2024 schedule); pay via FCC Fee Filer at www.fcc.gov/licensing-databases/fees` },
+      ];
+
+      const exhibits_G_da = isDA_ch ? [
+        { id: 'G1', section: 'G', title: 'DA horizontal radiation pattern (theoretical)', required: true, cfr: '§73.150; §73.151', notes: 'Tabulated field ratios at 36 azimuths (10° increments) for each operating mode (DA-D, DA-N); signed by engineer' },
+        { id: 'G2', section: 'G', title: 'Antenna system design parameters', required: true, cfr: '§73.152; §73.154(a)', notes: 'Phase/ratio values for each element; mutual impedance matrix; driving point impedances; ATU design schematic' },
+        { id: 'G3', section: 'G', title: 'Moment method analysis (NEC or MININEC)', required: true, cfr: '§73.150(b); §73.154(a)', notes: 'Full-wave electromagnetic model of the DA array; submitted as Exhibit D to Form 301; used for theoretical pattern' },
+        { id: 'G4', section: 'G', title: 'DA proof monitoring specification', required: true, cfr: '§73.61; §73.154(a)', notes: 'Specifies monitoring points, reference parameters, tolerance values (±2° phase, ±0.5 dB ratio per §73.155)' },
+      ] : [];
+
+      const all_exhibits = [...exhibits_A, ...exhibits_B, ...exhibits_C, ...exhibits_D_nepa, ...exhibits_E_asr, ...exhibits_F, ...exhibits_G_da];
+      const required_exhibits = all_exhibits.filter(e => e.required);
+      const n_required = required_exhibits.length;
+      const n_da_specific = exhibits_G_da.length;
+
+      // Common deficiency causes.
+      const deficiency_triggers = [
+        { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
+        { rank: 2, issue: 'Incomplete NEPA checklist (§1.1306)', cfr: '§1.1306', how_to_avoid: 'Complete all 13 NEPA categories; consult environmental attorney if any "yes" — EA may be required' },
+        { rank: 3, issue: 'ASR number missing for tower ≥ 200 ft', cfr: '§17.4; §17.7', how_to_avoid: 'Register ASR in FCC ASR system before filing Form 301; ASR number is required in LMS before grant' },
+        { rank: 4, issue: 'Site coordinates not in NAD83', cfr: '§73.1020(c)', how_to_avoid: 'Convert all GPS coordinates to NAD83 using NGS NADCON5 tool; WGS84 and NAD83 differ by ~1m in CONUS' },
+        { rank: 5, issue: 'RF exposure (MPE) exhibit missing', cfr: '§1.1310; OET-65', how_to_avoid: 'Calculate MPE per OET Bulletin 65; include calculation exhibit showing compliance with general population limits' },
+      ];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        tpo_kw,
+        is_directional:         isDA_ch,
+        is_clear_channel:       is_clear_ch,
+        tower_height_ft:        tower_ft_ch,
+        asr_required:           asr_required_ch,
+        n_exhibits_total:       all_exhibits.length,
+        n_exhibits_required:    n_required,
+        n_exhibits_da_specific: n_da_specific,
+        exhibits_by_section: {
+          A_identification:   exhibits_A,
+          B_technical:        exhibits_B,
+          C_interference:     exhibits_C,
+          D_environmental:    exhibits_D_nepa,
+          E_antenna_structure:exhibits_E_asr,
+          F_certification:    exhibits_F,
+          G_da_specific:      exhibits_G_da,
+        },
+        required_exhibits,
+        deficiency_triggers,
+        n_deficiency_risks:     deficiency_triggers.length,
+        filing_fee_usd:         4200,
+        filing_system:          'FCC LMS (Licensing Management System)',
+        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65; NHPA §106',
+        note: `FCC Form 301-AM ${isDA_ch ? `DA (${pattern_mode})` : 'NDA'} application for ${frequency_khz} kHz Class ${fcc_class}: ${n_required} required exhibits across ${isDA_ch ? 7 : 6} sections. Top deficiency risk: ${deficiency_triggers[0].issue}. ${asr_required_ch ? `ASR registration required (tower ≈ ${tower_ft_ch} ft). ` : ''}Filing fee: $4,200.`
       };
     })(),
 
