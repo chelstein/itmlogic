@@ -3171,3 +3171,14 @@ test('am_real_estate_and_land_acquisition_guide present across colocation candid
     assert.ok(g.radial_ft > 0, `rank ${c.rank}: radial_ft must be positive`);
   }
 });
+
+test('am_total_project_cost_summary_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_total_project_cost_summary_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_total_project_cost_summary_guide missing`);
+    assert.ok(g.grand_total_low_usd > 0, `rank ${c.rank}: grand_total_low_usd must be positive`);
+    assert.ok(g.total_with_contingency_low_usd > g.grand_total_low_usd, `rank ${c.rank}: contingency must increase total`);
+    assert.ok(typeof g.line_items_low === 'object', `rank ${c.rank}: line_items_low must be object`);
+  }
+});

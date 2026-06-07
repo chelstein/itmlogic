@@ -2226,6 +2226,37 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Total Project Cost Summary Guide */}
+        {candidate.am_total_project_cost_summary_guide && (() => {
+          const g = candidate.am_total_project_cost_summary_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const li = g.line_items_low ?? {};
+          const liH = g.line_items_high ?? {};
+          const liKeys = Object.keys(li);
+          return (
+            <div key="tpc-guide" style={{ marginBottom: 16, padding: 12, background: '#0f172a', borderRadius: 8, border: '2px solid #38bdf8' }}>
+              <div style={{ fontWeight: 700, color: '#f0f9ff', marginBottom: 6, fontSize: 13 }}>Total Project Cost Summary</div>
+              <div style={{ fontSize: 12, color: '#bae6fd', marginBottom: 6 }}>
+                {liKeys.map(k => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ color: '#93c5fd' }}>{k.replace(/_/g, ' ')}:</span>
+                    <span>{fmt(li[k])} – {fmt(liH[k])}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ borderTop: '1px solid #1e3a5f', paddingTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
+                <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total:</span>
+                <span style={{ color: '#e0f2fe', fontWeight: 600 }}>{fmt(g.grand_total_low_usd)} – {fmt(g.grand_total_high_usd)}</span>
+                <span style={{ color: '#bae6fd' }}>+ {g.contingency_pct}% contingency:</span>
+                <span style={{ color: '#e0f2fe' }}>{fmt(g.contingency_low_usd)} – {fmt(g.contingency_high_usd)}</span>
+                <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL (w/ contingency):</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>{fmt(g.total_with_contingency_low_usd)} – {fmt(g.total_with_contingency_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7dd3fc', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Real Estate and Land Acquisition Guide */}
         {candidate.am_real_estate_and_land_acquisition_guide && (() => {
           const g = candidate.am_real_estate_and_land_acquisition_guide;

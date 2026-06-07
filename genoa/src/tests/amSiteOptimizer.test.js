@@ -13498,3 +13498,48 @@ test('am_real_estate_and_land_acquisition_guide comparison table columns present
   assert.strictEqual(r0.re_total_purchase_low_usd, 12000, 'rank-1 re_total_purchase_low should be 12000');
   assert.strictEqual(r0.re_lease_low_per_month,    500,   'rank-1 re_lease_low_per_month should be 500');
 });
+
+test('am_total_project_cost_summary_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_total_project_cost_summary_guide;
+  assert.ok(g !== undefined && g !== null, 'am_total_project_cost_summary_guide missing');
+  assert.ok(g.grand_total_low_usd > 0, 'grand_total_low_usd must be positive');
+  assert.ok(g.grand_total_high_usd >= g.grand_total_low_usd, 'grand_total_high must be >= low');
+});
+
+test('KAZM total project cost line items and grand total', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_total_project_cost_summary_guide;
+  assert.strictEqual(g.grand_total_low_usd,  377615, 'KAZM grand_total_low should be 377615');
+  assert.strictEqual(g.grand_total_high_usd, 1817175, 'KAZM grand_total_high should be 1817175');
+  assert.ok(typeof g.line_items_low === 'object', 'line_items_low must be object');
+  assert.ok(Object.keys(g.line_items_low).length >= 10, 'line_items_low must have >= 10 entries');
+});
+
+test('KAZM 15% contingency applied correctly', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_total_project_cost_summary_guide;
+  assert.strictEqual(g.contingency_pct,            15,         'contingency_pct should be 15');
+  assert.strictEqual(g.contingency_low_usd,        56642.25,   'KAZM contingency_low should be 56642.25');
+  assert.strictEqual(g.total_with_contingency_low_usd,  434257.25, 'KAZM total_with_contingency_low should be 434257.25');
+});
+
+test('KAZM total project cost reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_total_project_cost_summary_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('contingency'), 'reference must mention contingency');
+  assert.ok(typeof g.note === 'string' && g.note.includes('contingency'), 'note must mention contingency');
+});
+
+test('am_total_project_cost_summary_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tpc_grand_total_low_usd'    in row, 'tpc_grand_total_low_usd missing from comparison table');
+    assert.ok('tpc_grand_total_high_usd'   in row, 'tpc_grand_total_high_usd missing from comparison table');
+    assert.ok('tpc_total_with_contingency' in row, 'tpc_total_with_contingency missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.tpc_grand_total_low_usd,    377615,    'rank-1 tpc_grand_total_low should be 377615');
+  assert.strictEqual(r0.tpc_grand_total_high_usd,   1817175,   'rank-1 tpc_grand_total_high should be 1817175');
+  assert.strictEqual(r0.tpc_total_with_contingency, 434257.25, 'rank-1 tpc_total_with_contingency should be 434257.25');
+});
