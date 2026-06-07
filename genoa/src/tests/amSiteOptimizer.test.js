@@ -14823,3 +14823,39 @@ it('candidate_comparison_table sky columns are present and valid for KAZM', asyn
   assert.ok(typeof r0.sky_dominant_station === 'string', 'sky_dominant_station must be a string');
   assert.ok(r0.sky_total_compliance_low_usd > 0, 'sky_total_compliance_low_usd must be positive');
 });
+
+it('am_antenna_insulator_and_base_voltage_protection_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_antenna_insulator_and_base_voltage_protection_guide, `candidate missing am_antenna_insulator_and_base_voltage_protection_guide`);
+  }
+});
+
+it('am_antenna_insulator_and_base_voltage_protection_guide v_base_rms matches sqrt(P × R_base)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_insulator_and_base_voltage_protection_guide;
+  // sqrt(5000 W × 120 Ω) = 774.6 V RMS
+  assert.ok(Math.abs(g.v_base_rms_vrms - 774.6) < 0.5, `v_base_rms_vrms ${g.v_base_rms_vrms} should be ~774.6 V`);
+});
+
+it('am_antenna_insulator_and_base_voltage_protection_guide v_peak_kv = v_rms × sqrt(2) / 1000', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_insulator_and_base_voltage_protection_guide;
+  const expected_peak = g.v_base_rms_vrms * Math.SQRT2 / 1000;
+  assert.ok(Math.abs(g.v_peak_kv - expected_peak) < 0.01, `v_peak_kv ${g.v_peak_kv} should equal v_rms × √2 / 1000`);
+});
+
+it('am_antenna_insulator_and_base_voltage_protection_guide insulator_rating_kv_min ≥ 15 kV (ANSI)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_insulator_and_base_voltage_protection_guide;
+  assert.ok(g.insulator_rating_kv_min >= 15, 'ANSI minimum for AM base insulator is 15 kV BIL');
+  assert.ok(g.insulator_margin_ratio > 1, 'insulator margin must exceed 1× (rated > V_peak)');
+});
+
+it('candidate_comparison_table bip columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.bip_v_peak_kv > 0, 'bip_v_peak_kv must be positive');
+  assert.ok(r0.bip_insulator_rating_kv_min >= 15, 'bip_insulator_rating_kv_min must be ≥ 15 kV');
+  assert.ok(r0.bip_total_protection_low_usd > 0, 'bip_total_protection_low_usd must be positive');
+});

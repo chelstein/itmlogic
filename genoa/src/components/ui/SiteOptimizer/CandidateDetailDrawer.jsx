@@ -2226,6 +2226,37 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna Insulator and Base Voltage Protection Guide */}
+        {candidate.am_antenna_insulator_and_base_voltage_protection_guide && (() => {
+          const g = candidate.am_antenna_insulator_and_base_voltage_protection_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="bip-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Base Insulator &amp; Voltage Protection — §73.1215 / NFPA 780</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
+                <span style={{ color: '#ea580c' }}>V_base RMS:</span><span>{fmtF(g.v_base_rms_vrms, 1)} V RMS</span>
+                <span style={{ color: '#ea580c' }}>V_peak:</span><span style={{ fontWeight: 700 }}>{fmtF(g.v_peak_kv, 2)} kV peak</span>
+                <span style={{ color: '#ea580c' }}>Insulator rating:</span><span>≥ {g.insulator_rating_kv_min} kV BIL (ANSI)</span>
+                <span style={{ color: '#ea580c' }}>Safety margin:</span><span>{fmtF(g.insulator_margin_ratio, 1)}× above V_peak</span>
+                <span style={{ color: '#ea580c' }}>Tower elements:</span><span>{g.n_tower_elements} ({g.n_tower_elements > 1 ? 'DA' : 'NDA'})</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#7c2d12', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#ea580c' }}>Annual inspection:</span><span>${fmt(g.inspect_low_usd)} – ${fmt(g.inspect_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>Insulator replacement:</span><span>${fmt(g.replace_low_usd)} – ${fmt(g.replace_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>RF choke (DC bond):</span><span>${fmt(g.choke_low_usd)} – ${fmt(g.choke_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>Spark gap:</span><span>${fmt(g.spark_low_usd)} – ${fmt(g.spark_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>MOV arrestor:</span><span>${fmt(g.mov_low_usd)} – ${fmt(g.mov_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fed7aa', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#ea580c', fontWeight: 600 }}>Total protection:</span>
+                <span style={{ color: '#7c2d12', fontWeight: 700 }}>${fmt(g.total_protection_low_usd)} – ${fmt(g.total_protection_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#c2410c' }}>Ref: 47 CFR §73.1215, §73.49; ANSI/IEEE Std 1313.1; NFPA 780</div>
+            </div>
+          );
+        })()}
+
         {/* AM Skywave Nighttime Service and Interference Guide */}
         {candidate.am_skywave_nighttime_service_and_interference_guide && (() => {
           const g = candidate.am_skywave_nighttime_service_and_interference_guide;

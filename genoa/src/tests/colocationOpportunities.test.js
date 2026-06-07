@@ -3684,3 +3684,20 @@ test('colocation candidates include am_skywave_nighttime_service_and_interferenc
     assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB');
   }
 });
+
+test('colocation candidates include am_antenna_insulator_and_base_voltage_protection_guide with V_peak check', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_insulator_and_base_voltage_protection_guide;
+    assert.ok(g, `candidate missing am_antenna_insulator_and_base_voltage_protection_guide`);
+    assert.ok(g.v_peak_kv > 0, 'v_peak_kv must be positive');
+    assert.ok(g.insulator_rating_kv_min >= 15, 'insulator_rating_kv_min must be ≥ 15 kV BIL');
+    assert.ok(g.insulator_margin_ratio > 1, 'insulator must be rated above V_peak');
+  }
+});

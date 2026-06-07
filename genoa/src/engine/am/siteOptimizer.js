@@ -1407,7 +1407,10 @@ export async function runSiteOptimizer(body = {}){
     rlh_total_renewal_low_usd:          c.am_license_renewal_and_regulatory_history_guide?.total_renewal_low_usd ?? null,
     sky_night_signoff_risk:             c.am_skywave_nighttime_service_and_interference_guide?.night_signoff_risk ?? null,
     sky_dominant_station:               c.am_skywave_nighttime_service_and_interference_guide?.dominant_station ?? null,
-    sky_total_compliance_low_usd:       c.am_skywave_nighttime_service_and_interference_guide?.total_compliance_low_usd ?? null
+    sky_total_compliance_low_usd:       c.am_skywave_nighttime_service_and_interference_guide?.total_compliance_low_usd ?? null,
+    bip_v_peak_kv:                      c.am_antenna_insulator_and_base_voltage_protection_guide?.v_peak_kv ?? null,
+    bip_insulator_rating_kv_min:        c.am_antenna_insulator_and_base_voltage_protection_guide?.insulator_rating_kv_min ?? null,
+    bip_total_protection_low_usd:       c.am_antenna_insulator_and_base_voltage_protection_guide?.total_protection_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7142,6 +7145,105 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_insulator_and_base_voltage_protection_guide: (() => {
+      // AM tower base insulator: the electrically-critical component that floats the tower at RF voltage.
+      //
+      // §73.49: AM antenna towers must be physically enclosed (fence) — the insulator itself is not
+      //   addressed by a single rule but is an equipment maintenance obligation under §73.1215.
+      //
+      // §73.1215: Licensees must maintain equipment in good operating condition.  A cracked or
+      //   contaminated base insulator causes an RF short to ground — reduces radiation efficiency,
+      //   may cause SWR misfeed, and can damage the transmitter final stage.
+      //
+      // Base voltage physics:
+      //   Z_base = R_rad + R_g + jX_t (base impedance complex; R_rad ≈ 36.6 Ω at λ/4, R_g ≈ 1.5 Ω)
+      //   For NDA: R_base_total ≈ 120 Ω (includes R_g, loss, typical ATU-referred value at FCC NDA limit)
+      //   V_base_rms = sqrt(P_w × R_base_typical_Ω)
+      //   V_base_peak = V_base_rms × sqrt(2)
+      //
+      // For DA stations, R_base may vary per element; use nominal 120 Ω for screening.
+      //
+      // Insulator ratings (ANSI standard porcelain, 1970+ era):
+      //   Station insulators: typically rated 15–100 kV BIL (Basic Impulse Level)
+      //   Working voltage: 3–10 kV continuous (far exceeds typical AM station V_peak of ~1–2 kV)
+      //   Modern fiberglass (FRP) insulators: rated 50+ kV; preferred for coastal/humid environments
+      //
+      // Inspection protocol:
+      //   Visual: look for cracks, chips, contamination, bird-dropping conductive paths
+      //   Megohmeter test: resistance to ground > 100 MΩ dry; < 10 MΩ indicates contamination
+      //   Replacement interval: 20–30 years typical; sooner in coastal/industrial environments
+      //
+      // Lightning protection across base insulator:
+      //   Spark gap (3–5 mm air gap): fires at ~15 kV; protects ATU from direct lightning stroke
+      //   MOV surge arrestor (650 V clamping): protects remote monitoring electronics
+      //   RF choke coil (for DC bonding): 100–500 μH; presents high Z at AM frequencies,
+      //     near-zero Z at DC/power frequency → keeps tower at DC ground for lightning
+      //   Combined protection cost: $1,500–$4,000
+      //
+      // Equipment costs (2024):
+      //   Base insulator inspection (visual + megohmeter): $500–$1,500 per tower per year
+      //   Insulator replacement (porcelain set, including labor): $2,000–$6,000
+      //   RF choke coil (DC bonding): $800–$2,000 installed
+      //   Spark gap set: $300–$800
+      //   MOV surge arrestor: $150–$400
+      //   Inspection report / engineering sign-off: $500–$1,200
+      //   Total first-year protection budget: $4,250–$11,900
+      const isDA    = /^DA/i.test(pattern_mode);
+      const P_w     = tpo_kw * 1000;
+      const R_base  = 120;                          // nominal Ω for screening (see #51 am_tower_base_rf_safety)
+      const V_rms   = round2(Math.sqrt(P_w * R_base));
+      const V_peak  = round2(V_rms * Math.SQRT2);
+      const V_peak_kv = round2(V_peak / 1000);
+
+      // Insulator minimum rated voltage (should be > V_peak by margin):
+      const insulator_rating_kv_min = 15;           // ANSI minimum for AM tower base insulator
+      const insulator_margin_ratio  = round2(insulator_rating_kv_min * 1000 / V_peak);
+
+      // Number of tower elements (DA: n_elements in pattern; NDA: 1)
+      const n_elements = isDA ? 2 : 1;             // screening assumes 2-tower DA; exact count from FCC record
+
+      const inspect_low_usd  = 500  * n_elements;
+      const inspect_high_usd = 1500 * n_elements;
+      const replace_low_usd  = 2000 * n_elements;
+      const replace_high_usd = 6000 * n_elements;
+      const choke_low_usd    = 800  * n_elements;
+      const choke_high_usd   = 2000 * n_elements;
+      const spark_low_usd    = 300  * n_elements;
+      const spark_high_usd   = 800  * n_elements;
+      const mov_low_usd      = 150  * n_elements;
+      const mov_high_usd     = 400  * n_elements;
+      const report_low_usd   = 500;
+      const report_high_usd  = 1200;
+
+      const total_protection_low_usd  = inspect_low_usd  + choke_low_usd  + spark_low_usd  + mov_low_usd  + report_low_usd;
+      const total_protection_high_usd = inspect_high_usd + choke_high_usd + spark_high_usd + mov_high_usd + report_high_usd;
+
+      return {
+        v_base_rms_vrms:       V_rms,
+        v_peak_kv:             V_peak_kv,
+        v_base_r_base_ohm:     R_base,
+        insulator_rating_kv_min,
+        insulator_margin_ratio,
+        n_tower_elements:      n_elements,
+        inspect_low_usd,
+        inspect_high_usd,
+        replace_low_usd,
+        replace_high_usd,
+        choke_low_usd,
+        choke_high_usd,
+        spark_low_usd,
+        spark_high_usd,
+        mov_low_usd,
+        mov_high_usd,
+        report_low_usd,
+        report_high_usd,
+        total_protection_low_usd,
+        total_protection_high_usd,
+        reference: '47 CFR §73.1215 (equipment maintenance); §73.49 (antenna enclosure); ANSI/IEEE Std 1313.1 (insulation coordination); NFPA 780 (lightning protection); §73.61 (base current)',
+        note: `V_peak = ${V_peak_kv} kV at ${tpo_kw} kW / ${R_base} Ω nominal base impedance. Insulator rating ≥ ${insulator_rating_kv_min} kV BIL (margin factor ${insulator_margin_ratio.toFixed(1)}×). ${n_elements > 1 ? `DA station: ${n_elements} tower elements, inspect all bases. ` : ''}RF choke + spark gap + MOV provide DC bonding and lightning protection across base insulator per NFPA 780.`
       };
     })(),
 
