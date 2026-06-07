@@ -12704,3 +12704,47 @@ test('am_tower_lighting_and_aviation_compliance_guide comparison table columns p
   assert.strictEqual(r0.lit_total_install_low_usd,  6125,                         'rank-1 lit_total_install_low_usd should be $6,125');
   assert.strictEqual(r0.lit_lighting_type,          'medium_intensity_white_or_red', 'rank-1 lit_lighting_type mismatch');
 });
+
+test('am_soil_conductivity_and_ground_loss_assessment_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_ground_loss_assessment_guide;
+  assert.ok(g !== undefined && g !== null, 'am_soil_conductivity_and_ground_loss_assessment_guide missing');
+  assert.ok(g.sigma_est_ms_m > 0, 'sigma_est_ms_m must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM soil conductivity tier (Arizona arid site)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_ground_loss_assessment_guide;
+  assert.strictEqual(g.conductivity_tier,    'arid_low', 'Arizona candidate should be arid_low');
+  assert.strictEqual(g.sigma_est_ms_m,       2,          'arid_low sigma should be 2 mS/m');
+  assert.strictEqual(g.soil_treatment_needed, true,      'arid_low site should recommend soil treatment');
+});
+
+test('KAZM soil conductivity resistivity test cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_ground_loss_assessment_guide;
+  assert.strictEqual(g.resistivity_test_low_usd,  2000, 'resistivity_test_low should be $2,000');
+  assert.strictEqual(g.resistivity_test_high_usd, 8000, 'resistivity_test_high should be $8,000');
+  assert.strictEqual(g.soil_treatment_low_usd,    8000, 'soil_treatment_low should be $8,000 for arid site');
+});
+
+test('KAZM soil assessment total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_ground_loss_assessment_guide;
+  assert.strictEqual(g.total_low_usd,  10000, 'total_low should be $10,000');
+  assert.strictEqual(g.total_high_usd, 33000, 'total_high should be $33,000');
+});
+
+test('am_soil_conductivity_and_ground_loss_assessment_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gsc_conductivity_tier' in row, 'gsc_conductivity_tier missing from comparison table');
+    assert.ok('gsc_sigma_est_ms_m'    in row, 'gsc_sigma_est_ms_m missing from comparison table');
+    assert.ok('gsc_total_low_usd'     in row, 'gsc_total_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.gsc_conductivity_tier, 'arid_low', 'rank-1 gsc_conductivity_tier should be arid_low');
+  assert.strictEqual(r0.gsc_sigma_est_ms_m,    2,          'rank-1 gsc_sigma_est_ms_m should be 2');
+  assert.strictEqual(r0.gsc_total_low_usd,     10000,      'rank-1 gsc_total_low_usd should be $10,000');
+});

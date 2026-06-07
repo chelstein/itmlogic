@@ -2968,3 +2968,15 @@ test('am_tower_lighting_and_aviation_compliance_guide present across colocation 
       `rank ${c.rank}: unexpected lighting_type: ${g.lighting_type}`);
   }
 });
+
+test('am_soil_conductivity_and_ground_loss_assessment_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_soil_conductivity_and_ground_loss_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_soil_conductivity_and_ground_loss_assessment_guide missing`);
+    assert.ok(g.sigma_est_ms_m > 0, `rank ${c.rank}: sigma_est_ms_m must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['arid_low','average'].includes(g.conductivity_tier),
+      `rank ${c.rank}: unexpected conductivity_tier: ${g.conductivity_tier}`);
+  }
+});

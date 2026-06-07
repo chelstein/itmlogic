@@ -1251,7 +1251,10 @@ export async function runSiteOptimizer(body = {}){
     env_section_106_low_usd:    c.am_environmental_impact_assessment_guide?.section_106_low_usd ?? null,
     lit_tower_height_ft:        c.am_tower_lighting_and_aviation_compliance_guide?.tower_height_ft ?? null,
     lit_total_install_low_usd:  c.am_tower_lighting_and_aviation_compliance_guide?.total_install_low_usd ?? null,
-    lit_lighting_type:          c.am_tower_lighting_and_aviation_compliance_guide?.lighting_type ?? null
+    lit_lighting_type:          c.am_tower_lighting_and_aviation_compliance_guide?.lighting_type ?? null,
+    gsc_conductivity_tier:      c.am_soil_conductivity_and_ground_loss_assessment_guide?.conductivity_tier ?? null,
+    gsc_sigma_est_ms_m:         c.am_soil_conductivity_and_ground_loss_assessment_guide?.sigma_est_ms_m ?? null,
+    gsc_total_low_usd:          c.am_soil_conductivity_and_ground_loss_assessment_guide?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6986,6 +6989,35 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_soil_conductivity_and_ground_loss_assessment_guide: (() => {
+      // FCC AM propagation uses M3 ground conductivity maps (σ in mS/m).
+      // Arid Southwest US (lat 29-42N, lon 100-120W) typically has low conductivity
+      // (0.5–3 mS/m) which attenuates groundwave propagation and lowers effective reach.
+      // On-site four-electrode (Wenner) resistivity testing refines FCC M3 assumptions;
+      // poor-conductivity sites may benefit from chemical or bentonite soil treatment.
+      const candidate_lat = pt.lat;
+      const candidate_lon = pt.lon;
+      const likely_arid = (candidate_lat >= 29 && candidate_lat <= 42 && candidate_lon >= -120 && candidate_lon <= -100);
+      const conductivity_tier = likely_arid ? 'arid_low' : 'average';
+      const sigma_est_ms_m    = likely_arid ? 2.0 : 5.0;
+      const resistivity_test_low_usd  = 2000;
+      const resistivity_test_high_usd = 8000;
+      const soil_treatment_needed     = likely_arid;
+      const soil_treatment_low_usd    = soil_treatment_needed ? 8000  : 0;
+      const soil_treatment_high_usd   = soil_treatment_needed ? 25000 : 0;
+      const total_low_usd  = round2(resistivity_test_low_usd  + soil_treatment_low_usd);
+      const total_high_usd = round2(resistivity_test_high_usd + soil_treatment_high_usd);
+      return {
+        candidate_lat, candidate_lon, conductivity_tier, sigma_est_ms_m,
+        soil_treatment_needed,
+        resistivity_test_low_usd, resistivity_test_high_usd,
+        soil_treatment_low_usd, soil_treatment_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'FCC M3 conductivity maps; ARRL ground conductivity data; IEEE Std 81 (four-electrode resistivity)',
+        note: `${conductivity_tier}: σ ≈ ${sigma_est_ms_m} mS/m; soil assessment total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 

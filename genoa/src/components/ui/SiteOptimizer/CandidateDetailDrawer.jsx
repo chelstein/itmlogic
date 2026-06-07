@@ -2226,6 +2226,33 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Soil Conductivity and Ground Loss Assessment Guide */}
+        {candidate.am_soil_conductivity_and_ground_loss_assessment_guide && (() => {
+          const g = candidate.am_soil_conductivity_and_ground_loss_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const tierLabel = {
+            arid_low: 'Arid / Low (≈2 mS/m)',
+            average:  'Average US (≈5 mS/m)',
+          }[g.conductivity_tier] ?? g.conductivity_tier ?? '—';
+          return (
+            <div key="gsc-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#4a044e', marginBottom: 6, fontSize: 13 }}>Soil Conductivity &amp; Ground Loss</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#701a75' }}>
+                <span>Tier:</span><span>{tierLabel}</span>
+                <span>σ estimate:</span><span>{g.sigma_est_ms_m != null ? `${g.sigma_est_ms_m} mS/m` : '—'}</span>
+                <span>Soil treatment:</span><span>{g.soil_treatment_needed ? 'Recommended' : 'Not needed'}</span>
+                <span>Resistivity test:</span><span>{fmt(g.resistivity_test_low_usd)} – {fmt(g.resistivity_test_high_usd)}</span>
+                {g.soil_treatment_needed && <>
+                  <span>Soil treatment:</span><span>{fmt(g.soil_treatment_low_usd)} – {fmt(g.soil_treatment_high_usd)}</span>
+                </>}
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#86198f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Tower Lighting and Aviation Compliance Guide */}
         {candidate.am_tower_lighting_and_aviation_compliance_guide && (() => {
           const g = candidate.am_tower_lighting_and_aviation_compliance_guide;
