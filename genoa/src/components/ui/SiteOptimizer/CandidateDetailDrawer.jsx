@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Station Financial Feasibility Guide */}
+        {candidate.am_station_financial_feasibility_guide && (() => {
+          const g = candidate.am_station_financial_feasibility_guide;
+          const fmt = (n) => n != null ? Number(Math.round(n)).toLocaleString() : '—';
+          const isViable = g.feasibility_flag === 'POTENTIALLY_VIABLE';
+          return (
+            <div key="fin-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: `2px solid ${isViable ? '#16a34a' : '#dc2626'}` }}>
+              <div style={{ fontWeight: 700, color: isViable ? '#14532d' : '#7f1d1d', marginBottom: 6, fontSize: 13 }}>Financial Feasibility Analysis</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: isViable ? '#166534' : '#991b1b' }}>
+                <span>Est. capex range:</span><span>${fmt(g.capex_low_usd)} – ${fmt(g.capex_high_usd)}</span>
+                <span>Revenue uplift/yr:</span><span>${fmt(g.annual_revenue_uplift_low_usd)} – ${fmt(g.annual_revenue_uplift_high_usd)}</span>
+                <span>Payback period:</span><span>{g.payback_years_low != null ? `${g.payback_years_low}–${g.payback_years_high} yrs` : '—'}</span>
+                <span>Discount rate:</span><span>{g.discount_rate_low != null ? `${(g.discount_rate_low*100).toFixed(0)}–${(g.discount_rate_high*100).toFixed(0)}%` : '—'}</span>
+                <span>10-yr NPV (optimistic):</span><span style={{ color: g.npv_optimistic_10yr > 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>{g.npv_optimistic_10yr != null ? `$${fmt(g.npv_optimistic_10yr)}` : '—'}</span>
+                <span>10-yr NPV (pessimistic):</span><span style={{ color: '#dc2626' }}>{g.npv_pessimistic_10yr != null ? `$${fmt(g.npv_pessimistic_10yr)}` : '—'}</span>
+                <span>Feasibility:</span><span style={{ fontWeight: 700, color: isViable ? '#16a34a' : '#dc2626' }}>{g.feasibility_flag ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: isViable ? '#15803d' : '#b91c1c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Frequency Monitoring and Technical Compliance Guide */}
         {candidate.am_frequency_monitoring_and_technical_compliance_guide && (() => {
           const g = candidate.am_frequency_monitoring_and_technical_compliance_guide;

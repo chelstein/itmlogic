@@ -14346,3 +14346,41 @@ it('candidate_comparison_table fmtc columns are present and valid for KAZM', asy
   assert.ok(r0.fmtc_total_monitoring_equip_low_usd > 0, 'fmtc_total_monitoring_equip_low_usd must be positive');
   assert.ok(r0.fmtc_annual_compliance_low_usd > 0, 'fmtc_annual_compliance_low_usd must be positive');
 });
+
+// ── am_station_financial_feasibility_guide ───────────────────────────────────
+
+it('am_station_financial_feasibility_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_station_financial_feasibility_guide, 'financial guide missing on candidate');
+  }
+});
+
+it('am_station_financial_feasibility_guide npv_optimistic_10yr is a finite number', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_financial_feasibility_guide;
+  assert.ok(Number.isFinite(g.npv_optimistic_10yr), 'npv_optimistic_10yr must be finite');
+  assert.ok(Number.isFinite(g.npv_pessimistic_10yr), 'npv_pessimistic_10yr must be finite');
+});
+
+it('am_station_financial_feasibility_guide feasibility_flag is valid enum value', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_financial_feasibility_guide;
+  const valid = ['POTENTIALLY_VIABLE', 'FINANCIALLY_CHALLENGED'];
+  assert.ok(valid.includes(g.feasibility_flag), `feasibility_flag must be one of ${valid.join('|')}`);
+});
+
+it('am_station_financial_feasibility_guide payback_years_low is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_financial_feasibility_guide;
+  assert.ok(g.payback_years_low > 0, 'payback_years_low must be positive');
+  assert.ok(g.payback_years_high > g.payback_years_low, 'payback_years_high must be > low');
+});
+
+it('candidate_comparison_table fin columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(Number.isFinite(r0.fin_npv_optimistic_10yr), 'fin_npv_optimistic_10yr must be finite');
+  assert.ok(r0.fin_payback_years_low > 0, 'fin_payback_years_low must be positive');
+  assert.ok(r0.fin_feasibility_flag != null, 'fin_feasibility_flag must not be null');
+});

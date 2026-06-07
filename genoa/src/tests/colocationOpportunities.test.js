@@ -3463,3 +3463,20 @@ test('am_frequency_monitoring_and_technical_compliance_guide colocation: all can
     assert.strictEqual(g.audio_bandwidth_khz, 10, `audio_bandwidth_khz must be 10 kHz (NRSC-2-B)`);
   }
 });
+
+test('am_station_financial_feasibility_guide colocation: all candidates have valid financial data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_station_financial_feasibility_guide;
+    assert.ok(g, `candidate missing am_station_financial_feasibility_guide`);
+    assert.ok(Number.isFinite(g.npv_optimistic_10yr), `npv_optimistic_10yr must be finite`);
+    assert.ok(g.capex_low_usd > 0, `capex_low_usd must be positive`);
+    assert.ok(['POTENTIALLY_VIABLE','FINANCIALLY_CHALLENGED'].includes(g.feasibility_flag), `feasibility_flag must be valid`);
+  }
+});

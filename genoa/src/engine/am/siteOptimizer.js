@@ -1368,7 +1368,10 @@ export async function runSiteOptimizer(body = {}){
     sec_monitoring_annual_low_usd:      c.am_broadcast_facility_security_guide?.monitoring_annual_low_usd ?? null,
     fmtc_freq_tolerance_hz:             c.am_frequency_monitoring_and_technical_compliance_guide?.freq_tolerance_hz ?? null,
     fmtc_total_monitoring_equip_low_usd: c.am_frequency_monitoring_and_technical_compliance_guide?.total_monitoring_equip_low_usd ?? null,
-    fmtc_annual_compliance_low_usd:     c.am_frequency_monitoring_and_technical_compliance_guide?.annual_fcc_compliance_low_usd ?? null
+    fmtc_annual_compliance_low_usd:     c.am_frequency_monitoring_and_technical_compliance_guide?.annual_fcc_compliance_low_usd ?? null,
+    fin_npv_optimistic_10yr:            c.am_station_financial_feasibility_guide?.npv_optimistic_10yr ?? null,
+    fin_payback_years_low:              c.am_station_financial_feasibility_guide?.payback_years_low ?? null,
+    fin_feasibility_flag:               c.am_station_financial_feasibility_guide?.feasibility_flag ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7103,6 +7106,59 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_station_financial_feasibility_guide: (() => {
+      // Financial feasibility of AM relocation: NPV/payback analysis for the capital investment.
+      // Key inputs: total project cost (capex), incremental revenue from coverage improvement,
+      // discount rate, and operating cost delta.
+      // Typical AM station relocation capex: $250,000–$2,500,000 depending on site/tower/permits.
+      // Revenue proxy: AM station revenue typically $100–$600K/yr for small-market stations.
+      const capex_low_usd  = 250000;
+      const capex_high_usd = 2500000;
+      const annual_revenue_proxy_low_usd  = 100000;
+      const annual_revenue_proxy_high_usd = 600000;
+      // Coverage improvement factor: how much revenue uplift from coverage increase
+      const coverage_gain_factor_low  = 0.05; // 5% uplift — conservative
+      const coverage_gain_factor_high = 0.25; // 25% uplift — optimistic
+      const annual_revenue_uplift_low_usd  = round2(annual_revenue_proxy_low_usd  * coverage_gain_factor_low);
+      const annual_revenue_uplift_high_usd = round2(annual_revenue_proxy_high_usd * coverage_gain_factor_high);
+      // Simple payback period: capex / annual uplift
+      const payback_years_low  = round2(capex_low_usd  / annual_revenue_uplift_high_usd);
+      const payback_years_high = round2(capex_high_usd / annual_revenue_uplift_low_usd);
+      // Discount rate for NPV (small broadcaster): 8–12%
+      const discount_rate_low  = 0.08;
+      const discount_rate_high = 0.12;
+      // NPV over 10 years at low capex / high uplift (optimistic)
+      const npv_optimistic_10yr = round2(
+        Array.from({ length: 10 }, (_, i) => annual_revenue_uplift_high_usd / Math.pow(1 + discount_rate_low, i + 1))
+          .reduce((a, b) => a + b, 0) - capex_low_usd
+      );
+      // NPV over 10 years at high capex / low uplift (pessimistic)
+      const npv_pessimistic_10yr = round2(
+        Array.from({ length: 10 }, (_, i) => annual_revenue_uplift_low_usd / Math.pow(1 + discount_rate_high, i + 1))
+          .reduce((a, b) => a + b, 0) - capex_high_usd
+      );
+      const feasibility_flag = npv_optimistic_10yr > 0 ? 'POTENTIALLY_VIABLE' : 'FINANCIALLY_CHALLENGED';
+      return {
+        capex_low_usd,
+        capex_high_usd,
+        annual_revenue_proxy_low_usd,
+        annual_revenue_proxy_high_usd,
+        coverage_gain_factor_low,
+        coverage_gain_factor_high,
+        annual_revenue_uplift_low_usd,
+        annual_revenue_uplift_high_usd,
+        payback_years_low,
+        payback_years_high,
+        discount_rate_low,
+        discount_rate_high,
+        npv_optimistic_10yr,
+        npv_pessimistic_10yr,
+        feasibility_flag,
+        reference: 'NAB Broadcasting & Cable Yearbook (station revenue benchmarks); FCC Form 323 (biennial ownership report — revenue proxy); IBEW/NAB Engineering Handbook 11th Ed. (project cost estimation); SBA 7(a) loan programs for broadcast facility financing; IRS Rev. Proc. 87-56 (MACRS 7-year depreciation for broadcast equipment)',
+        note: `Capex est. $${capex_low_usd.toLocaleString()}–$${capex_high_usd.toLocaleString()}. Revenue uplift: $${annual_revenue_uplift_low_usd.toLocaleString()}–$${annual_revenue_uplift_high_usd.toLocaleString()}/yr. Payback: ${payback_years_low}–${payback_years_high} yrs. 10-yr NPV: $${npv_optimistic_10yr.toLocaleString()} (optimistic) / $${npv_pessimistic_10yr.toLocaleString()} (pessimistic). Flag: ${feasibility_flag}.`
       };
     })(),
 
