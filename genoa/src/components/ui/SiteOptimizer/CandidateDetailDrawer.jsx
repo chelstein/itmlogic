@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Insurance and Liability Guide */}
+        {candidate.am_insurance_and_liability_guide && (() => {
+          const g = candidate.am_insurance_and_liability_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="ins-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdfa', borderRadius: 8, border: '2px solid #0d9488' }}>
+              <div style={{ fontWeight: 700, color: '#134e4a', marginBottom: 6, fontSize: 13 }}>Insurance &amp; Liability</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0f766e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Tower replacement value:</span><span>{g.tower_replacement_value_low_usd != null ? `$${fmt(g.tower_replacement_value_low_usd)} – $${fmt(g.tower_replacement_value_high_usd)}` : '—'}</span>
+                <span>Equipment value:</span><span>{g.equipment_value_low_usd != null ? `$${fmt(g.equipment_value_low_usd)} – $${fmt(g.equipment_value_high_usd)}` : '—'}</span>
+                <span>Total insured value:</span><span style={{ fontWeight: 600 }}>{g.total_insured_value_low_usd != null ? `$${fmt(g.total_insured_value_low_usd)} – $${fmt(g.total_insured_value_high_usd)}` : '—'}</span>
+                <span>Property premium/yr:</span><span>{g.annual_property_premium_low_usd != null ? `$${fmt(Math.round(g.annual_property_premium_low_usd))} – $${fmt(Math.round(g.annual_property_premium_high_usd))}` : '—'}</span>
+                <span>GL premium/yr:</span><span>{g.annual_gl_premium_low_usd != null ? `$${fmt(g.annual_gl_premium_low_usd)} – $${fmt(g.annual_gl_premium_high_usd)}` : '—'}</span>
+                <span>Total annual insurance:</span><span style={{ color: '#dc2626', fontWeight: 600 }}>{g.total_annual_insurance_low_usd != null ? `$${fmt(Math.round(g.total_annual_insurance_low_usd))} – $${fmt(Math.round(g.total_annual_insurance_high_usd))}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0f766e', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Transmission Line and Phasor Guide */}
         {candidate.am_transmission_line_and_phasor_guide && (() => {
           const g = candidate.am_transmission_line_and_phasor_guide;

@@ -3395,3 +3395,20 @@ test('am_transmission_line_and_phasor_guide colocation: all colocation candidate
     assert.ok(typeof g.is_directional === 'boolean', `is_directional must be boolean`);
   }
 });
+
+test('am_insurance_and_liability_guide colocation: all colocation candidates have valid insurance data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_insurance_and_liability_guide;
+    assert.ok(g, `candidate missing am_insurance_and_liability_guide`);
+    assert.ok(g.total_annual_insurance_low_usd > 0, `total_annual_insurance_low_usd must be positive`);
+    assert.ok(g.tower_replacement_value_low_usd > 0, `tower_replacement_value_low_usd must be positive`);
+    assert.ok(g.annual_gl_premium_low_usd > 0, `annual_gl_premium_low_usd must be positive`);
+  }
+});

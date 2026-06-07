@@ -1356,7 +1356,10 @@ export async function runSiteOptimizer(body = {}){
     zon_total_zoning_low_usd:           c.am_zoning_and_land_use_approval_guide?.total_zoning_low_usd ?? null,
     tl_total_system_low_usd:            c.am_transmission_line_and_phasor_guide?.total_tl_system_low_usd ?? null,
     tl_is_directional:                  c.am_transmission_line_and_phasor_guide?.is_directional ?? null,
-    tl_lambda_m:                        c.am_transmission_line_and_phasor_guide?.lambda_m ?? null
+    tl_lambda_m:                        c.am_transmission_line_and_phasor_guide?.lambda_m ?? null,
+    ins_total_annual_low_usd:           c.am_insurance_and_liability_guide?.total_annual_insurance_low_usd ?? null,
+    ins_tower_replacement_low_usd:      c.am_insurance_and_liability_guide?.tower_replacement_value_low_usd ?? null,
+    ins_total_insured_low_usd:          c.am_insurance_and_liability_guide?.total_insured_value_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7091,6 +7094,54 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_insurance_and_liability_guide: (() => {
+      // AM broadcast tower insurance: property (tower + equipment), general liability, workers' comp.
+      // Tower property value: replacement cost of a guyed AM monopole at typical market rates.
+      const freq_mhz_ins = frequency_khz / 1000;
+      const lambda_m_ins = 299.792458 / freq_mhz_ins;
+      const isHighClass_ins = /^[AB]/i.test(fcc_class);
+      const tower_height_m_ins = round2(isHighClass_ins ? lambda_m_ins / 2 : lambda_m_ins / 4);
+      const tower_height_ft_ins = round2(tower_height_m_ins * 3.28084);
+      // Tower replacement cost: ~$800–$1,500 per foot for guyed AM monopole (Rohn/Valmont grade)
+      const tower_replacement_cost_per_ft_low  = 800;
+      const tower_replacement_cost_per_ft_high = 1500;
+      const tower_replacement_value_low_usd  = round2(tower_height_ft_ins * tower_replacement_cost_per_ft_low);
+      const tower_replacement_value_high_usd = round2(tower_height_ft_ins * tower_replacement_cost_per_ft_high);
+      // Equipment replacement: transmitter + TL + ATU + aux
+      const equipment_value_low_usd  = 50000;
+      const equipment_value_high_usd = 250000;
+      const total_insured_value_low_usd  = round2(tower_replacement_value_low_usd  + equipment_value_low_usd);
+      const total_insured_value_high_usd = round2(tower_replacement_value_high_usd + equipment_value_high_usd);
+      // Annual property insurance: ~0.4–0.8% of insured value
+      const property_insurance_rate_low  = 0.004;
+      const property_insurance_rate_high = 0.008;
+      const annual_property_premium_low_usd  = round2(total_insured_value_low_usd  * property_insurance_rate_low);
+      const annual_property_premium_high_usd = round2(total_insured_value_high_usd * property_insurance_rate_high);
+      // General liability: $1M/$2M occurrence/aggregate; typical annual ~$2,500–$6,000
+      const annual_gl_premium_low_usd  = 2500;
+      const annual_gl_premium_high_usd = 6000;
+      const total_annual_insurance_low_usd  = round2(annual_property_premium_low_usd  + annual_gl_premium_low_usd);
+      const total_annual_insurance_high_usd = round2(annual_property_premium_high_usd + annual_gl_premium_high_usd);
+      return {
+        tower_height_ft: tower_height_ft_ins,
+        tower_height_m: tower_height_m_ins,
+        tower_replacement_value_low_usd,
+        tower_replacement_value_high_usd,
+        equipment_value_low_usd,
+        equipment_value_high_usd,
+        total_insured_value_low_usd,
+        total_insured_value_high_usd,
+        annual_property_premium_low_usd,
+        annual_property_premium_high_usd,
+        annual_gl_premium_low_usd,
+        annual_gl_premium_high_usd,
+        total_annual_insurance_low_usd,
+        total_annual_insurance_high_usd,
+        reference: 'National Association of Broadcasters (NAB) risk management guidelines; FM/AM tower insurance underwriting standards (Chubb, Lloyds of London, Beacon Mutual); FCC §73.49 (tower fencing/security requirements affecting liability); OSHA 29 CFR 1910.268 (tower climbing safety)',
+        note: `Class ${fcc_class} tower (${tower_height_ft_ins} ft): est. replacement value $${tower_replacement_value_low_usd.toLocaleString()}–$${tower_replacement_value_high_usd.toLocaleString()}. Total insured: $${total_insured_value_low_usd.toLocaleString()}–$${total_insured_value_high_usd.toLocaleString()}. Annual insurance: $${total_annual_insurance_low_usd.toLocaleString()}–$${total_annual_insurance_high_usd.toLocaleString()}/yr.`
       };
     })(),
 

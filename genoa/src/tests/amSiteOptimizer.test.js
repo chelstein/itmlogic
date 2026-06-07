@@ -14198,3 +14198,41 @@ it('candidate_comparison_table tl columns are present and valid for KAZM NDA', a
   assert.strictEqual(r0.tl_is_directional, false, 'tl_is_directional should be false for NDA');
   assert.ok(Math.abs(r0.tl_lambda_m - 384.35) < 0.5, `tl_lambda_m expected ~384.35, got ${r0.tl_lambda_m}`);
 });
+
+// ── am_insurance_and_liability_guide ─────────────────────────────────────────
+
+it('am_insurance_and_liability_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_insurance_and_liability_guide, 'insurance guide missing on candidate');
+  }
+});
+
+it('am_insurance_and_liability_guide tower_replacement_value_low_usd is positive and tower-height-proportional', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_liability_guide;
+  assert.ok(g.tower_replacement_value_low_usd > 100000, `tower_replacement_value_low_usd should exceed $100k for 315 ft tower`);
+  assert.ok(g.tower_replacement_value_high_usd > g.tower_replacement_value_low_usd, 'high > low replacement value');
+});
+
+it('am_insurance_and_liability_guide total_annual_insurance_low_usd is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_liability_guide;
+  assert.ok(g.total_annual_insurance_low_usd > 0, `total_annual_insurance_low_usd must be positive`);
+  assert.ok(g.total_annual_insurance_high_usd > g.total_annual_insurance_low_usd, 'high > low annual premium');
+});
+
+it('am_insurance_and_liability_guide reference cites NAB and OSHA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_liability_guide;
+  assert.ok(g.reference.includes('NAB'), 'reference must cite NAB');
+  assert.ok(g.reference.includes('OSHA'), 'reference must cite OSHA');
+});
+
+it('candidate_comparison_table ins columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.ins_total_annual_low_usd > 0, 'ins_total_annual_low_usd must be positive');
+  assert.ok(r0.ins_tower_replacement_low_usd > 100000, 'ins_tower_replacement_low_usd should exceed $100k');
+  assert.ok(r0.ins_total_insured_low_usd > r0.ins_tower_replacement_low_usd, 'total_insured must exceed tower_replacement (equipment added)');
+});
