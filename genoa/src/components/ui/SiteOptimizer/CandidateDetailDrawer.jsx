@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Daytime vs Nighttime Coverage Differential Guide */}
+        {candidate.am_daytime_vs_nighttime_coverage_differential_guide && (() => {
+          const g = candidate.am_daytime_vs_nighttime_coverage_differential_guide;
+          const isSecondary = g.nighttime_restriction?.includes('SECONDARY');
+          return (
+            <div key="dnc-guide" style={{ marginBottom: 16, padding: 12, background: '#1e1b4b', borderRadius: 8, border: '2px solid #6366f1' }}>
+              <div style={{ fontWeight: 700, color: '#e0e7ff', marginBottom: 6, fontSize: 13 }}>Daytime vs. Nighttime Coverage Differential</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#c7d2fe' }}>
+                <span>ERP:</span><span>{g.erp_kw != null ? `${g.erp_kw} kW` : '—'}</span>
+                <span>Clear channel (780 kHz):</span><span style={{ color: g.is_clear_channel ? '#fbbf24' : '#94a3b8' }}>{g.is_clear_channel ? 'YES — dominant station protection' : 'No'}</span>
+                <span>Daytime 0.5 mV/m radius:</span><span>{g.daytime_05mvpm_radius_km != null ? `~${g.daytime_05mvpm_radius_km} km` : '—'}</span>
+                <span>Daytime 0.2 mV/m radius:</span><span>{g.daytime_02mvpm_radius_km != null ? `~${g.daytime_02mvpm_radius_km} km` : '—'}</span>
+                <span>Daytime coverage area:</span><span>{g.daytime_coverage_area_km2 != null ? `~${Number(g.daytime_coverage_area_km2).toLocaleString()} km²` : '—'}</span>
+                <span>Nighttime skywave reach:</span><span>{g.nighttime_skywave_radius_km != null ? `~${g.nighttime_skywave_radius_km} km` : '—'}</span>
+                <span>Nighttime interference zone:</span><span>{g.nighttime_interference_zone_km != null ? `${g.nighttime_interference_zone_km} km` : '—'}</span>
+                <span>Nighttime restriction:</span><span style={{ color: isSecondary ? '#f87171' : '#86efac', fontWeight: 600, fontSize: 11 }}>{g.nighttime_restriction ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#a5b4fc', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Antenna Tower Lighting and Marking Guide */}
         {candidate.am_antenna_tower_lighting_and_marking_guide && (() => {
           const g = candidate.am_antenna_tower_lighting_and_marking_guide;

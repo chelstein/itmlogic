@@ -1377,7 +1377,10 @@ export async function runSiteOptimizer(body = {}){
     pm_gc_markup_pct_low:               c.am_construction_contractor_and_pm_guide?.gc_markup_pct_low ?? null,
     ltg_lighting_required:              c.am_antenna_tower_lighting_and_marking_guide?.lighting_required ?? null,
     ltg_led_system_cost_low_usd:        c.am_antenna_tower_lighting_and_marking_guide?.led_system_cost_low_usd ?? null,
-    ltg_painting_cost_low_usd:          c.am_antenna_tower_lighting_and_marking_guide?.painting_cost_low_usd ?? null
+    ltg_painting_cost_low_usd:          c.am_antenna_tower_lighting_and_marking_guide?.painting_cost_low_usd ?? null,
+    dnc_daytime_05mvpm_radius_km:       c.am_daytime_vs_nighttime_coverage_differential_guide?.daytime_05mvpm_radius_km ?? null,
+    dnc_is_clear_channel:               c.am_daytime_vs_nighttime_coverage_differential_guide?.is_clear_channel ?? null,
+    dnc_nighttime_restriction:          c.am_daytime_vs_nighttime_coverage_differential_guide?.nighttime_restriction ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7112,6 +7115,46 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_daytime_vs_nighttime_coverage_differential_guide: (() => {
+      // AM groundwave (daytime) vs. skywave (nighttime) coverage differential.
+      // Daytime: groundwave propagation, limited by conductivity and TPO.
+      // Nighttime: skywave from ionospheric D-layer reflection; clear-channel stations can reach 1000+ km.
+      // Class D secondary stations: nighttime operation restricted by dominant station protection.
+      // 47 CFR §73.182: AM protection ratios for skywave; §73.185: nighttime protection.
+      // FCC field strength thresholds: 0.5 mV/m daytime (principal city coverage),
+      //   0.1 mV/m for rural/fringe areas; 0.025 mV/m (25 µV/m) nighttime skywave protected.
+      const erp_kw_cov = round2(tpo_kw * 0.85);
+      // Groundwave coverage radius: empirical approximation from FCC AM coverage tables
+      // For σ ≈ 2 mS/m (Southwest), 0.5 mV/m contour ~15–40 km for 1–5 kW
+      const daytime_05mvpm_radius_km = round2(15 * Math.sqrt(erp_kw_cov));
+      const daytime_02mvpm_radius_km = round2(25 * Math.sqrt(erp_kw_cov));
+      // Nighttime skywave: Class D secondary is interference-limited
+      const isDA_cov = /^DA/i.test(pattern_mode);
+      const is_clear_channel_cov = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      // Clear-channel dominant station skywave radius: up to 750 km at night
+      const nighttime_skywave_radius_km = is_clear_channel_cov ? 750 : 300;
+      const nighttime_interference_zone_km = is_clear_channel_cov ? 200 : 100;
+      // Coverage area (km²) for daytime 0.5 mV/m contour
+      const daytime_coverage_area_km2 = round2(Math.PI * daytime_05mvpm_radius_km ** 2);
+      // Nighttime protection: secondary stations typically must sign off or reduce at night
+      const nighttime_restriction = fcc_class === 'D' ? 'SECONDARY_RESTRICTION (may require sign-off or reduced power)' : 'NONE';
+      return {
+        tpo_kw,
+        erp_kw: erp_kw_cov,
+        daytime_05mvpm_radius_km,
+        daytime_02mvpm_radius_km,
+        daytime_coverage_area_km2,
+        nighttime_skywave_radius_km,
+        nighttime_interference_zone_km,
+        is_clear_channel: is_clear_channel_cov,
+        is_directional: isDA_cov,
+        nighttime_restriction,
+        fcc_class_used: fcc_class,
+        reference: '47 CFR §73.182 (AM service protection ratios — skywave); 47 CFR §73.185 (nighttime operation of Class D stations); 47 CFR §73.14 (definitions: dominant/secondary); FCC AM groundwave/skywave coverage tables (§73.190); ITU-R P.1147 (AM groundwave propagation)',
+        note: `${frequency_khz} kHz Class ${fcc_class} ${isDA_cov ? 'DA' : 'NDA'}: daytime 0.5 mV/m radius ~${daytime_05mvpm_radius_km} km (~${daytime_coverage_area_km2.toLocaleString()} km²). Nighttime skywave reach ~${nighttime_skywave_radius_km} km${is_clear_channel_cov ? ' (clear channel dominant)' : ''}. Class D: ${nighttime_restriction}.`
       };
     })(),
 

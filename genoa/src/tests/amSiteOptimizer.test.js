@@ -14457,3 +14457,39 @@ it('candidate_comparison_table ltg columns are present and valid for KAZM', asyn
   assert.ok(r0.ltg_led_system_cost_low_usd > 0, 'ltg_led_system_cost_low_usd must be positive');
   assert.ok(r0.ltg_painting_cost_low_usd > 0, 'ltg_painting_cost_low_usd must be positive');
 });
+
+// ── am_daytime_vs_nighttime_coverage_differential_guide ──────────────────────
+
+it('am_daytime_vs_nighttime_coverage_differential_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_daytime_vs_nighttime_coverage_differential_guide, 'dnc guide missing on candidate');
+  }
+});
+
+it('am_daytime_vs_nighttime_coverage_differential_guide is_clear_channel is true for 780 kHz (CLEAR_CHANNEL_KHZ)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_vs_nighttime_coverage_differential_guide;
+  assert.strictEqual(g.is_clear_channel, true, '780 kHz must be flagged as clear channel');
+});
+
+it('am_daytime_vs_nighttime_coverage_differential_guide nighttime_restriction indicates secondary for Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_vs_nighttime_coverage_differential_guide;
+  assert.ok(g.nighttime_restriction.includes('SECONDARY'), `Class D 780 kHz must have secondary restriction`);
+});
+
+it('am_daytime_vs_nighttime_coverage_differential_guide daytime_05mvpm_radius_km is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_vs_nighttime_coverage_differential_guide;
+  assert.ok(g.daytime_05mvpm_radius_km > 0, 'daytime_05mvpm_radius_km must be positive');
+  assert.ok(g.daytime_02mvpm_radius_km > g.daytime_05mvpm_radius_km, '0.2 mV/m radius > 0.5 mV/m radius');
+});
+
+it('candidate_comparison_table dnc columns are correct for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.dnc_daytime_05mvpm_radius_km > 0, 'dnc_daytime_05mvpm_radius_km must be positive');
+  assert.strictEqual(r0.dnc_is_clear_channel, true, 'dnc_is_clear_channel should be true for 780 kHz');
+  assert.ok(r0.dnc_nighttime_restriction != null, 'dnc_nighttime_restriction must not be null');
+});

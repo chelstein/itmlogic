@@ -3514,3 +3514,20 @@ test('am_antenna_tower_lighting_and_marking_guide colocation: all candidates hav
     assert.ok(g.painting_cost_low_usd >= 0, `painting_cost_low_usd must be non-negative`);
   }
 });
+
+test('am_daytime_vs_nighttime_coverage_differential_guide colocation: all candidates have valid day/night data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_daytime_vs_nighttime_coverage_differential_guide;
+    assert.ok(g, `candidate missing am_daytime_vs_nighttime_coverage_differential_guide`);
+    assert.ok(g.daytime_05mvpm_radius_km > 0, `daytime_05mvpm_radius_km must be positive`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', `is_clear_channel must be boolean`);
+    assert.ok(g.nighttime_restriction != null, `nighttime_restriction must not be null`);
+  }
+});
