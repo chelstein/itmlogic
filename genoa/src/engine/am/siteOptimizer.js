@@ -1206,7 +1206,10 @@ export async function runSiteOptimizer(body = {}){
     shlt_total_low_usd:         c.am_transmitter_building_and_equipment_shelter_guide?.total_shelter_low_usd ?? null,
     mon_monitor_type:           c.am_modulation_monitor_and_station_logging_guide?.monitor_type ?? null,
     mon_total_low_usd:          c.am_modulation_monitor_and_station_logging_guide?.total_monitoring_low_usd ?? null,
-    mon_readings_per_day:       c.am_modulation_monitor_and_station_logging_guide?.readings_per_day ?? null
+    mon_readings_per_day:       c.am_modulation_monitor_and_station_logging_guide?.readings_per_day ?? null,
+    bkp_generator_kw:           c.am_auxiliary_transmitter_and_backup_power_guide?.generator_kw ?? null,
+    bkp_total_low_usd:          c.am_auxiliary_transmitter_and_backup_power_guide?.total_backup_low_usd ?? null,
+    bkp_annual_maint_low_usd:   c.am_auxiliary_transmitter_and_backup_power_guide?.annual_maint_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6941,6 +6944,72 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_auxiliary_transmitter_and_backup_power_guide: (() => {
+      // §73.1660: Auxiliary transmitters encouraged; §73.1680: technical standards.
+      // FCC does not mandate backup power for AM, but generators are industry standard.
+      // Generator must power transmitter, HVAC, lighting, and control systems.
+
+      // Transmitter DC power draw ≈ TPO / efficiency; assume 65% efficiency typical AM transmitter
+      const tx_efficiency = 0.65;
+      const tx_dc_kw = round2(tpo_kw / tx_efficiency);
+
+      // Building loads (HVAC + lighting + control): scale with TPO
+      const building_load_kw = tpo_kw >= 50 ? 15 : tpo_kw >= 10 ? 8 : 3;
+      const total_load_kw = round2(tx_dc_kw + building_load_kw);
+
+      // Generator sizing: next standard commercial size above total load
+      let generator_kw;
+      if (total_load_kw <= 10)      generator_kw = 15;
+      else if (total_load_kw <= 20) generator_kw = 25;
+      else if (total_load_kw <= 40) generator_kw = 50;
+      else if (total_load_kw <= 80) generator_kw = 100;
+      else                           generator_kw = Math.ceil(total_load_kw / 25) * 25;
+
+      const generator_cost_per_kw_low  = 600;
+      const generator_cost_per_kw_high = 1200;
+      const generator_cost_low_usd  = round2(generator_kw * generator_cost_per_kw_low);
+      const generator_cost_high_usd = round2(generator_kw * generator_cost_per_kw_high);
+
+      // Automatic transfer switch (ATS)
+      const ats_low_usd  = 2000;
+      const ats_high_usd = 5000;
+
+      // UPS for 10-min bridge to generator start
+      const ups_low_usd  = 1500;
+      const ups_high_usd = 4000;
+
+      // Annual generator maintenance (oil change, load bank test, fuel)
+      const annual_maint_low_usd  = 500;
+      const annual_maint_high_usd = 1500;
+
+      const total_backup_low_usd  = round2(generator_cost_low_usd  + ats_low_usd  + ups_low_usd);
+      const total_backup_high_usd = round2(generator_cost_high_usd + ats_high_usd + ups_high_usd);
+
+      return {
+        tpo_kw,
+        fcc_class,
+        tx_efficiency,
+        tx_dc_kw,
+        building_load_kw,
+        total_load_kw,
+        generator_kw,
+        generator_cost_per_kw_low,
+        generator_cost_per_kw_high,
+        generator_cost_low_usd,
+        generator_cost_high_usd,
+        ats_low_usd,
+        ats_high_usd,
+        ups_low_usd,
+        ups_high_usd,
+        annual_maint_low_usd,
+        annual_maint_high_usd,
+        total_backup_low_usd,
+        total_backup_high_usd,
+        reference: '47 CFR §73.1660 (auxiliary transmitter); §73.1680 (transmitter standards); NFPA 110 (emergency/standby power); IEEE 446 (backup power sizing)',
+        note: `${tpo_kw} kW Class ${fcc_class}: tx draw ${tx_dc_kw} kW + building ${building_load_kw} kW = ${total_load_kw} kW total; ${generator_kw} kW generator $${generator_cost_low_usd.toLocaleString()}–$${generator_cost_high_usd.toLocaleString()} + ATS/UPS; total backup $${total_backup_low_usd.toLocaleString()}–$${total_backup_high_usd.toLocaleString()}; annual maint $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}`
       };
     })(),
 

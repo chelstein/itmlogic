@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Auxiliary Transmitter and Backup Power Guide */}
+        {candidate.am_auxiliary_transmitter_and_backup_power_guide && (() => {
+          const g = candidate.am_auxiliary_transmitter_and_backup_power_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="bkp-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfeff', borderRadius: 8, border: '2px solid #0891b2' }}>
+              <div style={{ fontWeight: 700, color: '#164e63', marginBottom: 6, fontSize: 13 }}>Auxiliary Transmitter &amp; Backup Power (§73.1660)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0e7490' }}>
+                <span style={{ color: '#0891b2' }}>Power Budget:</span><span>{g.tx_dc_kw} kW tx + {g.building_load_kw} kW bldg = {g.total_load_kw} kW total</span>
+                <span style={{ color: '#0891b2' }}>Generator:</span><span style={{ fontWeight: 600 }}>{g.generator_kw} kW — {fmt(g.generator_cost_low_usd)} – {fmt(g.generator_cost_high_usd)}</span>
+                <span style={{ color: '#0891b2' }}>Auto Transfer Switch:</span><span>{fmt(g.ats_low_usd)} – {fmt(g.ats_high_usd)}</span>
+                <span style={{ color: '#0891b2' }}>UPS (10-min bridge):</span><span>{fmt(g.ups_low_usd)} – {fmt(g.ups_high_usd)}</span>
+                <span style={{ color: '#0891b2' }}>Annual Maintenance:</span><span>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}/yr</span>
+                <span style={{ color: '#0891b2' }}>Total Backup System:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_backup_low_usd)} – {fmt(g.total_backup_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#155e75' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Modulation Monitor and Station Logging Guide */}
         {candidate.am_modulation_monitor_and_station_logging_guide && (() => {
           const g = candidate.am_modulation_monitor_and_station_logging_guide;

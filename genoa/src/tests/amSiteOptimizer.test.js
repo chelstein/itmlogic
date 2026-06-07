@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_auxiliary_transmitter_and_backup_power_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_transmitter_and_backup_power_guide;
+  assert.ok(g !== undefined && g !== null, 'am_auxiliary_transmitter_and_backup_power_guide missing');
+  assert.ok(g.generator_kw > 0, 'generator_kw must be positive');
+  assert.ok(g.total_backup_low_usd > 0, 'total_backup_low_usd must be positive');
+});
+
+test('am_auxiliary_transmitter_and_backup_power_guide KAZM power budget', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_transmitter_and_backup_power_guide;
+  assert.strictEqual(g.tx_dc_kw,         7.69, 'KAZM tx_dc_kw should be 7.69 (5kW / 0.65)');
+  assert.strictEqual(g.building_load_kw, 3,    'KAZM 5kW building_load_kw should be 3');
+  assert.strictEqual(g.total_load_kw,    10.69, 'KAZM total_load_kw should be 10.69');
+});
+
+test('am_auxiliary_transmitter_and_backup_power_guide KAZM generator sizing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_transmitter_and_backup_power_guide;
+  assert.strictEqual(g.generator_kw,         25,    'KAZM generator_kw should be 25 (next size above 10.69 kW)');
+  assert.strictEqual(g.generator_cost_low_usd, 15000, 'KAZM generator_cost_low_usd should be $15,000');
+});
+
+test('am_auxiliary_transmitter_and_backup_power_guide KAZM total costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_transmitter_and_backup_power_guide;
+  assert.strictEqual(g.total_backup_low_usd,  18500, 'KAZM total_backup_low_usd should be $18,500');
+  assert.strictEqual(g.total_backup_high_usd, 39000, 'KAZM total_backup_high_usd should be $39,000');
+  assert.strictEqual(g.annual_maint_low_usd,  500,   'KAZM annual_maint_low_usd should be $500');
+});
+
+test('am_auxiliary_transmitter_and_backup_power_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bkp_generator_kw'         in row, 'bkp_generator_kw missing from comparison table');
+    assert.ok('bkp_total_low_usd'        in row, 'bkp_total_low_usd missing from comparison table');
+    assert.ok('bkp_annual_maint_low_usd' in row, 'bkp_annual_maint_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.bkp_generator_kw,         25,    'rank-1 bkp_generator_kw should be 25');
+  assert.strictEqual(r0.bkp_total_low_usd,        18500, 'rank-1 bkp_total_low_usd should be $18,500');
+  assert.strictEqual(r0.bkp_annual_maint_low_usd, 500,   'rank-1 bkp_annual_maint_low_usd should be $500');
+});
+
 test('am_modulation_monitor_and_station_logging_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_modulation_monitor_and_station_logging_guide;
