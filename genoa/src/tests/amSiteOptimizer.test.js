@@ -14384,3 +14384,40 @@ it('candidate_comparison_table fin columns are present and valid for KAZM', asyn
   assert.ok(r0.fin_payback_years_low > 0, 'fin_payback_years_low must be positive');
   assert.ok(r0.fin_feasibility_flag != null, 'fin_feasibility_flag must not be null');
 });
+
+// ── am_construction_contractor_and_pm_guide ───────────────────────────────────
+
+it('am_construction_contractor_and_pm_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_construction_contractor_and_pm_guide, 'pm guide missing on candidate');
+  }
+});
+
+it('am_construction_contractor_and_pm_guide total_construction_weeks_low is 17 (sum of 5 phases)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_contractor_and_pm_guide;
+  assert.strictEqual(g.total_construction_weeks_low, 17, 'total_construction_weeks_low should be 17');
+});
+
+it('am_construction_contractor_and_pm_guide tower_erection_cost_low_usd is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_contractor_and_pm_guide;
+  assert.ok(g.tower_erection_cost_low_usd > 0, 'tower_erection_cost_low_usd must be positive');
+  assert.ok(g.tower_erection_cost_high_usd > g.tower_erection_cost_low_usd, 'high > low erection cost');
+});
+
+it('am_construction_contractor_and_pm_guide reference cites NATE and OSHA 1926.502', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_contractor_and_pm_guide;
+  assert.ok(g.reference.includes('NATE'), 'reference must cite NATE');
+  assert.ok(g.reference.includes('1926.502'), 'reference must cite OSHA 1926.502');
+});
+
+it('candidate_comparison_table pm columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.pm_total_construction_weeks_low, 17, 'pm_total_construction_weeks_low should be 17');
+  assert.ok(r0.pm_tower_erection_cost_low_usd > 0, 'pm_tower_erection_cost_low_usd must be positive');
+  assert.strictEqual(r0.pm_gc_markup_pct_low, 15, 'pm_gc_markup_pct_low should be 15');
+});

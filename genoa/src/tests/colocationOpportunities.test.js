@@ -3480,3 +3480,20 @@ test('am_station_financial_feasibility_guide colocation: all candidates have val
     assert.ok(['POTENTIALLY_VIABLE','FINANCIALLY_CHALLENGED'].includes(g.feasibility_flag), `feasibility_flag must be valid`);
   }
 });
+
+test('am_construction_contractor_and_pm_guide colocation: all candidates have valid PM data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_construction_contractor_and_pm_guide;
+    assert.ok(g, `candidate missing am_construction_contractor_and_pm_guide`);
+    assert.ok(g.total_construction_weeks_low > 0, `total_construction_weeks_low must be positive`);
+    assert.ok(g.tower_erection_cost_low_usd > 0, `tower_erection_cost_low_usd must be positive`);
+    assert.ok(g.gc_markup_pct_low > 0 && g.gc_markup_pct_low < 100, `gc_markup_pct_low must be 0-100`);
+  }
+});

@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Construction Contractor and PM Guide */}
+        {candidate.am_construction_contractor_and_pm_guide && (() => {
+          const g = candidate.am_construction_contractor_and_pm_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="pm-guide" style={{ marginBottom: 16, padding: 12, background: '#fff9f0', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Construction &amp; Project Management</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Phase 1 (site prep):</span><span>{g.phase1_weeks_low != null ? `${g.phase1_weeks_low}–${g.phase1_weeks_high} wks` : '—'}</span>
+                <span>Phase 2 (foundation):</span><span>{g.phase2_weeks_low != null ? `${g.phase2_weeks_low}–${g.phase2_weeks_high} wks` : '—'}</span>
+                <span>Phase 3 (tower erection):</span><span>{g.phase3_weeks_low != null ? `${g.phase3_weeks_low}–${g.phase3_weeks_high} wks` : '—'}</span>
+                <span>Phase 4 (TL/antenna):</span><span>{g.phase4_weeks_low != null ? `${g.phase4_weeks_low}–${g.phase4_weeks_high} wks` : '—'}</span>
+                <span>Phase 5 (TX/proof):</span><span>{g.phase5_weeks_low != null ? `${g.phase5_weeks_low}–${g.phase5_weeks_high} wks` : '—'}</span>
+                <span>Total timeline:</span><span style={{ fontWeight: 600 }}>{g.total_construction_weeks_low != null ? `${g.total_construction_weeks_low}–${g.total_construction_weeks_high} weeks` : '—'}</span>
+                <span>Tower crew (NATE):</span><span>{g.tower_erection_days_low != null ? `${g.tower_erection_days_low}–${g.tower_erection_days_high} days × $${fmt(g.tower_crew_day_rate_low_usd)}/day` : '—'}</span>
+                <span>Tower erection cost:</span><span>{g.tower_erection_cost_low_usd != null ? `$${fmt(g.tower_erection_cost_low_usd)} – $${fmt(g.tower_erection_cost_high_usd)}` : '—'}</span>
+                <span>GC markup:</span><span>{g.gc_markup_pct_low != null ? `${g.gc_markup_pct_low}–${g.gc_markup_pct_high}%` : '—'}</span>
+                <span>PM cost:</span><span>{g.pm_cost_pct_low != null ? `${g.pm_cost_pct_low}–${g.pm_cost_pct_high}% of project` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Station Financial Feasibility Guide */}
         {candidate.am_station_financial_feasibility_guide && (() => {
           const g = candidate.am_station_financial_feasibility_guide;

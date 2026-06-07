@@ -1371,7 +1371,10 @@ export async function runSiteOptimizer(body = {}){
     fmtc_annual_compliance_low_usd:     c.am_frequency_monitoring_and_technical_compliance_guide?.annual_fcc_compliance_low_usd ?? null,
     fin_npv_optimistic_10yr:            c.am_station_financial_feasibility_guide?.npv_optimistic_10yr ?? null,
     fin_payback_years_low:              c.am_station_financial_feasibility_guide?.payback_years_low ?? null,
-    fin_feasibility_flag:               c.am_station_financial_feasibility_guide?.feasibility_flag ?? null
+    fin_feasibility_flag:               c.am_station_financial_feasibility_guide?.feasibility_flag ?? null,
+    pm_total_construction_weeks_low:    c.am_construction_contractor_and_pm_guide?.total_construction_weeks_low ?? null,
+    pm_tower_erection_cost_low_usd:     c.am_construction_contractor_and_pm_guide?.tower_erection_cost_low_usd ?? null,
+    pm_gc_markup_pct_low:               c.am_construction_contractor_and_pm_guide?.gc_markup_pct_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7106,6 +7109,58 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_construction_contractor_and_pm_guide: (() => {
+      // Tower construction project phases for AM relocation:
+      // Phase 1: Site prep / access road (~4–8 weeks)
+      // Phase 2: Foundation / ground system installation (~6–12 weeks)
+      // Phase 3: Tower erection (~2–4 weeks)
+      // Phase 4: TL and antenna installation (~1–2 weeks)
+      // Phase 5: Transmitter install, STL, proof of performance (~4–8 weeks)
+      // Tower erection: requires specialized broadcast tower crew (member of NATE — National Association
+      //   of Tower Erectors); crew must be OSHA 10/30 certified.
+      const phase1_weeks_low = 4;  const phase1_weeks_high = 8;
+      const phase2_weeks_low = 6;  const phase2_weeks_high = 12;
+      const phase3_weeks_low = 2;  const phase3_weeks_high = 4;
+      const phase4_weeks_low = 1;  const phase4_weeks_high = 2;
+      const phase5_weeks_low = 4;  const phase5_weeks_high = 8;
+      const total_construction_weeks_low  = phase1_weeks_low  + phase2_weeks_low  + phase3_weeks_low  + phase4_weeks_low  + phase5_weeks_low;
+      const total_construction_weeks_high = phase1_weeks_high + phase2_weeks_high + phase3_weeks_high + phase4_weeks_high + phase5_weeks_high;
+      // GC markup: typically 15–25% of direct cost
+      const gc_markup_pct_low  = 15;
+      const gc_markup_pct_high = 25;
+      // PM cost: 5–10% of total project cost
+      const pm_cost_pct_low  = 5;
+      const pm_cost_pct_high = 10;
+      // Tower erection crew day rate: $3,000–$8,000/day; typical 3–6 day job for 300 ft guyed monopole
+      const tower_crew_day_rate_low_usd  = 3000;
+      const tower_crew_day_rate_high_usd = 8000;
+      const tower_erection_days_low  = 3;
+      const tower_erection_days_high = 6;
+      const tower_erection_cost_low_usd  = round2(tower_crew_day_rate_low_usd  * tower_erection_days_low);
+      const tower_erection_cost_high_usd = round2(tower_crew_day_rate_high_usd * tower_erection_days_high);
+      return {
+        phase1_weeks_low,  phase1_weeks_high,
+        phase2_weeks_low,  phase2_weeks_high,
+        phase3_weeks_low,  phase3_weeks_high,
+        phase4_weeks_low,  phase4_weeks_high,
+        phase5_weeks_low,  phase5_weeks_high,
+        total_construction_weeks_low,
+        total_construction_weeks_high,
+        gc_markup_pct_low,
+        gc_markup_pct_high,
+        pm_cost_pct_low,
+        pm_cost_pct_high,
+        tower_crew_day_rate_low_usd,
+        tower_crew_day_rate_high_usd,
+        tower_erection_days_low,
+        tower_erection_days_high,
+        tower_erection_cost_low_usd,
+        tower_erection_cost_high_usd,
+        reference: 'NATE (National Association of Tower Erectors) safety standards; OSHA 1926.502 (fall protection for tower work); NAB Engineering Handbook 11th Ed. Chapter 6 (AM antenna systems installation); ANSI/TIA-1019-A (climber certification); FCC §73.1615 (operation during modifications)',
+        note: `Total construction timeline: ${total_construction_weeks_low}–${total_construction_weeks_high} weeks (5 phases). Tower erection: ${tower_erection_days_low}–${tower_erection_days_high} days × $${tower_crew_day_rate_low_usd.toLocaleString()}–$${tower_crew_day_rate_high_usd.toLocaleString()}/day = $${tower_erection_cost_low_usd.toLocaleString()}–$${tower_erection_cost_high_usd.toLocaleString()}. GC markup: ${gc_markup_pct_low}–${gc_markup_pct_high}%. PM: ${pm_cost_pct_low}–${pm_cost_pct_high}% of project.`
       };
     })(),
 
