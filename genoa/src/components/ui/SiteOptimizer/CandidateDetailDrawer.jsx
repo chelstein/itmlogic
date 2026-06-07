@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Utility Power Service and Metering Guide */}
+        {candidate.am_utility_power_service_and_metering_guide && (() => {
+          const g = candidate.am_utility_power_service_and_metering_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="pwr-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf2f8', borderRadius: 8, border: '2px solid #be185d' }}>
+              <div style={{ fontWeight: 700, color: '#831843', marginBottom: 6, fontSize: 13 }}>Utility Power Service &amp; Metering (NEC Art. 230)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9d174d' }}>
+                <span style={{ color: '#be185d' }}>Load / Service:</span><span style={{ fontWeight: 600 }}>{g.total_load_kw} kW — {g.service_type} ({g.service_size_amps}A)</span>
+                <span style={{ color: '#be185d' }}>Service Entrance:</span><span>{fmt(g.service_entrance_low_usd)} – {fmt(g.service_entrance_high_usd)}</span>
+                <span style={{ color: '#be185d' }}>Line Extension:</span><span>{g.line_ext_miles} mi — {fmt(g.line_ext_low_usd)} – {fmt(g.line_ext_high_usd)}</span>
+                <span style={{ color: '#be185d' }}>Total Setup:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_utility_setup_low_usd)} – {fmt(g.total_utility_setup_high_usd)}</span>
+                <span style={{ color: '#be185d' }}>Monthly Power:</span><span>{fmt(g.monthly_power_cost_usd)}/mo at ${g.power_rate_per_kwh}/kWh</span>
+                <span style={{ color: '#be185d' }}>Annual Power:</span><span>{fmt(g.annual_power_cost_usd)}/yr</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#881337' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmission Line and Antenna Tuning Unit Guide */}
         {candidate.am_transmission_line_and_antenna_tuning_unit_guide && (() => {
           const g = candidate.am_transmission_line_and_antenna_tuning_unit_guide;

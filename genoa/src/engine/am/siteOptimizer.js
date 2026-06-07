@@ -1218,7 +1218,10 @@ export async function runSiteOptimizer(body = {}){
     rfi_n_guy_levels:           c.am_tower_base_insulator_and_rf_isolation_guide?.n_guy_levels ?? null,
     atu_is_da:                  c.am_transmission_line_and_antenna_tuning_unit_guide?.is_da ?? null,
     atu_total_low_usd:          c.am_transmission_line_and_antenna_tuning_unit_guide?.total_atu_system_low_usd ?? null,
-    atu_r_base_ohm:             c.am_transmission_line_and_antenna_tuning_unit_guide?.r_base_est_ohm ?? null
+    atu_r_base_ohm:             c.am_transmission_line_and_antenna_tuning_unit_guide?.r_base_est_ohm ?? null,
+    pwr_service_type:           c.am_utility_power_service_and_metering_guide?.service_type ?? null,
+    pwr_monthly_cost_usd:       c.am_utility_power_service_and_metering_guide?.monthly_power_cost_usd ?? null,
+    pwr_setup_low_usd:          c.am_utility_power_service_and_metering_guide?.total_utility_setup_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6953,6 +6956,61 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_utility_power_service_and_metering_guide: (() => {
+      // Rural AM sites often require utility line extensions and new service entrance equipment.
+      // Power costs are dominated by transmitter DC draw running 24/7.
+      const tx_efficiency  = 0.65;
+      const tx_dc_kw       = round2(tpo_kw / tx_efficiency);
+      const building_load_kw = tpo_kw >= 50 ? 15 : tpo_kw >= 10 ? 8 : 3;
+      const total_load_kw  = round2(tx_dc_kw + building_load_kw);
+
+      const service_type       = total_load_kw > 20 ? 'three_phase_208V' : 'single_phase_240V';
+      const service_size_amps  = total_load_kw > 20 ? 200 : 100;
+
+      // Service entrance equipment (meter base, disconnect, main panel)
+      const service_entrance_low_usd  = 2000;
+      const service_entrance_high_usd = 6000;
+
+      // Utility line extension: estimate based on distance from current site
+      const dist_km = pt.distance_from_current_km;
+      const line_ext_miles = dist_km < 5 ? 0 : round2(Math.min(dist_km / 8, 2.0));
+      const line_ext_cost_per_mile_low  = 15000;
+      const line_ext_cost_per_mile_high = 30000;
+      const line_ext_low_usd  = round2(line_ext_miles * line_ext_cost_per_mile_low);
+      const line_ext_high_usd = round2(line_ext_miles * line_ext_cost_per_mile_high);
+
+      // Monthly/annual power cost at flat EIA residential-commercial blended rate
+      const power_rate_per_kwh     = 0.12;
+      const monthly_power_cost_usd = round2(total_load_kw * 24 * 30 * power_rate_per_kwh);
+      const annual_power_cost_usd  = round2(monthly_power_cost_usd * 12);
+
+      const total_utility_setup_low_usd  = round2(service_entrance_low_usd  + line_ext_low_usd);
+      const total_utility_setup_high_usd = round2(service_entrance_high_usd + line_ext_high_usd);
+
+      return {
+        tpo_kw,
+        fcc_class,
+        tx_dc_kw,
+        building_load_kw,
+        total_load_kw,
+        service_type,
+        service_size_amps,
+        service_entrance_low_usd,
+        service_entrance_high_usd,
+        dist_km: round2(dist_km),
+        line_ext_miles,
+        line_ext_low_usd,
+        line_ext_high_usd,
+        power_rate_per_kwh,
+        monthly_power_cost_usd,
+        annual_power_cost_usd,
+        total_utility_setup_low_usd,
+        total_utility_setup_high_usd,
+        reference: 'EIA electricity pricing; NEC Article 230 (service entrance); utility line extension rate schedules',
+        note: `${total_load_kw} kW ${service_type} (${service_size_amps}A); line ext. ${line_ext_miles} mi $${line_ext_low_usd.toLocaleString()}–$${line_ext_high_usd.toLocaleString()}; setup $${total_utility_setup_low_usd.toLocaleString()}–$${total_utility_setup_high_usd.toLocaleString()}; ~$${monthly_power_cost_usd.toLocaleString()}/mo ($${annual_power_cost_usd.toLocaleString()}/yr) at $${power_rate_per_kwh}/kWh`
       };
     })(),
 

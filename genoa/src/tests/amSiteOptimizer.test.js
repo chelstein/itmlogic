@@ -11439,6 +11439,51 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_utility_power_service_and_metering_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_service_and_metering_guide;
+  assert.ok(g !== undefined && g !== null, 'am_utility_power_service_and_metering_guide missing');
+  assert.ok(typeof g.service_type === 'string', 'service_type should be a string');
+  assert.ok(g.monthly_power_cost_usd > 0, 'monthly_power_cost_usd must be positive');
+});
+
+test('am_utility_power_service_and_metering_guide KAZM service classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_service_and_metering_guide;
+  assert.strictEqual(g.service_type,      'single_phase_240V', 'KAZM 5kW should use single_phase_240V');
+  assert.strictEqual(g.service_size_amps, 100,                 'KAZM single_phase service should be 100A');
+  assert.strictEqual(g.total_load_kw,     10.69,               'KAZM total_load_kw should be 10.69');
+});
+
+test('am_utility_power_service_and_metering_guide KAZM rank-1 no line extension', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_service_and_metering_guide;
+  assert.strictEqual(g.line_ext_miles,    0,    'KAZM rank-1 at dist=0 should have 0 line extension miles');
+  assert.strictEqual(g.line_ext_low_usd,  0,    'KAZM rank-1 line_ext_low_usd should be $0');
+  assert.strictEqual(g.total_utility_setup_low_usd, 2000, 'KAZM rank-1 total_utility_setup_low_usd should be $2,000');
+});
+
+test('am_utility_power_service_and_metering_guide KAZM power cost estimate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_service_and_metering_guide;
+  assert.strictEqual(g.power_rate_per_kwh,     0.12,    'power_rate_per_kwh should be $0.12');
+  assert.strictEqual(g.monthly_power_cost_usd, 923.62,  'KAZM monthly_power_cost_usd should be $923.62');
+  assert.strictEqual(g.annual_power_cost_usd,  11083.44, 'KAZM annual_power_cost_usd should be $11,083.44');
+});
+
+test('am_utility_power_service_and_metering_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pwr_service_type'      in row, 'pwr_service_type missing from comparison table');
+    assert.ok('pwr_monthly_cost_usd'  in row, 'pwr_monthly_cost_usd missing from comparison table');
+    assert.ok('pwr_setup_low_usd'     in row, 'pwr_setup_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.pwr_service_type,     'single_phase_240V', 'rank-1 pwr_service_type should be single_phase_240V');
+  assert.strictEqual(r0.pwr_monthly_cost_usd, 923.62,              'rank-1 pwr_monthly_cost_usd should be $923.62');
+  assert.strictEqual(r0.pwr_setup_low_usd,    2000,                'rank-1 pwr_setup_low_usd should be $2,000');
+});
+
 test('am_transmission_line_and_antenna_tuning_unit_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmission_line_and_antenna_tuning_unit_guide;

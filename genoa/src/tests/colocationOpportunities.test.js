@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_utility_power_service_and_metering_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_utility_power_service_and_metering_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_utility_power_service_and_metering_guide missing`);
+    assert.ok(g.monthly_power_cost_usd > 0, `rank ${c.rank}: monthly_power_cost_usd must be positive`);
+    assert.ok(g.total_utility_setup_low_usd >= 0, `rank ${c.rank}: total_utility_setup_low_usd must be non-negative`);
+    assert.ok(['single_phase_240V','three_phase_208V'].includes(g.service_type), `rank ${c.rank}: service_type must be valid`);
+  }
+});
+
 test('am_transmission_line_and_antenna_tuning_unit_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {
