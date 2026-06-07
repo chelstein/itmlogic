@@ -1182,7 +1182,10 @@ export async function runSiteOptimizer(body = {}){
     fnd_n_anchors:              c.am_concrete_foundation_and_anchor_design_guide?.n_anchors ?? null,
     reg_annual_fcc_fee_usd:     c.am_annual_regulatory_compliance_and_fee_guide?.annual_fcc_fee_usd ?? null,
     reg_total_annual_low_usd:   c.am_annual_regulatory_compliance_and_fee_guide?.total_annual_compliance_low_usd ?? null,
-    reg_renewal_years:          c.am_annual_regulatory_compliance_and_fee_guide?.license_renewal_cycle_years ?? null
+    reg_renewal_years:          c.am_annual_regulatory_compliance_and_fee_guide?.license_renewal_cycle_years ?? null,
+    insp_tower_height_ft:       c.am_broadcast_tower_structural_inspection_guide?.tower_insp_ft ?? null,
+    insp_annual_reserve_low:    c.am_broadcast_tower_structural_inspection_guide?.total_annual_inspection_low_usd ?? null,
+    insp_3yr_detail_low_usd:    c.am_broadcast_tower_structural_inspection_guide?.detailed_inspection_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6917,6 +6920,59 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_broadcast_tower_structural_inspection_guide: (() => {
+      // Annual and periodic structural inspection requirements per TIA-222-H §8.
+      // Guyed AM towers require visual inspection annually and a comprehensive
+      // structural inspection every 3 years.  Guy wire tensions must be verified
+      // to within ±10% of design per TIA-222-H §8.2.
+
+      // Tower height from frequency and class
+      const lambda_insp_m = 300000 / frequency_khz;
+      const tower_insp_m  = ['A','B'].includes(fcc_class)
+        ? round2(lambda_insp_m * 0.5)
+        : round2(lambda_insp_m / 4);
+      const tower_insp_ft = Math.round(tower_insp_m * 3.281);
+
+      // Annual visual inspection (ground-level + drone or limited climbing)
+      const annual_inspection_low_usd  = tower_insp_ft > 400 ? 3000 : tower_insp_ft > 200 ? 2000 : 1500;
+      const annual_inspection_high_usd = tower_insp_ft > 400 ? 5000 : tower_insp_ft > 200 ? 3500 : 2500;
+
+      // Comprehensive 3-year structural inspection (full climbing + load analysis + report)
+      const detailed_inspection_cycle_years = 3;
+      const detailed_inspection_low_usd  = tower_insp_ft > 400 ? 8000 : tower_insp_ft > 200 ? 5000 : 3000;
+      const detailed_inspection_high_usd = tower_insp_ft > 400 ? 15000 : tower_insp_ft > 200 ? 10000 : 6000;
+      const detailed_amortized_annual_usd = Math.round(detailed_inspection_high_usd / detailed_inspection_cycle_years);
+
+      // Guy wire tension measurement by level (number of guy levels from tower height)
+      const n_guy_levels           = tower_insp_ft > 400 ? 4 : tower_insp_ft > 250 ? 3 : 2;
+      const guy_tension_check_low_usd  = n_guy_levels * 250;
+      const guy_tension_check_high_usd = n_guy_levels * 750;
+
+      // Total annual inspection reserve
+      const total_annual_inspection_low_usd  = annual_inspection_low_usd  + detailed_amortized_annual_usd + guy_tension_check_low_usd;
+      const total_annual_inspection_high_usd = annual_inspection_high_usd + detailed_amortized_annual_usd + guy_tension_check_high_usd;
+
+      return {
+        fcc_class,
+        tower_insp_ft,
+        tower_insp_m,
+        n_guy_levels,
+        annual_inspection_low_usd,
+        annual_inspection_high_usd,
+        detailed_inspection_cycle_years,
+        detailed_inspection_low_usd,
+        detailed_inspection_high_usd,
+        detailed_amortized_annual_usd,
+        guy_tension_check_low_usd,
+        guy_tension_check_high_usd,
+        total_annual_inspection_low_usd,
+        total_annual_inspection_high_usd,
+        design_life_years: 50,
+        reference: 'TIA-222-H §8 (structural inspection recommendations); OSHA 29 CFR §1910.268 (tower climbing safety); 47 CFR §17.47 (obstruction lighting inspection — semiannual); ANSI A10.48 (communication tower safety); EIA/TIA-222-G §8 (historic standard)',
+        note: `Structural inspection: ${tower_insp_ft} ft guyed tower (Class ${fcc_class}, ${frequency_khz} kHz), ${n_guy_levels} guy levels. Annual visual: $${annual_inspection_low_usd.toLocaleString()}–$${annual_inspection_high_usd.toLocaleString()}. 3-yr comprehensive: $${detailed_inspection_low_usd.toLocaleString()}–$${detailed_inspection_high_usd.toLocaleString()} ($${detailed_amortized_annual_usd.toLocaleString()}/yr amortized). Guy tension: $${guy_tension_check_low_usd.toLocaleString()}–$${guy_tension_check_high_usd.toLocaleString()}. Total annual reserve: $${total_annual_inspection_low_usd.toLocaleString()}–$${total_annual_inspection_high_usd.toLocaleString()}.`
       };
     })(),
 

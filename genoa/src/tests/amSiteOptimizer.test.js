@@ -11393,6 +11393,52 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_broadcast_tower_structural_inspection_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
+  assert.ok(g !== undefined && g !== null, 'am_broadcast_tower_structural_inspection_guide missing');
+  assert.ok(typeof g.tower_insp_ft === 'number', 'tower_insp_ft should be a number');
+  assert.ok(typeof g.total_annual_inspection_low_usd === 'number', 'total_annual_inspection_low_usd should be a number');
+});
+
+test('am_broadcast_tower_structural_inspection_guide KAZM tower and guy levels', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
+  assert.strictEqual(g.tower_insp_ft, 315, 'KAZM 780 kHz Class D tower should be 315 ft');
+  assert.strictEqual(g.n_guy_levels,   3,  '315 ft tower should have 3 guy levels');
+  assert.strictEqual(g.detailed_inspection_cycle_years, 3, 'Detailed inspection cycle should be 3 years');
+  assert.strictEqual(g.design_life_years, 50, 'Design life should be 50 years');
+});
+
+test('am_broadcast_tower_structural_inspection_guide KAZM annual inspection costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
+  assert.strictEqual(g.annual_inspection_low_usd,  2000, 'Annual inspection low should be $2,000');
+  assert.strictEqual(g.annual_inspection_high_usd, 3500, 'Annual inspection high should be $3,500');
+  assert.strictEqual(g.detailed_amortized_annual_usd, 3333, '3-yr inspection amortized should be $3,333');
+});
+
+test('am_broadcast_tower_structural_inspection_guide KAZM total inspection reserve', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;
+  assert.strictEqual(g.total_annual_inspection_low_usd,  6083, 'Total annual inspection reserve low should be $6,083');
+  assert.strictEqual(g.total_annual_inspection_high_usd, 9083, 'Total annual inspection reserve high should be $9,083');
+  assert.ok(g.total_annual_inspection_high_usd > g.total_annual_inspection_low_usd, 'High must exceed low');
+});
+
+test('am_broadcast_tower_structural_inspection_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('insp_tower_height_ft'    in row, 'insp_tower_height_ft missing from comparison table');
+    assert.ok('insp_annual_reserve_low' in row, 'insp_annual_reserve_low missing from comparison table');
+    assert.ok('insp_3yr_detail_low_usd' in row, 'insp_3yr_detail_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.insp_tower_height_ft,    315,  'rank-1 insp_tower_height_ft should be 315');
+  assert.strictEqual(r0.insp_annual_reserve_low, 6083, 'rank-1 insp_annual_reserve_low should be $6,083');
+  assert.strictEqual(r0.insp_3yr_detail_low_usd, 5000, 'rank-1 insp_3yr_detail_low_usd should be $5,000');
+});
+
 test('am_annual_regulatory_compliance_and_fee_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;

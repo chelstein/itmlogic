@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Broadcast Tower Structural Inspection Guide */}
+        {candidate.am_broadcast_tower_structural_inspection_guide && (() => {
+          const g = candidate.am_broadcast_tower_structural_inspection_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="insp-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: '2px solid #e11d48' }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Tower Structural Inspection (TIA-222-H §8)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9f1239' }}>
+                <span style={{ color: '#e11d48' }}>Tower Height:</span><span>{g.tower_insp_ft} ft — {g.n_guy_levels} guy levels</span>
+                <span style={{ color: '#e11d48' }}>Annual Visual:</span><span>{fmt(g.annual_inspection_low_usd)} – {fmt(g.annual_inspection_high_usd)}</span>
+                <span style={{ color: '#e11d48' }}>3-yr Detailed:</span><span>{fmt(g.detailed_inspection_low_usd)} – {fmt(g.detailed_inspection_high_usd)} ({fmt(g.detailed_amortized_annual_usd)}/yr)</span>
+                <span style={{ color: '#e11d48' }}>Guy Tension Check:</span><span>{fmt(g.guy_tension_check_low_usd)} – {fmt(g.guy_tension_check_high_usd)}</span>
+                <span style={{ color: '#e11d48' }}>Annual Reserve:</span><span>{fmt(g.total_annual_inspection_low_usd)} – {fmt(g.total_annual_inspection_high_usd)}</span>
+                <span style={{ color: '#e11d48' }}>Design Life:</span><span>{g.design_life_years} years</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#881337' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Annual Regulatory Compliance and Fee Guide */}
         {candidate.am_annual_regulatory_compliance_and_fee_guide && (() => {
           const g = candidate.am_annual_regulatory_compliance_and_fee_guide;
