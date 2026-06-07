@@ -1080,7 +1080,10 @@ export async function runSiteOptimizer(body = {}){
     terr_col_range_km:          c.rf_propagation_terrain_roughness_guide?.effective_range_col_km ?? null,
     sky_lat_zone:               c.am_night_skywave_coverage_and_interference_risk_guide?.lat_zone ?? null,
     sky_night_op:               c.am_night_skywave_coverage_and_interference_risk_guide?.night_operation_type ?? null,
-    sky_class_a_risk:           c.am_night_skywave_coverage_and_interference_risk_guide?.dominant_class_a_risk ?? null
+    sky_class_a_risk:           c.am_night_skywave_coverage_and_interference_risk_guide?.dominant_class_a_risk ?? null,
+    struct_wind_zone:           c.tower_structural_wind_and_ice_load_design_guide?.wind_zone ?? null,
+    struct_wind_speed_mph:      c.tower_structural_wind_and_ice_load_design_guide?.design_wind_speed_mph ?? null,
+    struct_ice_zone:            c.tower_structural_wind_and_ice_load_design_guide?.ice_zone ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6815,6 +6818,132 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    tower_structural_wind_and_ice_load_design_guide: (() => {
+      // Structural wind and ice load design parameters for AM tower construction.
+      // Based on ANSI/TIA-222-H (2017) and EIA/TIA-222-G structural standards
+      // for antenna towers and supporting structures.
+      //
+      // Wind load design: ASCE 7-22 Risk Category II, Exposure Category C (open terrain).
+      // Basic wind speed by geographic zone (3-second gust, 700-year MRI):
+      //   Southwest desert (AZ/NM/NV/UT): 90 mph (39 m/s)
+      //   Central plains: 115 mph (51 m/s) — tornado alley
+      //   Gulf Coast: 140–175 mph (62–78 m/s) — hurricane zone
+      //   Mountain West: 100 mph (45 m/s) — Chinook/downslope
+      //   Pacific Coast: 110 mph (49 m/s)
+      //   Northeast/Great Lakes: 105 mph (47 m/s)
+      //
+      // Ice load design: ASCE 7-22 Figure 10-2 (1-inch radial ice, 50-yr MRI).
+      // Guy wire tension: typically 10–15% of Rated Breaking Strength (RBS).
+      // Foundation: CIP concrete pier; depth = max(frost line, geotechnical).
+      //
+      // Tower weight estimates (guyed, lattice, λ/4 AM tower):
+      //   Class A (50 kW, ~200m): 80,000–150,000 lb steel
+      //   Class B (10 kW, ~150m): 40,000–80,000 lb
+      //   Class D clr (5 kW, ~96m/315ft): 15,000–35,000 lb
+      //   Class D loc (1 kW, ~60m/197ft): 8,000–15,000 lb
+      //
+      // Guy anchor spacing: typically 80–100% of tower height for moment resistance.
+      // Insulator requirements: all guys and base must have base insulator
+      // (lightning protection + RF isolation); guy insulators per §73.49.
+
+      const isDA_str        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_str = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_str = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Tower height (λ/4 for this station)
+      const lambda_m_str    = Math.round(299792 / frequency_khz);
+      const tower_height_m  = Math.round(lambda_m_str / 4);
+      const tower_height_ft = Math.round(tower_height_m * 3.28084);
+
+      // Geographic wind zone from candidate latitude/longitude
+      const cand_lat = pt?.lat ?? 35;
+      const cand_lon = pt?.lon ?? -112;
+
+      const wind_zone =
+        (cand_lat < 30 && cand_lon > -97)  ? 'GULF_COAST'      :
+        (cand_lat < 35 && cand_lon > -105 && cand_lon < -90) ? 'CENTRAL_PLAINS' :
+        (cand_lon < -115)                   ? 'PACIFIC_COAST'   :
+        (cand_lat > 40 && cand_lon > -85)   ? 'NORTHEAST'       :
+        (cand_lon > -110 && cand_lat > 30 && cand_lat < 50) ? 'MOUNTAIN_WEST'  :
+                                               'SOUTHWEST_DESERT';
+
+      const WIND_SPEED_MPH = {
+        SOUTHWEST_DESERT: 90, MOUNTAIN_WEST: 100, PACIFIC_COAST: 110,
+        NORTHEAST: 105, CENTRAL_PLAINS: 115, GULF_COAST: 150
+      };
+      const design_wind_speed_mph  = WIND_SPEED_MPH[wind_zone];
+      const design_wind_speed_ms   = Math.round(design_wind_speed_mph * 0.44704);
+
+      // Wind pressure: P = 0.00256 * V² * Kz * Kd * Kzt * G * Cf
+      // Simplified: P_psf ≈ 0.00256 * V² * 1.0 * 0.85 * 1.0 * 0.85 * 1.3 (tower shape)
+      const wind_pressure_psf = Math.round(0.00256 * design_wind_speed_mph ** 2 * 0.85 * 0.85 * 1.3 * 10) / 10;
+      const wind_pressure_pa  = Math.round(wind_pressure_psf * 47.88);
+
+      // Ice load zone: standard 1-inch radial ice for ASCE 7 Figure 10-2 Zone 1
+      const ice_radial_in = cand_lat > 40 ? 1.5 : cand_lat > 35 ? 0.75 : 0.5;
+      const ice_zone      = ice_radial_in >= 1.5 ? 'HEAVY_ICE' : ice_radial_in >= 0.75 ? 'MODERATE_ICE' : 'LIGHT_ICE';
+
+      // Tower weight estimate by class
+      const TOWER_WEIGHT_LB = {
+        A: { low: 80000, high: 150000 },
+        B: { low: 40000, high: 80000  },
+        C: { low: 20000, high: 45000  },
+        D: is_local_ch_str ? { low: 8000, high: 15000 } : { low: 15000, high: 35000 }
+      };
+      const tw = TOWER_WEIGHT_LB[fcc_class] ?? TOWER_WEIGHT_LB['D'];
+
+      // Guy anchor spacing (80–100% of tower height)
+      const guy_anchor_radius_m_low  = Math.round(tower_height_m * 0.8);
+      const guy_anchor_radius_m_high = Math.round(tower_height_m * 1.0);
+
+      // Number of guy levels (rule of thumb: 1 level per 1/3 tower height)
+      const n_guy_levels = isDA_str ? 4 : Math.max(2, Math.round(tower_height_m / 30));
+
+      // Foundation depth: frost line + geotechnical minimum
+      const frost_depth_m = cand_lat >= 45 ? 1.5 : cand_lat >= 40 ? 1.2 : cand_lat >= 35 ? 0.6 : 0.3;
+      const foundation_depth_m = Math.max(frost_depth_m + 0.5, 2.0);
+      const foundation_diameter_m = Math.round(tower_height_m * 0.04 * 10) / 10;
+
+      // Base insulator voltage: typically 10–15 kV rated
+      const base_insulator_kv = tpo_kw >= 50 ? 15 : 10;
+
+      // TIA-222-H risk category (RC-II for broadcast, RC-III for redundant systems)
+      const tia_risk_category = fcc_class === 'A' || tpo_kw >= 50 ? 'RC-III' : 'RC-II';
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        tower_height_m,
+        tower_height_ft,
+        n_towers_in_array:            isDA_str ? (tpo_kw >= 50 ? 4 : 2) : 1,
+        wind_zone,
+        design_wind_speed_mph,
+        design_wind_speed_ms,
+        design_standard:              'ANSI/TIA-222-H (2017) / ASCE 7-22',
+        wind_pressure_psf,
+        wind_pressure_pa,
+        ice_radial_in,
+        ice_zone,
+        tower_weight_lb_low:          tw.low,
+        tower_weight_lb_high:         tw.high,
+        guy_anchor_radius_m_low,
+        guy_anchor_radius_m_high,
+        n_guy_levels,
+        frost_depth_m,
+        foundation_depth_m,
+        foundation_diameter_m,
+        base_insulator_kv,
+        tia_risk_category,
+        is_clear_channel:             is_clear_ch_str,
+        is_local_channel:             is_local_ch_str,
+        is_da:                        isDA_str,
+        reference: 'ANSI/TIA-222-H (2017); ASCE 7-22 §26 (wind) / §10 (ice); 47 CFR §73.49 (tower lighting/fencing); NEC Article 810; FAA AC 70/7460-1M',
+        note: `${wind_zone} wind zone: ${design_wind_speed_mph} mph design wind speed. ` +
+              `${ice_zone}: ${ice_radial_in}-inch radial ice load. ` +
+              `TIA risk category: ${tia_risk_category}. ` +
+              `Tower ${tower_height_m}m, weight ${tw.low.toLocaleString()}–${tw.high.toLocaleString()} lb.`
       };
     })(),
 

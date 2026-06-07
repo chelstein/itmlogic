@@ -2235,3 +2235,20 @@ test('am_night_skywave_coverage_and_interference_risk_guide present across coloc
     assert.ok(g.skip_distance_km > 0, `rank ${c.rank}: skip_distance_km must be > 0`);
   }
 });
+
+test('tower_structural_wind_and_ice_load_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_zones = ['SOUTHWEST_DESERT', 'MOUNTAIN_WEST', 'PACIFIC_COAST', 'NORTHEAST', 'CENTRAL_PLAINS', 'GULF_COAST'];
+  for (const c of out.candidates) {
+    const g = c.tower_structural_wind_and_ice_load_design_guide;
+    assert.ok(g != null, `rank ${c.rank} missing tower_structural_wind_and_ice_load_design_guide`);
+    assert.ok(valid_zones.includes(g.wind_zone), `rank ${c.rank}: wind_zone '${g.wind_zone}' invalid`);
+    assert.ok(g.design_wind_speed_mph > 0, `rank ${c.rank}: design_wind_speed_mph must be > 0`);
+  }
+});

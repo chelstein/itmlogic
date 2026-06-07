@@ -2226,6 +2226,40 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Tower Structural Wind & Ice Load Design Guide */}
+        {candidate.tower_structural_wind_and_ice_load_design_guide && (() => {
+          const g = candidate.tower_structural_wind_and_ice_load_design_guide;
+          const iceColor = {
+            HEAVY_ICE: '#b91c1c', MODERATE_ICE: '#92400e', LIGHT_ICE: '#15803d'
+          }[g.ice_zone] ?? '#374151';
+          const windRisk = g.design_wind_speed_mph >= 130 ? 'HIGH' : g.design_wind_speed_mph >= 105 ? 'MODERATE' : 'LOW';
+          const windColor = windRisk === 'HIGH' ? '#b91c1c' : windRisk === 'MODERATE' ? '#92400e' : '#15803d';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #94a3b8' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', marginBottom: 8 }}>
+                Tower Structural — Wind & Ice Load Design
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Tower Height:</span> <strong>{g.tower_height_m}m / {g.tower_height_ft}ft</strong></div>
+                <div><span style={{ color: '#64748b' }}>Wind Zone:</span> <strong style={{ color: windColor }}>{g.wind_zone?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Design Wind Speed:</span> <strong style={{ color: windColor }}>{g.design_wind_speed_mph} mph ({g.design_wind_speed_ms} m/s)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Wind Pressure:</span> <strong>{g.wind_pressure_psf} psf ({g.wind_pressure_pa} Pa)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Ice Load Zone:</span> <strong style={{ color: iceColor }}>{g.ice_zone?.replace(/_/g, ' ')} ({g.ice_radial_in}")</strong></div>
+                <div><span style={{ color: '#64748b' }}>TIA Risk Category:</span> <strong>{g.tia_risk_category}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Tower Weight:</span> <strong>{g.tower_weight_lb_low?.toLocaleString()}–{g.tower_weight_lb_high?.toLocaleString()} lb</strong></div>
+                <div><span style={{ color: '#64748b' }}>Guy Levels:</span> <strong>{g.n_guy_levels}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Guy Anchor Radius:</span> <strong>{g.guy_anchor_radius_m_low}–{g.guy_anchor_radius_m_high}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>Foundation Depth:</span> <strong>{g.foundation_depth_m}m dia {g.foundation_diameter_m}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>Base Insulator:</span> <strong>{g.base_insulator_kv} kV</strong></div>
+                <div><span style={{ color: '#64748b' }}>Design Standard:</span> <strong style={{ fontSize: 10 }}>{g.design_standard}</strong></div>
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Night Skywave Coverage & Interference Risk Guide */}
         {candidate.am_night_skywave_coverage_and_interference_risk_guide && (() => {
           const g = candidate.am_night_skywave_coverage_and_interference_risk_guide;

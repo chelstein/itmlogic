@@ -10047,3 +10047,46 @@ test('am_night_skywave_coverage_and_interference_risk_guide comparison table col
     assert.ok('sky_class_a_risk' in row, 'sky_class_a_risk missing from comparison table');
   }
 });
+
+test('tower_structural_wind_and_ice_load_design_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_structural_wind_and_ice_load_design_guide;
+  assert.ok(g, 'wind/ice guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.tower_height_m, 96, 'tower height must be 96m at 780 kHz');
+  assert.strictEqual(g.design_standard, 'ANSI/TIA-222-H (2017) / ASCE 7-22', 'design standard must be TIA-222-H');
+});
+
+test('tower_structural_wind_and_ice_load_design_guide KAZM Sedona AZ is SOUTHWEST_DESERT zone', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_structural_wind_and_ice_load_design_guide;
+  assert.strictEqual(g.wind_zone, 'SOUTHWEST_DESERT', 'Sedona AZ must be SOUTHWEST_DESERT');
+  assert.strictEqual(g.design_wind_speed_mph, 90, 'SW desert design wind must be 90 mph');
+  assert.strictEqual(g.ice_zone, 'LIGHT_ICE', 'Sedona AZ must be LIGHT_ICE zone');
+});
+
+test('tower_structural_wind_and_ice_load_design_guide tower weight range is valid for Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_structural_wind_and_ice_load_design_guide;
+  assert.ok(g.tower_weight_lb_low >= 8000, 'Class D clear tower weight must be >= 8,000 lb');
+  assert.ok(g.tower_weight_lb_high <= 40000, 'Class D clear tower weight must be <= 40,000 lb');
+  assert.ok(g.n_guy_levels >= 2, 'must have at least 2 guy levels');
+});
+
+test('tower_structural_wind_and_ice_load_design_guide structural parameters are valid ranges', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].tower_structural_wind_and_ice_load_design_guide;
+  assert.ok(g.wind_pressure_psf > 0, 'wind pressure must be positive');
+  assert.ok(g.foundation_depth_m >= 2.0, 'foundation depth must be >= 2.0m');
+  assert.ok(g.guy_anchor_radius_m_high >= g.guy_anchor_radius_m_low, 'anchor radius high must be >= low');
+  assert.ok(['RC-II', 'RC-III'].includes(g.tia_risk_category), 'TIA risk category must be RC-II or RC-III');
+});
+
+test('tower_structural_wind_and_ice_load_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('struct_wind_zone'      in row, 'struct_wind_zone missing from comparison table');
+    assert.ok('struct_wind_speed_mph' in row, 'struct_wind_speed_mph missing from comparison table');
+    assert.ok('struct_ice_zone'       in row, 'struct_ice_zone missing from comparison table');
+  }
+});
