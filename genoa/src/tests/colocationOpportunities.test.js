@@ -3116,3 +3116,14 @@ test('am_utility_power_and_backup_systems_guide present across colocation candid
     assert.ok(g.power_ext_mi >= 0.1, `rank ${c.rank}: power_ext_mi must be >= 0.1 (minimum)`);
   }
 });
+
+test('am_transmitter_building_and_studio_link_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_building_and_studio_link_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_building_and_studio_link_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(['licensed_950mhz_microwave','leased_circuit_or_fiber'].includes(g.stl_type),
+      `rank ${c.rank}: unexpected stl_type: ${g.stl_type}`);
+  }
+});

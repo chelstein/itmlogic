@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Building and Studio Link Guide */}
+        {candidate.am_transmitter_building_and_studio_link_guide && (() => {
+          const g = candidate.am_transmitter_building_and_studio_link_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const stlLabel = g.stl_type === 'licensed_950mhz_microwave' ? '950 MHz microwave (Part 74)' : 'Leased circuit / fiber';
+          return (
+            <div key="bld-guide" style={{ marginBottom: 16, padding: 12, background: '#fff8f1', borderRadius: 8, border: '2px solid #c2410c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Transmitter Building &amp; STL</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Equipment shelter:</span><span>{fmt(g.building_low_usd)} – {fmt(g.building_high_usd)}</span>
+                <span>HVAC:</span><span>{fmt(g.hvac_low_usd)} – {fmt(g.hvac_high_usd)}</span>
+                <span>Security/alarm:</span><span>{fmt(g.security_low_usd)} – {fmt(g.security_high_usd)}</span>
+                <span>STL type:</span><span>{stlLabel}</span>
+                <span>STL system:</span><span>{fmt(g.stl_low_usd)} – {fmt(g.stl_high_usd)}{g.stl_license_fee_usd ? ` + $${g.stl_license_fee_usd} license` : ''}</span>
+                <span>Audio codecs:</span><span>{fmt(g.codec_low_usd)} – {fmt(g.codec_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Utility Power and Backup Systems Guide */}
         {candidate.am_utility_power_and_backup_systems_guide && (() => {
           const g = candidate.am_utility_power_and_backup_systems_guide;

@@ -13279,3 +13279,46 @@ test('am_utility_power_and_backup_systems_guide comparison table columns present
   assert.strictEqual(r0.pwr_gen_kw,             15,   'rank-1 pwr_gen_kw should be 15');
   assert.strictEqual(r0.pwr_generator_low_usd,  6000, 'rank-1 pwr_generator_low_usd should be 6000');
 });
+
+test('am_transmitter_building_and_studio_link_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
+  assert.ok(g !== undefined && g !== null, 'am_transmitter_building_and_studio_link_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM rank-1 site uses 950 MHz microwave STL (short distance)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
+  assert.strictEqual(g.stl_type,    'licensed_950mhz_microwave', 'KAZM rank-1 should use microwave STL');
+  assert.strictEqual(g.stl_low_usd, 8000,   'microwave STL low should be 8000');
+  assert.strictEqual(g.stl_license_fee_usd, 440, 'Part 74 license fee should be 440');
+});
+
+test('KAZM transmitter building and STL total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
+  assert.strictEqual(g.total_low_usd,  41440,  'KAZM total_low_usd should be 41440');
+  assert.strictEqual(g.total_high_usd, 127440, 'KAZM total_high_usd should be 127440');
+});
+
+test('KAZM building guide reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_studio_link_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('Part 74'), 'reference must cite Part 74');
+  assert.ok(typeof g.note === 'string' && g.note.includes('STL type'), 'note must describe STL type');
+});
+
+test('am_transmitter_building_and_studio_link_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bld_total_low_usd' in row, 'bld_total_low_usd missing from comparison table');
+    assert.ok('bld_stl_type'      in row, 'bld_stl_type missing from comparison table');
+    assert.ok('bld_stl_low_usd'   in row, 'bld_stl_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.bld_total_low_usd, 41440,  'rank-1 bld_total_low_usd should be 41440');
+  assert.strictEqual(r0.bld_stl_type,      'licensed_950mhz_microwave', 'rank-1 bld_stl_type should be microwave');
+  assert.strictEqual(r0.bld_stl_low_usd,   8000,   'rank-1 bld_stl_low_usd should be 8000');
+});

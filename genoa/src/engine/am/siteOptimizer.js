@@ -1290,7 +1290,10 @@ export async function runSiteOptimizer(body = {}){
     acc_road_low_usd:           c.am_site_access_and_road_construction_guide?.road_low_usd ?? null,
     pwr_total_low_usd:          c.am_utility_power_and_backup_systems_guide?.total_low_usd ?? null,
     pwr_gen_kw:                 c.am_utility_power_and_backup_systems_guide?.gen_kw ?? null,
-    pwr_generator_low_usd:      c.am_utility_power_and_backup_systems_guide?.generator_low_usd ?? null
+    pwr_generator_low_usd:      c.am_utility_power_and_backup_systems_guide?.generator_low_usd ?? null,
+    bld_total_low_usd:          c.am_transmitter_building_and_studio_link_guide?.total_low_usd ?? null,
+    bld_stl_type:               c.am_transmitter_building_and_studio_link_guide?.stl_type ?? null,
+    bld_stl_low_usd:            c.am_transmitter_building_and_studio_link_guide?.stl_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7025,6 +7028,49 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_building_and_studio_link_guide: (() => {
+      // AM transmitter sites require a weather-hardened equipment building and a
+      // Studio-to-Transmitter Link (STL) to carry program audio from the studio.
+      // STL options: IP/internet, licensed microwave (Part 74), leased circuit, or fiber.
+      const distance_km   = pt.distance_from_current_km ?? 0;
+      const distance_mi   = round2(distance_km * 0.621371);
+      // Transmitter building: prefab steel shelter (12×20 ft) installed
+      const building_low_usd  = 25000;
+      const building_high_usd = 80000;
+      // HVAC for transmitter shelter: 2-ton mini-split
+      const hvac_low_usd  = 3000;
+      const hvac_high_usd = 8000;
+      // Security/alarm system
+      const security_low_usd  = 2000;
+      const security_high_usd = 6000;
+      // STL: IP-based cellular backup: $500–$2,000/yr capex; licensed microwave preferred
+      // Microwave STL (950 MHz Part 74): $8,000–$25,000 installed for path up to 25 mi
+      // Beyond 25 mi or difficult terrain: leased T1/fiber or ISDN codec
+      const stl_type = distance_mi <= 25 ? 'licensed_950mhz_microwave' : 'leased_circuit_or_fiber';
+      const stl_low_usd  = distance_mi <= 25 ? 8000  : 15000;
+      const stl_high_usd = distance_mi <= 25 ? 25000 : 50000;
+      // Audio codec pairs (Tieline/Comrex/MPEG): $3,000–$8,000/pair
+      const codec_low_usd  = 3000;
+      const codec_high_usd = 8000;
+      // Part 74 STL license application fee: ~$440
+      const stl_license_fee_usd = stl_type === 'licensed_950mhz_microwave' ? 440 : 0;
+      const total_low_usd  = round2(building_low_usd  + hvac_low_usd  + security_low_usd  + stl_low_usd  + codec_low_usd  + stl_license_fee_usd);
+      const total_high_usd = round2(building_high_usd + hvac_high_usd + security_high_usd + stl_high_usd + codec_high_usd + stl_license_fee_usd);
+      return {
+        distance_km: round2(distance_km), distance_mi,
+        stl_type,
+        stl_license_fee_usd,
+        building_low_usd, building_high_usd,
+        hvac_low_usd, hvac_high_usd,
+        security_low_usd, security_high_usd,
+        stl_low_usd, stl_high_usd,
+        codec_low_usd, codec_high_usd,
+        total_low_usd, total_high_usd,
+        reference: '47 CFR Part 74 Subpart G (STL licensing); FCC Form 601 (microwave STL); Tieline/Comrex codec specs; RS Means Building Construction Cost Data (prefab shelter)',
+        note: `STL type: ${stl_type === 'licensed_950mhz_microwave' ? '950 MHz licensed microwave (Part 74)' : 'leased circuit/fiber (site >25 mi)'}. Total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 
