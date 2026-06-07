@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Colocation Sharing and Tower Lease Guide */}
+        {candidate.am_colocation_sharing_and_tower_lease_guide && (() => {
+          const g = candidate.am_colocation_sharing_and_tower_lease_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="cot-guide" style={{ marginBottom: 16, padding: 12, background: '#dcfce7', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Colocation vs Standalone Tower</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Standalone tower:</span><span>{fmt(g.standalone_tower_low_usd)} – {fmt(g.standalone_tower_high_usd)}</span>
+                <span>Structural analysis:</span><span>{fmt(g.structural_analysis_low_usd)} – {fmt(g.structural_analysis_high_usd)}</span>
+                <span>Co-location monthly:</span><span>${g.colocation_monthly_low ?? '—'} – ${g.colocation_monthly_high ?? '—'}/mo</span>
+                <span>Co-location annual:</span><span>{fmt(g.colocation_annual_low)} – {fmt(g.colocation_annual_high)}</span>
+                <span style={{ fontWeight: 600 }}>10-yr lease total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.colocation_10yr_low)} – {fmt(g.colocation_10yr_high)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#16a34a', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Zoning and Land Use Permit Guide */}
         {candidate.am_zoning_and_land_use_permit_guide && (() => {
           const g = candidate.am_zoning_and_land_use_permit_guide;

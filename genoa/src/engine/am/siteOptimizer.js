@@ -1257,7 +1257,10 @@ export async function runSiteOptimizer(body = {}){
     gsc_total_low_usd:          c.am_soil_conductivity_and_ground_loss_assessment_guide?.total_low_usd ?? null,
     zon_market_tier:            c.am_zoning_and_land_use_permit_guide?.market_tier ?? null,
     zon_total_low_usd:          c.am_zoning_and_land_use_permit_guide?.total_low_usd ?? null,
-    zon_typical_weeks_max:      c.am_zoning_and_land_use_permit_guide?.typical_weeks_max ?? null
+    zon_typical_weeks_max:      c.am_zoning_and_land_use_permit_guide?.typical_weeks_max ?? null,
+    cot_standalone_low_usd:     c.am_colocation_sharing_and_tower_lease_guide?.standalone_tower_low_usd ?? null,
+    cot_annual_low_usd:         c.am_colocation_sharing_and_tower_lease_guide?.colocation_annual_low ?? null,
+    cot_10yr_low_usd:           c.am_colocation_sharing_and_tower_lease_guide?.colocation_10yr_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6992,6 +6995,45 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_colocation_sharing_and_tower_lease_guide: (() => {
+      // Standalone guyed AM monopole vs. colocation on an existing structure.
+      // Colocation avoids construction cost but requires structural analysis and
+      // ongoing lease payments; 10-year NPV comparison helps choose the better option.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd     = /^[CD]$/i.test(fcc_class);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_ft = round2(tower_height_m * 3.28084);
+      let standalone_tower_low_usd, standalone_tower_high_usd;
+      if (tower_height_ft <= 200) {
+        standalone_tower_low_usd = 20000; standalone_tower_high_usd = 60000;
+      } else if (tower_height_ft <= 400) {
+        standalone_tower_low_usd = 60000; standalone_tower_high_usd = 180000;
+      } else if (tower_height_ft <= 600) {
+        standalone_tower_low_usd = 150000; standalone_tower_high_usd = 400000;
+      } else {
+        standalone_tower_low_usd = 350000; standalone_tower_high_usd = 900000;
+      }
+      const colocation_monthly_low  = 500;
+      const colocation_monthly_high = 3000;
+      const colocation_annual_low   = round2(colocation_monthly_low  * 12);
+      const colocation_annual_high  = round2(colocation_monthly_high * 12);
+      const colocation_10yr_low     = round2(colocation_annual_low   * 10);
+      const colocation_10yr_high    = round2(colocation_annual_high  * 10);
+      const structural_analysis_low_usd  = 3000;
+      const structural_analysis_high_usd = 10000;
+      return {
+        frequency_khz, fcc_class, tower_height_m, tower_height_ft,
+        standalone_tower_low_usd, standalone_tower_high_usd,
+        colocation_monthly_low, colocation_monthly_high,
+        colocation_annual_low, colocation_annual_high,
+        colocation_10yr_low, colocation_10yr_high,
+        structural_analysis_low_usd, structural_analysis_high_usd,
+        reference: 'ANSI/TIA-222-H structural standards; BOMA tower lease data; AM broadcast site engineering',
+        note: `Class ${fcc_class} ${tower_height_ft.toFixed(0)} ft: standalone ${standalone_tower_low_usd.toLocaleString()}–${standalone_tower_high_usd.toLocaleString()} vs co-location $${colocation_monthly_low}/mo (10yr: ${colocation_10yr_low.toLocaleString()}–${colocation_10yr_high.toLocaleString()})`
       };
     })(),
 

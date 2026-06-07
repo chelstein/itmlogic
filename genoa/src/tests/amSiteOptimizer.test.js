@@ -12792,3 +12792,47 @@ test('am_zoning_and_land_use_permit_guide comparison table columns present', asy
   assert.strictEqual(r0.zon_total_low_usd,      6500,    'rank-1 zon_total_low_usd should be $6,500');
   assert.strictEqual(r0.zon_typical_weeks_max,  24,      'rank-1 zon_typical_weeks_max should be 24');
 });
+
+test('am_colocation_sharing_and_tower_lease_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_colocation_sharing_and_tower_lease_guide;
+  assert.ok(g !== undefined && g !== null, 'am_colocation_sharing_and_tower_lease_guide missing');
+  assert.ok(g.standalone_tower_low_usd > 0, 'standalone_tower_low_usd must be positive');
+  assert.ok(g.colocation_10yr_high >= g.colocation_10yr_low, 'colocation_10yr_high must be >= low');
+});
+
+test('KAZM standalone tower cost (315 ft Class D)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_colocation_sharing_and_tower_lease_guide;
+  assert.strictEqual(g.tower_height_ft,           315.26,  'KAZM tower_height_ft should be 315.26');
+  assert.strictEqual(g.standalone_tower_low_usd,  60000,   '200-400 ft tower standalone low should be $60,000');
+  assert.strictEqual(g.standalone_tower_high_usd, 180000,  '200-400 ft tower standalone high should be $180,000');
+});
+
+test('KAZM colocation monthly and annual lease', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_colocation_sharing_and_tower_lease_guide;
+  assert.strictEqual(g.colocation_monthly_low,  500,  'colocation_monthly_low should be $500');
+  assert.strictEqual(g.colocation_monthly_high, 3000, 'colocation_monthly_high should be $3,000');
+  assert.strictEqual(g.colocation_annual_low,   6000, 'colocation_annual_low should be $6,000');
+});
+
+test('KAZM colocation 10-year cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_colocation_sharing_and_tower_lease_guide;
+  assert.strictEqual(g.colocation_10yr_low,  60000,  'colocation_10yr_low should be $60,000');
+  assert.strictEqual(g.colocation_10yr_high, 360000, 'colocation_10yr_high should be $360,000');
+});
+
+test('am_colocation_sharing_and_tower_lease_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cot_standalone_low_usd' in row, 'cot_standalone_low_usd missing from comparison table');
+    assert.ok('cot_annual_low_usd'     in row, 'cot_annual_low_usd missing from comparison table');
+    assert.ok('cot_10yr_low_usd'       in row, 'cot_10yr_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cot_standalone_low_usd, 60000, 'rank-1 cot_standalone_low_usd should be $60,000');
+  assert.strictEqual(r0.cot_annual_low_usd,      6000,  'rank-1 cot_annual_low_usd should be $6,000');
+  assert.strictEqual(r0.cot_10yr_low_usd,        60000, 'rank-1 cot_10yr_low_usd should be $60,000');
+});
