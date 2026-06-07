@@ -3260,3 +3260,14 @@ test('am_frequency_allocation_class_and_channel_guide present across colocation 
     assert.ok(g.class_max_day_kw > 0, `rank ${c.rank}: class_max_day_kw must be positive`);
   }
 });
+
+test('am_modulation_and_audio_processing_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_modulation_and_audio_processing_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_and_audio_processing_guide missing`);
+    assert.ok(g.pos_mod_limit_pct === 125, `rank ${c.rank}: pos_mod_limit_pct should always be 125%`);
+    assert.ok(g.iboc_digital_kw >= 0, `rank ${c.rank}: iboc_digital_kw must be >= 0`);
+    assert.ok(g.total_basic_low_usd > 0, `rank ${c.rank}: total_basic_low_usd must be positive`);
+  }
+});

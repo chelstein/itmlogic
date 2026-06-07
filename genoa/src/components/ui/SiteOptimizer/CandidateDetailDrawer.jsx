@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Modulation and Audio Processing Guide */}
+        {candidate.am_modulation_and_audio_processing_guide && (() => {
+          const g = candidate.am_modulation_and_audio_processing_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="map-guide" style={{ marginBottom: 16, padding: 12, background: '#fef9f0', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Modulation &amp; Audio Processing</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Pos. modulation limit:</span><span>{g.pos_mod_limit_pct != null ? `${g.pos_mod_limit_pct}%` : '—'} (§73.1570)</span>
+                <span>Neg. modulation limit:</span><span>{g.neg_mod_limit_pct != null ? `${g.neg_mod_limit_pct}%` : '—'}</span>
+                <span>Audio bandwidth:</span><span>{g.audio_bandwidth_hz != null ? `${g.audio_bandwidth_hz/1000} kHz` : '—'}</span>
+                <span>Min SNR:</span><span>{g.min_snr_db != null ? `${g.min_snr_db} dB` : '—'}</span>
+                <span>HD Radio digital:</span><span>{g.iboc_digital_power_dbc != null ? `${g.iboc_digital_power_dbc} dBc` : '—'} = {g.iboc_digital_kw != null ? `${g.iboc_digital_kw} kW` : '—'}</span>
+                <span>Audio processor:</span><span>{fmt(g.audio_processor_low_usd)} – {fmt(g.audio_processor_high_usd)}</span>
+                <span>Modulation monitor:</span><span>{fmt(g.mod_monitor_low_usd)} – {fmt(g.mod_monitor_high_usd)}</span>
+                <span>HD Radio upgrade:</span><span>{fmt(g.iboc_upgrade_low_usd)} – {fmt(g.iboc_upgrade_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Basic total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_basic_low_usd)} – {fmt(g.total_basic_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Frequency Allocation Class and Channel Guide */}
         {candidate.am_frequency_allocation_class_and_channel_guide && (() => {
           const g = candidate.am_frequency_allocation_class_and_channel_guide;

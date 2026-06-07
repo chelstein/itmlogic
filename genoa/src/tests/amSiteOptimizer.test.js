@@ -13847,3 +13847,48 @@ test('am_frequency_allocation_class_and_channel_guide comparison table columns p
   assert.strictEqual(r0.fac_class_max_day_kw,      1,     'rank-1 fac_class_max_day_kw should be 1');
   assert.strictEqual(r0.fac_upgrade_potential_kw,  0,     'rank-1 fac_upgrade_potential_kw should be 0');
 });
+
+test('am_modulation_and_audio_processing_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_and_audio_processing_guide;
+  assert.ok(g !== undefined && g !== null, 'am_modulation_and_audio_processing_guide missing');
+  assert.ok(g.total_basic_low_usd > 0, 'total_basic_low_usd must be positive');
+  assert.ok(g.pos_mod_limit_pct > 0, 'pos_mod_limit_pct must be positive');
+});
+
+test('KAZM modulation limits per §73.1570', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_and_audio_processing_guide;
+  assert.strictEqual(g.pos_mod_limit_pct,   125, 'positive modulation limit should be 125%');
+  assert.strictEqual(g.neg_mod_limit_pct,   100, 'negative modulation limit should be 100%');
+  assert.strictEqual(g.audio_bandwidth_hz, 10200, 'audio bandwidth should be 10200 Hz');
+  assert.strictEqual(g.min_snr_db,          40,  'min SNR should be 40 dB');
+});
+
+test('KAZM HD Radio digital sideband power', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_and_audio_processing_guide;
+  assert.strictEqual(g.iboc_digital_power_dbc, -20, 'HD Radio digital should be -20 dBc');
+  assert.strictEqual(g.iboc_digital_power_pct,   1, 'HD Radio power pct should be 1%');
+  assert.strictEqual(g.iboc_digital_kw,       0.05, 'KAZM 5 kW × 1% = 0.05 kW digital');
+});
+
+test('KAZM modulation reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_and_audio_processing_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.1570'), 'reference must cite §73.1570');
+  assert.ok(typeof g.note === 'string' && g.note.includes('125%'), 'note must mention 125% modulation limit');
+});
+
+test('am_modulation_and_audio_processing_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('map_pos_mod_limit_pct'   in row, 'map_pos_mod_limit_pct missing from comparison table');
+    assert.ok('map_iboc_digital_kw'     in row, 'map_iboc_digital_kw missing from comparison table');
+    assert.ok('map_total_basic_low_usd' in row, 'map_total_basic_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.map_pos_mod_limit_pct,   125,  'rank-1 map_pos_mod_limit_pct should be 125');
+  assert.strictEqual(r0.map_iboc_digital_kw,     0.05, 'rank-1 map_iboc_digital_kw should be 0.05');
+  assert.strictEqual(r0.map_total_basic_low_usd, 4500, 'rank-1 map_total_basic_low_usd should be 4500');
+});

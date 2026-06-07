@@ -1329,7 +1329,10 @@ export async function runSiteOptimizer(body = {}){
     tae_base_current_excellent: c.am_tpo_and_antenna_efficiency_guide?.base_current_excellent_a ?? null,
     fac_channel_type:           c.am_frequency_allocation_class_and_channel_guide?.channel_type ?? null,
     fac_class_max_day_kw:       c.am_frequency_allocation_class_and_channel_guide?.class_max_day_kw ?? null,
-    fac_upgrade_potential_kw:   c.am_frequency_allocation_class_and_channel_guide?.upgrade_potential_kw ?? null
+    fac_upgrade_potential_kw:   c.am_frequency_allocation_class_and_channel_guide?.upgrade_potential_kw ?? null,
+    map_pos_mod_limit_pct:      c.am_modulation_and_audio_processing_guide?.pos_mod_limit_pct ?? null,
+    map_iboc_digital_kw:        c.am_modulation_and_audio_processing_guide?.iboc_digital_kw ?? null,
+    map_total_basic_low_usd:    c.am_modulation_and_audio_processing_guide?.total_basic_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7064,6 +7067,54 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_modulation_and_audio_processing_guide: (() => {
+      // FCC §73.1570: AM modulation must not exceed 125% positive or 100% negative.
+      // §73.1590: annual equipment performance measurements required.
+      // Audio processing chain: AGC → compressor/limiter → clipper → audio processor → STL → exciter.
+      // HD Radio (IBOC) digital sideband power: typically -20 dBc relative to analog carrier.
+      const isDA_mp    = /^DA/i.test(pattern_mode);
+      // Positive modulation limit: §73.1570(b)(1) — must not exceed 125% momentarily
+      const pos_mod_limit_pct = 125;
+      const neg_mod_limit_pct = 100;
+      // Audio bandwidth: §73.44 — AM audio bandwidth ≤10.2 kHz (channel spacing 10 kHz)
+      const audio_bandwidth_hz = 10200;
+      // Signal-to-noise ratio for AM: §73.1590 requires SNR ≥ 40 dB
+      const min_snr_db = 40;
+      // HD Radio IBOC parameters (if applicable):
+      // NRSC-5-D: digital sidebands at 5–15 kHz offset; total digital power = -20 dBc
+      const iboc_digital_power_dbc = -20;  // dB relative to analog carrier
+      const iboc_digital_power_pct = round2(Math.pow(10, iboc_digital_power_dbc / 10) * 100);  // % of analog power
+      const iboc_digital_kw        = round2(tpo_kw * iboc_digital_power_pct / 100);
+      // Equipment costs:
+      // Audio processor (Orban Optimod AM / Wheatstone): $3,000–$12,000
+      const audio_processor_low_usd  = 3000;
+      const audio_processor_high_usd = 12000;
+      // Modulation monitor (Belar BFMM / Inovonics): $1,500–$5,000
+      const mod_monitor_low_usd  = 1500;
+      const mod_monitor_high_usd = 5000;
+      // HD Radio upgrade (iBiquity/Xperi license + exciter upgrade): $15,000–$40,000
+      const iboc_upgrade_low_usd  = 15000;
+      const iboc_upgrade_high_usd = 40000;
+      const total_basic_low_usd  = round2(audio_processor_low_usd  + mod_monitor_low_usd);
+      const total_basic_high_usd = round2(audio_processor_high_usd + mod_monitor_high_usd);
+      return {
+        frequency_khz, fcc_class, tpo_kw, pattern_mode,
+        isDA: isDA_mp,
+        pos_mod_limit_pct, neg_mod_limit_pct,
+        audio_bandwidth_hz,
+        min_snr_db,
+        iboc_digital_power_dbc,
+        iboc_digital_power_pct,
+        iboc_digital_kw,
+        audio_processor_low_usd, audio_processor_high_usd,
+        mod_monitor_low_usd, mod_monitor_high_usd,
+        iboc_upgrade_low_usd, iboc_upgrade_high_usd,
+        total_basic_low_usd, total_basic_high_usd,
+        reference: '47 CFR §73.1570 (modulation limits); §73.44 (AM audio bandwidth); §73.1590 (equipment performance tests); NRSC-5-D (HD Radio IBOC standard); NAB Engineering Handbook Ch. AM audio processing',
+        note: `AM modulation: ≤${pos_mod_limit_pct}% positive, ≤${neg_mod_limit_pct}% negative (§73.1570). Audio BW: ${audio_bandwidth_hz/1000} kHz. HD Radio digital: ${iboc_digital_power_dbc} dBc = ${iboc_digital_kw} kW. Basic audio gear: $${total_basic_low_usd.toLocaleString()}–$${total_basic_high_usd.toLocaleString()}`
       };
     })(),
 
