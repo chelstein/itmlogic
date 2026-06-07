@@ -1425,7 +1425,10 @@ export async function runSiteOptimizer(body = {}){
     cca_total_study_low_usd:            c.am_contour_overlap_and_co_channel_interference_guide?.total_study_low_usd ?? null,
     log_retention_years:                c.am_operating_log_and_technical_records_compliance_guide?.log_retention_years ?? null,
     log_public_file_required:           c.am_operating_log_and_technical_records_compliance_guide?.log_public_file_required ?? null,
-    log_total_setup_low_usd:            c.am_operating_log_and_technical_records_compliance_guide?.total_setup_low_usd ?? null
+    log_total_setup_low_usd:            c.am_operating_log_and_technical_records_compliance_guide?.total_setup_low_usd ?? null,
+    prl_site_area_required_acres:       c.am_transmitter_site_lease_and_property_rights_guide?.site_area_required_acres ?? null,
+    prl_lease_annual_low_usd:           c.am_transmitter_site_lease_and_property_rights_guide?.lease_annual_low_usd ?? null,
+    prl_total_acquisition_low_usd:      c.am_transmitter_site_lease_and_property_rights_guide?.total_acquisition_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7160,6 +7163,98 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_site_lease_and_property_rights_guide: (() => {
+      // Site lease and property acquisition — the dominant practical constraint in AM relocation.
+      //
+      // Site area requirement:
+      //   Standard 120-radial ground system: radials extend λ/4 from tower base.
+      //   At 780 kHz: λ/4 = 96.15 m → full radial circle area = π × r² = π × 96.15² = 29,054 m².
+      //   Add 20% buffer for fence perimeter, access road, and outbuilding: ~34,865 m² = 8.6 acres.
+      //   Minimum practical site: ~5–7 acres for NDA; DA with multiple towers needs 10–25 acres.
+      //
+      // Key lease provisions required for broadcast tower sites:
+      //   • 24/7 access for maintenance and FCC inspection compliance
+      //   • Utility easements: electric service, fiber/copper for STL, generator fuel delivery
+      //   • No RF interference clauses (landlord cannot add RF-generating equipment)
+      //   • Broadcast use permitted (local zoning approval must be confirmed)
+      //   • Tower/antenna rights clearly defined (height, guy wires if applicable)
+      //   • Environmental indemnification clause
+      //
+      // Zoning considerations:
+      //   Agricultural/open land: typically allowed by right or conditional use permit
+      //   Industrial/commercial: varies; many allow towers
+      //   Residential: almost always requires variance; difficult for AM tower (~100 m tall)
+      //   FCC does not preempt local zoning (unlike some federal spectrum users); full compliance required.
+      //
+      // Environmental:
+      //   Phase I Environmental Site Assessment (ESA, ASTM E1527-21): $1,500–$3,500
+      //   Phase II (if Phase I flags REC/RECs): $5,000–$30,000+
+      //   For rural/agricultural sites: typically clean Phase I.
+      //
+      // Legal and survey:
+      //   ALTA/NSPS Land Title Survey: $3,000–$8,000
+      //   Title search and title insurance: $500–$1,500
+      //   Lease negotiation (broadcast attorney): $2,000–$5,000
+      //
+      // Annual lease costs (2024 market):
+      //   Rural/agricultural (1–2 hr from metro): $10,000–$30,000/year
+      //   Suburban/exurban (30–60 min from metro): $24,000–$60,000/year
+      //   Urban-adjacent: $60,000–$120,000+/year
+      //   KAZM (Sedona AZ, rural high-desert): likely $10,000–$25,000/year
+      //
+      // Escalation clause: typical 3% annual CPI-linked increases; negotiate cap at 5%.
+      //
+      // Distance-based proxy: pt.distance_from_current_km used to estimate urban vs rural tier.
+      //   < 20 km from current: assume same-tier market (similar lease cost)
+      //   ≥ 20 km: may be different market; use conservative estimate.
+      const lambda_m      = 300000 / frequency_khz;
+      const radial_m      = round2(lambda_m / 4);
+      const circle_m2     = round2(Math.PI * radial_m * radial_m);
+      const buffer_factor = 1.20;
+      const site_m2       = round2(circle_m2 * buffer_factor);
+      const site_acres    = round2(site_m2 / 4046.86);   // 1 acre = 4046.86 m²
+
+      // Lease tier based on candidate distance from current site (proxy for urbanization)
+      const d_km = pt.distance_from_current_km ?? 0;
+      const lease_tier = d_km < 10 ? 'suburban' : 'rural';
+
+      const lease_annual_low_usd  = lease_tier === 'suburban' ? 24000 : 10000;
+      const lease_annual_high_usd = lease_tier === 'suburban' ? 60000 : 25000;
+
+      const phase1_esa_low_usd  = 1500;
+      const phase1_esa_high_usd = 3500;
+      const survey_low_usd      = 3000;
+      const survey_high_usd     = 8000;
+      const title_low_usd       = 500;
+      const title_high_usd      = 1500;
+      const legal_low_usd       = 2000;
+      const legal_high_usd      = 5000;
+
+      const acquisition_low_usd  = phase1_esa_low_usd  + survey_low_usd  + title_low_usd  + legal_low_usd;
+      const acquisition_high_usd = phase1_esa_high_usd + survey_high_usd + title_high_usd + legal_high_usd;
+
+      return {
+        radial_length_m:         radial_m,
+        site_area_m2:            site_m2,
+        site_area_required_acres: site_acres,
+        lease_tier,
+        lease_annual_low_usd,
+        lease_annual_high_usd,
+        phase1_esa_low_usd,
+        phase1_esa_high_usd,
+        survey_low_usd,
+        survey_high_usd,
+        title_low_usd,
+        title_high_usd,
+        legal_low_usd,
+        legal_high_usd,
+        total_acquisition_low_usd:  acquisition_low_usd,
+        total_acquisition_high_usd: acquisition_high_usd,
+        reference: '47 CFR §73.49 (site enclosure / exclusion zone); ASTM E1527-21 (Phase I ESA); ALTA/NSPS Land Title Survey standard; §73.1125 (site access)',
+        note: `${radial_m} m radial at ${frequency_khz} kHz → ${site_acres} acres minimum site (incl. 20% buffer). Lease tier: ${lease_tier} (candidate ${round2(d_km)} km from current). Annual lease: $${lease_annual_low_usd.toLocaleString()}–$${lease_annual_high_usd.toLocaleString()}. Phase I ESA + ALTA survey + legal: $${acquisition_low_usd.toLocaleString()}–$${acquisition_high_usd.toLocaleString()} one-time. Broadcast attorney review of lease essential before signing.`
       };
     })(),
 

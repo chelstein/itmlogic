@@ -3786,3 +3786,20 @@ test('colocation candidates include am_operating_log_and_technical_records_compl
     assert.ok(g.total_setup_low_usd > 0, 'total_setup_low_usd must be positive');
   }
 });
+
+test('colocation candidates include am_transmitter_site_lease_and_property_rights_guide with site area calculation', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_site_lease_and_property_rights_guide;
+    assert.ok(g, `candidate missing am_transmitter_site_lease_and_property_rights_guide`);
+    assert.ok(g.site_area_required_acres > 5, 'site area must be > 5 acres for 780 kHz');
+    assert.ok(g.lease_annual_low_usd > 0, 'lease_annual_low_usd must be positive');
+    assert.ok(g.total_acquisition_low_usd > 0, 'total_acquisition must be positive');
+  }
+});

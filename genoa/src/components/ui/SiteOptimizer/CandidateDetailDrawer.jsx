@@ -2226,6 +2226,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Site Lease and Property Rights Guide */}
+        {candidate.am_transmitter_site_lease_and_property_rights_guide && (() => {
+          const g = candidate.am_transmitter_site_lease_and_property_rights_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="prl-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf7f2', borderRadius: 8, border: '2px solid #9a3412' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Site Lease &amp; Property Rights — ASTM E1527 / §73.49</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
+                <span style={{ color: '#9a3412' }}>Radial reach:</span><span>{fmtF(g.radial_length_m, 1)} m (λ/4)</span>
+                <span style={{ color: '#9a3412' }}>Min. site area:</span><span style={{ fontWeight: 700 }}>{fmtF(g.site_area_required_acres, 1)} acres</span>
+                <span style={{ color: '#9a3412' }}>Lease tier:</span><span style={{ textTransform: 'capitalize' }}>{g.lease_tier}</span>
+                <span style={{ color: '#9a3412' }}>Annual lease:</span><span>${fmt(g.lease_annual_low_usd)} – ${fmt(g.lease_annual_high_usd)}/yr</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#7c2d12', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#9a3412' }}>Phase I ESA:</span><span>${fmt(g.phase1_esa_low_usd)} – ${fmt(g.phase1_esa_high_usd)}</span>
+                <span style={{ color: '#9a3412' }}>ALTA survey:</span><span>${fmt(g.survey_low_usd)} – ${fmt(g.survey_high_usd)}</span>
+                <span style={{ color: '#9a3412' }}>Title search:</span><span>${fmt(g.title_low_usd)} – ${fmt(g.title_high_usd)}</span>
+                <span style={{ color: '#9a3412' }}>Lease legal:</span><span>${fmt(g.legal_low_usd)} – ${fmt(g.legal_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fed7aa', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#9a3412', fontWeight: 600 }}>One-time acquisition:</span>
+                <span style={{ color: '#7c2d12', fontWeight: 700 }}>${fmt(g.total_acquisition_low_usd)} – ${fmt(g.total_acquisition_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#c2410c' }}>Ref: 47 CFR §73.49, §73.1125; ASTM E1527-21; ALTA/NSPS Survey</div>
+            </div>
+          );
+        })()}
+
         {/* AM Operating Log and Technical Records Compliance Guide */}
         {candidate.am_operating_log_and_technical_records_compliance_guide && (() => {
           const g = candidate.am_operating_log_and_technical_records_compliance_guide;

@@ -15034,3 +15034,39 @@ it('candidate_comparison_table log columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.log_public_file_required, true, 'log_public_file_required must be true');
   assert.ok(r0.log_total_setup_low_usd > 0, 'log_total_setup_low_usd must be positive');
 });
+
+it('am_transmitter_site_lease_and_property_rights_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_transmitter_site_lease_and_property_rights_guide, `candidate missing am_transmitter_site_lease_and_property_rights_guide`);
+  }
+});
+
+it('am_transmitter_site_lease_and_property_rights_guide site_area_required_acres based on λ/4 radial circle', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_site_lease_and_property_rights_guide;
+  // 780 kHz: radial = 96.15 m → circle area + 20% ≈ 34,852 m² ≈ 8.61 acres
+  assert.ok(g.site_area_required_acres > 5, 'site must be > 5 acres for 780 kHz ground system');
+  assert.ok(Math.abs(g.radial_length_m - 96.15) < 0.1, 'radial_length_m should be λ/4 ≈ 96.15 m');
+});
+
+it('am_transmitter_site_lease_and_property_rights_guide lease_annual_low_usd > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_site_lease_and_property_rights_guide;
+  assert.ok(g.lease_annual_low_usd > 0, 'lease_annual_low_usd must be positive');
+  assert.ok(g.lease_annual_high_usd >= g.lease_annual_low_usd, 'high must be >= low');
+});
+
+it('am_transmitter_site_lease_and_property_rights_guide total_acquisition_low_usd > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_site_lease_and_property_rights_guide;
+  assert.ok(g.total_acquisition_low_usd > 0, 'total_acquisition_low_usd must include Phase I ESA + survey + legal');
+});
+
+it('candidate_comparison_table prl columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.prl_site_area_required_acres > 0, 'prl_site_area_required_acres must be positive');
+  assert.ok(r0.prl_lease_annual_low_usd > 0, 'prl_lease_annual_low_usd must be positive');
+  assert.ok(r0.prl_total_acquisition_low_usd > 0, 'prl_total_acquisition_low_usd must be positive');
+});
