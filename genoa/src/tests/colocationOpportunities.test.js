@@ -2252,3 +2252,20 @@ test('tower_structural_wind_and_ice_load_design_guide present across colocation 
     assert.ok(g.design_wind_speed_mph > 0, `rank ${c.rank}: design_wind_speed_mph must be > 0`);
   }
 });
+
+test('broadcast_market_competitive_landscape_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['MAJOR', 'MEDIUM', 'SMALL', 'RURAL'];
+  for (const c of out.candidates) {
+    const g = c.broadcast_market_competitive_landscape_guide;
+    assert.ok(g != null, `rank ${c.rank} missing broadcast_market_competitive_landscape_guide`);
+    assert.ok(valid_tiers.includes(g.market_tier), `rank ${c.rank}: market_tier '${g.market_tier}' invalid`);
+    assert.ok(g.n_format_segments >= 5, `rank ${c.rank}: must have at least 5 format segments`);
+  }
+});

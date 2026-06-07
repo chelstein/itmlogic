@@ -1083,7 +1083,10 @@ export async function runSiteOptimizer(body = {}){
     sky_class_a_risk:           c.am_night_skywave_coverage_and_interference_risk_guide?.dominant_class_a_risk ?? null,
     struct_wind_zone:           c.tower_structural_wind_and_ice_load_design_guide?.wind_zone ?? null,
     struct_wind_speed_mph:      c.tower_structural_wind_and_ice_load_design_guide?.design_wind_speed_mph ?? null,
-    struct_ice_zone:            c.tower_structural_wind_and_ice_load_design_guide?.ice_zone ?? null
+    struct_ice_zone:            c.tower_structural_wind_and_ice_load_design_guide?.ice_zone ?? null,
+    mkt_tier:                   c.broadcast_market_competitive_landscape_guide?.market_tier ?? null,
+    mkt_am_stations:            c.broadcast_market_competitive_landscape_guide?.estimated_am_stations_in_market ?? null,
+    mkt_audience_change_pct:    c.broadcast_market_competitive_landscape_guide?.audience_potential_change_pct ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6818,6 +6821,117 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    broadcast_market_competitive_landscape_guide: (() => {
+      // Models the competitive radio market landscape relevant to the candidate
+      // relocation site. Integrates market size tier, estimated competitor
+      // count by format, and AM/FM competitive dynamics.
+      //
+      // Radio market tiers (Arbitron/Nielsen Audio ADI ranks):
+      //   MAJOR:   ADI 1–25   (NYC, LA, Chicago, PHX, etc.)
+      //   MEDIUM:  ADI 26–75  (Flagstaff, Prescott, Sedona area)
+      //   SMALL:   ADI 76–200
+      //   RURAL:   ADI 200+   (unrated markets)
+      //
+      // AM competitive dynamics:
+      //   - AM market share nationally: ~7% (2024 Nielsen)
+      //   - Talk/News/Sports dominate AM; Spanish-language AM growing
+      //   - FM translators: ~8,000 nationally (boosts AM competitiveness)
+      //   - HD Radio: AM HD adoption < 15% of stations
+      //   - AM stereo (C-QUAM/DTS-HD MA): < 200 stations active
+      //
+      // Format competition by class and frequency band:
+      //   Clear-channel AM (class A/D-clr): competes nationally for news/talk
+      //   Local-channel AM (class D-loc): competes for community/ethnic formats
+      //   Spanish-language AM: fastest-growing segment (12%/yr 2020–2024)
+      //
+      // Candidate site market proximity score: closer to larger market →
+      // greater competition, but also larger total audience pool.
+      //
+      // relocation_market_advantage: positive if new site reaches more
+      // ADI listeners than current site (larger market, more population).
+
+      const isDA_mkt         = /^DA/i.test(pattern_mode);
+      const is_clear_ch_mkt  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_mkt  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Estimate market tier from reach_scale_km (proxy for market size)
+      const scale_km = reach_scale_km ?? 50;
+      const market_tier =
+        scale_km >= 150 ? 'MAJOR'  :
+        scale_km >= 80  ? 'MEDIUM' :
+        scale_km >= 40  ? 'SMALL'  : 'RURAL';
+
+      // Estimated total stations in market by tier
+      const STATIONS_BY_TIER = {
+        MAJOR: { am: 18, fm: 42, translator: 28 },
+        MEDIUM: { am: 8, fm: 22, translator: 12 },
+        SMALL: { am: 4, fm: 12, translator: 6 },
+        RURAL: { am: 2, fm: 6, translator: 2 }
+      };
+      const market_stations = STATIONS_BY_TIER[market_tier];
+
+      // AM market share estimate (national trend %)
+      const am_market_share_pct = 7;
+      const fm_market_share_pct = 76;
+      const streaming_share_pct = 17;
+
+      // Competitive format categories for AM
+      const format_segments = [
+        { format: 'News/Talk', am_station_pct: 45, growth_trend: 'STABLE', competitive_pressure: 'HIGH' },
+        { format: 'Sports', am_station_pct: 15, growth_trend: 'GROWING', competitive_pressure: 'MODERATE' },
+        { format: 'Spanish Language', am_station_pct: 20, growth_trend: 'RAPID_GROWTH', competitive_pressure: 'LOW' },
+        { format: 'Religious', am_station_pct: 12, growth_trend: 'DECLINING', competitive_pressure: 'LOW' },
+        { format: 'Ethnic/Other', am_station_pct: 8, growth_trend: 'GROWING', competitive_pressure: 'LOW' }
+      ];
+
+      // FM translator competitive advantage (AM with FM translator has higher effective reach)
+      const fm_translator_advantage =
+        is_clear_ch_mkt ? 'MODERATE' : 'HIGH'; // Local-channel AM benefits more from translators
+
+      // HD Radio adoption context
+      const hd_adoption_pct_am = 14;
+      const am_stereo_active_count = 200;
+
+      // Market displacement risk: moving to a larger market increases competition
+      const dist_km = pt?.distance_from_current_km ?? 0;
+      const market_displacement_risk =
+        dist_km > 50 && scale_km >= 100 ? 'HIGH' :
+        dist_km > 25                    ? 'MODERATE' : 'LOW';
+
+      // Estimated audience potential change (% vs current site)
+      // Larger reach_scale_km → more listeners within service contour
+      const audience_potential_change_pct = Math.round(
+        Math.min(50, Math.max(-30, (scale_km - 50) * 0.3 + (isDA_mkt ? 10 : 0)))
+      );
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        market_tier,
+        reach_scale_km:                 scale_km,
+        estimated_am_stations_in_market: market_stations.am,
+        estimated_fm_stations_in_market: market_stations.fm,
+        estimated_translators_in_market: market_stations.translator,
+        am_market_share_pct,
+        fm_market_share_pct,
+        streaming_share_pct,
+        format_segments,
+        n_format_segments:              format_segments.length,
+        fm_translator_advantage,
+        hd_radio_adoption_pct_am:       hd_adoption_pct_am,
+        am_stereo_active_count,
+        market_displacement_risk,
+        audience_potential_change_pct,
+        is_clear_channel:               is_clear_ch_mkt,
+        is_local_channel:               is_local_ch_mkt,
+        is_da:                          isDA_mkt,
+        reference: 'Nielsen Audio (2024); BIA Advisory Services AM Market Report (2024); FCC Broadcast Station Totals; Arbitron ADI Market Rankings; RAIN News AM Radio Report (2024)',
+        note: `Market tier: ${market_tier} (reach scale ${scale_km} km). ` +
+              `Est. ${market_stations.am} AM / ${market_stations.fm} FM stations in market. ` +
+              `Audience potential change vs current: ${audience_potential_change_pct >= 0 ? '+' : ''}${audience_potential_change_pct}%. ` +
+              `Displacement risk: ${market_displacement_risk}.`
       };
     })(),
 

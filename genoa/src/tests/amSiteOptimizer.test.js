@@ -10090,3 +10090,47 @@ test('tower_structural_wind_and_ice_load_design_guide comparison table columns p
     assert.ok('struct_ice_zone'       in row, 'struct_ice_zone missing from comparison table');
   }
 });
+
+test('broadcast_market_competitive_landscape_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_market_competitive_landscape_guide;
+  assert.ok(g, 'market landscape guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.n_format_segments, 5, 'must have 5 format segments');
+});
+
+test('broadcast_market_competitive_landscape_guide market_tier is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_market_competitive_landscape_guide;
+  const valid_tiers = ['MAJOR', 'MEDIUM', 'SMALL', 'RURAL'];
+  assert.ok(valid_tiers.includes(g.market_tier), `market_tier '${g.market_tier}' must be a valid enum`);
+  assert.ok(g.estimated_am_stations_in_market >= 2, 'must have at least 2 AM stations estimate');
+  assert.ok(g.estimated_fm_stations_in_market >= 6, 'must have at least 6 FM stations estimate');
+});
+
+test('broadcast_market_competitive_landscape_guide AM market share context values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_market_competitive_landscape_guide;
+  assert.strictEqual(g.am_market_share_pct, 7, 'AM national market share must be 7%');
+  assert.strictEqual(g.fm_market_share_pct, 76, 'FM national market share must be 76%');
+  assert.strictEqual(g.am_stereo_active_count, 200, 'AM stereo count must be 200');
+});
+
+test('broadcast_market_competitive_landscape_guide displacement risk and audience change are valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].broadcast_market_competitive_landscape_guide;
+  const valid_risks = ['LOW', 'MODERATE', 'HIGH'];
+  assert.ok(valid_risks.includes(g.market_displacement_risk), `displacement_risk '${g.market_displacement_risk}' invalid`);
+  assert.ok(typeof g.audience_potential_change_pct === 'number', 'audience change must be numeric');
+  assert.ok(g.format_segments.every(f => f.format && f.am_station_pct > 0), 'all format segments must have format and pct');
+});
+
+test('broadcast_market_competitive_landscape_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mkt_tier'              in row, 'mkt_tier missing from comparison table');
+    assert.ok('mkt_am_stations'       in row, 'mkt_am_stations missing from comparison table');
+    assert.ok('mkt_audience_change_pct' in row, 'mkt_audience_change_pct missing from comparison table');
+  }
+});

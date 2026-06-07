@@ -2226,6 +2226,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Broadcast Market Competitive Landscape Guide */}
+        {candidate.broadcast_market_competitive_landscape_guide && (() => {
+          const g = candidate.broadcast_market_competitive_landscape_guide;
+          const tierColor = {
+            MAJOR: '#0c4a6e', MEDIUM: '#1e40af', SMALL: '#374151', RURAL: '#15803d'
+          }[g.market_tier] ?? '#374151';
+          const tierBg = {
+            MAJOR: '#e0f2fe', MEDIUM: '#dbeafe', SMALL: '#f3f4f6', RURAL: '#dcfce7'
+          }[g.market_tier] ?? '#f3f4f6';
+          const dispRiskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#15803d' }[g.market_displacement_risk] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff7ed', borderRadius: 8, border: '1px solid #fed7aa' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c2410c', marginBottom: 8 }}>
+                Broadcast Market — Competitive Landscape
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Market Tier:</span> <strong style={{ color: tierColor }}>{g.market_tier}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Reach Scale:</span> <strong>{g.reach_scale_km?.toFixed(0)} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Stations in Market:</span> <strong>{g.estimated_am_stations_in_market}</strong></div>
+                <div><span style={{ color: '#64748b' }}>FM Stations in Market:</span> <strong>{g.estimated_fm_stations_in_market}</strong></div>
+                <div><span style={{ color: '#64748b' }}>FM Translators:</span> <strong>{g.estimated_translators_in_market}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM National Share:</span> <strong>{g.am_market_share_pct}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Audience Δ vs Current:</span> <strong style={{ color: g.audience_potential_change_pct >= 0 ? '#15803d' : '#b91c1c' }}>{g.audience_potential_change_pct >= 0 ? '+' : ''}{g.audience_potential_change_pct}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Displacement Risk:</span> <strong style={{ color: dispRiskColor }}>{g.market_displacement_risk}</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: tierBg, color: tierColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.market_tier} MARKET
+                </span>
+                <span style={{ background: '#fef9c3', color: '#92400e', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  FM Translator Advantage: {g.fm_translator_advantage}
+                </span>
+              </div>
+              {g.format_segments?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#c2410c', marginBottom: 4 }}>AM Format Segments</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {g.format_segments.map((f, i) => (
+                      <span key={i} style={{ background: '#fed7aa', color: '#7c2d12', borderRadius: 3, padding: '1px 6px', fontSize: 10 }}>
+                        {f.format} {f.am_station_pct}% · {f.growth_trend?.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Tower Structural Wind & Ice Load Design Guide */}
         {candidate.tower_structural_wind_and_ice_load_design_guide && (() => {
           const g = candidate.tower_structural_wind_and_ice_load_design_guide;
