@@ -11258,3 +11258,51 @@ test('am_coverage_improvement_vs_current_site_guide comparison table columns pre
   assert.strictEqual(r0.ci_coverage_delta_pct, 0, 'rank-1 ci_coverage_delta_pct should be 0');
   assert.strictEqual(r0.ci_verdict, 'EQUIVALENT_COVERAGE', 'rank-1 ci_verdict should be EQUIVALENT_COVERAGE');
 });
+
+test('am_rf_system_monitoring_and_telemetry_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_system_monitoring_and_telemetry_guide;
+  assert.ok(g !== undefined && g !== null, 'am_rf_system_monitoring_and_telemetry_guide should be present');
+  assert.ok(typeof g.total_telemetry_low_usd === 'number', 'total_telemetry_low_usd should be a number');
+  assert.ok(g.fcc_remote_control_allowed === true, 'FCC remote control should be allowed');
+});
+
+test('am_rf_system_monitoring_and_telemetry_guide KAZM NDA single-element configuration', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_system_monitoring_and_telemetry_guide;
+  // KAZM is NDA → 1 element, 1 base current meter
+  assert.strictEqual(g.n_elements, 1, 'NDA station has 1 tower element');
+  assert.strictEqual(g.n_base_meters, 1, 'NDA station has 1 base current meter');
+  assert.strictEqual(g.scada_low_usd, 0, 'SCADA not required for ≤50 kW stations');
+});
+
+test('am_rf_system_monitoring_and_telemetry_guide KAZM cost components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_system_monitoring_and_telemetry_guide;
+  // $500 base meter + $3000 controller + $1500 connectivity = $5000 low
+  assert.strictEqual(g.base_meters_total_low_usd, 500, 'base_meters_total_low_usd = 1 × $500');
+  assert.strictEqual(g.total_telemetry_low_usd, 5000, 'total_telemetry_low_usd should be $5,000');
+  assert.strictEqual(g.total_telemetry_high_usd, 14000, 'total_telemetry_high_usd should be $14,000');
+  assert.strictEqual(g.annual_connectivity_usd, 2400, 'annual_connectivity_usd = $2,400/yr');
+});
+
+test('am_rf_system_monitoring_and_telemetry_guide KAZM FCC log requirements', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_system_monitoring_and_telemetry_guide;
+  assert.strictEqual(g.log_interval_min, 30, 'FCC §73.1800 automated log interval = 30 min');
+  // 365 × 24 × 60 / 30 = 17,520 log entries per year
+  assert.strictEqual(g.annual_log_entries, 17520, 'annual_log_entries should be 17,520');
+});
+
+test('am_rf_system_monitoring_and_telemetry_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tel_n_monitoring_points'     in row, 'tel_n_monitoring_points missing from comparison table');
+    assert.ok('tel_total_cost_low_usd'      in row, 'tel_total_cost_low_usd missing from comparison table');
+    assert.ok('tel_annual_connectivity_usd' in row, 'tel_annual_connectivity_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.tel_n_monitoring_points, 1, 'rank-1 tel_n_monitoring_points should be 1');
+  assert.strictEqual(r0.tel_total_cost_low_usd, 5000, 'rank-1 tel_total_cost_low_usd should be $5,000');
+  assert.strictEqual(r0.tel_annual_connectivity_usd, 2400, 'rank-1 tel_annual_connectivity_usd should be $2,400');
+});

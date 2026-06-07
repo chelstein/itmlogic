@@ -1155,7 +1155,10 @@ export async function runSiteOptimizer(body = {}){
     lp_total_cost_low_usd:      c.am_lightning_protection_and_surge_suppression_guide?.total_lp_cost_low_usd ?? null,
     ci_d_candidate_km:          c.am_coverage_improvement_vs_current_site_guide?.d_candidate_km ?? null,
     ci_coverage_delta_pct:      c.am_coverage_improvement_vs_current_site_guide?.coverage_radius_delta_pct ?? null,
-    ci_verdict:                 c.am_coverage_improvement_vs_current_site_guide?.verdict ?? null
+    ci_verdict:                 c.am_coverage_improvement_vs_current_site_guide?.verdict ?? null,
+    tel_n_monitoring_points:    c.am_rf_system_monitoring_and_telemetry_guide?.n_base_meters ?? null,
+    tel_total_cost_low_usd:     c.am_rf_system_monitoring_and_telemetry_guide?.total_telemetry_low_usd ?? null,
+    tel_annual_connectivity_usd: c.am_rf_system_monitoring_and_telemetry_guide?.annual_connectivity_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6890,6 +6893,51 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_rf_system_monitoring_and_telemetry_guide: (() => {
+      // Models the remote monitoring, telemetry, and base current measurement system
+      // required at the AM transmitter site.  47 CFR §73.61 mandates base current
+      // monitoring; §73.1400 permits unmanned transmitter operation with approved
+      // remote control; §73.1800/§73.1820 require operating power log records.
+      const isDA_tel      = /^DA/i.test(pattern_mode);
+      const n_elements    = isDA_tel
+        ? ((fcc_class === 'A' || fcc_class === 'B') ? 4 : 3)
+        : 1;
+      // Base current meter: one per tower element (§73.61(b) for DA stations)
+      const base_meter_cost_low_usd  = 500;
+      const base_meter_cost_high_usd = 2000;
+      const n_base_meters = n_elements;
+      const base_meters_total_low_usd  = Math.round(n_base_meters * base_meter_cost_low_usd);
+      const base_meters_total_high_usd = Math.round(n_base_meters * base_meter_cost_high_usd);
+      // Remote monitoring/control unit (covers: forward/reflected power, VSWR,
+      // transmitter alarms, ATU status, tower lighting monitor, environmental sensors)
+      const remote_ctrl_cost_low_usd  = 3000;
+      const remote_ctrl_cost_high_usd = 8000;
+      // Connectivity: broadband IP + cellular backup (§73.1400 remote control)
+      const connectivity_install_low_usd  = 1500;
+      const connectivity_install_high_usd = 4000;
+      const annual_connectivity_usd        = 2400; // $200/month broadband + cell data
+      // SCADA/data-logging integration (optional but recommended for large stations)
+      const scada_low_usd  = tpo_kw >= 50 ? 5000 : 0;
+      const scada_high_usd = tpo_kw >= 50 ? 15000 : 0;
+      const total_telemetry_low_usd  = base_meters_total_low_usd  + remote_ctrl_cost_low_usd  + connectivity_install_low_usd  + scada_low_usd;
+      const total_telemetry_high_usd = base_meters_total_high_usd + remote_ctrl_cost_high_usd + connectivity_install_high_usd + scada_high_usd;
+      // FCC §73.1800 log: power measurements every 30 min when automated, every 3 hr manual
+      const log_interval_min = 30;
+      const annual_log_entries = Math.round((365 * 24 * 60) / log_interval_min);
+      const fcc_remote_control_allowed = true; // §73.1400 permits unmanned operation
+      return {
+        n_elements, n_base_meters,
+        base_meters_total_low_usd, base_meters_total_high_usd,
+        remote_ctrl_cost_low_usd, remote_ctrl_cost_high_usd,
+        connectivity_install_low_usd, connectivity_install_high_usd,
+        annual_connectivity_usd, scada_low_usd, scada_high_usd,
+        total_telemetry_low_usd, total_telemetry_high_usd,
+        log_interval_min, annual_log_entries, fcc_remote_control_allowed,
+        reference: '47 CFR §73.61 (base current measurement); §73.1400 (remote control); §73.1800 (station records); §73.1820 (operating power log); §73.1870 (chief operator responsibilities)',
+        note: `${n_elements}-element ${isDA_tel ? 'DA array' : 'NDA antenna'}: ${n_base_meters} base current meter(s) + remote controller + broadband/cellular. Capital: $${total_telemetry_low_usd.toLocaleString()}–$${total_telemetry_high_usd.toLocaleString()}; ongoing connectivity: $${annual_connectivity_usd.toLocaleString()}/yr. §73.1800 log: ${log_interval_min}-min intervals (${annual_log_entries.toLocaleString()} entries/yr).`
       };
     })(),
 

@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM RF System Monitoring and Telemetry Guide */}
+        {candidate.am_rf_system_monitoring_and_telemetry_guide && (() => {
+          const g = candidate.am_rf_system_monitoring_and_telemetry_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="tel-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 8, border: '1px solid #1d4ed8' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a5f', marginBottom: 6, fontSize: 13 }}>RF System Monitoring &amp; Telemetry</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Tower Elements:</span><span>{g.n_elements} ({g.n_base_meters} base current meter{g.n_base_meters > 1 ? 's' : ''})</span>
+                <span style={{ color: '#6b7280' }}>Remote Control:</span><span>{g.fcc_remote_control_allowed ? '✓ Permitted (§73.1400)' : 'Not permitted'}</span>
+                <span style={{ color: '#6b7280' }}>Base Current Meters:</span><span>{fmt(g.base_meters_total_low_usd)} – {fmt(g.base_meters_total_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Remote Controller:</span><span>{fmt(g.remote_ctrl_cost_low_usd)} – {fmt(g.remote_ctrl_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Connectivity Install:</span><span>{fmt(g.connectivity_install_low_usd)} – {fmt(g.connectivity_install_high_usd)}</span>
+                {g.scada_low_usd > 0 && <><span style={{ color: '#6b7280' }}>SCADA System:</span><span>{fmt(g.scada_low_usd)} – {fmt(g.scada_high_usd)}</span></>}
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_telemetry_low_usd)} – {fmt(g.total_telemetry_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual Connectivity:</span><span>{fmt(g.annual_connectivity_usd)}/yr</span>
+                <span style={{ color: '#6b7280' }}>FCC Log Interval:</span><span>{g.log_interval_min} min ({g.annual_log_entries.toLocaleString()} entries/yr)</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#1e3a5f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Coverage Improvement vs Current Site Guide */}
         {candidate.am_coverage_improvement_vs_current_site_guide && (() => {
           const g = candidate.am_coverage_improvement_vs_current_site_guide;

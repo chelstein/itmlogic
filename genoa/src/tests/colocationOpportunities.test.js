@@ -2613,3 +2613,14 @@ test('am_coverage_improvement_vs_current_site_guide present across colocation ca
     assert.ok(['SIGNIFICANT_COVERAGE_GAIN','MARGINAL_COVERAGE_GAIN','EQUIVALENT_COVERAGE','MARGINAL_COVERAGE_LOSS','SIGNIFICANT_COVERAGE_LOSS'].includes(g.verdict), `rank ${c.rank}: verdict should be a valid classification`);
   }
 });
+
+test('am_rf_system_monitoring_and_telemetry_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_rf_system_monitoring_and_telemetry_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_rf_system_monitoring_and_telemetry_guide missing`);
+    assert.ok(g.n_base_meters >= 1, `rank ${c.rank}: n_base_meters must be at least 1`);
+    assert.ok(g.total_telemetry_low_usd > 0, `rank ${c.rank}: total_telemetry_low_usd must be positive`);
+    assert.ok(g.annual_log_entries > 0, `rank ${c.rank}: annual_log_entries must be positive`);
+  }
+});
