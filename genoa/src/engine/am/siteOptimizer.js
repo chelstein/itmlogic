@@ -1191,7 +1191,10 @@ export async function runSiteOptimizer(body = {}){
     com_mpe_required:           c.am_commissioning_and_acceptance_testing_guide?.mpe_evaluation_required ?? null,
     grm_rg_est_ohm:             c.am_ground_system_resistance_and_maintenance_guide?.rg_est_ohm ?? null,
     grm_rg_acceptable:          c.am_ground_system_resistance_and_maintenance_guide?.rg_acceptable ?? null,
-    grm_annual_maint_low_usd:   c.am_ground_system_resistance_and_maintenance_guide?.total_annual_ground_maint_low_usd ?? null
+    grm_annual_maint_low_usd:   c.am_ground_system_resistance_and_maintenance_guide?.total_annual_ground_maint_low_usd ?? null,
+    demo_tower_cost_low_usd:    c.am_tower_decommissioning_and_site_remediation_guide?.tower_demo_cost_low_usd ?? null,
+    demo_total_low_usd:         c.am_tower_decommissioning_and_site_remediation_guide?.total_demo_cost_low_usd ?? null,
+    demo_salvage_value_usd:     c.am_tower_decommissioning_and_site_remediation_guide?.salvage_high_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6926,6 +6929,83 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_decommissioning_and_site_remediation_guide: (() => {
+      // Costs and process for decommissioning the CURRENT (vacated) transmitter site
+      // after relocation.  Covers tower demolition, salvage, site restoration, and
+      // FCC/FAA notifications.  These costs offset against any site sale proceeds.
+
+      // Tower height from frequency and class (for demolition cost scaling)
+      const lambda_demo_m = 300000 / frequency_khz;
+      const tower_demo_m  = ['A','B'].includes(fcc_class)
+        ? round2(lambda_demo_m * 0.5)
+        : round2(lambda_demo_m / 4);
+      const tower_demo_ft = Math.round(tower_demo_m * 3.281);
+
+      // Tower demolition cost: scales with height and configuration
+      // Guyed tower: $50–$120/ft to dismantle and remove (crane + crew)
+      const demo_cost_per_ft_low  = 50;
+      const demo_cost_per_ft_high = 120;
+      const tower_demo_cost_low_usd  = Math.round(tower_demo_ft * demo_cost_per_ft_low);
+      const tower_demo_cost_high_usd = Math.round(tower_demo_ft * demo_cost_per_ft_high);
+
+      // Salvage value of tower steel (galvanized lattice tower steel)
+      // Typical guyed towers: 10-30 tons of steel @ $0.08–$0.12/lb salvage
+      const tower_steel_tons_est = Math.round(tower_demo_ft * 0.07);  // ~0.07 tons/ft for lattice
+      const salvage_low_usd  = Math.round(tower_steel_tons_est * 2000 * 0.08);
+      const salvage_high_usd = Math.round(tower_steel_tons_est * 2000 * 0.12);
+
+      // Ground radial system: typically left in place (buried, no hazmat)
+      // Removal optional for land resale; cost = $5,000–$15,000 if required
+      const radial_removal_low_usd  = 0;      // left in place
+      const radial_removal_high_usd = 15000;  // if land buyer requires removal
+
+      // Building demolition (small concrete/metal transmitter building)
+      const building_demo_low_usd  = 5000;
+      const building_demo_high_usd = 15000;
+
+      // Site grading, seeding, and restoration to natural grade
+      const site_restoration_low_usd  = 3000;
+      const site_restoration_high_usd = 10000;
+
+      // FCC/FAA notifications: no fee, but legal/engineering time (~$500–$1,500)
+      const regulatory_notification_usd = 1000;
+
+      // Total decommissioning cost (before salvage credit)
+      const total_demo_cost_low_usd  = tower_demo_cost_low_usd  + building_demo_low_usd
+                                      + site_restoration_low_usd + regulatory_notification_usd;
+      const total_demo_cost_high_usd = tower_demo_cost_high_usd + radial_removal_high_usd
+                                      + building_demo_high_usd  + site_restoration_high_usd
+                                      + regulatory_notification_usd;
+
+      // Net cost after salvage (best case)
+      const net_demo_cost_low_usd  = Math.max(0, total_demo_cost_low_usd  - salvage_high_usd);
+      const net_demo_cost_high_usd = Math.max(0, total_demo_cost_high_usd - salvage_low_usd);
+
+      return {
+        fcc_class,
+        tower_demo_ft,
+        tower_demo_m,
+        tower_steel_tons_est,
+        tower_demo_cost_low_usd,
+        tower_demo_cost_high_usd,
+        salvage_low_usd,
+        salvage_high_usd,
+        radial_removal_low_usd,
+        radial_removal_high_usd,
+        building_demo_low_usd,
+        building_demo_high_usd,
+        site_restoration_low_usd,
+        site_restoration_high_usd,
+        regulatory_notification_usd,
+        total_demo_cost_low_usd,
+        total_demo_cost_high_usd,
+        net_demo_cost_low_usd,
+        net_demo_cost_high_usd,
+        reference: '47 CFR §17.50 (ASR cancellation); FAA Form 7460-1 (notice of removal — required within 5 days of completion); 47 CFR §17.58 (notification requirements); OSHA 29 CFR §1926.502 (fall protection during demolition); EPA RCRA §6002 (steel recycling)',
+        note: `Site decommissioning: ${tower_demo_ft} ft guyed tower (Class ${fcc_class}, ${frequency_khz} kHz). Tower demolition: $${tower_demo_cost_low_usd.toLocaleString()}–$${tower_demo_cost_high_usd.toLocaleString()} (≈${tower_steel_tons_est} tons steel, salvage $${salvage_low_usd.toLocaleString()}–$${salvage_high_usd.toLocaleString()}). Total: $${total_demo_cost_low_usd.toLocaleString()}–$${total_demo_cost_high_usd.toLocaleString()}. Net (after salvage): $${net_demo_cost_low_usd.toLocaleString()}–$${net_demo_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

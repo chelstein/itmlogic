@@ -11393,6 +11393,51 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_tower_decommissioning_and_site_remediation_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_decommissioning_and_site_remediation_guide missing');
+  assert.ok(typeof g.tower_demo_cost_low_usd === 'number', 'tower_demo_cost_low_usd should be a number');
+  assert.ok(typeof g.total_demo_cost_low_usd === 'number', 'total_demo_cost_low_usd should be a number');
+});
+
+test('am_tower_decommissioning_and_site_remediation_guide KAZM tower demolition', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
+  assert.strictEqual(g.tower_demo_ft,           315,   'KAZM 780 kHz Class D tower should be 315 ft');
+  assert.strictEqual(g.tower_steel_tons_est,    22,    '315 ft tower ≈ 22 tons of steel');
+  assert.strictEqual(g.tower_demo_cost_low_usd, 15750, '315 ft × $50/ft = $15,750 demolition low');
+});
+
+test('am_tower_decommissioning_and_site_remediation_guide KAZM salvage and total', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
+  assert.strictEqual(g.salvage_high_usd,       5280,  '22 tons × 2000 lb × $0.12/lb = $5,280 salvage high');
+  assert.strictEqual(g.total_demo_cost_low_usd, 24750, 'Total decommissioning low should be $24,750');
+  assert.ok(g.total_demo_cost_high_usd > g.total_demo_cost_low_usd, 'High cost must exceed low');
+});
+
+test('am_tower_decommissioning_and_site_remediation_guide KAZM net cost after salvage', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;
+  assert.strictEqual(g.net_demo_cost_low_usd, 19470, 'Net demo cost low (24750 - 5280) should be $19,470');
+  assert.ok(g.net_demo_cost_high_usd >= 0, 'Net cost should be non-negative (no salvage windfall)');
+  assert.ok(g.net_demo_cost_high_usd > g.net_demo_cost_low_usd, 'Net high must exceed net low');
+});
+
+test('am_tower_decommissioning_and_site_remediation_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('demo_tower_cost_low_usd' in row, 'demo_tower_cost_low_usd missing from comparison table');
+    assert.ok('demo_total_low_usd'      in row, 'demo_total_low_usd missing from comparison table');
+    assert.ok('demo_salvage_value_usd'  in row, 'demo_salvage_value_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.demo_tower_cost_low_usd, 15750, 'rank-1 demo_tower_cost_low_usd should be $15,750');
+  assert.strictEqual(r0.demo_total_low_usd,      24750, 'rank-1 demo_total_low_usd should be $24,750');
+  assert.strictEqual(r0.demo_salvage_value_usd,  5280,  'rank-1 demo_salvage_value_usd should be $5,280');
+});
+
 test('am_ground_system_resistance_and_maintenance_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_ground_system_resistance_and_maintenance_guide;

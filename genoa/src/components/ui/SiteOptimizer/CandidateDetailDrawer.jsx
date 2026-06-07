@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Decommissioning and Site Remediation Guide */}
+        {candidate.am_tower_decommissioning_and_site_remediation_guide && (() => {
+          const g = candidate.am_tower_decommissioning_and_site_remediation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="demo-guide" style={{ marginBottom: 16, padding: 12, background: '#f4f4f5', borderRadius: 8, border: '2px solid #52525b' }}>
+              <div style={{ fontWeight: 700, color: '#18181b', marginBottom: 6, fontSize: 13 }}>Site Decommissioning &amp; Remediation (Current Tower)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3f3f46' }}>
+                <span style={{ color: '#71717a' }}>Tower Height:</span><span>{g.tower_demo_ft} ft ≈ {g.tower_steel_tons_est} tons steel</span>
+                <span style={{ color: '#71717a' }}>Tower Demolition:</span><span>{fmt(g.tower_demo_cost_low_usd)} – {fmt(g.tower_demo_cost_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Steel Salvage:</span><span>{fmt(g.salvage_low_usd)} – {fmt(g.salvage_high_usd)} (credit)</span>
+                <span style={{ color: '#71717a' }}>Building Demo:</span><span>{fmt(g.building_demo_low_usd)} – {fmt(g.building_demo_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Site Restoration:</span><span>{fmt(g.site_restoration_low_usd)} – {fmt(g.site_restoration_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Total (gross):</span><span>{fmt(g.total_demo_cost_low_usd)} – {fmt(g.total_demo_cost_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Net (after salvage):</span><span>{fmt(g.net_demo_cost_low_usd)} – {fmt(g.net_demo_cost_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#52525b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Ground System Resistance and Maintenance Guide */}
         {candidate.am_ground_system_resistance_and_maintenance_guide && (() => {
           const g = candidate.am_ground_system_resistance_and_maintenance_guide;

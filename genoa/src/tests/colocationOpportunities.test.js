@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_tower_decommissioning_and_site_remediation_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tower_decommissioning_and_site_remediation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_decommissioning_and_site_remediation_guide missing`);
+    assert.ok(g.tower_demo_ft > 0, `rank ${c.rank}: tower_demo_ft must be positive`);
+    assert.ok(g.total_demo_cost_low_usd > 0, `rank ${c.rank}: total_demo_cost_low_usd must be positive`);
+    assert.ok(g.net_demo_cost_high_usd >= 0, `rank ${c.rank}: net_demo_cost_high_usd must be non-negative`);
+  }
+});
+
 test('am_ground_system_resistance_and_maintenance_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {
