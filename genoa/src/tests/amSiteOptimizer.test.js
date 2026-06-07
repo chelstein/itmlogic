@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_insurance_and_bonding_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_bonding_guide;
+  assert.ok(g !== undefined && g !== null, 'am_insurance_and_bonding_guide missing');
+  assert.ok(g.annual_total_ins_low_usd > 0, 'annual_total_ins_low_usd must be positive');
+  assert.ok(g.surety_bond_low_usd > 0, 'surety_bond_low_usd must be positive');
+});
+
+test('am_insurance_and_bonding_guide KAZM annual insurance costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_bonding_guide;
+  assert.strictEqual(g.annual_tower_ins_low_usd,  2000, 'KAZM annual_tower_ins_low_usd should be $2,000');
+  assert.strictEqual(g.annual_eo_ins_low_usd,     1000, 'annual_eo_ins_low_usd should be $1,000');
+  assert.strictEqual(g.annual_total_ins_low_usd,  3000, 'KAZM annual_total_ins_low_usd should be $3,000');
+});
+
+test('am_insurance_and_bonding_guide KAZM surety bond', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_bonding_guide;
+  assert.strictEqual(g.surety_bond_pct,      0.10,  'surety_bond_pct should be 0.10 (10%)');
+  assert.strictEqual(g.surety_bond_low_usd,  8000,  'KAZM surety_bond_low_usd should be $8,000');
+  assert.strictEqual(g.surety_bond_high_usd, 25000, 'KAZM surety_bond_high_usd should be $25,000');
+});
+
+test('am_insurance_and_bonding_guide KAZM workers compensation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_insurance_and_bonding_guide;
+  assert.strictEqual(g.wc_during_construction_low_usd,  6400,  'KAZM wc_during_construction_low_usd should be $6,400');
+  assert.strictEqual(g.wc_during_construction_high_usd, 20000, 'KAZM wc_during_construction_high_usd should be $20,000');
+});
+
+test('am_insurance_and_bonding_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ins_annual_total_low_usd'   in row, 'ins_annual_total_low_usd missing from comparison table');
+    assert.ok('ins_surety_bond_low_usd'    in row, 'ins_surety_bond_low_usd missing from comparison table');
+    assert.ok('ins_wc_construction_low_usd' in row, 'ins_wc_construction_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ins_annual_total_low_usd,   3000, 'rank-1 ins_annual_total_low_usd should be $3,000');
+  assert.strictEqual(r0.ins_surety_bond_low_usd,    8000, 'rank-1 ins_surety_bond_low_usd should be $8,000');
+  assert.strictEqual(r0.ins_wc_construction_low_usd, 6400, 'rank-1 ins_wc_construction_low_usd should be $6,400');
+});
+
 test('am_studio_transmitter_link_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_studio_transmitter_link_guide;

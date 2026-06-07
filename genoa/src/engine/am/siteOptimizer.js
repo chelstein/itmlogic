@@ -1227,7 +1227,10 @@ export async function runSiteOptimizer(body = {}){
     sch_pm_cost_low_usd:        c.am_construction_project_schedule_and_management_guide?.pm_cost_low_usd ?? null,
     stl_type:                   c.am_studio_transmitter_link_guide?.stl_type ?? null,
     stl_setup_low_usd:          c.am_studio_transmitter_link_guide?.total_stl_setup_low_usd ?? null,
-    stl_annual_internet_low_usd: c.am_studio_transmitter_link_guide?.annual_internet_low_usd ?? null
+    stl_annual_internet_low_usd: c.am_studio_transmitter_link_guide?.annual_internet_low_usd ?? null,
+    ins_annual_total_low_usd:   c.am_insurance_and_bonding_guide?.annual_total_ins_low_usd ?? null,
+    ins_surety_bond_low_usd:    c.am_insurance_and_bonding_guide?.surety_bond_low_usd ?? null,
+    ins_wc_construction_low_usd: c.am_insurance_and_bonding_guide?.wc_during_construction_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6962,6 +6965,60 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_insurance_and_bonding_guide: (() => {
+      // AM tower insurance covers property/casualty, liability, and E&O.
+      // Construction surety bond protects the owner if contractor defaults.
+      // Workers' comp is required during tower erection and ground system installation.
+      const wavelength_m   = round2(300000 / frequency_khz);
+      const is_cd = /^[CD]$/i.test(fcc_class);
+      const tower_height_m  = round2(is_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_ft = round2(tower_height_m * 3.28084);
+
+      // Annual tower property and liability insurance (scales with tower height and power)
+      const annual_tower_ins_low_usd  = tpo_kw >= 50 ? 6000  : tpo_kw >= 10 ? 4000  : 2000;
+      const annual_tower_ins_high_usd = tpo_kw >= 50 ? 20000 : tpo_kw >= 10 ? 10000 : 5000;
+
+      // Broadcast errors & omissions (E&O) insurance: protects against content liability
+      const annual_eo_ins_low_usd  = 1000;
+      const annual_eo_ins_high_usd = 4000;
+
+      // Total annual insurance
+      const annual_total_ins_low_usd  = round2(annual_tower_ins_low_usd  + annual_eo_ins_low_usd);
+      const annual_total_ins_high_usd = round2(annual_tower_ins_high_usd + annual_eo_ins_high_usd);
+
+      // Construction surety bond (10% of estimated construction contract value)
+      const est_construction_low  = tpo_kw >= 50 ? 500000 : tpo_kw >= 10 ? 200000 : 80000;
+      const est_construction_high = tpo_kw >= 50 ? 1500000 : tpo_kw >= 10 ? 600000 : 250000;
+      const surety_bond_pct = 0.10;
+      const surety_bond_low_usd  = round2(est_construction_low  * surety_bond_pct);
+      const surety_bond_high_usd = round2(est_construction_high * surety_bond_pct);
+
+      // Workers' compensation during construction (15–25% of labor costs; ~40% of construction is labor)
+      const wc_pct_of_construction = 0.08; // ~20% wc rate × ~40% labor fraction
+      const wc_during_construction_low_usd  = round2(est_construction_low  * wc_pct_of_construction);
+      const wc_during_construction_high_usd = round2(est_construction_high * wc_pct_of_construction);
+
+      return {
+        tpo_kw,
+        fcc_class,
+        tower_height_ft,
+        annual_tower_ins_low_usd,
+        annual_tower_ins_high_usd,
+        annual_eo_ins_low_usd,
+        annual_eo_ins_high_usd,
+        annual_total_ins_low_usd,
+        annual_total_ins_high_usd,
+        surety_bond_pct,
+        surety_bond_low_usd,
+        surety_bond_high_usd,
+        wc_pct_of_construction,
+        wc_during_construction_low_usd,
+        wc_during_construction_high_usd,
+        reference: 'NAIC broadcast tower insurance underwriting guidelines; SBA surety bond requirements; OSHA workers\' compensation standards',
+        note: `${tower_height_ft} ft ${fcc_class}-class tower: annual ins $${annual_total_ins_low_usd.toLocaleString()}–$${annual_total_ins_high_usd.toLocaleString()}/yr (tower + E&O); construction surety bond ${surety_bond_pct * 100}% = $${surety_bond_low_usd.toLocaleString()}–$${surety_bond_high_usd.toLocaleString()}; workers' comp during construction $${wc_during_construction_low_usd.toLocaleString()}–$${wc_during_construction_high_usd.toLocaleString()}`
       };
     })(),
 

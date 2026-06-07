@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Insurance and Bonding Guide */}
+        {candidate.am_insurance_and_bonding_guide && (() => {
+          const g = candidate.am_insurance_and_bonding_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ins-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #b45309' }}>
+              <div style={{ fontWeight: 700, color: '#451a03', marginBottom: 6, fontSize: 13 }}>Insurance &amp; Bonding</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span style={{ color: '#b45309' }}>Tower Ins. (annual):</span><span>{fmt(g.annual_tower_ins_low_usd)} – {fmt(g.annual_tower_ins_high_usd)}/yr</span>
+                <span style={{ color: '#b45309' }}>E&amp;O Ins. (annual):</span><span>{fmt(g.annual_eo_ins_low_usd)} – {fmt(g.annual_eo_ins_high_usd)}/yr</span>
+                <span style={{ color: '#b45309' }}>Total Annual Ins.:</span><span style={{ fontWeight: 600 }}>{fmt(g.annual_total_ins_low_usd)} – {fmt(g.annual_total_ins_high_usd)}/yr</span>
+                <span style={{ color: '#b45309' }}>Surety Bond ({(g.surety_bond_pct * 100).toFixed(0)}%):</span><span>{fmt(g.surety_bond_low_usd)} – {fmt(g.surety_bond_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Workers' Comp (construction):</span><span>{fmt(g.wc_during_construction_low_usd)} – {fmt(g.wc_during_construction_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Tower Height:</span><span>{g.tower_height_ft} ft Class {g.fcc_class}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#78350f' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Studio-Transmitter Link Guide */}
         {candidate.am_studio_transmitter_link_guide && (() => {
           const g = candidate.am_studio_transmitter_link_guide;
