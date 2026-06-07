@@ -2226,6 +2226,44 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Directional Antenna Phase and Ratio Verification Guide */}
+        {candidate.am_directional_antenna_phase_and_ratio_verification_guide && (() => {
+          const g = candidate.am_directional_antenna_phase_and_ratio_verification_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="dav-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: `2px solid ${g.is_da_station ? '#4338ca' : '#6b7280'}` }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>DA Phase &amp; Ratio Verification — §73.68 / §73.154</div>
+              {!g.is_da_station ? (
+                <div style={{ fontSize: 12, color: '#4b5563', padding: '6px 0' }}>
+                  NDA station — no DA phase/ratio monitoring required. DA-specific compliance cost: <strong>$0</strong>.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#1e1b4b', marginBottom: 8 }}>
+                    <span style={{ color: '#4338ca' }}>Pattern mode:</span><span style={{ fontWeight: 700 }}>{g.pattern_mode}</span>
+                    <span style={{ color: '#4338ca' }}>Phase tolerance:</span><span>±{g.phase_tolerance_deg}° (§73.68(a))</span>
+                    <span style={{ color: '#4338ca' }}>Ratio tolerance:</span><span>±{g.ratio_tolerance_pct}% (§73.61(b))</span>
+                    <span style={{ color: '#4338ca' }}>Proof radials:</span><span>{g.proof_radials} (§73.154(a))</span>
+                    <span style={{ color: '#4338ca' }}>Emergency NDA:</span><span>≤{g.emergency_nda_days} days (§73.68(c))</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#1e1b4b', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                    <span style={{ color: '#4338ca' }}>Phase/ratio monitor:</span><span>${fmt(g.monitor_low_usd)} – ${fmt(g.monitor_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>Monitor calibration:</span><span>${fmt(g.calibration_low_usd)} – ${fmt(g.calibration_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>Proof of performance:</span><span>${fmt(g.proof_low_usd)} – ${fmt(g.proof_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>Pattern design:</span><span>${fmt(g.design_low_usd)} – ${fmt(g.design_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>FCC DA amendment:</span><span>${fmt(g.amendment_low_usd)} – ${fmt(g.amendment_high_usd)}</span>
+                  </div>
+                  <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #c7d2fe', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span style={{ color: '#4338ca', fontWeight: 600 }}>Total DA compliance:</span>
+                    <span style={{ color: '#1e1b4b', fontWeight: 700 }}>${fmt(g.total_da_low_usd)} – ${fmt(g.total_da_high_usd)}</span>
+                  </div>
+                </>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#6366f1' }}>Ref: 47 CFR §73.55, §73.61(b), §73.68, §73.154(a), §73.316(b)</div>
+            </div>
+          );
+        })()}
+
         {/* AM Antenna Insulator and Base Voltage Protection Guide */}
         {candidate.am_antenna_insulator_and_base_voltage_protection_guide && (() => {
           const g = candidate.am_antenna_insulator_and_base_voltage_protection_guide;

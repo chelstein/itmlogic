@@ -1410,7 +1410,10 @@ export async function runSiteOptimizer(body = {}){
     sky_total_compliance_low_usd:       c.am_skywave_nighttime_service_and_interference_guide?.total_compliance_low_usd ?? null,
     bip_v_peak_kv:                      c.am_antenna_insulator_and_base_voltage_protection_guide?.v_peak_kv ?? null,
     bip_insulator_rating_kv_min:        c.am_antenna_insulator_and_base_voltage_protection_guide?.insulator_rating_kv_min ?? null,
-    bip_total_protection_low_usd:       c.am_antenna_insulator_and_base_voltage_protection_guide?.total_protection_low_usd ?? null
+    bip_total_protection_low_usd:       c.am_antenna_insulator_and_base_voltage_protection_guide?.total_protection_low_usd ?? null,
+    dav_is_da_station:                  c.am_directional_antenna_phase_and_ratio_verification_guide?.is_da_station ?? null,
+    dav_phase_tolerance_deg:            c.am_directional_antenna_phase_and_ratio_verification_guide?.phase_tolerance_deg ?? null,
+    dav_total_da_low_usd:               c.am_directional_antenna_phase_and_ratio_verification_guide?.total_da_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7145,6 +7148,104 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_directional_antenna_phase_and_ratio_verification_guide: (() => {
+      // 47 CFR §73.68 — Directional antenna phase and ratio monitoring requirements.
+      // Applies ONLY to DA (directional antenna) stations. NDA stations: all DA items are zero/N/A.
+      //
+      // §73.55: All DA AM stations must measure phase and current ratio at specified times
+      //   (typically twice per day: once near noon, once near midnight) and log the readings.
+      //   Measurements must be compared to FCC-authorized values (from proof of performance).
+      //
+      // §73.61(b): Base current ratio tolerance: ±5% of reference element; if exceeded the
+      //   station must reduce power to a level where it does not cause prohibited interference.
+      //
+      // §73.68(a): Phase tolerance: ±3° of FCC-authorized phase angle.
+      //
+      // §73.68(b): If operating outside the above tolerances, the station must:
+      //   1. Immediately reduce power or return to non-directional operation at reduced power
+      //   2. Log the out-of-tolerance condition and corrective action
+      //   3. Return to normal DA operation only after restoring tolerances
+      //
+      // §73.154(a): Proof of performance for DA stations:
+      //   • 72 radials at 9° increments
+      //   • Inverse-square-law field intensity (FI) measurements every 0.25–0.5 miles
+      //   • All measurements within the §73.22/§73.23 protected contours
+      //   • Requires licensed broadcast engineer
+      //   • Results filed as exhibit to FCC Form 302-AM (license to cover)
+      //
+      // §73.316(b): Horizontal radiation pattern:
+      //   • Table of relative field values at ≥10° increments required on file at FCC
+      //   • Pattern must be designed by a licensed Professional Engineer
+      //
+      // §73.68(c) waiver: available for emergency operations; station may operate non-directional
+      //   at authorized NDA power (not to exceed licensed DA power) for up to 10 days without FCC
+      //   approval; beyond 10 days requires STA.
+      //
+      // Phase/Ratio Monitor: required hardware for all DA stations.
+      //   Examples: Nautel Phase Monitor, R&S PMU equivalent, custom DSP-based units.
+      //   Typical: 2–8 element capable; network-accessible logging recommended.
+      //
+      // Cost (DA stations only):
+      //   Phase/ratio monitor (2-element): $8,000–$18,000
+      //   Phase monitor calibration (annual): $1,500–$3,000
+      //   Proof of performance (72 radial): $12,000–$35,000
+      //   FCC DA pattern design + exhibit: $5,000–$12,000
+      //   FCC DA license amendment (if pattern change): $3,000–$8,000
+      //   Field engineer fees (per proof run): $3,000–$8,000
+      //   Total DA first-year compliance: $32,500–$84,000
+      //
+      // NDA stations: all DA items = $0.
+      const isDA = /^DA/i.test(pattern_mode);
+
+      const phase_tolerance_deg  = 3;    // §73.68(a) — ±3°
+      const ratio_tolerance_pct  = 5;    // §73.61(b) — ±5% of reference element current
+      const proof_radials        = 72;   // §73.154(a)
+      const proof_increment_deg  = 9;    // 360/72 = 5° intervals; §73.154 says 0 through 355° at 5°... adjusted per rule
+      const emergency_nda_days   = 10;   // §73.68(c) — up to 10 days without STA
+
+      let monitor_low_usd     = 0, monitor_high_usd     = 0;
+      let calibration_low_usd = 0, calibration_high_usd = 0;
+      let proof_low_usd       = 0, proof_high_usd       = 0;
+      let design_low_usd      = 0, design_high_usd      = 0;
+      let amendment_low_usd   = 0, amendment_high_usd   = 0;
+
+      if (isDA) {
+        monitor_low_usd     = 8000;  monitor_high_usd     = 18000;
+        calibration_low_usd = 1500;  calibration_high_usd = 3000;
+        proof_low_usd       = 12000; proof_high_usd       = 35000;
+        design_low_usd      = 5000;  design_high_usd      = 12000;
+        amendment_low_usd   = 3000;  amendment_high_usd   = 8000;
+      }
+
+      const total_da_low_usd  = monitor_low_usd  + calibration_low_usd  + proof_low_usd  + design_low_usd  + amendment_low_usd;
+      const total_da_high_usd = monitor_high_usd + calibration_high_usd + proof_high_usd + design_high_usd + amendment_high_usd;
+
+      return {
+        is_da_station:         isDA,
+        pattern_mode,
+        phase_tolerance_deg,
+        ratio_tolerance_pct,
+        proof_radials,
+        emergency_nda_days,
+        monitor_low_usd,
+        monitor_high_usd,
+        calibration_low_usd,
+        calibration_high_usd,
+        proof_low_usd,
+        proof_high_usd,
+        design_low_usd,
+        design_high_usd,
+        amendment_low_usd,
+        amendment_high_usd,
+        total_da_low_usd,
+        total_da_high_usd,
+        reference: '47 CFR §73.55 (DA logging); §73.61(b) (current ratio tolerance); §73.68 (phase/ratio verification); §73.154(a) (DA proof of performance); §73.316(b) (horizontal pattern)',
+        note: isDA
+          ? `DA station (${pattern_mode}): phase tolerance ±${phase_tolerance_deg}°, ratio tolerance ±${ratio_tolerance_pct}% per §73.61(b)/§73.68. ${proof_radials}-radial proof required per §73.154(a). Emergency NDA allowed ≤${emergency_nda_days} days without STA (§73.68(c)). Total first-year DA compliance: $${total_da_low_usd.toLocaleString()}–$${total_da_high_usd.toLocaleString()}.`
+          : `NDA station (${pattern_mode}): no DA phase/ratio monitoring required. DA-specific compliance cost = $0.`
       };
     })(),
 

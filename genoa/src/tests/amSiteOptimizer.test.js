@@ -14859,3 +14859,39 @@ it('candidate_comparison_table bip columns are present and valid for KAZM', asyn
   assert.ok(r0.bip_insulator_rating_kv_min >= 15, 'bip_insulator_rating_kv_min must be ≥ 15 kV');
   assert.ok(r0.bip_total_protection_low_usd > 0, 'bip_total_protection_low_usd must be positive');
 });
+
+it('am_directional_antenna_phase_and_ratio_verification_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_directional_antenna_phase_and_ratio_verification_guide, `candidate missing am_directional_antenna_phase_and_ratio_verification_guide`);
+  }
+});
+
+it('am_directional_antenna_phase_and_ratio_verification_guide NDA station has total_da_low_usd = 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_directional_antenna_phase_and_ratio_verification_guide;
+  assert.strictEqual(g.is_da_station, false, 'KAZM NDA should not be a DA station');
+  assert.strictEqual(g.total_da_low_usd, 0, 'NDA station has zero DA-specific compliance cost');
+});
+
+it('am_directional_antenna_phase_and_ratio_verification_guide phase_tolerance_deg is ±3° per §73.68', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_directional_antenna_phase_and_ratio_verification_guide;
+  assert.strictEqual(g.phase_tolerance_deg, 3, '§73.68(a) phase tolerance is ±3°');
+  assert.strictEqual(g.ratio_tolerance_pct, 5, '§73.61(b) current ratio tolerance is ±5%');
+});
+
+it('am_directional_antenna_phase_and_ratio_verification_guide DA station has total_da_low_usd > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const g = out.candidates[0].am_directional_antenna_phase_and_ratio_verification_guide;
+  assert.strictEqual(g.is_da_station, true, 'DA-D station should be detected as DA');
+  assert.ok(g.total_da_low_usd > 0, 'DA station must have positive DA compliance cost');
+});
+
+it('candidate_comparison_table dav columns are present and valid for KAZM NDA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.dav_is_da_station, false, 'dav_is_da_station must be false for NDA');
+  assert.strictEqual(r0.dav_phase_tolerance_deg, 3, 'dav_phase_tolerance_deg must be 3');
+  assert.strictEqual(r0.dav_total_da_low_usd, 0, 'dav_total_da_low_usd must be 0 for NDA');
+});

@@ -3701,3 +3701,20 @@ test('colocation candidates include am_antenna_insulator_and_base_voltage_protec
     assert.ok(g.insulator_margin_ratio > 1, 'insulator must be rated above V_peak');
   }
 });
+
+test('colocation candidates include am_directional_antenna_phase_and_ratio_verification_guide (NDA = zero DA cost)', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_directional_antenna_phase_and_ratio_verification_guide;
+    assert.ok(g, `candidate missing am_directional_antenna_phase_and_ratio_verification_guide`);
+    assert.strictEqual(g.is_da_station, false, 'KAZM NDA should not be DA');
+    assert.strictEqual(g.total_da_low_usd, 0, 'NDA station DA compliance cost must be 0');
+    assert.strictEqual(g.phase_tolerance_deg, 3, '§73.68(a) phase tolerance = ±3°');
+  }
+});
