@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Guy Wire and Anchor System Guide */}
+        {candidate.am_tower_guy_wire_and_anchor_system_guide && (() => {
+          const g = candidate.am_tower_guy_wire_and_anchor_system_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="gwy-guide" style={{ marginBottom: 16, padding: 12, background: '#fef8ee', borderRadius: 8, border: '2px solid #c05621' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Guy Wire &amp; Anchor System</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Guy levels:</span><span>{g.num_guy_levels ?? '—'}</span>
+                <span>Total anchors:</span><span>{g.num_total_anchors ?? '—'}</span>
+                <span>Guy wire:</span><span>{fmt(g.guy_wire_low_usd)} – {fmt(g.guy_wire_high_usd)}</span>
+                <span>Anchors:</span><span>{fmt(g.anchor_low_usd)} – {fmt(g.anchor_high_usd)}</span>
+                <span>RF insulators:</span><span>{fmt(g.insulator_low_usd)} – {fmt(g.insulator_high_usd)}</span>
+                <span>Install labor:</span><span>{fmt(g.install_low_usd)} – {fmt(g.install_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#d97706', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Financial Feasibility and ROI Guide */}
         {candidate.am_financial_feasibility_and_roi_guide && (() => {
           const g = candidate.am_financial_feasibility_and_roi_guide;

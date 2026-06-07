@@ -3049,3 +3049,14 @@ test('am_financial_feasibility_and_roi_guide present across colocation candidate
     assert.ok(g.simple_payback_years_low > 0, `rank ${c.rank}: payback_years_low must be positive`);
   }
 });
+
+test('am_tower_guy_wire_and_anchor_system_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tower_guy_wire_and_anchor_system_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_guy_wire_and_anchor_system_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.num_total_anchors >= 9, `rank ${c.rank}: num_total_anchors must be >= 9`);
+    assert.ok([3,4].includes(g.num_guy_levels), `rank ${c.rank}: num_guy_levels should be 3 or 4`);
+  }
+});

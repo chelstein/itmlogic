@@ -13013,3 +13013,49 @@ test('am_financial_feasibility_and_roi_guide comparison table columns present', 
   assert.strictEqual(r0.fin_total_capital_high_usd, 510000, 'rank-1 fin_total_capital_high should be $510,000');
   assert.strictEqual(r0.fin_payback_years_low,       0.3,   'rank-1 fin_payback_years_low should be 0.3');
 });
+
+test('am_tower_guy_wire_and_anchor_system_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_guy_wire_and_anchor_system_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM guy wire system configuration (315 ft tower)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
+  assert.strictEqual(g.tower_height_ft,       315.26, 'KAZM 780 kHz Class D tower should be 315.26 ft');
+  assert.strictEqual(g.num_guy_levels,        3,      '315 ft tower should have 3 guy levels');
+  assert.strictEqual(g.num_anchors_per_level, 3,      'should have 3 anchors per level');
+  assert.strictEqual(g.num_total_anchors,     9,      '3 levels × 3 = 9 total anchors');
+});
+
+test('KAZM guy wire cost components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
+  assert.strictEqual(g.guy_wire_low_usd,  2837.34, 'guy_wire_low should be $2,837.34');
+  assert.strictEqual(g.anchor_low_usd,    18000,   'anchor_low = 9 × $2,000 = $18,000');
+  assert.strictEqual(g.insulator_low_usd, 4500,    'insulator_low = 9 × $500 = $4,500');
+  assert.strictEqual(g.install_low_usd,   15763,   'install_low = 315.26 × 50 = $15,763');
+});
+
+test('KAZM guy wire system total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_guy_wire_and_anchor_system_guide;
+  assert.strictEqual(g.total_low_usd,  41100.34,  'total_low should be $41,100.34');
+  assert.strictEqual(g.total_high_usd, 127801.02, 'total_high should be $127,801.02');
+});
+
+test('am_tower_guy_wire_and_anchor_system_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gwy_num_total_anchors' in row, 'gwy_num_total_anchors missing from comparison table');
+    assert.ok('gwy_total_low_usd'     in row, 'gwy_total_low_usd missing from comparison table');
+    assert.ok('gwy_tower_height_ft'   in row, 'gwy_tower_height_ft missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.gwy_num_total_anchors, 9,         'rank-1 gwy_num_total_anchors should be 9');
+  assert.strictEqual(r0.gwy_total_low_usd,     41100.34,  'rank-1 gwy_total_low_usd should be $41,100.34');
+  assert.strictEqual(r0.gwy_tower_height_ft,   315.26,    'rank-1 gwy_tower_height_ft should be 315.26');
+});
