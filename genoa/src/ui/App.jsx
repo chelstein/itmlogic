@@ -227,13 +227,15 @@ function AuthedRouter({ onLogout }){
   const path = useRoute();
   if (path === ROUTE_MAP){
     return (
-      <React.Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-black font-mono text-textDim text-[12px] tracking-rack uppercase">
-          Loading map…
-        </div>
-      }>
-        <MapPage authed onNavigate={navigateTo} onLogout={onLogout} />
-      </React.Suspense>
+      <RouteErrorBoundary label="Live Map" onReset={() => navigateTo('/')}>
+        <React.Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-black font-mono text-textDim text-[12px] tracking-rack uppercase">
+            Loading map…
+          </div>
+        }>
+          <MapPage authed onNavigate={navigateTo} onLogout={onLogout} />
+        </React.Suspense>
+      </RouteErrorBoundary>
     );
   }
   if (path === ROUTE_OPTIMIZER){
