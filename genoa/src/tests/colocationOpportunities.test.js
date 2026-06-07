@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_noise_floor_and_rf_environment_analysis_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_noise_floor_and_rf_environment_analysis_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_noise_floor_and_rf_environment_analysis_guide missing`);
+    assert.ok(g.fa_atmospheric_db > 0, `rank ${c.rank}: fa_atmospheric_db must be positive`);
+    assert.ok(g.noise_score >= 0 && g.noise_score <= 100, `rank ${c.rank}: noise_score must be 0-100`);
+    assert.ok(['low','medium','high'].includes(g.interference_risk), `rank ${c.rank}: interference_risk must be low/medium/high`);
+  }
+});
+
 test('am_phase_i_environmental_site_assessment_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

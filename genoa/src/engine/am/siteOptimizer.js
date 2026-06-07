@@ -1170,7 +1170,10 @@ export async function runSiteOptimizer(body = {}){
     fca_total_app_low_usd:      c.am_fcc_application_engineering_report_guide?.total_application_low_usd ?? null,
     esa_phase1_cost_low_usd:    c.am_phase_i_environmental_site_assessment_guide?.phase1_cost_low_usd ?? null,
     esa_rec_probability_pct:    c.am_phase_i_environmental_site_assessment_guide?.rec_probability_pct ?? null,
-    esa_total_high_usd:         c.am_phase_i_environmental_site_assessment_guide?.total_esa_high_usd ?? null
+    esa_total_high_usd:         c.am_phase_i_environmental_site_assessment_guide?.total_esa_high_usd ?? null,
+    nf_fa_atmospheric_db:       c.am_noise_floor_and_rf_environment_analysis_guide?.fa_atmospheric_db ?? null,
+    nf_land_use_class:          c.am_noise_floor_and_rf_environment_analysis_guide?.land_use_noise_class ?? null,
+    nf_interference_risk:       c.am_noise_floor_and_rf_environment_analysis_guide?.interference_risk ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6905,6 +6908,64 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_noise_floor_and_rf_environment_analysis_guide: (() => {
+      // ITU-R P.372-15 ambient noise analysis for AM broadcast band candidates.
+      // Quantifies atmospheric and man-made noise at each candidate site.
+      // Quieter RF environment → better SNR margin and effective coverage area.
+
+      // ITU-R P.372 atmospheric noise figure (Fa) — temperate/subtropical daytime model
+      // Approximate: Fa(dB) ≈ 53 − 28 log10(f_MHz) (Curve D, daytime, summer)
+      const f_mhz_nf = round2(frequency_khz / 1000);
+      const fa_atmospheric_db = Math.round(53 - 28 * Math.log10(f_mhz_nf));
+
+      // Man-made noise figure by inferred land use (ITU-R P.372 Table 1)
+      // Use distance from current site as a proxy for rural vs urban character.
+      // >20 km from current site (which is typically in/near town): likely rural
+      // 8-20 km: suburban/agricultural edge
+      // <8 km: urban edge / mixed-use
+      const dist_nf_km = pt.distance_from_current_km ?? 0;
+      const land_use_noise_class = dist_nf_km > 20 ? 'rural'
+        : dist_nf_km > 8 ? 'suburban'
+        : 'urban_edge';
+      const fa_man_made_db = land_use_noise_class === 'rural' ? 20
+        : land_use_noise_class === 'suburban' ? 32
+        : 40;
+
+      // Total noise figure: dominant component (atmospheric vs man-made)
+      const fa_total_db = Math.max(fa_atmospheric_db, fa_man_made_db);
+
+      // Noise floor in dBμV/m for 10 kHz AM bandwidth (standard AM channel)
+      // Noise floor ≈ Fa − 103.4 + 10·log10(BW_kHz)
+      const bw_khz_nf = 10;
+      const noise_floor_db_uvm = Math.round(fa_total_db - 103.4 + 10 * Math.log10(bw_khz_nf));
+
+      // Site noise score 0–100 (100 = perfectly quiet rural, 0 = high-noise urban)
+      const noise_score = Math.max(0, Math.min(100, Math.round(100 - (fa_man_made_db - 20) * 2)));
+
+      const interference_risk = land_use_noise_class === 'rural' ? 'low'
+        : land_use_noise_class === 'suburban' ? 'medium'
+        : 'high';
+
+      // dB improvement in man-made noise vs worst-case urban (Fa_mm=40 dB)
+      const noise_reduction_vs_urban_db = Math.max(0, 40 - fa_man_made_db);
+
+      return {
+        frequency_khz,
+        f_mhz:                    f_mhz_nf,
+        fa_atmospheric_db,
+        fa_man_made_db,
+        fa_total_db,
+        land_use_noise_class,
+        noise_floor_db_uvm,
+        bw_khz:                   bw_khz_nf,
+        noise_score,
+        interference_risk,
+        noise_reduction_vs_urban_db,
+        reference: 'ITU-R P.372-15 §§5-7 (atmospheric and man-made radio noise); ITU-R P.372-15 Table 1 (noise figure categories: rural Fa=20 dB, suburban Fa=32 dB, urban Fa=46 dB); 47 CFR §73.44 (AM technical standards)',
+        note: `RF noise environment at ${round2(pt.lat)}°N / ${round2(pt.lon)}°W (${round2(dist_nf_km)} km from current site): classified ${land_use_noise_class}. Atmospheric Fa=${fa_atmospheric_db} dB, man-made Fa=${fa_man_made_db} dB (ITU-R P.372). Effective noise floor ≈${noise_floor_db_uvm} dBμV/m (${bw_khz_nf} kHz BW). Interference risk: ${interference_risk}. Noise score: ${noise_score}/100 (higher = quieter site).`
       };
     })(),
 

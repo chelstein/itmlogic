@@ -11393,6 +11393,53 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_noise_floor_and_rf_environment_analysis_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_rf_environment_analysis_guide;
+  assert.ok(g !== undefined && g !== null, 'am_noise_floor_and_rf_environment_analysis_guide missing');
+  assert.ok(typeof g.fa_atmospheric_db === 'number', 'fa_atmospheric_db should be a number');
+  assert.ok(typeof g.noise_score === 'number', 'noise_score should be a number');
+});
+
+test('am_noise_floor_and_rf_environment_analysis_guide KAZM atmospheric noise at 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_rf_environment_analysis_guide;
+  assert.strictEqual(g.fa_atmospheric_db, 56, '780 kHz atmospheric Fa should be 56 dB (ITU-R P.372)');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz should be 780');
+  assert.strictEqual(g.bw_khz, 10, 'AM bandwidth should be 10 kHz');
+});
+
+test('am_noise_floor_and_rf_environment_analysis_guide KAZM rank-1 site noise class', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_rf_environment_analysis_guide;
+  assert.strictEqual(g.land_use_noise_class, 'urban_edge', 'rank-1 (0 km) should be urban_edge');
+  assert.strictEqual(g.noise_score, 60, 'urban_edge noise score should be 60/100');
+  assert.strictEqual(g.interference_risk, 'high', 'urban_edge interference risk should be high');
+});
+
+test('am_noise_floor_and_rf_environment_analysis_guide KAZM rural candidate is quieter', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  const rural = out.candidates.find(c => c.am_noise_floor_and_rf_environment_analysis_guide.land_use_noise_class === 'rural');
+  assert.ok(rural !== undefined, 'At least one rural candidate expected at 50 km grid');
+  const g = rural.am_noise_floor_and_rf_environment_analysis_guide;
+  assert.strictEqual(g.noise_score, 100, 'Rural site should score 100/100');
+  assert.strictEqual(g.interference_risk, 'low', 'Rural site interference risk should be low');
+  assert.strictEqual(g.fa_man_made_db, 20, 'Rural man-made noise Fa should be 20 dB');
+});
+
+test('am_noise_floor_and_rf_environment_analysis_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('nf_fa_atmospheric_db' in row, 'nf_fa_atmospheric_db missing from comparison table');
+    assert.ok('nf_land_use_class'    in row, 'nf_land_use_class missing from comparison table');
+    assert.ok('nf_interference_risk' in row, 'nf_interference_risk missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.nf_fa_atmospheric_db, 56,           'rank-1 nf_fa_atmospheric_db should be 56');
+  assert.strictEqual(r0.nf_land_use_class,    'urban_edge', 'rank-1 nf_land_use_class should be urban_edge');
+  assert.strictEqual(r0.nf_interference_risk, 'high',       'rank-1 nf_interference_risk should be high');
+});
+
 test('am_phase_i_environmental_site_assessment_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_phase_i_environmental_site_assessment_guide;

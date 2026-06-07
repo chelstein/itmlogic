@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Noise Floor and RF Environment Analysis Guide */}
+        {candidate.am_noise_floor_and_rf_environment_analysis_guide && (() => {
+          const g = candidate.am_noise_floor_and_rf_environment_analysis_guide;
+          const riskColor = g.interference_risk === 'low' ? '#16a34a' : g.interference_risk === 'medium' ? '#d97706' : '#dc2626';
+          return (
+            <div key="nf-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #334155' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Noise Floor &amp; RF Environment (ITU-R P.372)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span style={{ color: '#64748b' }}>Atmospheric Fa:</span><span>{g.fa_atmospheric_db} dB ({g.frequency_khz} kHz)</span>
+                <span style={{ color: '#64748b' }}>Man-Made Fa:</span><span>{g.fa_man_made_db} dB ({g.land_use_noise_class})</span>
+                <span style={{ color: '#64748b' }}>Noise Floor:</span><span>≈{g.noise_floor_db_uvm} dBμV/m ({g.bw_khz} kHz BW)</span>
+                <span style={{ color: '#64748b' }}>Interference Risk:</span><span style={{ fontWeight: 600, color: riskColor }}>{g.interference_risk.toUpperCase()}</span>
+                <span style={{ color: '#64748b' }}>Noise Score:</span><span>{g.noise_score}/100 (higher = quieter)</span>
+                <span style={{ color: '#64748b' }}>Reduction vs Urban:</span><span>−{g.noise_reduction_vs_urban_db} dB man-made noise</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#475569' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Phase I Environmental Site Assessment Guide */}
         {candidate.am_phase_i_environmental_site_assessment_guide && (() => {
           const g = candidate.am_phase_i_environmental_site_assessment_guide;
