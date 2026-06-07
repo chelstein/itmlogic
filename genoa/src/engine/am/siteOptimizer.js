@@ -1053,7 +1053,10 @@ export async function runSiteOptimizer(body = {}){
     tpupg_total_low_usd:        c.transmitter_power_upgrade_pathway_guide?.total_project_low_usd ?? null,
     pfg_total_low_usd:          c.station_total_project_cost_pro_forma_guide?.total_project_low_usd ?? null,
     pfg_total_typ_usd:          c.station_total_project_cost_pro_forma_guide?.total_project_typ_usd ?? null,
-    pfg_n_cost_categories:      c.station_total_project_cost_pro_forma_guide?.n_cost_categories ?? null
+    pfg_n_cost_categories:      c.station_total_project_cost_pro_forma_guide?.n_cost_categories ?? null,
+    atu_r_base_typ_ohm:         c.antenna_base_impedance_and_atu_design_guide?.r_base_typ_ohm ?? null,
+    atu_l_shunt_uh:             c.antenna_base_impedance_and_atu_design_guide?.l_shunt_uh ?? null,
+    atu_bw_3db_khz:             c.antenna_base_impedance_and_atu_design_guide?.bw_3db_khz ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6788,6 +6791,125 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    antenna_base_impedance_and_atu_design_guide: (() => {
+      // ATU (Antenna Tuning Unit) design guide for a λ/4 AM monopole at this candidate site.
+      //
+      // Physics:
+      //   AM vertical monopoles are typically resonated at λ/4 where base reactance → 0.
+      //   Base resistance = Rr (radiation) + Rg (ground loss) + R_conductor (small).
+      //   At λ/4 resonance, Rr ≈ 36.6 Ω (standard result for ideal λ/4 monopole over PEC).
+      //   With a practical 120-radial ground system on medium soil, Rg ≈ 2–5 Ω.
+      //   Total base resistance R_base ≈ 38–42 Ω.
+      //
+      //   Feedline to transmitter: standard 50 Ω hardline coaxial.
+      //   ATU transforms R_base (~38–42 Ω) to 50 Ω feedline.
+      //
+      //   L-network design (shunt L / series C, source > load → mild step-down):
+      //     Q  = √(R_src / R_base - 1)          [network Q]
+      //     XL = R_src / Q                        [shunt inductor reactance]
+      //     XC = R_base × Q                       [series capacitor reactance]
+      //     L  = XL / (2π f)                      [Henry]
+      //     C  = 1 / (2π f × XC)                 [Farad]
+      //
+      //   -3 dB bandwidth (doubly-terminated): BW ≈ f / Q_loaded
+      //   Higher Q gives narrower bandwidth — want Q < 10 to stay well clear of ±10 kHz
+      //   channel edges (FCC AM channel spacing is 10 kHz).
+      //
+      //   Detuning circuits: FCC §73.190 requires series detuning coils on guy wires and
+      //   metallic objects within the tower base region (typically within 1/4 wavelength).
+
+      const f_hz      = frequency_khz * 1000;   // carrier frequency (Hz)
+      const omega     = 2 * Math.PI * f_hz;     // angular frequency (rad/s)
+      const lambda_m  = 300000 / frequency_khz; // wavelength (m)
+      const lambda_q_m = lambda_m / 4;           // λ/4 monopole height (m)
+
+      // Base impedance at λ/4 resonance (screening-grade estimates).
+      // Rr from classical monopole theory: 36.6 Ω at 90° (λ/4).
+      const Rr_ohm    = 36.6;
+      // Ground loss: 120-radial λ/4 system on moderate soil (4 mS/m) → Rg ≈ 2–4 Ω.
+      const Rg_low_ohm  = 2.0;
+      const Rg_high_ohm = 5.0;
+      // Small conductor resistance (tower steel, base insulator contacts): ~0.3–0.5 Ω.
+      const Rcond_ohm   = 0.4;
+      const R_base_low  = parseFloat((Rr_ohm + Rg_low_ohm  + Rcond_ohm).toFixed(1));  // ≈ 39.0 Ω
+      const R_base_high = parseFloat((Rr_ohm + Rg_high_ohm + Rcond_ohm).toFixed(1));  // ≈ 42.0 Ω
+      const R_base_typ  = parseFloat(((R_base_low + R_base_high) / 2).toFixed(1));
+
+      // Feedline impedance: standard 50 Ω hardline.
+      const Z_feedline = 50;
+
+      // L-network (shunt inductor / series capacitor) design for R_base_typ → 50 Ω.
+      // Source (transmitter/feedline): R_src = Z_feedline = 50 Ω.
+      // Load (antenna base): R_load = R_base_typ.
+      // Condition: R_src > R_load → valid shunt-L / series-C L-network.
+      const Q_net   = Math.sqrt(Z_feedline / R_base_typ - 1);
+      const XL_shunt = Z_feedline / Q_net;                  // shunt inductor reactance (Ω)
+      const XC_ser   = R_base_typ * Q_net;                  // series capacitor reactance (Ω)
+      const L_shunt_uH  = parseFloat((XL_shunt / omega * 1e6).toFixed(2));  // μH
+      const C_ser_pF    = Math.round(1 / (omega * XC_ser) * 1e12);           // pF
+
+      // Loaded Q and -3 dB bandwidth.
+      const Q_loaded  = Q_net;
+      const BW_3dB_hz = Math.round(f_hz / Q_loaded);
+      const BW_3dB_khz = parseFloat((BW_3dB_hz / 1000).toFixed(1));
+      const BW_adequate = BW_3dB_khz > 30;  // AM channel is 10 kHz; 30 kHz BW → good margin
+
+      // Antenna efficiency η = Rr / (Rr + Rg + Rcond).
+      const eta_low_pct  = parseFloat((Rr_ohm / R_base_high * 100).toFixed(1));
+      const eta_high_pct = parseFloat((Rr_ohm / R_base_low  * 100).toFixed(1));
+      const eta_typ_pct  = parseFloat(((eta_low_pct + eta_high_pct) / 2).toFixed(1));
+
+      // Detuning circuits: required for all grounded metallic objects within 0.25λ.
+      const detuning_radius_m = Math.round(lambda_q_m);   // §73.190 detuning zone ≈ λ/4
+      const guy_wire_detuning_required = lambda_q_m > 30; // any tower tall enough to need guys
+
+      // ATU components for DA station: pattern control network adds complexity.
+      const isDA_atu = /^DA/i.test(pattern_mode);
+      const n_atu_networks = isDA_atu ? 'one per tower (phasing also required)' : 'one (NDA — single tower)';
+
+      // Base current at rated TPO: I_base = √(P / R_base).
+      const I_base_low_a  = parseFloat(Math.sqrt(tpo_kw * 1000 / R_base_high).toFixed(2));
+      const I_base_high_a = parseFloat(Math.sqrt(tpo_kw * 1000 / R_base_low).toFixed(2));
+      const I_base_typ_a  = parseFloat(((I_base_low_a + I_base_high_a) / 2).toFixed(2));
+
+      return {
+        frequency_khz,
+        f_hz,
+        lambda_m:          parseFloat(lambda_m.toFixed(1)),
+        lambda_quarter_m:  Math.round(lambda_q_m),
+        tpo_kw,
+        pattern_mode,
+        feedline_impedance_ohm: Z_feedline,
+        rr_ohm:            Rr_ohm,
+        rg_low_ohm:        Rg_low_ohm,
+        rg_high_ohm:       Rg_high_ohm,
+        rcond_ohm:         Rcond_ohm,
+        r_base_low_ohm:    R_base_low,
+        r_base_high_ohm:   R_base_high,
+        r_base_typ_ohm:    R_base_typ,
+        q_network:         parseFloat(Q_net.toFixed(3)),
+        xl_shunt_ohm:      parseFloat(XL_shunt.toFixed(2)),
+        xc_series_ohm:     parseFloat(XC_ser.toFixed(2)),
+        l_shunt_uh:        L_shunt_uH,
+        c_series_pf:       C_ser_pF,
+        bw_3db_khz:        BW_3dB_khz,
+        bw_adequate:       BW_adequate,
+        antenna_efficiency_low_pct:  eta_low_pct,
+        antenna_efficiency_high_pct: eta_high_pct,
+        antenna_efficiency_typ_pct:  eta_typ_pct,
+        base_current_low_a:   I_base_low_a,
+        base_current_high_a:  I_base_high_a,
+        base_current_typ_a:   I_base_typ_a,
+        detuning_radius_m,
+        guy_wire_detuning_required,
+        n_atu_networks,
+        is_directional:       isDA_atu,
+        atu_network_type:     'L-network (shunt inductor / series capacitor)',
+        reference: '47 CFR §73.190 (ground system/detuning); §73.62 (antenna base current monitoring); §73.154 (proof of performance); ITU-R BS.346-1 (monopole radiation resistance); IEEE Std 100 (ATU design)',
+        note: `${frequency_khz} kHz λ/4 monopole (${Math.round(lambda_q_m)} m): base impedance ~${R_base_low}–${R_base_high} Ω (Rr=${Rr_ohm} Ω + Rg=${Rg_low_ohm}–${Rg_high_ohm} Ω). ATU: ${lambda_m.toFixed(0)}-m-wavelength L-network; shunt L ≈ ${L_shunt_uH} μH, series C ≈ ${C_ser_pF} pF; -3 dB BW ≈ ${BW_3dB_khz} kHz. Antenna efficiency ≈ ${eta_typ_pct}% (increases to ~95% with low-Rg ground system). Base current at ${tpo_kw} kW TPO: ≈ ${I_base_typ_a} A (monitor per §73.62). Guy wire detuning coils required within ${detuning_radius_m} m of tower base (§73.190).`
       };
     })(),
 

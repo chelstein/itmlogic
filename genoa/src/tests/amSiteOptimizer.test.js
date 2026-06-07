@@ -9653,3 +9653,49 @@ test('station_total_project_cost_pro_forma_guide comparison table columns presen
     assert.ok('pfg_n_cost_categories' in row, 'pfg_n_cost_categories missing from comparison table');
   }
 });
+
+// ---- antenna_base_impedance_and_atu_design_guide ----
+
+test('antenna_base_impedance_and_atu_design_guide present on candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_base_impedance_and_atu_design_guide;
+  assert.ok(g != null, 'antenna_base_impedance_and_atu_design_guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz must be 780');
+});
+
+test('antenna_base_impedance_and_atu_design_guide KAZM base impedance physics', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_base_impedance_and_atu_design_guide;
+  assert.strictEqual(g.rr_ohm, 36.6, 'Rr must be 36.6 Ω (λ/4 monopole)');
+  assert.ok(g.r_base_low_ohm >= 38 && g.r_base_low_ohm <= 40, `r_base_low must be 38–40 Ω, got ${g.r_base_low_ohm}`);
+  assert.ok(g.r_base_high_ohm >= 41 && g.r_base_high_ohm <= 44, `r_base_high must be 41–44 Ω, got ${g.r_base_high_ohm}`);
+  assert.strictEqual(g.feedline_impedance_ohm, 50, 'feedline must be 50 Ω');
+});
+
+test('antenna_base_impedance_and_atu_design_guide L-network component values physically correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_base_impedance_and_atu_design_guide;
+  assert.ok(g.l_shunt_uh > 15 && g.l_shunt_uh < 30,   `l_shunt_uh must be 15–30 μH, got ${g.l_shunt_uh}`);
+  assert.ok(g.c_series_pf > 8000 && g.c_series_pf < 15000, `c_series_pf must be 8000–15000 pF, got ${g.c_series_pf}`);
+  assert.ok(g.bw_3db_khz > 100, `bw_3db_khz must be > 100 kHz, got ${g.bw_3db_khz}`);
+  assert.strictEqual(g.bw_adequate, true, 'bw_adequate must be true for λ/4 L-network');
+});
+
+test('antenna_base_impedance_and_atu_design_guide efficiency and base current', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].antenna_base_impedance_and_atu_design_guide;
+  assert.ok(g.antenna_efficiency_typ_pct > 85 && g.antenna_efficiency_typ_pct < 95,
+    `antenna efficiency must be 85–95%, got ${g.antenna_efficiency_typ_pct}`);
+  assert.ok(g.base_current_typ_a > 10 && g.base_current_typ_a < 12,
+    `base_current_typ_a must be 10–12 A at 5 kW, got ${g.base_current_typ_a}`);
+  assert.strictEqual(g.guy_wire_detuning_required, true, 'guy wire detuning required for 315ft tower');
+});
+
+test('antenna_base_impedance_and_atu_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('atu_r_base_typ_ohm' in row, 'atu_r_base_typ_ohm missing from comparison table');
+    assert.ok('atu_l_shunt_uh'     in row, 'atu_l_shunt_uh missing from comparison table');
+    assert.ok('atu_bw_3db_khz'     in row, 'atu_bw_3db_khz missing from comparison table');
+  }
+});

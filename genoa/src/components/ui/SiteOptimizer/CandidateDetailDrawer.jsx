@@ -2226,6 +2226,37 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Antenna Base Impedance & ATU Design Guide */}
+        {candidate.antenna_base_impedance_and_atu_design_guide && (() => {
+          const g = candidate.antenna_base_impedance_and_atu_design_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fafaf0', borderRadius: 8, border: '1px solid #d4c84a' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5c4a00', marginBottom: 8 }}>
+                Antenna Base Impedance &amp; ATU Design — §73.190 / §73.62
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Frequency:</span> <strong>{g.frequency_khz} kHz (λ = {g.lambda_m} m)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tower height (λ/4):</span> <strong>{g.lambda_quarter_m} m</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Rr (radiation Ω):</span> <strong>{g.rr_ohm} Ω</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Rg (ground loss):</span> <strong>{g.rg_low_ohm}–{g.rg_high_ohm} Ω</strong></div>
+                <div><span style={{ color: '#6b7280' }}>R_base (total):</span> <strong>{g.r_base_low_ohm}–{g.r_base_high_ohm} Ω (typ {g.r_base_typ_ohm} Ω)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Feedline:</span> <strong>{g.feedline_impedance_ohm} Ω coax</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ATU type:</span> <strong>{g.atu_network_type}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Networks:</span> <strong>{g.n_atu_networks}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>L (shunt):</span> <strong>{g.l_shunt_uh} μH (X = {g.xl_shunt_ohm} Ω)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>C (series):</span> <strong>{g.c_series_pf?.toLocaleString()} pF (X = {g.xc_series_ohm} Ω)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Network Q:</span> <strong>{g.q_network}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>-3 dB BW:</span> <strong style={{ color: g.bw_adequate ? '#15803d' : '#dc2626' }}>{g.bw_3db_khz} kHz {g.bw_adequate ? '✓' : '⚠'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Antenna efficiency:</span> <strong>{g.antenna_efficiency_low_pct}–{g.antenna_efficiency_high_pct}% (typ {g.antenna_efficiency_typ_pct}%)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Base current ({g.tpo_kw} kW):</span> <strong>{g.base_current_low_a}–{g.base_current_high_a} A (typ {g.base_current_typ_a} A)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Detuning zone:</span> <strong>≤ {g.detuning_radius_m} m from tower (§73.190)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Guy wire detuning:</span> <strong style={{ color: g.guy_wire_detuning_required ? '#b45309' : '#6b7280' }}>{g.guy_wire_detuning_required ? 'Required' : 'Not required'}</strong></div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#5c4a00' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Station Total Project Cost Pro Forma Guide */}
         {candidate.station_total_project_cost_pro_forma_guide && (() => {
           const g = candidate.station_total_project_cost_pro_forma_guide;

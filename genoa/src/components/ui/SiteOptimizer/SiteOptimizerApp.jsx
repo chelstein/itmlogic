@@ -1717,6 +1717,21 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      antenna_base_impedance_and_atu_design_guide: {
+        frequency_khz: 780, f_hz: 780000, lambda_m: 384.6, lambda_quarter_m: 96, tpo_kw: 5, pattern_mode: 'NDA',
+        feedline_impedance_ohm: 50, rr_ohm: 36.6, rg_low_ohm: 2.0, rg_high_ohm: 5.0, rcond_ohm: 0.4,
+        r_base_low_ohm: 39.0, r_base_high_ohm: 42.0, r_base_typ_ohm: 40.5,
+        q_network: 0.484, xl_shunt_ohm: 103.3, xc_series_ohm: 19.6,
+        l_shunt_uh: 21.06, c_series_pf: 10402,
+        bw_3db_khz: 1610.5, bw_adequate: true,
+        antenna_efficiency_low_pct: 87.1, antenna_efficiency_high_pct: 93.8, antenna_efficiency_typ_pct: 90.4,
+        base_current_low_a: 10.91, base_current_high_a: 11.34, base_current_typ_a: 11.12,
+        detuning_radius_m: 96, guy_wire_detuning_required: true,
+        n_atu_networks: 'one (NDA — single tower)', is_directional: false,
+        atu_network_type: 'L-network (shunt inductor / series capacitor)',
+        reference: '47 CFR §73.190 (ground system/detuning); §73.62 (base current monitoring); §73.154 (proof); ITU-R BS.346-1; IEEE Std 100',
+        note: '780 kHz λ/4 monopole (96 m): base impedance ~39–42 Ω (Rr=36.6 Ω + Rg=2–5 Ω). ATU: L-network; shunt L ≈ 21.06 μH, series C ≈ 10,402 pF; -3 dB BW ≈ 1610 kHz. Efficiency ≈ 90.4%. Base current at 5 kW: ≈ 11.12 A. Guy wire detuning coils required within 96 m (§73.190).'
+      },
       station_total_project_cost_pro_forma_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
         tower_height_m: 96, tower_height_ft: 315, n_radials: 120, radial_length_m: 96,

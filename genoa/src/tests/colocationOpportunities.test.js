@@ -2086,3 +2086,19 @@ test('colocation GRID candidates have station_total_project_cost_pro_forma_guide
     assert.ok(g.total_project_low_usd > 200000, `rank ${c.rank} total_low must be > $200k`);
   }
 });
+
+test('colocation GRID candidates have antenna_base_impedance_and_atu_design_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.antenna_base_impedance_and_atu_design_guide;
+    assert.ok(g != null, `rank ${c.rank} missing antenna_base_impedance_and_atu_design_guide`);
+    assert.strictEqual(g.rr_ohm, 36.6, `rank ${c.rank} Rr must be 36.6 Ω`);
+    assert.ok(g.bw_adequate, `rank ${c.rank} bw_adequate must be true`);
+  }
+});
