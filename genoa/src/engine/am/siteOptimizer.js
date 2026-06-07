@@ -1341,7 +1341,10 @@ export async function runSiteOptimizer(body = {}){
     ter_terrain_study_low_usd:  c.am_terrain_and_propagation_assessment_guide?.terrain_study_low_usd ?? null,
     tfciv_tower_height_ft:          c.am_tower_foundation_and_civil_engineering_guide?.tower_height_ft ?? null,
     tfciv_concrete_cuyd_low:        c.am_tower_foundation_and_civil_engineering_guide?.concrete_cuyd_low ?? null,
-    tfciv_civil_foundation_low_usd: c.am_tower_foundation_and_civil_engineering_guide?.civil_foundation_low_usd ?? null
+    tfciv_civil_foundation_low_usd: c.am_tower_foundation_and_civil_engineering_guide?.civil_foundation_low_usd ?? null,
+    rf65_exclusion_radius_m_general:    c.am_rf_exposure_and_oet65_compliance_guide?.exclusion_radius_m_general ?? null,
+    rf65_evaluation_required:           c.am_rf_exposure_and_oet65_compliance_guide?.evaluation_required ?? null,
+    rf65_evaluation_cost_low_usd:       c.am_rf_exposure_and_oet65_compliance_guide?.evaluation_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7076,6 +7079,44 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_rf_exposure_and_oet65_compliance_guide: (() => {
+      // 47 CFR §1.1310 / OET Bulletin 65: General population/uncontrolled MPE limit
+      // for MF (AM) broadcast: 614 mV/m (E-field), or equivalently 100 µW/cm² power density
+      // Controlled (occupational): 1842 mV/m, 1000 µW/cm²
+      // Exclusion zone: radius where field exceeds MPE limit
+      // FCC formula (OET-65 Ed. 97-01): for vertical monopole over ground,
+      //   E (mV/m) = 222 * sqrt(ERP_kW) / d_km  (approximate far-field)
+      // Solve for d_min where E = 614 mV/m:  d_min_km = 222*sqrt(ERP_kW)/614
+      const erp_kw = round2(tpo_kw * 0.85); // assume 85% antenna efficiency for NDA
+      const mpe_general_mv_per_m = 614;
+      const mpe_controlled_mv_per_m = 1842;
+      const mpe_general_uW_per_cm2 = 100;
+      const exclusion_radius_km_general    = round2((222 * Math.sqrt(erp_kw)) / mpe_general_mv_per_m);
+      const exclusion_radius_m_general     = round2(exclusion_radius_km_general * 1000);
+      const exclusion_radius_km_controlled = round2((222 * Math.sqrt(erp_kw)) / mpe_controlled_mv_per_m);
+      const exclusion_radius_m_controlled  = round2(exclusion_radius_km_controlled * 1000);
+      // Threshold: §1.1310 requires an evaluation if ERP > 5 kW for AM
+      const evaluation_required = tpo_kw > 5;
+      const evaluation_cost_low_usd  = 1500;
+      const evaluation_cost_high_usd = 4500;
+      return {
+        tpo_kw,
+        erp_kw,
+        mpe_general_mv_per_m,
+        mpe_controlled_mv_per_m,
+        mpe_general_uW_per_cm2,
+        exclusion_radius_km_general,
+        exclusion_radius_m_general,
+        exclusion_radius_km_controlled,
+        exclusion_radius_m_controlled,
+        evaluation_required,
+        evaluation_cost_low_usd,
+        evaluation_cost_high_usd,
+        reference: '47 CFR §1.1310 (RF exposure limits); FCC OET Bulletin 65 Ed. 97-01 (RF exposure evaluation methods); 47 CFR §73.816 (AM RF exposure); IEEE C95.1-2019 (RF safety standard)',
+        note: `ERP ~${erp_kw} kW → general population exclusion zone ~${exclusion_radius_m_general} m (${exclusion_radius_km_general} km); controlled ~${exclusion_radius_m_controlled} m. Formal §1.1310 evaluation ${evaluation_required ? 'REQUIRED (ERP > 5 kW)' : 'not required (ERP ≤ 5 kW) — retain calculation on file'}. MPE limit: ${mpe_general_mv_per_m} mV/m (${mpe_general_uW_per_cm2} µW/cm²) general population.`
       };
     })(),
 

@@ -14015,3 +14015,40 @@ it('candidate_comparison_table tfciv columns match KAZM Class D expected values'
   assert.strictEqual(r0.tfciv_civil_foundation_low_usd, 25000, 'tfciv_civil_foundation_low_usd should be 25000');
   assert.ok(r0.tfciv_concrete_cuyd_low > 0, 'tfciv_concrete_cuyd_low must be positive');
 });
+
+// ── am_rf_exposure_and_oet65_compliance_guide ────────────────────────────────
+
+it('am_rf_exposure_and_oet65_compliance_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_rf_exposure_and_oet65_compliance_guide, 'rf65 guide missing on candidate');
+  }
+});
+
+it('am_rf_exposure_and_oet65_compliance_guide exclusion_radius_m_general is positive for KAZM 5 kW', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_exposure_and_oet65_compliance_guide;
+  assert.ok(g.exclusion_radius_m_general > 0, `exclusion_radius_m_general must be positive, got ${g.exclusion_radius_m_general}`);
+  assert.ok(g.exclusion_radius_m_controlled < g.exclusion_radius_m_general, 'controlled zone must be smaller than general');
+});
+
+it('am_rf_exposure_and_oet65_compliance_guide evaluation_required is false for KAZM 5 kW (at/below threshold)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_exposure_and_oet65_compliance_guide;
+  assert.strictEqual(g.evaluation_required, false, 'evaluation_required should be false for 5 kW');
+});
+
+it('am_rf_exposure_and_oet65_compliance_guide reference cites §1.1310 and OET Bulletin 65', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_exposure_and_oet65_compliance_guide;
+  assert.ok(g.reference.includes('§1.1310'), 'reference must cite §1.1310');
+  assert.ok(g.reference.includes('OET Bulletin 65'), 'reference must cite OET Bulletin 65');
+});
+
+it('candidate_comparison_table rf65 columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.rf65_exclusion_radius_m_general > 0, 'rf65_exclusion_radius_m_general must be positive');
+  assert.strictEqual(r0.rf65_evaluation_required, false, 'rf65_evaluation_required should be false for 5 kW');
+  assert.strictEqual(r0.rf65_evaluation_cost_low_usd, 1500, 'rf65_evaluation_cost_low_usd should be 1500');
+});

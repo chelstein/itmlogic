@@ -3310,3 +3310,20 @@ test('am_tower_foundation_and_civil_engineering_guide colocation: all colocation
     assert.ok(g.guy_anchor_count === 3, `guy_anchor_count should be 3 for guyed AM monopole`);
   }
 });
+
+test('am_rf_exposure_and_oet65_compliance_guide colocation: all colocation candidates have valid RF exposure data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_rf_exposure_and_oet65_compliance_guide;
+    assert.ok(g, `candidate missing am_rf_exposure_and_oet65_compliance_guide`);
+    assert.ok(g.exclusion_radius_m_general > 0, `exclusion_radius_m_general must be positive`);
+    assert.ok(typeof g.evaluation_required === 'boolean', `evaluation_required must be boolean`);
+    assert.ok(g.mpe_general_mv_per_m === 614, `mpe_general_mv_per_m must be 614 mV/m (FCC limit)`);
+  }
+});

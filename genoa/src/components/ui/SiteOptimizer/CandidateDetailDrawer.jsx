@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM RF Exposure and OET-65 Compliance Guide */}
+        {candidate.am_rf_exposure_and_oet65_compliance_guide && (() => {
+          const g = candidate.am_rf_exposure_and_oet65_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="rf65-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>RF Exposure &amp; OET-65 Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>ERP:</span><span>{g.erp_kw != null ? `${g.erp_kw} kW` : '—'}</span>
+                <span>MPE limit (general public):</span><span>{g.mpe_general_mv_per_m != null ? `${g.mpe_general_mv_per_m} mV/m (${g.mpe_general_uW_per_cm2} µW/cm²)` : '—'}</span>
+                <span>Exclusion zone (general):</span><span style={{ color: '#dc2626' }}>{g.exclusion_radius_m_general != null ? `${fmt(g.exclusion_radius_m_general)} m (${g.exclusion_radius_km_general} km)` : '—'}</span>
+                <span>Exclusion zone (controlled):</span><span>{g.exclusion_radius_m_controlled != null ? `${fmt(g.exclusion_radius_m_controlled)} m (${g.exclusion_radius_km_controlled} km)` : '—'}</span>
+                <span>§1.1310 evaluation:</span><span style={{ fontWeight: 600, color: g.evaluation_required ? '#dc2626' : '#16a34a' }}>{g.evaluation_required === true ? 'REQUIRED' : g.evaluation_required === false ? 'Not required' : '—'}</span>
+                <span>Evaluation cost:</span><span>{g.evaluation_cost_low_usd != null ? `$${fmt(g.evaluation_cost_low_usd)} – $${fmt(g.evaluation_cost_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Tower Foundation and Civil Engineering Guide */}
         {candidate.am_tower_foundation_and_civil_engineering_guide && (() => {
           const g = candidate.am_tower_foundation_and_civil_engineering_guide;
