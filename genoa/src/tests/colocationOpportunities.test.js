@@ -2538,7 +2538,7 @@ test('am_annual_operating_cost_analysis_guide present across colocation candidat
 });
 
 test('am_emergency_power_and_backup_systems_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_emergency_power_and_backup_systems_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_emergency_power_and_backup_systems_guide missing`);
@@ -2549,7 +2549,7 @@ test('am_emergency_power_and_backup_systems_guide present across colocation cand
 });
 
 test('am_tower_structural_and_wind_loading_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_structural_and_wind_loading_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_structural_and_wind_loading_guide missing`);
@@ -2560,7 +2560,7 @@ test('am_tower_structural_and_wind_loading_guide present across colocation candi
 });
 
 test('am_nepa_and_environmental_permitting_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_nepa_and_environmental_permitting_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nepa_and_environmental_permitting_guide missing`);
@@ -2571,7 +2571,7 @@ test('am_nepa_and_environmental_permitting_guide present across colocation candi
 });
 
 test('am_electrical_service_and_power_infrastructure_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_electrical_service_and_power_infrastructure_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_electrical_service_and_power_infrastructure_guide missing`);
@@ -2582,7 +2582,7 @@ test('am_electrical_service_and_power_infrastructure_guide present across coloca
 });
 
 test('am_soil_conductivity_and_groundwave_coverage_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_soil_conductivity_and_groundwave_coverage_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_soil_conductivity_and_groundwave_coverage_guide missing`);
@@ -2593,7 +2593,7 @@ test('am_soil_conductivity_and_groundwave_coverage_guide present across colocati
 });
 
 test('am_lightning_protection_and_surge_suppression_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_lightning_protection_and_surge_suppression_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_lightning_protection_and_surge_suppression_guide missing`);
@@ -2604,7 +2604,7 @@ test('am_lightning_protection_and_surge_suppression_guide present across colocat
 });
 
 test('am_coverage_improvement_vs_current_site_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_coverage_improvement_vs_current_site_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_coverage_improvement_vs_current_site_guide missing`);
@@ -2615,7 +2615,7 @@ test('am_coverage_improvement_vs_current_site_guide present across colocation ca
 });
 
 test('am_rf_system_monitoring_and_telemetry_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_rf_system_monitoring_and_telemetry_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_rf_system_monitoring_and_telemetry_guide missing`);
@@ -2626,7 +2626,7 @@ test('am_rf_system_monitoring_and_telemetry_guide present across colocation cand
 });
 
 test('am_geotechnical_and_soil_investigation_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_geotechnical_and_soil_investigation_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_geotechnical_and_soil_investigation_guide missing`);
@@ -2637,7 +2637,7 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
 });
 
 test('am_transmitter_procurement_and_upgrade_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_transmitter_procurement_and_upgrade_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_procurement_and_upgrade_guide missing`);
@@ -2648,7 +2648,7 @@ test('am_transmitter_procurement_and_upgrade_guide present across colocation can
 });
 
 test('am_site_grading_and_drainage_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_site_grading_and_drainage_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_grading_and_drainage_guide missing`);
@@ -2658,7 +2658,7 @@ test('am_site_grading_and_drainage_guide present across colocation candidates', 
 });
 
 test('am_insurance_and_bonding_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_insurance_and_bonding_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_insurance_and_bonding_guide missing`);
@@ -2669,7 +2669,7 @@ test('am_insurance_and_bonding_guide present across colocation candidates', asyn
 });
 
 test('am_studio_transmitter_link_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_studio_transmitter_link_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_studio_transmitter_link_guide missing`);
@@ -2680,7 +2680,7 @@ test('am_studio_transmitter_link_guide present across colocation candidates', as
 });
 
 test('am_construction_project_schedule_and_management_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_construction_project_schedule_and_management_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_construction_project_schedule_and_management_guide missing`);
@@ -2691,7 +2691,7 @@ test('am_construction_project_schedule_and_management_guide present across coloc
 });
 
 test('am_utility_power_service_and_metering_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_utility_power_service_and_metering_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_utility_power_service_and_metering_guide missing`);
@@ -2702,7 +2702,7 @@ test('am_utility_power_service_and_metering_guide present across colocation cand
 });
 
 test('am_transmission_line_and_antenna_tuning_unit_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_transmission_line_and_antenna_tuning_unit_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmission_line_and_antenna_tuning_unit_guide missing`);
@@ -2713,7 +2713,7 @@ test('am_transmission_line_and_antenna_tuning_unit_guide present across colocati
 });
 
 test('am_tower_base_insulator_and_rf_isolation_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_base_insulator_and_rf_isolation_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_base_insulator_and_rf_isolation_guide missing`);
@@ -2724,7 +2724,7 @@ test('am_tower_base_insulator_and_rf_isolation_guide present across colocation c
 });
 
 test('am_emergency_alert_system_equipment_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_emergency_alert_system_equipment_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_emergency_alert_system_equipment_guide missing`);
@@ -2735,7 +2735,7 @@ test('am_emergency_alert_system_equipment_guide present across colocation candid
 });
 
 test('am_auxiliary_transmitter_and_backup_power_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_auxiliary_transmitter_and_backup_power_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_auxiliary_transmitter_and_backup_power_guide missing`);
@@ -2746,7 +2746,7 @@ test('am_auxiliary_transmitter_and_backup_power_guide present across colocation 
 });
 
 test('am_modulation_monitor_and_station_logging_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_modulation_monitor_and_station_logging_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_monitor_and_station_logging_guide missing`);
@@ -2757,7 +2757,7 @@ test('am_modulation_monitor_and_station_logging_guide present across colocation 
 });
 
 test('am_transmitter_building_and_equipment_shelter_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_transmitter_building_and_equipment_shelter_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_building_and_equipment_shelter_guide missing`);
@@ -2768,7 +2768,7 @@ test('am_transmitter_building_and_equipment_shelter_guide present across colocat
 });
 
 test('am_site_lease_and_land_acquisition_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_site_lease_and_land_acquisition_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_lease_and_land_acquisition_guide missing`);
@@ -2779,7 +2779,7 @@ test('am_site_lease_and_land_acquisition_guide present across colocation candida
 });
 
 test('am_carrier_frequency_accuracy_and_reference_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_carrier_frequency_accuracy_and_reference_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_carrier_frequency_accuracy_and_reference_guide missing`);
@@ -2790,7 +2790,7 @@ test('am_carrier_frequency_accuracy_and_reference_guide present across colocatio
 });
 
 test('am_tower_decommissioning_and_site_remediation_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_decommissioning_and_site_remediation_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_decommissioning_and_site_remediation_guide missing`);
@@ -2801,7 +2801,7 @@ test('am_tower_decommissioning_and_site_remediation_guide present across colocat
 });
 
 test('am_ground_system_resistance_and_maintenance_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_ground_system_resistance_and_maintenance_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_resistance_and_maintenance_guide missing`);
@@ -2812,7 +2812,7 @@ test('am_ground_system_resistance_and_maintenance_guide present across colocatio
 });
 
 test('am_commissioning_and_acceptance_testing_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_commissioning_and_acceptance_testing_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_commissioning_and_acceptance_testing_guide missing`);
@@ -2823,7 +2823,7 @@ test('am_commissioning_and_acceptance_testing_guide present across colocation ca
 });
 
 test('am_broadcast_tower_structural_inspection_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_broadcast_tower_structural_inspection_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_broadcast_tower_structural_inspection_guide missing`);
@@ -2834,7 +2834,7 @@ test('am_broadcast_tower_structural_inspection_guide present across colocation c
 });
 
 test('am_annual_regulatory_compliance_and_fee_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_annual_regulatory_compliance_and_fee_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_regulatory_compliance_and_fee_guide missing`);
@@ -2845,7 +2845,7 @@ test('am_annual_regulatory_compliance_and_fee_guide present across colocation ca
 });
 
 test('am_concrete_foundation_and_anchor_design_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_concrete_foundation_and_anchor_design_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_concrete_foundation_and_anchor_design_guide missing`);
@@ -2856,7 +2856,7 @@ test('am_concrete_foundation_and_anchor_design_guide present across colocation c
 });
 
 test('am_tower_painting_and_aviation_marking_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_painting_and_aviation_marking_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_painting_and_aviation_marking_guide missing`);
@@ -2867,7 +2867,7 @@ test('am_tower_painting_and_aviation_marking_guide present across colocation can
 });
 
 test('am_noise_floor_and_rf_environment_analysis_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_noise_floor_and_rf_environment_analysis_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_noise_floor_and_rf_environment_analysis_guide missing`);
@@ -2878,7 +2878,7 @@ test('am_noise_floor_and_rf_environment_analysis_guide present across colocation
 });
 
 test('am_phase_i_environmental_site_assessment_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_phase_i_environmental_site_assessment_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_phase_i_environmental_site_assessment_guide missing`);
@@ -2889,7 +2889,7 @@ test('am_phase_i_environmental_site_assessment_guide present across colocation c
 });
 
 test('am_fcc_application_engineering_report_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_fcc_application_engineering_report_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_application_engineering_report_guide missing`);
@@ -2900,7 +2900,7 @@ test('am_fcc_application_engineering_report_guide present across colocation cand
 });
 
 test('am_site_access_road_and_security_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_site_access_road_and_security_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_access_road_and_security_guide missing`);
@@ -2911,7 +2911,7 @@ test('am_site_access_road_and_security_guide present across colocation candidate
 });
 
 test('am_ground_system_installation_and_maintenance_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_ground_system_installation_and_maintenance_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_installation_and_maintenance_guide missing`);
@@ -2922,7 +2922,7 @@ test('am_ground_system_installation_and_maintenance_guide present across colocat
 });
 
 test('am_rf_radiation_safety_and_compliance_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_rf_radiation_safety_and_compliance_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_rf_radiation_safety_and_compliance_guide missing`);
@@ -2934,7 +2934,7 @@ test('am_rf_radiation_safety_and_compliance_guide present across colocation cand
 });
 
 test('am_antenna_array_and_phasor_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_antenna_array_and_phasor_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_antenna_array_and_phasor_guide missing`);
@@ -2946,7 +2946,7 @@ test('am_antenna_array_and_phasor_guide present across colocation candidates', a
 });
 
 test('am_environmental_impact_assessment_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_environmental_impact_assessment_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_environmental_impact_assessment_guide missing`);
@@ -2958,7 +2958,7 @@ test('am_environmental_impact_assessment_guide present across colocation candida
 });
 
 test('am_tower_lighting_and_aviation_compliance_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_lighting_and_aviation_compliance_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_lighting_and_aviation_compliance_guide missing`);
@@ -2970,7 +2970,7 @@ test('am_tower_lighting_and_aviation_compliance_guide present across colocation 
 });
 
 test('am_soil_conductivity_and_ground_loss_assessment_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_soil_conductivity_and_ground_loss_assessment_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_soil_conductivity_and_ground_loss_assessment_guide missing`);
@@ -2982,7 +2982,7 @@ test('am_soil_conductivity_and_ground_loss_assessment_guide present across coloc
 });
 
 test('am_zoning_and_land_use_permit_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_zoning_and_land_use_permit_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_zoning_and_land_use_permit_guide missing`);
@@ -2994,7 +2994,7 @@ test('am_zoning_and_land_use_permit_guide present across colocation candidates',
 });
 
 test('am_colocation_sharing_and_tower_lease_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_colocation_sharing_and_tower_lease_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_colocation_sharing_and_tower_lease_guide missing`);
@@ -3005,7 +3005,7 @@ test('am_colocation_sharing_and_tower_lease_guide present across colocation cand
 });
 
 test('am_operating_cost_and_annual_expense_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_operating_cost_and_annual_expense_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_operating_cost_and_annual_expense_guide missing`);
@@ -3016,7 +3016,7 @@ test('am_operating_cost_and_annual_expense_guide present across colocation candi
 });
 
 test('am_nighttime_operation_and_skywave_classification_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_nighttime_operation_and_skywave_classification_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nighttime_operation_and_skywave_classification_guide missing`);
@@ -3028,7 +3028,7 @@ test('am_nighttime_operation_and_skywave_classification_guide present across col
 });
 
 test('am_broadcast_proof_of_performance_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_broadcast_proof_of_performance_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_broadcast_proof_of_performance_guide missing`);
@@ -3040,7 +3040,7 @@ test('am_broadcast_proof_of_performance_guide present across colocation candidat
 });
 
 test('am_financial_feasibility_and_roi_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_financial_feasibility_and_roi_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_financial_feasibility_and_roi_guide missing`);
@@ -3051,7 +3051,7 @@ test('am_financial_feasibility_and_roi_guide present across colocation candidate
 });
 
 test('am_tower_guy_wire_and_anchor_system_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_guy_wire_and_anchor_system_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_guy_wire_and_anchor_system_guide missing`);
@@ -3062,7 +3062,7 @@ test('am_tower_guy_wire_and_anchor_system_guide present across colocation candid
 });
 
 test('am_transmission_loss_budget_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_transmission_loss_budget_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmission_loss_budget_guide missing`);
@@ -3074,7 +3074,7 @@ test('am_transmission_loss_budget_guide present across colocation candidates', a
 });
 
 test('am_grounding_and_lightning_protection_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_grounding_and_lightning_protection_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_grounding_and_lightning_protection_guide missing`);
@@ -3085,7 +3085,7 @@ test('am_grounding_and_lightning_protection_guide present across colocation cand
 });
 
 test('am_fcc_asr_tower_registration_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_fcc_asr_tower_registration_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_asr_tower_registration_guide missing`);
@@ -3096,7 +3096,7 @@ test('am_fcc_asr_tower_registration_guide present across colocation candidates',
 });
 
 test('am_site_access_and_road_construction_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_site_access_and_road_construction_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_access_and_road_construction_guide missing`);
@@ -3107,7 +3107,7 @@ test('am_site_access_and_road_construction_guide present across colocation candi
 });
 
 test('am_utility_power_and_backup_systems_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_utility_power_and_backup_systems_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_utility_power_and_backup_systems_guide missing`);
@@ -3118,7 +3118,7 @@ test('am_utility_power_and_backup_systems_guide present across colocation candid
 });
 
 test('am_transmitter_building_and_studio_link_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_transmitter_building_and_studio_link_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_building_and_studio_link_guide missing`);
@@ -3129,7 +3129,7 @@ test('am_transmitter_building_and_studio_link_guide present across colocation ca
 });
 
 test('am_fcc_construction_permit_and_license_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_fcc_construction_permit_and_license_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_construction_permit_and_license_guide missing`);
@@ -3140,7 +3140,7 @@ test('am_fcc_construction_permit_and_license_guide present across colocation can
 });
 
 test('am_signal_contour_and_coverage_area_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_signal_contour_and_coverage_area_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_signal_contour_and_coverage_area_guide missing`);
@@ -3151,7 +3151,7 @@ test('am_signal_contour_and_coverage_area_guide present across colocation candid
 });
 
 test('am_nighttime_skywave_interference_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_nighttime_skywave_interference_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nighttime_skywave_interference_guide missing`);
@@ -3162,7 +3162,7 @@ test('am_nighttime_skywave_interference_guide present across colocation candidat
 });
 
 test('am_real_estate_and_land_acquisition_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_real_estate_and_land_acquisition_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_real_estate_and_land_acquisition_guide missing`);
@@ -3173,7 +3173,7 @@ test('am_real_estate_and_land_acquisition_guide present across colocation candid
 });
 
 test('am_total_project_cost_summary_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_total_project_cost_summary_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_total_project_cost_summary_guide missing`);
@@ -3184,7 +3184,7 @@ test('am_total_project_cost_summary_guide present across colocation candidates',
 });
 
 test('am_community_impact_and_coverage_shift_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_community_impact_and_coverage_shift_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_community_impact_and_coverage_shift_guide missing`);
@@ -3195,7 +3195,7 @@ test('am_community_impact_and_coverage_shift_guide present across colocation can
 });
 
 test('am_transmitter_decommission_and_site_remediation_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_transmitter_decommission_and_site_remediation_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_decommission_and_site_remediation_guide missing`);
@@ -3206,7 +3206,7 @@ test('am_transmitter_decommission_and_site_remediation_guide present across colo
 });
 
 test('am_interference_protection_contour_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_interference_protection_contour_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_interference_protection_contour_guide missing`);
@@ -3217,7 +3217,7 @@ test('am_interference_protection_contour_guide present across colocation candida
 });
 
 test('am_tower_painting_and_marking_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tower_painting_and_marking_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_painting_and_marking_guide missing`);
@@ -3230,7 +3230,7 @@ test('am_tower_painting_and_marking_guide present across colocation candidates',
 });
 
 test('am_ground_system_radial_design_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_ground_system_radial_design_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_radial_design_guide missing`);
@@ -3241,7 +3241,7 @@ test('am_ground_system_radial_design_guide present across colocation candidates'
 });
 
 test('am_tpo_and_antenna_efficiency_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_tpo_and_antenna_efficiency_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tpo_and_antenna_efficiency_guide missing`);
@@ -3252,7 +3252,7 @@ test('am_tpo_and_antenna_efficiency_guide present across colocation candidates',
 });
 
 test('am_frequency_allocation_class_and_channel_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_frequency_allocation_class_and_channel_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_frequency_allocation_class_and_channel_guide missing`);
@@ -3262,7 +3262,7 @@ test('am_frequency_allocation_class_and_channel_guide present across colocation 
 });
 
 test('am_modulation_and_audio_processing_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_modulation_and_audio_processing_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_and_audio_processing_guide missing`);
@@ -3273,7 +3273,7 @@ test('am_modulation_and_audio_processing_guide present across colocation candida
 });
 
 test('am_annual_operating_cost_breakdown_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_annual_operating_cost_breakdown_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_operating_cost_breakdown_guide missing`);
@@ -3284,7 +3284,7 @@ test('am_annual_operating_cost_breakdown_guide present across colocation candida
 });
 
 test('am_terrain_and_propagation_assessment_guide present across colocation candidates', async () => {
-  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
   for (const c of out.candidates) {
     const g = c.am_terrain_and_propagation_assessment_guide;
     assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_terrain_and_propagation_assessment_guide missing`);

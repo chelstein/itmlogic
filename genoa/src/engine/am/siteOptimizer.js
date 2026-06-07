@@ -4267,7 +4267,8 @@ async function scoreCandidate(pt, ctx, warnings){
         additional_engineering_weeks_min: add_wks_min,
         additional_engineering_weeks_max: add_wks_max,
         note: `Commission a ${study_type.replace(/_/g, ' ')} study before filing. DA engineering adds ${add_wks_min}–${add_wks_max} weeks; budget for multiple antenna modeling iterations.`,
-        rule: '47 CFR §73.150 / §73.316'
+        rule: '47 CFR §73.150 / §73.316',
+        reference: '47 CFR §73.150 (DA authorization); §73.152 (AM DA operation); §73.316 (horizontal pattern); §73.25 (clear channel protection); §73.182 (skywave interference); §73.154(a) (DA proof of performance)',
       };
     })(),
     // Signal environment advisory — characterizes the directional interference
@@ -12921,7 +12922,8 @@ async function scoreCandidate(pt, ctx, warnings){
         pv_factor_10yr: PV_FACTOR_10YR,
         opex_10yr_pv_low_usd,
         opex_10yr_pv_high_usd,
-        note: `Annual OPEX: electricity ${annual_kwh_total.toLocaleString()} kWh/yr ($${elec_cost_low_usd.toLocaleString()}–$${elec_cost_high_usd.toLocaleString()}); equip maintenance $${equip_maint_low_usd.toLocaleString()}–$${equip_maint_high_usd.toLocaleString()}; FCC fee $${fcc_annual_fee_usd.toLocaleString()}; insurance $${insurance_low_usd.toLocaleString()}–$${insurance_high_usd.toLocaleString()}. Total: $${total_annual_low_usd.toLocaleString()}–$${total_annual_high_usd.toLocaleString()}/yr; 10-yr NPV at 5%: $${opex_10yr_pv_low_usd.toLocaleString()}–$${opex_10yr_pv_high_usd.toLocaleString()}.`
+        note: `Annual OPEX: electricity ${annual_kwh_total.toLocaleString()} kWh/yr ($${elec_cost_low_usd.toLocaleString()}–$${elec_cost_high_usd.toLocaleString()}); equip maintenance $${equip_maint_low_usd.toLocaleString()}–$${equip_maint_high_usd.toLocaleString()}; FCC fee $${fcc_annual_fee_usd.toLocaleString()}; insurance $${insurance_low_usd.toLocaleString()}–$${insurance_high_usd.toLocaleString()}. Total: $${total_annual_low_usd.toLocaleString()}–$${total_annual_high_usd.toLocaleString()}/yr; 10-yr NPV at 5%: $${opex_10yr_pv_low_usd.toLocaleString()}–$${opex_10yr_pv_high_usd.toLocaleString()}.`,
+        reference: '47 CFR §73.1215 (equipment maintenance); FCC Schedule of Application Fees (annual regulatory fees); §11.35 (EAS equipment); NEC Art. 702 (emergency power)',
       };
     })(),
 
@@ -13000,7 +13002,8 @@ async function scoreCandidate(pt, ctx, warnings){
         effective_erp_kw_high,
         vswr_bw_khz_low,
         vswr_bw_khz_high,
-        note: `${electrical_height_deg}° monopole @ ${frequency_khz} kHz: h = ${physical_height_m}m, λ = ${lambda_m}m. R_r = ${radiation_resistance_ohm}Ω; ground loss (${n_radials} radials) = ${ground_loss_ohm_low}–${ground_loss_ohm_high}Ω [Brown-Lewis-Epstein]. Antenna η = ${efficiency_pct_low}–${efficiency_pct_high}%; ATU loss ${atu_loss_pct_low}–${atu_loss_pct_high}%; net system efficiency ${total_efficiency_pct_low}–${total_efficiency_pct_high}%. Effective ERP: ${effective_erp_kw_low}–${effective_erp_kw_high} kW from ${tpo_kw} kW TPO. VSWR 2:1 BW: ~${vswr_bw_khz_low}–${vswr_bw_khz_high} kHz.`
+        note: `${electrical_height_deg}° monopole @ ${frequency_khz} kHz: h = ${physical_height_m}m, λ = ${lambda_m}m. R_r = ${radiation_resistance_ohm}Ω; ground loss (${n_radials} radials) = ${ground_loss_ohm_low}–${ground_loss_ohm_high}Ω [Brown-Lewis-Epstein]. Antenna η = ${efficiency_pct_low}–${efficiency_pct_high}%; ATU loss ${atu_loss_pct_low}–${atu_loss_pct_high}%; net system efficiency ${total_efficiency_pct_low}–${total_efficiency_pct_high}%. Effective ERP: ${effective_erp_kw_low}–${effective_erp_kw_high} kW from ${tpo_kw} kW TPO. VSWR 2:1 BW: ~${vswr_bw_khz_low}–${vswr_bw_khz_high} kHz.`,
+        reference: '47 CFR §73.184 (groundwave propagation / conductivity); §73.190 (ground system efficiency); IEEE Std 100-1992 (radiation resistance definitions); Terman, Electronic and Radio Engineering (1955)',
       };
     })(),
 
@@ -13078,7 +13081,8 @@ async function scoreCandidate(pt, ctx, warnings){
         stl_latency_ms,
         total_stl_cost_low_usd,
         total_stl_cost_high_usd,
-        note: `STL run: ${stl_distance_km}km (${stl_distance_mi}mi). Technology: ${stl_technology.replace(/_/g, ' ')}${fcc_part_74_license_required ? ` — FCC Part 74.550 license required ($${fcc_license_fee_usd.toLocaleString()})` : ' — no FCC STL license needed'}; latency: ${stl_latency_ms}ms. Backup: ${backup_technology ? backup_technology.replace(/_/g, ' ') : 'dual-path IP recommended'}. Total: $${total_stl_cost_low_usd.toLocaleString()}–$${total_stl_cost_high_usd.toLocaleString()}; annual: $${stl_annual_low_usd.toLocaleString()}–$${stl_annual_high_usd.toLocaleString()}.`
+        note: `STL run: ${stl_distance_km}km (${stl_distance_mi}mi). Technology: ${stl_technology.replace(/_/g, ' ')}${fcc_part_74_license_required ? ` — FCC Part 74.550 license required ($${fcc_license_fee_usd.toLocaleString()})` : ' — no FCC STL license needed'}; latency: ${stl_latency_ms}ms. Backup: ${backup_technology ? backup_technology.replace(/_/g, ' ') : 'dual-path IP recommended'}. Total: $${total_stl_cost_low_usd.toLocaleString()}–$${total_stl_cost_high_usd.toLocaleString()}; annual: $${stl_annual_low_usd.toLocaleString()}–$${stl_annual_high_usd.toLocaleString()}.`,
+        reference: '47 CFR Part 74 Subpart D (STL auxiliary broadcast stations); §74.502 (STL eligibility); §74.535 (frequency coordination); §73.1215 (equipment maintenance)',
       };
     })(),
 
@@ -13138,7 +13142,8 @@ async function scoreCandidate(pt, ctx, warnings){
         service_radius_05_mvpm_km,
         service_radius_015_mvpm_km,
         co_channel_risk,
-        note: `${channel_type} (${frequency_khz} kHz), ${fcc_class} class, ${isDA_int ? 'DA' : 'NDA'}. ${is_secondary ? `SECONDARY status (§73.21): may not raise interference to dominant Class A/B; nighttime TPO limited to ${night_power_limit_kw} kW. ` : 'PRIMARY status. '}Daytime co-channel D/U protection: ${co_channel_D_U_daytime_db} dB per §73.182; 1st adjacent (±10 kHz): ${first_adjacent_protection_db} dB. Est. daytime 0.5 mV/m primary radius: ~${service_radius_05_mvpm_km}km (simplified Carey; actual varies with ground conductivity). Co-channel risk: ${co_channel_risk}.`
+        note: `${channel_type} (${frequency_khz} kHz), ${fcc_class} class, ${isDA_int ? 'DA' : 'NDA'}. ${is_secondary ? `SECONDARY status (§73.21): may not raise interference to dominant Class A/B; nighttime TPO limited to ${night_power_limit_kw} kW. ` : 'PRIMARY status. '}Daytime co-channel D/U protection: ${co_channel_D_U_daytime_db} dB per §73.182; 1st adjacent (±10 kHz): ${first_adjacent_protection_db} dB. Est. daytime 0.5 mV/m primary radius: ~${service_radius_05_mvpm_km}km (simplified Carey; actual varies with ground conductivity). Co-channel risk: ${co_channel_risk}.`,
+        reference: '47 CFR §73.37 (interference protection contours); §73.182(c) (D/U ratios); §73.182(d) (groundwave interference); §73.184 (groundwave method)',
       };
     })(),
 
@@ -13246,7 +13251,8 @@ async function scoreCandidate(pt, ctx, warnings){
         legal_fees_high_usd,
         total_zoning_cost_low_usd,
         total_zoning_cost_high_usd,
-        note: `Tower est. ${tower_height_ft}ft (λ/4 @ ${frequency_khz} kHz). Zoning: ${zoning_class} (${dist_from_col_km}km from COL); CUP probability ${Math.round(cup_probability * 100)}%${height_variance_required ? `; height variance required (limit: ${zoning_height_limit_ft}ft)` : ''}. Setback: ${setback_required_ft}ft from residential. SHPO review: ${shpo_review_required ? `required per FCC/ACHP NPA (${shpo_review_weeks_low}–${shpo_review_weeks_high} weeks)` : 'not triggered (<200ft)'}. Opposition risk: ${opposition_risk}. Zoning total: $${total_zoning_cost_low_usd.toLocaleString()}–$${total_zoning_cost_high_usd.toLocaleString()}.`
+        note: `Tower est. ${tower_height_ft}ft (λ/4 @ ${frequency_khz} kHz). Zoning: ${zoning_class} (${dist_from_col_km}km from COL); CUP probability ${Math.round(cup_probability * 100)}%${height_variance_required ? `; height variance required (limit: ${zoning_height_limit_ft}ft)` : ''}. Setback: ${setback_required_ft}ft from residential. SHPO review: ${shpo_review_required ? `required per FCC/ACHP NPA (${shpo_review_weeks_low}–${shpo_review_weeks_high} weeks)` : 'not triggered (<200ft)'}. Opposition risk: ${opposition_risk}. Zoning total: $${total_zoning_cost_low_usd.toLocaleString()}–$${total_zoning_cost_high_usd.toLocaleString()}.`,
+        reference: '47 CFR §73.49 (antenna enclosure / site requirement); §73.1125 (main studio proximity); FCC v. Beach Communications (1993); Telecommunications Act 1996 §704 (tower siting)',
       };
     })(),
 
@@ -13334,7 +13340,8 @@ async function scoreCandidate(pt, ctx, warnings){
         // Totals
         total_infrastructure_low_usd,
         total_infrastructure_high_usd,
-        note: `Transmitter building: ${bld_sqft_low}–${bld_sqft_high} sq ft ${isDA_bld ? '(DA phasing room included)' : '(NDA)'}; electrical service: ${electrical_service_amps}A/${electrical_service_volts}V; HVAC: ${hvac_tons}-ton; emergency generator: ${generator_kw} kW (${fuel_tank_gal}-gal fuel storage). Total site infrastructure: $${total_infrastructure_low_usd.toLocaleString()}–$${total_infrastructure_high_usd.toLocaleString()}.`
+        note: `Transmitter building: ${bld_sqft_low}–${bld_sqft_high} sq ft ${isDA_bld ? '(DA phasing room included)' : '(NDA)'}; electrical service: ${electrical_service_amps}A/${electrical_service_volts}V; HVAC: ${hvac_tons}-ton; emergency generator: ${generator_kw} kW (${fuel_tank_gal}-gal fuel storage). Total site infrastructure: $${total_infrastructure_low_usd.toLocaleString()}–$${total_infrastructure_high_usd.toLocaleString()}.`,
+        reference: '47 CFR §73.1215 (equipment maintenance / transmitter building); NEC Art. 702 (optional standby power); NEC 230.67 (SPD); NFPA 101 (Life Safety Code for occupied buildings)',
       };
     })(),
 
@@ -13429,7 +13436,8 @@ async function scoreCandidate(pt, ctx, warnings){
         total_equipment_high_usd,
         annual_maint_low_usd,
         annual_maint_high_usd,
-        note: `${nominal_tx_kw} kW ${power_class_tx} power class AM transmitter (TPO: ${tpo_kw} kW); backup at ${backup_tx_kw} kW recommended${isDA_tx ? '; DA phasing cabinet required' : ''}. ${n_base_current_meters} base current meter${n_base_current_meters > 1 ? 's' : ''} (§73.61); remote control required (§73.1400). Total equipment: $${total_equipment_low_usd.toLocaleString()}–$${total_equipment_high_usd.toLocaleString()} excl. ATU/ground system; annual maintenance: $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}.`
+        note: `${nominal_tx_kw} kW ${power_class_tx} power class AM transmitter (TPO: ${tpo_kw} kW); backup at ${backup_tx_kw} kW recommended${isDA_tx ? '; DA phasing cabinet required' : ''}. ${n_base_current_meters} base current meter${n_base_current_meters > 1 ? 's' : ''} (§73.61); remote control required (§73.1400). Total equipment: $${total_equipment_low_usd.toLocaleString()}–$${total_equipment_high_usd.toLocaleString()} excl. ATU/ground system; annual maintenance: $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}.`,
+        reference: '47 CFR §73.1560 (operating power tolerances ±10%); §73.1675 (auxiliary transmitters); §73.1215 (equipment maintenance); §73.1400 (transmission system requirements)',
       };
     })(),
 
@@ -13537,7 +13545,8 @@ async function scoreCandidate(pt, ctx, warnings){
         engineering_cost_low_usd,
         engineering_cost_high_usd,
         fcc_filing_fee_usd,
-        note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.67; construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`
+        note: `${filing_type} relocation via ${fcc_form}: CP processing ${cp_processing_months_low}–${cp_processing_months_high} months; post-grant construction ${post_cp_months_low}–${post_cp_months_high} months; total ${total_months_low}–${total_months_high} months decision-to-on-air. CP valid ${cp_validity_years} yrs per §73.67; construction margin ${construction_margin_months_low}–${construction_margin_months_high} months → expiration risk: ${cp_expiration_risk}.`,
+        reference: '47 CFR §73.3533 (application for CP); §73.3534 (filing procedures); §73.3598 (CP expiration — 3 years); §73.3535 (dismissal of applications); FCC Form 301-AM',
       };
     })(),
 
@@ -13643,7 +13652,8 @@ async function scoreCandidate(pt, ctx, warnings){
         transaction_costs_high_usd,
         total_lease_setup_low_usd,
         total_lease_setup_high_usd,
-        note: `Site class: ${site_class} (${dist_from_col_km}km from COL centroid); ${min_site_acres_low}–${min_site_acres_high} acres needed for ${n_tower_elements}-element ${isDA_acq ? 'DA array' : 'NDA tower'}. Purchase: $${purchase_cost_low_usd.toLocaleString()}–$${purchase_cost_high_usd.toLocaleString()} land + $${transaction_costs_low_usd.toLocaleString()}–$${transaction_costs_high_usd.toLocaleString()} transaction costs. Lease: $${annual_lease_low_usd.toLocaleString()}–$${annual_lease_high_usd.toLocaleString()}/yr (20-yr PV at 5%: $${lease_20yr_pv_low_usd.toLocaleString()}–$${lease_20yr_pv_high_usd.toLocaleString()}).`
+        note: `Site class: ${site_class} (${dist_from_col_km}km from COL centroid); ${min_site_acres_low}–${min_site_acres_high} acres needed for ${n_tower_elements}-element ${isDA_acq ? 'DA array' : 'NDA tower'}. Purchase: $${purchase_cost_low_usd.toLocaleString()}–$${purchase_cost_high_usd.toLocaleString()} land + $${transaction_costs_low_usd.toLocaleString()}–$${transaction_costs_high_usd.toLocaleString()} transaction costs. Lease: $${annual_lease_low_usd.toLocaleString()}–$${annual_lease_high_usd.toLocaleString()}/yr (20-yr PV at 5%: $${lease_20yr_pv_low_usd.toLocaleString()}–$${lease_20yr_pv_high_usd.toLocaleString()}).`,
+        reference: '47 CFR §73.49 (site requirements); §73.1125 (studio/transmitter proximity); ASTM E1527-21 (Phase I ESA); ALTA/NSPS Land Title Survey standard; §73.3533 (CP application)',
       };
     })(),
 
@@ -13734,7 +13744,8 @@ async function scoreCandidate(pt, ctx, warnings){
         annual_maintenance_cost_high_usd,
         total_initial_cost_low_usd,
         total_initial_cost_high_usd,
-        note: `Tower height (λ/4 estimate): ${std_tower_height_ft}ft (${std_tower_height_m}m) at ${frequency_khz} kHz${faa_notification_required ? ` — FAA Form 7460-1 required (14 CFR §77.9); FCC ASR registration required (§17.7); lighting: ${lighting_type.replace(/_/g, ' ')} on ${n_tower_elements} structure${n_tower_elements > 1 ? 's' : ''} per §17.21; annual maintenance obligation per §17.47` : ' — below 200 ft FAA notification threshold; no ASR registration required'}.`
+        note: `Tower height (λ/4 estimate): ${std_tower_height_ft}ft (${std_tower_height_m}m) at ${frequency_khz} kHz${faa_notification_required ? ` — FAA Form 7460-1 required (14 CFR §77.9); FCC ASR registration required (§17.7); lighting: ${lighting_type.replace(/_/g, ' ')} on ${n_tower_elements} structure${n_tower_elements > 1 ? 's' : ''} per §17.21; annual maintenance obligation per §17.47` : ' — below 200 ft FAA notification threshold; no ASR registration required'}.`,
+        reference: '47 CFR §17.7 (ASR registration threshold); §17.21 (lighting/marking requirements); §17.47 (annual lighting inspection); 14 CFR §77.9 (FAA Form 7460-1 threshold); FCC Form 854 (ASR)',
       };
     })(),
 
@@ -13842,7 +13853,8 @@ async function scoreCandidate(pt, ctx, warnings){
         // Grand total (ground system + fence)
         total_cost_low_usd,
         total_cost_high_usd,
-        note: `Ground system: ${n_radials} buried #${wire_gauge_awg} AWG copper radials at λ/4 = ${radial_length_m}m (λ = ${lambda_m}m @ ${frequency_khz} kHz) per §73.54${isDA_gnd ? ` — ${n_tower_elements}-tower DA array` : ''}; total copper: ${total_radial_length_m}m. RF safety per OET-65 Supplement B and §1.1310: uncontrolled MPE = ${mpe_uncontrolled_mw_cm2} mW/cm² at ${f_mhz} MHz; uncontrolled exclusion zone ${exclusion_zone_m}m, controlled zone ${controlled_zone_m}m${rf_fence_required ? `; RF safety fence required (${Math.round(fence_perimeter_ft)} linear ft, $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()})` : ''}.`
+        note: `Ground system: ${n_radials} buried #${wire_gauge_awg} AWG copper radials at λ/4 = ${radial_length_m}m (λ = ${lambda_m}m @ ${frequency_khz} kHz) per §73.54${isDA_gnd ? ` — ${n_tower_elements}-tower DA array` : ''}; total copper: ${total_radial_length_m}m. RF safety per OET-65 Supplement B and §1.1310: uncontrolled MPE = ${mpe_uncontrolled_mw_cm2} mW/cm² at ${f_mhz} MHz; uncontrolled exclusion zone ${exclusion_zone_m}m, controlled zone ${controlled_zone_m}m${rf_fence_required ? `; RF safety fence required (${Math.round(fence_perimeter_ft)} linear ft, $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()})` : ''}.`,
+        reference: '47 CFR §73.190 (ground system); §73.54 (AM antenna systems); §1.1310 (RF exposure limits); OET Bulletin 65 Supplement B (AM RF safety); NFPA 780 (lightning protection); §73.49 (antenna enclosure)',
       };
     })(),
 
