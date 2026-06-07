@@ -11393,6 +11393,53 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_concrete_foundation_and_anchor_design_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
+  assert.ok(g !== undefined && g !== null, 'am_concrete_foundation_and_anchor_design_guide missing');
+  assert.ok(typeof g.total_concrete_cy === 'number', 'total_concrete_cy should be a number');
+  assert.ok(typeof g.total_foundation_low_usd === 'number', 'total_foundation_low_usd should be a number');
+});
+
+test('am_concrete_foundation_and_anchor_design_guide KAZM tower and pier sizing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
+  assert.strictEqual(g.tower_fnd_ft, 315, 'KAZM 780 kHz Class D λ/4 tower should be 315 ft');
+  assert.strictEqual(g.base_pier_diameter_ft, 4, '315 ft tower base pier should be 4 ft diameter');
+  assert.strictEqual(g.base_pier_depth_ft,   15, '315 ft tower base pier should be 15 ft deep');
+  assert.strictEqual(g.base_pier_cy,        6.98, 'Base pier concrete should be 6.98 CY');
+});
+
+test('am_concrete_foundation_and_anchor_design_guide KAZM guy anchor sizing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
+  assert.strictEqual(g.n_anchors,        3,     'Guyed tower should have 3 guy anchors');
+  assert.strictEqual(g.anchor_cy_each,   3.56,  'Each anchor should be 3.56 CY');
+  assert.strictEqual(g.total_anchor_cy,  10.68, 'Total anchor concrete should be 10.68 CY');
+  assert.strictEqual(g.total_concrete_cy, 17.66, 'Total concrete (pier + anchors) should be 17.66 CY');
+});
+
+test('am_concrete_foundation_and_anchor_design_guide KAZM foundation costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
+  assert.strictEqual(g.total_foundation_low_usd,  59480,  'Foundation low cost should be $59,480');
+  assert.strictEqual(g.total_foundation_high_usd, 120460, 'Foundation high cost should be $120,460');
+  assert.ok(g.total_foundation_high_usd > g.total_foundation_low_usd, 'High cost must exceed low');
+});
+
+test('am_concrete_foundation_and_anchor_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fnd_concrete_cy'  in row, 'fnd_concrete_cy missing from comparison table');
+    assert.ok('fnd_total_low_usd' in row, 'fnd_total_low_usd missing from comparison table');
+    assert.ok('fnd_n_anchors'    in row, 'fnd_n_anchors missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.fnd_concrete_cy,   17.66, 'rank-1 fnd_concrete_cy should be 17.66');
+  assert.strictEqual(r0.fnd_total_low_usd, 59480, 'rank-1 fnd_total_low_usd should be $59,480');
+  assert.strictEqual(r0.fnd_n_anchors,     3,     'rank-1 fnd_n_anchors should be 3');
+});
+
 test('am_tower_painting_and_aviation_marking_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;

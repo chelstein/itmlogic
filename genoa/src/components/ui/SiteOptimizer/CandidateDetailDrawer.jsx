@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Concrete Foundation and Anchor Design Guide */}
+        {candidate.am_concrete_foundation_and_anchor_design_guide && (() => {
+          const g = candidate.am_concrete_foundation_and_anchor_design_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="fnd-guide" style={{ marginBottom: 16, padding: 12, background: '#fafaf9', borderRadius: 8, border: '2px solid #78716c' }}>
+              <div style={{ fontWeight: 700, color: '#292524', marginBottom: 6, fontSize: 13 }}>Concrete Foundation &amp; Anchor Design (TIA-222-H / ACI 318)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#44403c' }}>
+                <span style={{ color: '#78716c' }}>Tower Height:</span><span>{g.tower_fnd_ft} ft ({g.tower_fnd_m} m)</span>
+                <span style={{ color: '#78716c' }}>Base Pier:</span><span>{g.base_pier_diameter_ft} ft dia × {g.base_pier_depth_ft} ft deep ({g.base_pier_cy} CY)</span>
+                <span style={{ color: '#78716c' }}>Guy Anchors:</span><span>{g.n_anchors} × {g.anchor_dim_ft} ft × {g.anchor_dim_ft} ft × {g.anchor_depth_ft} ft ({g.anchor_cy_each} CY each)</span>
+                <span style={{ color: '#78716c' }}>Total Concrete:</span><span>{g.total_concrete_cy} CY</span>
+                <span style={{ color: '#78716c' }}>Foundation Cost:</span><span>{fmt(g.foundation_cost_low_usd)} – {fmt(g.foundation_cost_high_usd)}</span>
+                <span style={{ color: '#78716c' }}>Total System:</span><span>{fmt(g.total_foundation_low_usd)} – {fmt(g.total_foundation_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#57534e' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Painting and Aviation Marking Guide */}
         {candidate.am_tower_painting_and_aviation_marking_guide && (() => {
           const g = candidate.am_tower_painting_and_aviation_marking_guide;

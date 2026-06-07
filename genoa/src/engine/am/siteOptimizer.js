@@ -1176,7 +1176,10 @@ export async function runSiteOptimizer(body = {}){
     nf_interference_risk:       c.am_noise_floor_and_rf_environment_analysis_guide?.interference_risk ?? null,
     pnt_tower_height_ft:        c.am_tower_painting_and_aviation_marking_guide?.tower_pnt_ft ?? null,
     pnt_initial_cost_low_usd:   c.am_tower_painting_and_aviation_marking_guide?.initial_paint_cost_low_usd ?? null,
-    pnt_annual_reserve_usd:     c.am_tower_painting_and_aviation_marking_guide?.annual_paint_reserve_usd ?? null
+    pnt_annual_reserve_usd:     c.am_tower_painting_and_aviation_marking_guide?.annual_paint_reserve_usd ?? null,
+    fnd_concrete_cy:            c.am_concrete_foundation_and_anchor_design_guide?.total_concrete_cy ?? null,
+    fnd_total_low_usd:          c.am_concrete_foundation_and_anchor_design_guide?.total_foundation_low_usd ?? null,
+    fnd_n_anchors:              c.am_concrete_foundation_and_anchor_design_guide?.n_anchors ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6911,6 +6914,67 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_concrete_foundation_and_anchor_design_guide: (() => {
+      // Tower base pier and guy anchor foundation design per TIA-222-H and ACI 318-19.
+      // Guyed AM broadcast towers require a base pier (compression/tension) and typically
+      // 3 guy anchor foundations.  Sizing and cost scale with tower height.
+
+      // Derive tower height from frequency and class
+      const lambda_fnd_m = 300000 / frequency_khz;
+      const tower_fnd_m  = ['A','B'].includes(fcc_class)
+        ? round2(lambda_fnd_m * 0.5)
+        : round2(lambda_fnd_m / 4);
+      const tower_fnd_ft = Math.round(tower_fnd_m * 3.281);
+
+      // Base pier (drilled): diameter and depth scale with tower height
+      const base_pier_diameter_ft = tower_fnd_ft > 400 ? 5 : tower_fnd_ft > 250 ? 4 : 3;
+      const base_pier_depth_ft    = tower_fnd_ft > 400 ? 20 : tower_fnd_ft > 250 ? 15 : 10;
+      const base_pier_cy          = round2(Math.PI * Math.pow(base_pier_diameter_ft / 2, 2) * base_pier_depth_ft / 27);
+
+      // Guy anchor foundations: 3 anchors, concrete blocks
+      const anchor_dim_ft   = tower_fnd_ft > 400 ? 5 : tower_fnd_ft > 250 ? 4 : 3;
+      const anchor_depth_ft = tower_fnd_ft > 400 ? 8 : tower_fnd_ft > 250 ? 6 : 4;
+      const anchor_cy_each  = round2(anchor_dim_ft * anchor_dim_ft * anchor_depth_ft / 27);
+      const n_anchors        = 3;
+      const total_anchor_cy  = round2(anchor_cy_each * n_anchors);
+
+      const total_concrete_cy = round2(base_pier_cy + total_anchor_cy);
+
+      // Foundation cost: concrete + rebar + formwork + excavation + labor
+      const foundation_cost_low_usd  = Math.round(total_concrete_cy * 3000 + 5000);
+      const foundation_cost_high_usd = Math.round(total_concrete_cy * 6000 + 10000);
+
+      // Anchor bolt/cable embedment hardware per anchor
+      const anchor_bolt_cost_low_usd  = n_anchors * 500;
+      const anchor_bolt_cost_high_usd = n_anchors * 1500;
+
+      const total_foundation_low_usd  = foundation_cost_low_usd  + anchor_bolt_cost_low_usd;
+      const total_foundation_high_usd = foundation_cost_high_usd + anchor_bolt_cost_high_usd;
+
+      return {
+        fcc_class,
+        tower_fnd_ft,
+        tower_fnd_m,
+        base_pier_diameter_ft,
+        base_pier_depth_ft,
+        base_pier_cy,
+        n_anchors,
+        anchor_dim_ft,
+        anchor_depth_ft,
+        anchor_cy_each,
+        total_anchor_cy,
+        total_concrete_cy,
+        foundation_cost_low_usd,
+        foundation_cost_high_usd,
+        anchor_bolt_cost_low_usd,
+        anchor_bolt_cost_high_usd,
+        total_foundation_low_usd,
+        total_foundation_high_usd,
+        reference: 'TIA-222-H §2.3 (foundation design loads); ACI 318-19 (concrete design); AISC 360-22 (anchor bolt design); 47 CFR §17.7 (ASR — foundation drawings required for registered structures); OSHA 29 CFR §1926.502(d) (anchor system engineering)',
+        note: `Tower foundation: ${tower_fnd_ft} ft guyed tower (Class ${fcc_class}, ${frequency_khz} kHz). Base pier: ${base_pier_diameter_ft} ft dia × ${base_pier_depth_ft} ft deep (${base_pier_cy} CY). ${n_anchors} guy anchors: ${anchor_dim_ft} ft × ${anchor_dim_ft} ft × ${anchor_depth_ft} ft deep (${anchor_cy_each} CY each). Total concrete: ${total_concrete_cy} CY. Foundation system: $${total_foundation_low_usd.toLocaleString()}–$${total_foundation_high_usd.toLocaleString()}.`
       };
     })(),
 
