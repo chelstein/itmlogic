@@ -13059,3 +13059,49 @@ test('am_tower_guy_wire_and_anchor_system_guide comparison table columns present
   assert.strictEqual(r0.gwy_total_low_usd,     41100.34,  'rank-1 gwy_total_low_usd should be $41,100.34');
   assert.strictEqual(r0.gwy_tower_height_ft,   315.26,    'rank-1 gwy_tower_height_ft should be 315.26');
 });
+
+test('am_transmission_loss_budget_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_loss_budget_guide;
+  assert.ok(g !== undefined && g !== null, 'am_transmission_loss_budget_guide missing');
+  assert.ok(g.total_loss_db > 0, 'total_loss_db must be positive');
+  assert.ok(g.power_fraction_at_antenna > 0.9, 'power_fraction should be > 90% for AM');
+});
+
+test('KAZM coax run and diameter', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_loss_budget_guide;
+  assert.strictEqual(g.coax_run_ft,    207.63,       'KAZM coax_run_ft should be 207.63');
+  assert.strictEqual(g.coax_diameter,  '1_5_8_inch', 'KAZM 5 kW should use 1-5/8 inch coax');
+  assert.strictEqual(g.loss_per_100ft, 0.025,        '1-5/8 inch coax loss should be 0.025 dB/100ft');
+});
+
+test('KAZM transmission loss components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_loss_budget_guide;
+  assert.strictEqual(g.coax_loss_db,      0.05, 'coax_loss_db should be 0.05');
+  assert.strictEqual(g.atu_loss_db,        0.10, 'atu_loss_db should be 0.10');
+  assert.strictEqual(g.connector_loss_db,  0.05, 'connector_loss_db should be 0.05');
+  assert.strictEqual(g.total_loss_db,      0.22, 'total_loss_db should be 0.22 dB');
+});
+
+test('KAZM power at antenna and system cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_loss_budget_guide;
+  assert.strictEqual(g.power_fraction_at_antenna, 0.9506, 'power_fraction should be 0.9506');
+  assert.strictEqual(g.power_at_antenna_kw,        4.75,  'power_at_antenna_kw should be 4.75');
+  assert.strictEqual(g.total_low_usd,              3529.71, 'total_low should be $3,529.71');
+});
+
+test('am_transmission_loss_budget_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('txl_total_loss_db' in row, 'txl_total_loss_db missing from comparison table');
+    assert.ok('txl_total_low_usd' in row, 'txl_total_low_usd missing from comparison table');
+    assert.ok('txl_coax_run_ft'   in row, 'txl_coax_run_ft missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.txl_total_loss_db, 0.22,    'rank-1 txl_total_loss_db should be 0.22');
+  assert.strictEqual(r0.txl_total_low_usd, 3529.71, 'rank-1 txl_total_low_usd should be $3,529.71');
+  assert.strictEqual(r0.txl_coax_run_ft,   207.63,  'rank-1 txl_coax_run_ft should be 207.63');
+});

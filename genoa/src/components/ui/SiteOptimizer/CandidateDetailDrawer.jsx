@@ -2226,6 +2226,33 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmission Loss Budget Guide */}
+        {candidate.am_transmission_loss_budget_guide && (() => {
+          const g = candidate.am_transmission_loss_budget_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const coaxLabel = {
+            '7_8_inch':   '7/8"',
+            '1_5_8_inch': '1-5/8"',
+            '3_inch':     '3"',
+          }[g.coax_diameter] ?? g.coax_diameter ?? '—';
+          return (
+            <div key="txl-guide" style={{ marginBottom: 16, padding: 12, background: '#d1fae5', borderRadius: 8, border: '2px solid #065f46' }}>
+              <div style={{ fontWeight: 700, color: '#022c22', marginBottom: 6, fontSize: 13 }}>Transmission Line Loss Budget</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#064e3b' }}>
+                <span>Coax size:</span><span>{coaxLabel} ({g.coax_run_ft != null ? `${g.coax_run_ft.toFixed(0)} ft` : '—'})</span>
+                <span>Coax loss:</span><span>{g.coax_loss_db != null ? `${g.coax_loss_db} dB` : '—'}</span>
+                <span>ATU loss:</span><span>{g.atu_loss_db != null ? `${g.atu_loss_db} dB` : '—'}</span>
+                <span>Connectors:</span><span>{g.connector_loss_db != null ? `${g.connector_loss_db} dB` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>Total loss:</span>
+                <span style={{ fontWeight: 600 }}>{g.total_loss_db != null ? `${g.total_loss_db} dB` : '—'}</span>
+                <span>Power at antenna:</span><span>{g.power_at_antenna_kw != null ? `${g.power_at_antenna_kw} kW` : '—'} ({g.power_fraction_at_antenna != null ? `${(g.power_fraction_at_antenna*100).toFixed(1)}%` : '—'})</span>
+                <span>Coax system:</span><span>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#047857', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Tower Guy Wire and Anchor System Guide */}
         {candidate.am_tower_guy_wire_and_anchor_system_guide && (() => {
           const g = candidate.am_tower_guy_wire_and_anchor_system_guide;

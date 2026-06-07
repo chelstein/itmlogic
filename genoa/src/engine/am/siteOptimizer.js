@@ -1275,7 +1275,10 @@ export async function runSiteOptimizer(body = {}){
     fin_payback_years_low:      c.am_financial_feasibility_and_roi_guide?.simple_payback_years_low ?? null,
     gwy_num_total_anchors:      c.am_tower_guy_wire_and_anchor_system_guide?.num_total_anchors ?? null,
     gwy_total_low_usd:          c.am_tower_guy_wire_and_anchor_system_guide?.total_low_usd ?? null,
-    gwy_tower_height_ft:        c.am_tower_guy_wire_and_anchor_system_guide?.tower_height_ft ?? null
+    gwy_tower_height_ft:        c.am_tower_guy_wire_and_anchor_system_guide?.tower_height_ft ?? null,
+    txl_total_loss_db:          c.am_transmission_loss_budget_guide?.total_loss_db ?? null,
+    txl_total_low_usd:          c.am_transmission_loss_budget_guide?.total_low_usd ?? null,
+    txl_coax_run_ft:            c.am_transmission_loss_budget_guide?.coax_run_ft ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7010,6 +7013,45 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmission_loss_budget_guide: (() => {
+      // RF link budget from transmitter output to antenna feed point.
+      // AM coax loss at MF frequencies is very low (0.02-0.06 dB per 100 ft);
+      // total system loss typically 0.15-0.5 dB including ATU, connectors, and arrester.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd     = /^[CD]$/i.test(fcc_class);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const coax_run_ft     = round2(tower_height_m * 3.28084 * 0.5 + 50);
+      const coax_diameter   = tpo_kw >= 50 ? '3_inch' : tpo_kw >= 5 ? '1_5_8_inch' : '7_8_inch';
+      const loss_per_100ft  = coax_diameter === '3_inch' ? 0.018 : coax_diameter === '1_5_8_inch' ? 0.025 : 0.04;
+      const coax_loss_db    = round2(coax_run_ft / 100 * loss_per_100ft);
+      const atu_loss_db     = 0.10;
+      const connector_loss_db  = 0.05;
+      const lightning_arr_loss = 0.02;
+      const total_loss_db   = round2(coax_loss_db + atu_loss_db + connector_loss_db + lightning_arr_loss);
+      const power_fraction_at_antenna = round2(Math.pow(10, -total_loss_db / 10) * 100) / 100;
+      const power_at_antenna_kw = round2(tpo_kw * power_fraction_at_antenna);
+      const coax_cost_per_ft = coax_diameter === '3_inch' ? 25 : coax_diameter === '1_5_8_inch' ? 15 : 8;
+      const coax_material_low_usd  = round2(coax_run_ft * coax_cost_per_ft * 0.8);
+      const coax_material_high_usd = round2(coax_run_ft * coax_cost_per_ft * 1.5);
+      const install_low_usd  = round2(coax_run_ft * 5);
+      const install_high_usd = round2(coax_run_ft * 15);
+      const total_low_usd  = round2(coax_material_low_usd  + install_low_usd);
+      const total_high_usd = round2(coax_material_high_usd + install_high_usd);
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        coax_run_ft, coax_diameter, loss_per_100ft,
+        coax_loss_db, atu_loss_db, connector_loss_db, lightning_arr_loss,
+        total_loss_db,
+        power_fraction_at_antenna, power_at_antenna_kw,
+        coax_material_low_usd, coax_material_high_usd,
+        install_low_usd, install_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'Andrew/CommScope coax loss tables; Belden cable specs; AM broadcast engineering handbook',
+        note: `${coax_run_ft.toFixed(0)} ft ${coax_diameter} coax: ${total_loss_db} dB total; ${(power_fraction_at_antenna*100).toFixed(1)}% power at antenna; system ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 

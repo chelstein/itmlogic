@@ -3060,3 +3060,15 @@ test('am_tower_guy_wire_and_anchor_system_guide present across colocation candid
     assert.ok([3,4].includes(g.num_guy_levels), `rank ${c.rank}: num_guy_levels should be 3 or 4`);
   }
 });
+
+test('am_transmission_loss_budget_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_transmission_loss_budget_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmission_loss_budget_guide missing`);
+    assert.ok(g.total_loss_db > 0, `rank ${c.rank}: total_loss_db must be positive`);
+    assert.ok(g.power_fraction_at_antenna > 0.9, `rank ${c.rank}: power_fraction_at_antenna must be > 0.9`);
+    assert.ok(['7_8_inch','1_5_8_inch','3_inch'].includes(g.coax_diameter),
+      `rank ${c.rank}: unexpected coax_diameter: ${g.coax_diameter}`);
+  }
+});
