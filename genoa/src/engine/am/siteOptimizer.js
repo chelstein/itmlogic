@@ -1071,7 +1071,10 @@ export async function runSiteOptimizer(body = {}){
     colpop_307b_risk:           c.community_of_license_population_change_trend_guide?.sect_307b_preference_risk ?? null,
     nepa_tier:                  c.environmental_permitting_and_nepa_compliance_guide?.nepa_tier ?? null,
     nepa_n_triggers:            c.environmental_permitting_and_nepa_compliance_guide?.n_section_1307_triggers ?? null,
-    nepa_total_days_low:        c.environmental_permitting_and_nepa_compliance_guide?.total_permitting_timeline_days_low ?? null
+    nepa_total_days_low:        c.environmental_permitting_and_nepa_compliance_guide?.total_permitting_timeline_days_low ?? null,
+    lic_processing_priority:    c.fcc_license_history_and_compliance_record_guide?.processing_priority ?? null,
+    lic_processing_months_low:  c.fcc_license_history_and_compliance_record_guide?.processing_months_low ?? null,
+    lic_comparative_risk:       c.fcc_license_history_and_compliance_record_guide?.comparative_proceeding_risk ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6806,6 +6809,111 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    fcc_license_history_and_compliance_record_guide: (() => {
+      // Models the FCC license-record risk factors that affect a relocation
+      // application's processing priority and likelihood of approval.
+      //
+      // Key license record risk categories:
+      //   1. Construction Permit (CP) expiration risk: CPs expire 3 years from
+      //      grant date (47 CFR §73.3534); lapse → must re-apply from scratch
+      //   2. License renewal history: "red light" rule (47 CFR §1.1910)
+      //      blocks new applications during unpaid debts/forfeitures
+      //   3. Foreign ownership: > 25% foreign ownership (47 USC §310(b))
+      //      triggers DOJ/FBI CFIUS review; adds 6–18 months to processing
+      //   4. Auction default history: prior default bars participation in
+      //      future auctions for 5 years (47 CFR §1.2109)
+      //   5. Unauthorized operation history: multiple NOVs or consent decrees
+      //      trigger heightened review under Character Policy (FCC Policy Statement)
+      //
+      // FCC processing times for major amendments (Form 301-AM relocation):
+      //   Normal: 8–18 months; Priority: 4–8 months (if Class A or rural)
+      //   Expedited (STA): 30 days for Special Temporary Authority
+      //   Comparative: 2–5 years if mutually exclusive with another application
+      //
+      // Ownership structure risk indicators by class:
+      //   Class A: higher likelihood of multiple owners, holding companies
+      //   Class B/C: typically group-owned; foreign ownership more common
+      //   Class D: typically owner-operated; simpler ownership structure
+
+      const isDA_lic        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_lic = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // CP expiration risk score (0–5): higher for complex DA arrays
+      const cp_complexity_score = isDA_lic ? (tpo_kw >= 50 ? 4 : 2) : 1;
+      const cp_years_to_expiry  = 3; // §73.3534 standard CP term
+
+      // STA eligibility: available for DA-to-NDA temporary conversions or
+      // minor facility changes; not available for major technical changes
+      const sta_eligible = !isDA_lic || tpo_kw < 50;
+      const sta_duration_days = 180; // §73.1635 standard STA term
+
+      // Red light rule check: any unpaid FCC debt blocks new applications
+      const red_light_risk_factors = [
+        { risk: 'Unpaid FCC forfeiture order', trigger: 'Any outstanding FCC debt > $0', cfr: '47 CFR §1.1910' },
+        { risk: 'License renewal application pending', trigger: 'Renewal filed < 4 months before license expiry', cfr: '47 CFR §73.3539' },
+        { risk: 'Outstanding Notice of Apparent Liability (NAL)', trigger: 'NAL not yet paid or appealed', cfr: '47 CFR §1.80' }
+      ];
+
+      // Foreign ownership risk: different thresholds for different licensee types
+      const foreign_ownership_thresholds = [
+        { structure: 'Direct licensee (individual)', max_foreign_pct: 20, authority: '47 USC §310(b)(1)' },
+        { structure: 'Corporate licensee', max_foreign_pct: 20, authority: '47 USC §310(b)(3)' },
+        { structure: 'Corporate licensee (indirect via parent)', max_foreign_pct: 25, authority: '47 USC §310(b)(4)' }
+      ];
+
+      // Processing priority by class
+      const processing_priority =
+        is_clear_ch_lic && fcc_class === 'A'  ? 'PRIORITY_RURAL'    :
+        fcc_class === 'A'                      ? 'NORMAL'            :
+        fcc_class === 'D' && !isDA_lic         ? 'EXPEDITED_ELIGIBLE' :
+                                                  'NORMAL';
+
+      // Estimated FCC processing time by class/complexity
+      const processing_months_low =
+        processing_priority === 'EXPEDITED_ELIGIBLE' ? 6 :
+        processing_priority === 'PRIORITY_RURAL'     ? 4 : 8;
+      const processing_months_high =
+        isDA_lic ? 24 :
+        processing_priority === 'EXPEDITED_ELIGIBLE' ? 12 : 18;
+
+      // Comparative proceeding risk: higher for clear-channel proposals
+      const comparative_risk =
+        is_clear_ch_lic && fcc_class === 'A'  ? 'HIGH'     :
+        isDA_lic                               ? 'MODERATE' : 'LOW';
+
+      // Key filing deadlines
+      const key_deadlines = [
+        { item: 'STA application', deadline: 'Before authorized facilities expire (§73.1635)', form: 'FCC Form 302-AM' },
+        { item: 'Construction Permit', deadline: '3 years from CP grant (§73.3534)', form: 'FCC Form 301-AM' },
+        { item: 'License to Cover (LTC)', deadline: 'Within 15 days of construction completion (§73.3536)', form: 'FCC Form 302-AM' },
+        { item: 'License Renewal', deadline: 'First full-power year after construction (§73.3539)', form: 'FCC Form 303-S' }
+      ];
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        cp_complexity_score,
+        cp_years_to_expiry,
+        sta_eligible,
+        sta_duration_days,
+        n_red_light_risk_factors:    red_light_risk_factors.length,
+        red_light_risk_factors,
+        foreign_ownership_thresholds,
+        n_foreign_ownership_limits:  foreign_ownership_thresholds.length,
+        processing_priority,
+        processing_months_low,
+        processing_months_high,
+        comparative_proceeding_risk: comparative_risk,
+        key_filing_deadlines:        key_deadlines,
+        n_key_deadlines:             key_deadlines.length,
+        is_clear_channel:            is_clear_ch_lic,
+        is_da:                       isDA_lic,
+        reference: '47 CFR §73.3534; §73.3536; §73.3539; §1.1910; §1.80; §1.2109; 47 USC §310(b); FCC Character Policy Statement (1990); FCC Red Light Rule',
+        note: `FCC license compliance profile for ${fcc_class}-class station on ${frequency_khz} kHz. ` +
+              `Processing: ${processing_priority} (${processing_months_low}–${processing_months_high} months). ` +
+              `Comparative risk: ${comparative_risk}. STA eligible: ${sta_eligible}.`
       };
     })(),
 

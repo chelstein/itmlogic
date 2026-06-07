@@ -2184,3 +2184,20 @@ test('environmental_permitting_and_nepa_compliance_guide present across colocati
     assert.ok(g.total_permitting_timeline_days_low > 0, `rank ${c.rank}: timeline must be positive`);
   }
 });
+
+test('fcc_license_history_and_compliance_record_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_priorities = ['EXPEDITED_ELIGIBLE', 'NORMAL', 'PRIORITY_RURAL'];
+  for (const c of out.candidates) {
+    const g = c.fcc_license_history_and_compliance_record_guide;
+    assert.ok(g != null, `rank ${c.rank} missing fcc_license_history_and_compliance_record_guide`);
+    assert.ok(valid_priorities.includes(g.processing_priority), `rank ${c.rank}: processing_priority '${g.processing_priority}' invalid`);
+    assert.ok(g.processing_months_low > 0, `rank ${c.rank}: processing_months_low must be > 0`);
+  }
+});

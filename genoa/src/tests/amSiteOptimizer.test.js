@@ -9919,3 +9919,46 @@ test('environmental_permitting_and_nepa_compliance_guide comparison table column
     assert.ok('nepa_total_days_low' in row, 'nepa_total_days_low missing from comparison table');
   }
 });
+
+test('fcc_license_history_and_compliance_record_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_license_history_and_compliance_record_guide;
+  assert.ok(g, 'license history guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.cp_years_to_expiry, 3, 'CP expiry must be 3 years per §73.3534');
+});
+
+test('fcc_license_history_and_compliance_record_guide KAZM NDA Class D processing priority', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_license_history_and_compliance_record_guide;
+  assert.strictEqual(g.processing_priority, 'EXPEDITED_ELIGIBLE', 'NDA Class D must be EXPEDITED_ELIGIBLE');
+  assert.strictEqual(g.sta_eligible, true, 'NDA Class D must be STA eligible');
+  assert.strictEqual(g.comparative_proceeding_risk, 'LOW', 'NDA Class D must be LOW comparative risk');
+});
+
+test('fcc_license_history_and_compliance_record_guide processing timeline is positive range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_license_history_and_compliance_record_guide;
+  assert.ok(g.processing_months_low > 0, 'processing_months_low must be > 0');
+  assert.ok(g.processing_months_high >= g.processing_months_low, 'high must be >= low');
+  assert.ok(g.n_red_light_risk_factors >= 3, 'must list at least 3 red light risk factors');
+  assert.ok(g.n_key_deadlines >= 4, 'must list at least 4 key filing deadlines');
+});
+
+test('fcc_license_history_and_compliance_record_guide foreign ownership structure present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_license_history_and_compliance_record_guide;
+  assert.ok(g.n_foreign_ownership_limits >= 3, 'must have at least 3 foreign ownership threshold entries');
+  assert.ok(g.foreign_ownership_thresholds.every(t => t.max_foreign_pct <= 25), 'all limits must be <= 25%');
+  assert.ok(g.sta_duration_days === 180, 'STA duration must be 180 days per §73.1635');
+});
+
+test('fcc_license_history_and_compliance_record_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lic_processing_priority'   in row, 'lic_processing_priority missing from comparison table');
+    assert.ok('lic_processing_months_low' in row, 'lic_processing_months_low missing from comparison table');
+    assert.ok('lic_comparative_risk'      in row, 'lic_comparative_risk missing from comparison table');
+  }
+});

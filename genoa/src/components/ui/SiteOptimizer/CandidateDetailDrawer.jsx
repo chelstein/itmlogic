@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FCC License History & Compliance Record Guide */}
+        {candidate.fcc_license_history_and_compliance_record_guide && (() => {
+          const g = candidate.fcc_license_history_and_compliance_record_guide;
+          const priorityColor = {
+            EXPEDITED_ELIGIBLE: '#14532d', PRIORITY_RURAL: '#1e40af', NORMAL: '#374151'
+          }[g.processing_priority] ?? '#374151';
+          const priorityBg = {
+            EXPEDITED_ELIGIBLE: '#dcfce7', PRIORITY_RURAL: '#dbeafe', NORMAL: '#f3f4f6'
+          }[g.processing_priority] ?? '#f3f4f6';
+          const compRiskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#14532d' }[g.comparative_proceeding_risk] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fefce8', borderRadius: 8, border: '1px solid #fde047' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#854d0e', marginBottom: 8 }}>
+                FCC License History & Compliance Profile
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Processing Priority:</span> <strong style={{ color: priorityColor }}>{g.processing_priority?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Processing Time:</span> <strong>{g.processing_months_low}–{g.processing_months_high} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>Comparative Risk:</span> <strong style={{ color: compRiskColor }}>{g.comparative_proceeding_risk}</strong></div>
+                <div><span style={{ color: '#64748b' }}>STA Eligible:</span> <strong style={{ color: g.sta_eligible ? '#15803d' : '#b91c1c' }}>{g.sta_eligible ? `Yes (${g.sta_duration_days} days)` : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>CP Expiry Term:</span> <strong>{g.cp_years_to_expiry} years</strong></div>
+                <div><span style={{ color: '#64748b' }}>Foreign Ownership Limit:</span> <strong>20–25%</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: priorityBg, color: priorityColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.processing_priority?.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: '#fef9c3', color: compRiskColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  Comparative: {g.comparative_proceeding_risk}
+                </span>
+              </div>
+              {g.key_filing_deadlines?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#854d0e', marginBottom: 4 }}>Key Filing Deadlines</div>
+                  {g.key_filing_deadlines.map((d, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#fef9c3', borderRadius: 4, padding: '3px 8px', marginBottom: 2 }}>
+                      <strong>{d.item}</strong> ({d.form}): {d.deadline}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Environmental Permitting & NEPA Compliance Guide */}
         {candidate.environmental_permitting_and_nepa_compliance_guide && (() => {
           const g = candidate.environmental_permitting_and_nepa_compliance_guide;
