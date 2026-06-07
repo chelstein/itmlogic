@@ -1086,7 +1086,10 @@ export async function runSiteOptimizer(body = {}){
     struct_ice_zone:            c.tower_structural_wind_and_ice_load_design_guide?.ice_zone ?? null,
     mkt_tier:                   c.broadcast_market_competitive_landscape_guide?.market_tier ?? null,
     mkt_am_stations:            c.broadcast_market_competitive_landscape_guide?.estimated_am_stations_in_market ?? null,
-    mkt_audience_change_pct:    c.broadcast_market_competitive_landscape_guide?.audience_potential_change_pct ?? null
+    mkt_audience_change_pct:    c.broadcast_market_competitive_landscape_guide?.audience_potential_change_pct ?? null,
+    eas_tier:                   c.am_automation_and_emergency_alert_system_guide?.recommended_eas_tier ?? null,
+    eas_setup_cost_low_usd:     c.am_automation_and_emergency_alert_system_guide?.eas_setup_cost_low_usd ?? null,
+    eas_automation:             c.am_automation_and_emergency_alert_system_guide?.recommended_automation ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6821,6 +6824,138 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_automation_and_emergency_alert_system_guide: (() => {
+      // Models automation and Emergency Alert System (EAS) compliance requirements
+      // for the candidate AM relocation site under FCC Part 11 rules.
+      //
+      // FCC EAS requirements (47 CFR Part 11):
+      //   - All AM stations must receive, record, and rebroadcast EAS alerts
+      //   - REQUIRED EAS equipment: EAS decoder, encoder, two-tone attention signal
+      //   - Weekly Required Weekly Tests (RWT) and monthly Required Monthly Tests (RMT)
+      //   - Presidential Alert (PAS) must be broadcast without delay
+      //   - New: WEA (Wireless Emergency Alerts) coordination with local FEMA IPAWS
+      //
+      // EAS equipment cost (2024):
+      //   Entry-level decoder/encoder combo: $1,200–$2,500 (Gorman-Redlich, TFT, Sage)
+      //   Professional EAS station: $3,500–$8,000 (with logging, monitoring)
+      //   IPAWS monitoring add-on: $50–$200/month subscription
+      //
+      // Automation requirements for relocations:
+      //   - During silent period: no EAS source; backup needed via IP or studio relay
+      //   - Unattended operation: EAS must work automatically without operator present
+      //   - Remote monitoring: required for unattended transmitter per §73.1350
+      //   - Studio-transmitter link (STL): backup paths required for EAS delivery
+      //
+      // STL backup path options:
+      //   1. IP/Internet (primary + backup) — low cost, reliability varies
+      //   2. Microwave STL — high reliability, APCSS license required
+      //   3. Phone hybrid — legacy, acceptable for smaller markets
+      //   4. Direct fiber — highest reliability, expensive
+      //
+      // Automation levels:
+      //   FULL: 24h unattended operation with automated EAS monitoring
+      //   SEMI: attended during daytime, automated overnight
+      //   MANUAL: operator present when station is on air
+      //
+      // Remote control requirement: §73.1350 requires transmitter remote control
+      // that allows immediate shutdown within 3 minutes of operator notification.
+
+      const isDA_eas        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_eas = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_eas = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // EAS equipment tiers
+      const eas_equipment_tiers = [
+        { tier: 'Entry-level', description: 'Basic decoder/encoder combo', cost_low_usd: 1200, cost_high_usd: 2500, brands: 'Gorman-Redlich, TFT, Dasdec' },
+        { tier: 'Professional', description: 'Full EAS with logging, monitoring, remote access', cost_low_usd: 3500, cost_high_usd: 8000, brands: 'Dasdec-II, Sage ENDEC' },
+        { tier: 'Enterprise', description: 'Network-integrated, multi-site EAS with IPAWS', cost_low_usd: 8000, cost_high_usd: 20000, brands: 'Trilithic/Cobalt, Dasdec-III' }
+      ];
+
+      // Recommended EAS tier by class
+      const recommended_eas_tier =
+        fcc_class === 'A' ? 'Enterprise' :
+        is_clear_ch_eas   ? 'Professional' : 'Entry-level';
+
+      const eas_tier_obj = eas_equipment_tiers.find(t => t.tier === recommended_eas_tier);
+
+      // IPAWS monitoring (Integrated Public Alert & Warning System)
+      const ipaws_monitoring_required = true; // Required for all EAS participants since 2019
+      const ipaws_monthly_cost_usd    = 120;  // Typical IPAWS subscription
+
+      // STL backup path requirements
+      const stl_backup_paths = [
+        { type: 'Primary IP/Internet', monthly_cost_usd: 80, reliability_pct: 99.5, fcc_approved: true },
+        { type: 'Secondary IP (cellular backup)', monthly_cost_usd: 40, reliability_pct: 98.5, fcc_approved: true },
+        { type: 'Microwave STL (licensed)', monthly_cost_usd: 150, reliability_pct: 99.99, fcc_approved: true }
+      ];
+
+      // Remote control system cost
+      const remote_control_cost_low_usd  = 800;
+      const remote_control_cost_high_usd = 3000;
+
+      // Automation level recommendation by class
+      const recommended_automation =
+        fcc_class === 'A' ? 'FULL' :
+        isDA_eas          ? 'FULL' :
+        fcc_class === 'D' ? 'SEMI' : 'FULL';
+
+      // EAS test schedule
+      const eas_tests = [
+        { type: 'Required Weekly Test (RWT)', frequency: 'Weekly, Wednesday 11am–noon (local)', penalty_per_miss_usd: 0, note: 'Self-originated; logged by station' },
+        { type: 'Required Monthly Test (RMT)', frequency: 'Monthly; state EAS Chair schedule', penalty_per_miss_usd: 10000, note: 'Triggered by state EAS; must retransmit' },
+        { type: 'Presidential Alert (PAS)', frequency: 'As issued by FEMA/White House', penalty_per_miss_usd: 25000, note: 'Non-optional; must originate immediately' }
+      ];
+
+      // Part 11 compliance checklist items
+      const part11_checklist = [
+        { item: 'EAS decoder installed and operational', cfr: '47 CFR §11.32', required: true },
+        { item: 'EAS encoder installed and operational', cfr: '47 CFR §11.33', required: true },
+        { item: 'Two-tone attention signal capability', cfr: '47 CFR §11.31(a)', required: true },
+        { item: 'IPAWS OPEN monitoring configured', cfr: '47 CFR §11.56', required: true },
+        { item: 'EAS log maintained for 60 days', cfr: '47 CFR §11.35(b)', required: true },
+        { item: 'Remote control system operational', cfr: '47 CFR §73.1350', required: true },
+        { item: 'STL backup path documented', cfr: '47 CFR §73.1350(c)', required: fcc_class === 'A' || is_clear_ch_eas }
+      ];
+
+      const n_required_items = part11_checklist.filter(i => i.required).length;
+
+      // Total EAS setup cost estimate
+      const eas_setup_low_usd  = (eas_tier_obj?.cost_low_usd ?? 1200) + remote_control_cost_low_usd + 500;
+      const eas_setup_high_usd = (eas_tier_obj?.cost_high_usd ?? 2500) + remote_control_cost_high_usd + 1500;
+
+      // Monthly operating cost (IPAWS + STL backup)
+      const monthly_operating_cost_usd = ipaws_monthly_cost_usd +
+        stl_backup_paths.reduce((sum, p) => sum + p.monthly_cost_usd, 0);
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        recommended_eas_tier,
+        eas_equipment_tiers,
+        n_eas_tiers:                  eas_equipment_tiers.length,
+        eas_setup_cost_low_usd:       eas_setup_low_usd,
+        eas_setup_cost_high_usd:      eas_setup_high_usd,
+        ipaws_monitoring_required,
+        ipaws_monthly_cost_usd,
+        stl_backup_paths,
+        n_stl_backup_paths:           stl_backup_paths.length,
+        remote_control_cost_low_usd,
+        remote_control_cost_high_usd,
+        recommended_automation,
+        eas_tests,
+        n_eas_tests:                  eas_tests.length,
+        part11_checklist,
+        n_part11_required_items:      n_required_items,
+        monthly_operating_cost_usd,
+        is_clear_channel:             is_clear_ch_eas,
+        is_local_channel:             is_local_ch_eas,
+        is_da:                        isDA_eas,
+        reference: '47 CFR Part 11 (EAS); §73.1350 (Remote Control); FCC EAS Handbook (2019); FEMA IPAWS Developer Guide; EIA-542; NRSC-5-D',
+        note: `Recommended EAS tier: ${recommended_eas_tier}. Setup cost: $${eas_setup_low_usd.toLocaleString()}–$${eas_setup_high_usd.toLocaleString()}. ` +
+              `Monthly operating: $${monthly_operating_cost_usd}/mo. ` +
+              `Automation: ${recommended_automation}. Part 11 checklist: ${n_required_items} required items.`
       };
     })(),
 

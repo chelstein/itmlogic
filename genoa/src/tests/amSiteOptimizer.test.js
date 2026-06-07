@@ -10134,3 +10134,46 @@ test('broadcast_market_competitive_landscape_guide comparison table columns pres
     assert.ok('mkt_audience_change_pct' in row, 'mkt_audience_change_pct missing from comparison table');
   }
 });
+
+test('am_automation_and_emergency_alert_system_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_automation_and_emergency_alert_system_guide;
+  assert.ok(g, 'EAS guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.ipaws_monitoring_required, true, 'IPAWS monitoring must be required for all EAS participants');
+});
+
+test('am_automation_and_emergency_alert_system_guide KAZM clear-channel gets Professional EAS tier', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_automation_and_emergency_alert_system_guide;
+  assert.strictEqual(g.recommended_eas_tier, 'Professional', 'Class D clear-channel must use Professional EAS tier');
+  assert.strictEqual(g.recommended_automation, 'SEMI', 'Class D non-DA must be SEMI automation');
+  assert.ok(g.eas_setup_cost_low_usd > 0, 'EAS setup cost must be positive');
+  assert.ok(g.eas_setup_cost_high_usd >= g.eas_setup_cost_low_usd, 'high cost must be >= low cost');
+});
+
+test('am_automation_and_emergency_alert_system_guide Part 11 checklist is comprehensive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_automation_and_emergency_alert_system_guide;
+  assert.ok(g.n_part11_required_items >= 6, 'must have at least 6 required Part 11 checklist items');
+  assert.ok(g.n_eas_tests >= 3, 'must list at least 3 EAS test types');
+  assert.ok(g.part11_checklist.every(i => i.cfr), 'every checklist item must have a CFR reference');
+});
+
+test('am_automation_and_emergency_alert_system_guide STL backup paths and monthly cost valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_automation_and_emergency_alert_system_guide;
+  assert.ok(g.n_stl_backup_paths >= 3, 'must list at least 3 STL backup path options');
+  assert.ok(g.monthly_operating_cost_usd > 0, 'monthly operating cost must be positive');
+  assert.ok(g.stl_backup_paths.every(p => p.reliability_pct >= 95), 'all STL paths must have >= 95% reliability');
+});
+
+test('am_automation_and_emergency_alert_system_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('eas_tier'              in row, 'eas_tier missing from comparison table');
+    assert.ok('eas_setup_cost_low_usd' in row, 'eas_setup_cost_low_usd missing from comparison table');
+    assert.ok('eas_automation'        in row, 'eas_automation missing from comparison table');
+  }
+});

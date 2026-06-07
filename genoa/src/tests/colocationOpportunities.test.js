@@ -2269,3 +2269,20 @@ test('broadcast_market_competitive_landscape_guide present across colocation can
     assert.ok(g.n_format_segments >= 5, `rank ${c.rank}: must have at least 5 format segments`);
   }
 });
+
+test('am_automation_and_emergency_alert_system_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['Entry-level', 'Professional', 'Enterprise'];
+  for (const c of out.candidates) {
+    const g = c.am_automation_and_emergency_alert_system_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_automation_and_emergency_alert_system_guide`);
+    assert.ok(valid_tiers.includes(g.recommended_eas_tier), `rank ${c.rank}: eas_tier '${g.recommended_eas_tier}' invalid`);
+    assert.ok(g.eas_setup_cost_low_usd > 0, `rank ${c.rank}: EAS setup cost must be positive`);
+  }
+});

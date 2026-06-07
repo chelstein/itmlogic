@@ -2226,6 +2226,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Automation & Emergency Alert System Guide */}
+        {candidate.am_automation_and_emergency_alert_system_guide && (() => {
+          const g = candidate.am_automation_and_emergency_alert_system_guide;
+          const autoColor = {
+            FULL: '#15803d', SEMI: '#0c4a6e', MANUAL: '#92400e'
+          }[g.recommended_automation] ?? '#374151';
+          const tierBadgeColor = {
+            'Enterprise': '#7c3aed', 'Professional': '#0c4a6e', 'Entry-level': '#15803d'
+          }[g.recommended_eas_tier] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #7dd3fc' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0369a1', marginBottom: 8 }}>
+                Automation & Emergency Alert System (EAS)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>EAS Tier:</span> <strong style={{ color: tierBadgeColor }}>{g.recommended_eas_tier}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Automation:</span> <strong style={{ color: autoColor }}>{g.recommended_automation}</strong></div>
+                <div><span style={{ color: '#64748b' }}>EAS Setup Cost:</span> <strong>${g.eas_setup_cost_low_usd?.toLocaleString()}–${g.eas_setup_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Monthly Op Cost:</span> <strong>${g.monthly_operating_cost_usd}/mo</strong></div>
+                <div><span style={{ color: '#64748b' }}>IPAWS Required:</span> <strong style={{ color: '#0369a1' }}>{g.ipaws_monitoring_required ? 'Yes' : 'No'} (${g.ipaws_monthly_cost_usd}/mo)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Part 11 Items:</span> <strong>{g.n_part11_required_items} required</strong></div>
+                <div><span style={{ color: '#64748b' }}>STL Backup Paths:</span> <strong>{g.n_stl_backup_paths}</strong></div>
+                <div><span style={{ color: '#64748b' }}>EAS Test Types:</span> <strong>{g.n_eas_tests}</strong></div>
+              </div>
+              {g.eas_tests?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0369a1', marginBottom: 4 }}>EAS Tests</div>
+                  {g.eas_tests.map((t, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#e0f2fe', borderRadius: 3, padding: '3px 7px', marginBottom: 2 }}>
+                      <strong>{t.type}</strong>: {t.frequency}{t.penalty_per_miss_usd > 0 ? ` · Max fine $${t.penalty_per_miss_usd.toLocaleString()}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Broadcast Market Competitive Landscape Guide */}
         {candidate.broadcast_market_competitive_landscape_guide && (() => {
           const g = candidate.broadcast_market_competitive_landscape_guide;
