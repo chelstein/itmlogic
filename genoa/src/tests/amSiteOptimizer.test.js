@@ -10177,3 +10177,46 @@ test('am_automation_and_emergency_alert_system_guide comparison table columns pr
     assert.ok('eas_automation'        in row, 'eas_automation missing from comparison table');
   }
 });
+
+test('am_digital_hd_radio_upgrade_pathway_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_hd_radio_upgrade_pathway_guide;
+  assert.ok(g, 'HD Radio guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.hd_channel_width_khz, 20, 'HD channel width must be ±10 kHz = 20 kHz total');
+  assert.strictEqual(g.national_hd_am_adoption_pct, 14, 'national HD AM adoption must be 14%');
+});
+
+test('am_digital_hd_radio_upgrade_pathway_guide KAZM Class D only MA1 mode applicable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_hd_radio_upgrade_pathway_guide;
+  assert.strictEqual(g.n_applicable_hd_modes, 1, 'KAZM Class D must have 1 applicable HD mode');
+  const applicable = g.applicable_hd_modes.filter(m => m.applicable);
+  assert.strictEqual(applicable[0].mode, 'MA1', 'only MA1 must be applicable for Class D');
+  assert.strictEqual(g.hd_sideband_dbhd_increased, -20, 'Class D sideband power must be -20 dBc');
+});
+
+test('am_digital_hd_radio_upgrade_pathway_guide cost range is valid for Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_hd_radio_upgrade_pathway_guide;
+  assert.ok(g.total_hd_upgrade_cost_low_usd > 0, 'total HD cost must be positive');
+  assert.ok(g.total_hd_upgrade_cost_high_usd >= g.total_hd_upgrade_cost_low_usd, 'high cost must be >= low');
+  assert.ok(g.hd_multicast_channels === 4, 'must have 4 HD multicast channels');
+});
+
+test('am_digital_hd_radio_upgrade_pathway_guide 780 kHz clear-channel has MODERATE adj interference risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_hd_radio_upgrade_pathway_guide;
+  assert.strictEqual(g.adjacent_ch_interference_risk, 'MODERATE', '780 kHz clear-channel must be MODERATE adj risk');
+  assert.ok(g.hd_coverage_fraction > 0 && g.hd_coverage_fraction < 1, 'HD coverage fraction must be in (0,1)');
+  assert.ok(g.hd_authorization_timeline_months_low > 0, 'authorization timeline must be positive');
+});
+
+test('am_digital_hd_radio_upgrade_pathway_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('hd_n_applicable_modes'    in row, 'hd_n_applicable_modes missing from comparison table');
+    assert.ok('hd_cost_low_usd'          in row, 'hd_cost_low_usd missing from comparison table');
+    assert.ok('hd_adj_interference_risk' in row, 'hd_adj_interference_risk missing from comparison table');
+  }
+});

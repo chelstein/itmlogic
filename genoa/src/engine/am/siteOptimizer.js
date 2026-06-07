@@ -1089,7 +1089,10 @@ export async function runSiteOptimizer(body = {}){
     mkt_audience_change_pct:    c.broadcast_market_competitive_landscape_guide?.audience_potential_change_pct ?? null,
     eas_tier:                   c.am_automation_and_emergency_alert_system_guide?.recommended_eas_tier ?? null,
     eas_setup_cost_low_usd:     c.am_automation_and_emergency_alert_system_guide?.eas_setup_cost_low_usd ?? null,
-    eas_automation:             c.am_automation_and_emergency_alert_system_guide?.recommended_automation ?? null
+    eas_automation:             c.am_automation_and_emergency_alert_system_guide?.recommended_automation ?? null,
+    hd_n_applicable_modes:      c.am_digital_hd_radio_upgrade_pathway_guide?.n_applicable_hd_modes ?? null,
+    hd_cost_low_usd:            c.am_digital_hd_radio_upgrade_pathway_guide?.total_hd_upgrade_cost_low_usd ?? null,
+    hd_adj_interference_risk:   c.am_digital_hd_radio_upgrade_pathway_guide?.adjacent_ch_interference_risk ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6824,6 +6827,161 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_digital_hd_radio_upgrade_pathway_guide: (() => {
+      // Models the HD Radio® digital upgrade pathway for the candidate AM
+      // relocation site under FCC Part 73 Subpart B and NRSC-5-D standard.
+      //
+      // FCC AM HD Radio authorization (47 CFR §73.404):
+      //   - Licensed as hybrid (analog + digital) or all-digital operation
+      //   - All-digital AM (MA3 mode): approved 2020; only ~20 stations nationwide
+      //   - Hybrid AM HD (MA1 mode): most common; adds ±10 kHz digital sidebands
+      //   - Power level: HD sidebands at -20 dBc relative to analog carrier
+      //     (Class A: can increase to -14 dBc; others: -20 dBc default)
+      //
+      // NRSC-5-D modes for AM:
+      //   MA1: Hybrid (analog + ±10 kHz digital); most common
+      //   MA2: Extended Hybrid (MA1 + extended sidebands); ±20 kHz
+      //   MA3: All-digital (no analog carrier); requires FCC special authorization
+      //
+      // HD Radio equipment costs (2024):
+      //   Exporter (audio encoding/processing): $8,000–$18,000
+      //   Exciter upgrade (HD-capable): $12,000–$35,000
+      //   HD-capable transmitter (new): $25,000–$80,000 (Class A/B) / $15,000–$40,000 (D)
+      //   Total system integration: $5,000–$15,000
+      //
+      // Coverage characteristics:
+      //   HD digital coverage: ~50–70% of analog coverage radius
+      //   HD audio quality: 44.1 kHz / 64 kbps (main channel, MA1)
+      //   HD multicast: up to 4 additional channels (HD2–HD5)
+      //
+      // Relocation consideration: new site must maintain analog coverage
+      // before HD sidebands can be authorized; analog license must be
+      // in good standing with no outstanding consent decrees.
+      //
+      // All-digital conversion considerations:
+      //   - Must obtain FCC experimental authorization initially (§73.3598)
+      //   - 90-day public comment period required
+      //   - Must demonstrate equivalent coverage to analog operation
+      //   - FCC granted expedited review for rural markets (2021)
+
+      const isDA_hd         = /^DA/i.test(pattern_mode);
+      const is_clear_ch_hd  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_hd  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // HD sideband power level authorization
+      const hd_sideband_dbhd_default   = -20; // dBc below analog carrier
+      const hd_sideband_dbhd_increased =
+        fcc_class === 'A'  ? -14 :
+        fcc_class === 'B'  ? -17 : -20;
+
+      // Channel width for HD sidebands
+      const hd_channel_width_khz = 20; // ±10 kHz
+
+      // HD coverage estimate as fraction of analog coverage
+      const hd_coverage_fraction = 0.6; // ~60% of analog coverage
+
+      // Equipment cost by class
+      const EXCITER_COST = {
+        A: { low: 20000, high: 35000 },
+        B: { low: 12000, high: 28000 },
+        C: { low: 10000, high: 22000 },
+        D: { low: 8000, high: 18000 }
+      };
+      const TRANSMITTER_COST = {
+        A: { low: 40000, high: 80000 },
+        B: { low: 25000, high: 55000 },
+        C: { low: 18000, high: 35000 },
+        D: { low: 12000, high: 28000 }
+      };
+
+      const exc_cost = EXCITER_COST[fcc_class] ?? EXCITER_COST['D'];
+      const tx_cost  = TRANSMITTER_COST[fcc_class] ?? TRANSMITTER_COST['D'];
+
+      const exporter_cost_low  = 8000;
+      const exporter_cost_high = 18000;
+      const integration_cost   = 8000;
+
+      const total_hd_cost_low  = exc_cost.low  + exporter_cost_low  + integration_cost;
+      const total_hd_cost_high = exc_cost.high + exporter_cost_high + integration_cost + 5000;
+
+      // HD modes applicable by class
+      const applicable_hd_modes = [
+        {
+          mode: 'MA1', name: 'Hybrid AM HD', description: 'Analog + ±10 kHz digital sidebands',
+          fcc_authorized: true, coverage_fraction_analog: 0.6,
+          applicable: true
+        },
+        {
+          mode: 'MA2', name: 'Extended Hybrid AM HD', description: 'MA1 + ±20 kHz extended sidebands',
+          fcc_authorized: true, coverage_fraction_analog: 0.55,
+          applicable: fcc_class === 'A' || (is_clear_ch_hd && fcc_class !== 'D')
+        },
+        {
+          mode: 'MA3', name: 'All-Digital AM', description: 'No analog carrier; FCC special authorization required',
+          fcc_authorized: false, coverage_fraction_analog: 0.5,
+          applicable: fcc_class === 'A' || fcc_class === 'B'
+        }
+      ];
+
+      const n_applicable_modes = applicable_hd_modes.filter(m => m.applicable).length;
+
+      // HD multicast capability
+      const hd_multicast_channels = 4; // HD2-HD5 available
+      const hd_multicast_bitrate_kbps = { HD2: 32, HD3: 32, HD4: 16, HD5: 16 };
+
+      // Interference considerations: HD sidebands ±10 kHz may cause interference
+      // to adjacent-channel stations within 20 kHz
+      const adjacent_ch_interference_risk =
+        is_clear_ch_hd  ? 'MODERATE' :   // many co-channel stations on clear channels
+        isDA_hd         ? 'HIGH'     :   // DA pattern can concentrate sidebands
+                          'LOW';
+
+      // Timeline to HD authorization
+      const hd_authorization_timeline_months_low  = 6;
+      const hd_authorization_timeline_months_high = 18;
+
+      // All-digital conversion timeline (much longer)
+      const all_digital_timeline_months_low  = 18;
+      const all_digital_timeline_months_high = 36;
+
+      // National HD adoption context
+      const national_hd_am_adoption_pct = 14;
+      const national_all_digital_count  = 20;
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        hd_sideband_dbhd_default,
+        hd_sideband_dbhd_increased,
+        hd_channel_width_khz,
+        hd_coverage_fraction,
+        exporter_cost_low_usd:        exporter_cost_low,
+        exporter_cost_high_usd:       exporter_cost_high,
+        exciter_upgrade_cost_low_usd: exc_cost.low,
+        exciter_upgrade_cost_high_usd: exc_cost.high,
+        total_hd_upgrade_cost_low_usd:  total_hd_cost_low,
+        total_hd_upgrade_cost_high_usd: total_hd_cost_high,
+        applicable_hd_modes,
+        n_applicable_hd_modes:        n_applicable_modes,
+        hd_multicast_channels,
+        hd_multicast_bitrate_kbps,
+        adjacent_ch_interference_risk,
+        hd_authorization_timeline_months_low,
+        hd_authorization_timeline_months_high,
+        all_digital_timeline_months_low,
+        all_digital_timeline_months_high,
+        national_hd_am_adoption_pct,
+        national_all_digital_count,
+        is_clear_channel:             is_clear_ch_hd,
+        is_local_channel:             is_local_ch_hd,
+        is_da:                        isDA_hd,
+        reference: '47 CFR §73.404; NRSC-5-D (2017); FCC MB 2020 All-Digital AM Order (MB Docket 13-249); iBiquity/Xperi HD Radio spec; FCC Form 302-AM Supplement; IBOC',
+        note: `HD Radio upgrade: ${n_applicable_modes} mode(s) applicable (${applicable_hd_modes.filter(m=>m.applicable).map(m=>m.mode).join(', ')}). ` +
+              `Total cost: $${total_hd_cost_low.toLocaleString()}–$${total_hd_cost_high.toLocaleString()}. ` +
+              `Coverage: ~${Math.round(hd_coverage_fraction * 100)}% of analog. ` +
+              `Adjacent-ch interference risk: ${adjacent_ch_interference_risk}.`
       };
     })(),
 

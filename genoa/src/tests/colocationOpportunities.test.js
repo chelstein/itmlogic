@@ -2286,3 +2286,19 @@ test('am_automation_and_emergency_alert_system_guide present across colocation c
     assert.ok(g.eas_setup_cost_low_usd > 0, `rank ${c.rank}: EAS setup cost must be positive`);
   }
 });
+
+test('am_digital_hd_radio_upgrade_pathway_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_digital_hd_radio_upgrade_pathway_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_digital_hd_radio_upgrade_pathway_guide`);
+    assert.ok(g.n_applicable_hd_modes >= 1, `rank ${c.rank}: must have at least 1 applicable HD mode`);
+    assert.ok(g.total_hd_upgrade_cost_low_usd > 0, `rank ${c.rank}: HD upgrade cost must be positive`);
+  }
+});

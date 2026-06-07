@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Digital HD Radio Upgrade Pathway Guide */}
+        {candidate.am_digital_hd_radio_upgrade_pathway_guide && (() => {
+          const g = candidate.am_digital_hd_radio_upgrade_pathway_guide;
+          const riskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#15803d' }[g.adjacent_ch_interference_risk] ?? '#374151';
+          const applicableModes = g.applicable_hd_modes?.filter(m => m.applicable) ?? [];
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fdf2f8', borderRadius: 8, border: '1px solid #f0abfc' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#86198f', marginBottom: 8 }}>
+                AM Digital — HD Radio® Upgrade Pathway
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Applicable Modes:</span> <strong>{applicableModes.map(m => m.mode).join(', ') || 'MA1'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Sideband Level:</span> <strong>{g.hd_sideband_dbhd_increased} dBc</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Upgrade Cost:</span> <strong>${g.total_hd_upgrade_cost_low_usd?.toLocaleString()}–${g.total_hd_upgrade_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>HD Coverage:</span> <strong>{Math.round((g.hd_coverage_fraction ?? 0.6) * 100)}% of analog</strong></div>
+                <div><span style={{ color: '#64748b' }}>Multicast Channels:</span> <strong>HD2–HD{g.hd_multicast_channels + 1}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Authorization Time:</span> <strong>{g.hd_authorization_timeline_months_low}–{g.hd_authorization_timeline_months_high} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>Adj. Ch. Interf. Risk:</span> <strong style={{ color: riskColor }}>{g.adjacent_ch_interference_risk}</strong></div>
+                <div><span style={{ color: '#64748b' }}>National AM HD Adoption:</span> <strong>{g.national_hd_am_adoption_pct}%</strong></div>
+              </div>
+              {applicableModes.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#86198f', marginBottom: 4 }}>HD Modes</div>
+                  {applicableModes.map((m, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#fae8ff', borderRadius: 3, padding: '3px 7px', marginBottom: 2 }}>
+                      <strong>{m.mode} — {m.name}</strong>: {m.description} · Coverage {Math.round(m.coverage_fraction_analog * 100)}% of analog
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Automation & Emergency Alert System Guide */}
         {candidate.am_automation_and_emergency_alert_system_guide && (() => {
           const g = candidate.am_automation_and_emergency_alert_system_guide;
