@@ -2226,6 +2226,49 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Skywave Nighttime Service and Interference Guide */}
+        {candidate.am_skywave_nighttime_service_and_interference_guide && (() => {
+          const g = candidate.am_skywave_nighttime_service_and_interference_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="sky-guide" style={{ marginBottom: 16, padding: 12, background: '#1c0f1f', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#e879f9', marginBottom: 6, fontSize: 13 }}>Skywave Nighttime Service &amp; Interference — §73.182</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#f0abfc', marginBottom: 8 }}>
+                <span style={{ color: '#c026d3' }}>Clear channel:</span>
+                <span style={{ fontWeight: 700, color: g.is_clear_channel ? '#f0abfc' : '#6b7280' }}>
+                  {g.is_clear_channel ? 'YES' : 'NO'}
+                </span>
+                <span style={{ color: '#c026d3' }}>Dominant station:</span><span>{g.dominant_station}</span>
+                <span style={{ color: '#c026d3' }}>Night sign-off risk:</span>
+                <span style={{ fontWeight: 700, color: g.night_signoff_risk ? '#f87171' : '#4ade80' }}>
+                  {g.night_signoff_risk ? '⚠ YES — §73.182(m)' : 'NO'}
+                </span>
+                <span style={{ color: '#c026d3' }}>D/U study required:</span>
+                <span style={{ fontWeight: 700, color: g.du_study_required ? '#fbbf24' : '#4ade80' }}>
+                  {g.du_study_required ? 'YES — ITU-R P.1147' : 'NO'}
+                </span>
+                <span style={{ color: '#c026d3' }}>Skip zone est:</span><span>~{fmt(g.skip_zone_est_km)} km</span>
+                <span style={{ color: '#c026d3' }}>1st hop max:</span><span>~{fmt(g.skywave_first_hop_max_km)} km</span>
+              </div>
+              {g.night_signoff_risk && (
+                <div style={{ fontSize: 11, color: '#fca5a5', background: '#3b0a0a', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Class D secondary on clear channel — nighttime D/U study required. If inadequate, station must suspend nighttime ops per §73.182(m).
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#f0abfc', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#c026d3' }}>Skywave study:</span><span>${fmt(g.study_low_usd)} – ${fmt(g.study_high_usd)}</span>
+                <span style={{ color: '#c026d3' }}>FCC counsel:</span><span>${fmt(g.counsel_low_usd)} – ${fmt(g.counsel_high_usd)}</span>
+                <span style={{ color: '#c026d3' }}>STA (interim):</span><span>${fmt(g.sta_low_usd)} – ${fmt(g.sta_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #4a1d5e', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#c026d3', fontWeight: 600 }}>Total skywave compliance:</span>
+                <span style={{ color: '#e879f9', fontWeight: 700 }}>${fmt(g.total_compliance_low_usd)} – ${fmt(g.total_compliance_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#a855f7' }}>Ref: 47 CFR §73.182, §73.25, §73.27; ITU-R P.1147</div>
+            </div>
+          );
+        })()}
+
         {/* AM License Renewal and Regulatory History Guide */}
         {candidate.am_license_renewal_and_regulatory_history_guide && (() => {
           const g = candidate.am_license_renewal_and_regulatory_history_guide;

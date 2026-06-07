@@ -3667,3 +3667,20 @@ test('colocation candidates include am_license_renewal_and_regulatory_history_gu
     assert.ok(g.total_renewal_low_usd > 0, `total_renewal_low_usd must be positive`);
   }
 });
+
+test('colocation candidates include am_skywave_nighttime_service_and_interference_guide with §73.182 D/U obligation', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_skywave_nighttime_service_and_interference_guide;
+    assert.ok(g, `candidate missing am_skywave_nighttime_service_and_interference_guide`);
+    assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
+    assert.strictEqual(g.night_signoff_risk, true, 'Class D on 780 kHz has nighttime sign-off risk');
+    assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB');
+  }
+});

@@ -14788,3 +14788,38 @@ it('candidate_comparison_table rlh columns are present and valid for KAZM', asyn
   assert.ok(r0.rlh_distance_to_col_km != null, 'rlh_distance_to_col_km must not be null');
   assert.ok(r0.rlh_total_renewal_low_usd > 0, 'rlh_total_renewal_low_usd must be positive');
 });
+
+it('am_skywave_nighttime_service_and_interference_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_skywave_nighttime_service_and_interference_guide, `candidate missing am_skywave_nighttime_service_and_interference_guide`);
+  }
+});
+
+it('am_skywave_nighttime_service_and_interference_guide 780 kHz is clear channel with KKOB dominant', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_skywave_nighttime_service_and_interference_guide;
+  assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
+  assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB (Albuquerque)');
+});
+
+it('am_skywave_nighttime_service_and_interference_guide night_signoff_risk true for Class D on clear channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_skywave_nighttime_service_and_interference_guide;
+  assert.strictEqual(g.night_signoff_risk, true, 'Class D on clear channel has nighttime sign-off risk per §73.182(m)');
+  assert.strictEqual(g.du_study_required, true, 'D/U skywave study required for Class D on clear channel');
+});
+
+it('am_skywave_nighttime_service_and_interference_guide total_compliance_low_usd > 0 for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_skywave_nighttime_service_and_interference_guide;
+  assert.ok(g.total_compliance_low_usd > 0, 'total_compliance_low_usd must be positive for Class D clear channel');
+});
+
+it('candidate_comparison_table sky columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.sky_night_signoff_risk, true, 'sky_night_signoff_risk must be true for KAZM');
+  assert.ok(typeof r0.sky_dominant_station === 'string', 'sky_dominant_station must be a string');
+  assert.ok(r0.sky_total_compliance_low_usd > 0, 'sky_total_compliance_low_usd must be positive');
+});

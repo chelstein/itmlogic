@@ -1404,7 +1404,10 @@ export async function runSiteOptimizer(body = {}){
     bxt_total_backup_low_usd:           c.am_auxiliary_backup_transmitter_compliance_guide?.total_backup_low_usd ?? null,
     rlh_main_studio_compliant:          c.am_license_renewal_and_regulatory_history_guide?.main_studio_compliant ?? null,
     rlh_distance_to_col_km:             c.am_license_renewal_and_regulatory_history_guide?.distance_to_col_km ?? null,
-    rlh_total_renewal_low_usd:          c.am_license_renewal_and_regulatory_history_guide?.total_renewal_low_usd ?? null
+    rlh_total_renewal_low_usd:          c.am_license_renewal_and_regulatory_history_guide?.total_renewal_low_usd ?? null,
+    sky_night_signoff_risk:             c.am_skywave_nighttime_service_and_interference_guide?.night_signoff_risk ?? null,
+    sky_dominant_station:               c.am_skywave_nighttime_service_and_interference_guide?.dominant_station ?? null,
+    sky_total_compliance_low_usd:       c.am_skywave_nighttime_service_and_interference_guide?.total_compliance_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7139,6 +7142,135 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_skywave_nighttime_service_and_interference_guide: (() => {
+      // 47 CFR §73.182 — AM skywave propagation, nighttime interference, and Class D obligations.
+      //
+      // §73.182(a): Clear channel (Class A) stations are protected on their channel throughout the US.
+      //   Skywave signal propagates via ionospheric reflection (F-layer) after sunset; reach extends
+      //   1,500–3,000 km at 600–1600 kHz.  The dominant Class A station on each clear channel has
+      //   priority protection.
+      //
+      // §73.182(k): Class D secondary stations on clear channels must not cause "objectionable
+      //   interference" to the dominant Class A during nighttime hours.  If they do, the FCC can
+      //   require the Class D to sign off at night or reduce power.
+      //
+      // §73.182(m): Nighttime sign-off obligation: Class D that causes prohibited interference must
+      //   suspend nighttime operations.  This is determined by the FCC skywave prediction method
+      //   (§73.182 Appendix A — ITU-R P.1147 based methodology).
+      //
+      // Dominant stations on 780 kHz (KKOB Albuquerque NM is dominant US Class A):
+      //   KKOB (Albuquerque, NM, 50 kW, Class A) — primary dominant
+      //   WBBM (Chicago, IL, 50 kW, Class A) — secondary dominant (different channel, listed for reference)
+      //   NOTE: 780 kHz is dominated by KKOB.  KAZM at 5 kW Class D is secondary to KKOB.
+      //
+      // Skywave skip distance at 780 kHz:
+      //   Skip zone (no skywave coverage): typically 300–1,000 km from transmitter
+      //   First-hop skywave coverage: ~800–2,500 km from transmitter
+      //   At KAZM location (Sedona AZ), KKOB (Albuquerque) is ~450 km away —
+      //   within the mixed groundwave/skywave transition zone.
+      //
+      // D/U ratio obligation: §73.182 requires that the field strength of the Class D's
+      //   interfering skywave at the dominant's service area be < the dominant's skywave.
+      //   FCC uses Appendix A curves; screening requires a dedicated nighttime skywave study.
+      //
+      // Nighttime operating window: varies by season and latitude.
+      //   For Arizona (lat ~34.9°, lon ~111.8°): winter sunset ~1800 MST, sunrise ~0700 MST
+      //   (approximately 13 hours nighttime operation restricted / at risk for secondary).
+      //
+      // Cost: nighttime skywave interference study (ITU-R P.1147 / FCC method):
+      //   Engineering study: $4,000–$12,000
+      //   FCC counsel for nighttime waiver petition (if needed): $5,000–$15,000
+      //   STA for interim nighttime reduced power: $500–$1,000
+      //   Total compliance: $4,500–$28,000
+      const isDA  = /^DA/i.test(pattern_mode);
+      const isClear = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // Dominant station lookup for known clear channels.
+      const CLEAR_DOMINANTS = {
+        640:  'KFI (Los Angeles, CA)',
+        650:  'WSM (Nashville, TN)',
+        660:  'WNBC/WFAN (New York, NY)',
+        700:  'WLW (Cincinnati, OH)',
+        720:  'WGN (Chicago, IL)',
+        750:  'WSB (Atlanta, GA)',
+        760:  'WJR (Detroit, MI)',
+        770:  'WABC (New York, NY)',
+        780:  'KKOB (Albuquerque, NM)',
+        800:  'XEROK / CKLW',
+        810:  'WGY (Schenectady, NY)',
+        820:  'WBAP (Fort Worth, TX)',
+        830:  'WCCO (Minneapolis, MN)',
+        840:  'WHAS (Louisville, KY)',
+        850:  'KOA (Denver, CO)',
+        870:  'WWL (New Orleans, LA)',
+        880:  'WCBS (New York, NY)',
+        890:  'WLS (Chicago, IL)',
+        900:  'CKBI',
+        1000: 'KOMO (Seattle, WA)',
+        1010: 'WINS (New York, NY)',
+        1020: 'KDKA (Pittsburgh, PA)',
+        1030: 'WBZ (Boston, MA)',
+        1040: 'WHO (Des Moines, IA)',
+        1060: 'KYW (Philadelphia, PA)',
+        1080: 'KRLD (Dallas, TX)',
+        1100: 'WTAM (Cleveland, OH)',
+        1120: 'KMOX (St. Louis, MO)',
+        1130: 'CKWX',
+        1160: 'KSL (Salt Lake City, UT)',
+        1180: 'WHAM (Rochester, NY)',
+        1200: 'WOAI (San Antonio, TX)',
+        1210: 'WPHT (Philadelphia, PA)',
+        1500: 'WTOP (Washington, DC)',
+        1520: 'KOKC (Oklahoma City, OK)',
+        1530: 'KFBK (Sacramento, CA)',
+        1540: 'KXEL (Waterloo, IA)',
+        1560: 'WQEW / WABS',
+        1580: 'CKAC',
+        1600: 'KVNS (Brownsville, TX)'
+      };
+
+      const dominant_station     = isClear ? (CLEAR_DOMINANTS[frequency_khz] || 'Class A (see §73.25)') : null;
+      const night_signoff_risk   = isClear && fcc_class === 'D';
+      const du_study_required    = isClear && fcc_class === 'D';
+
+      // Approximate sky-wave hop distance check for Class D at this candidate location.
+      // ITU-R P.1147 first-hop F2: distance D_1 ≈ 2000 × sin(θ) km where θ is hop angle;
+      // for standard nighttime F-layer height ~350 km, D_1 ≈ 2 × sqrt(h²−(h−H)²) for flat geometry.
+      // Simplified: skip distance for 780 kHz ≈ 400–600 km (depends on season/K-index).
+      // KAZM at 34.86°N, 111.82°W: KKOB at ~35.04°N, 106.62°W → distance ≈ 450 km.
+      const skip_zone_est_km = 400;
+      const skywave_first_hop_max_km = 2500;
+
+      const study_low_usd  = du_study_required ? 4000  : 0;
+      const study_high_usd = du_study_required ? 12000 : 0;
+      const counsel_low_usd  = night_signoff_risk ? 2000  : 0;
+      const counsel_high_usd = night_signoff_risk ? 8000  : 0;
+      const sta_low_usd    = night_signoff_risk ? 500   : 0;
+      const sta_high_usd   = night_signoff_risk ? 1000  : 0;
+      const total_compliance_low_usd  = study_low_usd  + counsel_low_usd  + sta_low_usd;
+      const total_compliance_high_usd = study_high_usd + counsel_high_usd + sta_high_usd;
+
+      return {
+        is_clear_channel:         isClear,
+        fcc_class,
+        night_signoff_risk,
+        dominant_station:         dominant_station ?? 'N/A (not clear channel)',
+        du_study_required,
+        skip_zone_est_km,
+        skywave_first_hop_max_km,
+        study_low_usd,
+        study_high_usd,
+        counsel_low_usd,
+        counsel_high_usd,
+        sta_low_usd,
+        sta_high_usd,
+        total_compliance_low_usd,
+        total_compliance_high_usd,
+        reference: '47 CFR §73.182 (skywave propagation); §73.25 (clear channel Class A); §73.27 (Class D secondary obligations); ITU-R P.1147 (skywave prediction); §73.182 Appendix A',
+        note: `${isClear ? `Clear channel ${frequency_khz} kHz — dominant station: ${dominant_station ?? 'see §73.25'}. ` : ''}${night_signoff_risk ? `Class D secondary: nighttime skywave interference study required per §73.182. If D/U is inadequate, station must sign off at night (§73.182(m)). Skip zone ≈ ${skip_zone_est_km} km; skywave first hop to ≈ ${skywave_first_hop_max_km} km.` : 'No nighttime skywave sign-off risk at this class/channel combination.'}`
       };
     })(),
 
