@@ -1173,7 +1173,10 @@ export async function runSiteOptimizer(body = {}){
     esa_total_high_usd:         c.am_phase_i_environmental_site_assessment_guide?.total_esa_high_usd ?? null,
     nf_fa_atmospheric_db:       c.am_noise_floor_and_rf_environment_analysis_guide?.fa_atmospheric_db ?? null,
     nf_land_use_class:          c.am_noise_floor_and_rf_environment_analysis_guide?.land_use_noise_class ?? null,
-    nf_interference_risk:       c.am_noise_floor_and_rf_environment_analysis_guide?.interference_risk ?? null
+    nf_interference_risk:       c.am_noise_floor_and_rf_environment_analysis_guide?.interference_risk ?? null,
+    pnt_tower_height_ft:        c.am_tower_painting_and_aviation_marking_guide?.tower_pnt_ft ?? null,
+    pnt_initial_cost_low_usd:   c.am_tower_painting_and_aviation_marking_guide?.initial_paint_cost_low_usd ?? null,
+    pnt_annual_reserve_usd:     c.am_tower_painting_and_aviation_marking_guide?.annual_paint_reserve_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6908,6 +6911,64 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_painting_and_aviation_marking_guide: (() => {
+      // 47 CFR §17.50 (painting requirements); FAA AC 70/7460-1M (marking standards).
+      // AM broadcast towers above 200 ft AGL require alternating aviation orange/white
+      // banding under §17.50 unless an FAA lighting waiver is in effect.  Paint
+      // maintenance cycles of 5–7 years are the industry standard.
+
+      // Derive tower height from frequency and class (λ/4 for C/D, λ/2 for A/B)
+      const lambda_pnt_m   = 300000 / frequency_khz;
+      const tower_pnt_m    = ['A','B'].includes(fcc_class)
+        ? round2(lambda_pnt_m * 0.5)
+        : round2(lambda_pnt_m / 4);
+      const tower_pnt_ft   = Math.round(tower_pnt_m * 3.281);
+
+      // FAA obstruction marking threshold: 200 ft AGL (61 m)
+      const requires_aviation_marking = tower_pnt_ft > 200;
+
+      // Paint cost per linear foot: includes surface prep, primer, two finish coats
+      // $15/ft (simple guyed, good access) to $30/ft (complex lattice, difficult access)
+      const paint_per_ft_low  = 15;
+      const paint_per_ft_high = 30;
+
+      const initial_paint_cost_low_usd  = Math.round(tower_pnt_ft * paint_per_ft_low);
+      const initial_paint_cost_high_usd = Math.round(tower_pnt_ft * paint_per_ft_high);
+
+      // Repainting cycle per FAA AC 70/7460-1M / industry practice
+      const paint_cycle_years_low  = 5;
+      const paint_cycle_years_high = 7;
+
+      // Annual paint reserve (amortized over the longer 7-year cycle, high-cost scenario)
+      const annual_paint_reserve_usd = Math.round(initial_paint_cost_high_usd / paint_cycle_years_high);
+
+      // 20-year lifecycle painting cost
+      const life_20yr_paint_low_usd  = Math.round(initial_paint_cost_low_usd  * 20 / paint_cycle_years_high);
+      const life_20yr_paint_high_usd = Math.round(initial_paint_cost_high_usd * 20 / paint_cycle_years_low);
+
+      // Alternative: medium-intensity white strobe + red beacon (lighting-only waiver)
+      const lighting_only_initial_low_usd  = requires_aviation_marking ? 15000 : 0;
+      const lighting_only_initial_high_usd = requires_aviation_marking ? 35000 : 0;
+
+      return {
+        fcc_class,
+        tower_pnt_ft,
+        tower_pnt_m,
+        requires_aviation_marking,
+        initial_paint_cost_low_usd,
+        initial_paint_cost_high_usd,
+        paint_cycle_years_low,
+        paint_cycle_years_high,
+        annual_paint_reserve_usd,
+        life_20yr_paint_low_usd,
+        life_20yr_paint_high_usd,
+        lighting_only_initial_low_usd,
+        lighting_only_initial_high_usd,
+        reference: '47 CFR §17.50 (antenna structure painting); FAA AC 70/7460-1M (obstruction lighting and marking); 47 CFR §17.23 (ASR registration); §17.47 (obstruction light inspection); FAA Order JO 7400.11 (airspace obstruction criteria)',
+        note: `Tower marking: ${tower_pnt_ft} ft (${tower_pnt_m} m) at ${frequency_khz} kHz Class ${fcc_class}. ${requires_aviation_marking ? `Aviation orange/white marking required (§17.50). Paint cost: $${initial_paint_cost_low_usd.toLocaleString()}–$${initial_paint_cost_high_usd.toLocaleString()} per ${paint_cycle_years_low}–${paint_cycle_years_high}-year cycle. Annual paint reserve: $${annual_paint_reserve_usd.toLocaleString()}. 20-year lifecycle: $${life_20yr_paint_low_usd.toLocaleString()}–$${life_20yr_paint_high_usd.toLocaleString()}.` : 'Tower below 200 ft AGL — simplified marking requirements; check local jurisdiction.'}`
       };
     })(),
 

@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Painting and Aviation Marking Guide */}
+        {candidate.am_tower_painting_and_aviation_marking_guide && (() => {
+          const g = candidate.am_tower_painting_and_aviation_marking_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="pnt-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; Aviation Marking (47 CFR §17.50)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7c2d12' }}>
+                <span style={{ color: '#c2410c' }}>Tower Height:</span><span>{g.tower_pnt_ft} ft ({g.tower_pnt_m} m)</span>
+                <span style={{ color: '#c2410c' }}>Aviation Marking:</span><span style={{ fontWeight: 600, color: g.requires_aviation_marking ? '#dc2626' : '#16a34a' }}>{g.requires_aviation_marking ? 'Required (>200 ft)' : 'Not Required'}</span>
+                <span style={{ color: '#c2410c' }}>Initial Paint Cost:</span><span>{fmt(g.initial_paint_cost_low_usd)} – {fmt(g.initial_paint_cost_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Paint Cycle:</span><span>{g.paint_cycle_years_low}–{g.paint_cycle_years_high} years</span>
+                <span style={{ color: '#c2410c' }}>Annual Reserve:</span><span>{fmt(g.annual_paint_reserve_usd)}/yr</span>
+                <span style={{ color: '#c2410c' }}>20-yr Lifecycle:</span><span>{fmt(g.life_20yr_paint_low_usd)} – {fmt(g.life_20yr_paint_high_usd)}</span>
+                {g.requires_aviation_marking && <><span style={{ color: '#c2410c' }}>Lighting Alt:</span><span>{fmt(g.lighting_only_initial_low_usd)} – {fmt(g.lighting_only_initial_high_usd)} (strobe/beacon)</span></>}
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#9a3412' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Noise Floor and RF Environment Analysis Guide */}
         {candidate.am_noise_floor_and_rf_environment_analysis_guide && (() => {
           const g = candidate.am_noise_floor_and_rf_environment_analysis_guide;

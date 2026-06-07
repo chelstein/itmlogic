@@ -11393,6 +11393,51 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_tower_painting_and_aviation_marking_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_painting_and_aviation_marking_guide missing');
+  assert.ok(typeof g.tower_pnt_ft === 'number', 'tower_pnt_ft should be a number');
+  assert.ok(typeof g.initial_paint_cost_low_usd === 'number', 'initial_paint_cost_low_usd should be a number');
+});
+
+test('am_tower_painting_and_aviation_marking_guide KAZM tower height and marking', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
+  assert.strictEqual(g.tower_pnt_ft, 315, 'KAZM 780 kHz Class D λ/4 tower should be 315 ft');
+  assert.strictEqual(g.requires_aviation_marking, true, '315 ft tower requires FAA aviation marking');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class should be D');
+});
+
+test('am_tower_painting_and_aviation_marking_guide KAZM paint cost calculations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
+  assert.strictEqual(g.initial_paint_cost_low_usd,  4725, '315 ft × $15/ft should be $4,725');
+  assert.strictEqual(g.initial_paint_cost_high_usd, 9450, '315 ft × $30/ft should be $9,450');
+  assert.strictEqual(g.annual_paint_reserve_usd,    1350, '$9,450 / 7yr should be $1,350/yr');
+});
+
+test('am_tower_painting_and_aviation_marking_guide KAZM lifecycle costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_painting_and_aviation_marking_guide;
+  assert.strictEqual(g.life_20yr_paint_low_usd,  13500, '20yr lifecycle low should be $13,500');
+  assert.strictEqual(g.life_20yr_paint_high_usd, 37800, '20yr lifecycle high should be $37,800');
+  assert.ok(g.lighting_only_initial_low_usd > 0, 'Lighting alternative cost must be positive for >200 ft tower');
+});
+
+test('am_tower_painting_and_aviation_marking_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pnt_tower_height_ft'      in row, 'pnt_tower_height_ft missing from comparison table');
+    assert.ok('pnt_initial_cost_low_usd' in row, 'pnt_initial_cost_low_usd missing from comparison table');
+    assert.ok('pnt_annual_reserve_usd'   in row, 'pnt_annual_reserve_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.pnt_tower_height_ft,      315,  'rank-1 pnt_tower_height_ft should be 315');
+  assert.strictEqual(r0.pnt_initial_cost_low_usd, 4725, 'rank-1 pnt_initial_cost_low_usd should be $4,725');
+  assert.strictEqual(r0.pnt_annual_reserve_usd,   1350, 'rank-1 pnt_annual_reserve_usd should be $1,350');
+});
+
 test('am_noise_floor_and_rf_environment_analysis_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_noise_floor_and_rf_environment_analysis_guide;
