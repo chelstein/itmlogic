@@ -1413,7 +1413,10 @@ export async function runSiteOptimizer(body = {}){
     bip_total_protection_low_usd:       c.am_antenna_insulator_and_base_voltage_protection_guide?.total_protection_low_usd ?? null,
     dav_is_da_station:                  c.am_directional_antenna_phase_and_ratio_verification_guide?.is_da_station ?? null,
     dav_phase_tolerance_deg:            c.am_directional_antenna_phase_and_ratio_verification_guide?.phase_tolerance_deg ?? null,
-    dav_total_da_low_usd:               c.am_directional_antenna_phase_and_ratio_verification_guide?.total_da_low_usd ?? null
+    dav_total_da_low_usd:               c.am_directional_antenna_phase_and_ratio_verification_guide?.total_da_low_usd ?? null,
+    atu_type:                           c.am_transmission_line_and_atu_engineering_guide?.atu_type ?? null,
+    atu_vswr_target:                    c.am_transmission_line_and_atu_engineering_guide?.vswr_target ?? null,
+    atu_total_low_usd:                  c.am_transmission_line_and_atu_engineering_guide?.total_atu_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7148,6 +7151,97 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmission_line_and_atu_engineering_guide: (() => {
+      // Transmission line and ATU (Antenna Tuning Unit) engineering for AM broadcast stations.
+      //
+      // §73.1215: Equipment must be maintained in good operating condition; includes ATU, phasor,
+      //   and transmission line components.
+      //
+      // Transmission line choices for AM:
+      //   Open-wire (balanced): 600 Ω characteristic Z; typical for AM sites; very low loss at MF
+      //     (< 0.05 dB/100 m at 1 MHz). Simple to maintain. Requires balanced output or balun.
+      //   Coaxial (Heliax LDF5-50A): 50 Ω; slightly higher loss (~0.1 dB/100 m at 1 MHz);
+      //     better for runs > 100 m and locations with RF interference concerns.
+      //   Typical run: 20–100 m from transmitter building to tower base.
+      //
+      // ATU (NDA stations):
+      //   Matches transmitter output (50 Ω) to antenna base impedance.
+      //   Typical base impedance range: 15–350 Ω at λ/4 (resistive + reactive from detuning).
+      //   Network type: L-network (2-element), T-network (3-element), or pi-network.
+      //   Designed by licensed PE; must achieve VSWR ≤ 1.3:1 at tx output.
+      //   Design requires: antenna impedance measurement at the new site.
+      //
+      // Phasor (DA stations):
+      //   Combines ATU function with phase shifting and power splitting networks.
+      //   Typically 2–4 sections (one per tower); each section: L-network + phase delay network.
+      //   DA phasor is a significant engineering effort; requires computer modeling + field proof.
+      //   Cost: $25,000–$75,000 (2-tower); add $8k–$15k per additional element.
+      //
+      // VSWR target: ≤ 1.3:1 at transmitter output at operating frequency.
+      //   In-band bandwidth: FCC does not specify explicit bandwidth, but ATU must maintain match
+      //   across the ±10 kHz occupied bandwidth of the AM signal without significant loading change.
+      //
+      // Antenna impedance measurement: vector impedance analyzer (AIM 4170C or similar).
+      //   Measurement cost: $500–$1,500 (engineer + instrument).
+      //
+      // ATU/line costs (2024):
+      //   NDA ATU (L or T network, custom fabricated): $5,000–$20,000 installed
+      //   DA phasor (2-element): $25,000–$75,000 installed
+      //   Open-wire line (per 30 m run): $500–$1,500
+      //   Coax (Heliax LDF5, 50 m + connectors): $2,000–$5,000
+      //   Impedance measurement: $500–$1,500
+      //   ATU design (PE): $2,000–$6,000
+      //   Total NDA ATU + line: $10,000–$34,000
+      //   Total DA phasor + line: $30,000–$88,000
+      const isDA      = /^DA/i.test(pattern_mode);
+      const vswr_target = 1.3;
+
+      // Transmission line: distance from TX building to tower (use pt.distance_from_current_km as
+      // rough proxy for site scale; default to 60 m run if unknown).
+      const line_run_m        = 60;    // typical screened value; real design requires site survey
+      const line_type         = 'open-wire-600ohm';
+      const line_loss_db_per_100m = 0.05;
+      const line_loss_db      = round2(line_loss_db_per_100m * line_run_m / 100);
+      const line_efficiency   = round2(1 - (1 - Math.pow(10, -line_loss_db / 10)));
+
+      const atu_type = isDA ? 'DA phasor (phase + ratio network)' : 'NDA ATU (L or T network)';
+
+      let atu_low_usd  = isDA ? 25000 : 5000;
+      let atu_high_usd = isDA ? 75000 : 20000;
+
+      const line_low_usd    = 1000;
+      const line_high_usd   = 3000;
+      const impedance_measure_low_usd  = 500;
+      const impedance_measure_high_usd = 1500;
+      const atu_design_low_usd  = isDA ? 5000 : 2000;
+      const atu_design_high_usd = isDA ? 15000 : 6000;
+
+      const total_atu_low_usd  = atu_low_usd  + line_low_usd  + impedance_measure_low_usd  + atu_design_low_usd;
+      const total_atu_high_usd = atu_high_usd + line_high_usd + impedance_measure_high_usd + atu_design_high_usd;
+
+      return {
+        is_da_station:      isDA,
+        atu_type,
+        atu_design_required: true,           // always required at new site
+        vswr_target,
+        line_type,
+        line_run_m,
+        line_loss_db,
+        atu_low_usd,
+        atu_high_usd,
+        line_low_usd,
+        line_high_usd,
+        impedance_measure_low_usd,
+        impedance_measure_high_usd,
+        atu_design_low_usd,
+        atu_design_high_usd,
+        total_atu_low_usd,
+        total_atu_high_usd,
+        reference: '47 CFR §73.1215 (equipment maintenance); §73.1690 (modification of transmission systems); IEEE Std 100-1992 (ATU design); §73.154 (proof of performance requires ATU stable)',
+        note: `${atu_type} required at new site; ATU design by licensed PE mandatory. VSWR target ≤${vswr_target}:1. ${line_type} ${line_run_m} m run → estimated line loss ${line_loss_db} dB. New antenna impedance measurement at candidate site before ATU fabrication. Total: $${total_atu_low_usd.toLocaleString()}–$${total_atu_high_usd.toLocaleString()}.`
       };
     })(),
 

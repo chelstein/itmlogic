@@ -3718,3 +3718,20 @@ test('colocation candidates include am_directional_antenna_phase_and_ratio_verif
     assert.strictEqual(g.phase_tolerance_deg, 3, '§73.68(a) phase tolerance = ±3°');
   }
 });
+
+test('colocation candidates include am_transmission_line_and_atu_engineering_guide with VSWR target', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_atu_engineering_guide;
+    assert.ok(g, `candidate missing am_transmission_line_and_atu_engineering_guide`);
+    assert.strictEqual(g.atu_design_required, true, 'ATU design required at every new site');
+    assert.strictEqual(g.vswr_target, 1.3, 'VSWR target must be 1.3:1');
+    assert.ok(g.total_atu_low_usd > 0, 'total_atu_low_usd must be positive');
+  }
+});

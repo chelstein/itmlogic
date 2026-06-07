@@ -14895,3 +14895,38 @@ it('candidate_comparison_table dav columns are present and valid for KAZM NDA', 
   assert.strictEqual(r0.dav_phase_tolerance_deg, 3, 'dav_phase_tolerance_deg must be 3');
   assert.strictEqual(r0.dav_total_da_low_usd, 0, 'dav_total_da_low_usd must be 0 for NDA');
 });
+
+it('am_transmission_line_and_atu_engineering_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_transmission_line_and_atu_engineering_guide, `candidate missing am_transmission_line_and_atu_engineering_guide`);
+  }
+});
+
+it('am_transmission_line_and_atu_engineering_guide NDA station has ATU type with L or T network', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_atu_engineering_guide;
+  assert.ok(g.atu_type.includes('NDA'), 'NDA station ATU type should reference NDA');
+  assert.strictEqual(g.vswr_target, 1.3, 'VSWR target must be ≤ 1.3:1');
+});
+
+it('am_transmission_line_and_atu_engineering_guide atu_design_required is always true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_atu_engineering_guide;
+  assert.strictEqual(g.atu_design_required, true, 'ATU design always required at new site');
+});
+
+it('am_transmission_line_and_atu_engineering_guide total_atu_low_usd > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_atu_engineering_guide;
+  assert.ok(g.total_atu_low_usd > 0, 'total_atu_low_usd must be positive');
+  assert.ok(g.total_atu_high_usd >= g.total_atu_low_usd, 'high must be >= low');
+});
+
+it('candidate_comparison_table atu columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(typeof r0.atu_type === 'string', 'atu_type must be a string');
+  assert.strictEqual(r0.atu_vswr_target, 1.3, 'atu_vswr_target must be 1.3');
+  assert.ok(r0.atu_total_low_usd > 0, 'atu_total_low_usd must be positive');
+});

@@ -2226,6 +2226,38 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmission Line and ATU Engineering Guide */}
+        {candidate.am_transmission_line_and_atu_engineering_guide && (() => {
+          const g = candidate.am_transmission_line_and_atu_engineering_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="atu-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #0ea5e9' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Transmission Line &amp; ATU Engineering — §73.1215</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#0c4a6e', marginBottom: 8 }}>
+                <span style={{ color: '#0ea5e9' }}>ATU type:</span><span style={{ fontWeight: 600 }}>{g.atu_type}</span>
+                <span style={{ color: '#0ea5e9' }}>VSWR target:</span><span>≤ {g.vswr_target}:1</span>
+                <span style={{ color: '#0ea5e9' }}>Line type:</span><span>{g.line_type}</span>
+                <span style={{ color: '#0ea5e9' }}>Line run:</span><span>{g.line_run_m} m</span>
+                <span style={{ color: '#0ea5e9' }}>Line loss:</span><span>{fmtF(g.line_loss_db, 2)} dB</span>
+                <span style={{ color: '#0ea5e9' }}>ATU design:</span>
+                <span style={{ fontWeight: 700, color: '#0284c7' }}>REQUIRED (PE)</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#0c4a6e', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#0ea5e9' }}>ATU fabrication:</span><span>${fmt(g.atu_low_usd)} – ${fmt(g.atu_high_usd)}</span>
+                <span style={{ color: '#0ea5e9' }}>Transmission line:</span><span>${fmt(g.line_low_usd)} – ${fmt(g.line_high_usd)}</span>
+                <span style={{ color: '#0ea5e9' }}>Impedance measure:</span><span>${fmt(g.impedance_measure_low_usd)} – ${fmt(g.impedance_measure_high_usd)}</span>
+                <span style={{ color: '#0ea5e9' }}>ATU design (PE):</span><span>${fmt(g.atu_design_low_usd)} – ${fmt(g.atu_design_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#0ea5e9', fontWeight: 600 }}>Total ATU + line:</span>
+                <span style={{ color: '#0c4a6e', fontWeight: 700 }}>${fmt(g.total_atu_low_usd)} – ${fmt(g.total_atu_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#38bdf8' }}>Ref: 47 CFR §73.1215, §73.1690; IEEE Std 100-1992</div>
+            </div>
+          );
+        })()}
+
         {/* AM Directional Antenna Phase and Ratio Verification Guide */}
         {candidate.am_directional_antenna_phase_and_ratio_verification_guide && (() => {
           const g = candidate.am_directional_antenna_phase_and_ratio_verification_guide;
