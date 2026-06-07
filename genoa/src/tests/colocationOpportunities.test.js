@@ -3548,3 +3548,20 @@ test('am_digital_broadcasting_iboc_guide colocation: all candidates have valid I
     assert.ok(g.iboc_bandwidth_khz === 30, `iboc_bandwidth_khz must be 30 kHz (hybrid AM IBOC)`);
   }
 });
+
+test('colocation candidates include am_tower_base_rf_safety_and_detuning_guide with §73.49 fence', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_base_rf_safety_and_detuning_guide;
+    assert.ok(g, `candidate missing am_tower_base_rf_safety_and_detuning_guide`);
+    assert.strictEqual(g.fence_required_by_regulation, true, '§73.49 fence required on all AM towers');
+    assert.ok(g.v_base_high_vrms > 0, `v_base_high_vrms must be positive`);
+    assert.ok(g.total_rf_safety_low_usd > 0, `total_rf_safety_low_usd must be positive`);
+  }
+});

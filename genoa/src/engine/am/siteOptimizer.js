@@ -1383,7 +1383,10 @@ export async function runSiteOptimizer(body = {}){
     dnc_nighttime_restriction:          c.am_daytime_vs_nighttime_coverage_differential_guide?.nighttime_restriction ?? null,
     iboc_digital_sideband_kw:           c.am_digital_broadcasting_iboc_guide?.digital_sideband_kw ?? null,
     iboc_total_capex_low_usd:           c.am_digital_broadcasting_iboc_guide?.total_iboc_capex_low_usd ?? null,
-    iboc_benefit_rating:                c.am_digital_broadcasting_iboc_guide?.iboc_benefit_rating ?? null
+    iboc_benefit_rating:                c.am_digital_broadcasting_iboc_guide?.iboc_benefit_rating ?? null,
+    tbrf_v_base_high_vrms:              c.am_tower_base_rf_safety_and_detuning_guide?.v_base_high_vrms ?? null,
+    tbrf_fence_perimeter_ft:            c.am_tower_base_rf_safety_and_detuning_guide?.fence_perimeter_ft ?? null,
+    tbrf_total_rf_safety_low_usd:       c.am_tower_base_rf_safety_and_detuning_guide?.total_rf_safety_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7118,6 +7121,86 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_base_rf_safety_and_detuning_guide: (() => {
+      // Tower base RF safety and detuning — §73.49 protective fencing + OET Bulletin 65 base zone.
+      // AM tower base is a live RF element: voltage = sqrt(P_w × R_base_Ω).
+      // For Class D NDA at 5 kW, R_base ≈ 50–200 Ω (short tower, low conductivity → high R_base).
+      // 47 CFR §73.49: ALL AM towers must be enclosed by a locked fence ≥ 2.4 m (8 ft) high OR
+      //   have an approved anti-climb device AND RF hazard warning signs at each gate.
+      //   Non-directional self-supporting towers < 60 m sometimes qualify for fence waiver
+      //   with approved anti-climb alone; confirm with FCC Mass Media Bureau before omitting fence.
+      // Detuning (§73.150(a)(5) and §73.1030): towers used for DA arrays must be detuned when
+      //   the primary array is not operating. Detuning shack (ATU bypass, shorting switch) required.
+      // Base current monitoring (§73.61): authorized base current must be within 2% continuously;
+      //   automated base current monitor required at each tower.
+      const is_da_base = /^DA/i.test(pattern_mode);
+      // R_base estimate: short monopole (< λ/4) has higher radiation resistance.
+      // Typical range: 50–120 Ω NDA, 80–200 Ω per-tower DA.
+      const r_base_est_ohm_low  = is_da_base ? 80  : 50;
+      const r_base_est_ohm_high = is_da_base ? 200 : 120;
+      const p_watts = tpo_kw * 1000;
+      // Tower base voltage V_rms = sqrt(P × R_base)
+      const v_base_low_vrms  = round2(Math.sqrt(p_watts * r_base_est_ohm_low));
+      const v_base_high_vrms = round2(Math.sqrt(p_watts * r_base_est_ohm_high));
+      // RF exclusion distance from base insulator per OET Bulletin 65 §4.1.2:
+      // Controlled (occupational): d_occ = (1/(2π)) × sqrt(P_w × G_a / (S_mpe_occ × η)) ≈ ~3–6 m for 1–5 kW
+      // Uncontrolled (general public): d_gp ≈ 2× d_occ
+      // Simplified empirical from FCC practice: d_gp ≈ 3.5 × sqrt(P_kw) m at 1 MHz
+      const freq_mhz_base = frequency_khz / 1000;
+      const d_base_gp_m   = round2(3.5 * Math.sqrt(tpo_kw) * Math.sqrt(1.0 / freq_mhz_base)); // freq correction
+      const d_base_occ_m  = round2(d_base_gp_m / 2.23); // 10x vs 2x MPE ratio = sqrt(5)
+      // §73.49 fence specification
+      const fence_height_m = 2.44; // 8 ft minimum
+      const fence_perimeter_m = round2(4 * (d_base_gp_m + 6)); // 6 m clearance on each side
+      const fence_perimeter_ft = round2(fence_perimeter_m * 3.281);
+      // Cost estimates (2024 USD, chain-link with barbed wire, gate, warning signs)
+      const fence_cost_per_m_usd = 55; // chain-link + barbed top + post, installed
+      const fence_cost_low_usd   = Math.round(fence_perimeter_m * fence_cost_per_m_usd * 0.85);
+      const fence_cost_high_usd  = Math.round(fence_perimeter_m * fence_cost_per_m_usd * 1.30);
+      const warning_signs_usd    = 800;
+      // Detuning equipment for DA arrays
+      const detuning_shack_cost_low_usd  = is_da_base ? 15000 : 0;
+      const detuning_shack_cost_high_usd = is_da_base ? 35000 : 0;
+      // Base current monitor (required at each tower)
+      const n_towers_base = is_da_base ? 2 : 1; // typical DA = 2-element minimum
+      const base_monitor_cost_per_tower_usd = 3500;
+      const base_monitor_total_usd = n_towers_base * base_monitor_cost_per_tower_usd;
+      // Total base RF safety capex
+      const total_rf_safety_low_usd  = fence_cost_low_usd  + warning_signs_usd + detuning_shack_cost_low_usd  + base_monitor_total_usd;
+      const total_rf_safety_high_usd = fence_cost_high_usd + warning_signs_usd + detuning_shack_cost_high_usd + base_monitor_total_usd;
+      // Annual maintenance (fence inspection, warning sign replacement, monitor calibration)
+      const annual_maint_low_usd  = 1200;
+      const annual_maint_high_usd = 3000;
+      return {
+        frequency_khz,
+        tpo_kw,
+        is_directional: is_da_base,
+        n_towers: n_towers_base,
+        r_base_est_ohm_low,
+        r_base_est_ohm_high,
+        v_base_low_vrms,
+        v_base_high_vrms,
+        rf_exclusion_radius_gp_m: d_base_gp_m,
+        rf_exclusion_radius_occ_m: d_base_occ_m,
+        fence_height_m,
+        fence_perimeter_m,
+        fence_perimeter_ft,
+        fence_cost_low_usd,
+        fence_cost_high_usd,
+        detuning_shack_cost_low_usd,
+        detuning_shack_cost_high_usd,
+        base_monitor_cost_per_tower_usd,
+        base_monitor_total_usd,
+        total_rf_safety_low_usd,
+        total_rf_safety_high_usd,
+        annual_maint_low_usd,
+        annual_maint_high_usd,
+        fence_required_by_regulation: true,
+        reference: '47 CFR §73.49 (AM tower fencing and protection); §73.61 (base current monitoring requirements); §73.150(a)(5) (DA detuning); §73.1030 (AM antenna operation); FCC OET Bulletin 65 §4 (RF exposure near AM towers); NFPA 70 (electrical safety for transmitter facilities); EIA/TIA 222-H (structural considerations)',
+        note: `${frequency_khz} kHz, ${tpo_kw} kW: tower base voltage ${v_base_low_vrms}–${v_base_high_vrms} V RMS (R_base ${r_base_est_ohm_low}–${r_base_est_ohm_high} Ω). §73.49 fence required: ≥${fence_height_m} m high, ~${fence_perimeter_ft} ft perimeter. General-public RF exclusion ≈ ${d_base_gp_m} m. Total RF safety capex: $${total_rf_safety_low_usd.toLocaleString()}–$${total_rf_safety_high_usd.toLocaleString()}.${is_da_base ? ' Detuning shack required for DA array (§73.150).' : ''}`
       };
     })(),
 

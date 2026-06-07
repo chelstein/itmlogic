@@ -2226,6 +2226,33 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Base RF Safety and Detuning Guide */}
+        {candidate.am_tower_base_rf_safety_and_detuning_guide && (() => {
+          const g = candidate.am_tower_base_rf_safety_and_detuning_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="tbrf-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Tower Base RF Safety &amp; Detuning — §73.49 / OET Bul. 65</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Base voltage (high est.):</span><span>{g.v_base_high_vrms != null ? `${g.v_base_high_vrms} V RMS` : '—'}</span>
+                <span>R_base range:</span><span>{g.r_base_est_ohm_low != null ? `${g.r_base_est_ohm_low}–${g.r_base_est_ohm_high} Ω` : '—'}</span>
+                <span>GP exclusion radius:</span><span>{g.rf_exclusion_radius_gp_m != null ? `${g.rf_exclusion_radius_gp_m} m` : '—'}</span>
+                <span>Occ. exclusion radius:</span><span>{g.rf_exclusion_radius_occ_m != null ? `${g.rf_exclusion_radius_occ_m} m` : '—'}</span>
+                <span>§73.49 fence required:</span><span style={{ color: '#15803d', fontWeight: 700 }}>{g.fence_required_by_regulation ? 'YES' : 'NO'}</span>
+                <span>Fence perimeter:</span><span>{g.fence_perimeter_ft != null ? `${g.fence_perimeter_ft} ft` : '—'}</span>
+                <span>Fence height:</span><span>{g.fence_height_m != null ? `${g.fence_height_m} m (8 ft min.)` : '—'}</span>
+                <span>Directional array:</span><span>{g.is_directional ? 'YES — detuning shack required' : 'No'}</span>
+                {g.is_directional && <><span>Detuning shack:</span><span>${fmt(g.detuning_shack_cost_low_usd)}–${fmt(g.detuning_shack_cost_high_usd)}</span></>}
+                <span>Base monitors (×{g.n_towers ?? 1}):</span><span>${fmt(g.base_monitor_total_usd)}</span>
+                <span>Total RF safety capex:</span><span style={{ fontWeight: 700 }}>${fmt(g.total_rf_safety_low_usd)}–${fmt(g.total_rf_safety_high_usd)}</span>
+                <span>Annual maintenance:</span><span>${fmt(g.annual_maint_low_usd)}–${fmt(g.annual_maint_high_usd)}/yr</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#166534', fontStyle: 'italic' }}>{g.note}</div>}
+              <div style={{ marginTop: 4, fontSize: 10, color: '#4ade80' }}>Ref: {g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Digital Broadcasting (IBOC/HD Radio) Guide */}
         {candidate.am_digital_broadcasting_iboc_guide && (() => {
           const g = candidate.am_digital_broadcasting_iboc_guide;

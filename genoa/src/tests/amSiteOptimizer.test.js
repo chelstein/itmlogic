@@ -14529,3 +14529,42 @@ it('candidate_comparison_table iboc columns are present and valid for KAZM', asy
   assert.strictEqual(r0.iboc_total_capex_low_usd, 13000, 'iboc_total_capex_low_usd should be 13000');
   assert.ok(r0.iboc_benefit_rating != null, 'iboc_benefit_rating must not be null');
 });
+
+// ── Feature #51: am_tower_base_rf_safety_and_detuning_guide ─────────────────
+
+it('am_tower_base_rf_safety_and_detuning_guide is present on each candidate for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_tower_base_rf_safety_and_detuning_guide != null,
+      'am_tower_base_rf_safety_and_detuning_guide must be present on every candidate');
+  }
+});
+
+it('am_tower_base_rf_safety_and_detuning_guide fence_required_by_regulation is true (§73.49)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_rf_safety_and_detuning_guide;
+  assert.strictEqual(g.fence_required_by_regulation, true, '§73.49 requires fence on all AM towers');
+});
+
+it('am_tower_base_rf_safety_and_detuning_guide v_base_high_vrms is plausible for 5 kW KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_rf_safety_and_detuning_guide;
+  // 5000 W × 120 Ω = 600000 → sqrt ≈ 774.6 V RMS
+  assert.ok(g.v_base_high_vrms > 600 && g.v_base_high_vrms < 1200,
+    `v_base_high_vrms ${g.v_base_high_vrms} should be 600–1200 V for 5 kW NDA`);
+});
+
+it('am_tower_base_rf_safety_and_detuning_guide reference cites §73.49 and OET Bulletin 65', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_base_rf_safety_and_detuning_guide;
+  assert.ok(g.reference.includes('§73.49'), 'reference must cite §73.49');
+  assert.ok(g.reference.includes('OET Bulletin 65'), 'reference must cite OET Bulletin 65');
+});
+
+it('candidate_comparison_table tbrf columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.tbrf_v_base_high_vrms > 0, 'tbrf_v_base_high_vrms must be positive');
+  assert.ok(r0.tbrf_fence_perimeter_ft > 0, 'tbrf_fence_perimeter_ft must be positive');
+  assert.ok(r0.tbrf_total_rf_safety_low_usd > 0, 'tbrf_total_rf_safety_low_usd must be positive');
+});
