@@ -1320,7 +1320,10 @@ export async function runSiteOptimizer(body = {}){
     ipc_is_clear_channel:       c.am_interference_protection_contour_guide?.is_clear_channel ?? null,
     tpm_requires_painting:      c.am_tower_painting_and_marking_guide?.requires_painting ?? null,
     tpm_paint_low_usd:          c.am_tower_painting_and_marking_guide?.paint_low_usd ?? null,
-    tpm_num_bands:              c.am_tower_painting_and_marking_guide?.num_bands ?? null
+    tpm_num_bands:              c.am_tower_painting_and_marking_guide?.num_bands ?? null,
+    grd_num_radials_ideal:      c.am_ground_system_radial_design_guide?.num_radials_ideal ?? null,
+    grd_radial_length_ft:       c.am_ground_system_radial_design_guide?.radial_length_ft ?? null,
+    grd_total_low_usd:          c.am_ground_system_radial_design_guide?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7055,6 +7058,56 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_ground_system_radial_design_guide: (() => {
+      // FCC §73.190 references the minimum ground system for AM broadcast stations.
+      // FCC rules require a minimum of 120 ground radials, each λ/4 in length,
+      // for Class A/B/C stations. Class D (secondary) stations are encouraged but
+      // not mandated to meet the full 120-radial standard; 90–120 radials are common.
+      // Radial length: ideally λ/4 (one quarter wavelength); some sites use λ/8 for cost.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m      = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_ab_gr    = /^[AB]$/i.test(fcc_class);
+      const is_class_cd_gr    = /^[CD]$/i.test(fcc_class);
+      // Recommended radial counts:
+      const num_radials_ideal  = 120;
+      const num_radials_min    = is_class_ab_gr ? 120 : 90;  // FCC minimum or best practice
+      const radial_length_m    = round2(wavelength_m / 4);   // λ/4
+      const radial_length_ft   = round2(radial_length_m * 3.28084);
+      const radial_length_mi   = round2(radial_length_m / 1609.34);
+      // Total copper wire length:
+      const total_radial_length_ft   = round2(num_radials_ideal * radial_length_ft);
+      const total_radial_length_mi   = round2(total_radial_length_ft / 5280);
+      // #10 AWG bare copper wire: ~$0.10–$0.20/ft installed (material + burial)
+      const copper_low_per_ft  = 0.10;
+      const copper_high_per_ft = 0.20;
+      const copper_low_usd     = round2(total_radial_length_ft * copper_low_per_ft);
+      const copper_high_usd    = round2(total_radial_length_ft * copper_high_per_ft);
+      // Buried vs. surface: buried adds $0.10–$0.30/ft for trenching
+      const burial_low_per_ft  = 0.10;
+      const burial_high_per_ft = 0.30;
+      const burial_low_usd     = round2(total_radial_length_ft * burial_low_per_ft);
+      const burial_high_usd    = round2(total_radial_length_ft * burial_high_per_ft);
+      // Ground bus ring and connections:
+      const bus_ring_low_usd  = 2000;
+      const bus_ring_high_usd = 6000;
+      // Total installed cost:
+      const total_low_usd  = round2(copper_low_usd  + burial_low_usd  + bus_ring_low_usd);
+      const total_high_usd = round2(copper_high_usd + burial_high_usd + bus_ring_high_usd);
+      return {
+        frequency_khz, fcc_class,
+        wavelength_m,
+        num_radials_ideal, num_radials_min,
+        radial_length_m, radial_length_ft, radial_length_mi,
+        total_radial_length_ft, total_radial_length_mi,
+        copper_low_usd, copper_high_usd,
+        burial_low_usd, burial_high_usd,
+        bus_ring_low_usd, bus_ring_high_usd,
+        total_low_usd, total_high_usd,
+        reference: '47 CFR §73.190 (AM ground systems); FCC AM Improvement R&O (MB Docket 13-249); Terman "Radio Engineers Handbook"; Beverage/Brown/Schubert (1921) 120-radial standard; NRSC ground system engineering guidelines',
+        note: `${frequency_khz} kHz: λ=${wavelength_m}m, λ/4=${radial_length_ft.toFixed(0)} ft. ${num_radials_ideal} radials × ${radial_length_ft.toFixed(0)} ft = ${total_radial_length_mi} mi total wire. Total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 

@@ -3228,3 +3228,14 @@ test('am_tower_painting_and_marking_guide present across colocation candidates',
     }
   }
 });
+
+test('am_ground_system_radial_design_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_radial_design_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_radial_design_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.num_radials_ideal === 120, `rank ${c.rank}: num_radials_ideal should be 120`);
+    assert.ok(g.radial_length_ft > 0, `rank ${c.rank}: radial_length_ft must be positive`);
+  }
+});

@@ -13717,3 +13717,45 @@ test('am_tower_painting_and_marking_guide comparison table columns present', asy
   assert.strictEqual(r0.tpm_paint_low_usd,     6305.2, 'rank-1 tpm_paint_low_usd should be 6305.2');
   assert.strictEqual(r0.tpm_num_bands,         7,      'rank-1 tpm_num_bands should be 7');
 });
+
+test('am_ground_system_radial_design_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_radial_design_guide;
+  assert.ok(g !== undefined && g !== null, 'am_ground_system_radial_design_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM 780 kHz radial design specifications', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_radial_design_guide;
+  assert.strictEqual(g.wavelength_m,      384.35, 'KAZM wavelength_m should be 384.35');
+  assert.strictEqual(g.radial_length_ft,  315.26, 'KAZM radial_length_ft should be 315.26');
+  assert.strictEqual(g.num_radials_ideal, 120,    'num_radials_ideal should be 120');
+});
+
+test('KAZM total radial wire length', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_radial_design_guide;
+  assert.strictEqual(g.total_radial_length_mi, 7.16, 'KAZM total_radial_length_mi should be 7.16');
+});
+
+test('KAZM ground system radial total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_radial_design_guide;
+  assert.strictEqual(g.total_low_usd,  9566.24, 'KAZM total_low_usd should be 9566.24');
+  assert.strictEqual(g.total_high_usd, 24915.6, 'KAZM total_high_usd should be 24915.6');
+});
+
+test('am_ground_system_radial_design_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('grd_num_radials_ideal' in row, 'grd_num_radials_ideal missing from comparison table');
+    assert.ok('grd_radial_length_ft'  in row, 'grd_radial_length_ft missing from comparison table');
+    assert.ok('grd_total_low_usd'     in row, 'grd_total_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.grd_num_radials_ideal, 120,     'rank-1 grd_num_radials_ideal should be 120');
+  assert.strictEqual(r0.grd_radial_length_ft,  315.26,  'rank-1 grd_radial_length_ft should be 315.26');
+  assert.strictEqual(r0.grd_total_low_usd,     9566.24, 'rank-1 grd_total_low_usd should be 9566.24');
+});

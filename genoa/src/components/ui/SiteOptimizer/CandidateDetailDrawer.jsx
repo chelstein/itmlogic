@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Ground System Radial Design Guide */}
+        {candidate.am_ground_system_radial_design_guide && (() => {
+          const g = candidate.am_ground_system_radial_design_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="grd-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfdf5', borderRadius: 8, border: '2px solid #059669' }}>
+              <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>Ground Radial System Design (§73.190)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#065f46' }}>
+                <span>Wavelength (λ):</span><span>{g.wavelength_m != null ? `${g.wavelength_m} m` : '—'}</span>
+                <span>Radial length (λ/4):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? `${g.radial_length_m} m` : '—'})` : '—'}</span>
+                <span>Radials (ideal / min):</span><span>{g.num_radials_ideal} / {g.num_radials_min}</span>
+                <span>Total wire length:</span><span>{g.total_radial_length_mi != null ? `${g.total_radial_length_mi} mi (${g.total_radial_length_ft != null ? `${g.total_radial_length_ft.toLocaleString()} ft` : '—'})` : '—'}</span>
+                <span>Copper wire:</span><span>{fmt(g.copper_low_usd)} – {fmt(g.copper_high_usd)}</span>
+                <span>Burial / trenching:</span><span>{fmt(g.burial_low_usd)} – {fmt(g.burial_high_usd)}</span>
+                <span>Ground bus ring:</span><span>{fmt(g.bus_ring_low_usd)} – {fmt(g.bus_ring_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#047857', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Tower Painting and Marking Guide */}
         {candidate.am_tower_painting_and_marking_guide && (() => {
           const g = candidate.am_tower_painting_and_marking_guide;
