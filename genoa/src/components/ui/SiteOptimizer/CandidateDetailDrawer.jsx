@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna Tower Lighting and Marking Guide */}
+        {candidate.am_antenna_tower_lighting_and_marking_guide && (() => {
+          const g = candidate.am_antenna_tower_lighting_and_marking_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="ltg-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Tower Lighting &amp; Marking (§17.21 / FAA AC 70/7460-1M)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Lighting required:</span><span style={{ fontWeight: 600, color: g.lighting_required ? '#dc2626' : '#16a34a' }}>{g.lighting_required === true ? 'YES (> 200 ft AGL)' : 'No (≤ 200 ft AGL)'}</span>
+                <span>Lighting category:</span><span style={{ fontSize: 11 }}>{g.lighting_category ?? '—'}</span>
+                <span>Paint bands:</span><span>{g.paint_bands ?? '—'} alternating (aviation orange/white)</span>
+                <span>Tower surface area:</span><span>{g.tower_surface_area_sqft != null ? `${fmt(Math.round(g.tower_surface_area_sqft))} sq ft` : '—'}</span>
+                <span>LED lighting system:</span><span>{g.led_system_cost_low_usd != null ? `$${fmt(g.led_system_cost_low_usd)} – $${fmt(g.led_system_cost_high_usd)}` : '—'}</span>
+                <span>Tower painting:</span><span>{g.painting_cost_low_usd != null ? `$${fmt(Math.round(g.painting_cost_low_usd))} – $${fmt(Math.round(g.painting_cost_high_usd))}` : '—'}</span>
+                <span>Annual maintenance:</span><span>{g.annual_lighting_maintenance_low_usd != null ? `$${fmt(g.annual_lighting_maintenance_low_usd)} – $${fmt(g.annual_lighting_maintenance_high_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0284c7', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Construction Contractor and PM Guide */}
         {candidate.am_construction_contractor_and_pm_guide && (() => {
           const g = candidate.am_construction_contractor_and_pm_guide;

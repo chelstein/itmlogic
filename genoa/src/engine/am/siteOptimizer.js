@@ -1374,7 +1374,10 @@ export async function runSiteOptimizer(body = {}){
     fin_feasibility_flag:               c.am_station_financial_feasibility_guide?.feasibility_flag ?? null,
     pm_total_construction_weeks_low:    c.am_construction_contractor_and_pm_guide?.total_construction_weeks_low ?? null,
     pm_tower_erection_cost_low_usd:     c.am_construction_contractor_and_pm_guide?.tower_erection_cost_low_usd ?? null,
-    pm_gc_markup_pct_low:               c.am_construction_contractor_and_pm_guide?.gc_markup_pct_low ?? null
+    pm_gc_markup_pct_low:               c.am_construction_contractor_and_pm_guide?.gc_markup_pct_low ?? null,
+    ltg_lighting_required:              c.am_antenna_tower_lighting_and_marking_guide?.lighting_required ?? null,
+    ltg_led_system_cost_low_usd:        c.am_antenna_tower_lighting_and_marking_guide?.led_system_cost_low_usd ?? null,
+    ltg_painting_cost_low_usd:          c.am_antenna_tower_lighting_and_marking_guide?.painting_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7109,6 +7112,55 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_tower_lighting_and_marking_guide: (() => {
+      // 47 CFR §17.21–§17.25: FCC tower marking/lighting requirements cross-reference FAA AC 70/7460-1M.
+      // Tower height determines lighting category per 14 CFR Part 77 / FAA AC 70/7460-1M:
+      //   < 200 ft AGL: no lighting required (unless within airport approach zone)
+      //   200–499 ft:   Medium-intensity white strobes (day); red steady/flashing (night)
+      //   ≥ 500 ft:     High-intensity white strobes (day); red medium-intensity (night)
+      // Paint scheme: Aviation orange and white alternate bands (7 CFR §17.23)
+      const freq_mhz_ltg = frequency_khz / 1000;
+      const lambda_m_ltg = 299.792458 / freq_mhz_ltg;
+      const isHighClass_ltg = /^[AB]/i.test(fcc_class);
+      const tower_height_m_ltg   = round2(isHighClass_ltg ? lambda_m_ltg / 2 : lambda_m_ltg / 4);
+      const tower_height_ft_ltg  = round2(tower_height_m_ltg * 3.28084);
+      const lighting_required = tower_height_ft_ltg > 200;
+      const lighting_category = tower_height_ft_ltg >= 500
+        ? 'High-intensity (L-856/L-857 white strobes + L-810 red)'
+        : tower_height_ft_ltg > 200
+          ? 'Medium-intensity (L-864/L-865 red + L-810 white strobes)'
+          : 'None required (< 200 ft AGL)';
+      // Number of paint bands: FAR 77 / AC 70/7460-1M: 1 band per 100 ft, alternating orange/white
+      const paint_bands = lighting_required ? Math.max(1, Math.ceil(tower_height_ft_ltg / 100) * 2) : 0;
+      // LED lighting system cost: $8,000–$35,000 installed for 200–400 ft tower
+      const led_system_cost_low_usd  = lighting_required ? 8000  : 0;
+      const led_system_cost_high_usd = lighting_required ? 35000 : 0;
+      // Tower painting cost: $3–$8 per sq ft of surface area (approximate)
+      // Surface area of guyed monopole: ~π × 2 ft dia × height
+      const tower_surface_area_sqft = round2(Math.PI * 2 * tower_height_ft_ltg);
+      const painting_cost_low_usd  = round2(tower_surface_area_sqft * 3);
+      const painting_cost_high_usd = round2(tower_surface_area_sqft * 8);
+      // Annual lighting maintenance: lamp replacement + inspection ~$1,500–$4,000/yr
+      const annual_lighting_maintenance_low_usd  = lighting_required ? 1500 : 0;
+      const annual_lighting_maintenance_high_usd = lighting_required ? 4000 : 0;
+      return {
+        tower_height_ft: tower_height_ft_ltg,
+        tower_height_m: tower_height_m_ltg,
+        lighting_required,
+        lighting_category,
+        paint_bands,
+        tower_surface_area_sqft,
+        led_system_cost_low_usd,
+        led_system_cost_high_usd,
+        painting_cost_low_usd,
+        painting_cost_high_usd,
+        annual_lighting_maintenance_low_usd,
+        annual_lighting_maintenance_high_usd,
+        reference: '47 CFR §17.21–§17.25 (antenna structure marking/lighting); FAA AC 70/7460-1M (obstruction marking and lighting); 14 CFR Part 77 (safe efficient use of navigable airspace); FAA L-810/L-856/L-864/L-865 lamp standards; 47 CFR §17.6 (notification to FAA)',
+        note: `${tower_height_ft_ltg} ft tower: ${lighting_required ? `lighting REQUIRED — ${lighting_category}` : 'no lighting required (< 200 ft)'}. Paint: ${paint_bands} alternating bands (aviation orange/white). LED system: $${led_system_cost_low_usd.toLocaleString()}–$${led_system_cost_high_usd.toLocaleString()}. Painting: $${painting_cost_low_usd.toLocaleString()}–$${painting_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

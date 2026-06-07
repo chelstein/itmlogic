@@ -14421,3 +14421,39 @@ it('candidate_comparison_table pm columns are present and valid for KAZM', async
   assert.ok(r0.pm_tower_erection_cost_low_usd > 0, 'pm_tower_erection_cost_low_usd must be positive');
   assert.strictEqual(r0.pm_gc_markup_pct_low, 15, 'pm_gc_markup_pct_low should be 15');
 });
+
+// ── am_antenna_tower_lighting_and_marking_guide ───────────────────────────────
+
+it('am_antenna_tower_lighting_and_marking_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_antenna_tower_lighting_and_marking_guide, 'lighting guide missing on candidate');
+  }
+});
+
+it('am_antenna_tower_lighting_and_marking_guide lighting_required is true for KAZM 315 ft tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_marking_guide;
+  assert.strictEqual(g.lighting_required, true, 'KAZM 315 ft tower must require lighting (> 200 ft)');
+});
+
+it('am_antenna_tower_lighting_and_marking_guide paint_bands is 8 for KAZM (ceil(315/100)*2)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_marking_guide;
+  assert.strictEqual(g.paint_bands, 8, `paint_bands should be 8 for 315 ft tower`);
+});
+
+it('am_antenna_tower_lighting_and_marking_guide reference cites §17.21 and AC 70/7460-1M', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_marking_guide;
+  assert.ok(g.reference.includes('§17.21'), 'reference must cite §17.21');
+  assert.ok(g.reference.includes('AC 70/7460-1M'), 'reference must cite AC 70/7460-1M');
+});
+
+it('candidate_comparison_table ltg columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ltg_lighting_required, true, 'ltg_lighting_required should be true');
+  assert.ok(r0.ltg_led_system_cost_low_usd > 0, 'ltg_led_system_cost_low_usd must be positive');
+  assert.ok(r0.ltg_painting_cost_low_usd > 0, 'ltg_painting_cost_low_usd must be positive');
+});

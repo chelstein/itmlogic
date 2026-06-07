@@ -3497,3 +3497,20 @@ test('am_construction_contractor_and_pm_guide colocation: all candidates have va
     assert.ok(g.gc_markup_pct_low > 0 && g.gc_markup_pct_low < 100, `gc_markup_pct_low must be 0-100`);
   }
 });
+
+test('am_antenna_tower_lighting_and_marking_guide colocation: all candidates have valid lighting data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_tower_lighting_and_marking_guide;
+    assert.ok(g, `candidate missing am_antenna_tower_lighting_and_marking_guide`);
+    assert.ok(g.tower_height_ft > 0, `tower_height_ft must be positive`);
+    assert.ok(typeof g.lighting_required === 'boolean', `lighting_required must be boolean`);
+    assert.ok(g.painting_cost_low_usd >= 0, `painting_cost_low_usd must be non-negative`);
+  }
+});
