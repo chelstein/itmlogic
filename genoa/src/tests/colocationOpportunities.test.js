@@ -3327,3 +3327,20 @@ test('am_rf_exposure_and_oet65_compliance_guide colocation: all colocation candi
     assert.ok(g.mpe_general_mv_per_m === 614, `mpe_general_mv_per_m must be 614 mV/m (FCC limit)`);
   }
 });
+
+test('am_faa_aeronautical_study_and_airspace_guide colocation: all colocation candidates have valid FAA data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_faa_aeronautical_study_and_airspace_guide;
+    assert.ok(g, `candidate missing am_faa_aeronautical_study_and_airspace_guide`);
+    assert.ok(g.tower_height_ft > 0, `tower_height_ft must be positive`);
+    assert.ok(typeof g.notice_required === 'boolean', `notice_required must be boolean`);
+    assert.ok(g.faa_study_cost_low_usd > 0, `faa_study_cost_low_usd must be positive`);
+  }
+});

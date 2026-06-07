@@ -14052,3 +14052,39 @@ it('candidate_comparison_table rf65 columns are present and valid for KAZM', asy
   assert.strictEqual(r0.rf65_evaluation_required, false, 'rf65_evaluation_required should be false for 5 kW');
   assert.strictEqual(r0.rf65_evaluation_cost_low_usd, 1500, 'rf65_evaluation_cost_low_usd should be 1500');
 });
+
+// ── am_faa_aeronautical_study_and_airspace_guide ─────────────────────────────
+
+it('am_faa_aeronautical_study_and_airspace_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_faa_aeronautical_study_and_airspace_guide, 'faa guide missing on candidate');
+  }
+});
+
+it('am_faa_aeronautical_study_and_airspace_guide notice_required is true for KAZM Class D 780 kHz (> 200 ft)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_faa_aeronautical_study_and_airspace_guide;
+  assert.strictEqual(g.notice_required, true, 'KAZM Class D tower is > 200 ft, notice_required must be true');
+});
+
+it('am_faa_aeronautical_study_and_airspace_guide lighting_type references medium-intensity for 200–499 ft', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_faa_aeronautical_study_and_airspace_guide;
+  assert.ok(g.lighting_type.toLowerCase().includes('medium'), `lighting_type should mention medium-intensity for ~315 ft tower, got: ${g.lighting_type}`);
+});
+
+it('am_faa_aeronautical_study_and_airspace_guide reference cites 14 CFR Part 77 and FAA AC 70/7460-1M', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_faa_aeronautical_study_and_airspace_guide;
+  assert.ok(g.reference.includes('14 CFR Part 77'), 'reference must cite 14 CFR Part 77');
+  assert.ok(g.reference.includes('AC 70/7460-1M'), 'reference must cite FAA AC 70/7460-1M');
+});
+
+it('candidate_comparison_table faa columns are correct for KAZM Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.faa_notice_required, true, 'faa_notice_required should be true');
+  assert.ok(Math.abs(r0.faa_tower_height_ft - 315.26) < 0.5, `faa_tower_height_ft expected ~315.26, got ${r0.faa_tower_height_ft}`);
+  assert.strictEqual(r0.faa_study_cost_low_usd, 3500, 'faa_study_cost_low_usd should be 3500');
+});

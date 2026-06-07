@@ -1344,7 +1344,10 @@ export async function runSiteOptimizer(body = {}){
     tfciv_civil_foundation_low_usd: c.am_tower_foundation_and_civil_engineering_guide?.civil_foundation_low_usd ?? null,
     rf65_exclusion_radius_m_general:    c.am_rf_exposure_and_oet65_compliance_guide?.exclusion_radius_m_general ?? null,
     rf65_evaluation_required:           c.am_rf_exposure_and_oet65_compliance_guide?.evaluation_required ?? null,
-    rf65_evaluation_cost_low_usd:       c.am_rf_exposure_and_oet65_compliance_guide?.evaluation_cost_low_usd ?? null
+    rf65_evaluation_cost_low_usd:       c.am_rf_exposure_and_oet65_compliance_guide?.evaluation_cost_low_usd ?? null,
+    faa_notice_required:                c.am_faa_aeronautical_study_and_airspace_guide?.notice_required ?? null,
+    faa_tower_height_ft:                c.am_faa_aeronautical_study_and_airspace_guide?.tower_height_ft ?? null,
+    faa_study_cost_low_usd:             c.am_faa_aeronautical_study_and_airspace_guide?.faa_study_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7079,6 +7082,50 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_faa_aeronautical_study_and_airspace_guide: (() => {
+      // FAA Form 7460-1 (Notice of Proposed Construction): required for structures >200 ft AGL
+      // or any structure within certain distances of airports regardless of height.
+      // 14 CFR Part 77 (Objects Affecting Navigable Airspace) governs obstruction thresholds.
+      // FCC ASR (47 CFR §17.7) requires study for >200 ft AGL towers.
+      const freq_mhz_faa = frequency_khz / 1000;
+      const lambda_m_faa = 299.792458 / freq_mhz_faa;
+      const isHighClass_faa = /^[AB]/i.test(fcc_class);
+      const tower_height_m_faa = round2(isHighClass_faa ? lambda_m_faa / 2 : lambda_m_faa / 4);
+      const tower_height_ft_faa = round2(tower_height_m_faa * 3.28084);
+      const faa_notice_threshold_ft = 200;
+      const notice_required = tower_height_ft_faa > faa_notice_threshold_ft;
+      // Marking/lighting: AC 70/7460-1M criteria
+      // Towers 200–499 ft: medium-intensity lights (aviation orange + white)
+      // Towers 500+ ft: high-intensity lights
+      const lighting_required = notice_required;
+      const lighting_type = tower_height_ft_faa >= 500 ? 'High-intensity (red + white strobes)' : tower_height_ft_faa > 200 ? 'Medium-intensity (aviation orange paint + white strobes)' : 'None (< 200 ft AGL)';
+      // Airport proximity: different thresholds within 3 nm, 5 nm of airports
+      const airport_proximity_study_radius_nm = tower_height_ft_faa > 200 ? 5 : 3;
+      const faa_study_duration_weeks_low  = 4;
+      const faa_study_duration_weeks_high = 12;
+      const faa_study_cost_low_usd  = 3500;
+      const faa_study_cost_high_usd = 12000;
+      const obstruction_lighting_install_low_usd  = 8000;
+      const obstruction_lighting_install_high_usd = 35000;
+      return {
+        tower_height_m: tower_height_m_faa,
+        tower_height_ft: tower_height_ft_faa,
+        faa_notice_threshold_ft,
+        notice_required,
+        lighting_required,
+        lighting_type,
+        airport_proximity_study_radius_nm,
+        faa_study_duration_weeks_low,
+        faa_study_duration_weeks_high,
+        faa_study_cost_low_usd,
+        faa_study_cost_high_usd,
+        obstruction_lighting_install_low_usd,
+        obstruction_lighting_install_high_usd,
+        reference: '14 CFR Part 77 (Objects Affecting Navigable Airspace); FAA AC 70/7460-1M (obstruction marking/lighting); 47 CFR §17.7 (FCC ASR registration); FAA Form 7460-1 (Notice of Proposed Construction)',
+        note: `Class ${fcc_class} tower at ${frequency_khz} kHz: est. height ${tower_height_ft_faa} ft. FAA Form 7460-1 ${notice_required ? 'REQUIRED (> 200 ft AGL)' : 'not required (≤ 200 ft AGL)'}. Lighting: ${lighting_type}. Study: ${faa_study_duration_weeks_low}–${faa_study_duration_weeks_high} weeks, $${faa_study_cost_low_usd.toLocaleString()}–$${faa_study_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

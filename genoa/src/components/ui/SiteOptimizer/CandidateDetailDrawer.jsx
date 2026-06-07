@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM FAA Aeronautical Study and Airspace Guide */}
+        {candidate.am_faa_aeronautical_study_and_airspace_guide && (() => {
+          const g = candidate.am_faa_aeronautical_study_and_airspace_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="faa-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>FAA Aeronautical Study &amp; Airspace</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>FAA Form 7460-1:</span><span style={{ fontWeight: 600, color: g.notice_required ? '#dc2626' : '#16a34a' }}>{g.notice_required === true ? 'REQUIRED (> 200 ft AGL)' : g.notice_required === false ? 'Not required (≤ 200 ft)' : '—'}</span>
+                <span>Obstruction lighting:</span><span>{g.lighting_type ?? '—'}</span>
+                <span>Airport study radius:</span><span>{g.airport_proximity_study_radius_nm != null ? `${g.airport_proximity_study_radius_nm} nm` : '—'}</span>
+                <span>Study timeline:</span><span>{g.faa_study_duration_weeks_low != null ? `${g.faa_study_duration_weeks_low}–${g.faa_study_duration_weeks_high} weeks` : '—'}</span>
+                <span>Study cost:</span><span>{g.faa_study_cost_low_usd != null ? `$${fmt(g.faa_study_cost_low_usd)} – $${fmt(g.faa_study_cost_high_usd)}` : '—'}</span>
+                <span>Lighting install:</span><span>{g.obstruction_lighting_install_low_usd != null ? `$${fmt(g.obstruction_lighting_install_low_usd)} – $${fmt(g.obstruction_lighting_install_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#15803d', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM RF Exposure and OET-65 Compliance Guide */}
         {candidate.am_rf_exposure_and_oet65_compliance_guide && (() => {
           const g = candidate.am_rf_exposure_and_oet65_compliance_guide;
