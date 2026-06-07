@@ -11439,6 +11439,49 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_site_grading_and_drainage_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_grading_and_drainage_guide;
+  assert.ok(g !== undefined && g !== null, 'am_site_grading_and_drainage_guide missing');
+  assert.ok(typeof g.terrain_class === 'string', 'terrain_class should be a string');
+  assert.ok(g.total_site_prep_low_usd > 0, 'total_site_prep_low_usd must be positive');
+});
+
+test('am_site_grading_and_drainage_guide KAZM rank-1 terrain classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_grading_and_drainage_guide;
+  assert.strictEqual(g.terrain_class,   'existing_or_improved', 'KAZM rank-1 at dist=0 should be existing_or_improved');
+  assert.strictEqual(g.grading_low_usd, 2000,                   'KAZM rank-1 grading_low_usd should be $2,000');
+  assert.strictEqual(g.clearing_low_usd, 1000,                  'KAZM rank-1 clearing_low_usd should be $1,000');
+});
+
+test('am_site_grading_and_drainage_guide KAZM total site prep costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_grading_and_drainage_guide;
+  assert.strictEqual(g.total_site_prep_low_usd,  4500,  'KAZM total_site_prep_low_usd should be $4,500');
+  assert.strictEqual(g.total_site_prep_high_usd, 22000, 'KAZM total_site_prep_high_usd should be $22,000');
+});
+
+test('am_site_grading_and_drainage_guide drainage and erosion components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_grading_and_drainage_guide;
+  assert.strictEqual(g.drainage_low_usd,         1000, 'drainage_low_usd should be $1,000');
+  assert.strictEqual(g.erosion_control_low_usd,  500,  'erosion_control_low_usd should be $500');
+});
+
+test('am_site_grading_and_drainage_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('grd_terrain_class'   in row, 'grd_terrain_class missing from comparison table');
+    assert.ok('grd_total_low_usd'   in row, 'grd_total_low_usd missing from comparison table');
+    assert.ok('grd_grading_low_usd' in row, 'grd_grading_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.grd_terrain_class,   'existing_or_improved', 'rank-1 grd_terrain_class should be existing_or_improved');
+  assert.strictEqual(r0.grd_total_low_usd,   4500,                   'rank-1 grd_total_low_usd should be $4,500');
+  assert.strictEqual(r0.grd_grading_low_usd, 2000,                   'rank-1 grd_grading_low_usd should be $2,000');
+});
+
 test('am_insurance_and_bonding_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_insurance_and_bonding_guide;

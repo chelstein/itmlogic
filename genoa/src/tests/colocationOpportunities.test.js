@@ -2636,6 +2636,16 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_site_grading_and_drainage_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_site_grading_and_drainage_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_grading_and_drainage_guide missing`);
+    assert.ok(g.total_site_prep_low_usd > 0, `rank ${c.rank}: total_site_prep_low_usd must be positive`);
+    assert.ok(['existing_or_improved','semi_rural','rural_undeveloped'].includes(g.terrain_class), `rank ${c.rank}: terrain_class must be valid`);
+  }
+});
+
 test('am_insurance_and_bonding_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Grading and Drainage Guide */}
+        {candidate.am_site_grading_and_drainage_guide && (() => {
+          const g = candidate.am_site_grading_and_drainage_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="grd-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfdf5', borderRadius: 8, border: '2px solid #059669' }}>
+              <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>Site Grading &amp; Drainage</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#065f46' }}>
+                <span style={{ color: '#059669' }}>Terrain Class:</span><span style={{ fontWeight: 600 }}>{g.terrain_class} @ {g.dist_km} km</span>
+                <span style={{ color: '#059669' }}>Grading:</span><span>{fmt(g.grading_low_usd)} – {fmt(g.grading_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Clearing &amp; Grubbing:</span><span>{fmt(g.clearing_low_usd)} – {fmt(g.clearing_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Storm Drainage:</span><span>{fmt(g.drainage_low_usd)} – {fmt(g.drainage_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Erosion Control:</span><span>{fmt(g.erosion_control_low_usd)} – {fmt(g.erosion_control_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Total Site Prep:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_site_prep_low_usd)} – {fmt(g.total_site_prep_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#047857' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Insurance and Bonding Guide */}
         {candidate.am_insurance_and_bonding_guide && (() => {
           const g = candidate.am_insurance_and_bonding_guide;

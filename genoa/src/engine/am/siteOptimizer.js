@@ -1230,7 +1230,10 @@ export async function runSiteOptimizer(body = {}){
     stl_annual_internet_low_usd: c.am_studio_transmitter_link_guide?.annual_internet_low_usd ?? null,
     ins_annual_total_low_usd:   c.am_insurance_and_bonding_guide?.annual_total_ins_low_usd ?? null,
     ins_surety_bond_low_usd:    c.am_insurance_and_bonding_guide?.surety_bond_low_usd ?? null,
-    ins_wc_construction_low_usd: c.am_insurance_and_bonding_guide?.wc_during_construction_low_usd ?? null
+    ins_wc_construction_low_usd: c.am_insurance_and_bonding_guide?.wc_during_construction_low_usd ?? null,
+    grd_terrain_class:          c.am_site_grading_and_drainage_guide?.terrain_class ?? null,
+    grd_total_low_usd:          c.am_site_grading_and_drainage_guide?.total_site_prep_low_usd ?? null,
+    grd_grading_low_usd:        c.am_site_grading_and_drainage_guide?.grading_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6965,6 +6968,60 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_grading_and_drainage_guide: (() => {
+      // Site grading prepares the land for tower base, radial ground system, and building pad.
+      // Costs depend on distance from current site (proxy for terrain disturbance) and site area.
+      // Access road costs are captured separately in the site_access_road_and_security_guide.
+      const dist_km = pt.distance_from_current_km;
+
+      let terrain_class, grading_low_usd, grading_high_usd;
+      if (dist_km < 5) {
+        terrain_class = 'existing_or_improved';
+        grading_low_usd  = 2000;
+        grading_high_usd = 10000;
+      } else if (dist_km < 25) {
+        terrain_class = 'semi_rural';
+        grading_low_usd  = 8000;
+        grading_high_usd = 25000;
+      } else {
+        terrain_class = 'rural_undeveloped';
+        grading_low_usd  = 15000;
+        grading_high_usd = 50000;
+      }
+
+      // Clearing and grubbing (vegetation removal for ~2 acre tower footprint)
+      const clearing_low_usd  = terrain_class === 'existing_or_improved' ? 1000 : 3000;
+      const clearing_high_usd = terrain_class === 'existing_or_improved' ? 4000 : 12000;
+
+      // Storm drainage (culverts, swales, retention basin)
+      const drainage_low_usd  = 1000;
+      const drainage_high_usd = 6000;
+
+      // Erosion control (silt fence, seed/straw)
+      const erosion_control_low_usd  = 500;
+      const erosion_control_high_usd = 2000;
+
+      const total_site_prep_low_usd  = round2(grading_low_usd  + clearing_low_usd  + drainage_low_usd  + erosion_control_low_usd);
+      const total_site_prep_high_usd = round2(grading_high_usd + clearing_high_usd + drainage_high_usd + erosion_control_high_usd);
+
+      return {
+        dist_km: round2(dist_km),
+        terrain_class,
+        grading_low_usd,
+        grading_high_usd,
+        clearing_low_usd,
+        clearing_high_usd,
+        drainage_low_usd,
+        drainage_high_usd,
+        erosion_control_low_usd,
+        erosion_control_high_usd,
+        total_site_prep_low_usd,
+        total_site_prep_high_usd,
+        reference: 'RS Means site work cost data; EPA NPDES stormwater permit requirements; USACE wetlands guidance',
+        note: `${terrain_class} site at ${round2(dist_km)} km: grading $${grading_low_usd.toLocaleString()}–$${grading_high_usd.toLocaleString()} + clearing $${clearing_low_usd.toLocaleString()}–$${clearing_high_usd.toLocaleString()} + drainage/erosion $${(drainage_low_usd + erosion_control_low_usd).toLocaleString()}–$${(drainage_high_usd + erosion_control_high_usd).toLocaleString()}; total $${total_site_prep_low_usd.toLocaleString()}–$${total_site_prep_high_usd.toLocaleString()}`
       };
     })(),
 
