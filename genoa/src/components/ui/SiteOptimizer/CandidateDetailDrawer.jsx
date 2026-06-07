@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Emergency Alert System Equipment Guide */}
+        {candidate.am_emergency_alert_system_equipment_guide && (() => {
+          const g = candidate.am_emergency_alert_system_equipment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="eas-guide" style={{ marginBottom: 16, padding: 12, background: '#fef2f2', borderRadius: 8, border: '2px solid #dc2626' }}>
+              <div style={{ fontWeight: 700, color: '#7f1d1d', marginBottom: 6, fontSize: 13 }}>Emergency Alert System (EAS) Equipment (47 CFR Part 11)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#b91c1c' }}>
+                <span style={{ color: '#dc2626' }}>CAP Compatible:</span><span style={{ fontWeight: 600, color: g.cap_compatible ? '#16a34a' : '#dc2626' }}>{g.cap_compatible ? 'Yes (required)' : 'No — upgrade needed'}</span>
+                <span style={{ color: '#dc2626' }}>Encoder/Decoder:</span><span>{fmt(g.eas_encoder_decoder_low_usd)} – {fmt(g.eas_encoder_decoder_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Audio Routing:</span><span>{fmt(g.audio_routing_low_usd)} – {fmt(g.audio_routing_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Installation:</span><span>{fmt(g.installation_low_usd)} – {fmt(g.installation_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Annual Monitoring:</span><span>{fmt(g.annual_monitoring_low_usd)} – {fmt(g.annual_monitoring_high_usd)}/yr (IPAWS/CAP)</span>
+                <span style={{ color: '#dc2626' }}>Total Equipment:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_eas_equipment_low_usd)} – {fmt(g.total_eas_equipment_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Required Sources:</span><span>{g.n_required_sources} (LP-1 + LP-2); logs retained {g.log_retention_years} years</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#991b1b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Auxiliary Transmitter and Backup Power Guide */}
         {candidate.am_auxiliary_transmitter_and_backup_power_guide && (() => {
           const g = candidate.am_auxiliary_transmitter_and_backup_power_guide;

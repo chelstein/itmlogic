@@ -1209,7 +1209,10 @@ export async function runSiteOptimizer(body = {}){
     mon_readings_per_day:       c.am_modulation_monitor_and_station_logging_guide?.readings_per_day ?? null,
     bkp_generator_kw:           c.am_auxiliary_transmitter_and_backup_power_guide?.generator_kw ?? null,
     bkp_total_low_usd:          c.am_auxiliary_transmitter_and_backup_power_guide?.total_backup_low_usd ?? null,
-    bkp_annual_maint_low_usd:   c.am_auxiliary_transmitter_and_backup_power_guide?.annual_maint_low_usd ?? null
+    bkp_annual_maint_low_usd:   c.am_auxiliary_transmitter_and_backup_power_guide?.annual_maint_low_usd ?? null,
+    eas_total_equipment_low_usd: c.am_emergency_alert_system_equipment_guide?.total_eas_equipment_low_usd ?? null,
+    eas_annual_monitoring_low:  c.am_emergency_alert_system_equipment_guide?.annual_monitoring_low_usd ?? null,
+    eas_n_required_sources:     c.am_emergency_alert_system_equipment_guide?.n_required_sources ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6944,6 +6947,57 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_emergency_alert_system_equipment_guide: (() => {
+      // 47 CFR Part 11: All broadcast stations must have operational EAS equipment.
+      // §11.35: equipment required; §11.51: encoder/decoder specs; §11.52: monitoring requirements.
+      // CAP (Common Alerting Protocol) compatibility required since 2012 (FCC Report & Order 12-7).
+      // Stations must monitor at least two LP-1/LP-2 EAS sources per state EAS plan.
+
+      const cap_compatible = true; // required for all broadcast stations
+
+      // Encoder/decoder combo unit (integrates CAP decoding, audio playback, and SAME encoding)
+      const eas_encoder_decoder_low_usd  = 1500;
+      const eas_encoder_decoder_high_usd = 4500;
+
+      // Audio interrupt/routing hardware to integrate EAS audio into transmitter chain
+      const audio_routing_low_usd  = 500;
+      const audio_routing_high_usd = 2000;
+
+      // Installation and commissioning at new site (wiring, testing, SECC monitoring setup)
+      const installation_low_usd  = 500;
+      const installation_high_usd = 1500;
+
+      // Annual software subscriptions and monitoring (IPAWS/CAP aggregator services)
+      const annual_monitoring_low_usd  = 500;
+      const annual_monitoring_high_usd = 2000;
+
+      // EAS test log retention: §11.35(c) requires records kept for 2 years
+      const log_retention_years = 2;
+      const n_required_sources  = 2; // LP-1 + LP-2 per §11.52
+
+      const total_eas_equipment_low_usd  = round2(eas_encoder_decoder_low_usd  + audio_routing_low_usd  + installation_low_usd);
+      const total_eas_equipment_high_usd = round2(eas_encoder_decoder_high_usd + audio_routing_high_usd + installation_high_usd);
+
+      return {
+        fcc_class,
+        cap_compatible,
+        eas_encoder_decoder_low_usd,
+        eas_encoder_decoder_high_usd,
+        audio_routing_low_usd,
+        audio_routing_high_usd,
+        installation_low_usd,
+        installation_high_usd,
+        annual_monitoring_low_usd,
+        annual_monitoring_high_usd,
+        log_retention_years,
+        n_required_sources,
+        total_eas_equipment_low_usd,
+        total_eas_equipment_high_usd,
+        reference: '47 CFR Part 11 (EAS); §11.35 (equipment); §11.51 (encoder/decoder); §11.52 (monitoring); FCC R&O 12-7 (CAP mandate)',
+        note: `Class ${fcc_class} station: CAP-compatible EAS encoder/decoder $${eas_encoder_decoder_low_usd.toLocaleString()}–$${eas_encoder_decoder_high_usd.toLocaleString()} + audio routing + installation = $${total_eas_equipment_low_usd.toLocaleString()}–$${total_eas_equipment_high_usd.toLocaleString()} total; annual monitoring $${annual_monitoring_low_usd.toLocaleString()}–$${annual_monitoring_high_usd.toLocaleString()}; monitor ${n_required_sources} EAS sources; retain logs ${log_retention_years} years`
       };
     })(),
 

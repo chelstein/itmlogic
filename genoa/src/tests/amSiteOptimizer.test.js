@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_emergency_alert_system_equipment_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_alert_system_equipment_guide;
+  assert.ok(g !== undefined && g !== null, 'am_emergency_alert_system_equipment_guide missing');
+  assert.strictEqual(g.cap_compatible, true, 'cap_compatible should be true (required since 2012)');
+  assert.ok(g.total_eas_equipment_low_usd > 0, 'total_eas_equipment_low_usd must be positive');
+});
+
+test('am_emergency_alert_system_equipment_guide KAZM equipment costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_alert_system_equipment_guide;
+  assert.strictEqual(g.eas_encoder_decoder_low_usd,   1500, 'eas_encoder_decoder_low_usd should be $1,500');
+  assert.strictEqual(g.total_eas_equipment_low_usd,   2500, 'total_eas_equipment_low_usd should be $2,500');
+  assert.strictEqual(g.total_eas_equipment_high_usd,  8000, 'total_eas_equipment_high_usd should be $8,000');
+});
+
+test('am_emergency_alert_system_equipment_guide KAZM monitoring requirements', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_alert_system_equipment_guide;
+  assert.strictEqual(g.n_required_sources,          2, 'n_required_sources should be 2 (LP-1 + LP-2)');
+  assert.strictEqual(g.log_retention_years,         2, 'log_retention_years should be 2 (§11.35(c))');
+  assert.strictEqual(g.annual_monitoring_low_usd,   500, 'annual_monitoring_low_usd should be $500');
+});
+
+test('am_emergency_alert_system_equipment_guide KAZM high cost bound', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_alert_system_equipment_guide;
+  assert.ok(g.total_eas_equipment_high_usd > g.total_eas_equipment_low_usd, 'high cost must exceed low');
+  assert.ok(g.annual_monitoring_high_usd > g.annual_monitoring_low_usd, 'annual high must exceed low');
+});
+
+test('am_emergency_alert_system_equipment_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('eas_total_equipment_low_usd' in row, 'eas_total_equipment_low_usd missing from comparison table');
+    assert.ok('eas_annual_monitoring_low'   in row, 'eas_annual_monitoring_low missing from comparison table');
+    assert.ok('eas_n_required_sources'      in row, 'eas_n_required_sources missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.eas_total_equipment_low_usd, 2500, 'rank-1 eas_total_equipment_low_usd should be $2,500');
+  assert.strictEqual(r0.eas_annual_monitoring_low,   500,  'rank-1 eas_annual_monitoring_low should be $500');
+  assert.strictEqual(r0.eas_n_required_sources,      2,    'rank-1 eas_n_required_sources should be 2');
+});
+
 test('am_auxiliary_transmitter_and_backup_power_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_auxiliary_transmitter_and_backup_power_guide;
