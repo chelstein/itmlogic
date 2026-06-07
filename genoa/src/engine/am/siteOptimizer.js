@@ -1146,7 +1146,10 @@ export async function runSiteOptimizer(body = {}){
     env_weeks_low:              c.am_nepa_and_environmental_permitting_guide?.env_review_weeks_low ?? null,
     es_service_amps:            c.am_electrical_service_and_power_infrastructure_guide?.service_amps ?? null,
     es_transformer_kva:         c.am_electrical_service_and_power_infrastructure_guide?.transformer_kva ?? null,
-    es_total_utility_low_usd:   c.am_electrical_service_and_power_infrastructure_guide?.total_utility_low_usd ?? null
+    es_total_utility_low_usd:   c.am_electrical_service_and_power_infrastructure_guide?.total_utility_low_usd ?? null,
+    sc_sigma_ms_m:              c.am_soil_conductivity_and_groundwave_coverage_guide?.sigma_ms ?? null,
+    sc_d_05_mvm_km:             c.am_soil_conductivity_and_groundwave_coverage_guide?.d_05_mvm_km ?? null,
+    sc_coverage_area_km2:       c.am_soil_conductivity_and_groundwave_coverage_guide?.coverage_area_km2 ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6881,6 +6884,78 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_soil_conductivity_and_groundwave_coverage_guide: (() => {
+      // Estimates the FCC M3 ground conductivity at the candidate site and models
+      // the resulting daytime groundwave coverage radius and area at the 0.5 mV/m
+      // service contour, using a frequency/conductivity-calibrated Bullington
+      // approximation to the FCC groundwave curves.
+      //
+      // d(0.5 mV/m) ≈ K_ref(sigma) × (1000/f_kHz)^0.5 × ERP_kW^0.4
+      //   where K_ref is calibrated at 1000 kHz from FCC Table M-3.
+
+      // ---- FCC M3 conductivity zone (simplified, CONUS) ----
+      const lat_sc = pt.lat;
+      const lon_sc = pt.lon;
+      let sigma_ms, conductivity_label, m3_zone;
+      if (lon_sc < -115 && lat_sc > 45) {
+        sigma_ms = 30; conductivity_label = 'Very high (Pacific NW)'; m3_zone = 'E';
+      } else if (lon_sc < -120 && lat_sc < 45) {
+        sigma_ms = 15; conductivity_label = 'High (Pacific Coast)'; m3_zone = 'D';
+      } else if (lat_sc < 31 && lon_sc > -97 && lon_sc < -80) {
+        sigma_ms = 15; conductivity_label = 'High (Gulf Coast)'; m3_zone = 'D';
+      } else if (lon_sc > -90) {
+        sigma_ms = 8;  conductivity_label = 'Moderate-high (Eastern US)'; m3_zone = 'C';
+      } else if (lon_sc > -100 && lat_sc > 38) {
+        sigma_ms = 5;  conductivity_label = 'Moderate (Northern Plains)'; m3_zone = 'B';
+      } else if (lon_sc > -100) {
+        sigma_ms = 5;  conductivity_label = 'Moderate (Southern Plains)'; m3_zone = 'B';
+      } else if (lon_sc > -115 && lat_sc < 37) {
+        sigma_ms = 2;  conductivity_label = 'Low (Desert SW)'; m3_zone = 'A';
+      } else if (lon_sc > -115) {
+        sigma_ms = 3;  conductivity_label = 'Low-moderate (Mountain West)'; m3_zone = 'A';
+      } else {
+        sigma_ms = 5;  conductivity_label = 'Moderate (continental default)'; m3_zone = 'B';
+      }
+
+      // ---- K_ref at 1000 kHz by conductivity (calibrated to FCC curves) ----
+      const K_BY_SIGMA = { 0.5: 12, 1: 15, 2: 18, 3: 20, 5: 23, 8: 27, 15: 30, 30: 35 };
+      const sigma_keys = Object.keys(K_BY_SIGMA).map(Number).sort((a, b) => a - b);
+      let k_ref = 18; // default
+      for (let i = 0; i < sigma_keys.length - 1; i++) {
+        if (sigma_ms >= sigma_keys[i] && sigma_ms <= sigma_keys[i + 1]) {
+          const t = (sigma_ms - sigma_keys[i]) / (sigma_keys[i + 1] - sigma_keys[i]);
+          k_ref = K_BY_SIGMA[sigma_keys[i]] + t * (K_BY_SIGMA[sigma_keys[i + 1]] - K_BY_SIGMA[sigma_keys[i]]);
+          break;
+        }
+      }
+      if (sigma_ms >= sigma_keys[sigma_keys.length - 1]) k_ref = K_BY_SIGMA[30];
+      if (sigma_ms <= sigma_keys[0]) k_ref = K_BY_SIGMA[0.5];
+
+      // Frequency scaling: attenuation increases with frequency → coverage decreases
+      const freq_scale      = round2(Math.sqrt(1000 / frequency_khz));
+      const d_05_mvm_km     = round2(k_ref * freq_scale * Math.pow(tpo_kw, 0.4));
+      const coverage_area_km2 = round2(Math.PI * d_05_mvm_km * d_05_mvm_km);
+
+      // Relative improvement vs reference 5 mS/m "average" US soil
+      const d_ref_avg_km    = round2(23 * freq_scale * Math.pow(tpo_kw, 0.4));
+      const coverage_delta_pct = Math.round((d_05_mvm_km / d_ref_avg_km - 1) * 100);
+
+      // Ground type advisory
+      const ground_advisory = sigma_ms < 3
+        ? 'Poor ground conductivity — consider maximizing radial system and verifying local conductivity with NRQZ maps'
+        : sigma_ms < 8
+        ? 'Average conductivity — standard 90-radial ground system adequate'
+        : 'Good conductivity — favorable for groundwave coverage; standard ground system appropriate';
+
+      return {
+        sigma_ms, conductivity_label, m3_zone,
+        freq_scale, d_05_mvm_km, coverage_area_km2,
+        d_ref_avg_km, coverage_delta_pct, ground_advisory,
+        reference: 'FCC M3 ground conductivity map (FCC OST R-6506); ITU-R P.368-9 (groundwave propagation curves); FCC AM coverage curves (FCC 73.182 / OET Bulletin 73-1)',
+        note: `Candidate site: FCC M3 Zone ${m3_zone}, σ≈${sigma_ms} mS/m (${conductivity_label}). Est. daytime 0.5 mV/m contour: ${d_05_mvm_km} km radius, ${coverage_area_km2.toLocaleString()} km² area (vs ${d_ref_avg_km} km at US average σ=5 mS/m — ${Math.abs(coverage_delta_pct)}% ${coverage_delta_pct >= 0 ? 'better' : 'worse'}). ${ground_advisory}`
       };
     })(),
 

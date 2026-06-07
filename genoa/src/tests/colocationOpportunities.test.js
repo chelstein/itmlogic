@@ -2580,3 +2580,14 @@ test('am_electrical_service_and_power_infrastructure_guide present across coloca
     assert.ok(g.total_utility_low_usd > 0, `rank ${c.rank}: total_utility_low_usd must be positive`);
   }
 });
+
+test('am_soil_conductivity_and_groundwave_coverage_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_soil_conductivity_and_groundwave_coverage_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_soil_conductivity_and_groundwave_coverage_guide missing`);
+    assert.ok(g.sigma_ms > 0, `rank ${c.rank}: sigma_ms must be positive`);
+    assert.ok(g.d_05_mvm_km > 0, `rank ${c.rank}: d_05_mvm_km must be positive`);
+    assert.ok(g.coverage_area_km2 > 0, `rank ${c.rank}: coverage_area_km2 must be positive`);
+  }
+});

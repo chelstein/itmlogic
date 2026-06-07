@@ -11111,3 +11111,51 @@ test('am_electrical_service_and_power_infrastructure_guide comparison table colu
   assert.strictEqual(r0.es_transformer_kva, 15, 'rank-1 es_transformer_kva should be 15 kVA');
   assert.strictEqual(r0.es_total_utility_low_usd, 14376, 'rank-1 es_total_utility_low_usd should be $14,376');
 });
+
+test('am_soil_conductivity_and_groundwave_coverage_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_groundwave_coverage_guide;
+  assert.ok(g !== undefined && g !== null, 'am_soil_conductivity_and_groundwave_coverage_guide should be present');
+  assert.ok(typeof g.sigma_ms === 'number', 'sigma_ms should be a number');
+  assert.ok(g.d_05_mvm_km > 0, 'd_05_mvm_km must be positive');
+});
+
+test('am_soil_conductivity_and_groundwave_coverage_guide KAZM Desert SW classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_groundwave_coverage_guide;
+  // Sedona AZ (lat 34.86, lon -111.82): lon > -115 && lat < 37 → Desert SW, σ=2 mS/m, Zone A
+  assert.strictEqual(g.sigma_ms, 2, 'Sedona AZ should have σ=2 mS/m');
+  assert.strictEqual(g.m3_zone, 'A', 'Desert SW should be FCC M3 Zone A');
+  assert.ok(g.conductivity_label.includes('Desert SW'), `label should mention Desert SW, got: ${g.conductivity_label}`);
+});
+
+test('am_soil_conductivity_and_groundwave_coverage_guide KAZM frequency scaling', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_groundwave_coverage_guide;
+  // freq_scale = round2(√(1000/780)) = round2(1.1325) = 1.13
+  assert.strictEqual(g.freq_scale, 1.13, 'freq_scale should be 1.13 for 780 kHz');
+  assert.strictEqual(g.d_05_mvm_km, 38.72, 'KAZM 0.5 mV/m radius should be 38.72 km');
+  assert.strictEqual(g.coverage_area_km2, 4710, 'KAZM coverage area should be 4710 km²');
+});
+
+test('am_soil_conductivity_and_groundwave_coverage_guide KAZM coverage vs average soil', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_soil_conductivity_and_groundwave_coverage_guide;
+  // Desert SW σ=2 is worse than US average σ=5 → negative delta_pct
+  assert.ok(g.coverage_delta_pct < 0, 'Desert SW should have worse coverage than average soil');
+  assert.strictEqual(g.coverage_delta_pct, -22, 'coverage_delta_pct should be -22%');
+  assert.ok(g.d_ref_avg_km > g.d_05_mvm_km, 'average soil radius should exceed desert SW radius');
+});
+
+test('am_soil_conductivity_and_groundwave_coverage_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sc_sigma_ms_m'       in row, 'sc_sigma_ms_m missing from comparison table');
+    assert.ok('sc_d_05_mvm_km'      in row, 'sc_d_05_mvm_km missing from comparison table');
+    assert.ok('sc_coverage_area_km2' in row, 'sc_coverage_area_km2 missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.sc_sigma_ms_m, 2, 'rank-1 sc_sigma_ms_m should be 2');
+  assert.strictEqual(r0.sc_d_05_mvm_km, 38.72, 'rank-1 sc_d_05_mvm_km should be 38.72 km');
+  assert.strictEqual(r0.sc_coverage_area_km2, 4710, 'rank-1 sc_coverage_area_km2 should be 4710');
+});

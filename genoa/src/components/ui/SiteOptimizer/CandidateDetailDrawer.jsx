@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Soil Conductivity and Groundwave Coverage Guide */}
+        {candidate.am_soil_conductivity_and_groundwave_coverage_guide && (() => {
+          const g = candidate.am_soil_conductivity_and_groundwave_coverage_guide;
+          return (
+            <div key="sc-guide" style={{ marginBottom: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, border: '1px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Soil Conductivity &amp; Groundwave Coverage</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>FCC M3 Zone:</span><span style={{ fontWeight: 600 }}>Zone {g.m3_zone} — σ = {g.sigma_ms} mS/m</span>
+                <span style={{ color: '#6b7280' }}>Conductivity:</span><span>{g.conductivity_label}</span>
+                <span style={{ color: '#6b7280' }}>Frequency Scale:</span><span>{g.freq_scale}× (√1000/{Math.round(1000/g.freq_scale/g.freq_scale)} kHz)</span>
+                <span style={{ color: '#6b7280' }}>0.5 mV/m Radius:</span><span style={{ fontWeight: 600 }}>{g.d_05_mvm_km} km</span>
+                <span style={{ color: '#6b7280' }}>Coverage Area:</span><span>{g.coverage_area_km2.toLocaleString()} km²</span>
+                <span style={{ color: '#6b7280' }}>vs US Avg (σ=5):</span><span style={{ color: g.coverage_delta_pct >= 0 ? '#15803d' : '#dc2626', fontWeight: 600 }}>{g.coverage_delta_pct >= 0 ? '+' : ''}{g.coverage_delta_pct}% ({g.d_ref_avg_km} km avg)</span>
+                <span style={{ color: '#6b7280', gridColumn: '1/-1' }}>{g.ground_advisory}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#334155', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Electrical Service and Power Infrastructure Guide */}
         {candidate.am_electrical_service_and_power_infrastructure_guide && (() => {
           const g = candidate.am_electrical_service_and_power_infrastructure_guide;
