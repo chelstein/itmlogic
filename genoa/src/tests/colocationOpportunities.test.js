@@ -2218,3 +2218,20 @@ test('rf_propagation_terrain_roughness_guide present across colocation candidate
     assert.ok(g.estimated_range_km > 0, `rank ${c.rank}: estimated_range_km must be > 0`);
   }
 });
+
+test('am_night_skywave_coverage_and_interference_risk_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_ops = ['FULL_POWER_24H', 'DA_N_REQUIRED', 'REDUCED_POWER_OR_SILENT'];
+  for (const c of out.candidates) {
+    const g = c.am_night_skywave_coverage_and_interference_risk_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_night_skywave_coverage_and_interference_risk_guide`);
+    assert.ok(valid_ops.includes(g.night_operation_type), `rank ${c.rank}: night_operation_type '${g.night_operation_type}' invalid`);
+    assert.ok(g.skip_distance_km > 0, `rank ${c.rank}: skip_distance_km must be > 0`);
+  }
+});

@@ -1077,7 +1077,10 @@ export async function runSiteOptimizer(body = {}){
     lic_comparative_risk:       c.fcc_license_history_and_compliance_record_guide?.comparative_proceeding_risk ?? null,
     terr_class:                 c.rf_propagation_terrain_roughness_guide?.terrain_class ?? null,
     terr_est_range_km:          c.rf_propagation_terrain_roughness_guide?.estimated_range_km ?? null,
-    terr_col_range_km:          c.rf_propagation_terrain_roughness_guide?.effective_range_col_km ?? null
+    terr_col_range_km:          c.rf_propagation_terrain_roughness_guide?.effective_range_col_km ?? null,
+    sky_lat_zone:               c.am_night_skywave_coverage_and_interference_risk_guide?.lat_zone ?? null,
+    sky_night_op:               c.am_night_skywave_coverage_and_interference_risk_guide?.night_operation_type ?? null,
+    sky_class_a_risk:           c.am_night_skywave_coverage_and_interference_risk_guide?.dominant_class_a_risk ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6812,6 +6815,131 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_night_skywave_coverage_and_interference_risk_guide: (() => {
+      // Models nighttime skywave propagation characteristics and interference
+      // risk for AM station relocation candidates per FCC §73.182 and §73.184.
+      //
+      // At night, AM signals refract off the ionospheric E-layer and travel
+      // thousands of km. Class A clear-channel stations operate full-power 24h;
+      // Class B/C/D must either reduce power at night or operate DA-N to protect
+      // Class A dominant stations (47 CFR §73.182(a)-(f)).
+      //
+      // FCC skywave protection distances (50% ionosphere, Table 1 §73.182):
+      //   Class A dominant → protected 0.5 mV/m groundwave contour
+      //   Class B → protected to 50 uV/m
+      //   Class C → protected to 25 uV/m
+      //   Class D → no nighttime skywave protection (must protect others)
+      //
+      // Candidate site latitude affects ionospheric skip geometry:
+      //   Low latitude (< 35°N): shorter skip distance, more tropical noise
+      //   Mid latitude (35–50°N): standard ITU-R P.533 ionosphere model
+      //   High latitude (> 50°N): polar cap absorption, longer skip variability
+      //
+      // Skywave range factors:
+      //   At 780 kHz, 1-hop skip ≈ 700 km at night (E-layer height ~90 km)
+      //   Groundwave at 780 kHz: fades ~1000 km from tower (day), ~100 km (night)
+      //   The "skip zone" (dark zone) ≈ 100–700 km from transmitter at night
+      //
+      // DA-N (nighttime directional) requirement:
+      //   Class B/C must operate DA-N if skywave would cause > 50 uV/m
+      //   to co-/adjacent-channel Class A at the Class A's 0.5 mV/m
+      //   groundwave contour (§73.182(g))
+
+      const isDA_sky        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_sky = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_sky = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Candidate latitude (degrees north)
+      const cand_lat = pt?.lat ?? 35;
+
+      // Latitude zone classification
+      const lat_zone =
+        cand_lat < 35 ? 'LOW_LATITUDE'  :
+        cand_lat < 50 ? 'MID_LATITUDE'  : 'HIGH_LATITUDE';
+
+      // E-layer virtual height (km) by latitude zone
+      const e_layer_height_km = lat_zone === 'LOW_LATITUDE' ? 80 : lat_zone === 'MID_LATITUDE' ? 90 : 100;
+
+      // Skip distance approximation (ITU-R P.533 1-hop E-layer model)
+      // D_skip ≈ 2 * sqrt(h²  + (R*sin(alpha))²) for vertical incidence at 1/4 wave
+      // Simplified: skip_km ≈ 2 * sqrt((e_layer_height_km)² * 3) for 30° elevation
+      const skip_distance_km = Math.round(2 * Math.sqrt(3 * e_layer_height_km * e_layer_height_km));
+
+      // Skip zone (groundwave fades before skywave arrives)
+      const groundwave_night_fade_km = Math.round(base_gs_km_from_power(tpo_kw) * 0.15);
+
+      // Inline helper for approximate groundwave night-limit
+      function base_gs_km_from_power(p_kw) {
+        return Math.round(10 * Math.log10(Math.max(p_kw, 0.001)) * 22 + 50);
+      }
+
+      const skip_zone_low_km  = Math.max(0, groundwave_night_fade_km);
+      const skip_zone_high_km = skip_distance_km;
+
+      // FCC night protection class
+      const night_protection_class =
+        fcc_class === 'A' && is_clear_ch_sky ? 'DOMINANT_UNLIMITED' :
+        fcc_class === 'A'                    ? 'CLASS_A_SECONDARY'  :
+        fcc_class === 'B'                    ? 'CLASS_B_PROTECTED'  :
+        fcc_class === 'C'                    ? 'CLASS_C_PROTECTED'  :
+        is_clear_ch_sky                      ? 'CLASS_D_CLEAR_NIGHT_RESTRICTED' :
+                                               'CLASS_D_LOCAL_NIGHT_RESTRICTED';
+
+      // Night power restriction: Class D must reduce or go silent
+      // Class D on clear-channel must protect dominant Class A at night (§73.182)
+      const requires_night_power_reduction =
+        fcc_class === 'D' || fcc_class === 'C';
+      const night_operation_type =
+        fcc_class === 'A' ? 'FULL_POWER_24H' :
+        isDA_sky          ? 'DA_N_REQUIRED'   :
+        requires_night_power_reduction ? 'REDUCED_POWER_OR_SILENT' :
+                                          'FULL_POWER_24H';
+
+      // DA-N requirement check
+      const da_n_required = fcc_class === 'B' || (fcc_class === 'C' && is_clear_ch_sky);
+
+      // Interference risk: D-class clear-channel at night competes with dominant Class A
+      const dominant_class_a_risk =
+        is_clear_ch_sky && fcc_class !== 'A'
+          ? 'HIGH'   // sharing clear-channel with Class A dominant
+          : is_clear_ch_sky
+            ? 'MODERATE'
+            : 'LOW';
+
+      // Noise floor estimate at night (higher due to skywave QRM)
+      // AM night noise figure typical 15-25 dB above day noise at medium distances
+      const night_noise_penalty_db = lat_zone === 'LOW_LATITUDE' ? 20 : lat_zone === 'MID_LATITUDE' ? 15 : 10;
+
+      // FCC night protection contour (uV/m) by class
+      const protected_night_contour_uvm =
+        fcc_class === 'A' ? 500 : fcc_class === 'B' ? 50 : fcc_class === 'C' ? 25 : null;
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        candidate_lat:                cand_lat,
+        lat_zone,
+        e_layer_height_km,
+        skip_distance_km,
+        skip_zone_low_km,
+        skip_zone_high_km,
+        groundwave_night_fade_km,
+        night_protection_class,
+        requires_night_power_reduction,
+        night_operation_type,
+        da_n_required,
+        dominant_class_a_risk,
+        night_noise_penalty_db,
+        protected_night_contour_uvm,
+        is_clear_channel:             is_clear_ch_sky,
+        is_local_channel:             is_local_ch_sky,
+        is_da:                        isDA_sky,
+        reference: '47 CFR §73.182; §73.184; ITU-R P.533-14; ITU-R P.368-9; FCC Skywave Table 1 (1-hop E-layer); OET Bulletin 69',
+        note: `Night skywave profile: ${lat_zone}, skip zone ${skip_zone_low_km}–${skip_zone_high_km} km. ` +
+              `Night protection: ${night_protection_class}. Operation: ${night_operation_type}. ` +
+              `Dominant Class A interference risk: ${dominant_class_a_risk}.`
       };
     })(),
 

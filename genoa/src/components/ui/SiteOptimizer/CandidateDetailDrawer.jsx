@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Night Skywave Coverage & Interference Risk Guide */}
+        {candidate.am_night_skywave_coverage_and_interference_risk_guide && (() => {
+          const g = candidate.am_night_skywave_coverage_and_interference_risk_guide;
+          const riskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#15803d' }[g.dominant_class_a_risk] ?? '#374151';
+          const opColor = {
+            FULL_POWER_24H: '#15803d', DA_N_REQUIRED: '#0c4a6e', REDUCED_POWER_OR_SILENT: '#92400e'
+          }[g.night_operation_type] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#1e1b4b', borderRadius: 8, border: '1px solid #4338ca' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#a5b4fc', marginBottom: 8 }}>
+                Night Skywave — Coverage & Interference Risk
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10, color: '#e0e7ff' }}>
+                <div><span style={{ color: '#94a3b8' }}>Latitude Zone:</span> <strong>{g.lat_zone?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>E-Layer Height:</span> <strong>{g.e_layer_height_km} km</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Skip Distance:</span> <strong>{g.skip_distance_km} km</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Skip Zone:</span> <strong>{g.skip_zone_low_km}–{g.skip_zone_high_km} km</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Operation:</span> <strong style={{ color: opColor === '#15803d' ? '#4ade80' : opColor === '#92400e' ? '#fb923c' : '#93c5fd' }}>{g.night_operation_type?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>DA-N Required:</span> <strong style={{ color: g.da_n_required ? '#f87171' : '#4ade80' }}>{g.da_n_required ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Reduce Power:</span> <strong style={{ color: g.requires_night_power_reduction ? '#fb923c' : '#4ade80' }}>{g.requires_night_power_reduction ? 'Required' : 'No'}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Noise Penalty:</span> <strong>{g.night_noise_penalty_db} dB</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: '#312e81', color: '#a5b4fc', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.night_protection_class?.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: g.dominant_class_a_risk === 'HIGH' ? '#7f1d1d' : g.dominant_class_a_risk === 'MODERATE' ? '#78350f' : '#14532d', color: '#fecaca', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  Class A Risk: {g.dominant_class_a_risk}
+                </span>
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* RF Propagation Terrain Roughness Guide */}
         {candidate.rf_propagation_terrain_roughness_guide && (() => {
           const g = candidate.rf_propagation_terrain_roughness_guide;

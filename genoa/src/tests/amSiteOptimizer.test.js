@@ -10005,3 +10005,45 @@ test('rf_propagation_terrain_roughness_guide comparison table columns present', 
     assert.ok('terr_col_range_km' in row, 'terr_col_range_km missing from comparison table');
   }
 });
+
+test('am_night_skywave_coverage_and_interference_risk_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_night_skywave_coverage_and_interference_risk_guide;
+  assert.ok(g, 'skywave guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear-channel frequency');
+});
+
+test('am_night_skywave_coverage_and_interference_risk_guide lat_zone is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_night_skywave_coverage_and_interference_risk_guide;
+  const valid_zones = ['LOW_LATITUDE', 'MID_LATITUDE', 'HIGH_LATITUDE'];
+  assert.ok(valid_zones.includes(g.lat_zone), `lat_zone '${g.lat_zone}' must be valid`);
+  assert.ok(g.e_layer_height_km >= 80, 'E-layer height must be >= 80 km');
+  assert.ok(g.skip_distance_km > 0, 'skip distance must be positive');
+});
+
+test('am_night_skywave_coverage_and_interference_risk_guide KAZM Class D must reduce power at night', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_night_skywave_coverage_and_interference_risk_guide;
+  assert.strictEqual(g.requires_night_power_reduction, true, 'Class D must require night power reduction');
+  assert.strictEqual(g.night_operation_type, 'REDUCED_POWER_OR_SILENT', 'KAZM NDA Class D must be REDUCED_POWER_OR_SILENT');
+  assert.strictEqual(g.da_n_required, false, 'KAZM Class D is not required to operate DA-N');
+});
+
+test('am_night_skywave_coverage_and_interference_risk_guide KAZM clear-channel Class A interference risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_night_skywave_coverage_and_interference_risk_guide;
+  assert.strictEqual(g.dominant_class_a_risk, 'HIGH', 'Class D on clear-channel must have HIGH Class A interference risk');
+  assert.strictEqual(g.night_protection_class, 'CLASS_D_CLEAR_NIGHT_RESTRICTED', 'protection class must be CLASS_D_CLEAR_NIGHT_RESTRICTED');
+});
+
+test('am_night_skywave_coverage_and_interference_risk_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sky_lat_zone'     in row, 'sky_lat_zone missing from comparison table');
+    assert.ok('sky_night_op'     in row, 'sky_night_op missing from comparison table');
+    assert.ok('sky_class_a_risk' in row, 'sky_class_a_risk missing from comparison table');
+  }
+});
