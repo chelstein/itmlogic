@@ -1326,7 +1326,10 @@ export async function runSiteOptimizer(body = {}){
     grd_total_low_usd:          c.am_ground_system_radial_design_guide?.total_low_usd ?? null,
     tae_eta_excellent:          c.am_tpo_and_antenna_efficiency_guide?.eta_excellent ?? null,
     tae_erp_excellent_kw:       c.am_tpo_and_antenna_efficiency_guide?.erp_excellent_kw ?? null,
-    tae_base_current_excellent: c.am_tpo_and_antenna_efficiency_guide?.base_current_excellent_a ?? null
+    tae_base_current_excellent: c.am_tpo_and_antenna_efficiency_guide?.base_current_excellent_a ?? null,
+    fac_channel_type:           c.am_frequency_allocation_class_and_channel_guide?.channel_type ?? null,
+    fac_class_max_day_kw:       c.am_frequency_allocation_class_and_channel_guide?.class_max_day_kw ?? null,
+    fac_upgrade_potential_kw:   c.am_frequency_allocation_class_and_channel_guide?.upgrade_potential_kw ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7061,6 +7064,50 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_frequency_allocation_class_and_channel_guide: (() => {
+      // FCC AM frequency allocation per 47 CFR §73.21–§73.29:
+      // Class A: dominant clear channel, up to 50 kW, nationwide coverage
+      // Class B: regional channel, up to 50 kW daytime, limited nighttime
+      // Class C: local channel, up to 1 kW daytime
+      // Class D: secondary/local, up to 1 kW daytime, nighttime secondary only
+      const is_clear_fac  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_fac  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const is_regional   = !is_clear_fac && !is_local_fac;
+      const channel_type  = is_clear_fac ? 'clear' : is_local_fac ? 'local' : 'regional';
+      // Class-specific characteristics per FCC rules:
+      const class_descriptions = {
+        A: { max_day_kw: 50, max_night_kw: 50, protection: 'dominant — nationwide co-channel protection', nighttime: 'full nighttime operation', coverage: 'national', ref: '§73.21' },
+        B: { max_day_kw: 50, max_night_kw: 50, protection: 'regional — limited co-channel protection',    nighttime: 'with interference study',  coverage: 'regional', ref: '§73.22' },
+        C: { max_day_kw:  1, max_night_kw:  0.25, protection: 'local — no co-channel protection',            nighttime: 'limited (0.25 kW max)',   coverage: 'local',    ref: '§73.24' },
+        D: { max_day_kw:  1, max_night_kw:  0,    protection: 'secondary — must protect Class A/B',          nighttime: 'secondary only (may be restricted)', coverage: 'secondary', ref: '§73.25' },
+      };
+      const class_key     = fcc_class.toUpperCase();
+      const class_info    = class_descriptions[class_key] ?? class_descriptions['D'];
+      const max_power_kw  = class_info.max_day_kw;
+      const tpo_pct_of_max = round2((tpo_kw / max_power_kw) * 100);
+      const headroom_kw   = round2(max_power_kw - tpo_kw);
+      // Power upgrade potential (Class D limited to 1 kW; Class A/B could go to 50 kW)
+      const upgrade_potential_kw = headroom_kw > 0 ? headroom_kw : 0;
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        channel_type,
+        is_clear_channel: is_clear_fac,
+        is_local_channel: is_local_fac,
+        is_regional_channel: is_regional,
+        class_max_day_kw:    class_info.max_day_kw,
+        class_max_night_kw:  class_info.max_night_kw,
+        class_protection:    class_info.protection,
+        class_nighttime:     class_info.nighttime,
+        class_coverage:      class_info.coverage,
+        class_reference:     class_info.ref,
+        tpo_pct_of_max,
+        headroom_kw,
+        upgrade_potential_kw,
+        reference: `47 CFR ${class_info.ref} (Class ${class_key} stations); §73.21–§73.29 (AM frequency allocations); §73.182 (service contours); FCC AM revitalization R&O (MB Docket 13-249)`,
+        note: `Class ${class_key} on ${channel_type} channel (${frequency_khz} kHz): max ${max_power_kw} kW day / ${class_info.max_night_kw} kW night. Current TPO ${tpo_kw} kW = ${tpo_pct_of_max}% of max. Upgrade headroom: ${headroom_kw} kW.`
       };
     })(),
 

@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Frequency Allocation Class and Channel Guide */}
+        {candidate.am_frequency_allocation_class_and_channel_guide && (() => {
+          const g = candidate.am_frequency_allocation_class_and_channel_guide;
+          const chColor = g.channel_type === 'clear' ? '#1d4ed8' : g.channel_type === 'regional' ? '#15803d' : '#92400e';
+          return (
+            <div key="fac-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: `2px solid ${chColor}` }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Frequency Allocation &amp; Station Class</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>Frequency:</span><span style={{ fontWeight: 600 }}>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
+                <span>Channel type:</span><span style={{ fontWeight: 600, color: chColor, textTransform: 'capitalize' }}>{g.channel_type}</span>
+                <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.class_coverage ?? '—'})</span>
+                <span>Max power (day):</span><span>{g.class_max_day_kw != null ? `${g.class_max_day_kw} kW` : '—'}</span>
+                <span>Max power (night):</span><span>{g.class_max_night_kw != null ? (g.class_max_night_kw === 0 ? 'Secondary only' : `${g.class_max_night_kw} kW`) : '—'}</span>
+                <span>Current TPO:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'} ({g.tpo_pct_of_max != null ? `${g.tpo_pct_of_max}% of max` : '—'})</span>
+                <span>Upgrade headroom:</span><span>{g.upgrade_potential_kw != null ? (g.upgrade_potential_kw > 0 ? `${g.upgrade_potential_kw} kW available` : 'None') : '—'}</span>
+                <span>Protection:</span><span style={{ fontSize: 11 }}>{g.class_protection ?? '—'}</span>
+                <span>Nighttime ops:</span><span style={{ fontSize: 11 }}>{g.class_nighttime ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#475569', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM TPO and Antenna Efficiency Guide */}
         {candidate.am_tpo_and_antenna_efficiency_guide && (() => {
           const g = candidate.am_tpo_and_antenna_efficiency_guide;

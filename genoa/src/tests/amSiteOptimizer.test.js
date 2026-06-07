@@ -13803,3 +13803,47 @@ test('am_tpo_and_antenna_efficiency_guide comparison table columns present', asy
   assert.strictEqual(r0.tae_erp_excellent_kw,        4.68,  'rank-1 tae_erp_excellent_kw should be 4.68');
   assert.strictEqual(r0.tae_base_current_excellent,  11.32, 'rank-1 tae_base_current_excellent should be 11.32');
 });
+
+test('am_frequency_allocation_class_and_channel_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
+  assert.ok(g !== undefined && g !== null, 'am_frequency_allocation_class_and_channel_guide missing');
+  assert.ok(typeof g.channel_type === 'string', 'channel_type must be string');
+  assert.ok(g.class_max_day_kw > 0, 'class_max_day_kw must be positive');
+});
+
+test('KAZM 780 kHz Class D clear channel allocation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
+  assert.strictEqual(g.channel_type,        'clear', '780 kHz should be clear channel type');
+  assert.strictEqual(g.is_clear_channel,     true,   'is_clear_channel should be true');
+  assert.strictEqual(g.class_max_day_kw,     1,      'Class D max day power should be 1 kW');
+  assert.strictEqual(g.class_max_night_kw,   0,      'Class D max night power should be 0');
+});
+
+test('KAZM Class D power relative to class maximum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
+  assert.strictEqual(g.tpo_pct_of_max,       500, 'KAZM 5 kW / 1 kW max = 500%');
+  assert.strictEqual(g.upgrade_potential_kw,  0,  'Class D at 5 kW has no upgrade headroom');
+});
+
+test('KAZM frequency allocation reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_allocation_class_and_channel_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.21'), 'reference must cite §73.21');
+  assert.ok(typeof g.note === 'string' && g.note.includes('Class D'), 'note must mention Class D');
+});
+
+test('am_frequency_allocation_class_and_channel_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fac_channel_type'         in row, 'fac_channel_type missing from comparison table');
+    assert.ok('fac_class_max_day_kw'     in row, 'fac_class_max_day_kw missing from comparison table');
+    assert.ok('fac_upgrade_potential_kw' in row, 'fac_upgrade_potential_kw missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.fac_channel_type,         'clear', 'rank-1 fac_channel_type should be clear');
+  assert.strictEqual(r0.fac_class_max_day_kw,      1,     'rank-1 fac_class_max_day_kw should be 1');
+  assert.strictEqual(r0.fac_upgrade_potential_kw,  0,     'rank-1 fac_upgrade_potential_kw should be 0');
+});

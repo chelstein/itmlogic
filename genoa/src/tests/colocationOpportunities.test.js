@@ -3250,3 +3250,13 @@ test('am_tpo_and_antenna_efficiency_guide present across colocation candidates',
     assert.ok(g.erp_excellent_kw <= g.tpo_kw, `rank ${c.rank}: erp must be <= tpo (losses exist)`);
   }
 });
+
+test('am_frequency_allocation_class_and_channel_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_frequency_allocation_class_and_channel_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_frequency_allocation_class_and_channel_guide missing`);
+    assert.ok(['clear','local','regional'].includes(g.channel_type), `rank ${c.rank}: unexpected channel_type: ${g.channel_type}`);
+    assert.ok(g.class_max_day_kw > 0, `rank ${c.rank}: class_max_day_kw must be positive`);
+  }
+});
