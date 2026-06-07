@@ -1179,7 +1179,10 @@ export async function runSiteOptimizer(body = {}){
     pnt_annual_reserve_usd:     c.am_tower_painting_and_aviation_marking_guide?.annual_paint_reserve_usd ?? null,
     fnd_concrete_cy:            c.am_concrete_foundation_and_anchor_design_guide?.total_concrete_cy ?? null,
     fnd_total_low_usd:          c.am_concrete_foundation_and_anchor_design_guide?.total_foundation_low_usd ?? null,
-    fnd_n_anchors:              c.am_concrete_foundation_and_anchor_design_guide?.n_anchors ?? null
+    fnd_n_anchors:              c.am_concrete_foundation_and_anchor_design_guide?.n_anchors ?? null,
+    reg_annual_fcc_fee_usd:     c.am_annual_regulatory_compliance_and_fee_guide?.annual_fcc_fee_usd ?? null,
+    reg_total_annual_low_usd:   c.am_annual_regulatory_compliance_and_fee_guide?.total_annual_compliance_low_usd ?? null,
+    reg_renewal_years:          c.am_annual_regulatory_compliance_and_fee_guide?.license_renewal_cycle_years ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6914,6 +6917,69 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_annual_regulatory_compliance_and_fee_guide: (() => {
+      // FCC Annual Regulatory Fees + license renewal + EAS + public file compliance.
+      // Quantifies the ongoing annual regulatory cost burden for the AM broadcast station,
+      // independent of candidate location (driven by station class and power).
+
+      // FCC Annual Regulatory Fee (FY 2024 schedule, 47 CFR §1.1152).
+      // AM fees are assessed per station; rate differs by class.
+      // Class A: typically $4,300–$6,500; Class B: $2,100–$3,800;
+      // Class C/D small market: $585; Class C/D large market: $1,225.
+      // Using class as primary driver; assume non-dominant market for Class C/D.
+      const annual_fcc_fee_usd = fcc_class === 'A' ? 5400
+        : fcc_class === 'B' ? 3000
+        : 585;   // Class C or D
+
+      // License renewal cycle (47 CFR §73.1020): 8-year term, Form 303-S filing
+      const license_renewal_cycle_years = 8;
+      const renewal_fee_usd             = 610;  // FCC Schedule of Fees FY 2024
+      const renewal_amortized_annual_usd = Math.round(renewal_fee_usd / license_renewal_cycle_years);
+
+      // EAS compliance testing (§11.61): weekly, monthly, and annual test logging
+      // Requires EAS encoder/decoder maintenance and log review
+      const eas_testing_annual_low_usd  = 500;
+      const eas_testing_annual_high_usd = 1500;
+
+      // Compliance consultant (optional): regulatory counsel, FCC form filings,
+      // renewal petition preparation, ownership reporting (biennial Form 323)
+      const compliance_consultant_annual_low_usd  = 1000;
+      const compliance_consultant_annual_high_usd = 3000;
+
+      // Public inspection file (§73.3526): digital online file, no printing cost
+      const public_file_annual_cost_usd = 0;
+
+      // Total annual regulatory burden
+      const total_annual_compliance_low_usd  = annual_fcc_fee_usd + renewal_amortized_annual_usd
+                                              + eas_testing_annual_low_usd  + compliance_consultant_annual_low_usd;
+      const total_annual_compliance_high_usd = annual_fcc_fee_usd + renewal_amortized_annual_usd
+                                              + eas_testing_annual_high_usd + compliance_consultant_annual_high_usd;
+
+      // 10-year present value (3% discount rate)
+      const pv_factor_10yr = round2((1 - Math.pow(1.03, -10)) / 0.03);
+      const pv_10yr_low_usd  = Math.round(total_annual_compliance_low_usd  * pv_factor_10yr);
+      const pv_10yr_high_usd = Math.round(total_annual_compliance_high_usd * pv_factor_10yr);
+
+      return {
+        fcc_class,
+        annual_fcc_fee_usd,
+        license_renewal_cycle_years,
+        renewal_fee_usd,
+        renewal_amortized_annual_usd,
+        eas_testing_annual_low_usd,
+        eas_testing_annual_high_usd,
+        compliance_consultant_annual_low_usd,
+        compliance_consultant_annual_high_usd,
+        public_file_annual_cost_usd,
+        total_annual_compliance_low_usd,
+        total_annual_compliance_high_usd,
+        pv_10yr_low_usd,
+        pv_10yr_high_usd,
+        reference: '47 CFR §1.1152 (annual regulatory fees); §73.1020 (license term — 8 years); §73.3570 (Form 303-S renewal); §11.61 (EAS testing); §73.3526 (public file); FCC Schedule of Fees FY 2024 (AM Class D: $585; Class A: $5,400)',
+        note: `Annual regulatory burden for Class ${fcc_class} AM station at ${frequency_khz} kHz: FCC fee $${annual_fcc_fee_usd}/yr; renewal amortized $${renewal_amortized_annual_usd}/yr (8-yr cycle, $${renewal_fee_usd} fee); EAS testing $${eas_testing_annual_low_usd}–$${eas_testing_annual_high_usd}/yr; compliance counsel $${compliance_consultant_annual_low_usd}–$${compliance_consultant_annual_high_usd}/yr. Total: $${total_annual_compliance_low_usd.toLocaleString()}–$${total_annual_compliance_high_usd.toLocaleString()}/yr. 10-yr PV: $${pv_10yr_low_usd.toLocaleString()}–$${pv_10yr_high_usd.toLocaleString()}.`
       };
     })(),
 

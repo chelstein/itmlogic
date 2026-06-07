@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Annual Regulatory Compliance and Fee Guide */}
+        {candidate.am_annual_regulatory_compliance_and_fee_guide && (() => {
+          const g = candidate.am_annual_regulatory_compliance_and_fee_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="reg-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: '2px solid #4338ca' }}>
+              <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 6, fontSize: 13 }}>Annual Regulatory Compliance &amp; FCC Fees</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
+                <span style={{ color: '#4338ca' }}>Annual FCC Fee:</span><span>{fmt(g.annual_fcc_fee_usd)} (Class {g.fcc_class})</span>
+                <span style={{ color: '#4338ca' }}>License Renewal:</span><span>{fmt(g.renewal_fee_usd)} / {g.license_renewal_cycle_years} yr ({fmt(g.renewal_amortized_annual_usd)}/yr amortized)</span>
+                <span style={{ color: '#4338ca' }}>EAS Testing:</span><span>{fmt(g.eas_testing_annual_low_usd)} – {fmt(g.eas_testing_annual_high_usd)}/yr</span>
+                <span style={{ color: '#4338ca' }}>Compliance Counsel:</span><span>{fmt(g.compliance_consultant_annual_low_usd)} – {fmt(g.compliance_consultant_annual_high_usd)}/yr</span>
+                <span style={{ color: '#4338ca' }}>Total Annual:</span><span>{fmt(g.total_annual_compliance_low_usd)} – {fmt(g.total_annual_compliance_high_usd)}</span>
+                <span style={{ color: '#4338ca' }}>10-yr PV (3%):</span><span>{fmt(g.pv_10yr_low_usd)} – {fmt(g.pv_10yr_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#312e81' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Concrete Foundation and Anchor Design Guide */}
         {candidate.am_concrete_foundation_and_anchor_design_guide && (() => {
           const g = candidate.am_concrete_foundation_and_anchor_design_guide;

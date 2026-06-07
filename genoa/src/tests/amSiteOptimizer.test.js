@@ -11393,6 +11393,52 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_annual_regulatory_compliance_and_fee_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
+  assert.ok(g !== undefined && g !== null, 'am_annual_regulatory_compliance_and_fee_guide missing');
+  assert.ok(typeof g.annual_fcc_fee_usd === 'number', 'annual_fcc_fee_usd should be a number');
+  assert.ok(typeof g.total_annual_compliance_low_usd === 'number', 'total_annual_compliance_low_usd should be a number');
+});
+
+test('am_annual_regulatory_compliance_and_fee_guide KAZM Class D FCC fee', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
+  assert.strictEqual(g.annual_fcc_fee_usd, 585, 'Class D annual FCC regulatory fee should be $585');
+  assert.strictEqual(g.license_renewal_cycle_years, 8, 'AM license renewal cycle should be 8 years');
+  assert.strictEqual(g.renewal_fee_usd, 610, 'Renewal fee should be $610');
+  assert.strictEqual(g.renewal_amortized_annual_usd, 76, 'Amortized renewal should be $76/yr');
+});
+
+test('am_annual_regulatory_compliance_and_fee_guide KAZM total annual compliance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
+  assert.strictEqual(g.total_annual_compliance_low_usd,  2161, 'Total annual compliance low should be $2,161');
+  assert.strictEqual(g.total_annual_compliance_high_usd, 5161, 'Total annual compliance high should be $5,161');
+  assert.ok(g.total_annual_compliance_high_usd > g.total_annual_compliance_low_usd, 'High must exceed low');
+});
+
+test('am_annual_regulatory_compliance_and_fee_guide KAZM 10yr present value', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_regulatory_compliance_and_fee_guide;
+  assert.strictEqual(g.pv_10yr_low_usd, 18433, '10-yr PV low should be $18,433');
+  assert.ok(g.pv_10yr_high_usd > g.pv_10yr_low_usd, '10-yr PV high must exceed low');
+  assert.strictEqual(g.public_file_annual_cost_usd, 0, 'Digital public file should have zero cost');
+});
+
+test('am_annual_regulatory_compliance_and_fee_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('reg_annual_fcc_fee_usd'   in row, 'reg_annual_fcc_fee_usd missing from comparison table');
+    assert.ok('reg_total_annual_low_usd' in row, 'reg_total_annual_low_usd missing from comparison table');
+    assert.ok('reg_renewal_years'        in row, 'reg_renewal_years missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.reg_annual_fcc_fee_usd,   585,  'rank-1 reg_annual_fcc_fee_usd should be $585');
+  assert.strictEqual(r0.reg_total_annual_low_usd, 2161, 'rank-1 reg_total_annual_low_usd should be $2,161');
+  assert.strictEqual(r0.reg_renewal_years,          8,  'rank-1 reg_renewal_years should be 8');
+});
+
 test('am_concrete_foundation_and_anchor_design_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_concrete_foundation_and_anchor_design_guide;
