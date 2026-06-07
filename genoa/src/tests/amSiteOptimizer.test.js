@@ -13978,3 +13978,40 @@ test('am_terrain_and_propagation_assessment_guide comparison table columns prese
   assert.strictEqual(r0.ter_penalty_db_low,        6,    'rank-1 ter_penalty_db_low should be 6');
   assert.strictEqual(r0.ter_terrain_study_low_usd, 2500, 'rank-1 ter_terrain_study_low_usd should be 2500');
 });
+
+// ── am_tower_foundation_and_civil_engineering_guide ──────────────────────────
+
+it('am_tower_foundation_and_civil_engineering_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_tower_foundation_and_civil_engineering_guide, 'tfciv guide missing on candidate');
+  }
+});
+
+it('am_tower_foundation_and_civil_engineering_guide tower_height_ft is ~315.26 ft for KAZM (Class D, 780 kHz)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_foundation_and_civil_engineering_guide;
+  assert.ok(Math.abs(g.tower_height_ft - 315.26) < 0.5, `tower_height_ft expected ~315.26, got ${g.tower_height_ft}`);
+});
+
+it('am_tower_foundation_and_civil_engineering_guide concrete_cuyd_low is positive and reasonable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_foundation_and_civil_engineering_guide;
+  assert.ok(g.concrete_cuyd_low > 0, 'concrete_cuyd_low must be positive');
+  assert.ok(g.concrete_cuyd_low < g.concrete_cuyd_high, 'concrete_cuyd_low < concrete_cuyd_high');
+});
+
+it('am_tower_foundation_and_civil_engineering_guide reference cites EIA/TIA-222-H and ACI 318', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_foundation_and_civil_engineering_guide;
+  assert.ok(g.reference.includes('EIA/TIA-222-H'), 'reference must cite EIA/TIA-222-H');
+  assert.ok(g.reference.includes('ACI 318'), 'reference must cite ACI 318');
+});
+
+it('candidate_comparison_table tfciv columns match KAZM Class D expected values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(Math.abs(r0.tfciv_tower_height_ft - 315.26) < 0.5, `tfciv_tower_height_ft expected ~315.26, got ${r0.tfciv_tower_height_ft}`);
+  assert.strictEqual(r0.tfciv_civil_foundation_low_usd, 25000, 'tfciv_civil_foundation_low_usd should be 25000');
+  assert.ok(r0.tfciv_concrete_cuyd_low > 0, 'tfciv_concrete_cuyd_low must be positive');
+});

@@ -1338,7 +1338,10 @@ export async function runSiteOptimizer(body = {}){
     aoc_kwh_per_year:           c.am_annual_operating_cost_breakdown_guide?.kwh_per_year ?? null,
     ter_conductivity_low:       c.am_terrain_and_propagation_assessment_guide?.conductivity_ms_per_m_low ?? null,
     ter_penalty_db_low:         c.am_terrain_and_propagation_assessment_guide?.conductivity_penalty_db_low ?? null,
-    ter_terrain_study_low_usd:  c.am_terrain_and_propagation_assessment_guide?.terrain_study_low_usd ?? null
+    ter_terrain_study_low_usd:  c.am_terrain_and_propagation_assessment_guide?.terrain_study_low_usd ?? null,
+    tfciv_tower_height_ft:          c.am_tower_foundation_and_civil_engineering_guide?.tower_height_ft ?? null,
+    tfciv_concrete_cuyd_low:        c.am_tower_foundation_and_civil_engineering_guide?.concrete_cuyd_low ?? null,
+    tfciv_civil_foundation_low_usd: c.am_tower_foundation_and_civil_engineering_guide?.civil_foundation_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7073,6 +7076,51 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_foundation_and_civil_engineering_guide: (() => {
+      const freq_mhz = frequency_khz / 1000;
+      const lambda_m = 299.792458 / freq_mhz;
+      const isHighClass_tf = /^[AB]/i.test(fcc_class);
+      const tower_height_m   = round2(isHighClass_tf ? lambda_m / 2 : lambda_m / 4);
+      const tower_height_ft  = round2(tower_height_m * 3.28084);
+      // Base pier: cylindrical concrete anchor beneath tower base plate
+      const base_pier_depth_ft_low  = round2(Math.max(6,  tower_height_ft * 0.05));
+      const base_pier_depth_ft_high = round2(Math.max(10, tower_height_ft * 0.08));
+      const concrete_cuyd_low  = round2(Math.max(5,  tower_height_m * 0.4));
+      const concrete_cuyd_high = round2(Math.max(10, tower_height_m * 0.7));
+      // Guy anchors: AM monopoles are typically guyed (120° spacing, 3 anchors)
+      const guy_anchor_count = 3;
+      const guy_anchor_cuyd_each_low  = round2(Math.max(3, tower_height_m * 0.06));
+      const guy_anchor_cuyd_each_high = round2(Math.max(5, tower_height_m * 0.10));
+      const geo_study_low_usd  = 3000;
+      const geo_study_high_usd = 8000;
+      const civil_foundation_low_usd  = 25000;
+      const civil_foundation_high_usd = 80000;
+      const soil_bearing_capacity_psf_poor = 1000;
+      const soil_bearing_capacity_psf_good = 3000;
+      return {
+        tower_height_m,
+        tower_height_ft,
+        fcc_class_used: fcc_class,
+        base_pier_depth_ft_low,
+        base_pier_depth_ft_high,
+        concrete_cuyd_low,
+        concrete_cuyd_high,
+        guy_anchor_count,
+        guy_anchor_cuyd_each_low,
+        guy_anchor_cuyd_each_high,
+        geo_study_low_usd,
+        geo_study_high_usd,
+        civil_foundation_low_usd,
+        civil_foundation_high_usd,
+        soil_bearing_capacity_psf_poor,
+        soil_bearing_capacity_psf_good,
+        design_standard: 'EIA/TIA-222-H',
+        concrete_standard: 'ACI 318',
+        reference: '47 CFR §73.49 (AM tower fencing); EIA/TIA-222-H (structural design of antenna supporting structures); ACI 318 (concrete design); ASCE 7-22 (wind/seismic loads); ASTM D1586 (standard penetration test)',
+        note: `Class ${fcc_class} tower at ${frequency_khz} kHz: est. height ${tower_height_ft} ft (${tower_height_m} m). Base pier est. ${base_pier_depth_ft_low}–${base_pier_depth_ft_high} ft deep, ${concrete_cuyd_low}–${concrete_cuyd_high} cu yd concrete. ${guy_anchor_count} guy anchors × ${guy_anchor_cuyd_each_low}–${guy_anchor_cuyd_each_high} cu yd each. Geotech study required ($${geo_study_low_usd.toLocaleString()}–$${geo_study_high_usd.toLocaleString()}). Civil/foundation total: $${civil_foundation_low_usd.toLocaleString()}–$${civil_foundation_high_usd.toLocaleString()}.`
       };
     })(),
 

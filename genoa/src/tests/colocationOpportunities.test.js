@@ -3293,3 +3293,20 @@ test('am_terrain_and_propagation_assessment_guide present across colocation cand
     assert.ok(g.terrain_study_low_usd > 0, `rank ${c.rank}: terrain_study_low_usd must be positive`);
   }
 });
+
+test('am_tower_foundation_and_civil_engineering_guide colocation: all colocation candidates have valid tower foundation data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_foundation_and_civil_engineering_guide;
+    assert.ok(g, `candidate missing am_tower_foundation_and_civil_engineering_guide`);
+    assert.ok(g.tower_height_m > 0, `tower_height_m must be positive`);
+    assert.ok(g.civil_foundation_low_usd > 0, `civil_foundation_low_usd must be positive`);
+    assert.ok(g.guy_anchor_count === 3, `guy_anchor_count should be 3 for guyed AM monopole`);
+  }
+});

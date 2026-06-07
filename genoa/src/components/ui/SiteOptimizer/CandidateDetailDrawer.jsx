@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Foundation and Civil Engineering Guide */}
+        {candidate.am_tower_foundation_and_civil_engineering_guide && (() => {
+          const g = candidate.am_tower_foundation_and_civil_engineering_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="tfciv-guide" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', borderRadius: 8, border: '2px solid #2563eb' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>Tower Foundation &amp; Civil Engineering</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#1e40af' }}>
+                <span>Tower class/height:</span><span>{g.fcc_class_used ?? '—'} — {g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Base pier depth:</span><span>{g.base_pier_depth_ft_low != null ? `${g.base_pier_depth_ft_low}–${g.base_pier_depth_ft_high} ft` : '—'}</span>
+                <span>Concrete (base pier):</span><span>{g.concrete_cuyd_low != null ? `${g.concrete_cuyd_low}–${g.concrete_cuyd_high} cu yd` : '—'}</span>
+                <span>Guy anchors:</span><span>{g.guy_anchor_count ?? '—'} × {g.guy_anchor_cuyd_each_low != null ? `${g.guy_anchor_cuyd_each_low}–${g.guy_anchor_cuyd_each_high} cu yd` : '—'}</span>
+                <span>Geotech study:</span><span>{g.geo_study_low_usd != null ? `$${fmt(g.geo_study_low_usd)} – $${fmt(g.geo_study_high_usd)}` : '—'}</span>
+                <span>Civil/foundation total:</span><span style={{ color: '#dc2626' }}>{g.civil_foundation_low_usd != null ? `$${fmt(g.civil_foundation_low_usd)} – $${fmt(g.civil_foundation_high_usd)}` : '—'}</span>
+                <span>Design standard:</span><span>{g.design_standard ?? '—'}</span>
+                <span>Concrete standard:</span><span>{g.concrete_standard ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#1d4ed8', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Terrain and Propagation Assessment Guide */}
         {candidate.am_terrain_and_propagation_assessment_guide && (() => {
           const g = candidate.am_terrain_and_propagation_assessment_guide;
