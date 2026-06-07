@@ -2909,3 +2909,14 @@ test('am_site_access_road_and_security_guide present across colocation candidate
     assert.ok(g.annual_security_maint_usd > 0, `rank ${c.rank}: annual_security_maint_usd must be positive`);
   }
 });
+
+test('am_ground_system_installation_and_maintenance_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_installation_and_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_installation_and_maintenance_guide missing`);
+    assert.ok(g.radial_length_ft > 0, `rank ${c.rank}: radial_length_ft must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok([120, 160].includes(g.recommended_radials), `rank ${c.rank}: recommended_radials must be 120 or 160`);
+  }
+});

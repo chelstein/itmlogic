@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Ground System Installation and Maintenance Guide */}
+        {candidate.am_ground_system_installation_and_maintenance_guide && (() => {
+          const g = candidate.am_ground_system_installation_and_maintenance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="gnd-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Ground System (Radials)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Frequency:</span><span>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
+                <span>λ/4 radial:</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? g.radial_length_m.toFixed(1) : '—'} m)` : '—'}</span>
+                <span>Radials:</span><span>{g.recommended_radials ?? '—'} {g.is_da ? '(DA enhanced)' : '(standard)'}</span>
+                <span>Total wire:</span><span>{g.total_ft_standard != null ? `${Math.round(g.total_ft_standard).toLocaleString()} ft` : '—'}</span>
+                <span>Wire:</span><span>{fmt(g.wire_low_usd)} – {fmt(g.wire_high_usd)}</span>
+                <span>Labor:</span><span>{fmt(g.labor_low_usd)} – {fmt(g.labor_high_usd)}</span>
+                <span>Hardware:</span><span>{fmt(g.hardware_low_usd)} – {fmt(g.hardware_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4ade80', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Procurement and Upgrade Guide */}
         {candidate.am_transmitter_procurement_and_upgrade_guide && (() => {
           const g = candidate.am_transmitter_procurement_and_upgrade_guide;

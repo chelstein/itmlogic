@@ -12482,3 +12482,48 @@ test('am_site_access_road_and_security_guide comparison table columns present', 
   assert.strictEqual(r0.sec_total_security_low_usd, 26500, 'rank-1 sec_total_security_low_usd should be $26,500');
   assert.strictEqual(r0.sec_annual_monitoring_usd, 1200, 'rank-1 sec_annual_monitoring_usd should be $1,200');
 });
+
+test('am_ground_system_installation_and_maintenance_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_installation_and_maintenance_guide;
+  assert.ok(g !== undefined && g !== null, 'am_ground_system_installation_and_maintenance_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM ground system radial geometry', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_installation_and_maintenance_guide;
+  assert.strictEqual(g.frequency_khz, 780, 'frequency_khz should be 780');
+  assert.strictEqual(g.radial_length_ft, 315.26, 'radial_length_ft should be 315.26');
+  assert.strictEqual(g.recommended_radials, 120, 'NDA station should use 120 radials');
+  assert.strictEqual(g.is_da, false, 'NDA pattern_mode should set is_da=false');
+});
+
+test('KAZM ground system wire and labor costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_installation_and_maintenance_guide;
+  assert.strictEqual(g.wire_low_usd,   11349.36, 'wire_low_usd should be 11349.36');
+  assert.strictEqual(g.labor_low_usd,  18915.6,  'labor_low_usd should be 18915.6');
+  assert.strictEqual(g.hardware_low_usd, 1500,   'hardware_low_usd should be 1500');
+});
+
+test('KAZM ground system total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_installation_and_maintenance_guide;
+  assert.strictEqual(g.total_low_usd,  31764.96,  'total_low_usd should be 31764.96');
+  assert.strictEqual(g.total_high_usd, 146236.48, 'total_high_usd should be 146236.48');
+});
+
+test('am_ground_system_installation_and_maintenance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gnd_radial_length_ft'    in row, 'gnd_radial_length_ft missing from comparison table');
+    assert.ok('gnd_total_low_usd'       in row, 'gnd_total_low_usd missing from comparison table');
+    assert.ok('gnd_recommended_radials' in row, 'gnd_recommended_radials missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.gnd_radial_length_ft,    315.26,   'rank-1 gnd_radial_length_ft should be 315.26');
+  assert.strictEqual(r0.gnd_total_low_usd,        31764.96, 'rank-1 gnd_total_low_usd should be 31764.96');
+  assert.strictEqual(r0.gnd_recommended_radials,  120,      'rank-1 gnd_recommended_radials should be 120');
+});

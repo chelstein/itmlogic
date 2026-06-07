@@ -1236,7 +1236,10 @@ export async function runSiteOptimizer(body = {}){
     grd_grading_low_usd:        c.am_site_grading_and_drainage_guide?.grading_low_usd ?? null,
     txp_tx_type:                c.am_transmitter_procurement_and_upgrade_guide?.tx_type ?? null,
     txp_total_low_usd:          c.am_transmitter_procurement_and_upgrade_guide?.total_tx_low_usd ?? null,
-    txp_tx_cost_low_usd:        c.am_transmitter_procurement_and_upgrade_guide?.tx_cost_low_usd ?? null
+    txp_tx_cost_low_usd:        c.am_transmitter_procurement_and_upgrade_guide?.tx_cost_low_usd ?? null,
+    gnd_radial_length_ft:       c.am_ground_system_installation_and_maintenance_guide?.radial_length_ft ?? null,
+    gnd_total_low_usd:          c.am_ground_system_installation_and_maintenance_guide?.total_low_usd ?? null,
+    gnd_recommended_radials:    c.am_ground_system_installation_and_maintenance_guide?.recommended_radials ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6971,6 +6974,47 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_ground_system_installation_and_maintenance_guide: (() => {
+      // FCC-standard AM ground system: 120 buried radials at λ/4 length.
+      // Longer/more radials (160+) improve efficiency and are typical for DA or
+      // Class A/B stations; shorter legacy systems may need upgrade to meet efficiency targets.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const radial_length_m  = round2(wavelength_m / 4);
+      const radial_length_ft = round2(radial_length_m * 3.28084);
+      const num_radials_standard = 120;
+      const num_radials_enhanced = 160; // DA or high-efficiency systems
+      const is_da = /^DA/i.test(pattern_mode);
+      const recommended_radials = is_da ? num_radials_enhanced : num_radials_standard;
+      const total_ft_standard = round2(num_radials_standard * radial_length_ft);
+      const total_ft_enhanced  = round2(num_radials_enhanced  * radial_length_ft);
+      const wire_cost_low_per_ft  = 0.30; // bare #12 AWG copper
+      const wire_cost_high_per_ft = 0.80; // stranded copper, installed
+      const install_low_per_ft  = 0.50;
+      const install_high_per_ft = 2.00;
+      const wire_low_usd   = round2(total_ft_standard * wire_cost_low_per_ft);
+      const wire_high_usd  = round2(total_ft_enhanced  * wire_cost_high_per_ft);
+      const labor_low_usd  = round2(total_ft_standard * install_low_per_ft);
+      const labor_high_usd = round2(total_ft_enhanced  * install_high_per_ft);
+      const hardware_low_usd  = 1500;  // rods, clamps, exothermic welds
+      const hardware_high_usd = 5000;
+      const total_low_usd  = round2(wire_low_usd  + labor_low_usd  + hardware_low_usd);
+      const total_high_usd = round2(wire_high_usd + labor_high_usd + hardware_high_usd);
+      return {
+        frequency_khz, wavelength_m, radial_length_m, radial_length_ft,
+        num_radials_standard, num_radials_enhanced, recommended_radials, is_da,
+        total_ft_standard, total_ft_enhanced,
+        wire_cost_low_per_ft, wire_cost_high_per_ft,
+        install_low_per_ft, install_high_per_ft,
+        wire_low_usd, wire_high_usd,
+        labor_low_usd, labor_high_usd,
+        hardware_low_usd, hardware_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'FCC AM Antenna Ground Systems; IEEE Std 100; NEC ground system practice; ARRL AM engineering data',
+        note: `${frequency_khz} kHz: λ/4=${radial_length_ft.toFixed(0)} ft; ${recommended_radials} radials recommended; ground system total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 
