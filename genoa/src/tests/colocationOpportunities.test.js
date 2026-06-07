@@ -3847,3 +3847,14 @@ test('am_fm_translator_and_signal_booster_filing_guide present across colocation
     assert.ok(g.total_translator_low_usd > 0, 'total_translator_low_usd must be positive');
   }
 });
+
+test('am_nrsc_emission_mask_and_bandwidth_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_nrsc_emission_mask_and_bandwidth_compliance_guide`);
+    assert.strictEqual(g.occupied_bw_khz, 20, 'AM occupied bandwidth must be 20 kHz (±10 kHz NRSC-1-A audio)');
+    assert.strictEqual(g.harmonic_suppression_required_dBc, 40, '§73.44(e) requires 40 dBc harmonic suppression');
+    assert.ok(Array.isArray(g.nrsc2b_mask) && g.nrsc2b_mask.length >= 3, 'nrsc2b_mask must have mask points');
+  }
+});

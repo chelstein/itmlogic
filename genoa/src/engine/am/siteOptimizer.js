@@ -1440,7 +1440,10 @@ export async function runSiteOptimizer(body = {}){
     nfl_noise_risk_level:               c.am_noise_floor_and_rf_interference_environment_guide?.noise_risk_level ?? null,
     xltr_eligible:                      c.am_fm_translator_and_signal_booster_filing_guide?.translator_eligible ?? null,
     xltr_coverage_km:                   c.am_fm_translator_and_signal_booster_filing_guide?.translator_coverage_km ?? null,
-    xltr_total_low_usd:                 c.am_fm_translator_and_signal_booster_filing_guide?.total_translator_low_usd ?? null
+    xltr_total_low_usd:                 c.am_fm_translator_and_signal_booster_filing_guide?.total_translator_low_usd ?? null,
+    emk_occupied_bw_khz:                c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.occupied_bw_khz ?? null,
+    emk_harmonic_2nd_khz:               c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.harmonic_2nd_khz ?? null,
+    emk_harmonic_max_mW:                c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.harmonic_max_mW ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7176,6 +7179,138 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_nrsc_emission_mask_and_bandwidth_compliance_guide: (() => {
+      // AM NRSC-2-B emission mask and §73.44 bandwidth compliance guide.
+      //
+      // The FCC requires all AM broadcast stations to comply with the NRSC-2-B
+      // emission mask standard, which limits the spectral energy of the AM signal
+      // to prevent interference with adjacent-channel stations.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.44: AM station emission limitations.
+      //   §73.44(a): AM stations must comply with the NRSC-2-B emission mask.
+      //   NRSC-2-B (1994, updated 2011): Defines the spectral occupancy mask for AM.
+      //   Note: NRSC-1-A (audio bandwidth ≤10 kHz) is a prerequisite; §73.44 implements it.
+      //
+      // NRSC-2-B mask requirements:
+      //   The mask defines maximum allowed spectral power density vs frequency offset
+      //   from the carrier. Key mask points (from NRSC-2-B Table 1):
+      //
+      //   Offset from carrier (kHz) → Attenuation below modulated carrier (dBc):
+      //     ±10.2 kHz: -25 dBc
+      //     ±10.8 kHz: -35 dBc
+      //     ±20 kHz:   -50 dBc (approximate; interpolated from mask)
+      //     ±30 kHz:   -60 dBc
+      //     ±60 kHz:   -80 dBc (general spurious limit)
+      //
+      //   At the ±10 kHz (first adjacent channel boundary):
+      //     The signal level must be ≤ -25 dBc at ±10.2 kHz (adjacent channel edge).
+      //
+      // Harmonic emissions:
+      //   §73.44(e) / §2.1046: AM transmitter harmonics and spurious emissions must be
+      //   suppressed to the greater of:
+      //     (a) 40 dBc below the carrier, OR
+      //     (b) For carriers ≥ 25 W: 1 mW (-30 dBW = +60 dBm absolute limit for low power)
+      //   For Class A/B (50 kW): 40 dBc of 50 kW = 5 W max harmonic at 2nd/3rd harmonic.
+      //   For Class D (5 kW): 40 dBc of 5 kW = 0.5 W max harmonic.
+      //
+      //   2nd harmonic of 780 kHz = 1560 kHz (aviation band edge / AM band)
+      //   3rd harmonic of 780 kHz = 2340 kHz (outside AM band — harmonic filter required)
+      //
+      // Occupied bandwidth:
+      //   With NRSC-2-B compliant audio processing and 10 kHz audio bandwidth,
+      //   the occupied bandwidth of an AM signal is approximately 20 kHz
+      //   (±10 kHz sidebands). This is the occupied bandwidth for channel allocation.
+      //   AM channel spacing: 10 kHz (US standard).
+      //
+      // Transmitter type acceptance:
+      //   §73.1660(a): All AM transmitters must be FCC type-accepted per Part 2, Subpart J.
+      //   NRSC-2-B compliance must be demonstrated in the type-acceptance process.
+      //   Modern AM transmitters (Nautel, GatesAir, BW Broadcast) are pre-certified compliant.
+      //
+      // Measurement setup:
+      //   For verification: spectrum analyzer with resolution bandwidth ≤100 Hz,
+      //   using a calibrated antenna coupler or transmission line directional coupler.
+      //   Measurements must be made with NRSC-1-A compliant audio source.
+      //
+      // Cost:
+      //   No marginal cost for NRSC-2-B compliance if transmitter is type-accepted.
+      //   If older transmitter (pre-1994) is in use: possible upgrade required.
+      //   Emission mask verification measurement: $500–$2,000 (spectrum analyzer rental + time).
+
+      // Carrier frequency and key harmonics
+      const carrier_khz       = frequency_khz;
+      const harmonic_2nd_khz  = carrier_khz * 2;  // 1560 kHz for 780
+      const harmonic_3rd_khz  = carrier_khz * 3;  // 2340 kHz for 780
+      const harmonic_4th_khz  = carrier_khz * 4;  // 3120 kHz for 780
+
+      // Occupied bandwidth
+      const audio_bw_khz      = 10.0;   // NRSC-1-A / §73.44 prerequisite
+      const occupied_bw_khz   = round2(audio_bw_khz * 2);   // double-sideband AM = 20 kHz
+      const channel_spacing_khz = 10;   // US AM channel spacing
+
+      // NRSC-2-B mask key points (carrier offset → attenuation in dBc)
+      const nrsc2b_mask = [
+        { offset_khz: 10.2, attenuation_dBc: 25 },   // first adjacent channel edge
+        { offset_khz: 10.8, attenuation_dBc: 35 },
+        { offset_khz: 20,   attenuation_dBc: 50 },
+        { offset_khz: 30,   attenuation_dBc: 60 },
+        { offset_khz: 60,   attenuation_dBc: 80 },
+      ];
+
+      // Harmonic suppression requirements:
+      //   §73.44(e): ≥40 dBc suppression for all harmonics
+      const harmonic_suppression_required_dBc = 40;
+
+      // Maximum allowable harmonic power
+      const tpo_w              = tpo_kw * 1000;
+      const harmonic_max_mW    = round2((tpo_w * Math.pow(10, -harmonic_suppression_required_dBc / 10)) * 1000);  // in mW
+      const harmonic_max_w     = round2(harmonic_max_mW / 1000);
+
+      // 2nd harmonic frequency assessment:
+      //   1560 kHz is within the AM broadcast band (530–1700 kHz)
+      //   → must not interfere with any station licensed on 1560 kHz
+      const harmonic_2nd_in_am_band = harmonic_2nd_khz >= 530 && harmonic_2nd_khz <= 1700;
+      const harmonic_3rd_in_am_band = harmonic_3rd_khz >= 530 && harmonic_3rd_khz <= 1700;
+
+      // Transmitter certification status:
+      //   Modern transmitters (post-1994) are type-accepted with NRSC-2-B compliance.
+      //   Screening assumption: facility uses modern transmitter.
+      const transmitter_type_acceptance_required = true;  // §73.1660(a) — always
+      const nrsc2b_compliance_assumed             = true;  // modern transmitters are pre-certified
+
+      // Cost:
+      const verification_low_usd  = 500;
+      const verification_high_usd = 2000;
+      const upgrade_risk_usd      = 0;   // assumed modern transmitter
+      const total_emission_low_usd  = verification_low_usd;
+      const total_emission_high_usd = verification_high_usd;
+
+      return {
+        carrier_khz,
+        harmonic_2nd_khz,
+        harmonic_3rd_khz,
+        harmonic_4th_khz,
+        audio_bw_khz,
+        occupied_bw_khz,
+        channel_spacing_khz,
+        nrsc2b_mask,
+        harmonic_suppression_required_dBc,
+        harmonic_max_mW,
+        harmonic_max_w,
+        harmonic_2nd_in_am_band,
+        harmonic_3rd_in_am_band,
+        transmitter_type_acceptance_required,
+        nrsc2b_compliance_assumed,
+        verification_low_usd,
+        verification_high_usd,
+        total_emission_low_usd,
+        total_emission_high_usd,
+        reference: '47 CFR §73.44 (AM emission mask — NRSC-2-B); §73.44(e) (harmonic suppression ≥40 dBc); §73.1660(a) (transmitter type acceptance); NRSC-2-B (1994/2011 emission mask standard); §2.1046 (spurious emission limits); NRSC-1-A (10 kHz audio bandwidth prerequisite)',
+        note: `NRSC-2-B emission mask compliance required per §73.44. At ${carrier_khz} kHz: occupied bandwidth ±${audio_bw_khz} kHz (${occupied_bw_khz} kHz total). Key mask: ≤-25 dBc at ±10.2 kHz, ≤-50 dBc at ±20 kHz. 2nd harmonic: ${harmonic_2nd_khz} kHz (${harmonic_2nd_in_am_band ? 'within AM band — verify no 1560 kHz interference' : 'outside AM band'}), max allowed: ${harmonic_max_mW} mW (−${harmonic_suppression_required_dBc} dBc). Modern type-accepted transmitters are pre-certified NRSC-2-B compliant.`
       };
     })(),
 

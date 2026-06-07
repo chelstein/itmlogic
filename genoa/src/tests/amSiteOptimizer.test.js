@@ -15246,3 +15246,51 @@ it('candidate_comparison_table xltr columns are present and valid for KAZM', asy
   assert.ok(r0.xltr_coverage_km >= 20, 'xltr_coverage_km must be ≥20 km');
   assert.ok(r0.xltr_total_low_usd > 0, 'xltr_total_low_usd must be positive');
 });
+
+it('am_nrsc_emission_mask_and_bandwidth_compliance_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_nrsc_emission_mask_and_bandwidth_compliance_guide !== undefined &&
+      c.am_nrsc_emission_mask_and_bandwidth_compliance_guide !== null,
+      `rank ${c.rank}: am_nrsc_emission_mask_and_bandwidth_compliance_guide must be present`
+    );
+  }
+});
+
+it('KAZM 780 kHz harmonics and occupied bandwidth per §73.44 / NRSC-2-B', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+  assert.strictEqual(g.carrier_khz, 780, 'carrier must be 780 kHz');
+  assert.strictEqual(g.harmonic_2nd_khz, 1560, '2nd harmonic of 780 kHz must be 1560 kHz');
+  assert.strictEqual(g.harmonic_3rd_khz, 2340, '3rd harmonic of 780 kHz must be 2340 kHz');
+  assert.strictEqual(g.occupied_bw_khz, 20, 'occupied bandwidth must be 20 kHz (±10 kHz sidebands)');
+  assert.strictEqual(g.channel_spacing_khz, 10, 'US AM channel spacing must be 10 kHz');
+});
+
+it('KAZM harmonic suppression 40 dBc per §73.44(e)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+  assert.strictEqual(g.harmonic_suppression_required_dBc, 40, '§73.44(e) requires 40 dBc harmonic suppression');
+  // 5 kW × 10^(-40/10) = 0.5 W = 500 mW
+  assert.ok(Math.abs(g.harmonic_max_w - 0.5) < 0.01, `harmonic_max_w should be ~0.5 W at 5 kW TPO, got ${g.harmonic_max_w}`);
+  assert.strictEqual(g.harmonic_max_mW, 500, 'harmonic_max_mW should be 500 mW for 5 kW station with 40 dBc suppression');
+});
+
+it('KAZM NRSC-2-B mask has required suppression points', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+  assert.ok(Array.isArray(g.nrsc2b_mask) && g.nrsc2b_mask.length >= 3, 'nrsc2b_mask must have at least 3 mask points');
+  const firstPoint = g.nrsc2b_mask[0];
+  assert.strictEqual(firstPoint.offset_khz, 10.2, 'first mask point must be at ±10.2 kHz (adjacent channel edge)');
+  assert.strictEqual(firstPoint.attenuation_dBc, 25, 'first mask point attenuation must be 25 dBc per NRSC-2-B');
+  assert.strictEqual(g.harmonic_2nd_in_am_band, true, '780 kHz 2nd harmonic (1560 kHz) is within AM band');
+});
+
+it('candidate_comparison_table emk columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.emk_occupied_bw_khz, 20, 'emk_occupied_bw_khz must be 20 kHz');
+  assert.strictEqual(r0.emk_harmonic_2nd_khz, 1560, 'emk_harmonic_2nd_khz must be 1560 kHz for 780 kHz carrier');
+  assert.strictEqual(r0.emk_harmonic_max_mW, 500, 'emk_harmonic_max_mW must be 500 mW for 5 kW at 40 dBc');
+});

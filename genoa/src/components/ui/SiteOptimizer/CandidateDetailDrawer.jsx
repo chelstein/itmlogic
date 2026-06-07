@@ -2226,6 +2226,37 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM NRSC Emission Mask and Bandwidth Compliance Guide */}
+        {candidate.am_nrsc_emission_mask_and_bandwidth_compliance_guide && (() => {
+          const g = candidate.am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#334155', marginBottom: 8 }}>
+                NRSC-2-B Emission Mask &amp; Bandwidth (§73.44)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#475569' }}>
+                <div><b>Carrier:</b> {g.carrier_khz} kHz | Occupied BW: ±{g.audio_bw_khz} kHz ({g.occupied_bw_khz} kHz total)</div>
+                <div><b>Channel Spacing:</b> {g.channel_spacing_khz} kHz (US AM)</div>
+                <div><b>Harmonic Suppression:</b> ≥{g.harmonic_suppression_required_dBc} dBc (§73.44(e))</div>
+                <div><b>Max Harmonic Power:</b> {g.harmonic_max_mW} mW ({fmtF(g.harmonic_max_w, 3)} W)</div>
+                <div><b>2nd Harmonic:</b> {g.harmonic_2nd_khz} kHz {g.harmonic_2nd_in_am_band ? '⚠ within AM band' : '(outside AM band)'}</div>
+                <div><b>3rd Harmonic:</b> {g.harmonic_3rd_khz} kHz {g.harmonic_3rd_in_am_band ? '⚠ within AM band' : '(outside AM band)'}</div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <b>NRSC-2-B Mask:</b>{' '}
+                  {g.nrsc2b_mask?.map(p => `±${p.offset_khz} kHz: −${p.attenuation_dBc} dBc`).join(' | ')}
+                </div>
+                <div><b>Type Acceptance:</b> {g.transmitter_type_acceptance_required ? 'Required §73.1660(a)' : 'N/A'}</div>
+                <div><b>NRSC-2-B Compliant:</b> {g.nrsc2b_compliance_assumed ? 'Yes (modern TX assumed)' : 'Verify required'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #cbd5e1', marginTop: 4, paddingTop: 6 }}>
+                  <b>Verification Cost:</b> ${fmt(g.verification_low_usd)}–${fmt(g.verification_high_usd)} (spectrum analyzer measurement)
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM FM Translator and Signal Booster Filing Guide */}
         {candidate.am_fm_translator_and_signal_booster_filing_guide && (() => {
           const g = candidate.am_fm_translator_and_signal_booster_filing_guide;
