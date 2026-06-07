@@ -2226,6 +2226,41 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Broadcast Tower Grounding and Cathodic Protection Guide */}
+        {candidate.am_broadcast_tower_grounding_and_cathodic_protection_guide && (() => {
+          const g = candidate.am_broadcast_tower_grounding_and_cathodic_protection_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="gcp-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf6ee', borderRadius: 8, border: '2px solid #92400e' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Tower Grounding &amp; Cathodic Protection — §73.190 / NFPA 780</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#451a03', marginBottom: 8 }}>
+                <span style={{ color: '#92400e' }}>Radials (std):</span><span>{fmt(g.n_radials_standard)}</span>
+                <span style={{ color: '#92400e' }}>Radial length:</span><span>{g.radial_length_m != null ? `${Number(g.radial_length_m).toFixed(1)} m` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Total copper:</span><span>{g.total_copper_wire_m != null ? `${fmt(g.total_copper_wire_m)} m` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Ground R:</span><span>{g.r_ground_std_ohm != null ? `${Number(g.r_ground_std_ohm).toFixed(1)} Ω` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Soil resistivity:</span><span>{g.soil_resistivity_ohm_m != null ? `${fmt(g.soil_resistivity_ohm_m)} Ω·m` : '—'}</span>
+                <span style={{ color: '#92400e' }}>CP recommended:</span>
+                <span style={{ fontWeight: 700, color: g.cp_recommended ? '#b91c1c' : '#15803d' }}>{g.cp_recommended ? 'YES' : 'NO'}</span>
+              </div>
+              {g.cp_recommended && (
+                <div style={{ fontSize: 11, color: '#92400e', background: '#fff7ed', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Soil resistivity &lt; 300 Ω·m — cathodic protection anode bed recommended per IEEE Std 80-2013 §12.
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#451a03', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#92400e' }}>Ground system:</span><span>${fmt(g.ground_radials_low_usd)} – ${fmt(g.ground_radials_high_usd)}</span>
+                <span style={{ color: '#92400e' }}>CP anode bed:</span><span>{g.cp_recommended ? `$${fmt(g.cp_anode_bed_low_usd)} – $${fmt(g.cp_anode_bed_high_usd)}` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Bonding / lightning:</span><span>${fmt(g.bonding_lightning_low_usd)} – ${fmt(g.bonding_lightning_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fcd9a0', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#92400e', fontWeight: 600 }}>Total ground system:</span>
+                <span style={{ color: '#78350f', fontWeight: 700 }}>${fmt(g.total_ground_low_usd)} – ${fmt(g.total_ground_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#a16207' }}>Ref: 47 CFR §73.190, §73.1820, NFPA 780, IEEE Std 80-2013</div>
+            </div>
+          );
+        })()}
+
         {/* AM Antenna Base Current and Impedance Monitoring Guide */}
         {candidate.am_antenna_base_current_and_impedance_monitoring_guide && (() => {
           const g = candidate.am_antenna_base_current_and_impedance_monitoring_guide;

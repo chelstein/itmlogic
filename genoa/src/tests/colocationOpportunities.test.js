@@ -3582,3 +3582,20 @@ test('colocation candidates include am_antenna_base_current_and_impedance_monito
     assert.ok(g.calibration_interval_months === 12, `calibration_interval_months must be 12`);
   }
 });
+
+test('colocation candidates include am_broadcast_tower_grounding_and_cathodic_protection_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_tower_grounding_and_cathodic_protection_guide;
+    assert.ok(g, `candidate missing am_broadcast_tower_grounding_and_cathodic_protection_guide`);
+    assert.strictEqual(g.n_radials_standard, 120, 'standard ground system = 120 radials');
+    assert.ok(g.total_ground_low_usd > 0, `total_ground_low_usd must be positive`);
+    assert.ok(g.cp_recommended != null, `cp_recommended must be defined`);
+  }
+});

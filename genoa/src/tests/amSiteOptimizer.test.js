@@ -14607,3 +14607,42 @@ it('candidate_comparison_table bcim columns are present and valid for KAZM', asy
   assert.ok(r0.bcim_total_monitoring_equip_low_usd > 0, 'bcim_total_monitoring_equip_low_usd must be positive');
   assert.strictEqual(r0.bcim_calibration_interval_months, 12, 'calibration_interval_months should be 12 (annual)');
 });
+
+// ── Feature #53: am_broadcast_tower_grounding_and_cathodic_protection_guide ──
+
+it('am_broadcast_tower_grounding_and_cathodic_protection_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_broadcast_tower_grounding_and_cathodic_protection_guide != null,
+      'am_broadcast_tower_grounding_and_cathodic_protection_guide must be present on every candidate');
+  }
+});
+
+it('am_broadcast_tower_grounding_and_cathodic_protection_guide radial_length_m matches λ/4 for 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_grounding_and_cathodic_protection_guide;
+  // λ/4 at 780 kHz = 300000/780/4 ≈ 96.15 m
+  assert.ok(Math.abs(g.radial_length_m - 96.15) < 0.1, `radial_length_m ${g.radial_length_m} should be ~96.15 m`);
+});
+
+it('am_broadcast_tower_grounding_and_cathodic_protection_guide total_copper_wire_m = 120 × radial_length_m', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_grounding_and_cathodic_protection_guide;
+  const expected = g.n_radials_standard * g.radial_length_m;
+  assert.ok(Math.abs(g.total_copper_wire_m - expected) < 1, `total_copper_wire_m should be n_radials × radial_length_m`);
+});
+
+it('am_broadcast_tower_grounding_and_cathodic_protection_guide reference cites §73.190 and NFPA 780', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_tower_grounding_and_cathodic_protection_guide;
+  assert.ok(g.reference.includes('§73.190'), 'reference must cite §73.190');
+  assert.ok(g.reference.includes('NFPA 780'), 'reference must cite NFPA 780');
+});
+
+it('candidate_comparison_table gcp columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.gcp_total_copper_wire_m > 0, 'gcp_total_copper_wire_m must be positive');
+  assert.ok(r0.gcp_total_ground_low_usd > 0, 'gcp_total_ground_low_usd must be positive');
+  assert.ok(r0.gcp_cp_recommended != null, 'gcp_cp_recommended must not be null');
+});

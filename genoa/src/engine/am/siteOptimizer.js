@@ -1389,7 +1389,10 @@ export async function runSiteOptimizer(body = {}){
     tbrf_total_rf_safety_low_usd:       c.am_tower_base_rf_safety_and_detuning_guide?.total_rf_safety_low_usd ?? null,
     bcim_i_base_authorized_a:           c.am_antenna_base_current_and_impedance_monitoring_guide?.i_base_authorized_a ?? null,
     bcim_total_monitoring_equip_low_usd: c.am_antenna_base_current_and_impedance_monitoring_guide?.total_monitoring_equip_low_usd ?? null,
-    bcim_calibration_interval_months:   c.am_antenna_base_current_and_impedance_monitoring_guide?.calibration_interval_months ?? null
+    bcim_calibration_interval_months:   c.am_antenna_base_current_and_impedance_monitoring_guide?.calibration_interval_months ?? null,
+    gcp_total_copper_wire_m:            c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.total_copper_wire_m ?? null,
+    gcp_total_ground_low_usd:           c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.total_ground_low_usd ?? null,
+    gcp_cp_recommended:                 c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.cp_recommended ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7124,6 +7127,77 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_broadcast_tower_grounding_and_cathodic_protection_guide: (() => {
+      // AM tower grounding serves two roles: RF ground (antenna efficiency) + safety/lightning ground.
+      // §73.190(a): ground conductivity σ (mS/m) governs groundwave propagation — the radial copper
+      //   system reduces ground loss R_g, boosting radiation resistance and antenna efficiency.
+      // FCC Rule of Thumb (§73.190(b)): 120 buried radials of length ≥ λ/4 is the "standard"
+      //   high-efficiency ground system; shorter radials or fewer count are allowed but reduce η.
+      // R_g estimate: R_g ≈ (1/(n × r)) × (ρ/(2π)) × ln(r/a) where n=radials, r=length, ρ=soil.
+      //   Simplified empirical: R_g ≈ 40/n for n<120 radials at λ/4 length; ≈ 1–3 Ω for 120 radials.
+      // Cathodic protection: buried copper radials in high-pH / corrosive soils (alkali Southwest US)
+      //   may suffer cuprosolvency. NFPA 780 §4.13 recommends sacrificial zinc anodes or impressed
+      //   current CP for copper radials in soils with pH < 6 or > 9, or resistivity < 1000 Ω·m.
+      // Lightning: NFPA 780 (2023) governs AM tower lightning protection; §73.1820 (FCC) requires
+      //   adequate grounding. AWS D1.1/D1.2 governs structural welded connections to ground ring.
+      const n_radials_std = 120;
+      const radial_length_m = round2(300000 / frequency_khz / 4); // λ/4
+      const radial_length_ft = round2(radial_length_m * 3.281);
+      // R_g estimate: standard 120-radial system ≈ 1.5 Ω; fewer radials → higher R_g
+      const r_g_std_ohm = 1.5;
+      // Soil resistivity surrogate from σ_msm (σ = 1/ρ × 1000 → ρ = 1000/σ Ω·m)
+      const sigma_local = ctx.goals ? (8) : 8; // default 8 mS/m when not site-specific (KAZM region)
+      const rho_soil_ohm_m = round2(1000 / sigma_local); // Ω·m from mS/m
+      // CP need: high soil corrosivity if ρ < 300 Ω·m (σ > 3.3 mS/m) or pH issues
+      const cp_recommended = rho_soil_ohm_m < 300;
+      // Total copper wire needed for 120 × λ/4 radials (AWG #10 stranded, ~1.4 kg/m)
+      const total_copper_wire_m = round2(n_radials_std * radial_length_m);
+      const copper_wire_kg = round2(total_copper_wire_m * 0.35 / 1000); // AWG #12, ~0.35 kg/100m
+      // Cost estimates (2024 USD)
+      const copper_wire_cost_per_m_usd = 1.85; // installed (trenching + AWG 12 wire)
+      const radial_install_low_usd   = Math.round(total_copper_wire_m * copper_wire_cost_per_m_usd * 0.80);
+      const radial_install_high_usd  = Math.round(total_copper_wire_m * copper_wire_cost_per_m_usd * 1.40);
+      const ground_ring_low_usd      = 4500;  // copper ground ring around base insulator
+      const ground_ring_high_usd     = 9000;
+      const cp_system_low_usd        = cp_recommended ? 8000  : 0;  // cathodic protection if needed
+      const cp_system_high_usd       = cp_recommended ? 18000 : 0;
+      const lightning_spd_cost_usd   = 6000;  // surge protective devices + bonding
+      const ground_resistance_test_usd = 2500; // fall-of-potential measurement
+      const total_ground_low_usd  = radial_install_low_usd  + ground_ring_low_usd  + cp_system_low_usd  + lightning_spd_cost_usd + ground_resistance_test_usd;
+      const total_ground_high_usd = radial_install_high_usd + ground_ring_high_usd + cp_system_high_usd + lightning_spd_cost_usd + ground_resistance_test_usd;
+      // Annual maintenance: resistance check, CP anode replacement (every 5 yrs)
+      const annual_maint_ground_low_usd  = cp_recommended ? 1800 : 800;
+      const annual_maint_ground_high_usd = cp_recommended ? 4000 : 2000;
+      return {
+        frequency_khz,
+        tpo_kw,
+        n_radials_standard: n_radials_std,
+        radial_length_m,
+        radial_length_ft,
+        total_copper_wire_m,
+        r_g_std_ohm,
+        rho_soil_ohm_m,
+        cp_recommended,
+        cp_reason: cp_recommended
+          ? `Soil resistivity ≈${rho_soil_ohm_m} Ω·m (<300) → elevated corrosion risk for buried copper (NFPA 780 §4.13)`
+          : `Soil resistivity ≈${rho_soil_ohm_m} Ω·m — routine inspection adequate`,
+        radial_install_low_usd,
+        radial_install_high_usd,
+        ground_ring_low_usd,
+        ground_ring_high_usd,
+        cp_system_low_usd: cp_recommended ? cp_system_low_usd : null,
+        cp_system_high_usd: cp_recommended ? cp_system_high_usd : null,
+        lightning_spd_cost_usd,
+        ground_resistance_test_usd,
+        total_ground_low_usd,
+        total_ground_high_usd,
+        annual_maint_ground_low_usd,
+        annual_maint_ground_high_usd,
+        reference: '47 CFR §73.190 (AM groundwave, ground conductivity, radial system requirements); §73.1820 (grounding); NFPA 780 §4.13 (2023) (cathodic protection for buried copper); IEEE Std 80-2013 (safety grounding); FCC Engineering Handbook §9.4.2 (AM ground systems); ARRL Antenna Book Ch. 3 (R_g estimation)',
+        note: `${frequency_khz} kHz: standard 120×λ/4 radials = 120×${radial_length_m} m = ${total_copper_wire_m} m total copper (R_g ≈ ${r_g_std_ohm} Ω). σ=${sigma_local} mS/m → ρ≈${rho_soil_ohm_m} Ω·m. ${cp_recommended ? 'Cathodic protection RECOMMENDED.' : 'CP not required.'} Total ground system: $${total_ground_low_usd.toLocaleString()}–$${total_ground_high_usd.toLocaleString()}.`
       };
     })(),
 
