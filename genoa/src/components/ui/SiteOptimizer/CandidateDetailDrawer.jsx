@@ -2226,6 +2226,49 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* RF Propagation Terrain Roughness Guide */}
+        {candidate.rf_propagation_terrain_roughness_guide && (() => {
+          const g = candidate.rf_propagation_terrain_roughness_guide;
+          const classColor = {
+            VERY_SMOOTH: '#15803d', SMOOTH: '#166534', MODERATE: '#0c4a6e',
+            ROUGH: '#92400e', VERY_ROUGH: '#7c2d12'
+          }[g.terrain_class] ?? '#374151';
+          const classBg = {
+            VERY_SMOOTH: '#dcfce7', SMOOTH: '#d1fae5', MODERATE: '#e0f2fe',
+            ROUGH: '#fef3c7', VERY_ROUGH: '#fee2e2'
+          }[g.terrain_class] ?? '#f3f4f6';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fdf4ff', borderRadius: 8, border: '1px solid #e879f9' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#7e22ce', marginBottom: 8 }}>
+                RF Propagation — Terrain Roughness Analysis
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Wavelength:</span> <strong>{g.lambda_m}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>σ Terrain:</span> <strong>{g.sigma_msm_val}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>Δh Interdecile:</span> <strong>{g.delta_h_m}m (ref {g.delta_h_ref_m}m)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Terrain Factor:</span> <strong>{g.terrain_correction_factor}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Base Range:</span> <strong>{g.base_groundwave_range_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Est. R(50,50) Range:</span> <strong>{g.estimated_range_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Effective COL Range:</span> <strong>{g.effective_range_col_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>COL Bearing:</span> <strong>{g.bearing_to_col_deg !== null ? `${g.bearing_to_col_deg}°` : 'N/A'}</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: classBg, color: classColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.terrain_class?.replace(/_/g, ' ')}
+                </span>
+                {g.da_favored_bearing !== null && (
+                  <span style={{ background: g.da_favored_bearing ? '#dcfce7' : '#fee2e2', color: g.da_favored_bearing ? '#15803d' : '#b91c1c', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                    DA COL BEARING: {g.da_favored_bearing ? 'FAVORED' : 'UNFAVORED'}
+                  </span>
+                )}
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* FCC License History & Compliance Record Guide */}
         {candidate.fcc_license_history_and_compliance_record_guide && (() => {
           const g = candidate.fcc_license_history_and_compliance_record_guide;

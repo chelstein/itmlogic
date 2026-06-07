@@ -2201,3 +2201,20 @@ test('fcc_license_history_and_compliance_record_guide present across colocation 
     assert.ok(g.processing_months_low > 0, `rank ${c.rank}: processing_months_low must be > 0`);
   }
 });
+
+test('rf_propagation_terrain_roughness_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_classes = ['VERY_SMOOTH', 'SMOOTH', 'MODERATE', 'ROUGH', 'VERY_ROUGH'];
+  for (const c of out.candidates) {
+    const g = c.rf_propagation_terrain_roughness_guide;
+    assert.ok(g != null, `rank ${c.rank} missing rf_propagation_terrain_roughness_guide`);
+    assert.ok(valid_classes.includes(g.terrain_class), `rank ${c.rank}: terrain_class '${g.terrain_class}' invalid`);
+    assert.ok(g.estimated_range_km > 0, `rank ${c.rank}: estimated_range_km must be > 0`);
+  }
+});

@@ -9962,3 +9962,46 @@ test('fcc_license_history_and_compliance_record_guide comparison table columns p
     assert.ok('lic_comparative_risk'      in row, 'lic_comparative_risk missing from comparison table');
   }
 });
+
+test('rf_propagation_terrain_roughness_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].rf_propagation_terrain_roughness_guide;
+  assert.ok(g, 'terrain roughness guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.lambda_m, 384, 'wavelength must be 384m at 780 kHz');
+  assert.strictEqual(g.fcc_r50_50_contour_uvm, 100, 'FCC R(50,50) standard contour must be 100 mV/m');
+});
+
+test('rf_propagation_terrain_roughness_guide terrain_class is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].rf_propagation_terrain_roughness_guide;
+  const valid_classes = ['VERY_SMOOTH', 'SMOOTH', 'MODERATE', 'ROUGH', 'VERY_ROUGH'];
+  assert.ok(valid_classes.includes(g.terrain_class), `terrain_class '${g.terrain_class}' must be a valid enum`);
+  assert.ok(g.delta_h_m >= 0, 'delta_h_m must be >= 0');
+  assert.ok(g.delta_h_ref_m === 90, 'delta_h reference must be 90m (FCC §73.183)');
+});
+
+test('rf_propagation_terrain_roughness_guide base range reflects Class D clear-channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].rf_propagation_terrain_roughness_guide;
+  assert.strictEqual(g.base_groundwave_range_km, 80, 'Class D clear base range must be 80 km');
+  assert.ok(g.estimated_range_km > 0 && g.estimated_range_km <= g.base_groundwave_range_km * 1.1, 'estimated range must be <= 110% of base');
+  assert.ok(g.effective_range_col_km > 0, 'effective COL range must be positive');
+});
+
+test('rf_propagation_terrain_roughness_guide terrain correction factor is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].rf_propagation_terrain_roughness_guide;
+  assert.ok(g.terrain_correction_factor > 0, 'terrain_correction_factor must be > 0');
+  assert.ok(g.terrain_correction_factor <= 1.01, 'correction factor must be <= 1.01 (VERY_SMOOTH or smoother gets no bonus in this model)');
+  assert.strictEqual(g.is_da, false, 'KAZM NDA must have is_da = false');
+});
+
+test('rf_propagation_terrain_roughness_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('terr_class'       in row, 'terr_class missing from comparison table');
+    assert.ok('terr_est_range_km' in row, 'terr_est_range_km missing from comparison table');
+    assert.ok('terr_col_range_km' in row, 'terr_col_range_km missing from comparison table');
+  }
+});

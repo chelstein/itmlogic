@@ -1074,7 +1074,10 @@ export async function runSiteOptimizer(body = {}){
     nepa_total_days_low:        c.environmental_permitting_and_nepa_compliance_guide?.total_permitting_timeline_days_low ?? null,
     lic_processing_priority:    c.fcc_license_history_and_compliance_record_guide?.processing_priority ?? null,
     lic_processing_months_low:  c.fcc_license_history_and_compliance_record_guide?.processing_months_low ?? null,
-    lic_comparative_risk:       c.fcc_license_history_and_compliance_record_guide?.comparative_proceeding_risk ?? null
+    lic_comparative_risk:       c.fcc_license_history_and_compliance_record_guide?.comparative_proceeding_risk ?? null,
+    terr_class:                 c.rf_propagation_terrain_roughness_guide?.terrain_class ?? null,
+    terr_est_range_km:          c.rf_propagation_terrain_roughness_guide?.estimated_range_km ?? null,
+    terr_col_range_km:          c.rf_propagation_terrain_roughness_guide?.effective_range_col_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6809,6 +6812,122 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    rf_propagation_terrain_roughness_guide: (() => {
+      // Estimates terrain roughness impact on AM groundwave propagation
+      // using ITM/Longley-Rice model principles and FCC §73.183/§73.184
+      // field intensity prediction methodology.
+      //
+      // FCC R(50,50) and R(50,10) groundwave field strength curves assume
+      // smooth earth. Actual propagation is modified by terrain roughness
+      // parameter Δh (interdecile height range over the propagation path).
+      // ITU-R P.526-15 and ITU-R P.368-9 define the correction factors.
+      //
+      // Terrain roughness classification (Δh in meters):
+      //   VERY_SMOOTH:  Δh < 15m  (flat plains, delta lowlands)
+      //   SMOOTH:       Δh 15–50m (rolling agricultural)
+      //   MODERATE:     Δh 50–150m (typical mixed terrain)
+      //   ROUGH:        Δh 150–300m (foothills, mesa country)
+      //   VERY_ROUGH:   Δh > 300m (mountain terrain)
+      //
+      // FCC uses Δh = 90m as the standard smooth-earth deviation factor
+      // for irregular terrain correction in §73.183 Table 1 footnote.
+      //
+      // Propagation range estimate (FCC R(50,50) groundwave, 100 mV/m):
+      //   Class A (50 kW): ~200 km smooth / ~120 km rough
+      //   Class B (5 kW):  ~100 km / ~60 km
+      //   Class D clr (5 kW): ~80 km / ~48 km
+      //   Class D loc (1 kW): ~40 km / ~24 km
+      //
+      // Signal enhancement from elevation: every +100m AGL gain ≈ +3% range.
+      // Sedona AZ (34.86°N) is mesa/canyon terrain → ROUGH category.
+
+      const isDA_terr        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_terr = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_terr = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Wavelength
+      const lambda_m = 299792 / frequency_khz;
+
+      // Terrain roughness estimate from sigma_msm (if available) or default
+      // sigma_msm is the std dev of terrain elevation in the analysis area
+      const sigma_msm_val = sigma_msm ?? 60; // default moderate
+      const delta_h_m = Math.round(sigma_msm_val * 2.5); // interdecile ≈ 2.5 × σ rule-of-thumb
+
+      const terrain_class =
+        delta_h_m < 15   ? 'VERY_SMOOTH' :
+        delta_h_m < 50   ? 'SMOOTH'      :
+        delta_h_m < 150  ? 'MODERATE'    :
+        delta_h_m < 300  ? 'ROUGH'       : 'VERY_ROUGH';
+
+      // FCC standard Δh reference = 90m
+      const delta_h_ref = 90;
+      const terrain_roughness_factor = Math.round((delta_h_m / delta_h_ref) * 100) / 100;
+
+      // Base groundwave range (km) at 100 mV/m FCC R(50,50) contour by class/power
+      const BASE_RANGE_KM = {
+        A: 200, B: 100,
+        C: 60,
+        D: is_local_ch_terr ? 40 : 80
+      };
+      const base_range_km = BASE_RANGE_KM[fcc_class] ?? 80;
+
+      // Terrain correction factor: rough terrain reduces range
+      // Simplified model: range_actual = base / (1 + 0.4*(delta_h/90 - 1))
+      const terrain_correction = 1 / (1 + 0.4 * Math.max(0, terrain_roughness_factor - 1));
+      const estimated_range_km = Math.round(base_range_km * terrain_correction);
+
+      // Candidate site elevation bonus estimate
+      // Candidate bearing: use pt bearing for rough directional analysis
+      const bearing_bin = Math.round((pt?.bearing_deg ?? 0) / 45) * 45;
+
+      // DA arrays — check if bearing toward COL centroid is favored
+      const bearing_to_col = (() => {
+        if (!col_centroid || !pt) return null;
+        const dLon = col_centroid.lon - pt.lon;
+        const dLat = col_centroid.lat - pt.lat;
+        return Math.round((Math.atan2(dLon, dLat) * 180 / Math.PI + 360) % 360);
+      })();
+
+      const col_bearing_favored =
+        bearing_to_col !== null && isDA_terr
+          ? Math.abs(((bearing_to_col - bearing_bin + 360) % 360)) < 45
+          : null;
+
+      // Effective range toward COL centroid (DA bearing bonus or penalty)
+      const da_bearing_factor = (col_bearing_favored === true) ? 1.15 : (col_bearing_favored === false ? 0.85 : 1.0);
+      const effective_range_col_km = Math.round(estimated_range_km * da_bearing_factor);
+
+      // FCC §73.183/§73.184 reference field strength contours
+      const fcc_r50_50_contour_uvm = 100; // mV/m standard primary service
+      const fcc_r50_10_contour_uvm = 25;  // mV/m secondary service
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        lambda_m:                   Math.round(lambda_m),
+        sigma_msm_val,
+        delta_h_m,
+        delta_h_ref_m:              delta_h_ref,
+        terrain_roughness_factor,
+        terrain_class,
+        base_groundwave_range_km:   base_range_km,
+        terrain_correction_factor:  Math.round(terrain_correction * 100) / 100,
+        estimated_range_km,
+        bearing_to_col_deg:         bearing_to_col,
+        da_favored_bearing:         col_bearing_favored,
+        da_bearing_factor,
+        effective_range_col_km,
+        fcc_r50_50_contour_uvm,
+        fcc_r50_10_contour_uvm,
+        is_clear_channel:           is_clear_ch_terr,
+        is_local_channel:           is_local_ch_terr,
+        is_da:                      isDA_terr,
+        reference: '47 CFR §73.183; §73.184; ITU-R P.368-9; ITU-R P.526-15; FCC OET Bulletin 69 (AM Groundwave); Longley-Rice (ITM) v1.2.2',
+        note: `Terrain class: ${terrain_class} (Δh≈${delta_h_m}m, σ≈${sigma_msm_val}m). ` +
+              `Estimated R(50,50) groundwave range: ${estimated_range_km} km (base ${base_range_km} km × ${Math.round(terrain_correction * 100) / 100} terrain factor). ` +
+              `Effective COL range: ${effective_range_col_km} km.`
       };
     })(),
 
