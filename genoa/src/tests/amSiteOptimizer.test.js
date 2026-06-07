@@ -9876,3 +9876,46 @@ test('community_of_license_population_change_trend_guide comparison table column
     assert.ok('colpop_307b_risk'         in row, 'colpop_307b_risk missing from comparison table');
   }
 });
+
+test('environmental_permitting_and_nepa_compliance_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].environmental_permitting_and_nepa_compliance_guide;
+  assert.ok(g, 'NEPA guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.tower_height_m, 96, 'tower height must be 96m (λ/4 at 780 kHz)');
+  assert.strictEqual(g.tower_height_ft, 315, 'tower height must be 315ft');
+});
+
+test('environmental_permitting_and_nepa_compliance_guide NEPA tier is valid enum', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].environmental_permitting_and_nepa_compliance_guide;
+  const valid_tiers = ['CATEGORICAL_EXCLUSION', 'ENVIRONMENTAL_ASSESSMENT', 'ENVIRONMENTAL_IMPACT_STATEMENT'];
+  assert.ok(valid_tiers.includes(g.nepa_tier), `nepa_tier '${g.nepa_tier}' must be a valid enum`);
+  assert.ok(typeof g.n_section_1307_triggers === 'number', 'n_section_1307_triggers must be numeric');
+  assert.ok(g.n_section_1307_triggers >= 0, 'trigger count must be >= 0');
+});
+
+test('environmental_permitting_and_nepa_compliance_guide KAZM 780 kHz exceeds 61m threshold', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].environmental_permitting_and_nepa_compliance_guide;
+  assert.strictEqual(g.exceeds_61m_agl, true, '96m tower must exceed 61m AGL threshold');
+  assert.strictEqual(g.section_106_nhpa_required, true, 'Section 106 must be required for > 61m tower');
+  assert.strictEqual(g.rf_mpe_assessment_required, true, 'RF MPE assessment required for 5 kW station');
+});
+
+test('environmental_permitting_and_nepa_compliance_guide timeline fields are positive numbers', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].environmental_permitting_and_nepa_compliance_guide;
+  assert.ok(g.total_permitting_timeline_days_low > 0, 'permitting timeline low must be > 0');
+  assert.ok(g.total_permitting_timeline_days_high >= g.total_permitting_timeline_days_low, 'high must be >= low');
+  assert.ok(g.section_106_pa_parties.length >= 3, 'must list at least 3 Section 106 PA parties');
+});
+
+test('environmental_permitting_and_nepa_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('nepa_tier'       in row, 'nepa_tier missing from comparison table');
+    assert.ok('nepa_n_triggers' in row, 'nepa_n_triggers missing from comparison table');
+    assert.ok('nepa_total_days_low' in row, 'nepa_total_days_low missing from comparison table');
+  }
+});

@@ -2167,3 +2167,20 @@ test('community_of_license_population_change_trend_guide present across colocati
     assert.ok(g.col_pop_estimate_now >= 0, `rank ${c.rank}: col_pop_estimate_now must be >= 0`);
   }
 });
+
+test('environmental_permitting_and_nepa_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['CATEGORICAL_EXCLUSION', 'ENVIRONMENTAL_ASSESSMENT', 'ENVIRONMENTAL_IMPACT_STATEMENT'];
+  for (const c of out.candidates) {
+    const g = c.environmental_permitting_and_nepa_compliance_guide;
+    assert.ok(g != null, `rank ${c.rank} missing environmental_permitting_and_nepa_compliance_guide`);
+    assert.ok(valid_tiers.includes(g.nepa_tier), `rank ${c.rank}: nepa_tier '${g.nepa_tier}' invalid`);
+    assert.ok(g.total_permitting_timeline_days_low > 0, `rank ${c.rank}: timeline must be positive`);
+  }
+});

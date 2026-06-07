@@ -1068,7 +1068,10 @@ export async function runSiteOptimizer(body = {}){
     sprg_monthly_net_low_usd:   c.silent_period_revenue_impact_and_audience_retention_guide?.monthly_net_revenue_low_usd ?? null,
     colpop_growth_pct_per_yr:   c.community_of_license_population_change_trend_guide?.estimated_col_growth_pct_per_yr ?? null,
     colpop_growth_tier:         c.community_of_license_population_change_trend_guide?.growth_tier ?? null,
-    colpop_307b_risk:           c.community_of_license_population_change_trend_guide?.sect_307b_preference_risk ?? null
+    colpop_307b_risk:           c.community_of_license_population_change_trend_guide?.sect_307b_preference_risk ?? null,
+    nepa_tier:                  c.environmental_permitting_and_nepa_compliance_guide?.nepa_tier ?? null,
+    nepa_n_triggers:            c.environmental_permitting_and_nepa_compliance_guide?.n_section_1307_triggers ?? null,
+    nepa_total_days_low:        c.environmental_permitting_and_nepa_compliance_guide?.total_permitting_timeline_days_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6803,6 +6806,138 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    environmental_permitting_and_nepa_compliance_guide: (() => {
+      // NEPA/environmental compliance requirements for AM tower construction.
+      // FCC requires categorical exclusion (CE) review or full EIS under
+      // 47 CFR §1.1307 for all tower construction proposals.
+      //
+      // Trigger categories under 47 CFR §1.1307(a)-(b):
+      //   (a) Wilderness/national forest/refuge/tribal → full EIS likely
+      //   (b) Floodplain (100-yr) → EAP / conditional approval
+      //   (c) Endangered species (ESA §7) → biological opinion required
+      //   (d) Historic properties (NHPA §106) → Section 106 consultation
+      //   (e) Antenna tower > 61m AGL → FAA ASR + NEPA assessment
+      //   (f) Wetlands (CWA §404) → Army Corps permit + EAP
+      //   (g) High-intensity lights near residential → RF + visual impact
+      //
+      // Section 106 (NHPA 16 USC §470f) consultation required for all new
+      // towers > 200 ft (61m) or within 0.5 mi of National Register sites.
+      // Programmatic Agreement (PA) with State SHPO typically takes 90 days.
+      //
+      // Typical NEPA timelines by class:
+      //   CE only: 30–60 days;  EA: 6–12 months;  EIS: 2–4 years.
+      // Typical Section 106 timelines: 90–180 days (PA route).
+      // Army Corps §404 Nationwide Permit 57: 45 days for towers.
+
+      const isDA_env        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_env = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_env = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Tower height estimate: λ/4 for standard AM antenna
+      const wavelength_m   = 299792 / frequency_khz;
+      const tower_height_m = Math.round(wavelength_m / 4);
+      const tower_height_ft= Math.round(tower_height_m * 3.28084);
+
+      // Antenna array complexity
+      const n_towers = isDA_env ? (tpo_kw > 10 ? 4 : 2) : 1;
+
+      // §1.1307 triggers
+      const triggers_1307 = [];
+
+      // Height trigger: > 61m AGL (§1.1307(a)(5))
+      const exceeds_61m = tower_height_m > 61;
+      if (exceeds_61m) triggers_1307.push({
+        code: '§1.1307(a)(5)',
+        issue: `Tower height ${tower_height_m}m (${tower_height_ft}ft) exceeds 61m AGL threshold`,
+        action: 'FAA ASR registration + FCC NEPA environmental review required',
+        timeline_days_low: 30, timeline_days_high: 90
+      });
+
+      // Section 106 NHPA trigger: > 61m or tower count > 1
+      const needs_section_106 = exceeds_61m || n_towers > 1;
+      if (needs_section_106) triggers_1307.push({
+        code: 'NHPA §106 / 47 CFR §1.1307(a)(4)',
+        issue: `New tower(s) require Section 106 Historic Properties consultation with State SHPO`,
+        action: 'Programmatic Agreement (PA) or No Adverse Effect finding needed; 90–180 days typical',
+        timeline_days_low: 90, timeline_days_high: 180
+      });
+
+      // ESA §7 trigger: applies to high-power stations covering large territories
+      if (tpo_kw >= 50 || is_clear_ch_env) triggers_1307.push({
+        code: 'ESA §7 / 47 CFR §1.1307(a)(2)',
+        issue: 'Endangered Species Act §7 consultation required for tower covering significant territory',
+        action: 'FCC informal consultation with USFWS; biological assessment if may-affect finding',
+        timeline_days_low: 30, timeline_days_high: 120
+      });
+
+      // Floodplain/wetland: DA arrays or Class A/B stations with large ground systems
+      if (isDA_env || tpo_kw >= 50) triggers_1307.push({
+        code: '47 CFR §1.1307(a)(6)',
+        issue: 'Multi-tower ground system or high-power radial field may intersect 100-yr floodplain/wetland',
+        action: 'Floodplain evaluation; CWA §404 Army Corps Nationwide Permit 57 if wetland present (45 days)',
+        timeline_days_low: 45, timeline_days_high: 150
+      });
+
+      const n_triggers = triggers_1307.length;
+
+      // NEPA tier determination (EIS reserved for 4+ overlapping major triggers)
+      const nepa_tier =
+        n_triggers === 0 ? 'CATEGORICAL_EXCLUSION' :
+        n_triggers <= 3  ? 'ENVIRONMENTAL_ASSESSMENT' :
+                           'ENVIRONMENTAL_IMPACT_STATEMENT';
+
+      const nepa_timeline = {
+        CATEGORICAL_EXCLUSION:        { label: 'Categorical Exclusion (CE)', days_low: 30, days_high: 60 },
+        ENVIRONMENTAL_ASSESSMENT:     { label: 'Environmental Assessment (EA)', days_low: 180, days_high: 365 },
+        ENVIRONMENTAL_IMPACT_STATEMENT: { label: 'Full EIS', days_low: 730, days_high: 1460 }
+      }[nepa_tier];
+
+      // Army Corps NWP 57 (Nationwide Permit for telecom towers in wetlands)
+      const army_corps_nwp57_applicable = isDA_env || tpo_kw >= 5;
+
+      // RF Environmental (MPE) assessment — 47 CFR §1.1310 / OET Bulletin 65
+      // Required for AM stations > 0.003 kW ERP general population
+      const rf_mpe_assessment_required = tpo_kw >= 0.003;
+      const rf_mpe_eval_radius_m = Math.round(Math.sqrt(tpo_kw * 1000 / (0.001 * 4 * Math.PI)) * 10) / 10;
+
+      // Section 106 Programmatic Agreement signatories
+      const section_106_pa_parties = [
+        'FCC (federal undertaking agency)',
+        'State Historic Preservation Officer (SHPO)',
+        'Advisory Council on Historic Preservation (ACHP) if adverse effect',
+        'Tribal Historic Preservation Officers (THPO) if tribal lands affected'
+      ];
+
+      // Total permit timeline (parallel-path optimistic)
+      const total_timeline_low_days  = Math.max(...triggers_1307.map(t => t.timeline_days_low), nepa_timeline.days_low);
+      const total_timeline_high_days = Math.max(...triggers_1307.map(t => t.timeline_days_high), nepa_timeline.days_high);
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        tower_height_m,
+        tower_height_ft,
+        n_towers_in_array:                n_towers,
+        exceeds_61m_agl:                  exceeds_61m,
+        nepa_tier,
+        nepa_tier_label:                  nepa_timeline.label,
+        nepa_timeline_days_low:           nepa_timeline.days_low,
+        nepa_timeline_days_high:          nepa_timeline.days_high,
+        n_section_1307_triggers:          n_triggers,
+        section_1307_triggers:            triggers_1307,
+        section_106_nhpa_required:        needs_section_106,
+        section_106_pa_parties,
+        army_corps_nwp57_applicable,
+        rf_mpe_assessment_required,
+        rf_mpe_eval_radius_m,
+        total_permitting_timeline_days_low:  total_timeline_low_days,
+        total_permitting_timeline_days_high: total_timeline_high_days,
+        reference: '47 CFR §1.1307; NHPA 16 USC §470f (§106); ESA 16 USC §1536 (§7); CWA 33 USC §1344 (§404); FAA AC 70/7460-1M; OET Bulletin 65',
+        note: `NEPA tier: ${nepa_tier} (${n_triggers} §1.1307 triggers). ` +
+              `Section 106 NHPA required: ${needs_section_106}. ` +
+              `Total permitting timeline: ${total_timeline_low_days}–${total_timeline_high_days} days on parallel path.`
       };
     })(),
 

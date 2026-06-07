@@ -2226,6 +2226,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Environmental Permitting & NEPA Compliance Guide */}
+        {candidate.environmental_permitting_and_nepa_compliance_guide && (() => {
+          const g = candidate.environmental_permitting_and_nepa_compliance_guide;
+          const tierColor = {
+            CATEGORICAL_EXCLUSION: '#14532d', ENVIRONMENTAL_ASSESSMENT: '#92400e',
+            ENVIRONMENTAL_IMPACT_STATEMENT: '#7f1d1d'
+          }[g.nepa_tier] ?? '#374151';
+          const tierBg = {
+            CATEGORICAL_EXCLUSION: '#dcfce7', ENVIRONMENTAL_ASSESSMENT: '#fef3c7',
+            ENVIRONMENTAL_IMPACT_STATEMENT: '#fee2e2'
+          }[g.nepa_tier] ?? '#f3f4f6';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d', marginBottom: 8 }}>
+                Environmental Permitting & NEPA Compliance
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Tower Height:</span> <strong>{g.tower_height_m}m / {g.tower_height_ft}ft</strong></div>
+                <div><span style={{ color: '#64748b' }}>Array Towers:</span> <strong>{g.n_towers_in_array}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Exceeds 61m AGL:</span> <strong style={{ color: g.exceeds_61m_agl ? '#b91c1c' : '#15803d' }}>{g.exceeds_61m_agl ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>§1.1307 Triggers:</span> <strong>{g.n_section_1307_triggers}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Section 106 Required:</span> <strong style={{ color: g.section_106_nhpa_required ? '#b91c1c' : '#15803d' }}>{g.section_106_nhpa_required ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>RF MPE Assessment:</span> <strong>{g.rf_mpe_assessment_required ? 'Required' : 'CE applies'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Permitting Timeline:</span> <strong>{g.total_permitting_timeline_days_low}–{g.total_permitting_timeline_days_high} days</strong></div>
+                <div><span style={{ color: '#64748b' }}>Army Corps NWP-57:</span> <strong>{g.army_corps_nwp57_applicable ? 'Applicable' : 'N/A'}</strong></div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ background: tierBg, color: tierColor, borderRadius: 4, padding: '2px 10px', fontSize: 11, fontWeight: 600 }}>
+                  {g.nepa_tier_label ?? g.nepa_tier?.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {g.section_1307_triggers?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 4 }}>§1.1307 Triggers</div>
+                  {g.section_1307_triggers.map((t, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#dcfce7', borderRadius: 4, padding: '4px 8px', marginBottom: 3 }}>
+                      <strong>{t.code}</strong>: {t.issue} — <em>{t.action}</em>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Community of License Population Change Trend Guide */}
         {candidate.community_of_license_population_change_trend_guide && (() => {
           const g = candidate.community_of_license_population_change_trend_guide;
