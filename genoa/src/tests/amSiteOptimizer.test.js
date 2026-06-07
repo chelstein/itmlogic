@@ -15340,3 +15340,48 @@ it('candidate_comparison_table rc columns are present and valid for KAZM', async
   assert.ok(typeof r0.rc_preferred_connection === 'string', 'rc_preferred_connection must be string');
   assert.ok(r0.rc_total_rc_low_usd > 0, 'rc_total_rc_low_usd must be positive');
 });
+
+it('am_nighttime_nif_service_contour_analysis_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_nighttime_nif_service_contour_analysis_guide !== undefined &&
+      c.am_nighttime_nif_service_contour_analysis_guide !== null,
+      `rank ${c.rank}: am_nighttime_nif_service_contour_analysis_guide must be present`
+    );
+  }
+});
+
+it('KAZM distance to KKOB and skywave protection compliance per §73.182(j)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
+  // Sedona AZ to Albuquerque NM ≈ 460–490 km
+  assert.ok(g.dist_to_kkob_km > 400 && g.dist_to_kkob_km < 600, `dist_to_kkob_km should be 400–600 km, got ${g.dist_to_kkob_km}`);
+  assert.strictEqual(g.protection_threshold_uVm, 50, 'Class D clear channel protection threshold must be 50 µV/m per §73.182(j)');
+  assert.strictEqual(g.kkob_interference_compliant, true, 'KAZM at Sedona-area sites must be KKOB-compliant at 5 kW');
+});
+
+it('KAZM skywave estimate below 50 µV/m at KKOB distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
+  assert.ok(g.sky_uVm > 0, 'skywave estimate must be positive');
+  assert.ok(g.sky_uVm < 50, `skywave at KKOB must be < 50 µV/m for compliant Class D, got ${g.sky_uVm}`);
+  assert.ok(g.nighttime_0p1_km > 20, 'nighttime 0.1 mV/m contour radius must be > 20 km');
+  assert.ok(g.nighttime_0p1_km < 100, 'nighttime 0.1 mV/m contour radius must be < 100 km for 5 kW Class D');
+});
+
+it('KAZM NIF fraction reflects clear channel secondary limitation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_nif_service_contour_analysis_guide;
+  assert.ok(g.nif_fraction_pct_low >= 10 && g.nif_fraction_pct_low <= 60, `nif_fraction_pct_low should be 10–60%, got ${g.nif_fraction_pct_low}`);
+  assert.ok(g.nif_fraction_pct_high >= g.nif_fraction_pct_low, 'NIF high must be >= low');
+  assert.ok(g.total_nif_low_usd >= 2000, 'NIF study must cost ≥$2,000');
+});
+
+it('candidate_comparison_table nif columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.nif_dist_to_kkob_km > 400, 'nif_dist_to_kkob_km must be >400 km (Sedona to Albuquerque)');
+  assert.strictEqual(r0.nif_kkob_compliant, true, 'nif_kkob_compliant must be true for KAZM area candidates');
+  assert.ok(r0.nif_fraction_pct_low >= 10, 'nif_fraction_pct_low must be ≥10%');
+});

@@ -2226,6 +2226,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Nighttime NIF Service Contour Analysis Guide */}
+        {candidate.am_nighttime_nif_service_contour_analysis_guide && (() => {
+          const g = candidate.am_nighttime_nif_service_contour_analysis_guide;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const compliantColor = g.kkob_interference_compliant ? '#15803d' : '#dc2626';
+          return (
+            <div style={{ background: '#1e1b2e', border: `1px solid ${compliantColor}`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#a78bfa', marginBottom: 8 }}>
+                Nighttime NIF Service Contour (§73.182)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#d4d4d8' }}>
+                <div><b style={{ color: '#a1a1aa' }}>Distance to KKOB:</b> {fmtF(g.dist_to_kkob_km)} km</div>
+                <div>
+                  <b style={{ color: '#a1a1aa' }}>Skywave at KKOB:</b>{' '}
+                  <span style={{ color: compliantColor, fontWeight: 700 }}>{fmtF(g.sky_uVm, 1)} µV/m</span>
+                  {' '}(limit: {g.protection_threshold_uVm} µV/m — {g.kkob_interference_compliant ? 'COMPLIANT' : 'EXCEEDS'})
+                </div>
+                <div><b style={{ color: '#a1a1aa' }}>0.1 mV/m Contour:</b> ≈{g.nighttime_0p1_km} km radius</div>
+                <div><b style={{ color: '#a1a1aa' }}>Conductivity (σ):</b> ≈{g.sigma_proxy_mSm} mS/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Est. NIF Area:</b> {g.nif_fraction_pct_low}–{g.nif_fraction_pct_high}% of nighttime contour</div>
+                <div><b style={{ color: '#a1a1aa' }}>Clear Channel:</b> 780 kHz — KKOB dominant (50 kW)</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${compliantColor}40`, marginTop: 4, paddingTop: 6, color: '#a1a1aa' }}>
+                  <b>NIF Study Cost:</b> ${fmt(g.nif_study_low_usd)}–${fmt(g.nif_study_high_usd)} (§73.182 M3 skywave analysis required at filing)
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Remote Control and Unattended Operation Guide */}
         {candidate.am_remote_control_and_unattended_operation_guide && (() => {
           const g = candidate.am_remote_control_and_unattended_operation_guide;

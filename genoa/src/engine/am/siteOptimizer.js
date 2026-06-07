@@ -1446,7 +1446,10 @@ export async function runSiteOptimizer(body = {}){
     emk_harmonic_max_mW:                c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.harmonic_max_mW ?? null,
     rc_remote_required:                 c.am_remote_control_and_unattended_operation_guide?.remote_required ?? null,
     rc_preferred_connection:            c.am_remote_control_and_unattended_operation_guide?.preferred_connection ?? null,
-    rc_total_rc_low_usd:                c.am_remote_control_and_unattended_operation_guide?.total_rc_low_usd ?? null
+    rc_total_rc_low_usd:                c.am_remote_control_and_unattended_operation_guide?.total_rc_low_usd ?? null,
+    nif_dist_to_kkob_km:                c.am_nighttime_nif_service_contour_analysis_guide?.dist_to_kkob_km ?? null,
+    nif_kkob_compliant:                 c.am_nighttime_nif_service_contour_analysis_guide?.kkob_interference_compliant ?? null,
+    nif_fraction_pct_low:               c.am_nighttime_nif_service_contour_analysis_guide?.nif_fraction_pct_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7182,6 +7185,118 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_nighttime_nif_service_contour_analysis_guide: (() => {
+      // AM nighttime interference-free (NIF) service contour analysis guide.
+      //
+      // NIF analysis is required by 47 CFR §73.182 for all AM applications that
+      // modify facilities or involve new stations.  It determines the nighttime area
+      // in which a station's signal is interference-free at the 0.1 mV/m contour.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.182: Groundwave service — criteria for determining coverage and interference.
+      //   §73.182(k): NIF service — portion of 0.1 mV/m nighttime contour free from
+      //     interference from all other stations' skywave signals.
+      //   §73.24(i): Nighttime community of license service: 0.1 mV/m groundwave contour must
+      //     encompass community of license.
+      //   §73.37(b): For Class D secondary stations on clear channels: nighttime operation
+      //     must not cause objectionable interference to dominant (Class A) station.
+      //   §73.182(j): Dominant-station protection: Class D cannot exceed a specified skywave
+      //     field strength (typically 50 µV/m or 0.05 mV/m at dominant station's 0.5 mV/m contour).
+      //
+      // KKOB protection calculation:
+      //   KKOB: Albuquerque, NM; 780 kHz; Class A; 50 kW (daytime) / 50 kW (nighttime).
+      //   KKOB's 0.5 mV/m daytime groundwave contour extends ~190 km from Albuquerque.
+      //   Distance from KAZM current site (Sedona, AZ) to KKOB (Albuquerque):
+      //     ~460 km (approximate great-circle).
+      //   FCC §73.182(j) skywave protection for Class D secondary on 780 kHz:
+      //     Class D must not cause predicted skywave > 50 µV/m at the dominant station's
+      //     50% skywave field strength at the dominant station's location.
+      //     At 460 km, a 5 kW NDA station's skywave is typically < 50 µV/m — compliant.
+      //
+      // Distance from candidate site to KKOB:
+      //   We compute approximate great-circle distance from pt.lat, pt.lon to KKOB (35.1, -106.6).
+      const kkob_lat = 35.1107;   // KKOB transmitter site: Albuquerque, NM
+      const kkob_lon = -106.5994;
+      const lat1r = pt.lat * Math.PI / 180;
+      const lon1r = pt.lon * Math.PI / 180;
+      const lat2r = kkob_lat * Math.PI / 180;
+      const lon2r = kkob_lon * Math.PI / 180;
+      const dlat  = lat2r - lat1r;
+      const dlon  = lon2r - lon1r;
+      const a_hav = Math.sin(dlat/2)**2 + Math.cos(lat1r)*Math.cos(lat2r)*Math.sin(dlon/2)**2;
+      const dist_to_kkob_km = round2(6371 * 2 * Math.asin(Math.sqrt(a_hav)));
+
+      // FCC M3 skywave field strength estimate:
+      //   At distance d km, nighttime skywave field strength from a station with TPO P (kW) is
+      //   approximated by the FCC nighttime skywave curves (ITU-R f curves / M3 model):
+      //   F_sky(50%, 50%) at 780 kHz for NDA station.
+      //   Simplified empirical approximation for 780 kHz NDA (ITU-R HF propagation):
+      //   F_sky ≈ 10 * log10(P_kW) + 120 - 20 * log10(d_km) - 40  [dBµV/m rough model]
+      //   This is a rough screening estimate — actual M3 / FCC ITU f-curve computation required.
+      //   For 5 kW at 460 km: F ≈ 7 + 120 - 53.3 - 40 = 33.7 dBµV/m → 48 µV/m (< 50 µV/m threshold)
+      const tpo_dB      = 10 * Math.log10(tpo_kw);
+      const sky_raw_dB  = tpo_dB + 120 - 20 * Math.log10(dist_to_kkob_km) - 40;
+      const sky_uVm     = round2(Math.pow(10, sky_raw_dB / 20));  // µV/m at KKOB site
+
+      // FCC Class D secondary protection threshold on clear channel:
+      //   §73.182(j): skywave must not exceed 50 µV/m at dominant station's 0.5 mV/m contour.
+      //   (More precisely: 50 µV/m 50% skywave at critical distance)
+      const protection_threshold_uVm = 50;
+      const kkob_interference_compliant = sky_uVm <= protection_threshold_uVm;
+
+      // Nighttime service contour:
+      //   0.1 mV/m groundwave contour defines the nighttime service area.
+      //   NIF analysis computes what fraction of that area is interference-free.
+      //   For Class D secondary station on a clear channel, NIF is severely limited
+      //   because clear-channel dominant stations have skywave covering most of the country.
+      //   Practical expectation: Class D on 780 kHz has very limited NIF area at night.
+      //
+      // 0.1 mV/m groundwave contour distance for NDA Class D:
+      //   FCC AM groundwave curves (§73.184 Table 1): for 5 kW NDA at 780 kHz
+      //   σ = 8 mS/m (average US conductivity): 0.1 mV/m contour ≈ 55–75 km from transmitter
+      //   σ = 4 mS/m (rocky terrain, Sedona area): 0.1 mV/m ≈ 40–55 km
+      const sigma_proxy_mSm     = sigma_msm ?? 8;   // mS/m conductivity estimate from score context
+      const nighttime_0p1_km    = sigma_proxy_mSm >= 10 ? 75
+                                 : sigma_proxy_mSm >= 6  ? 60
+                                 : sigma_proxy_mSm >= 3  ? 45
+                                 : 35;   // rough screening from FCC Table 1
+
+      // NIF area fraction estimate:
+      //   For Class D on 780 kHz (clear channel, KKOB dominant):
+      //   A significant portion of the nighttime contour area is subject to interference
+      //   from KKOB's skywave and other clear-channel secondaries.
+      //   Conservative NIF estimate: 20–50% of 0.1 mV/m contour area may be interference-free
+      //   depending on the candidate's distance from KKOB.
+      const nif_fraction_pct_low  = dist_to_kkob_km > 500 ? 40 : (dist_to_kkob_km > 350 ? 25 : 15);
+      const nif_fraction_pct_high = dist_to_kkob_km > 500 ? 60 : (dist_to_kkob_km > 350 ? 45 : 30);
+
+      // NIF study engineering cost:
+      //   Full NIF analysis requires M3 skywave model computation for all co-channel stations.
+      //   Typically performed with FCC-approved AMCD (AM Clear Channel Database) or
+      //   commercial software (Nautel's AM analysis, BroadCast Broadcasting Software).
+      const nif_study_low_usd  = 2000;
+      const nif_study_high_usd = 6000;
+      const total_nif_low_usd  = nif_study_low_usd;
+      const total_nif_high_usd = nif_study_high_usd;
+
+      return {
+        dist_to_kkob_km,
+        sky_uVm,
+        protection_threshold_uVm,
+        kkob_interference_compliant,
+        nighttime_0p1_km,
+        nif_fraction_pct_low,
+        nif_fraction_pct_high,
+        sigma_proxy_mSm,
+        nif_study_low_usd,
+        nif_study_high_usd,
+        total_nif_low_usd,
+        total_nif_high_usd,
+        reference: '47 CFR §73.182 (NIF analysis required for AM applications); §73.182(j) (Class D dominant-station protection — 50 µV/m skywave limit); §73.182(k) (interference-free service definition); §73.24(i) (0.1 mV/m nighttime community contour); §73.37(b) (Class D secondary no-interference obligation); §73.184 (AM groundwave curves)',
+        note: `Class D secondary station on 780 kHz (clear channel — KKOB dominant). Distance to KKOB: ${dist_to_kkob_km} km. Estimated KAZM skywave at KKOB: ~${sky_uVm} µV/m (protection threshold: ${protection_threshold_uVm} µV/m — ${kkob_interference_compliant ? 'COMPLIANT' : 'EXCEEDS THRESHOLD — nighttime power reduction may be required'}). Nighttime 0.1 mV/m contour radius ≈ ${nighttime_0p1_km} km (σ ≈ ${sigma_proxy_mSm} mS/m). Estimated NIF area: ${nif_fraction_pct_low}–${nif_fraction_pct_high}% of nighttime contour. Full §73.182 NIF study required before filing.`
       };
     })(),
 
