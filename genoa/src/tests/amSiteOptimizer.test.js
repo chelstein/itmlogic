@@ -10263,3 +10263,46 @@ test('am_translator_and_booster_strategy_guide comparison table columns present'
     assert.ok('xltr_coverage_km'        in row, 'xltr_coverage_km missing from comparison table');
   }
 });
+
+test('fcc_proof_of_performance_measurement_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_proof_of_performance_measurement_guide;
+  assert.ok(g, 'POP guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.n_measurement_points_per_radial, 8, '§73.154 requires 8 points per radial');
+});
+
+test('fcc_proof_of_performance_measurement_guide KAZM NDA gets SHORT_PROOF', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_proof_of_performance_measurement_guide;
+  assert.strictEqual(g.proof_type, 'SHORT_PROOF', 'KAZM NDA must require SHORT_PROOF');
+  assert.strictEqual(g.da_monitor_required, false, 'NDA must not require DA antenna monitor');
+  assert.strictEqual(g.n_radials_required, 8, 'NDA must require 8 radials');
+  assert.strictEqual(g.total_measurement_points, 64, '8 radials × 8 points = 64 total');
+});
+
+test('fcc_proof_of_performance_measurement_guide cost range is valid for NDA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_proof_of_performance_measurement_guide;
+  assert.ok(g.total_proof_cost_low_usd > 0, 'proof cost must be positive');
+  assert.ok(g.total_proof_cost_high_usd >= g.total_proof_cost_low_usd, 'high must be >= low');
+  assert.ok(g.n_required_equipment >= 5, 'must list at least 5 required equipment items');
+});
+
+test('fcc_proof_of_performance_measurement_guide 780 kHz clear-channel requires critical hours', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].fcc_proof_of_performance_measurement_guide;
+  assert.strictEqual(g.critical_hours_required, true, '780 kHz clear-channel must require critical hours');
+  assert.ok(g.fcc_review_days_low > 0, 'FCC review time must be positive');
+  assert.ok(g.fcc_review_days_high >= g.fcc_review_days_low, 'high review time must be >= low');
+});
+
+test('fcc_proof_of_performance_measurement_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pop_proof_type' in row, 'pop_proof_type missing from comparison table');
+    assert.ok('pop_total_pts'  in row, 'pop_total_pts missing from comparison table');
+    assert.ok('pop_cost_low_usd' in row, 'pop_cost_low_usd missing from comparison table');
+  }
+});

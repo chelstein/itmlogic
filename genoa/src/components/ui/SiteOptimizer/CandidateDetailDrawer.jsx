@@ -2226,6 +2226,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FCC Proof of Performance Measurement Guide */}
+        {candidate.fcc_proof_of_performance_measurement_guide && (() => {
+          const g = candidate.fcc_proof_of_performance_measurement_guide;
+          const proofColor = {
+            FULL_PROOF: '#7c3aed', SHORT_PROOF: '#0c4a6e', ABBREVIATED: '#15803d', NONE: '#374151'
+          }[g.proof_type] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #a78bfa' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5b21b6', marginBottom: 8 }}>
+                FCC Proof of Performance — Field Measurement Guide
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Proof Type:</span> <strong style={{ color: proofColor }}>{g.proof_type?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Radials Required:</span> <strong>{g.n_radials_required}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Pts Per Radial:</span> <strong>{g.n_measurement_points_per_radial}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Measurement Pts:</span> <strong>{g.total_measurement_points}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Measurement Days:</span> <strong>{g.n_measurement_days}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Timeline:</span> <strong>{g.proof_weeks_low}–{g.proof_weeks_high} weeks</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Proof Cost:</span> <strong>${g.total_proof_cost_low_usd?.toLocaleString()}–${g.total_proof_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>DA Monitor Required:</span> <strong style={{ color: g.da_monitor_required ? '#b91c1c' : '#15803d' }}>{g.da_monitor_required ? `YES ($${g.da_monitor_cost_low_usd?.toLocaleString()}–$${g.da_monitor_cost_high_usd?.toLocaleString()})` : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Critical Hours:</span> <strong style={{ color: g.critical_hours_required ? '#92400e' : '#15803d' }}>{g.critical_hours_required ? 'Required' : 'Not required'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>FCC Review Time:</span> <strong>{g.fcc_review_days_low}–{g.fcc_review_days_high} days</strong></div>
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Translator & Booster Strategy Guide */}
         {candidate.am_translator_and_booster_strategy_guide && (() => {
           const g = candidate.am_translator_and_booster_strategy_guide;

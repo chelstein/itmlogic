@@ -2318,3 +2318,20 @@ test('am_translator_and_booster_strategy_guide present across colocation candida
     assert.ok(g.recommended_translator_erp_w > 0, `rank ${c.rank}: recommended ERP must be > 0`);
   }
 });
+
+test('fcc_proof_of_performance_measurement_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_proof_types = ['FULL_PROOF', 'SHORT_PROOF', 'ABBREVIATED', 'NONE'];
+  for (const c of out.candidates) {
+    const g = c.fcc_proof_of_performance_measurement_guide;
+    assert.ok(g != null, `rank ${c.rank} missing fcc_proof_of_performance_measurement_guide`);
+    assert.ok(valid_proof_types.includes(g.proof_type), `rank ${c.rank}: proof_type '${g.proof_type}' invalid`);
+    assert.ok(g.total_measurement_points > 0, `rank ${c.rank}: total measurement points must be > 0`);
+  }
+});

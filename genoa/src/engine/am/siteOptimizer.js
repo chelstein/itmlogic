@@ -1095,7 +1095,10 @@ export async function runSiteOptimizer(body = {}){
     hd_adj_interference_risk:   c.am_digital_hd_radio_upgrade_pathway_guide?.adjacent_ch_interference_risk ?? null,
     xltr_erp_w:                 c.am_translator_and_booster_strategy_guide?.recommended_translator_erp_w ?? null,
     xltr_total_cost_low_usd:    c.am_translator_and_booster_strategy_guide?.translator_total_cost_low_usd ?? null,
-    xltr_coverage_km:           c.am_translator_and_booster_strategy_guide?.recommended_translator_coverage_km ?? null
+    xltr_coverage_km:           c.am_translator_and_booster_strategy_guide?.recommended_translator_coverage_km ?? null,
+    pop_proof_type:             c.fcc_proof_of_performance_measurement_guide?.proof_type ?? null,
+    pop_total_pts:              c.fcc_proof_of_performance_measurement_guide?.total_measurement_points ?? null,
+    pop_cost_low_usd:           c.fcc_proof_of_performance_measurement_guide?.total_proof_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6830,6 +6833,137 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    fcc_proof_of_performance_measurement_guide: (() => {
+      // Models the FCC proof-of-performance (POP) field measurement requirements
+      // for new AM antenna systems after construction of a relocated station.
+      //
+      // FCC POP requirements (47 CFR §73.186 and §73.154):
+      //   DA stations: Full proof required — must measure field strength along
+      //   each radial specified in the construction permit (typically 8–16 radials,
+      //   8 measurement points per radial, per §73.154(b))
+      //   NDA stations (directional amendment): Short-form proof if no pattern change
+      //   NDA (new site): Full proof if new antenna or new effective height
+      //
+      // Proof types:
+      //   FULL_PROOF: Complete field-strength measurement (DA or new NDA tower)
+      //   SHORT_PROOF: Reduced measurement (minor amendment, same tower)
+      //   ABBREVIATED: Critical hours only (approved by FCC in advance)
+      //   NONE: License-to-cover without proof (CA waiver, temporary operations)
+      //
+      // Measurement equipment:
+      //   - FCC-calibrated field strength meter: RMS Instruments FSM-2 / Potomac FIM-41
+      //   - Calibrated antenna height and orientation logging required
+      //   - GPS-verified measurement point coordinates (within 50m per §73.154)
+      //   - Sunset/sunrise data required for critical hours measurements
+      //
+      // Timeline:
+      //   DA full proof: 4–8 weeks (travel, 3 measurement dates)
+      //   NDA short proof: 1–2 weeks
+      //   Full proof submission: Form 302-AM + Exhibit with proof data
+      //   FCC review: 30–90 days (routine) or up to 18 months (contested)
+      //
+      // Cost estimates:
+      //   DA full proof (consultant): $10,000–$30,000
+      //   NDA short proof (consultant): $3,000–$8,000
+      //   Equipment rental only: $1,500–$4,000/week
+      //   Travel (per-diem 3 measurements): $5,000–$12,000
+      //
+      // DA antenna monitor:
+      //   Required for DA stations per §73.69: sample voltages on each tower
+      //   Antenna monitoring equipment: $5,000–$15,000
+      //   Calibration required: annually (§73.69(e))
+
+      const isDA_pop        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_pop = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_pop = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Proof type determination
+      const proof_type =
+        isDA_pop ? 'FULL_PROOF' : 'SHORT_PROOF';
+
+      // Radials required for DA proof (per §73.154)
+      const n_radials_required = isDA_pop
+        ? (tpo_kw >= 50 ? 24 : 16)   // more radials for high-power DA
+        : 8;                            // standard NDA
+
+      const n_measurement_points_per_radial = 8; // §73.154(b) minimum
+      const total_measurement_points = n_radials_required * n_measurement_points_per_radial;
+
+      // Measurement dates required (FCC requires measurements on separate days)
+      const n_measurement_days = isDA_pop ? 3 : 1;
+
+      // Proof timeline
+      const proof_weeks_low  = isDA_pop ? 4 : 1;
+      const proof_weeks_high = isDA_pop ? 8 : 2;
+
+      // Cost estimate
+      const proof_consultant_cost_low  = isDA_pop ? 10000 : 3000;
+      const proof_consultant_cost_high = isDA_pop ? 30000 : 8000;
+      const travel_cost_low  = isDA_pop ? 5000 : 1500;
+      const travel_cost_high = isDA_pop ? 12000 : 4000;
+      const equipment_rental_per_week = 2000;
+      const total_proof_cost_low  = proof_consultant_cost_low  + travel_cost_low  + equipment_rental_per_week * proof_weeks_low;
+      const total_proof_cost_high = proof_consultant_cost_high + travel_cost_high + equipment_rental_per_week * proof_weeks_high;
+
+      // DA antenna monitor requirement
+      const da_monitor_required = isDA_pop;
+      const da_monitor_cost_low  = isDA_pop ? 5000  : 0;
+      const da_monitor_cost_high = isDA_pop ? 15000 : 0;
+      const da_monitor_calibration_annual = isDA_pop ? 1500 : 0;
+
+      // Proof measurement equipment
+      const measurement_equipment = [
+        { item: 'FCC-calibrated field strength meter', required: true, example: 'Potomac FIM-41 or RMS FSM-2' },
+        { item: 'GPS receiver (±50m accuracy)', required: true, example: 'Garmin GPSMAP or equivalent' },
+        { item: 'Calibrated antenna (loop or whip)', required: true, example: 'Calibrated against NIST standard' },
+        { item: 'Data logger', required: true, example: 'Timestamp, coordinates, field reading per point' },
+        { item: 'Sunrise/sunset tables', required: true, example: 'USNO data for the proof location' },
+        { item: 'DA antenna monitor', required: isDA_pop, example: '§73.69 sample voltage monitor for each tower' }
+      ];
+
+      const n_required_equipment = measurement_equipment.filter(e => e.required).length;
+
+      // Critical hours: within 2 hours of sunset/sunrise at measurement location
+      const critical_hours_required = isDA_pop || is_clear_ch_pop;
+
+      // FCC review timeline (days) after submission
+      const fcc_review_days_low  = 30;
+      const fcc_review_days_high = isDA_pop ? 180 : 90;
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        proof_type,
+        n_radials_required,
+        n_measurement_points_per_radial,
+        total_measurement_points,
+        n_measurement_days,
+        proof_weeks_low,
+        proof_weeks_high,
+        proof_consultant_cost_low_usd:  proof_consultant_cost_low,
+        proof_consultant_cost_high_usd: proof_consultant_cost_high,
+        travel_cost_low_usd:            travel_cost_low,
+        travel_cost_high_usd:           travel_cost_high,
+        total_proof_cost_low_usd:       total_proof_cost_low,
+        total_proof_cost_high_usd:      total_proof_cost_high,
+        da_monitor_required,
+        da_monitor_cost_low_usd:        da_monitor_cost_low,
+        da_monitor_cost_high_usd:       da_monitor_cost_high,
+        da_monitor_calibration_annual_usd: da_monitor_calibration_annual,
+        measurement_equipment,
+        n_required_equipment,
+        critical_hours_required,
+        fcc_review_days_low,
+        fcc_review_days_high,
+        is_clear_channel:               is_clear_ch_pop,
+        is_local_channel:               is_local_ch_pop,
+        is_da:                          isDA_pop,
+        reference: '47 CFR §73.154; §73.186; §73.69; FCC Form 302-AM; FCC Tech Note: DA Proof Procedures; OET Bulletin 65; NRSC-4',
+        note: `Proof type: ${proof_type}. ${n_radials_required} radials × ${n_measurement_points_per_radial} points = ${total_measurement_points} total. ` +
+              `Timeline: ${proof_weeks_low}–${proof_weeks_high} weeks. ` +
+              `Total cost: $${total_proof_cost_low.toLocaleString()}–$${total_proof_cost_high.toLocaleString()}.`
       };
     })(),
 
