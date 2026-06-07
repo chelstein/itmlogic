@@ -12616,3 +12616,46 @@ test('am_antenna_array_and_phasor_guide comparison table columns present', async
   assert.strictEqual(r0.ant_total_low_usd, 2000,               'rank-1 ant_total_low_usd should be $2,000');
   assert.strictEqual(r0.ant_tower_count,   1,                  'rank-1 ant_tower_count should be 1');
 });
+
+test('am_environmental_impact_assessment_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_impact_assessment_guide;
+  assert.ok(g !== undefined && g !== null, 'am_environmental_impact_assessment_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM environmental assessment type', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_impact_assessment_guide;
+  assert.strictEqual(g.assessment_type, 'categorical_exclusion', 'Class D 5 kW should be categorical_exclusion');
+  assert.strictEqual(g.likely_ea,       false,                   'Class D 5 kW should not trigger EA');
+});
+
+test('KAZM environmental review line-item costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_impact_assessment_guide;
+  assert.strictEqual(g.env_review_low_usd,   1000, 'CE env_review_low should be $1,000');
+  assert.strictEqual(g.section_106_low_usd,  2000, 'section_106_low should be $2,000');
+  assert.strictEqual(g.bio_survey_low_usd,   2000, 'bio_survey_low should be $2,000');
+});
+
+test('KAZM environmental assessment total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_environmental_impact_assessment_guide;
+  assert.strictEqual(g.total_low_usd,  5000,  'total_low should be $5,000');
+  assert.strictEqual(g.total_high_usd, 23000, 'total_high should be $23,000');
+});
+
+test('am_environmental_impact_assessment_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('env_assessment_type'     in row, 'env_assessment_type missing from comparison table');
+    assert.ok('env_total_low_usd'       in row, 'env_total_low_usd missing from comparison table');
+    assert.ok('env_section_106_low_usd' in row, 'env_section_106_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.env_assessment_type,     'categorical_exclusion', 'rank-1 env_assessment_type should be categorical_exclusion');
+  assert.strictEqual(r0.env_total_low_usd,        5000,                   'rank-1 env_total_low_usd should be $5,000');
+  assert.strictEqual(r0.env_section_106_low_usd,  2000,                   'rank-1 env_section_106_low_usd should be $2,000');
+});

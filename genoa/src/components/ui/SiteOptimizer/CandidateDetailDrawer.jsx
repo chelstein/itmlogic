@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Environmental Impact Assessment Guide */}
+        {candidate.am_environmental_impact_assessment_guide && (() => {
+          const g = candidate.am_environmental_impact_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const typeLabel = {
+            categorical_exclusion:    'Categorical Exclusion (CE)',
+            environmental_assessment: 'Environmental Assessment (EA)',
+          }[g.assessment_type] ?? g.assessment_type ?? '—';
+          return (
+            <div key="env-guide" style={{ marginBottom: 16, padding: 12, background: '#f7fee7', borderRadius: 8, border: '2px solid #65a30d' }}>
+              <div style={{ fontWeight: 700, color: '#365314', marginBottom: 6, fontSize: 13 }}>Environmental &amp; NEPA Review</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3f6212' }}>
+                <span>Assessment:</span><span>{typeLabel}</span>
+                <span>Env review:</span><span>{fmt(g.env_review_low_usd)} – {fmt(g.env_review_high_usd)}</span>
+                <span>Section 106:</span><span>{fmt(g.section_106_low_usd)} – {fmt(g.section_106_high_usd)}</span>
+                <span>Bio survey:</span><span>{fmt(g.bio_survey_low_usd)} – {fmt(g.bio_survey_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4d7c0f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Antenna Array and Phasor Guide */}
         {candidate.am_antenna_array_and_phasor_guide && (() => {
           const g = candidate.am_antenna_array_and_phasor_guide;

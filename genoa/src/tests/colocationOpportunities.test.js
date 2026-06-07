@@ -2944,3 +2944,15 @@ test('am_antenna_array_and_phasor_guide present across colocation candidates', a
       `rank ${c.rank}: unexpected array_type: ${g.array_type}`);
   }
 });
+
+test('am_environmental_impact_assessment_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_environmental_impact_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_environmental_impact_assessment_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['categorical_exclusion','environmental_assessment'].includes(g.assessment_type),
+      `rank ${c.rank}: unexpected assessment_type: ${g.assessment_type}`);
+  }
+});

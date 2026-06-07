@@ -1245,7 +1245,10 @@ export async function runSiteOptimizer(body = {}){
     rfr_evaluation_type:        c.am_rf_radiation_safety_and_compliance_guide?.evaluation_type ?? null,
     ant_array_type:             c.am_antenna_array_and_phasor_guide?.array_type ?? null,
     ant_total_low_usd:          c.am_antenna_array_and_phasor_guide?.total_low_usd ?? null,
-    ant_tower_count:            c.am_antenna_array_and_phasor_guide?.tower_count ?? null
+    ant_tower_count:            c.am_antenna_array_and_phasor_guide?.tower_count ?? null,
+    env_assessment_type:        c.am_environmental_impact_assessment_guide?.assessment_type ?? null,
+    env_total_low_usd:          c.am_environmental_impact_assessment_guide?.total_low_usd ?? null,
+    env_section_106_low_usd:    c.am_environmental_impact_assessment_guide?.section_106_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6980,6 +6983,35 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_environmental_impact_assessment_guide: (() => {
+      // 47 CFR Part 1 Subpart I / §1.1307: All new tower construction requires FCC
+      // environmental review.  Most sites qualify for Categorical Exclusion (CE);
+      // Class A/B or high-power sites near sensitive resources require an EA.
+      // Section 106 (NHPA) historic review and biological surveys are always included.
+      const is_class_ab = /^[AB]$/i.test(fcc_class);
+      const large_power = tpo_kw >= 50;
+      const likely_ea   = is_class_ab || large_power;
+      const assessment_type     = likely_ea ? 'environmental_assessment' : 'categorical_exclusion';
+      const env_review_low_usd  = likely_ea ? 5000  : 1000;
+      const env_review_high_usd = likely_ea ? 25000 : 5000;
+      const section_106_low_usd  = 2000;
+      const section_106_high_usd = 10000;
+      const bio_survey_low_usd   = 2000;
+      const bio_survey_high_usd  = 8000;
+      const total_low_usd  = round2(env_review_low_usd  + section_106_low_usd  + bio_survey_low_usd);
+      const total_high_usd = round2(env_review_high_usd + section_106_high_usd + bio_survey_high_usd);
+      return {
+        fcc_class, tpo_kw,
+        assessment_type, likely_ea,
+        env_review_low_usd, env_review_high_usd,
+        section_106_low_usd, section_106_high_usd,
+        bio_survey_low_usd, bio_survey_high_usd,
+        total_low_usd, total_high_usd,
+        reference: '47 CFR Part 1 Subpart I; §1.1307; NEPA; NHPA Section 106; FCC environmental compliance',
+        note: `Class ${fcc_class} ${tpo_kw} kW: likely ${assessment_type}; env review total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 
