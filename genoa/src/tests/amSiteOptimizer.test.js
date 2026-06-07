@@ -14161,3 +14161,40 @@ it('candidate_comparison_table zon columns are present and valid for KAZM', asyn
   assert.ok(r0.zon_min_parcel_acres > 0, 'zon_min_parcel_acres must be positive');
   assert.strictEqual(r0.zon_total_zoning_low_usd, 7000, 'zon_total_zoning_low_usd should be 7000');
 });
+
+// ── am_transmission_line_and_phasor_guide ────────────────────────────────────
+
+it('am_transmission_line_and_phasor_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_transmission_line_and_phasor_guide, 'tl guide missing on candidate');
+  }
+});
+
+it('am_transmission_line_and_phasor_guide is_directional is false and phasor_cost is 0 for KAZM NDA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_phasor_guide;
+  assert.strictEqual(g.is_directional, false, 'KAZM is NDA so is_directional must be false');
+  assert.strictEqual(g.phasor_cost_low_usd, 0, 'NDA phasor_cost_low_usd must be 0');
+});
+
+it('am_transmission_line_and_phasor_guide lambda_m is ~384.35 m for 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_phasor_guide;
+  assert.ok(Math.abs(g.lambda_m - 384.35) < 0.5, `lambda_m expected ~384.35, got ${g.lambda_m}`);
+});
+
+it('am_transmission_line_and_phasor_guide reference cites §73.54 and IEEE 100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_phasor_guide;
+  assert.ok(g.reference.includes('§73.54'), 'reference must cite §73.54');
+  assert.ok(g.reference.includes('IEEE 100'), 'reference must cite IEEE 100');
+});
+
+it('candidate_comparison_table tl columns are present and valid for KAZM NDA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.tl_total_system_low_usd > 0, 'tl_total_system_low_usd must be positive');
+  assert.strictEqual(r0.tl_is_directional, false, 'tl_is_directional should be false for NDA');
+  assert.ok(Math.abs(r0.tl_lambda_m - 384.35) < 0.5, `tl_lambda_m expected ~384.35, got ${r0.tl_lambda_m}`);
+});

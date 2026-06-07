@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmission Line and Phasor Guide */}
+        {candidate.am_transmission_line_and_phasor_guide && (() => {
+          const g = candidate.am_transmission_line_and_phasor_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="tl-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: '2px solid #e11d48' }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Transmission Line &amp; Phasor System</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9f1239' }}>
+                <span>Pattern mode:</span><span>{g.pattern_mode ?? '—'} {g.is_directional ? '(DA — phasor required)' : '(NDA)'}</span>
+                <span>Wavelength (λ):</span><span>{g.lambda_m != null ? `${g.lambda_m} m` : '—'}</span>
+                <span>Rec. TL type:</span><span>{g.tl_type_recommended ?? '—'}</span>
+                <span>VF (open wire / hardline):</span><span>{g.vf_open_wire != null ? `${g.vf_open_wire} / ${g.vf_hardline}` : '—'}</span>
+                <span>TL run estimate:</span><span>{g.tl_run_ft_typical_low != null ? `${g.tl_run_ft_typical_low}–${g.tl_run_ft_typical_high} ft` : '—'}</span>
+                <span>TL cost:</span><span>{g.tl_cost_low_usd != null ? `$${fmt(g.tl_cost_low_usd)} – $${fmt(g.tl_cost_high_usd)}` : '—'}</span>
+                {g.is_directional && <><span>Phasor cost:</span><span style={{ color: '#dc2626' }}>{g.phasor_cost_low_usd != null ? `$${fmt(g.phasor_cost_low_usd)} – $${fmt(g.phasor_cost_high_usd)}` : '—'}</span></>}
+                <span>Base tuning unit:</span><span>{g.base_tuning_low_usd != null ? `$${fmt(g.base_tuning_low_usd)} – $${fmt(g.base_tuning_high_usd)}` : '—'}</span>
+                <span>Total TL system:</span><span style={{ fontWeight: 600 }}>{g.total_tl_system_low_usd != null ? `$${fmt(g.total_tl_system_low_usd)} – $${fmt(g.total_tl_system_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#be123c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Zoning and Land Use Approval Guide */}
         {candidate.am_zoning_and_land_use_approval_guide && (() => {
           const g = candidate.am_zoning_and_land_use_approval_guide;

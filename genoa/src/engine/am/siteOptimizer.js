@@ -1353,7 +1353,10 @@ export async function runSiteOptimizer(body = {}){
     nepa_timeline_weeks_low:            c.am_environmental_and_nepa_compliance_guide?.nepa_timeline_weeks_low ?? null,
     zon_setback_ft_typical:             c.am_zoning_and_land_use_approval_guide?.setback_ft_typical ?? null,
     zon_min_parcel_acres:               c.am_zoning_and_land_use_approval_guide?.min_parcel_acres ?? null,
-    zon_total_zoning_low_usd:           c.am_zoning_and_land_use_approval_guide?.total_zoning_low_usd ?? null
+    zon_total_zoning_low_usd:           c.am_zoning_and_land_use_approval_guide?.total_zoning_low_usd ?? null,
+    tl_total_system_low_usd:            c.am_transmission_line_and_phasor_guide?.total_tl_system_low_usd ?? null,
+    tl_is_directional:                  c.am_transmission_line_and_phasor_guide?.is_directional ?? null,
+    tl_lambda_m:                        c.am_transmission_line_and_phasor_guide?.lambda_m ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7088,6 +7091,62 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmission_line_and_phasor_guide: (() => {
+      // AM transmission lines: typically open-wire (parallel conductor) for high-power arrays,
+      // or hardline coaxial (e.g., 3-1/8" EIA flange) for single-tower NDA.
+      // Phasor: required for DA arrays to split and phase-shift transmitter power to each tower.
+      // Power factor: typical AM antenna feedpoint impedance 50–600 Ω; matching network required.
+      const isDA_phasor = /^DA/i.test(pattern_mode);
+      const freq_mhz_tl = frequency_khz / 1000;
+      const lambda_m_tl = round2(299.792458 / freq_mhz_tl);
+      // Transmission line velocity factor: open wire ≈ 0.97, hardline coax ≈ 0.88
+      const vf_open_wire = 0.97;
+      const vf_hardline  = 0.88;
+      const electrical_lambda_m_open_wire = round2(lambda_m_tl * vf_open_wire);
+      const electrical_lambda_m_hardline  = round2(lambda_m_tl * vf_hardline);
+      // Typical run from transmitter building to tower base: 50–300 ft depending on site layout
+      const tl_run_ft_typical_low  = 50;
+      const tl_run_ft_typical_high = 300;
+      // Open wire line: $15–$40/ft installed; hardline coax: $25–$70/ft installed
+      const open_wire_cost_per_ft_low  = 15;
+      const open_wire_cost_per_ft_high = 40;
+      const hardline_cost_per_ft_low   = 25;
+      const hardline_cost_per_ft_high  = 70;
+      const tl_cost_low_usd  = round2(tl_run_ft_typical_low  * (isDA_phasor ? open_wire_cost_per_ft_low  : hardline_cost_per_ft_low));
+      const tl_cost_high_usd = round2(tl_run_ft_typical_high * (isDA_phasor ? open_wire_cost_per_ft_high : hardline_cost_per_ft_high));
+      // Phasor cost (DA only): $25,000–$120,000 for a 2-tower phasor
+      const phasor_cost_low_usd  = isDA_phasor ? 25000 : 0;
+      const phasor_cost_high_usd = isDA_phasor ? 120000 : 0;
+      // Matching network (base tuning unit): $3,000–$12,000 per tower
+      const base_tuning_low_usd  = 3000;
+      const base_tuning_high_usd = 12000;
+      const total_tl_system_low_usd  = round2(tl_cost_low_usd  + phasor_cost_low_usd  + base_tuning_low_usd);
+      const total_tl_system_high_usd = round2(tl_cost_high_usd + phasor_cost_high_usd + base_tuning_high_usd);
+      return {
+        pattern_mode,
+        is_directional: isDA_phasor,
+        frequency_khz,
+        lambda_m: lambda_m_tl,
+        vf_open_wire,
+        vf_hardline,
+        electrical_lambda_m_open_wire,
+        electrical_lambda_m_hardline,
+        tl_run_ft_typical_low,
+        tl_run_ft_typical_high,
+        tl_cost_low_usd,
+        tl_cost_high_usd,
+        phasor_cost_low_usd,
+        phasor_cost_high_usd,
+        base_tuning_low_usd,
+        base_tuning_high_usd,
+        total_tl_system_low_usd,
+        total_tl_system_high_usd,
+        tl_type_recommended: isDA_phasor ? 'Open-wire parallel conductor (DA array)' : 'Hardline coaxial (3-1/8" EIA, NDA)',
+        reference: '47 CFR §73.54 (AM antenna transmission systems); IEEE 100 (definitions: transmission line, phasor, velocity factor); EIA/TIA-222-H §8 (transmission line support); ARRL Antenna Book (transmission line theory); FCC DA proof-of-performance requirements §73.154',
+        note: `${isDA_phasor ? 'DA' : 'NDA'} at ${frequency_khz} kHz: λ = ${lambda_m_tl} m. Rec. line: ${isDA_phasor ? `open wire (VF ${vf_open_wire})` : `hardline coax (VF ${vf_hardline})`}. Run est. ${tl_run_ft_typical_low}–${tl_run_ft_typical_high} ft. ${isDA_phasor ? `Phasor: $${phasor_cost_low_usd.toLocaleString()}–$${phasor_cost_high_usd.toLocaleString()}. ` : ''}Total TL system: $${total_tl_system_low_usd.toLocaleString()}–$${total_tl_system_high_usd.toLocaleString()}.`
       };
     })(),
 

@@ -3378,3 +3378,20 @@ test('am_zoning_and_land_use_approval_guide colocation: all colocation candidate
     assert.ok(g.total_zoning_low_usd > 0, `total_zoning_low_usd must be positive`);
   }
 });
+
+test('am_transmission_line_and_phasor_guide colocation: all colocation candidates have valid TL data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_phasor_guide;
+    assert.ok(g, `candidate missing am_transmission_line_and_phasor_guide`);
+    assert.ok(g.lambda_m > 0, `lambda_m must be positive`);
+    assert.ok(g.total_tl_system_low_usd > 0, `total_tl_system_low_usd must be positive`);
+    assert.ok(typeof g.is_directional === 'boolean', `is_directional must be boolean`);
+  }
+});
