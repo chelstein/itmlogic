@@ -1359,7 +1359,10 @@ export async function runSiteOptimizer(body = {}){
     tl_lambda_m:                        c.am_transmission_line_and_phasor_guide?.lambda_m ?? null,
     ins_total_annual_low_usd:           c.am_insurance_and_liability_guide?.total_annual_insurance_low_usd ?? null,
     ins_tower_replacement_low_usd:      c.am_insurance_and_liability_guide?.tower_replacement_value_low_usd ?? null,
-    ins_total_insured_low_usd:          c.am_insurance_and_liability_guide?.total_insured_value_low_usd ?? null
+    ins_total_insured_low_usd:          c.am_insurance_and_liability_guide?.total_insured_value_low_usd ?? null,
+    str_total_structural_low_usd:       c.am_tower_structural_analysis_guide?.total_structural_low_usd ?? null,
+    str_guy_levels:                     c.am_tower_structural_analysis_guide?.guy_levels ?? null,
+    str_design_wind_speed_mph_low:      c.am_tower_structural_analysis_guide?.design_wind_speed_mph_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7094,6 +7097,55 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_structural_analysis_guide: (() => {
+      // EIA/TIA-222-H (2017): current standard for structural design of antenna support structures.
+      // Replaces EIA/TIA-222-G. Key changes: new exposure categories, revised ice/wind maps.
+      // AM monopole structural design driven by: tower height, wind zone, ice zone, antenna loading.
+      const freq_mhz_str = frequency_khz / 1000;
+      const lambda_m_str = 299.792458 / freq_mhz_str;
+      const isHighClass_str = /^[AB]/i.test(fcc_class);
+      const tower_height_m_str = round2(isHighClass_str ? lambda_m_str / 2 : lambda_m_str / 4);
+      const tower_height_ft_str = round2(tower_height_m_str * 3.28084);
+      // Design wind speed (ASCE 7-22, 3-sec gust, Risk Category II): Southwest US typically 90–115 mph
+      const design_wind_speed_mph_low  = 90;
+      const design_wind_speed_mph_high = 115;
+      // Ice load: Southwest arid sites typically negligible, northern sites 0.5–1.0 in radial
+      const ice_radial_in = 0; // arid Southwest default
+      // Structural analysis cost: $8,000–$25,000 for full EIA/TIA-222-H analysis + PE stamp
+      const structural_analysis_low_usd  = 8000;
+      const structural_analysis_high_usd = 25000;
+      const pe_stamp_low_usd  = 2000;
+      const pe_stamp_high_usd = 6000;
+      const total_structural_low_usd  = structural_analysis_low_usd  + pe_stamp_low_usd;
+      const total_structural_high_usd = structural_analysis_high_usd + pe_stamp_high_usd;
+      // Typical guy wire tension: 10–15% of rated breaking strength (Preformed Line Products)
+      const guy_wire_pretension_pct_low  = 10;
+      const guy_wire_pretension_pct_high = 15;
+      // Number of guy levels for AM monopole (rule of thumb: 1 level per 100 ft)
+      const guy_levels = Math.max(1, Math.ceil(tower_height_ft_str / 100));
+      return {
+        tower_height_m: tower_height_m_str,
+        tower_height_ft: tower_height_ft_str,
+        fcc_class_used: fcc_class,
+        design_standard: 'EIA/TIA-222-H (2017)',
+        load_standard: 'ASCE 7-22',
+        design_wind_speed_mph_low,
+        design_wind_speed_mph_high,
+        ice_radial_in,
+        guy_levels,
+        guy_wire_pretension_pct_low,
+        guy_wire_pretension_pct_high,
+        structural_analysis_low_usd,
+        structural_analysis_high_usd,
+        pe_stamp_low_usd,
+        pe_stamp_high_usd,
+        total_structural_low_usd,
+        total_structural_high_usd,
+        reference: 'EIA/TIA-222-H (2017) (structural design of antenna supporting structures and antennas); ASCE 7-22 (minimum design loads and associated criteria); 47 CFR §17.6 (notification requirements for construction); IBC 2021 §1609 (wind loads); ANSI/TIA-5G-TOWER (5G co-location structural assessment)',
+        note: `Class ${fcc_class} tower ${tower_height_ft_str} ft (${tower_height_m_str} m): ${guy_levels} guy level(s). Design wind: ${design_wind_speed_mph_low}–${design_wind_speed_mph_high} mph (ASCE 7-22 3-sec gust). Ice: ${ice_radial_in}" radial (Southwest arid). Structural analysis + PE stamp: $${total_structural_low_usd.toLocaleString()}–$${total_structural_high_usd.toLocaleString()}.`
       };
     })(),
 

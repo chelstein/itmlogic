@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Structural Analysis Guide */}
+        {candidate.am_tower_structural_analysis_guide && (() => {
+          const g = candidate.am_tower_structural_analysis_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="str-guide" style={{ marginBottom: 16, padding: 12, background: '#fff8f1', borderRadius: 8, border: '2px solid #f97316' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Tower Structural Analysis</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Design standard:</span><span>{g.design_standard ?? '—'}</span>
+                <span>Load standard:</span><span>{g.load_standard ?? '—'}</span>
+                <span>Design wind speed:</span><span>{g.design_wind_speed_mph_low != null ? `${g.design_wind_speed_mph_low}–${g.design_wind_speed_mph_high} mph (3-sec gust)` : '—'}</span>
+                <span>Ice radial load:</span><span>{g.ice_radial_in != null ? `${g.ice_radial_in}" (arid SW)` : '—'}</span>
+                <span>Guy levels:</span><span>{g.guy_levels ?? '—'}</span>
+                <span>Guy wire pretension:</span><span>{g.guy_wire_pretension_pct_low != null ? `${g.guy_wire_pretension_pct_low}–${g.guy_wire_pretension_pct_high}% RBS` : '—'}</span>
+                <span>Structural analysis:</span><span>{g.structural_analysis_low_usd != null ? `$${fmt(g.structural_analysis_low_usd)} – $${fmt(g.structural_analysis_high_usd)}` : '—'}</span>
+                <span>PE stamp:</span><span>{g.pe_stamp_low_usd != null ? `$${fmt(g.pe_stamp_low_usd)} – $${fmt(g.pe_stamp_high_usd)}` : '—'}</span>
+                <span>Total structural cost:</span><span style={{ fontWeight: 600, color: '#dc2626' }}>{g.total_structural_low_usd != null ? `$${fmt(g.total_structural_low_usd)} – $${fmt(g.total_structural_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Insurance and Liability Guide */}
         {candidate.am_insurance_and_liability_guide && (() => {
           const g = candidate.am_insurance_and_liability_guide;

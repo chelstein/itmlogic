@@ -14236,3 +14236,40 @@ it('candidate_comparison_table ins columns are present and valid for KAZM', asyn
   assert.ok(r0.ins_tower_replacement_low_usd > 100000, 'ins_tower_replacement_low_usd should exceed $100k');
   assert.ok(r0.ins_total_insured_low_usd > r0.ins_tower_replacement_low_usd, 'total_insured must exceed tower_replacement (equipment added)');
 });
+
+// ── am_tower_structural_analysis_guide ───────────────────────────────────────
+
+it('am_tower_structural_analysis_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_tower_structural_analysis_guide, 'structural guide missing on candidate');
+  }
+});
+
+it('am_tower_structural_analysis_guide guy_levels is 4 for KAZM 315 ft tower (ceil(315/100))', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_analysis_guide;
+  assert.strictEqual(g.guy_levels, 4, `KAZM 315 ft tower should have 4 guy levels`);
+});
+
+it('am_tower_structural_analysis_guide total_structural_low_usd is positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_analysis_guide;
+  assert.ok(g.total_structural_low_usd > 0, 'total_structural_low_usd must be positive');
+  assert.ok(g.total_structural_high_usd > g.total_structural_low_usd, 'high > low structural cost');
+});
+
+it('am_tower_structural_analysis_guide reference cites EIA/TIA-222-H', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_analysis_guide;
+  assert.ok(g.reference.includes('EIA/TIA-222-H'), 'reference must cite EIA/TIA-222-H');
+  assert.ok(g.reference.includes('ASCE 7-22'), 'reference must cite ASCE 7-22');
+});
+
+it('candidate_comparison_table str columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.str_total_structural_low_usd > 0, 'str_total_structural_low_usd must be positive');
+  assert.strictEqual(r0.str_guy_levels, 4, 'str_guy_levels should be 4 for KAZM');
+  assert.strictEqual(r0.str_design_wind_speed_mph_low, 90, 'str_design_wind_speed_mph_low should be 90');
+});
