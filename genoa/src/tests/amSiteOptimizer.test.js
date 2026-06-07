@@ -11357,3 +11357,51 @@ test('am_geotechnical_and_soil_investigation_guide comparison table columns pres
   assert.strictEqual(r0.gt_bearing_cap_psf_low, 2000, 'rank-1 gt_bearing_cap_psf_low should be 2000 psf');
   assert.strictEqual(r0.gt_total_geotech_low_usd, 7550, 'rank-1 gt_total_geotech_low_usd should be $7,550');
 });
+
+test('am_site_access_road_and_security_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_road_and_security_guide;
+  assert.ok(g !== undefined && g !== null, 'am_site_access_road_and_security_guide should be present');
+  assert.ok(typeof g.total_security_low_usd === 'number', 'total_security_low_usd should be a number');
+  assert.ok(g.n_rf_signs > 0, 'n_rf_signs must be positive');
+});
+
+test('am_site_access_road_and_security_guide KAZM Class D site sizing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_road_and_security_guide;
+  // Class D site: fence_perim_ft = 800; road_length_ft = 500
+  assert.strictEqual(g.fence_perim_ft, 800, 'Class D fence_perim_ft should be 800 ft');
+  assert.strictEqual(g.road_length_ft, 500, 'road_length_ft should be 500 ft');
+  assert.strictEqual(g.camera_count, 2, 'camera_count should be 2');
+});
+
+test('am_site_access_road_and_security_guide KAZM cost components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_road_and_security_guide;
+  // fence $12k + gate $2k + road $7.5k + cameras $1k + alarm $1.5k + signs $500 + clearing $2k = $26.5k
+  assert.strictEqual(g.fence_cost_low_usd, 12000, 'fence_cost_low_usd = 800×$15 = $12,000');
+  assert.strictEqual(g.road_cost_low_usd, 7500, 'road_cost_low_usd = 500×$15 = $7,500');
+  assert.strictEqual(g.total_security_low_usd, 26500, 'total_security_low_usd should be $26,500');
+  assert.strictEqual(g.total_security_high_usd, 69500, 'total_security_high_usd should be $69,500');
+});
+
+test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_road_and_security_guide;
+  assert.strictEqual(g.annual_security_maint_usd, 1200, 'annual_security_maint_usd should be $1,200');
+  assert.strictEqual(g.rf_signs_cost_usd, 500, 'rf_signs_cost_usd should be $500');
+  assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
+});
+
+test('am_site_access_road_and_security_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sec_fence_perim_ft'         in row, 'sec_fence_perim_ft missing from comparison table');
+    assert.ok('sec_total_security_low_usd' in row, 'sec_total_security_low_usd missing from comparison table');
+    assert.ok('sec_annual_monitoring_usd'  in row, 'sec_annual_monitoring_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.sec_fence_perim_ft, 800, 'rank-1 sec_fence_perim_ft should be 800');
+  assert.strictEqual(r0.sec_total_security_low_usd, 26500, 'rank-1 sec_total_security_low_usd should be $26,500');
+  assert.strictEqual(r0.sec_annual_monitoring_usd, 1200, 'rank-1 sec_annual_monitoring_usd should be $1,200');
+});

@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Access Road and Security Guide */}
+        {candidate.am_site_access_road_and_security_guide && (() => {
+          const g = candidate.am_site_access_road_and_security_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="sec-guide" style={{ marginBottom: 16, padding: 12, background: '#f9fafb', borderRadius: 8, border: '1px solid #6b7280' }}>
+              <div style={{ fontWeight: 700, color: '#1f2937', marginBottom: 6, fontSize: 13 }}>Site Access Road &amp; Security</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Perimeter Fence:</span><span>{g.fence_perim_ft} ft — {fmt(g.fence_cost_low_usd)} – {fmt(g.fence_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Entry Gate:</span><span>{fmt(g.gate_cost_low_usd)} – {fmt(g.gate_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Access Road:</span><span>{g.road_length_ft} ft — {fmt(g.road_cost_low_usd)} – {fmt(g.road_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Security Cameras ({g.camera_count}x):</span><span>{fmt(g.camera_cost_low_usd)} – {fmt(g.camera_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Alarm System:</span><span>{fmt(g.alarm_cost_low_usd)} – {fmt(g.alarm_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>RF Signs ({g.n_rf_signs}x) + Clearing:</span><span>{fmt(g.rf_signs_cost_usd + g.vegetation_clearing_low_usd)} – {fmt(g.rf_signs_cost_usd + g.vegetation_clearing_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_security_low_usd)} – {fmt(g.total_security_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual Monitoring:</span><span>{fmt(g.annual_security_maint_usd)}/yr</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#374151', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Geotechnical and Soil Investigation Guide */}
         {candidate.am_geotechnical_and_soil_investigation_guide && (() => {
           const g = candidate.am_geotechnical_and_soil_investigation_guide;

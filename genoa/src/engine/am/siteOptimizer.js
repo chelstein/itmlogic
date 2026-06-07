@@ -1161,7 +1161,10 @@ export async function runSiteOptimizer(body = {}){
     tel_annual_connectivity_usd: c.am_rf_system_monitoring_and_telemetry_guide?.annual_connectivity_usd ?? null,
     gt_frost_depth_in:          c.am_geotechnical_and_soil_investigation_guide?.frost_depth_in ?? null,
     gt_bearing_cap_psf_low:     c.am_geotechnical_and_soil_investigation_guide?.bearing_capacity_psf_low ?? null,
-    gt_total_geotech_low_usd:   c.am_geotechnical_and_soil_investigation_guide?.total_geotech_low_usd ?? null
+    gt_total_geotech_low_usd:   c.am_geotechnical_and_soil_investigation_guide?.total_geotech_low_usd ?? null,
+    sec_fence_perim_ft:         c.am_site_access_road_and_security_guide?.fence_perim_ft ?? null,
+    sec_total_security_low_usd: c.am_site_access_road_and_security_guide?.total_security_low_usd ?? null,
+    sec_annual_monitoring_usd:  c.am_site_access_road_and_security_guide?.annual_security_maint_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6896,6 +6899,62 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_access_road_and_security_guide: (() => {
+      // Models site access road construction, perimeter security fencing, entry gate,
+      // remote monitoring (cameras/alarm), vegetation clearing, and RF safety signage
+      // requirements per 47 CFR §1.1310 (MPE exposure postings).  These costs are
+      // often overlooked in preliminary budgets but are mandatory for operational sites.
+
+      // ---- Perimeter security fence ----
+      // Size estimate by FCC class (larger stations need larger secured site)
+      const FENCE_PERIM_FT = { A: 2000, B: 1500, C: 1000, D: 800 };
+      const fence_perim_ft       = FENCE_PERIM_FT[fcc_class] ?? 800;
+      const fence_cost_low_usd   = Math.round(fence_perim_ft * 15); // basic chain link
+      const fence_cost_high_usd  = Math.round(fence_perim_ft * 35); // chain link + barbed wire topper
+
+      // ---- Entry gate ----
+      const gate_cost_low_usd  = 2000; // manual padlock gate
+      const gate_cost_high_usd = 6000; // electronic actuated gate
+
+      // ---- Access road (new gravel road) ----
+      // Baseline 500 ft; heavily site-dependent (field survey required)
+      const road_length_ft     = 500;
+      const road_cost_low_usd  = Math.round(road_length_ft * 15); // gravel, minimal grading
+      const road_cost_high_usd = Math.round(road_length_ft * 40); // gravel + culverts + drainage
+
+      // ---- Remote security system ----
+      const camera_count             = 2;
+      const camera_cost_low_usd      = Math.round(camera_count * 500);
+      const camera_cost_high_usd     = Math.round(camera_count * 1500);
+      const alarm_cost_low_usd       = 1500;
+      const alarm_cost_high_usd      = 4000;
+      const annual_security_maint_usd = 1200; // cellular monitoring subscription $100/mo
+
+      // ---- RF warning signs (§1.1310 / OET Bulletin 65) ----
+      const rf_signs_cost_usd            = 500;
+      const n_rf_signs                   = 4; // one per fence quadrant minimum
+      const vegetation_clearing_low_usd  = 2000;
+      const vegetation_clearing_high_usd = 8000;
+
+      const total_security_low_usd  = fence_cost_low_usd  + gate_cost_low_usd  + road_cost_low_usd
+                                    + camera_cost_low_usd  + alarm_cost_low_usd
+                                    + rf_signs_cost_usd + vegetation_clearing_low_usd;
+      const total_security_high_usd = fence_cost_high_usd + gate_cost_high_usd + road_cost_high_usd
+                                    + camera_cost_high_usd + alarm_cost_high_usd
+                                    + rf_signs_cost_usd + vegetation_clearing_high_usd;
+      return {
+        fence_perim_ft, fence_cost_low_usd, fence_cost_high_usd,
+        gate_cost_low_usd, gate_cost_high_usd,
+        road_length_ft, road_cost_low_usd, road_cost_high_usd,
+        camera_count, camera_cost_low_usd, camera_cost_high_usd,
+        alarm_cost_low_usd, alarm_cost_high_usd, annual_security_maint_usd,
+        rf_signs_cost_usd, n_rf_signs, vegetation_clearing_low_usd, vegetation_clearing_high_usd,
+        total_security_low_usd, total_security_high_usd,
+        reference: '47 CFR §1.1310 (RF exposure — warning signs required at transmitter fence); OSHA 1910.303 (electrical safety); NEC Article 225 (outdoor wiring); NFPA 780-2020 (lightning — perimeter bonding)',
+        note: `Site security: ${fence_perim_ft} ft perimeter fence ($${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()}) + gate + ${road_length_ft} ft access road + ${camera_count}-camera system + RF warning signs (§1.1310). Total: $${total_security_low_usd.toLocaleString()}–$${total_security_high_usd.toLocaleString()}; ongoing monitoring: $${annual_security_maint_usd.toLocaleString()}/yr.`
       };
     })(),
 
