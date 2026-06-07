@@ -1717,6 +1717,29 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      transmitter_power_upgrade_pathway_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
+        current_tpo_kw: 5, day_max_tpo_kw: 10, night_max_tpo_kw: 1,
+        day_headroom_kw: 5, can_upgrade_day_power: true, upgraded_tpo_kw: 10,
+        coverage_radius_factor: 1.414, coverage_gain_pct: 41,
+        is_directional: false, night_upgrade_requires_da_n: true,
+        form301_fee_usd: 4200, form302_fee_usd: 435,
+        transmitter_cost_low_usd: 15000, transmitter_cost_high_usd: 45000,
+        installation_cost_usd: 7500,
+        engineering_cost_low_usd: 4000, engineering_cost_high_usd: 8000,
+        total_project_low_usd: 31135, total_project_high_usd: 65135,
+        cp_processing_months_low: 6, cp_processing_months_high: 18,
+        n_upgrade_steps: 5,
+        upgrade_steps: [
+          { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
+          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$4,200', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
+          { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; build must commence within 3 years (§73.1620)' },
+          { step: 4, action: 'Procure and install transmitter', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: '10 kW AM transmitter + electrical service upgrade + bonding + commissioning' },
+          { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
+        ],
+        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
+        note: '780 kHz Class D (NDA) — current 5 kW TPO. Daytime upgrade to 10 kW available (§73.21 Class D ceiling) — groundwave coverage radius grows ~41% (√ERP scaling). Nighttime ceiling: 1 kW (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade).'
+      },
       am_coverage_optimization_by_tower_height_guide: {
         frequency_khz: 780, wavelength_m: 384.6,
         lambda_eighth_m: 48,  lambda_eighth_ft: 157,

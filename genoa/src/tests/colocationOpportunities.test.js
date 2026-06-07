@@ -2054,3 +2054,19 @@ test('colocation GRID candidates have population_demographics_overlay', async ()
     assert.strictEqual(c.population_demographics_overlay.n_contours, 3, `rank ${c.rank} must have 3 contours`);
   }
 });
+
+test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.transmitter_power_upgrade_pathway_guide;
+    assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
+    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 10 kW headroom)`);
+    assert.strictEqual(g.coverage_gain_pct, 41, `rank ${c.rank} coverage_gain_pct must be 41`);
+  }
+});

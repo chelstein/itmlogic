@@ -1047,7 +1047,10 @@ export async function runSiteOptimizer(body = {}){
     smfdg_n_monitoring_methods: c.spectrum_monitoring_and_frequency_drift_guide?.n_monitoring_methods ?? null,
     acobth_lambda_quarter_m:    c.am_coverage_optimization_by_tower_height_guide?.lambda_quarter_m ?? null,
     acobth_five_eighth_m:       c.am_coverage_optimization_by_tower_height_guide?.five_eighth_m ?? null,
-    acobth_max_coverage_gain_pct: c.am_coverage_optimization_by_tower_height_guide?.max_coverage_gain_pct ?? null
+    acobth_max_coverage_gain_pct: c.am_coverage_optimization_by_tower_height_guide?.max_coverage_gain_pct ?? null,
+    tpupg_day_headroom_kw:      c.transmitter_power_upgrade_pathway_guide?.day_headroom_kw ?? null,
+    tpupg_coverage_gain_pct:    c.transmitter_power_upgrade_pathway_guide?.coverage_gain_pct ?? null,
+    tpupg_total_low_usd:        c.transmitter_power_upgrade_pathway_guide?.total_project_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6782,6 +6785,158 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    transmitter_power_upgrade_pathway_guide: (() => {
+      // 47 CFR §73.21 sets class-based daytime TPO ceilings.  Class D on a clear
+      // channel may operate up to 10 kW day; nighttime is capped at 1 kW for
+      // secondary stations (must protect the dominant Class A via §73.182 skywave).
+      //
+      // At 5 kW (KAZM baseline) the operator retains 5 kW of daytime headroom.
+      // Going 5 → 10 kW doubles ERP; groundwave field ∝ √ERP, so the coverage
+      // radius to a fixed contour (e.g. 0.5 mV/m) grows by √2 ≈ +41%.
+      //
+      // CP pathway (major facility change):
+      //   Form 301 filed → FCC processing 6-18 mo → CP granted → build → Form 302-AM.
+      // NDA stations do NOT need a DA proof; 8-radial NDA proof (§73.154(b)) suffices.
+      //
+      // FCC filing fees (47 CFR §1.1102, 2024 schedule):
+      //   Form 301 (AM major CP): $4,200
+      //   Form 302-AM (license to cover): $435
+
+      const is_clear_ch  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_pu      = /^DA/i.test(pattern_mode);
+
+      // Daytime TPO ceiling per §73.21.
+      // Class A/B: up to 50 kW.  Class C (local channels): 250 W.
+      // Class D on clear channel: 10 kW day per §73.21(e).
+      // Class D on regional channel: 5 kW day typical.
+      const day_max_kw = is_local_ch       ? 0.25
+                       : fcc_class === 'A' ? 50
+                       : fcc_class === 'B' ? 50
+                       : fcc_class === 'C' ? 0.25
+                       : is_clear_ch       ? 10
+                       : 5;      // Class D regional: 5 kW
+
+      // Nighttime ceiling for secondary stations on clear channels (§73.182).
+      // Class D secondary: 1 kW night if protected from dominant Class A skywave.
+      const night_max_kw = is_local_ch       ? 0.25
+                         : fcc_class === 'A' ? 50
+                         : fcc_class === 'B' ? 50
+                         : fcc_class === 'C' ? 0.25
+                         : is_clear_ch       ? 1
+                         : 5;    // Class D regional: same as day for night if ND-N
+
+      const day_headroom_kw  = Math.max(0, day_max_kw - tpo_kw);
+      const can_upgrade_day  = day_headroom_kw > 0;
+      const upgraded_tpo_kw  = can_upgrade_day ? day_max_kw : tpo_kw;
+
+      // Coverage radius scales as √(P2/P1) for groundwave to a fixed field contour.
+      const coverage_radius_factor = can_upgrade_day
+        ? Math.sqrt(upgraded_tpo_kw / tpo_kw)
+        : 1.0;
+      const coverage_gain_pct = Math.round((coverage_radius_factor - 1) * 100);
+
+      // FCC filing fees (47 CFR §1.1102, 2024 schedule).
+      const form301_fee_usd  = 4200;   // major change CP, AM commercial
+      const form302_fee_usd  = 435;    // license to cover
+
+      // Transmitter cost: 10 kW AM (2024 market).
+      // Low: refurbished Harris DX-10, Continental 312F, or Nautel NA-10.
+      // High: new Nautel NX10, GatesAir Flexiva FAX-10, or BE AM10A.
+      const tx_cost_low_usd   = 15000;
+      const tx_cost_high_usd  = 45000;
+      const install_cost_usd  = 7500;  // electrical, bonding, rigging, commissioning
+
+      // Engineering: interference analysis + Form 301 exhibit prep.
+      const eng_study_low_usd  = 4000;
+      const eng_study_high_usd = 8000;
+
+      // CP processing timeline (Form 301 filings, not streamlined).
+      const cp_months_low  = 6;
+      const cp_months_high = 18;
+
+      // Total project cost.
+      const total_low_usd  = form301_fee_usd + form302_fee_usd + tx_cost_low_usd  + install_cost_usd + eng_study_low_usd;
+      const total_high_usd = form301_fee_usd + form302_fee_usd + tx_cost_high_usd + install_cost_usd + eng_study_high_usd;
+
+      // Night power upgrade on a clear channel requires DA-N and §73.182 skywave analysis.
+      const night_upgrade_requires_da_n = is_clear_ch && (fcc_class === 'D');
+
+      const upgrade_steps = [
+        {
+          step: 1,
+          action: 'Interference analysis',
+          form: null,
+          cost_range_usd: `$${eng_study_low_usd.toLocaleString()}–$${eng_study_high_usd.toLocaleString()}`,
+          timeline: '2–4 weeks',
+          notes: `§73.182 co-channel/adjacent-channel analysis; ${isDA_pu ? 'DA pattern modeling required' : 'NDA — no pattern proof needed'}`
+        },
+        {
+          step: 2,
+          action: 'File FCC Form 301 (CP application)',
+          form: 'Form 301',
+          cost_range_usd: `$${form301_fee_usd.toLocaleString()}`,
+          timeline: '1–2 weeks',
+          notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)'
+        },
+        {
+          step: 3,
+          action: 'FCC processing / CP grant',
+          form: null,
+          cost_range_usd: 'included',
+          timeline: `${cp_months_low}–${cp_months_high} months`,
+          notes: 'CP grants construction authority; build must commence within 3 years (§73.1620); 180-day progress reports required'
+        },
+        {
+          step: 4,
+          action: 'Procure and install transmitter',
+          form: null,
+          cost_range_usd: `$${(tx_cost_low_usd + install_cost_usd).toLocaleString()}–$${(tx_cost_high_usd + install_cost_usd).toLocaleString()}`,
+          timeline: '4–12 weeks',
+          notes: `${upgraded_tpo_kw} kW AM transmitter + electrical service upgrade + bonding + commissioning`
+        },
+        {
+          step: 5,
+          action: 'File FCC Form 302-AM (license to cover)',
+          form: 'Form 302-AM',
+          cost_range_usd: `$${form302_fee_usd.toLocaleString()}`,
+          timeline: '2–8 weeks',
+          notes: `Submit within CP construction period; ${isDA_pu ? 'DA proof-of-performance required (§73.154(a))' : 'NDA 8-radial proof data required (§73.154(b))'}`
+        }
+      ];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        current_tpo_kw:            tpo_kw,
+        day_max_tpo_kw:            day_max_kw,
+        night_max_tpo_kw:          night_max_kw,
+        day_headroom_kw,
+        can_upgrade_day_power:     can_upgrade_day,
+        upgraded_tpo_kw,
+        coverage_radius_factor:    parseFloat(coverage_radius_factor.toFixed(3)),
+        coverage_gain_pct,
+        is_directional:            isDA_pu,
+        night_upgrade_requires_da_n,
+        form301_fee_usd,
+        form302_fee_usd,
+        transmitter_cost_low_usd:  tx_cost_low_usd,
+        transmitter_cost_high_usd: tx_cost_high_usd,
+        installation_cost_usd:     install_cost_usd,
+        engineering_cost_low_usd:  eng_study_low_usd,
+        engineering_cost_high_usd: eng_study_high_usd,
+        total_project_low_usd:     total_low_usd,
+        total_project_high_usd:    total_high_usd,
+        cp_processing_months_low:  cp_months_low,
+        cp_processing_months_high: cp_months_high,
+        n_upgrade_steps:           upgrade_steps.length,
+        upgrade_steps,
+        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301 (CP application); FCC Form 302-AM (license to cover)',
+        note: `${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) — current ${tpo_kw} kW TPO. ${can_upgrade_day ? `Daytime upgrade to ${upgraded_tpo_kw} kW available (§73.21 Class ${fcc_class} ceiling) — groundwave coverage radius grows ~${coverage_gain_pct}% (√ERP scaling). Requires Form 301 CP, ~${cp_months_low}–${cp_months_high} month FCC processing, and new ${upgraded_tpo_kw} kW transmitter.` : `No daytime headroom — already at Class ${fcc_class} ceiling of ${day_max_kw} kW.`} Nighttime ceiling: ${night_max_kw} kW${night_upgrade_requires_da_n ? ' (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade)' : ''}.`
       };
     })(),
 

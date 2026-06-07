@@ -9563,3 +9563,48 @@ test('population_demographics_overlay comparison table columns present', async (
     assert.ok('pop_col_radius_km' in row,    'pop_col_radius_km missing from comparison table');
   }
 });
+
+// ---- transmitter_power_upgrade_pathway_guide ----
+
+test('transmitter_power_upgrade_pathway_guide present on candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
+  assert.ok(g != null, 'transmitter_power_upgrade_pathway_guide must be present');
+});
+
+test('transmitter_power_upgrade_pathway_guide KAZM 780 kHz Class D NDA daytime headroom', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
+  assert.strictEqual(g.current_tpo_kw, 5, 'current_tpo_kw must be 5 (KAZM)');
+  assert.strictEqual(g.day_max_tpo_kw, 10, 'day_max_tpo_kw must be 10 (Class D clear channel)');
+  assert.strictEqual(g.day_headroom_kw, 5, 'day_headroom_kw must be 5');
+  assert.strictEqual(g.can_upgrade_day_power, true, 'can_upgrade_day_power must be true');
+  assert.strictEqual(g.upgraded_tpo_kw, 10, 'upgraded_tpo_kw must be 10');
+});
+
+test('transmitter_power_upgrade_pathway_guide KAZM coverage gain ~41% at doubled power', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
+  assert.ok(g.coverage_radius_factor > 1.41 && g.coverage_radius_factor < 1.43,
+    `coverage_radius_factor must be ~√2 ≈ 1.414, got ${g.coverage_radius_factor}`);
+  assert.strictEqual(g.coverage_gain_pct, 41, 'coverage_gain_pct must be 41');
+});
+
+test('transmitter_power_upgrade_pathway_guide costs and upgrade steps', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].transmitter_power_upgrade_pathway_guide;
+  assert.strictEqual(g.form301_fee_usd, 4200, 'Form 301 fee must be $4,200');
+  assert.strictEqual(g.form302_fee_usd, 435, 'Form 302-AM fee must be $435');
+  assert.ok(g.total_project_low_usd > 30000, 'total project low must be > $30k');
+  assert.ok(g.total_project_high_usd > g.total_project_low_usd, 'total high must exceed low');
+  assert.strictEqual(g.n_upgrade_steps, 5, 'must have 5 upgrade steps');
+});
+
+test('transmitter_power_upgrade_pathway_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tpupg_day_headroom_kw'   in row, 'tpupg_day_headroom_kw missing from comparison table');
+    assert.ok('tpupg_coverage_gain_pct' in row, 'tpupg_coverage_gain_pct missing from comparison table');
+    assert.ok('tpupg_total_low_usd'     in row, 'tpupg_total_low_usd missing from comparison table');
+  }
+});

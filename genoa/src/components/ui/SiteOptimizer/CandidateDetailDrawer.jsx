@@ -2226,6 +2226,56 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Power Upgrade Pathway Guide */}
+        {candidate.transmitter_power_upgrade_pathway_guide && (() => {
+          const g = candidate.transmitter_power_upgrade_pathway_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff7ed', borderRadius: 8, border: '1px solid #fdba74' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#9a3412', marginBottom: 8 }}>
+                Transmitter Power Upgrade Pathway — §73.21 / Form 301
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Current TPO:</span> <strong>{g.current_tpo_kw} kW ({g.pattern_mode})</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Day ceiling (§73.21):</span> <strong>{g.day_max_tpo_kw} kW</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Day headroom:</span> <strong style={{ color: g.day_headroom_kw > 0 ? '#15803d' : '#6b7280' }}>{g.day_headroom_kw} kW</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Night ceiling:</span> <strong>{g.night_max_tpo_kw} kW{g.night_upgrade_requires_da_n ? ' (DA-N req.)' : ''}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Upgraded TPO:</span> <strong>{g.upgraded_tpo_kw} kW</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Coverage gain:</span> <strong style={{ color: '#15803d' }}>+{g.coverage_gain_pct}% radius (√ERP)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>CP filing fee:</span> <strong>${g.form301_fee_usd?.toLocaleString()} (Form 301)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>FCC processing:</span> <strong>{g.cp_processing_months_low}–{g.cp_processing_months_high} months</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Project cost range:</span> <strong>${g.total_project_low_usd?.toLocaleString()}–${g.total_project_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Can upgrade day:</span> <strong style={{ color: g.can_upgrade_day_power ? '#15803d' : '#dc2626' }}>{g.can_upgrade_day_power ? 'Yes' : 'No — at ceiling'}</strong></div>
+              </div>
+              {g.upgrade_steps && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#9a3412', marginBottom: 4 }}>Power Upgrade Steps</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fed7aa' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>#</th>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Action</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Cost</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Timeline</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.upgrade_steps.map((s, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #fdba74' }}>
+                          <td style={{ padding: '3px 6px', color: '#9a3412', fontWeight: 700 }}>{s.step}</td>
+                          <td style={{ padding: '3px 6px' }}>{s.action}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px', whiteSpace: 'nowrap' }}>{s.cost_range_usd}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px', whiteSpace: 'nowrap' }}>{s.timeline}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#9a3412' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Coverage Optimization by Tower Height Guide */}
         {candidate.am_coverage_optimization_by_tower_height_guide && (() => {
           const g = candidate.am_coverage_optimization_by_tower_height_guide;
