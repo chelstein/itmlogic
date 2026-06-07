@@ -10860,3 +10860,52 @@ test('am_antenna_electrical_design_and_efficiency_guide comparison table columns
     assert.ok('ant_ground_loss_ohm_high' in row, 'ant_ground_loss_ohm_high missing from comparison table');
   }
 });
+
+test('am_annual_operating_cost_analysis_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_analysis_guide;
+  assert.ok(g != null, 'am_annual_operating_cost_analysis_guide must be present');
+  assert.ok(typeof g.total_annual_low_usd === 'number', 'total_annual_low_usd must be a number');
+  assert.ok(typeof g.annual_kwh_total === 'number', 'annual_kwh_total must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_annual_operating_cost_analysis_guide KAZM Class D clear-channel daytime operation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_analysis_guide;
+  // Class D on clear channel: 13h/day daytime, 11h night at 0.25kW
+  assert.strictEqual(g.daily_hrs_day, 13, 'Class D clear-channel should have 13 daily hrs daytime');
+  assert.strictEqual(g.daily_hrs_night, 11, 'Class D clear-channel should have 11 nightly hrs');
+  assert.ok(g.night_draw_kw > 0, 'night draw should be positive for Class D clear-channel');
+  assert.ok(g.annual_kwh_total > 10000, 'KAZM should use >10,000 kWh/yr');
+  assert.ok(g.annual_kwh_total < 100000, 'KAZM should use <100,000 kWh/yr');
+});
+
+test('am_annual_operating_cost_analysis_guide electricity cost uses correct rates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_analysis_guide;
+  const expected_low  = Math.round(g.annual_kwh_total * 0.10);
+  const expected_high = Math.round(g.annual_kwh_total * 0.20);
+  assert.strictEqual(g.elec_cost_low_usd,  expected_low,  'electricity low cost = kWh × $0.10');
+  assert.strictEqual(g.elec_cost_high_usd, expected_high, 'electricity high cost = kWh × $0.20');
+  assert.ok(g.total_annual_high_usd > g.total_annual_low_usd, 'high annual cost must exceed low');
+});
+
+test('am_annual_operating_cost_analysis_guide 10-yr NPV uses correct annuity factor', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_analysis_guide;
+  // PV factor for 10yr at 5%: ≈ 7.72
+  assert.ok(g.pv_factor_10yr > 7.5 && g.pv_factor_10yr < 8.0, `pv_factor_10yr ${g.pv_factor_10yr} should be ~7.72`);
+  const expected_pv_low = Math.round(g.total_annual_low_usd * g.pv_factor_10yr);
+  assert.strictEqual(g.opex_10yr_pv_low_usd, expected_pv_low, '10yr PV low = annual_low × pv_factor');
+  assert.ok(g.opex_10yr_pv_high_usd > g.opex_10yr_pv_low_usd, '10yr PV high must exceed low');
+});
+
+test('am_annual_operating_cost_analysis_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('opex_annual_low_usd'  in row, 'opex_annual_low_usd missing from comparison table');
+    assert.ok('opex_annual_kwh'      in row, 'opex_annual_kwh missing from comparison table');
+    assert.ok('opex_10yr_pv_low_usd' in row, 'opex_10yr_pv_low_usd missing from comparison table');
+  }
+});

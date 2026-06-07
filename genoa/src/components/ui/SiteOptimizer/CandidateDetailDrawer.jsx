@@ -2226,6 +2226,48 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Annual Operating Cost Analysis Guide */}
+        {candidate.am_annual_operating_cost_analysis_guide && (() => {
+          const g = candidate.am_annual_operating_cost_analysis_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 8, fontSize: 13 }}>
+                Annual Operating Cost Analysis (OPEX)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#166534' }}>
+                <span>Tx draw</span>
+                <span style={{ fontWeight: 600 }}>{g.tx_draw_kw} kW ({g.daily_hrs_day}h day / {g.daily_hrs_night}h night @ {g.night_draw_kw} kW)</span>
+                <span>Annual electricity</span>
+                <span style={{ fontWeight: 600 }}>{g.annual_kwh_total.toLocaleString()} kWh → {fmt(g.elec_cost_low_usd)} – {fmt(g.elec_cost_high_usd)}</span>
+                <span>Equipment maintenance</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.equip_maint_low_usd)} – {fmt(g.equip_maint_high_usd)}/yr</span>
+                <span>FCC regulatory fee</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.fcc_annual_fee_usd)}/yr</span>
+                <span>Insurance premium</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.insurance_low_usd)} – {fmt(g.insurance_high_usd)}/yr</span>
+                <span>STL operating cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.stl_annual_low_usd)} – {fmt(g.stl_annual_high_usd)}/yr</span>
+                <span>Tower/ground inspection</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.tower_inspection_usd_low)} – {fmt(g.tower_inspection_usd_high)}/yr</span>
+                <span>Tower lighting maint.</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.lighting_maint_low_usd)} – {fmt(g.lighting_maint_high_usd)}/yr</span>
+                <span>Property tax/lease</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.property_cost_low_usd)} – {fmt(g.property_cost_high_usd)}/yr</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>Total annual OPEX</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>{fmt(g.total_annual_low_usd)} – {fmt(g.total_annual_high_usd)}/yr</span>
+                <span>10-yr NPV (5%)</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.opex_10yr_pv_low_usd)} – {fmt(g.opex_10yr_pv_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#14532d', borderTop: '1px solid #bbf7d0', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Antenna Electrical Design & Efficiency Guide */}
         {candidate.am_antenna_electrical_design_and_efficiency_guide && (() => {
           const g = candidate.am_antenna_electrical_design_and_efficiency_guide;

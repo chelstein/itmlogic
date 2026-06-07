@@ -1131,7 +1131,10 @@ export async function runSiteOptimizer(body = {}){
     stl_total_cost_low_usd:     c.am_studio_to_transmitter_link_guide?.total_stl_cost_low_usd ?? null,
     ant_efficiency_pct_low:     c.am_antenna_electrical_design_and_efficiency_guide?.efficiency_pct_low ?? null,
     ant_effective_erp_kw_low:   c.am_antenna_electrical_design_and_efficiency_guide?.effective_erp_kw_low ?? null,
-    ant_ground_loss_ohm_high:   c.am_antenna_electrical_design_and_efficiency_guide?.ground_loss_ohm_high ?? null
+    ant_ground_loss_ohm_high:   c.am_antenna_electrical_design_and_efficiency_guide?.ground_loss_ohm_high ?? null,
+    opex_annual_low_usd:        c.am_annual_operating_cost_analysis_guide?.total_annual_low_usd ?? null,
+    opex_annual_kwh:            c.am_annual_operating_cost_analysis_guide?.annual_kwh_total ?? null,
+    opex_10yr_pv_low_usd:       c.am_annual_operating_cost_analysis_guide?.opex_10yr_pv_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6866,6 +6869,117 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_annual_operating_cost_analysis_guide: (() => {
+      // Models annual station operating costs: electricity, equipment maintenance,
+      // FCC license renewal, insurance, STL, ground/tower inspection, and property
+      // tax/lease.  Provides a year-1 vs. steady-state cost distinction and a
+      // 10-year NPV of annual operating expenses.
+
+      const isDA_aoc        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_aoc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // ---- Electricity ----
+      // Transmitter DC draw ≈ TPO / system_efficiency (assume 85% combined)
+      const tx_system_efficiency = 0.85;
+      const tx_draw_kw = round2(tpo_kw / tx_system_efficiency);
+      // Class D on clear channel: daytime-only operation (~13h/day average annual)
+      // Other classes: near-continuous (23h/day accounting for maintenance windows)
+      const daily_hrs_day   = is_clear_ch_aoc && fcc_class === 'D' ? 13 : 23;
+      const daily_hrs_night = is_clear_ch_aoc && fcc_class === 'D' ? 11 : 1;  // night at 0.25kW or off
+      const night_draw_kw   = is_clear_ch_aoc && fcc_class === 'D' ? round2(0.25 / tx_system_efficiency) : 0;
+
+      const annual_kwh_day   = Math.round(tx_draw_kw   * daily_hrs_day   * 365);
+      const annual_kwh_night = Math.round(night_draw_kw * daily_hrs_night * 365);
+      const annual_kwh_total = annual_kwh_day + annual_kwh_night;
+
+      // Electricity cost: $0.10–$0.20/kWh (commercial rate)
+      const elec_cost_low_usd  = Math.round(annual_kwh_total * 0.10);
+      const elec_cost_high_usd = Math.round(annual_kwh_total * 0.20);
+
+      // ---- Equipment maintenance ----
+      // 5% of equipment value per year (from transmitter guide logic)
+      // Equipment value proxy: LOW=30k, MEDIUM=60k, HIGH=150k, VERY_HIGH=400k
+      const EQUIP_VALUE = { LOW: 30000, MEDIUM: 60000, HIGH: 150000, VERY_HIGH: 400000 };
+      const power_class_aoc = tpo_kw > 50 ? 'VERY_HIGH' : (tpo_kw > 10 ? 'HIGH' : (tpo_kw > 1 ? 'MEDIUM' : 'LOW'));
+      const equip_maint_low_usd  = Math.round(EQUIP_VALUE[power_class_aoc] * 0.04);
+      const equip_maint_high_usd = Math.round(EQUIP_VALUE[power_class_aoc] * 0.08);
+
+      // ---- FCC license renewal fee ----
+      // Schedule of Regulatory Fees: AM stations pay annual regulatory fee
+      // by power class and market size; simplified flat estimate
+      const FCC_REGULATORY_FEE = { A: 6000, B: 4000, C: 2500, D: 1500 };
+      const fcc_annual_fee_usd = FCC_REGULATORY_FEE[fcc_class] ?? 2500;
+
+      // ---- Insurance ----
+      // Annual premium estimate by class (from insurance guide logic)
+      const INS_PREMIUM_LOW  = { A: 35000, B: 15000, C: 5000, D: 8000 };
+      const INS_PREMIUM_HIGH = { A: 80000, B: 35000, C: 12000, D: 20000 };
+      const insurance_low_usd  = INS_PREMIUM_LOW[fcc_class]  ?? 8000;
+      const insurance_high_usd = INS_PREMIUM_HIGH[fcc_class] ?? 20000;
+
+      // ---- STL annual cost ----
+      // Rough proxy: $500 (IP) to $5,000 (licensed microwave) per year
+      const stl_annual_low_usd  = 500;
+      const stl_annual_high_usd = 5000;
+
+      // ---- Ground system / tower annual inspection ----
+      const tower_inspection_usd_low  = 1500;
+      const tower_inspection_usd_high = 5000;
+
+      // ---- Tower lighting maintenance (if applicable) ----
+      // Medium intensity (typical for 315-ft tower): $2,000–$5,000/yr
+      const lighting_maint_low_usd  = 2000;
+      const lighting_maint_high_usd = 5000;
+
+      // ---- Property tax or lease ----
+      // Lease: from site acquisition guide proxy ($3k–$8k/yr for rural)
+      const property_cost_low_usd  = 3000;
+      const property_cost_high_usd = 12000;
+
+      // ---- Totals ----
+      const total_annual_low_usd  = elec_cost_low_usd  + equip_maint_low_usd  + fcc_annual_fee_usd + insurance_low_usd  + stl_annual_low_usd  + tower_inspection_usd_low  + lighting_maint_low_usd  + property_cost_low_usd;
+      const total_annual_high_usd = elec_cost_high_usd + equip_maint_high_usd + fcc_annual_fee_usd + insurance_high_usd + stl_annual_high_usd + tower_inspection_usd_high + lighting_maint_high_usd + property_cost_high_usd;
+
+      // 10-year NPV of operating costs at 5% discount rate
+      const PV_FACTOR_10YR = round2((1 - Math.pow(1.05, -10)) / 0.05); // ≈ 7.72
+      const opex_10yr_pv_low_usd  = Math.round(total_annual_low_usd  * PV_FACTOR_10YR);
+      const opex_10yr_pv_high_usd = Math.round(total_annual_high_usd * PV_FACTOR_10YR);
+
+      return {
+        // Electricity
+        tx_draw_kw,
+        daily_hrs_day,
+        daily_hrs_night,
+        night_draw_kw,
+        annual_kwh_total,
+        elec_cost_low_usd,
+        elec_cost_high_usd,
+        // Maintenance
+        equip_maint_low_usd,
+        equip_maint_high_usd,
+        // FCC and Insurance
+        fcc_annual_fee_usd,
+        insurance_low_usd,
+        insurance_high_usd,
+        // Infrastructure
+        stl_annual_low_usd,
+        stl_annual_high_usd,
+        tower_inspection_usd_low,
+        tower_inspection_usd_high,
+        lighting_maint_low_usd,
+        lighting_maint_high_usd,
+        property_cost_low_usd,
+        property_cost_high_usd,
+        // Grand totals
+        total_annual_low_usd,
+        total_annual_high_usd,
+        pv_factor_10yr: PV_FACTOR_10YR,
+        opex_10yr_pv_low_usd,
+        opex_10yr_pv_high_usd,
+        note: `Annual OPEX: electricity ${annual_kwh_total.toLocaleString()} kWh/yr ($${elec_cost_low_usd.toLocaleString()}–$${elec_cost_high_usd.toLocaleString()}); equip maintenance $${equip_maint_low_usd.toLocaleString()}–$${equip_maint_high_usd.toLocaleString()}; FCC fee $${fcc_annual_fee_usd.toLocaleString()}; insurance $${insurance_low_usd.toLocaleString()}–$${insurance_high_usd.toLocaleString()}. Total: $${total_annual_low_usd.toLocaleString()}–$${total_annual_high_usd.toLocaleString()}/yr; 10-yr NPV at 5%: $${opex_10yr_pv_low_usd.toLocaleString()}–$${opex_10yr_pv_high_usd.toLocaleString()}.`
       };
     })(),
 

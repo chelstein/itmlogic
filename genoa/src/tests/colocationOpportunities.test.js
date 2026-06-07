@@ -2519,3 +2519,20 @@ test('am_antenna_electrical_design_and_efficiency_guide present across colocatio
     assert.ok(g.radiation_resistance_ohm === 36.5, `rank ${c.rank}: radiation_resistance should be 36.5Ω`);
   }
 });
+
+test('am_annual_operating_cost_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_annual_operating_cost_analysis_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_annual_operating_cost_analysis_guide`);
+    assert.ok(g.total_annual_low_usd > 0, `rank ${c.rank}: total_annual_low_usd must be positive`);
+    assert.ok(g.annual_kwh_total > 0, `rank ${c.rank}: annual_kwh_total must be positive`);
+    assert.ok(g.opex_10yr_pv_low_usd > g.total_annual_low_usd, `rank ${c.rank}: 10yr NPV must exceed 1 year`);
+  }
+});
