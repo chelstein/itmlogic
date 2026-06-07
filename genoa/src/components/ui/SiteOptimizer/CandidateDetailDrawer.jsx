@@ -2226,6 +2226,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Remote Control and Unattended Operation Guide */}
+        {candidate.am_remote_control_and_unattended_operation_guide && (() => {
+          const g = candidate.am_remote_control_and_unattended_operation_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#854d0e', marginBottom: 8 }}>
+                Remote Control &amp; Unattended Operation (§73.1300 / §73.1400)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#713f12' }}>
+                <div><b>Remote Recommended:</b> {g.remote_required ? 'Yes' : 'Optional (site near city)'}</div>
+                <div><b>Operator Response:</b> Within {g.operator_response_time_hrs} hrs (§73.1300)</div>
+                <div><b>RC Accuracy Required:</b> ±{g.rc_accuracy_pct}% (§73.1400(b))</div>
+                <div><b>Must Control Power:</b> {g.rc_must_control_power ? 'Yes' : 'No'}</div>
+                <div><b>Must Monitor Antenna:</b> {g.rc_must_monitor_antenna ? 'Yes' : 'No'}</div>
+                <div><b>Must Monitor Modulation:</b> {g.rc_must_monitor_modulation ? 'Yes' : 'No'}</div>
+                <div><b>DA Antenna Monitor:</b> {g.rc_da_antenna_monitor ? 'Required (DA station)' : 'Not required (NDA)'}</div>
+                <div><b>Log Frequency:</b> {g.log_min_frequency} {g.da_log_frequency ? `/ DA: ${g.da_log_frequency}` : ''}</div>
+                <div><b>Preferred Connection:</b> {g.preferred_connection?.replace(/_/g, ' ')}</div>
+                <div><b>POTS Risk:</b> {g.pots_legacy_risk ? 'High (POTS unreliable in rural AZ)' : 'Low'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #fde047', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>RC System:</b> ${fmt(g.rc_system_low_usd)}–${fmt(g.rc_system_high_usd)}</span>
+                  <span><b>Install:</b> ${fmt(g.install_low_usd)}–${fmt(g.install_high_usd)}</span>
+                  <span><b>Internet/yr:</b> ${fmt(g.annual_internet_low_usd)}–${fmt(g.annual_internet_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM NRSC Emission Mask and Bandwidth Compliance Guide */}
         {candidate.am_nrsc_emission_mask_and_bandwidth_compliance_guide && (() => {
           const g = candidate.am_nrsc_emission_mask_and_bandwidth_compliance_guide;

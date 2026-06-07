@@ -1443,7 +1443,10 @@ export async function runSiteOptimizer(body = {}){
     xltr_total_low_usd:                 c.am_fm_translator_and_signal_booster_filing_guide?.total_translator_low_usd ?? null,
     emk_occupied_bw_khz:                c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.occupied_bw_khz ?? null,
     emk_harmonic_2nd_khz:               c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.harmonic_2nd_khz ?? null,
-    emk_harmonic_max_mW:                c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.harmonic_max_mW ?? null
+    emk_harmonic_max_mW:                c.am_nrsc_emission_mask_and_bandwidth_compliance_guide?.harmonic_max_mW ?? null,
+    rc_remote_required:                 c.am_remote_control_and_unattended_operation_guide?.remote_required ?? null,
+    rc_preferred_connection:            c.am_remote_control_and_unattended_operation_guide?.preferred_connection ?? null,
+    rc_total_rc_low_usd:                c.am_remote_control_and_unattended_operation_guide?.total_rc_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7179,6 +7182,141 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_remote_control_and_unattended_operation_guide: (() => {
+      // AM remote control and unattended transmitter operation compliance guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.1300: Unattended operation of broadcast stations.
+      //   §73.1400: Remote control operation — general requirements.
+      //   §73.1410: Remote control system specifications.
+      //   §73.1350: Transmitter control and monitoring (antenna monitor, modulation monitor, power meter).
+      //
+      // §73.1300 — Unattended operation:
+      //   AM stations may operate unattended at the transmitter site provided:
+      //   (1) A control point is established where an operator can monitor and control
+      //       the station. The control point must be staffed when the station is on air,
+      //       OR the station has been granted unattended operation authorization.
+      //   (2) For full unattended operation ("attended by computer"): FCC approval required.
+      //   (3) The operator designated as "in charge" must be reachable within 2 hours.
+      //       Practical standard: phone/pager response within 2 hours to reduce power or sign off.
+      //
+      // §73.1400 — Remote control requirements:
+      //   (a) AM stations operating under remote control must have a remote control system
+      //       capable of:
+      //     (1) Turning the transmitter on and off;
+      //     (2) Monitoring antenna base current(s) — or TPO directly;
+      //     (3) Monitoring modulation level (via modulation monitor);
+      //     (4) For DA stations: monitoring antenna pattern parameters (base currents, phases).
+      //   (b) Remote control equipment must provide readings equivalent to direct local readings
+      //       within ±2% accuracy.
+      //
+      // §73.1350 — Transmitter control and monitoring:
+      //   Measurements must be logged at regular intervals when transmitter is in operation.
+      //   Minimum log entries: transmitter power output, antenna base current, and modulation
+      //   must be recorded at least once per day (§73.1820(a)).
+      //   For DA stations: all antenna monitor parameters logged per §73.61.
+      //
+      // Remote control system types:
+      //   1. IP-based remote control (modern): internet-connected IOTA, TeleCommunications,
+      //      Burk ARC-16, or similar units.
+      //      - Provides web interface for power adjustment, on/off control, metering.
+      //      - Typical cost: $2,000–$8,000 + installation.
+      //   2. POTS (phone-line) remote control (legacy): still accepted per §73.1400.
+      //      - Typically requires POTS line at transmitter site.
+      //      - Increasingly unavailable in rural areas.
+      //   3. Cellular/LTE-based remote: growing standard; requires cellular coverage at site.
+      //
+      // Unattended operation implications for candidate site:
+      //   If the candidate site is remote (distance > 20 km from city), full-time staffing
+      //   is impractical. Remote control via IP/cellular is the expected solution.
+      //   Cellular coverage at Sedona area transmitter sites: generally available (Verizon/AT&T).
+      //
+      // Internet connectivity requirement:
+      //   IP remote control requires broadband at the transmitter site.
+      //   Options: fiber (if available), cellular LTE/5G hotspot (sufficient for remote control).
+      //   Monthly cost: $50–$200/month for dedicated broadband or cellular data.
+      //
+      // DA-specific remote monitoring:
+      //   §73.61 / §73.69: DA stations must continuously monitor antenna monitor data
+      //   (base currents, phases, ratios) and log deviations.
+      //   DA remote control must include antenna monitor data channel.
+      //
+      // Cost basis (2024):
+      //   IP remote control system (Burk ARC-16, Davicom, Tieline): $2,500–$8,000
+      //   Cellular backup (router/hotspot): $300–$800
+      //   Installation and configuration: $500–$2,000
+      //   Monthly ongoing (internet/cellular): $50–$200/month
+      //   Annual broadband: $600–$2,400/yr
+
+      const isDA_rc           = /^DA/i.test(pattern_mode);
+      const dist_km           = pt.distance_from_current_km ?? 25;
+      const remote_required   = dist_km > 10;   // sites > 10 km: full-time staffing impractical
+      const cellular_coverage_likely = true;    // Sedona/AZ area has good coverage
+
+      // Response time standard per §73.1300:
+      const operator_response_time_hrs = 2;
+
+      // Remote control capabilities required per §73.1400:
+      const rc_must_control_power     = true;   // on/off + power reduction
+      const rc_must_monitor_antenna   = true;   // base current or TPO ±2%
+      const rc_must_monitor_modulation = true;  // modulation monitor data
+      const rc_da_antenna_monitor     = isDA_rc;  // DA stations: additional antenna monitor
+      const rc_accuracy_pct           = 2.0;    // §73.1400(b): readings within ±2%
+
+      // Logging requirement per §73.1820(a):
+      const log_min_frequency         = 'daily';   // at minimum once per day
+      const da_log_frequency          = isDA_rc ? 'continuous' : null;  // §73.61 DA continuous
+
+      // Connectivity recommendation:
+      const preferred_connection      = cellular_coverage_likely ? 'IP_OVER_LTE' : 'IP_FIBER';
+      const pots_legacy_risk          = true;   // POTS increasingly unavailable in rural AZ
+
+      // Monthly internet cost for remote control:
+      const monthly_internet_low_usd  = 50;
+      const monthly_internet_high_usd = 200;
+      const annual_internet_low_usd   = monthly_internet_low_usd  * 12;
+      const annual_internet_high_usd  = monthly_internet_high_usd * 12;
+
+      // Equipment costs:
+      const rc_system_low_usd   = 2500;
+      const rc_system_high_usd  = 8000;
+      const cellular_low_usd    = 300;
+      const cellular_high_usd   = 800;
+      const install_low_usd     = 500;
+      const install_high_usd    = 2000;
+      const total_rc_low_usd    = rc_system_low_usd  + cellular_low_usd  + install_low_usd;
+      const total_rc_high_usd   = rc_system_high_usd + cellular_high_usd + install_high_usd;
+
+      return {
+        remote_required,
+        operator_response_time_hrs,
+        rc_must_control_power,
+        rc_must_monitor_antenna,
+        rc_must_monitor_modulation,
+        rc_da_antenna_monitor,
+        rc_accuracy_pct,
+        log_min_frequency,
+        da_log_frequency,
+        preferred_connection,
+        pots_legacy_risk,
+        cellular_coverage_likely,
+        monthly_internet_low_usd,
+        monthly_internet_high_usd,
+        annual_internet_low_usd,
+        annual_internet_high_usd,
+        rc_system_low_usd,
+        rc_system_high_usd,
+        cellular_low_usd,
+        cellular_high_usd,
+        install_low_usd,
+        install_high_usd,
+        total_rc_low_usd,
+        total_rc_high_usd,
+        reference: '47 CFR §73.1300 (unattended operation — 2-hour operator response); §73.1400 (remote control requirements); §73.1410 (remote control system specs); §73.1350 (transmitter control and monitoring); §73.1820(a) (daily log requirement); §73.61 (DA antenna monitor logging)',
+        note: `Remote control ${remote_required ? 'RECOMMENDED' : 'OPTIONAL'} for site ${round2(dist_km)} km from current location. Required capabilities: transmitter on/off, TPO/antenna current monitoring (±${rc_accuracy_pct}%), modulation monitoring.${isDA_rc ? ` DA station (${pattern_mode}): antenna monitor data channel required per §73.61.` : ''} Operator must respond within ${operator_response_time_hrs} hours per §73.1300. Preferred connection: ${preferred_connection}. POTS line-based legacy remote control: high risk in rural AZ. Log minimum: ${log_min_frequency}.`
       };
     })(),
 

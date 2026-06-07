@@ -3858,3 +3858,14 @@ test('am_nrsc_emission_mask_and_bandwidth_compliance_guide present across coloca
     assert.ok(Array.isArray(g.nrsc2b_mask) && g.nrsc2b_mask.length >= 3, 'nrsc2b_mask must have mask points');
   }
 });
+
+test('am_remote_control_and_unattended_operation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_remote_control_and_unattended_operation_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_remote_control_and_unattended_operation_guide`);
+    assert.strictEqual(g.operator_response_time_hrs, 2, '§73.1300 operator response time must be 2 hours');
+    assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1400 remote control accuracy must be ±2%');
+    assert.ok(g.total_rc_low_usd > 0, 'total_rc_low_usd must be positive');
+  }
+});

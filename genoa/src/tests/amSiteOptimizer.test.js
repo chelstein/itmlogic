@@ -15294,3 +15294,49 @@ it('candidate_comparison_table emk columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.emk_harmonic_2nd_khz, 1560, 'emk_harmonic_2nd_khz must be 1560 kHz for 780 kHz carrier');
   assert.strictEqual(r0.emk_harmonic_max_mW, 500, 'emk_harmonic_max_mW must be 500 mW for 5 kW at 40 dBc');
 });
+
+it('am_remote_control_and_unattended_operation_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_remote_control_and_unattended_operation_guide !== undefined &&
+      c.am_remote_control_and_unattended_operation_guide !== null,
+      `rank ${c.rank}: am_remote_control_and_unattended_operation_guide must be present`
+    );
+  }
+});
+
+it('KAZM operator response time and RC accuracy per §73.1300 and §73.1400', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_remote_control_and_unattended_operation_guide;
+  assert.strictEqual(g.operator_response_time_hrs, 2, '§73.1300 requires operator response within 2 hours');
+  assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1400(b) remote control readings must be within ±2%');
+  assert.strictEqual(g.rc_must_control_power, true, 'remote control must include power on/off');
+  assert.strictEqual(g.rc_must_monitor_antenna, true, 'remote control must include antenna current monitoring');
+});
+
+it('KAZM NDA station: DA antenna monitor not required via remote control', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_remote_control_and_unattended_operation_guide;
+  // KAZM_FIXTURE pattern_mode is 'NDA'
+  assert.strictEqual(g.rc_da_antenna_monitor, false, 'NDA station: DA antenna monitor channel not required');
+  assert.strictEqual(g.da_log_frequency, null, 'NDA station: DA continuous log not required');
+  assert.strictEqual(g.log_min_frequency, 'daily', 'minimum log frequency must be daily per §73.1820(a)');
+});
+
+it('KAZM remote control connectivity preference', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_remote_control_and_unattended_operation_guide;
+  assert.ok(typeof g.preferred_connection === 'string', 'preferred_connection must be a string');
+  assert.ok(['IP_OVER_LTE', 'IP_FIBER'].includes(g.preferred_connection), 'connection type must be IP_OVER_LTE or IP_FIBER');
+  assert.ok(g.total_rc_low_usd > 0, 'total_rc_low_usd must be positive');
+  assert.ok(g.annual_internet_low_usd >= 600, 'annual internet must be ≥$600/yr ($50/month minimum)');
+});
+
+it('candidate_comparison_table rc columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(typeof r0.rc_remote_required === 'boolean', 'rc_remote_required must be boolean');
+  assert.ok(typeof r0.rc_preferred_connection === 'string', 'rc_preferred_connection must be string');
+  assert.ok(r0.rc_total_rc_low_usd > 0, 'rc_total_rc_low_usd must be positive');
+});
