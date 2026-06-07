@@ -1314,7 +1314,10 @@ export async function runSiteOptimizer(body = {}){
     cis_col_proximity_improves: c.am_community_impact_and_coverage_shift_guide?.col_proximity_improves ?? null,
     dcom_total_low_usd:         c.am_transmitter_decommission_and_site_remediation_guide?.total_low_usd ?? null,
     dcom_total_demo_low_usd:    c.am_transmitter_decommission_and_site_remediation_guide?.total_demo_low_usd ?? null,
-    dcom_num_towers:            c.am_transmitter_decommission_and_site_remediation_guide?.num_towers ?? null
+    dcom_num_towers:            c.am_transmitter_decommission_and_site_remediation_guide?.num_towers ?? null,
+    ipc_du_cochannel_db:        c.am_interference_protection_contour_guide?.du_cochannel_db ?? null,
+    ipc_study_low_usd:          c.am_interference_protection_contour_guide?.study_low_usd ?? null,
+    ipc_is_clear_channel:       c.am_interference_protection_contour_guide?.is_clear_channel ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7049,6 +7052,53 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_interference_protection_contour_guide: (() => {
+      // FCC §73.207 defines minimum D/U (desired-to-undesired) field strength ratios
+      // required to protect AM stations from interference. §73.215 specifies the
+      // interference-free service area for AM stations.
+      // Key concepts:
+      // - Class A (clear channel) protects its 0.1 mV/m groundwave contour daytime
+      // - Class B protects its 0.5 mV/m groundwave contour
+      // - Class C/D: receive no co-channel protection; must protect Class A/B from skywave
+      // D/U ratios per §73.207:
+      //   - Co-channel: D must be 20 dB > U at protected contour (10:1 field strength ratio)
+      //   - Adjacent channel (±10 kHz): D must be 6 dB > U (2:1 ratio)
+      const is_clear_ic   = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ic   = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const is_class_ab   = /^[AB]$/i.test(fcc_class);
+      const is_class_cd_i = /^[CD]$/i.test(fcc_class);
+      const isDA_ic       = /^DA/i.test(pattern_mode);
+      // Protected contour field strength per class:
+      const protected_contour_mvm = is_class_ab ? (fcc_class.toUpperCase() === 'A' ? 0.1 : 0.5) : null;
+      // D/U ratio requirements:
+      const du_cochannel_db        = 20;   // §73.207(a)
+      const du_adjacent_channel_db = 6;    // §73.207(b)
+      // Interference engineering study cost:
+      // Basic D/U analysis (FCC Groundwave Assistant + skywave calculator): $3,000–$10,000
+      // Complex (multiple interferers, DA pattern optimization): $8,000–$25,000
+      const study_low_usd  = isDA_ic ? 8000  : 3000;
+      const study_high_usd = isDA_ic ? 25000 : 10000;
+      // Interference protection distance (rough): using 5 mV/m and 0.1 mV/m contours
+      // For Class D on clear channel: must protect dominant Class A 0.1 mV/m groundwave contour
+      // (dominant Class A stations on 780 kHz may have 0.1 mV/m contour extending hundreds of km)
+      const skywave_protection_km_low  = is_clear_ic && is_class_cd_i ? 1000 : 0;
+      const skywave_protection_km_high = is_clear_ic && is_class_cd_i ? 2500 : 0;
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        isDA: isDA_ic,
+        is_clear_channel: is_clear_ic,
+        is_local_channel: is_local_ic,
+        is_class_ab, is_class_cd: is_class_cd_i,
+        protected_contour_mvm,
+        du_cochannel_db,
+        du_adjacent_channel_db,
+        study_low_usd, study_high_usd,
+        skywave_protection_km_low, skywave_protection_km_high,
+        reference: '47 CFR §73.207 (D/U ratios); §73.182 (service and interference); §73.183 (groundwave field strength tables); §73.25 (clear channel dominant station protection); FCC Groundwave Assistant; MWAA (Medium Wave Antenna Analysis)',
+        note: `Class ${fcc_class} ${is_clear_ic ? 'clear' : is_local_ic ? 'local' : 'regional'} channel — D/U co-channel: ${du_cochannel_db} dB; adjacent: ${du_adjacent_channel_db} dB. ${is_class_cd_i && is_clear_ic ? `Skywave protection zone: ${skywave_protection_km_low}–${skywave_protection_km_high} km. Must not interfere with dominant Class A. ` : ''}Engineering study: $${study_low_usd.toLocaleString()}–$${study_high_usd.toLocaleString()}`
       };
     })(),
 

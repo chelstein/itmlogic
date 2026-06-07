@@ -3204,3 +3204,14 @@ test('am_transmitter_decommission_and_site_remediation_guide present across colo
     assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
   }
 });
+
+test('am_interference_protection_contour_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_interference_protection_contour_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_interference_protection_contour_guide missing`);
+    assert.ok(g.du_cochannel_db > 0, `rank ${c.rank}: du_cochannel_db must be positive`);
+    assert.ok(g.study_low_usd > 0, `rank ${c.rank}: study_low_usd must be positive`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', `rank ${c.rank}: is_clear_channel must be boolean`);
+  }
+});

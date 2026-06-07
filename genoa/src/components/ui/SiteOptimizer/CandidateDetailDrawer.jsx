@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Interference Protection Contour Guide */}
+        {candidate.am_interference_protection_contour_guide && (() => {
+          const g = candidate.am_interference_protection_contour_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ipc-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Interference Protection Contour (§73.207)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear channel' : g.is_local_channel ? 'Local channel' : 'Regional channel'}</span>
+                <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.is_class_cd ? 'secondary / no protection' : 'has interference protection'})</span>
+                <span>D/U co-channel:</span><span>{g.du_cochannel_db != null ? `${g.du_cochannel_db} dB` : '—'}</span>
+                <span>D/U adjacent (±10 kHz):</span><span>{g.du_adjacent_channel_db != null ? `${g.du_adjacent_channel_db} dB` : '—'}</span>
+                {g.is_class_cd && g.is_clear_channel && (
+                  <><span>Skywave protect. zone:</span><span>{g.skywave_protection_km_low}–{g.skywave_protection_km_high} km</span></>
+                )}
+                <span>Engineering study:</span><span>{fmt(g.study_low_usd)} – {fmt(g.study_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Decommission and Site Remediation Guide */}
         {candidate.am_transmitter_decommission_and_site_remediation_guide && (() => {
           const g = candidate.am_transmitter_decommission_and_site_remediation_guide;

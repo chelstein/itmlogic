@@ -13628,3 +13628,47 @@ test('am_transmitter_decommission_and_site_remediation_guide comparison table co
   assert.strictEqual(r0.dcom_total_demo_low_usd, 40000, 'rank-1 dcom_total_demo_low should be 40000');
   assert.strictEqual(r0.dcom_num_towers,          1,    'rank-1 dcom_num_towers should be 1');
 });
+
+test('am_interference_protection_contour_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_protection_contour_guide;
+  assert.ok(g !== undefined && g !== null, 'am_interference_protection_contour_guide missing');
+  assert.ok(g.du_cochannel_db > 0, 'du_cochannel_db must be positive');
+  assert.ok(g.study_low_usd > 0, 'study_low_usd must be positive');
+});
+
+test('KAZM 780 kHz Class D clear channel D/U requirements', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_protection_contour_guide;
+  assert.strictEqual(g.is_clear_channel,        true, '780 kHz should be clear channel');
+  assert.strictEqual(g.is_class_cd,             true, 'Class D is_class_cd should be true');
+  assert.strictEqual(g.du_cochannel_db,           20, 'D/U co-channel should be 20 dB');
+  assert.strictEqual(g.du_adjacent_channel_db,     6, 'D/U adjacent channel should be 6 dB');
+});
+
+test('KAZM skywave protection zone (Class D clear channel)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_protection_contour_guide;
+  assert.strictEqual(g.skywave_protection_km_low,  1000, 'skywave_protection_km_low should be 1000');
+  assert.strictEqual(g.skywave_protection_km_high, 2500, 'skywave_protection_km_high should be 2500');
+});
+
+test('KAZM interference study cost (NDA, Class D)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_protection_contour_guide;
+  assert.strictEqual(g.study_low_usd,  3000,  'NDA study_low should be 3000');
+  assert.strictEqual(g.study_high_usd, 10000, 'NDA study_high should be 10000');
+});
+
+test('am_interference_protection_contour_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ipc_du_cochannel_db'  in row, 'ipc_du_cochannel_db missing from comparison table');
+    assert.ok('ipc_study_low_usd'    in row, 'ipc_study_low_usd missing from comparison table');
+    assert.ok('ipc_is_clear_channel' in row, 'ipc_is_clear_channel missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ipc_du_cochannel_db,  20,   'rank-1 ipc_du_cochannel_db should be 20');
+  assert.strictEqual(r0.ipc_study_low_usd,    3000, 'rank-1 ipc_study_low_usd should be 3000');
+  assert.strictEqual(r0.ipc_is_clear_channel, true, 'rank-1 ipc_is_clear_channel should be true');
+});
