@@ -13193,3 +13193,46 @@ test('am_fcc_asr_tower_registration_guide comparison table columns present', asy
   assert.strictEqual(r0.asr_total_low_usd,   5130,   'rank-1 asr_total_low_usd should be 5130');
   assert.strictEqual(r0.asr_tower_height_ft, 315.26, 'rank-1 asr_tower_height_ft should be 315.26');
 });
+
+test('am_site_access_and_road_construction_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_road_construction_guide;
+  assert.ok(g !== undefined && g !== null, 'am_site_access_and_road_construction_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM rank-1 road uses minimum length (0.25 mi)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_road_construction_guide;
+  assert.strictEqual(g.road_length_mi, 0.25,  'rank-1 road_length_mi should be 0.25 (minimum)');
+  assert.strictEqual(g.road_length_ft, 1320,   'rank-1 road_length_ft should be 1320');
+  assert.strictEqual(g.road_low_usd,   19800,  'rank-1 road_low_usd should be 19800');
+});
+
+test('KAZM site access total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_road_construction_guide;
+  assert.strictEqual(g.total_low_usd,  28800, 'KAZM total_low_usd should be 28800');
+  assert.strictEqual(g.total_high_usd, 92800, 'KAZM total_high_usd should be 92800');
+});
+
+test('KAZM site access reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_road_construction_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.length > 0, 'reference must be non-empty');
+  assert.ok(typeof g.note === 'string' && g.note.includes('mi access road'), 'note must mention access road');
+});
+
+test('am_site_access_and_road_construction_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('acc_total_low_usd'  in row, 'acc_total_low_usd missing from comparison table');
+    assert.ok('acc_road_length_mi' in row, 'acc_road_length_mi missing from comparison table');
+    assert.ok('acc_road_low_usd'   in row, 'acc_road_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.acc_total_low_usd,  28800, 'rank-1 acc_total_low_usd should be 28800');
+  assert.strictEqual(r0.acc_road_length_mi,  0.25, 'rank-1 acc_road_length_mi should be 0.25');
+  assert.strictEqual(r0.acc_road_low_usd,   19800, 'rank-1 acc_road_low_usd should be 19800');
+});

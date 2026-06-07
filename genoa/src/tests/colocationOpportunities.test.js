@@ -3094,3 +3094,14 @@ test('am_fcc_asr_tower_registration_guide present across colocation candidates',
     assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
   }
 });
+
+test('am_site_access_and_road_construction_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_site_access_and_road_construction_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_access_and_road_construction_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.road_length_mi >= 0.25, `rank ${c.rank}: road_length_mi must be >= 0.25 (minimum)`);
+    assert.ok(g.road_length_mi <= 2.0, `rank ${c.rank}: road_length_mi must be <= 2.0 (maximum)`);
+  }
+});

@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Access and Road Construction Guide */}
+        {candidate.am_site_access_and_road_construction_guide && (() => {
+          const g = candidate.am_site_access_and_road_construction_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="acc-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Site Access &amp; Road Construction</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Relocation distance:</span><span>{g.distance_mi != null ? `${g.distance_mi.toFixed(1)} mi (${g.distance_km != null ? `${g.distance_km.toFixed(1)} km` : '—'})` : '—'}</span>
+                <span>Est. road length:</span><span>{g.road_length_mi != null ? `${g.road_length_mi.toFixed(2)} mi (${g.road_length_ft != null ? `${g.road_length_ft.toFixed(0)} ft` : '—'})` : '—'}</span>
+                <span>Road construction:</span><span>{fmt(g.road_low_usd)} – {fmt(g.road_high_usd)}</span>
+                <span>Culverts/drainage:</span><span>{fmt(g.culvert_low_usd)} – {fmt(g.culvert_high_usd)}</span>
+                <span>Site clearing:</span><span>{fmt(g.clearing_low_usd)} – {fmt(g.clearing_high_usd)}</span>
+                <span>Gate &amp; fencing:</span><span>{fmt(g.gate_fence_low_usd)} – {fmt(g.gate_fence_high_usd)}</span>
+                <span>Grading/leveling:</span><span>{fmt(g.grading_low_usd)} – {fmt(g.grading_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#15803d', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM FCC ASR Tower Registration Guide */}
         {candidate.am_fcc_asr_tower_registration_guide && (() => {
           const g = candidate.am_fcc_asr_tower_registration_guide;

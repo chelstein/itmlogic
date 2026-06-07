@@ -1284,7 +1284,10 @@ export async function runSiteOptimizer(body = {}){
     ltp_num_ground_rods:        c.am_grounding_and_lightning_protection_guide?.num_ground_rods ?? null,
     asr_requires_asr:           c.am_fcc_asr_tower_registration_guide?.requires_asr ?? null,
     asr_total_low_usd:          c.am_fcc_asr_tower_registration_guide?.total_low_usd ?? null,
-    asr_tower_height_ft:        c.am_fcc_asr_tower_registration_guide?.tower_height_ft ?? null
+    asr_tower_height_ft:        c.am_fcc_asr_tower_registration_guide?.tower_height_ft ?? null,
+    acc_total_low_usd:          c.am_site_access_and_road_construction_guide?.total_low_usd ?? null,
+    acc_road_length_mi:         c.am_site_access_and_road_construction_guide?.road_length_mi ?? null,
+    acc_road_low_usd:           c.am_site_access_and_road_construction_guide?.road_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7019,6 +7022,48 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_access_and_road_construction_guide: (() => {
+      // AM tower sites require reliable year-round access for maintenance, fuel delivery,
+      // and emergency repairs. Road construction cost is the dominant site-prep variable.
+      const distance_km   = pt.distance_from_current_km ?? 0;
+      const distance_mi   = round2(distance_km * 0.621371);
+      // Assume access road length ≈ 15% of site relocation distance (min 0.25 mi, max 2 mi)
+      const road_length_mi = Math.min(2.0, Math.max(0.25, round2(distance_mi * 0.15)));
+      const road_length_ft = round2(road_length_mi * 5280);
+      // Gravel access road: $15–$40/LF (linear foot)
+      const road_low_per_lf  = 15;
+      const road_high_per_lf = 40;
+      const road_low_usd     = round2(road_length_ft * road_low_per_lf);
+      const road_high_usd    = round2(road_length_ft * road_high_per_lf);
+      // Culverts and drainage: typically $1,500–$5,000 per crossing; assume 1–2 crossings
+      const culvert_low_usd  = 1500;
+      const culvert_high_usd = 10000;
+      // Site clearing (trees, brush): $2,000–$8,000 for typical broadcast site
+      const clearing_low_usd  = 2000;
+      const clearing_high_usd = 8000;
+      // Security gate and fencing: $3,000–$12,000 (AM sites are fenced per RF safety rules)
+      const gate_fence_low_usd  = 3000;
+      const gate_fence_high_usd = 12000;
+      // Grading and site leveling
+      const grading_low_usd  = 2500;
+      const grading_high_usd = 10000;
+      const total_low_usd  = round2(road_low_usd  + culvert_low_usd  + clearing_low_usd  + gate_fence_low_usd  + grading_low_usd);
+      const total_high_usd = round2(road_high_usd + culvert_high_usd + clearing_high_usd + gate_fence_high_usd + grading_high_usd);
+      return {
+        distance_km: round2(distance_km), distance_mi,
+        road_length_mi, road_length_ft,
+        road_low_per_lf, road_high_per_lf,
+        road_low_usd, road_high_usd,
+        culvert_low_usd, culvert_high_usd,
+        clearing_low_usd, clearing_high_usd,
+        gate_fence_low_usd, gate_fence_high_usd,
+        grading_low_usd, grading_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'USDA Forest Service road construction cost data; RS Means Heavy Construction Cost Data; broadcast site engineering industry practice; 47 CFR §1.1310 (RF safety fencing)',
+        note: `${road_length_mi.toFixed(2)} mi access road (est. from ${distance_mi.toFixed(1)} mi relocation): $${road_low_usd.toLocaleString()}–$${road_high_usd.toLocaleString()}. Total site prep: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 
