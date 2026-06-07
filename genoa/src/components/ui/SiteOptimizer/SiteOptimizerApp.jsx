@@ -1717,6 +1717,43 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      station_total_project_cost_pro_forma_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
+        tower_height_m: 96, tower_height_ft: 315, n_radials: 120, radial_length_m: 96,
+        n_cost_categories: 9,
+        cost_categories: [
+          { category: 'FCC Regulatory Fees',            low_usd: 5295,   high_usd: 5955,   notes: 'Form 301 CP ($4,200) + Form 302-AM ($435) + annual fee ($660)' },
+          { category: 'Professional Services',           low_usd: 30000,  high_usd: 60000,  notes: 'Broadcast attorney + engineer; NDA simplifies attorney scope' },
+          { category: 'Site Acquisition (excl. land)',   low_usd: 8500,   high_usd: 31000,  notes: 'Title search, survey, Phase I ESA, NEPA §1.1307, local permits' },
+          { category: 'Tower Construction',              low_usd: 107100, high_usd: 252000, notes: 'λ/4 guyed monopole 96 m (315 ft); foundation, base insulator, guys, ASR' },
+          { category: 'Ground Radial System',            low_usd: 21888,  high_usd: 61488,  notes: '120 radials × 96 m; AWG-10 copper wire + burial/bonding labor; §73.190' },
+          { category: 'Transmitter & ATU Equipment',     low_usd: 25000,  high_usd: 68000,  notes: '5 kW transmitter + ATU + hardline + base current monitoring' },
+          { category: 'Transmitter Building',            low_usd: 83000,  high_usd: 235000, notes: '1000 sq ft + HVAC + 200A electrical + 50 kW generator + security' },
+          { category: 'STL System',                      low_usd: 11000,  high_usd: 33000,  notes: 'Microwave or IP studio-transmitter link; equipment + installation' },
+          { category: 'Proof of Performance',            low_usd: 8000,   high_usd: 20000,  notes: '8-radial NDA field intensity traversal (§73.154(b)) + report + FCC exhibit' }
+        ],
+        subtotal_low_usd: 299783, subtotal_high_usd: 766443,
+        contingency_pct: 15, contingency_low_usd: 44967, contingency_high_usd: 114967,
+        total_project_low_usd: 344750, total_project_high_usd: 881410, total_project_typ_usd: 613080,
+        total_timeline_months_low: 18, total_timeline_months_high: 30,
+        timeline_milestones: [
+          { milestone: 'Engineering study + Form 301 filed',      month_start: 0,  month_end: 2,  parallel: false },
+          { milestone: 'FCC CP processing',                        month_start: 2,  month_end: 20, parallel: false },
+          { milestone: 'Site acquisition + permitting',            month_start: 1,  month_end: 12, parallel: true  },
+          { milestone: 'Tower construction + radial installation', month_start: 12, month_end: 18, parallel: false },
+          { milestone: 'Equipment install + ATU commissioning',    month_start: 18, month_end: 21, parallel: false },
+          { milestone: 'Proof of performance + Form 302-AM',       month_start: 21, month_end: 24, parallel: false }
+        ],
+        n_financing_options: 4,
+        financing_options: [
+          { source: 'SBA 7(a) loan', max_usd: 5000000, term_years: 10, notes: 'Equipment and working capital; 7-8% rate typical (2024)' },
+          { source: 'SBA 504 loan', max_usd: 5500000, term_years: 20, notes: 'Real estate and tower construction; lower fixed rate' },
+          { source: 'CoBank / Farm Credit', max_usd: null, term_years: null, notes: 'Broadcast-specialized lender; familiar with FCC license collateral' },
+          { source: 'Seller financing', max_usd: null, term_years: null, notes: 'If acquiring existing AM facility; negotiate CP contingency clause' }
+        ],
+        reference: '47 CFR §73.21; §73.154; §73.182; §73.190; §1.1102; §1.1307; NHPA §106; SBA 7(a)/504 program guidelines',
+        note: 'Complete relocation budget for 780 kHz Class D (NDA) 5 kW: estimated $344,750–$881,410 (typical $613,080), including 15% contingency. Excludes land purchase price. Timeline: 18–30 months from CP filing to new license. All figures are 2024 screening-grade estimates.'
+      },
       transmitter_power_upgrade_pathway_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
         current_tpo_kw: 5, day_max_tpo_kw: 10, night_max_tpo_kw: 1,

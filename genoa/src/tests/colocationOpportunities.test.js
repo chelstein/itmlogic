@@ -2070,3 +2070,19 @@ test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', 
     assert.strictEqual(g.coverage_gain_pct, 41, `rank ${c.rank} coverage_gain_pct must be 41`);
   }
 });
+
+test('colocation GRID candidates have station_total_project_cost_pro_forma_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.station_total_project_cost_pro_forma_guide;
+    assert.ok(g != null, `rank ${c.rank} missing station_total_project_cost_pro_forma_guide`);
+    assert.strictEqual(g.n_cost_categories, 9, `rank ${c.rank} must have 9 cost categories`);
+    assert.ok(g.total_project_low_usd > 200000, `rank ${c.rank} total_low must be > $200k`);
+  }
+});

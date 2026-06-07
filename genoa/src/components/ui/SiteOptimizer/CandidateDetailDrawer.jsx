@@ -2226,6 +2226,62 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Station Total Project Cost Pro Forma Guide */}
+        {candidate.station_total_project_cost_pro_forma_guide && (() => {
+          const g = candidate.station_total_project_cost_pro_forma_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #7dd3fc' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0c4a6e', marginBottom: 8 }}>
+                Station Relocation Pro Forma — Total Project Cost
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Total (low):</span> <strong>${g.total_project_low_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total (high):</span> <strong>${g.total_project_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Typical estimate:</span> <strong style={{ color: '#0369a1' }}>${g.total_project_typ_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Contingency:</span> <strong>{g.contingency_pct}%</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Timeline:</span> <strong>{g.total_timeline_months_low}–{g.total_timeline_months_high} months</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tower height (λ/4):</span> <strong>{g.tower_height_m} m / {g.tower_height_ft} ft</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Radial system:</span> <strong>{g.n_radials} × {g.radial_length_m} m</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Cost categories:</span> <strong>{g.n_cost_categories}</strong></div>
+              </div>
+              {g.cost_categories && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#0c4a6e', marginBottom: 4 }}>Cost Breakdown by Category</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#bae6fd' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Category</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Low</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>High</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.cost_categories.map((cat, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #7dd3fc' }}>
+                          <td style={{ padding: '3px 6px' }}>{cat.category}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${cat.low_usd?.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${cat.high_usd?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ borderTop: '2px solid #0369a1', fontWeight: 700, background: '#e0f2fe' }}>
+                        <td style={{ padding: '3px 6px' }}>Subtotal (pre-contingency)</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.subtotal_low_usd?.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.subtotal_high_usd?.toLocaleString()}</td>
+                      </tr>
+                      <tr style={{ borderTop: '1px solid #0369a1', fontWeight: 700, color: '#0c4a6e', background: '#bae6fd' }}>
+                        <td style={{ padding: '3px 6px' }}>Total ({g.contingency_pct}% contingency)</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.total_project_low_usd?.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.total_project_high_usd?.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#0c4a6e' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Transmitter Power Upgrade Pathway Guide */}
         {candidate.transmitter_power_upgrade_pathway_guide && (() => {
           const g = candidate.transmitter_power_upgrade_pathway_guide;

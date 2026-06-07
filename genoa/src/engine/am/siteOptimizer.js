@@ -1050,7 +1050,10 @@ export async function runSiteOptimizer(body = {}){
     acobth_max_coverage_gain_pct: c.am_coverage_optimization_by_tower_height_guide?.max_coverage_gain_pct ?? null,
     tpupg_day_headroom_kw:      c.transmitter_power_upgrade_pathway_guide?.day_headroom_kw ?? null,
     tpupg_coverage_gain_pct:    c.transmitter_power_upgrade_pathway_guide?.coverage_gain_pct ?? null,
-    tpupg_total_low_usd:        c.transmitter_power_upgrade_pathway_guide?.total_project_low_usd ?? null
+    tpupg_total_low_usd:        c.transmitter_power_upgrade_pathway_guide?.total_project_low_usd ?? null,
+    pfg_total_low_usd:          c.station_total_project_cost_pro_forma_guide?.total_project_low_usd ?? null,
+    pfg_total_typ_usd:          c.station_total_project_cost_pro_forma_guide?.total_project_typ_usd ?? null,
+    pfg_n_cost_categories:      c.station_total_project_cost_pro_forma_guide?.n_cost_categories ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6785,6 +6788,183 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    station_total_project_cost_pro_forma_guide: (() => {
+      // Master financial summary for a complete AM station relocation project.
+      // All figures are 2024 screening-grade estimates in USD; actual costs vary
+      // significantly by region, site conditions, contractor market, and scope.
+      // Use as a budget template only — NOT a contractor quote or appraisal.
+      //
+      // Nine cost categories are modeled:
+      //   1. FCC regulatory fees (Form 301 CP + Form 302-AM license to cover)
+      //   2. Professional services (broadcast attorney + engineer)
+      //   3. Site acquisition costs (excl. land price: survey, ESA, permits)
+      //   4. Tower construction (new λ/4 guyed monopole at candidate site)
+      //   5. Ground radial system (120 radials at λ/4 length)
+      //   6. Transmitter & ATU equipment
+      //   7. Transmitter building (structure, HVAC, generator, security)
+      //   8. STL system (studio-transmitter link)
+      //   9. Proof-of-performance engineering
+      //
+      // A 15% contingency is applied to all subtotals.
+      //
+      // Timeline milestones: CP filing → grant (6-18 mo), site work (parallel),
+      // tower construction (3-6 mo), commissioning (1-3 mo), proof (1-3 mo).
+      // Total elapsed: typically 18–30 months from first filing to new license.
+
+      const isDA_pf     = /^DA/i.test(pattern_mode);
+      const is_clear_ch = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const lambda_m    = 300000 / frequency_khz;
+      const lambda_q_m  = lambda_m / 4;               // λ/4 tower height (m)
+      const tower_ft    = Math.round(lambda_q_m * 3.28084);
+      const n_radials   = 120;                          // standard AM ground system
+      const radial_len_m = Math.round(lambda_q_m);     // λ/4 radial length
+
+      // 1. FCC Regulatory Fees (§1.1102, 2024 schedule).
+      const fcc_form301     = 4200;   // major change CP, AM commercial
+      const fcc_form302am   = 435;    // license to cover
+      const fcc_annual_fee  = 660;    // Class D annual regulatory fee (first year)
+      const fcc_low  = fcc_form301 + fcc_form302am + fcc_annual_fee;
+      const fcc_high = fcc_low + 660; // NEPA categorical exclusion review, if triggered
+
+      // 2. Professional Services (attorney + engineer).
+      // NDA is simpler than DA; DA adds pattern modeling + §73.182 night analysis.
+      const atty_low  = isDA_pf ? 18000 : 12000;
+      const atty_high = isDA_pf ? 35000 : 25000;
+      const eng_low   = isDA_pf ? 25000 : 18000;
+      const eng_high  = isDA_pf ? 50000 : 35000;
+      const prof_low  = atty_low + eng_low;
+      const prof_high = atty_high + eng_high;
+
+      // 3. Site Acquisition (excluding land price).
+      // Includes title search, survey, Phase I ESA, NEPA/§106 consultation, permits.
+      const site_acq_low  = 8500;
+      const site_acq_high = 31000;
+
+      // 4. Tower Construction (λ/4 guyed monopole at candidate freq/site).
+      // Cost scales roughly with height and terrain accessibility.
+      // λ/4 at 780 kHz = 96m (315ft). Below 200ft → lower; above 300ft → higher.
+      const tower_height_factor = Math.min(2.0, Math.max(0.4, tower_ft / 250));
+      const tower_base_low  = 85000;
+      const tower_base_high = 200000;
+      const tower_low  = Math.round(tower_base_low  * tower_height_factor);
+      const tower_high = Math.round(tower_base_high * tower_height_factor);
+
+      // 5. Ground Radial System (n_radials × radial_len_m, copper AWG-10).
+      // Wire material ($/m) + per-radial labor (burial, bonding, termination).
+      const total_radial_m    = n_radials * radial_len_m;
+      const wire_cost_per_m   = 0.65;   // AWG-10 copper installed material: ~$0.65/m
+      const gnd_material      = Math.round(total_radial_m * wire_cost_per_m);
+      const labor_per_radial_low  = 120;  // $/radial — rural flat terrain
+      const labor_per_radial_high = 450;  // $/radial — suburban/complex terrain
+      const gnd_low  = gnd_material + n_radials * labor_per_radial_low;
+      const gnd_high = gnd_material + n_radials * labor_per_radial_high;
+
+      // 6. Transmitter & ATU Equipment.
+      const tx_low  = 12000;   // 5 kW transmitter (refurbished or new entry-level)
+      const tx_high = 35000;   // new Nautel or GatesAir
+      const atu_low  = 8000;   // ATU (antenna tuning unit, tower base)
+      const atu_high = 20000;
+      const txline_low  = 3000;  // hardline coax, base section
+      const txline_high = 8000;
+      const equip_low  = tx_low  + atu_low  + txline_low  + 2000;  // + monitoring
+      const equip_high = tx_high + atu_high + txline_high + 5000;
+
+      // 7. Transmitter Building.
+      const bldg_low  = 45000;   // 1000 sq ft prefab building, basic
+      const bldg_high = 120000;  // custom construction
+      const hvac_low  = 8000;    const hvac_high  = 25000;
+      const elec_low  = 10000;   const elec_high  = 30000;
+      const gen_low   = 15000;   const gen_high   = 45000;  // 50 kW diesel generator
+      const sec_low   = 5000;    const sec_high   = 15000;  // security, fencing
+      const bldg_total_low  = bldg_low  + hvac_low  + elec_low  + gen_low  + sec_low;
+      const bldg_total_high = bldg_high + hvac_high + elec_high + gen_high + sec_high;
+
+      // 8. STL System (studio-transmitter link).
+      const stl_equip_low  = 8000;   const stl_equip_high  = 25000;
+      const stl_inst_low   = 3000;   const stl_inst_high   = 8000;
+      const stl_low  = stl_equip_low  + stl_inst_low;
+      const stl_high = stl_equip_high + stl_inst_high;
+
+      // 9. Proof-of-Performance Engineering.
+      // NDA: 8-radial field intensity traversal (§73.154(b)), faster.
+      // DA:  72-radial FI traversal (§73.154(a)), 2–4× longer.
+      const proof_field_low  = isDA_pf ? 8000  : 5000;
+      const proof_field_high = isDA_pf ? 20000 : 12000;
+      const proof_report_low  = 3000;  const proof_report_high  = 8000;
+      const proof_low  = proof_field_low  + proof_report_low;
+      const proof_high = proof_field_high + proof_report_high;
+
+      // Build cost category table.
+      const cost_categories = [
+        { category: 'FCC Regulatory Fees',              low_usd: fcc_low,           high_usd: fcc_high,          notes: 'Form 301 CP ($4,200) + Form 302-AM ($435) + annual fee ($660); §1.1102' },
+        { category: 'Professional Services',             low_usd: prof_low,          high_usd: prof_high,         notes: `Broadcast attorney + engineer; ${isDA_pf ? 'DA adds pattern modeling & §73.182 night analysis' : 'NDA simplifies attorney scope'}` },
+        { category: 'Site Acquisition (excl. land)',     low_usd: site_acq_low,      high_usd: site_acq_high,     notes: 'Title search, survey, Phase I ESA, NEPA §1.1307 / §106 consultation, local permits' },
+        { category: 'Tower Construction',                low_usd: tower_low,         high_usd: tower_high,        notes: `λ/4 guyed monopole at ${frequency_khz} kHz = ${Math.round(lambda_q_m)} m (${tower_ft} ft); foundation, base insulator, guys, ASR reg.` },
+        { category: 'Ground Radial System',              low_usd: gnd_low,           high_usd: gnd_high,          notes: `${n_radials} radials × ${radial_len_m} m (λ/4); AWG-10 copper wire + burial/bonding labor; §73.190` },
+        { category: 'Transmitter & ATU Equipment',       low_usd: equip_low,         high_usd: equip_high,        notes: `${tpo_kw} kW AM transmitter + ATU + hardline + base current monitoring` },
+        { category: 'Transmitter Building',              low_usd: bldg_total_low,    high_usd: bldg_total_high,   notes: '1000 sq ft structure + HVAC + 200A electrical + 50 kW generator + security' },
+        { category: 'STL System',                        low_usd: stl_low,           high_usd: stl_high,          notes: 'Microwave or IP studio-transmitter link; equipment + installation' },
+        { category: 'Proof of Performance',              low_usd: proof_low,         high_usd: proof_high,        notes: `${isDA_pf ? '72-radial DA field intensity traversal (§73.154(a))' : '8-radial NDA traversal (§73.154(b))'} + report + FCC exhibit` },
+      ];
+
+      const subtotal_low  = cost_categories.reduce((s, c) => s + c.low_usd,  0);
+      const subtotal_high = cost_categories.reduce((s, c) => s + c.high_usd, 0);
+      const contingency_pct = 15;
+      const contingency_low  = Math.round(subtotal_low  * contingency_pct / 100);
+      const contingency_high = Math.round(subtotal_high * contingency_pct / 100);
+      const total_low  = subtotal_low  + contingency_low;
+      const total_high = subtotal_high + contingency_high;
+      const total_typ  = Math.round((total_low + total_high) / 2);
+
+      // Project timeline milestones (calendar months from first FCC filing).
+      const timeline_milestones = [
+        { milestone: 'Engineering study + Form 301 filed',     month_start: 0,  month_end: 2,  parallel: false },
+        { milestone: 'FCC CP processing',                       month_start: 2,  month_end: 20, parallel: false },
+        { milestone: 'Site acquisition + permitting',           month_start: 1,  month_end: 12, parallel: true  },
+        { milestone: 'Tower construction + radial installation',month_start: 12, month_end: 18, parallel: false },
+        { milestone: 'Equipment install + ATU commissioning',   month_start: 18, month_end: 21, parallel: false },
+        { milestone: 'Proof of performance + Form 302-AM',      month_start: 21, month_end: 24, parallel: false },
+      ];
+      const total_timeline_months_low  = 18;
+      const total_timeline_months_high = 30;
+
+      // Financing guidance.
+      const financing_options = [
+        { source: 'SBA 7(a) loan',            max_usd: 5000000, term_years: 10, notes: 'Equipment and working capital; 10-year term; 7-8% rate typical (2024)' },
+        { source: 'SBA 504 loan',             max_usd: 5500000, term_years: 20, notes: 'Real estate and tower construction; 20-year fixed; lower rate' },
+        { source: 'CoBank / Farm Credit',     max_usd: null,    term_years: null, notes: 'Broadcast-specialized lender; familiar with FCC license collateral' },
+        { source: 'Seller financing',         max_usd: null,    term_years: null, notes: 'If acquiring existing AM facility; negotiate CP contingency clause' },
+      ];
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        tpo_kw,
+        tower_height_m:             Math.round(lambda_q_m),
+        tower_height_ft:            tower_ft,
+        n_radials,
+        radial_length_m:            radial_len_m,
+        n_cost_categories:          cost_categories.length,
+        cost_categories,
+        subtotal_low_usd:           subtotal_low,
+        subtotal_high_usd:          subtotal_high,
+        contingency_pct,
+        contingency_low_usd:        contingency_low,
+        contingency_high_usd:       contingency_high,
+        total_project_low_usd:      total_low,
+        total_project_high_usd:     total_high,
+        total_project_typ_usd:      total_typ,
+        total_timeline_months_low,
+        total_timeline_months_high,
+        timeline_milestones,
+        financing_options,
+        n_financing_options:        financing_options.length,
+        reference: '47 CFR §73.21 (power); §73.154 (proof); §73.182 (interference); §73.190 (ground); §1.1102 (fees); §1.1307 (NEPA); NHPA §106; SBA 7(a)/504 program guidelines',
+        note: `Complete relocation budget for ${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}) ${tpo_kw} kW: estimated $${total_low.toLocaleString()}–$${total_high.toLocaleString()} (typical $${total_typ.toLocaleString()}), including ${contingency_pct}% contingency. Excludes land purchase price. Timeline: ${total_timeline_months_low}–${total_timeline_months_high} months from CP filing to new license. All figures are 2024 screening-grade estimates.`
       };
     })(),
 

@@ -9608,3 +9608,48 @@ test('transmitter_power_upgrade_pathway_guide comparison table columns present',
     assert.ok('tpupg_total_low_usd'     in row, 'tpupg_total_low_usd missing from comparison table');
   }
 });
+
+// ---- station_total_project_cost_pro_forma_guide ----
+
+test('station_total_project_cost_pro_forma_guide present on candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].station_total_project_cost_pro_forma_guide;
+  assert.ok(g != null, 'station_total_project_cost_pro_forma_guide must be present');
+  assert.strictEqual(g.n_cost_categories, 9, 'must have 9 cost categories');
+});
+
+test('station_total_project_cost_pro_forma_guide KAZM 780 kHz NDA total range plausible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].station_total_project_cost_pro_forma_guide;
+  assert.ok(g.total_project_low_usd > 200000,  `total_low must be > $200k, got ${g.total_project_low_usd}`);
+  assert.ok(g.total_project_high_usd < 1500000, `total_high must be < $1.5M, got ${g.total_project_high_usd}`);
+  assert.ok(g.total_project_typ_usd > g.total_project_low_usd, 'total_typ must exceed total_low');
+  assert.ok(g.total_project_typ_usd < g.total_project_high_usd, 'total_typ must be below total_high');
+});
+
+test('station_total_project_cost_pro_forma_guide tower height matches 780 kHz λ/4', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].station_total_project_cost_pro_forma_guide;
+  assert.strictEqual(g.tower_height_m, 96,  'tower_height_m must be 96 (λ/4 at 780 kHz)');
+  assert.strictEqual(g.tower_height_ft, 315, 'tower_height_ft must be 315');
+  assert.strictEqual(g.n_radials, 120, 'n_radials must be 120');
+  assert.strictEqual(g.radial_length_m, 96, 'radial_length_m must be 96');
+});
+
+test('station_total_project_cost_pro_forma_guide contingency and subtotals consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].station_total_project_cost_pro_forma_guide;
+  assert.strictEqual(g.contingency_pct, 15, 'contingency_pct must be 15');
+  const expectedTotal = g.subtotal_low_usd + g.contingency_low_usd;
+  assert.strictEqual(g.total_project_low_usd, expectedTotal, 'total_low = subtotal_low + contingency_low');
+  assert.ok(g.n_financing_options >= 4, 'must have at least 4 financing options');
+});
+
+test('station_total_project_cost_pro_forma_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pfg_total_low_usd'     in row, 'pfg_total_low_usd missing from comparison table');
+    assert.ok('pfg_total_typ_usd'     in row, 'pfg_total_typ_usd missing from comparison table');
+    assert.ok('pfg_n_cost_categories' in row, 'pfg_n_cost_categories missing from comparison table');
+  }
+});
