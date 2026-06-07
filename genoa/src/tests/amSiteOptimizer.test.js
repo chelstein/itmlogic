@@ -9786,3 +9786,51 @@ test('fcc_form_301_exhibit_checklist_guide comparison table columns present', as
     assert.ok('f301_asr_required' in row, 'f301_asr_required missing from comparison table');
   }
 });
+
+test('silent_period_revenue_impact_and_audience_retention_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].silent_period_revenue_impact_and_audience_retention_guide;
+  assert.ok(g, 'silent_period guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.fcc_silence_limit_months, 12, 'FCC silence limit must be 12 months');
+});
+
+test('silent_period_revenue_impact_and_audience_retention_guide revenue range correct for Class D clear-channel', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].silent_period_revenue_impact_and_audience_retention_guide;
+  assert.strictEqual(g.monthly_gross_revenue_low_usd, 6000, 'Class D clear low must be $6,000/mo');
+  assert.strictEqual(g.monthly_gross_revenue_high_usd, 28000, 'Class D clear high must be $28,000/mo');
+  assert.strictEqual(g.monthly_net_revenue_low_usd, 4380, 'net low must be 6000*0.73=4380');
+  assert.strictEqual(g.monthly_net_revenue_high_usd, 20440, 'net high must be 28000*0.73=20440');
+  assert.strictEqual(g.agency_rep_commission_pct, 27, 'commission pct must be 27%');
+});
+
+test('silent_period_revenue_impact_and_audience_retention_guide audience decay matches compound model', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].silent_period_revenue_impact_and_audience_retention_guide;
+  const s6 = g.silence_scenarios.find(s => s.months === 6);
+  assert.ok(s6, '6-month scenario must be present');
+  assert.strictEqual(s6.audience_retained_pct, 38, '0.85^6=0.377 → 38%');
+  assert.strictEqual(s6.audience_lost_pct, 62, '100-38=62%');
+  assert.strictEqual(g.monthly_audience_attrition_pct, 15, 'monthly attrition must be 15%');
+});
+
+test('silent_period_revenue_impact_and_audience_retention_guide 6-month typical scenario convenience fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].silent_period_revenue_impact_and_audience_retention_guide;
+  assert.strictEqual(g.typical_6mo_revenue_loss_low_usd, 26280, '6mo net loss low: 4380*6=26280');
+  assert.strictEqual(g.typical_6mo_revenue_loss_high_usd, 122640, '6mo net loss high: 20440*6=122640');
+  assert.strictEqual(g.typical_6mo_audience_retained_pct, 38, '6mo retained pct must be 38');
+  assert.strictEqual(g.n_silence_scenarios, 4, 'must have 4 silence scenarios');
+  assert.strictEqual(g.n_non_broadcast_streams, 5, 'must have 5 non-broadcast streams');
+});
+
+test('silent_period_revenue_impact_and_audience_retention_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sprg_6mo_rev_loss_low_usd' in row, 'sprg_6mo_rev_loss_low_usd missing from comparison table');
+    assert.ok('sprg_6mo_audience_ret_pct' in row, 'sprg_6mo_audience_ret_pct missing from comparison table');
+    assert.ok('sprg_monthly_net_low_usd'  in row, 'sprg_monthly_net_low_usd missing from comparison table');
+  }
+});

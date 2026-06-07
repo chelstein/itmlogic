@@ -2134,3 +2134,19 @@ test('colocation GRID candidates have fcc_form_301_exhibit_checklist_guide', asy
     assert.strictEqual(g.filing_fee_usd, 4200, `rank ${c.rank} filing fee must be $4,200`);
   }
 });
+
+test('silent_period_revenue_impact_and_audience_retention_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.silent_period_revenue_impact_and_audience_retention_guide;
+    assert.ok(g != null, `rank ${c.rank} missing silent_period guide`);
+    assert.ok(g.typical_6mo_revenue_loss_low_usd > 0, `rank ${c.rank}: 6mo revenue loss must be positive`);
+    assert.ok(g.silence_scenarios.length === 4, `rank ${c.rank}: must have 4 silence scenarios`);
+  }
+});

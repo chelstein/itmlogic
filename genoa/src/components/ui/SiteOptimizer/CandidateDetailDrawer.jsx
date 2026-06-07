@@ -2226,6 +2226,74 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Silent Period Revenue Impact & Audience Retention Guide */}
+        {candidate.silent_period_revenue_impact_and_audience_retention_guide && (() => {
+          const g = candidate.silent_period_revenue_impact_and_audience_retention_guide;
+          const typicalScenario = g.silence_scenarios?.find(s => s.months === 6);
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0fdfa', borderRadius: 8, border: '1px solid #5eead4' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0f766e', marginBottom: 8 }}>
+                Silent Period — Revenue & Audience Impact
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Monthly Gross:</span> <strong>${g.monthly_gross_revenue_low_usd?.toLocaleString()}–${g.monthly_gross_revenue_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Monthly Net:</span> <strong>${g.monthly_net_revenue_low_usd?.toLocaleString()}–${g.monthly_net_revenue_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Agency/Rep Commission:</span> <strong>{g.agency_rep_commission_pct}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Monthly Audience Attrition:</span> <strong>{g.monthly_audience_attrition_pct}%/mo</strong></div>
+                <div><span style={{ color: '#64748b' }}>FCC Silence Limit:</span> <strong>{g.fcc_silence_limit_months} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>1-Month Acceleration Value:</span> <strong>${g.acceleration_1mo_value_usd?.toLocaleString()}</strong></div>
+              </div>
+              {typicalScenario && (
+                <div style={{ background: '#ccfbf1', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 10 }}>
+                  <strong>Typical 6-Month Scenario:</strong> Revenue loss ${g.typical_6mo_revenue_loss_low_usd?.toLocaleString()}–${g.typical_6mo_revenue_loss_high_usd?.toLocaleString()} net · Audience retained {g.typical_6mo_audience_retained_pct}% · Recovery ~{g.typical_6mo_recovery_months} months
+                </div>
+              )}
+              {g.silence_scenarios?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0f766e', marginBottom: 4 }}>Silence Scenarios</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#99f6e4', color: '#134e4a' }}>
+                        <th style={{ padding: '3px 6px', textAlign: 'left' }}>Scenario</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Prob</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Audience Ret.</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Net Rev Loss</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Recovery</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.silence_scenarios.map((s, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#f0fdfa' : '#ccfbf1' }}>
+                          <td style={{ padding: '3px 6px' }}>{s.label}</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{Math.round(s.probability * 100)}%</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{s.audience_retained_pct}%</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>${s.revenue_loss_net_low_usd?.toLocaleString()}–${s.revenue_loss_net_high_usd?.toLocaleString()}</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{s.recovery_months_est} mo</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {g.non_broadcast_streams?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0f766e', marginBottom: 4 }}>Non-Broadcast Revenue During Silence</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {g.non_broadcast_streams.map((s, i) => (
+                      <span key={i} style={{ background: '#99f6e4', color: '#134e4a', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                        {s.source}: ${s.monthly_low?.toLocaleString()}–${s.monthly_high?.toLocaleString()}/mo
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* FCC Form 301 Exhibit Checklist Guide */}
         {candidate.fcc_form_301_exhibit_checklist_guide && (() => {
           const g = candidate.fcc_form_301_exhibit_checklist_guide;

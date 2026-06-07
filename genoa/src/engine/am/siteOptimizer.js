@@ -1062,7 +1062,10 @@ export async function runSiteOptimizer(body = {}){
     epcg_payback_years:         c.electrical_power_consumption_guide?.upgrade_payback_years ?? null,
     f301_n_required:            c.fcc_form_301_exhibit_checklist_guide?.n_exhibits_required ?? null,
     f301_n_da_specific:         c.fcc_form_301_exhibit_checklist_guide?.n_exhibits_da_specific ?? null,
-    f301_asr_required:          c.fcc_form_301_exhibit_checklist_guide?.asr_required ?? null
+    f301_asr_required:          c.fcc_form_301_exhibit_checklist_guide?.asr_required ?? null,
+    sprg_6mo_rev_loss_low_usd:  c.silent_period_revenue_impact_and_audience_retention_guide?.typical_6mo_revenue_loss_low_usd ?? null,
+    sprg_6mo_audience_ret_pct:  c.silent_period_revenue_impact_and_audience_retention_guide?.typical_6mo_audience_retained_pct ?? null,
+    sprg_monthly_net_low_usd:   c.silent_period_revenue_impact_and_audience_retention_guide?.monthly_net_revenue_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6797,6 +6800,125 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    silent_period_revenue_impact_and_audience_retention_guide: (() => {
+      // Financial and audience impact model for the station's silent period
+      // during AM transmitter relocation construction.
+      //
+      // When a station goes silent (required if old tower must come down before new tower
+      // is ready), it loses advertising revenue and audience share.  This guide models:
+      //   1. Monthly advertising revenue loss (by FCC class and TPO proxy)
+      //   2. Audience decay (exponential model: ~15%/month attrition)
+      //   3. Recovery timeline after return to air (6–18 months)
+      //   4. Cost-benefit of accelerating construction to shorten silence
+      //   5. Non-broadcast revenue streams available during silence
+      //
+      // FCC silent authority:
+      //   §73.1740: station may be silent ≤ 10 days without prior authorization.
+      //   Beyond 10 days: must notify FCC or file STA request (§73.1635).
+      //   12-month silence without FCC consent = automatic license forfeiture (§73.1740(a)(1)).
+      //   CP holders typically receive waiver for good-cause construction silences.
+      //
+      // Advertising revenue model (2024 screening-grade, US small market AM):
+      //   Monthly gross revenue scales approximately with:
+      //     Class A (50 kW, clear): $30,000–$150,000/mo
+      //     Class B (0.25–50 kW):   $15,000–$50,000/mo
+      //     Class C (≤250 W):        $3,000–$12,000/mo
+      //     Class D (≤10 kW, clear): $6,000–$28,000/mo
+      //   These are gross (before agency commission ~15%; rep firm ~10–15%).
+
+      const isDA_sp    = /^DA/i.test(pattern_mode);
+      const is_clear_ch_sp = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_sp = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Monthly gross revenue range by class.
+      const REVENUE_BY_CLASS = {
+        A: { low: 30000, high: 150000 },
+        B: { low: 15000, high: 50000  },
+        C: { low: 3000,  high: 12000  },
+        D: is_local_ch_sp ? { low: 3000, high: 12000 }
+                          : { low: 6000, high: 28000 }
+      };
+      const rev = REVENUE_BY_CLASS[fcc_class] ?? REVENUE_BY_CLASS['D'];
+      const monthly_rev_low  = rev.low;
+      const monthly_rev_high = rev.high;
+      const monthly_rev_typ  = Math.round((monthly_rev_low + monthly_rev_high) / 2);
+
+      // Net revenue after agency commission (15%) and rep fee (12%).
+      const net_factor = 1 - 0.15 - 0.12;   // 0.73 net
+      const monthly_net_low  = Math.round(monthly_rev_low  * net_factor);
+      const monthly_net_high = Math.round(monthly_rev_high * net_factor);
+
+      // Silence duration scenarios (months).
+      const SILENCE_SCENARIOS = [
+        { months: 3,  label: 'Optimistic (3 mo)',  probability: 0.15, notes: 'Old site demolished only after new site fully built and licensed; minimal overlap silence' },
+        { months: 6,  label: 'Typical (6 mo)',     probability: 0.55, notes: 'Most common; construction delays and proof-of-performance take 5–7 months' },
+        { months: 12, label: 'Extended (12 mo)',   probability: 0.25, notes: 'Environmental delays, contractor issues, or FCC processing; approaching forfeiture risk' },
+        { months: 18, label: 'Worst-case (18 mo)', probability: 0.05, notes: 'Near FCC §73.1740 license forfeiture threshold; STA extension required' },
+      ];
+
+      // Audience decay model: ~15% of remaining audience lost per month of silence.
+      // Compound decay: A(t) = A0 × (1 - 0.15)^t = A0 × 0.85^t
+      const monthly_attrition_rate = 0.15;
+      const audience_scenarios = SILENCE_SCENARIOS.map(s => {
+        const retained_pct = Math.round(Math.pow(1 - monthly_attrition_rate, s.months) * 100);
+        const lost_pct     = 100 - retained_pct;
+        const rev_loss_low  = Math.round(monthly_net_low  * s.months);
+        const rev_loss_high = Math.round(monthly_net_high * s.months);
+        const recovery_months_est = Math.round(lost_pct / 10);  // ~10%/month recovery rate
+        return {
+          ...s,
+          audience_retained_pct: retained_pct,
+          audience_lost_pct:     lost_pct,
+          revenue_loss_net_low_usd:  rev_loss_low,
+          revenue_loss_net_high_usd: rev_loss_high,
+          recovery_months_est
+        };
+      });
+
+      // ROI: value of accelerating construction by 1 month.
+      const acceleration_value_net_typ = monthly_rev_typ;  // 1 month revenue recovered
+      const acceleration_value_audience_pct = monthly_attrition_rate * 100;  // 15% audience saved
+
+      // Non-broadcast revenue available during silence.
+      const non_broadcast_streams = [
+        { source: 'AM-to-FM translator',   monthly_low: 0,    monthly_high: 2000, condition: 'Only if station has authorized §74.1201 translator; translator may continue during main station silence (FCC MB 13-249)' },
+        { source: 'Internet streaming',    monthly_low: 200,  monthly_high: 2500, condition: 'No FCC license required; SoundExchange royalties apply (~$0.0017/listener-hour); minimal revenue but audience retention tool' },
+        { source: 'Tower rental income',   monthly_low: 500,  monthly_high: 2000, condition: 'If new tower hosts cellular antenna or other co-tenants; lease negotiations during construction period' },
+        { source: 'Programming sales',     monthly_low: 0,    monthly_high: 5000, condition: 'If station has valuable programming (sports play-by-play, network affiliation) that can be brokered to other stations temporarily' },
+        { source: 'Digital ad revenue',    monthly_low: 100,  monthly_high: 1500, condition: 'Website, podcast, social media monetization; minimal for small-market AM' },
+      ];
+
+      // Typical 6-month scenario (most probable) summary.
+      const typical_scenario = audience_scenarios.find(s => s.months === 6);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        pattern_mode,
+        tpo_kw,
+        monthly_gross_revenue_low_usd:   monthly_rev_low,
+        monthly_gross_revenue_high_usd:  monthly_rev_high,
+        monthly_net_revenue_low_usd:     monthly_net_low,
+        monthly_net_revenue_high_usd:    monthly_net_high,
+        agency_rep_commission_pct:       Math.round((1 - net_factor) * 100),
+        monthly_audience_attrition_pct:  Math.round(monthly_attrition_rate * 100),
+        n_silence_scenarios:             SILENCE_SCENARIOS.length,
+        silence_scenarios:               audience_scenarios,
+        typical_6mo_revenue_loss_low_usd:  typical_scenario?.revenue_loss_net_low_usd  ?? null,
+        typical_6mo_revenue_loss_high_usd: typical_scenario?.revenue_loss_net_high_usd ?? null,
+        typical_6mo_audience_retained_pct: typical_scenario?.audience_retained_pct     ?? null,
+        typical_6mo_recovery_months:       typical_scenario?.recovery_months_est       ?? null,
+        acceleration_1mo_value_usd:        acceleration_value_net_typ,
+        acceleration_1mo_audience_saved_pct: acceleration_value_audience_pct,
+        non_broadcast_streams,
+        n_non_broadcast_streams:           non_broadcast_streams.length,
+        fcc_silence_limit_months:          12,
+        fcc_silence_reference:             '47 CFR §73.1740 (silent station); §73.1635 (STA); FCC MB Docket 13-249 (translator continuity)',
+        reference: '47 CFR §73.1740 (silent station authorization); §73.1635 (special temporary authority); FCC Media Bureau Docket 13-249; Nielsen Radio audience measurement methodology; SoundExchange AM streaming royalty schedule (2024)',
+        note: `${frequency_khz} kHz Class ${fcc_class} (${pattern_mode}): estimated monthly net revenue $${monthly_net_low.toLocaleString()}–$${monthly_net_high.toLocaleString()}. Typical 6-month silence: $${typical_scenario?.revenue_loss_net_low_usd?.toLocaleString()}–$${typical_scenario?.revenue_loss_net_high_usd?.toLocaleString()} net revenue loss; ${typical_scenario?.audience_lost_pct}% audience attrition; ${typical_scenario?.recovery_months_est}-month recovery after return. Each month of silence acceleration saves ~$${acceleration_value_net_typ.toLocaleString()} in net revenue.`
       };
     })(),
 
