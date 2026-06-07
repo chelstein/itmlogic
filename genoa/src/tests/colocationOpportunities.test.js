@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_construction_project_schedule_and_management_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_construction_project_schedule_and_management_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_construction_project_schedule_and_management_guide missing`);
+    assert.ok(g.total_months_low > 0, `rank ${c.rank}: total_months_low must be positive`);
+    assert.ok(g.total_months_high >= g.total_months_low, `rank ${c.rank}: high must be >= low`);
+    assert.strictEqual(g.is_clear, true, `rank ${c.rank}: KAZM 780 kHz is_clear should be true`);
+  }
+});
+
 test('am_utility_power_service_and_metering_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Construction Project Schedule and Management Guide */}
+        {candidate.am_construction_project_schedule_and_management_guide && (() => {
+          const g = candidate.am_construction_project_schedule_and_management_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="sch-guide" style={{ marginBottom: 16, padding: 12, background: '#faf5ff', borderRadius: 8, border: '2px solid #9333ea' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Construction Project Schedule &amp; Management</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7e22ce' }}>
+                <span style={{ color: '#9333ea' }}>Channel / Mode:</span><span style={{ fontWeight: 600 }}>{g.is_clear ? 'Clear channel' : 'Non-clear'} {g.is_da ? 'DA' : 'NDA'} Class {g.fcc_class}</span>
+                <span style={{ color: '#9333ea' }}>Pre-FCC (search+ESA+app):</span><span>{g.pre_fcc_months_low}–{g.pre_fcc_months_high} months</span>
+                <span style={{ color: '#9333ea' }}>FCC Processing:</span><span>{g.fcc_processing_months_low}–{g.fcc_processing_months_high} months{g.is_clear ? ' (clear channel)' : ''}</span>
+                <span style={{ color: '#9333ea' }}>Construction:</span><span>{g.post_fcc_months_low}–{g.post_fcc_months_high} months ({g.construction_weeks_low}–{g.construction_weeks_high} wks)</span>
+                <span style={{ color: '#9333ea' }}>Total Timeline:</span><span style={{ fontWeight: 600 }}>{g.total_months_low}–{g.total_months_high} months</span>
+                <span style={{ color: '#9333ea' }}>PM Overhead ({(g.pm_pct * 100).toFixed(0)}%):</span><span>{fmt(g.pm_cost_low_usd)} – {fmt(g.pm_cost_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#6b21a8' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Utility Power Service and Metering Guide */}
         {candidate.am_utility_power_service_and_metering_guide && (() => {
           const g = candidate.am_utility_power_service_and_metering_guide;

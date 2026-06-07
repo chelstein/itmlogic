@@ -1221,7 +1221,10 @@ export async function runSiteOptimizer(body = {}){
     atu_r_base_ohm:             c.am_transmission_line_and_antenna_tuning_unit_guide?.r_base_est_ohm ?? null,
     pwr_service_type:           c.am_utility_power_service_and_metering_guide?.service_type ?? null,
     pwr_monthly_cost_usd:       c.am_utility_power_service_and_metering_guide?.monthly_power_cost_usd ?? null,
-    pwr_setup_low_usd:          c.am_utility_power_service_and_metering_guide?.total_utility_setup_low_usd ?? null
+    pwr_setup_low_usd:          c.am_utility_power_service_and_metering_guide?.total_utility_setup_low_usd ?? null,
+    sch_total_months_low:       c.am_construction_project_schedule_and_management_guide?.total_months_low ?? null,
+    sch_fcc_months_low:         c.am_construction_project_schedule_and_management_guide?.fcc_processing_months_low ?? null,
+    sch_pm_cost_low_usd:        c.am_construction_project_schedule_and_management_guide?.pm_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6956,6 +6959,63 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_construction_project_schedule_and_management_guide: (() => {
+      // Total timeline and project management cost for AM broadcast station relocation.
+      // Clear channel stations face longer FCC processing due to additional interference review.
+      const is_clear = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_da    = /^DA/i.test(pattern_mode);
+
+      // FCC processing time (months): clear channel requires additional co-channel analysis
+      const fcc_processing_months_low  = is_clear ? 9  : 6;
+      const fcc_processing_months_high = is_clear ? 18 : 12;
+
+      // Pre-FCC phases (weeks): site search → Phase I ESA → application prep
+      const pre_fcc_weeks_low  = 2  + 4  + 8;   // site search + ESA + app prep
+      const pre_fcc_weeks_high = 8  + 8  + 16;
+
+      // Post-approval construction phases (weeks)
+      const construction_weeks_low  = 4 + 2 + 4  + 2 + 2 + (is_da ? 4 : 2);  // prep+tower+bldg+gnd+equip+proof
+      const construction_weeks_high = 8 + 4 + 12 + 6 + 4 + (is_da ? 8 : 4);
+
+      const pre_fcc_months_low  = round2(pre_fcc_weeks_low  / 4.33);
+      const pre_fcc_months_high = round2(pre_fcc_weeks_high / 4.33);
+      const post_fcc_months_low  = round2(construction_weeks_low  / 4.33);
+      const post_fcc_months_high = round2(construction_weeks_high / 4.33);
+      const total_months_low  = round2(pre_fcc_months_low  + fcc_processing_months_low  + post_fcc_months_low);
+      const total_months_high = round2(pre_fcc_months_high + fcc_processing_months_high + post_fcc_months_high);
+
+      // Construction budget estimate (used for PM % calculation)
+      const est_construction_budget_low  = tpo_kw >= 50 ? 500000 : tpo_kw >= 10 ? 200000 : 80000;
+      const est_construction_budget_high = tpo_kw >= 50 ? 1500000 : tpo_kw >= 10 ? 600000 : 250000;
+      const pm_pct = 0.12;
+      const pm_cost_low_usd  = round2(est_construction_budget_low  * pm_pct);
+      const pm_cost_high_usd = round2(est_construction_budget_high * pm_pct);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        is_clear,
+        is_da,
+        fcc_processing_months_low,
+        fcc_processing_months_high,
+        pre_fcc_months_low,
+        pre_fcc_months_high,
+        construction_weeks_low,
+        construction_weeks_high,
+        post_fcc_months_low,
+        post_fcc_months_high,
+        total_months_low,
+        total_months_high,
+        est_construction_budget_low,
+        est_construction_budget_high,
+        pm_pct,
+        pm_cost_low_usd,
+        pm_cost_high_usd,
+        reference: 'FCC AM Media Bureau processing time history; NABOB relocation guidelines; RS Means project management overhead norms',
+        note: `${is_clear ? 'Clear channel' : 'Non-clear'} ${is_da ? 'DA' : 'NDA'} relocation: pre-FCC ${pre_fcc_months_low}–${pre_fcc_months_high} mo + FCC processing ${fcc_processing_months_low}–${fcc_processing_months_high} mo + construction ${post_fcc_months_low}–${post_fcc_months_high} mo = ${total_months_low}–${total_months_high} months total; PM overhead ${pm_pct * 100}% = $${pm_cost_low_usd.toLocaleString()}–$${pm_cost_high_usd.toLocaleString()}`
       };
     })(),
 

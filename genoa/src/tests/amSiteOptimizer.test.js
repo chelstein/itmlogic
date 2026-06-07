@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_construction_project_schedule_and_management_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_project_schedule_and_management_guide;
+  assert.ok(g !== undefined && g !== null, 'am_construction_project_schedule_and_management_guide missing');
+  assert.ok(g.total_months_low > 0, 'total_months_low must be positive');
+  assert.ok(g.total_months_high >= g.total_months_low, 'high must be >= low');
+});
+
+test('am_construction_project_schedule_and_management_guide KAZM clear channel flag', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_project_schedule_and_management_guide;
+  assert.strictEqual(g.is_clear, true,  'KAZM 780 kHz should be clear channel');
+  assert.strictEqual(g.is_da,    false, 'KAZM NDA should have is_da=false');
+  assert.strictEqual(g.fcc_processing_months_low, 9, 'clear channel fcc_processing_months_low should be 9');
+});
+
+test('am_construction_project_schedule_and_management_guide KAZM timeline', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_project_schedule_and_management_guide;
+  assert.strictEqual(g.total_months_low,  15.93, 'KAZM total_months_low should be 15.93');
+  assert.strictEqual(g.total_months_high, 34.17, 'KAZM total_months_high should be 34.17');
+});
+
+test('am_construction_project_schedule_and_management_guide KAZM PM costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_construction_project_schedule_and_management_guide;
+  assert.strictEqual(g.pm_pct,           0.12,  'pm_pct should be 0.12 (12%)');
+  assert.strictEqual(g.pm_cost_low_usd,  9600,  'KAZM pm_cost_low_usd should be $9,600');
+  assert.strictEqual(g.pm_cost_high_usd, 30000, 'KAZM pm_cost_high_usd should be $30,000');
+});
+
+test('am_construction_project_schedule_and_management_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sch_total_months_low' in row, 'sch_total_months_low missing from comparison table');
+    assert.ok('sch_fcc_months_low'   in row, 'sch_fcc_months_low missing from comparison table');
+    assert.ok('sch_pm_cost_low_usd'  in row, 'sch_pm_cost_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.sch_total_months_low, 15.93, 'rank-1 sch_total_months_low should be 15.93');
+  assert.strictEqual(r0.sch_fcc_months_low,   9,     'rank-1 sch_fcc_months_low should be 9');
+  assert.strictEqual(r0.sch_pm_cost_low_usd,  9600,  'rank-1 sch_pm_cost_low_usd should be $9,600');
+});
+
 test('am_utility_power_service_and_metering_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_utility_power_service_and_metering_guide;
