@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Station Insurance & Bonding Guide */}
+        {candidate.am_station_insurance_and_bonding_guide && (() => {
+          const g = candidate.am_station_insurance_and_bonding_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff1f2', borderRadius: 8, border: '1px solid #fda4af' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#9f1239', marginBottom: 8 }}>
+                Station Insurance & Surety Bonding
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Annual Insurance Premium:</span> <strong>${g.annual_premium_low_usd?.toLocaleString()}–${g.annual_premium_high_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#64748b' }}>Tower Replacement Value:</span> <strong>${g.tower_replacement_value_low_usd?.toLocaleString()}–${g.tower_replacement_value_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Required Coverage Categories:</span> <strong>{g.n_required_categories}</strong></div>
+                <div><span style={{ color: '#64748b' }}>BI Coverage Max:</span> <strong>{g.bi_max_coverage_months} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>BI Waiting Period:</span> <strong>{g.bi_waiting_period_hours}h</strong></div>
+                <div><span style={{ color: '#64748b' }}>BI Monthly Coverage:</span> <strong>${g.bi_monthly_coverage_usd?.toLocaleString()}/mo</strong></div>
+                <div><span style={{ color: '#64748b' }}>Performance Bond:</span> <strong>${g.performance_bond_amount_usd?.toLocaleString()} ({g.performance_bond_pct}%)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Bond Annual Premium:</span> <strong>${g.bond_annual_premium_usd?.toLocaleString()}/yr</strong></div>
+              </div>
+              {g.insurance_categories?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#9f1239', marginBottom: 4 }}>Coverage Requirements</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {g.insurance_categories.filter(c => c.required).map((c, i) => (
+                      <span key={i} style={{ background: '#fecdd3', color: '#881337', borderRadius: 3, padding: '1px 6px', fontSize: 10 }}>
+                        {c.type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* FCC Proof of Performance Measurement Guide */}
         {candidate.fcc_proof_of_performance_measurement_guide && (() => {
           const g = candidate.fcc_proof_of_performance_measurement_guide;

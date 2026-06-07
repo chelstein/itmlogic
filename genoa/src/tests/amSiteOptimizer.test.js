@@ -10306,3 +10306,46 @@ test('fcc_proof_of_performance_measurement_guide comparison table columns presen
     assert.ok('pop_cost_low_usd' in row, 'pop_cost_low_usd missing from comparison table');
   }
 });
+
+test('am_station_insurance_and_bonding_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_insurance_and_bonding_guide;
+  assert.ok(g, 'insurance guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.bi_max_coverage_months, 12, 'BI max coverage must align with FCC §73.1740 silence limit');
+});
+
+test('am_station_insurance_and_bonding_guide KAZM Class D clear premium range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_insurance_and_bonding_guide;
+  assert.ok(g.annual_premium_low_usd >= 3000, 'Class D premium low must be >= $3,000');
+  assert.ok(g.annual_premium_high_usd <= 25000, 'Class D premium high must be <= $25,000');
+  assert.ok(g.annual_premium_high_usd >= g.annual_premium_low_usd, 'high must be >= low');
+});
+
+test('am_station_insurance_and_bonding_guide tower replacement value is reasonable for Class D', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_insurance_and_bonding_guide;
+  assert.ok(g.tower_replacement_value_low_usd > 0, 'tower value must be positive');
+  assert.ok(g.tower_replacement_value_high_usd >= g.tower_replacement_value_low_usd, 'high >= low');
+  assert.ok(g.n_required_categories >= 5, 'must have at least 5 required coverage categories');
+});
+
+test('am_station_insurance_and_bonding_guide bonding fields are valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_insurance_and_bonding_guide;
+  assert.ok(g.performance_bond_amount_usd > 0, 'performance bond must be positive');
+  assert.ok(g.performance_bond_pct >= 10, 'performance bond must be >= 10% of construction value');
+  assert.ok(g.bond_annual_premium_usd > 0, 'bond annual premium must be positive');
+  assert.strictEqual(g.bi_waiting_period_hours, 72, 'BI waiting period must be 72 hours');
+});
+
+test('am_station_insurance_and_bonding_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ins_annual_low_usd'      in row, 'ins_annual_low_usd missing from comparison table');
+    assert.ok('ins_tower_value_low_usd' in row, 'ins_tower_value_low_usd missing from comparison table');
+    assert.ok('ins_bond_amount_usd'     in row, 'ins_bond_amount_usd missing from comparison table');
+  }
+});

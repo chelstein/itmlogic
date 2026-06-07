@@ -1098,7 +1098,10 @@ export async function runSiteOptimizer(body = {}){
     xltr_coverage_km:           c.am_translator_and_booster_strategy_guide?.recommended_translator_coverage_km ?? null,
     pop_proof_type:             c.fcc_proof_of_performance_measurement_guide?.proof_type ?? null,
     pop_total_pts:              c.fcc_proof_of_performance_measurement_guide?.total_measurement_points ?? null,
-    pop_cost_low_usd:           c.fcc_proof_of_performance_measurement_guide?.total_proof_cost_low_usd ?? null
+    pop_cost_low_usd:           c.fcc_proof_of_performance_measurement_guide?.total_proof_cost_low_usd ?? null,
+    ins_annual_low_usd:         c.am_station_insurance_and_bonding_guide?.annual_premium_low_usd ?? null,
+    ins_tower_value_low_usd:    c.am_station_insurance_and_bonding_guide?.tower_replacement_value_low_usd ?? null,
+    ins_bond_amount_usd:        c.am_station_insurance_and_bonding_guide?.performance_bond_amount_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6833,6 +6836,119 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_station_insurance_and_bonding_guide: (() => {
+      // Models the insurance and bonding requirements for AM tower construction
+      // and station relocation to the candidate site.
+      //
+      // Key insurance categories for AM stations:
+      //   1. Tower construction liability: required by general contractors
+      //      OSHA 29 CFR 1926 requires $1M minimum liability per occurrence
+      //   2. Broadcast liability (media perils): E&O, content liability
+      //      $1M–$5M limit typical for AM market
+      //   3. Equipment/property coverage: transmitter, antenna, studio gear
+      //      Replacement cost basis; tower typically scheduled separately
+      //   4. Business interruption (BI): covers revenue loss during silent period
+      //      30–180 day waiting period; FCC silent period limit 12 months
+      //   5. Workers compensation: required for all employees (state-mandated)
+      //   6. General Liability (GL): $1M per occurrence / $2M aggregate typical
+      //   7. Commercial Auto: company vehicles (if applicable)
+      //
+      // Tower insurance considerations:
+      //   AM towers are "scheduled structures" — insured at stated value
+      //   Standard exclusions: earthquake, flood, wind (over certain speeds)
+      //   Guy wire failures: covered under property if not neglect
+      //   Base insulator damage: covered under equipment floater
+      //   NEPA/environmental cleanup: requires Pollution Liability endorsement
+      //
+      // Surety bonding for FCC construction:
+      //   FCC may require performance bond for new CP holders in some cases
+      //   Construction contracts typically require 10–15% performance bond
+      //   Payment bond: separate from performance bond; protects subcontractors
+      //
+      // Annual premium estimates by class (2024):
+      //   Class A (50 kW, $500k–2M tower value): $35,000–$80,000/yr all-in
+      //   Class B (10 kW): $15,000–$35,000/yr
+      //   Class C (1 kW): $5,000–$12,000/yr
+      //   Class D clear (5 kW, $150k tower): $8,000–$20,000/yr
+      //   Class D local (1 kW): $3,000–$8,000/yr
+      //
+      // Business Interruption (BI) coverage:
+      //   During construction/relocation, BI covers lost broadcasting revenue
+      //   Typical BI waiting period: 72 hours
+      //   Coverage period: up to 12 months (FCC §73.1740 limit)
+
+      const isDA_ins        = /^DA/i.test(pattern_mode);
+      const is_clear_ch_ins = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_ins = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Insurance premium estimates by class
+      const PREMIUM_BY_CLASS = {
+        A: { low: 35000, high: 80000 },
+        B: { low: 15000, high: 35000 },
+        C: { low: 5000,  high: 12000 },
+        D: is_local_ch_ins ? { low: 3000, high: 8000 } : { low: 8000, high: 20000 }
+      };
+      const premium = PREMIUM_BY_CLASS[fcc_class] ?? PREMIUM_BY_CLASS['D'];
+
+      // Tower replacement value estimate by class
+      const TOWER_VALUE = {
+        A: { low: 500000, high: 2000000 },
+        B: { low: 200000, high: 600000  },
+        C: { low: 80000,  high: 200000  },
+        D: is_local_ch_ins ? { low: 50000, high: 120000 } : { low: 100000, high: 300000 }
+      };
+      const tower_val = TOWER_VALUE[fcc_class] ?? TOWER_VALUE['D'];
+
+      // Coverage categories
+      const insurance_categories = [
+        { type: 'Tower & Transmitter Property', min_limit_usd: tower_val.low, recommended_limit_usd: tower_val.high, required: true },
+        { type: 'General Liability', min_limit_usd: 1000000, recommended_limit_usd: 2000000, required: true },
+        { type: 'Broadcast/Media Liability (E&O)', min_limit_usd: 1000000, recommended_limit_usd: 3000000, required: true },
+        { type: 'Business Interruption', min_limit_usd: 300000, recommended_limit_usd: 1000000, required: true },
+        { type: 'Workers Compensation', min_limit_usd: null, recommended_limit_usd: null, required: true },
+        { type: 'Pollution Liability (NEPA cleanup)', min_limit_usd: 500000, recommended_limit_usd: 1000000, required: isDA_ins || tpo_kw >= 50 },
+        { type: 'Tower Construction Liability', min_limit_usd: 1000000, recommended_limit_usd: 5000000, required: true }
+      ];
+
+      const n_required_categories = insurance_categories.filter(c => c.required).length;
+
+      // BI coverage details
+      const bi_waiting_period_hours = 72;
+      const bi_max_coverage_months  = 12; // aligns with FCC §73.1740 silence limit
+      const bi_monthly_coverage_usd = Math.round((premium.low + premium.high) / 2 * 0.4); // ~40% of total premium
+
+      // Performance bond estimate
+      const performance_bond_pct    = 0.10; // 10% of construction contract value
+      const est_construction_value  = Math.round((tower_val.low + tower_val.high) / 2);
+      const performance_bond_amount = Math.round(est_construction_value * performance_bond_pct);
+      const bond_premium_pct        = 0.015; // 1.5% of bond amount
+      const bond_annual_premium_usd = Math.round(performance_bond_amount * bond_premium_pct);
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        annual_premium_low_usd:           premium.low,
+        annual_premium_high_usd:          premium.high,
+        tower_replacement_value_low_usd:  tower_val.low,
+        tower_replacement_value_high_usd: tower_val.high,
+        insurance_categories,
+        n_required_categories,
+        bi_waiting_period_hours,
+        bi_max_coverage_months,
+        bi_monthly_coverage_usd,
+        performance_bond_pct:             Math.round(performance_bond_pct * 100),
+        performance_bond_amount_usd:      performance_bond_amount,
+        bond_annual_premium_usd,
+        is_clear_channel:                 is_clear_ch_ins,
+        is_local_channel:                 is_local_ch_ins,
+        is_da:                            isDA_ins,
+        reference: 'OSHA 29 CFR §1926 (Construction Safety); 47 CFR §73.1740 (Silence limit); FCC Broadcast Construction Practice; NAB Risk Management Guide (2023); SBA Insurance Requirements',
+        note: `Annual all-in insurance: $${premium.low.toLocaleString()}–$${premium.high.toLocaleString()}/yr. ` +
+              `Tower replacement value: $${tower_val.low.toLocaleString()}–$${tower_val.high.toLocaleString()}. ` +
+              `${n_required_categories} required coverage categories. ` +
+              `Performance bond: $${performance_bond_amount.toLocaleString()} (${Math.round(performance_bond_pct * 100)}% of construction value).`
       };
     })(),
 
