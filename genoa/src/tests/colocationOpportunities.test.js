@@ -3531,3 +3531,20 @@ test('am_daytime_vs_nighttime_coverage_differential_guide colocation: all candid
     assert.ok(g.nighttime_restriction != null, `nighttime_restriction must not be null`);
   }
 });
+
+test('am_digital_broadcasting_iboc_guide colocation: all candidates have valid IBOC data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_digital_broadcasting_iboc_guide;
+    assert.ok(g, `candidate missing am_digital_broadcasting_iboc_guide`);
+    assert.ok(g.digital_sideband_kw > 0, `digital_sideband_kw must be positive`);
+    assert.ok(g.total_iboc_capex_low_usd > 0, `total_iboc_capex_low_usd must be positive`);
+    assert.ok(g.iboc_bandwidth_khz === 30, `iboc_bandwidth_khz must be 30 kHz (hybrid AM IBOC)`);
+  }
+});

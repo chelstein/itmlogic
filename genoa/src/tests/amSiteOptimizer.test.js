@@ -14493,3 +14493,39 @@ it('candidate_comparison_table dnc columns are correct for KAZM', async () => {
   assert.strictEqual(r0.dnc_is_clear_channel, true, 'dnc_is_clear_channel should be true for 780 kHz');
   assert.ok(r0.dnc_nighttime_restriction != null, 'dnc_nighttime_restriction must not be null');
 });
+
+// ── am_digital_broadcasting_iboc_guide ───────────────────────────────────────
+
+it('am_digital_broadcasting_iboc_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_digital_broadcasting_iboc_guide, 'iboc guide missing on candidate');
+  }
+});
+
+it('am_digital_broadcasting_iboc_guide digital_sideband_kw is 0.5 kW for KAZM 5 kW at -10 dBc', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_broadcasting_iboc_guide;
+  assert.ok(Math.abs(g.digital_sideband_kw - 0.5) < 0.01, `digital_sideband_kw should be ~0.5 kW for 5 kW at -10 dBc, got ${g.digital_sideband_kw}`);
+});
+
+it('am_digital_broadcasting_iboc_guide iboc_benefit_rating is HIGH for clear channel 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_broadcasting_iboc_guide;
+  assert.ok(g.iboc_benefit_rating.includes('HIGH'), `780 kHz clear channel should have HIGH IBOC benefit`);
+});
+
+it('am_digital_broadcasting_iboc_guide reference cites NRSC-5-D and FCC MM Docket 99-325', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_digital_broadcasting_iboc_guide;
+  assert.ok(g.reference.includes('NRSC-5-D'), 'reference must cite NRSC-5-D');
+  assert.ok(g.reference.includes('99-325'), 'reference must cite MM Docket 99-325');
+});
+
+it('candidate_comparison_table iboc columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(Math.abs(r0.iboc_digital_sideband_kw - 0.5) < 0.01, `iboc_digital_sideband_kw should be ~0.5`);
+  assert.strictEqual(r0.iboc_total_capex_low_usd, 13000, 'iboc_total_capex_low_usd should be 13000');
+  assert.ok(r0.iboc_benefit_rating != null, 'iboc_benefit_rating must not be null');
+});

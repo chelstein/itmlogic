@@ -1380,7 +1380,10 @@ export async function runSiteOptimizer(body = {}){
     ltg_painting_cost_low_usd:          c.am_antenna_tower_lighting_and_marking_guide?.painting_cost_low_usd ?? null,
     dnc_daytime_05mvpm_radius_km:       c.am_daytime_vs_nighttime_coverage_differential_guide?.daytime_05mvpm_radius_km ?? null,
     dnc_is_clear_channel:               c.am_daytime_vs_nighttime_coverage_differential_guide?.is_clear_channel ?? null,
-    dnc_nighttime_restriction:          c.am_daytime_vs_nighttime_coverage_differential_guide?.nighttime_restriction ?? null
+    dnc_nighttime_restriction:          c.am_daytime_vs_nighttime_coverage_differential_guide?.nighttime_restriction ?? null,
+    iboc_digital_sideband_kw:           c.am_digital_broadcasting_iboc_guide?.digital_sideband_kw ?? null,
+    iboc_total_capex_low_usd:           c.am_digital_broadcasting_iboc_guide?.total_iboc_capex_low_usd ?? null,
+    iboc_benefit_rating:                c.am_digital_broadcasting_iboc_guide?.iboc_benefit_rating ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7115,6 +7118,56 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_digital_broadcasting_iboc_guide: (() => {
+      // AM HD Radio (IBOC — In-Band On-Channel): FCC authorized per Report and Order 2002 (MM 99-325).
+      // Standard: NRSC-5-D (National Radio Systems Committee) — AM IBOC digital broadcasting.
+      // AM IBOC modes: all-digital (MA3), hybrid (MA1/MA2/MA3 combo), or analog-only.
+      // Hybrid AM IBOC: digital sidebands at ±10, ±20 kHz offset; TPO must stay at analog level.
+      // FCC limits AM IBOC digital power injection: –10 dB relative to analog carrier (hybrid mode).
+      // AM IBOC bandwidth: ~±30 kHz (hybrid) vs. 10 kHz (analog-only, NRSC-2-B).
+      const iboc_mode = 'HYBRID_MA1'; // most common AM IBOC deployment
+      const digital_power_injection_db = -10; // relative to analog carrier
+      const analog_carrier_kw = tpo_kw;
+      const digital_sideband_kw = round2(analog_carrier_kw * Math.pow(10, digital_power_injection_db / 10));
+      const iboc_bandwidth_khz = 30; // ±15 kHz (hybrid)
+      const analog_bandwidth_khz = 10; // NRSC-2-B limit
+      // Adjacent channel interference: IBOC may degrade ±1 ch neighbors (±10 kHz)
+      const adjacent_channel_degradation_db = 6; // typical at ±10 kHz offset
+      // HD Radio equipment cost: exciter/combiner for AM hybrid
+      const hd_exciter_cost_low_usd  = 8000;
+      const hd_exciter_cost_high_usd = 25000;
+      const hd_combiner_cost_low_usd  = 5000;
+      const hd_combiner_cost_high_usd = 15000;
+      const total_iboc_capex_low_usd  = hd_exciter_cost_low_usd  + hd_combiner_cost_low_usd;
+      const total_iboc_capex_high_usd = hd_exciter_cost_high_usd + hd_combiner_cost_high_usd;
+      // Annual HD Radio royalty/licensing: per IBiquity/Xperi license terms
+      const annual_license_fee_usd = 3000;
+      // Clear channel: IBOC more beneficial (wider analog coverage + digital)
+      const is_clear_ch_iboc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const iboc_benefit_rating = is_clear_ch_iboc ? 'HIGH (clear-channel wide-area reach)' : 'MODERATE';
+      return {
+        frequency_khz,
+        iboc_mode,
+        digital_power_injection_db,
+        analog_carrier_kw,
+        digital_sideband_kw,
+        iboc_bandwidth_khz,
+        analog_bandwidth_khz,
+        adjacent_channel_degradation_db,
+        hd_exciter_cost_low_usd,
+        hd_exciter_cost_high_usd,
+        hd_combiner_cost_low_usd,
+        hd_combiner_cost_high_usd,
+        total_iboc_capex_low_usd,
+        total_iboc_capex_high_usd,
+        annual_license_fee_usd,
+        is_clear_channel: is_clear_ch_iboc,
+        iboc_benefit_rating,
+        reference: 'FCC MM Docket 99-325 (AM IBOC authorization 2002); NRSC-5-D (2017) (AM IBOC digital broadcasting standard); 47 CFR §73.404 (AM IBOC operation); IBiquity/Xperi HD Radio licensing; NRSC-2-B (AM analog bandwidth standard)',
+        note: `${frequency_khz} kHz hybrid AM IBOC (${iboc_mode}): digital sidebands at –${Math.abs(digital_power_injection_db)} dBc (${digital_sideband_kw} kW). BW: ${iboc_bandwidth_khz} kHz hybrid vs. ${analog_bandwidth_khz} kHz analog. IBOC benefit: ${iboc_benefit_rating}. Capex: $${total_iboc_capex_low_usd.toLocaleString()}–$${total_iboc_capex_high_usd.toLocaleString()} + $${annual_license_fee_usd.toLocaleString()}/yr license.`
       };
     })(),
 

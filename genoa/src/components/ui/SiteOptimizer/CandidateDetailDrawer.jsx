@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Digital Broadcasting (IBOC/HD Radio) Guide */}
+        {candidate.am_digital_broadcasting_iboc_guide && (() => {
+          const g = candidate.am_digital_broadcasting_iboc_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="iboc-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf2f8', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#701a75', marginBottom: 6, fontSize: 13 }}>HD Radio (IBOC) Digital Broadcasting — NRSC-5-D</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#86198f' }}>
+                <span>IBOC mode:</span><span>{g.iboc_mode ?? '—'}</span>
+                <span>Analog carrier:</span><span>{g.analog_carrier_kw != null ? `${g.analog_carrier_kw} kW` : '—'}</span>
+                <span>Digital sidebands (–10 dBc):</span><span>{g.digital_sideband_kw != null ? `${g.digital_sideband_kw} kW ea.` : '—'}</span>
+                <span>IBOC bandwidth:</span><span>{g.iboc_bandwidth_khz != null ? `±${g.iboc_bandwidth_khz/2} kHz (${g.iboc_bandwidth_khz} kHz total)` : '—'}</span>
+                <span>Analog bandwidth (NRSC-2-B):</span><span>{g.analog_bandwidth_khz != null ? `≤ ${g.analog_bandwidth_khz} kHz` : '—'}</span>
+                <span>Adj. ch. degradation:</span><span style={{ color: '#dc2626' }}>{g.adjacent_channel_degradation_db != null ? `~${g.adjacent_channel_degradation_db} dB at ±10 kHz` : '—'}</span>
+                <span>IBOC benefit:</span><span style={{ fontWeight: 600, color: g.iboc_benefit_rating?.includes('HIGH') ? '#16a34a' : '#ca8a04' }}>{g.iboc_benefit_rating ?? '—'}</span>
+                <span>HD exciter + combiner:</span><span>{g.total_iboc_capex_low_usd != null ? `$${fmt(g.total_iboc_capex_low_usd)} – $${fmt(g.total_iboc_capex_high_usd)}` : '—'}</span>
+                <span>Annual license fee:</span><span>{g.annual_license_fee_usd != null ? `$${fmt(g.annual_license_fee_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c026d3', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Daytime vs Nighttime Coverage Differential Guide */}
         {candidate.am_daytime_vs_nighttime_coverage_differential_guide && (() => {
           const g = candidate.am_daytime_vs_nighttime_coverage_differential_guide;
