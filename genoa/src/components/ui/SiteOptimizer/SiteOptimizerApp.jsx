@@ -1717,6 +1717,33 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      spectrum_monitoring_and_frequency_drift_guide: {
+        frequency_khz: 780, freq_hz: 780000, tolerance_hz: 20, tolerance_ppm: 25.64,
+        lower_limit_hz: 779980, upper_limit_hz: 780020,
+        n_monitoring_methods: 4, n_required_methods: 2, n_drift_causes: 5,
+        n_transmitter_types: 3, antenna_induced_drift_hz_max: 1,
+        monitor_check_interval_days: 30, n_correction_steps: 5,
+        transmitter_types: [
+          { type: 'MODERN_PLL',        label: 'Modern PLL (DX, Nautel, BE, GatesAir)', drift_typ_hz: 1,  drift_max_hz: 5,  ppm_typ: 0.001, margin_pct: 97.5, notes: 'GPS-disciplined or TCXO/OCXO reference; autonomous correction' },
+          { type: 'OLDER_SOLID_STATE', label: 'Older solid-state (1980s–90s)',         drift_typ_hz: 5,  drift_max_hz: 12, ppm_typ: 0.006, margin_pct: 75.0, notes: 'Crystal oscillator; temperature-sensitive; periodic realignment needed' },
+          { type: 'TUBE_AM',           label: 'Vintage tube transmitter (pre-1980)',   drift_typ_hz: 10, drift_max_hz: 18, ppm_typ: 0.013, margin_pct: 50.0, notes: 'Plate-modulated; warm-up drift significant; check after power cycling' }
+        ],
+        monitoring_options: [
+          { method: 'GPS_COUNTER',    label: 'GPS-disciplined frequency counter',    accuracy_hz: 0.01, cost_usd: 800,  required: true,  notes: 'Primary on-site reference; ±0.01 Hz; GPSDO-locked' },
+          { method: 'REMOTE_SDR',     label: 'Software-defined radio (SDR) monitor', accuracy_hz: 1.0,  cost_usd: 350,  required: false, notes: 'RTL-SDR + software; useful for continuous remote monitoring' },
+          { method: 'COMMERCIAL_MON', label: 'Commercial frequency monitor',          accuracy_hz: 0.1,  cost_usd: 2500, required: false, notes: 'e.g., Inovonics 223, Belar FMCS-1; integrated with logging' },
+          { method: 'THIRD_PARTY',    label: 'Annual third-party frequency check',    accuracy_hz: 0.05, cost_usd: 500,  required: true,  notes: '§73.1215(c): independent verification annually; file in station log' }
+        ],
+        correction_steps: [
+          { step: 1, action: 'IDENTIFY_SOURCE', label: 'Identify drift source',                  time_min: 30, notes: 'Compare transmitter ref output vs. GPS counter; check oscillator temp' },
+          { step: 2, action: 'OSCILLATOR_TRIM', label: 'Trim oscillator reference (if in-spec)', time_min: 60, notes: 'Adjust TCXO trimmer or synthesizer offset register; log adjustment' },
+          { step: 3, action: 'ATU_CHECK',       label: 'Verify ATU tuning and ground system',    time_min: 45, notes: 'Check base impedance; re-tune if ground saturation has shifted loading' },
+          { step: 4, action: 'REDUCE_POWER',    label: 'Reduce power if approaching tolerance',  time_min: 5,  notes: 'If drift >15 Hz, reduce to auxiliary power (§73.1560) until corrected' },
+          { step: 5, action: 'LOG_AND_REPORT',  label: 'Log correction in station records',      time_min: 15, notes: '§73.1820: all equipment adjustments logged; preserve GPS counter printout' }
+        ],
+        reference: '47 CFR §73.1215 (carrier frequency tolerance); §73.1820 (station logs); §73.1560 (power reduction)',
+        note: 'AM frequency tolerance is ±20 Hz (25.64 ppm at 780 kHz) per §73.1215. Modern PLL transmitters operate well within this with <2 Hz typical drift. Annual third-party frequency check required. Monitor after relocation — new site ground conditions may shift ATU tuning slightly.'
+      },
       broadcast_attorney_and_consulting_guide: {
         frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
         attorney_total_typ_usd: 24000,

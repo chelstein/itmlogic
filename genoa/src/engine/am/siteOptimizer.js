@@ -1041,7 +1041,10 @@ export async function runSiteOptimizer(body = {}){
     zulcg_permit_weeks_rural:   c.zoning_and_land_use_compliance_guide?.permit_weeks_high_rural ?? null,
     bacg_attorney_total_usd:    c.broadcast_attorney_and_consulting_guide?.attorney_total_typ_usd ?? null,
     bacg_engineering_total_usd: c.broadcast_attorney_and_consulting_guide?.engineering_total_typ_usd ?? null,
-    bacg_combined_typ_usd:      c.broadcast_attorney_and_consulting_guide?.combined_total_usd?.typical ?? null
+    bacg_combined_typ_usd:      c.broadcast_attorney_and_consulting_guide?.combined_total_usd?.typical ?? null,
+    smfdg_tolerance_hz:         c.spectrum_monitoring_and_frequency_drift_guide?.tolerance_hz ?? null,
+    smfdg_tolerance_ppm:        c.spectrum_monitoring_and_frequency_drift_guide?.tolerance_ppm ?? null,
+    smfdg_n_monitoring_methods: c.spectrum_monitoring_and_frequency_drift_guide?.n_monitoring_methods ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6776,6 +6779,91 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    spectrum_monitoring_and_frequency_drift_guide: (() => {
+      // 47 CFR §73.1215 — Carrier frequency tolerance for AM (MF) broadcast stations.
+      // Tolerance: ±20 Hz from assigned frequency (absolute), verified at all power levels.
+      // Typical modern PLL transmitters: ±0.5–2 Hz drift; older tube rigs: ±5–15 Hz.
+      //
+      // Monitoring methods:
+      //   1. On-site frequency counter (GPS-disciplined reference, ±0.01 Hz accuracy)
+      //   2. Remote frequency monitor (SDR or commercial, e.g., Nautel AUI or Inovonics 223)
+      //   3. Third-party independent frequency check (required annually by §73.1215(c))
+      //   4. Modulation monitor cross-check (some monitors include carrier freq readout)
+      //
+      // Drift causes in AM transmitters:
+      //   - Crystal oscillator aging (~0.5–2 ppm/year)
+      //   - Temperature coefficient of TCXO/OCXO reference (~0.01–0.5 ppm/°C without OCXO)
+      //   - Power supply variation (modulation-induced carrier shift in plate-modulated rigs)
+      //   - Antenna loading shift (ice loading, ground saturation changes antenna Q)
+      //   - ATU component aging (capacitor drift in L/C tuning networks)
+      //
+      // KAZM physics: 780 kHz assigned; tolerance = ±20 Hz → 779,980–780,020 Hz
+
+      const freq_khz         = frequency_khz;                      // 780
+      const freq_hz          = freq_khz * 1000;                     // 780,000
+      const tolerance_hz     = 20;                                  // §73.1215 absolute limit
+      const tolerance_ppm    = Math.round((tolerance_hz / freq_hz) * 1e6 * 100) / 100; // ~25.64 ppm
+      const lower_limit_hz   = freq_hz - tolerance_hz;              // 779,980
+      const upper_limit_hz   = freq_hz + tolerance_hz;              // 780,020
+
+      // Typical frequency stability by transmitter technology
+      const TRANSMITTER_TYPES = [
+        { type: 'MODERN_PLL',       label: 'Modern PLL (DX, Nautel, BE, GatesAir)', drift_typ_hz: 1,  drift_max_hz: 5,  ppm_typ: 0.001, margin_pct: 97.5, notes: 'GPS-disciplined or TCXO/OCXO reference; autonomous correction' },
+        { type: 'OLDER_SOLID_STATE', label: 'Older solid-state (1980s–90s)',        drift_typ_hz: 5,  drift_max_hz: 12, ppm_typ: 0.006, margin_pct: 75.0, notes: 'Crystal oscillator; temperature-sensitive; periodic realignment needed' },
+        { type: 'TUBE_AM',          label: 'Vintage tube transmitter (pre-1980)',   drift_typ_hz: 10, drift_max_hz: 18, ppm_typ: 0.013, margin_pct: 50.0, notes: 'Plate-modulated; warm-up drift significant; check after power cycling' },
+      ];
+
+      // Monitoring equipment options
+      const MONITORING_OPTIONS = [
+        { method: 'GPS_COUNTER',    label: 'GPS-disciplined frequency counter',   accuracy_hz: 0.01, cost_usd: 800,  required: true,  notes: 'Primary on-site reference; ±0.01 Hz; GPSDO-locked' },
+        { method: 'REMOTE_SDR',     label: 'Software-defined radio (SDR) monitor', accuracy_hz: 1.0,  cost_usd: 350,  required: false, notes: 'RTL-SDR + software; useful for continuous remote monitoring' },
+        { method: 'COMMERCIAL_MON', label: 'Commercial frequency monitor',         accuracy_hz: 0.1,  cost_usd: 2500, required: false, notes: 'e.g., Inovonics 223, Belar FMCS-1; integrated with logging' },
+        { method: 'THIRD_PARTY',    label: 'Annual third-party frequency check',   accuracy_hz: 0.05, cost_usd: 500,  required: true,  notes: '§73.1215(c): independent verification annually; file in station log' },
+      ];
+
+      const n_monitoring_methods   = MONITORING_OPTIONS.length;       // 4
+      const n_required_methods     = MONITORING_OPTIONS.filter(m => m.required).length; // 2
+      const n_drift_causes         = 5;
+      const n_transmitter_types    = TRANSMITTER_TYPES.length;        // 3
+
+      // Antenna-induced drift at new site: changes in ground conductivity or radial system
+      // integrity alter antenna feedpoint impedance → ATU detuning → small carrier shift.
+      // Ground saturation (spring thaw) can shift feedpoint R by ±2–5 Ω.
+      // Effect on frequency: negligible for well-designed ATU (<1 Hz), but must be verified.
+      const antenna_induced_drift_hz_max = 1;  // modern ATU with good ground system
+      const monitor_check_interval_days  = 30; // recommended post-relocation monitoring interval
+
+      // Correction procedures when drift detected
+      const CORRECTION_STEPS = [
+        { step: 1, action: 'IDENTIFY_SOURCE',  label: 'Identify drift source',                time_min: 30,  notes: 'Compare transmitter ref output vs. GPS counter; check oscillator temp' },
+        { step: 2, action: 'OSCILLATOR_TRIM',  label: 'Trim oscillator reference (if in-spec)', time_min: 60,  notes: 'Adjust TCXO trimmer or synthesizer offset register; log adjustment' },
+        { step: 3, action: 'ATU_CHECK',        label: 'Verify ATU tuning and ground system',  time_min: 45,  notes: 'Check base impedance; re-tune if ground saturation has shifted loading' },
+        { step: 4, action: 'REDUCE_POWER',     label: 'Reduce power if approaching tolerance', time_min: 5,   notes: 'If drift >15 Hz, reduce to auxiliary power (§73.1560) until corrected' },
+        { step: 5, action: 'LOG_AND_REPORT',   label: 'Log correction in station records',    time_min: 15,  notes: '§73.1820: all equipment adjustments logged; preserve GPS frequency counter printout' },
+      ];
+
+      return {
+        frequency_khz,
+        freq_hz,
+        tolerance_hz,
+        tolerance_ppm,
+        lower_limit_hz,
+        upper_limit_hz,
+        n_monitoring_methods,
+        n_required_methods,
+        n_drift_causes,
+        n_transmitter_types,
+        antenna_induced_drift_hz_max,
+        monitor_check_interval_days,
+        transmitter_types:  TRANSMITTER_TYPES,
+        monitoring_options: MONITORING_OPTIONS,
+        correction_steps:   CORRECTION_STEPS,
+        n_correction_steps: CORRECTION_STEPS.length,
+        reference: '47 CFR §73.1215 (carrier frequency tolerance); §73.1820 (station logs); §73.1560 (power reduction)',
+        note: `AM frequency tolerance is ±${tolerance_hz} Hz (${tolerance_ppm} ppm at ${freq_khz} kHz) per §73.1215. Modern PLL transmitters operate well within this with <2 Hz typical drift. Annual third-party frequency check required. Monitor after relocation — new site ground conditions may shift ATU tuning slightly.`
       };
     })(),
 

@@ -5683,6 +5683,64 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- spectrum_monitoring_and_frequency_drift_guide ----
+
+test('spectrum_monitoring_and_frequency_drift_guide presence and structure', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const c = res.candidates[0];
+  assert.ok(c.spectrum_monitoring_and_frequency_drift_guide != null, 'spectrum_monitoring_and_frequency_drift_guide missing');
+  const g = c.spectrum_monitoring_and_frequency_drift_guide;
+  assert.ok(Array.isArray(g.transmitter_types), 'transmitter_types not array');
+  assert.ok(Array.isArray(g.monitoring_options), 'monitoring_options not array');
+  assert.ok(Array.isArray(g.correction_steps), 'correction_steps not array');
+  assert.ok(typeof g.tolerance_hz === 'number', 'tolerance_hz not number');
+  assert.ok(typeof g.tolerance_ppm === 'number', 'tolerance_ppm not number');
+});
+
+test('spectrum_monitoring_and_frequency_drift_guide KAZM 780 kHz tolerance values', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].spectrum_monitoring_and_frequency_drift_guide;
+  assert.strictEqual(g.freq_hz, 780000, 'freq_hz should be 780000');
+  assert.strictEqual(g.tolerance_hz, 20, 'tolerance_hz should be 20 per §73.1215');
+  assert.strictEqual(g.lower_limit_hz, 779980, 'lower_limit_hz should be 779980');
+  assert.strictEqual(g.upper_limit_hz, 780020, 'upper_limit_hz should be 780020');
+  assert.ok(g.tolerance_ppm > 25 && g.tolerance_ppm < 26, `tolerance_ppm should be ~25.64 ppm (20 Hz / 780000 Hz), got ${g.tolerance_ppm}`);
+});
+
+test('spectrum_monitoring_and_frequency_drift_guide transmitter types coverage', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].spectrum_monitoring_and_frequency_drift_guide;
+  assert.strictEqual(g.n_transmitter_types, 3, 'should have 3 transmitter types');
+  const types = g.transmitter_types.map(t => t.type);
+  assert.ok(types.includes('MODERN_PLL'), 'MODERN_PLL missing');
+  assert.ok(types.includes('OLDER_SOLID_STATE'), 'OLDER_SOLID_STATE missing');
+  assert.ok(types.includes('TUBE_AM'), 'TUBE_AM missing');
+  const modern = g.transmitter_types.find(t => t.type === 'MODERN_PLL');
+  assert.ok(modern.drift_typ_hz <= 2, `modern PLL drift should be <=2 Hz, got ${modern.drift_typ_hz}`);
+});
+
+test('spectrum_monitoring_and_frequency_drift_guide monitoring methods and required count', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].spectrum_monitoring_and_frequency_drift_guide;
+  assert.strictEqual(g.n_monitoring_methods, 4, 'should have 4 monitoring methods');
+  assert.strictEqual(g.n_required_methods, 2, 'should have 2 required methods');
+  const required = g.monitoring_options.filter(m => m.required);
+  assert.ok(required.some(m => m.method === 'GPS_COUNTER'), 'GPS_COUNTER should be required');
+  assert.ok(required.some(m => m.method === 'THIRD_PARTY'), 'THIRD_PARTY should be required');
+});
+
+test('spectrum_monitoring_and_frequency_drift_guide correction steps and comparison table', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].spectrum_monitoring_and_frequency_drift_guide;
+  assert.strictEqual(g.n_correction_steps, 5, 'should have 5 correction steps');
+  assert.strictEqual(g.correction_steps[0].action, 'IDENTIFY_SOURCE', 'first step should be IDENTIFY_SOURCE');
+  assert.strictEqual(g.correction_steps[4].action, 'LOG_AND_REPORT', 'last step should be LOG_AND_REPORT');
+  // comparison table
+  const ct = res.candidate_comparison_table[0];
+  assert.strictEqual(ct.smfdg_tolerance_hz, 20, 'smfdg_tolerance_hz in comparison table');
+  assert.strictEqual(ct.smfdg_n_monitoring_methods, 4, 'smfdg_n_monitoring_methods in comparison table');
+});
+
 // ---- broadcast_attorney_and_consulting_guide ----
 
 test('broadcast_attorney_and_consulting_guide presence and structure', async () => {

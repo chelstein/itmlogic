@@ -2226,6 +2226,65 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Spectrum Monitoring and Frequency Drift Guide */}
+        {candidate.spectrum_monitoring_and_frequency_drift_guide && (() => {
+          const g = candidate.spectrum_monitoring_and_frequency_drift_guide;
+          const modern = g.transmitter_types?.find(t => t.type === 'MODERN_PLL');
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f4ff', borderRadius: 8, border: '1px solid #c7d2fe' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#3730a3', marginBottom: 8 }}>
+                Spectrum Monitoring &amp; Frequency Drift — §73.1215
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Assigned frequency:</span> <strong>{g.freq_hz?.toLocaleString()} Hz ({g.frequency_khz} kHz)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tolerance (§73.1215):</span> <strong>±{g.tolerance_hz} Hz ({g.tolerance_ppm} ppm)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Lower limit:</span> <strong>{g.lower_limit_hz?.toLocaleString()} Hz</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Upper limit:</span> <strong>{g.upper_limit_hz?.toLocaleString()} Hz</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Required methods:</span> <strong>{g.n_required_methods} of {g.n_monitoring_methods}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Correction steps:</span> <strong>{g.n_correction_steps}</strong></div>
+                {modern && <div><span style={{ color: '#6b7280' }}>Modern PLL drift typ:</span> <strong>±{modern.drift_typ_hz} Hz</strong></div>}
+                <div><span style={{ color: '#6b7280' }}>Post-relocation check:</span> <strong>Every {g.monitor_check_interval_days} days</strong></div>
+              </div>
+              {g.monitoring_options && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#4338ca', marginBottom: 4 }}>Monitoring Options</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#e0e7ff' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Method</th>
+                        <th style={{ textAlign: 'center', padding: '3px 6px' }}>Accuracy</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Cost</th>
+                        <th style={{ textAlign: 'center', padding: '3px 6px' }}>Required</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.monitoring_options.map((m, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #c7d2fe', background: m.required ? '#eef2ff' : 'transparent' }}>
+                          <td style={{ padding: '3px 6px' }}>{m.label}</td>
+                          <td style={{ textAlign: 'center', padding: '3px 6px' }}>±{m.accuracy_hz} Hz</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${m.cost_usd?.toLocaleString()}</td>
+                          <td style={{ textAlign: 'center', padding: '3px 6px' }}>{m.required ? '✓' : '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {g.transmitter_types && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#4338ca', marginBottom: 4 }}>Transmitter Frequency Stability by Type</div>
+                  {g.transmitter_types.map((t, i) => (
+                    <div key={i} style={{ fontSize: 11, padding: '2px 0', borderTop: i > 0 ? '1px solid #c7d2fe' : 'none' }}>
+                      <span style={{ fontWeight: 600 }}>{t.label}:</span> ±{t.drift_typ_hz} Hz typ / ±{t.drift_max_hz} Hz max ({t.margin_pct}% margin)
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#6366f1' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Broadcast Attorney and Consulting Guide */}
         {candidate.broadcast_attorney_and_consulting_guide && (() => {
           const g = candidate.broadcast_attorney_and_consulting_guide;
