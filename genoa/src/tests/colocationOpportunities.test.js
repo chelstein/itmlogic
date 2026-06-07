@@ -2502,3 +2502,20 @@ test('am_studio_to_transmitter_link_guide present across colocation candidates',
     assert.ok(g.stl_latency_ms > 0, `rank ${c.rank}: stl_latency_ms must be positive`);
   }
 });
+
+test('am_antenna_electrical_design_and_efficiency_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_electrical_design_and_efficiency_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_antenna_electrical_design_and_efficiency_guide`);
+    assert.ok(g.efficiency_pct_low > 0 && g.efficiency_pct_low < 100, `rank ${c.rank}: efficiency_pct_low must be 0-100`);
+    assert.ok(g.effective_erp_kw_low > 0, `rank ${c.rank}: effective_erp_kw_low must be positive`);
+    assert.ok(g.radiation_resistance_ohm === 36.5, `rank ${c.rank}: radiation_resistance should be 36.5Ω`);
+  }
+});

@@ -2226,6 +2226,50 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna Electrical Design & Efficiency Guide */}
+        {candidate.am_antenna_electrical_design_and_efficiency_guide && (() => {
+          const g = candidate.am_antenna_electrical_design_and_efficiency_guide;
+          const effColor = (pct) => pct >= 95 ? '#166534' : pct >= 88 ? '#92400e' : '#991b1b';
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fb923c', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 8, fontSize: 13 }}>
+                Antenna Electrical Design &amp; Efficiency
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#9a3412' }}>
+                <span>Wavelength</span>
+                <span style={{ fontWeight: 600 }}>{g.lambda_m}m @ {Math.round(300000/g.lambda_m)} kHz</span>
+                <span>Physical height</span>
+                <span style={{ fontWeight: 600 }}>{g.physical_height_m}m ({Math.round(g.physical_height_m * 3.281)}ft)</span>
+                <span>Electrical height</span>
+                <span style={{ fontWeight: 600 }}>{g.electrical_height_deg}° (λ/4 resonant)</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA)' : ' (NDA)'}</span>
+                <span>Radial count</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} buried (λ/4 each)</span>
+                <span>Radiation resistance</span>
+                <span style={{ fontWeight: 600 }}>{g.radiation_resistance_ohm}Ω</span>
+                <span>Ground loss (R_g)</span>
+                <span style={{ fontWeight: 600 }}>{g.ground_loss_ohm_low}–{g.ground_loss_ohm_high}Ω</span>
+                <span>Antenna efficiency</span>
+                <span style={{ fontWeight: 700, color: effColor(g.efficiency_pct_low) }}>{g.efficiency_pct_low}–{g.efficiency_pct_high}%</span>
+                <span>ATU insertion loss</span>
+                <span style={{ fontWeight: 600 }}>{g.atu_loss_pct_low}–{g.atu_loss_pct_high}%</span>
+                <span>System efficiency</span>
+                <span style={{ fontWeight: 700, color: effColor(g.total_efficiency_pct_low) }}>{g.total_efficiency_pct_low}–{g.total_efficiency_pct_high}%</span>
+                <span>Effective ERP</span>
+                <span style={{ fontWeight: 700, color: '#7c2d12' }}>{g.effective_erp_kw_low}–{g.effective_erp_kw_high} kW (from {g.effective_erp_kw_high > 0 ? Math.round(g.effective_erp_kw_high / g.total_efficiency_pct_high * 100) : '?'} kW TPO)</span>
+                <span>VSWR 2:1 bandwidth</span>
+                <span style={{ fontWeight: 600 }}>{g.vswr_bw_khz_low}–{g.vswr_bw_khz_high} kHz</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#7c2d12', borderTop: '1px solid #fed7aa', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Studio-to-Transmitter Link Guide */}
         {candidate.am_studio_to_transmitter_link_guide && (() => {
           const g = candidate.am_studio_to_transmitter_link_guide;

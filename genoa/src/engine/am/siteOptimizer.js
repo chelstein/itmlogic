@@ -1128,7 +1128,10 @@ export async function runSiteOptimizer(body = {}){
     int_service_radius_05_km:   c.am_daytime_interference_and_protection_guide?.service_radius_05_mvpm_km ?? null,
     stl_technology:             c.am_studio_to_transmitter_link_guide?.stl_technology ?? null,
     stl_distance_km:            c.am_studio_to_transmitter_link_guide?.stl_distance_km ?? null,
-    stl_total_cost_low_usd:     c.am_studio_to_transmitter_link_guide?.total_stl_cost_low_usd ?? null
+    stl_total_cost_low_usd:     c.am_studio_to_transmitter_link_guide?.total_stl_cost_low_usd ?? null,
+    ant_efficiency_pct_low:     c.am_antenna_electrical_design_and_efficiency_guide?.efficiency_pct_low ?? null,
+    ant_effective_erp_kw_low:   c.am_antenna_electrical_design_and_efficiency_guide?.effective_erp_kw_low ?? null,
+    ant_ground_loss_ohm_high:   c.am_antenna_electrical_design_and_efficiency_guide?.ground_loss_ohm_high ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6863,6 +6866,85 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_electrical_design_and_efficiency_guide: (() => {
+      // Models the electrical design and radiation efficiency of a standard
+      // quarter-wave vertical monopole antenna at the candidate site.
+      // Uses the Brown-Lewis-Epstein (1937) empirical ground-loss model and
+      // conventional radiation resistance for a resonant monopole over ground.
+
+      const isDA_eff        = /^DA/i.test(pattern_mode);
+      const is_local_ch_eff = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Wavelength and quarter-wave physical height
+      const lambda_m          = round2(300000 / frequency_khz);
+      const physical_height_m = round2(lambda_m * 0.25);
+      const electrical_height_deg = 90; // standard quarter-wave resonant monopole
+
+      // Radiation resistance for a resonant quarter-wave monopole over
+      // perfect ground ≈ 36.5 Ω (classical result)
+      const radiation_resistance_ohm = 36.5;
+
+      // Estimated number of ground radials (matching the grounding guide)
+      const N_RADIALS = { A: 120, B: 120, C: 90, D: is_local_ch_eff ? 60 : 90 };
+      const n_radials = N_RADIALS[fcc_class] ?? 90;
+
+      // Ground-loss resistance: Brown-Lewis-Epstein empirical model
+      // R_g_low  ≈ 100/n_radials Ω (good conductivity / dry season)
+      // R_g_high ≈ 300/n_radials Ω (poor conductivity / wet season)
+      const ground_loss_ohm_low  = round2(100 / n_radials);
+      const ground_loss_ohm_high = round2(300 / n_radials);
+
+      // Radiation efficiency η = R_r / (R_r + R_g)
+      const efficiency_pct_low  = round2(100 * radiation_resistance_ohm / (radiation_resistance_ohm + ground_loss_ohm_high));
+      const efficiency_pct_high = round2(100 * radiation_resistance_ohm / (radiation_resistance_ohm + ground_loss_ohm_low));
+
+      // ATU (antenna tuning unit) insertion loss: 3–8% typical
+      const atu_loss_pct_low  = 3;
+      const atu_loss_pct_high = 8;
+
+      // Combined system efficiency (antenna + ATU)
+      const total_efficiency_pct_low  = round2((efficiency_pct_low  / 100) * (1 - atu_loss_pct_high / 100) * 100);
+      const total_efficiency_pct_high = round2((efficiency_pct_high / 100) * (1 - atu_loss_pct_low  / 100) * 100);
+
+      // Effective ERP applied to authorized TPO
+      const effective_erp_kw_low  = round2(tpo_kw * total_efficiency_pct_low  / 100);
+      const effective_erp_kw_high = round2(tpo_kw * total_efficiency_pct_high / 100);
+
+      // Approximate VSWR 2:1 bandwidth (quarter-wave monopole: ~3–8% of center freq)
+      // VSWR bandwidth broadens with lower Q (lossier ground), narrows with high Q
+      const vswr_bw_pct_low  = round2(efficiency_pct_low  * 0.04);  // proportional approximation
+      const vswr_bw_pct_high = round2(efficiency_pct_high * 0.08);
+      const vswr_bw_khz_low  = round2(frequency_khz * vswr_bw_pct_low  / 100);
+      const vswr_bw_khz_high = round2(frequency_khz * vswr_bw_pct_high / 100);
+
+      // DA: each tower element has its own ground system and ATU
+      const n_tower_elements = isDA_eff
+        ? ((fcc_class === 'A' || fcc_class === 'B') ? 4 : 3)
+        : 1;
+
+      return {
+        lambda_m,
+        physical_height_m,
+        electrical_height_deg,
+        n_radials,
+        n_tower_elements,
+        radiation_resistance_ohm,
+        ground_loss_ohm_low,
+        ground_loss_ohm_high,
+        efficiency_pct_low,
+        efficiency_pct_high,
+        atu_loss_pct_low,
+        atu_loss_pct_high,
+        total_efficiency_pct_low,
+        total_efficiency_pct_high,
+        effective_erp_kw_low,
+        effective_erp_kw_high,
+        vswr_bw_khz_low,
+        vswr_bw_khz_high,
+        note: `${electrical_height_deg}° monopole @ ${frequency_khz} kHz: h = ${physical_height_m}m, λ = ${lambda_m}m. R_r = ${radiation_resistance_ohm}Ω; ground loss (${n_radials} radials) = ${ground_loss_ohm_low}–${ground_loss_ohm_high}Ω [Brown-Lewis-Epstein]. Antenna η = ${efficiency_pct_low}–${efficiency_pct_high}%; ATU loss ${atu_loss_pct_low}–${atu_loss_pct_high}%; net system efficiency ${total_efficiency_pct_low}–${total_efficiency_pct_high}%. Effective ERP: ${effective_erp_kw_low}–${effective_erp_kw_high} kW from ${tpo_kw} kW TPO. VSWR 2:1 BW: ~${vswr_bw_khz_low}–${vswr_bw_khz_high} kHz.`
       };
     })(),
 

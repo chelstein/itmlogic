@@ -10805,3 +10805,58 @@ test('am_studio_to_transmitter_link_guide comparison table columns present', asy
     assert.ok('stl_total_cost_low_usd' in row, 'stl_total_cost_low_usd missing from comparison table');
   }
 });
+
+test('am_antenna_electrical_design_and_efficiency_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_electrical_design_and_efficiency_guide;
+  assert.ok(g != null, 'am_antenna_electrical_design_and_efficiency_guide must be present');
+  assert.ok(typeof g.efficiency_pct_low === 'number', 'efficiency_pct_low must be a number');
+  assert.ok(typeof g.effective_erp_kw_low === 'number', 'effective_erp_kw_low must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_antenna_electrical_design_and_efficiency_guide KAZM electrical parameters', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_electrical_design_and_efficiency_guide;
+  // 90° quarter-wave, 780 kHz
+  assert.strictEqual(g.electrical_height_deg, 90, 'quarter-wave antenna should be 90°');
+  assert.strictEqual(g.radiation_resistance_ohm, 36.5, 'monopole radiation resistance should be 36.5Ω');
+  assert.strictEqual(g.n_radials, 90, 'KAZM Class D clear-channel should use 90 radials');
+  assert.strictEqual(g.n_tower_elements, 1, 'NDA station has 1 tower element');
+  // 90 radials: ground_loss_low = round2(100/90) ≈ 1.11Ω
+  assert.ok(g.ground_loss_ohm_low < 2, `ground_loss_ohm_low ${g.ground_loss_ohm_low} should be < 2Ω`);
+  assert.ok(g.ground_loss_ohm_high < g.radiation_resistance_ohm, 'ground loss must be less than radiation resistance');
+});
+
+test('am_antenna_electrical_design_and_efficiency_guide efficiency is physically plausible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_electrical_design_and_efficiency_guide;
+  // Good 90-radial system: expect 90-98% antenna efficiency
+  assert.ok(g.efficiency_pct_low > 85, `efficiency_pct_low ${g.efficiency_pct_low}% should be >85%`);
+  assert.ok(g.efficiency_pct_high <= 100, 'efficiency must be ≤ 100%');
+  assert.ok(g.efficiency_pct_high > g.efficiency_pct_low, 'high efficiency must exceed low');
+  assert.ok(g.total_efficiency_pct_high > g.total_efficiency_pct_low, 'total high must exceed total low');
+});
+
+test('am_antenna_electrical_design_and_efficiency_guide ERP is consistent with TPO and efficiency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_electrical_design_and_efficiency_guide;
+  // ERP = TPO × total_efficiency
+  const expected_erp_low  = round2(KAZM.tpo_kw * g.total_efficiency_pct_low  / 100);
+  const expected_erp_high = round2(KAZM.tpo_kw * g.total_efficiency_pct_high / 100);
+  assert.strictEqual(g.effective_erp_kw_low,  expected_erp_low,  'effective_erp_kw_low should equal TPO × efficiency_low');
+  assert.strictEqual(g.effective_erp_kw_high, expected_erp_high, 'effective_erp_kw_high should equal TPO × efficiency_high');
+  // ERP < TPO always (some losses)
+  assert.ok(g.effective_erp_kw_high < KAZM.tpo_kw, 'ERP must be less than TPO due to system losses');
+
+  function round2(v) { return Math.round(v * 100) / 100; }
+});
+
+test('am_antenna_electrical_design_and_efficiency_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ant_efficiency_pct_low'   in row, 'ant_efficiency_pct_low missing from comparison table');
+    assert.ok('ant_effective_erp_kw_low' in row, 'ant_effective_erp_kw_low missing from comparison table');
+    assert.ok('ant_ground_loss_ohm_high' in row, 'ant_ground_loss_ohm_high missing from comparison table');
+  }
+});
