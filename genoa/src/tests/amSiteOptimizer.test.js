@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_studio_transmitter_link_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_studio_transmitter_link_guide;
+  assert.ok(g !== undefined && g !== null, 'am_studio_transmitter_link_guide missing');
+  assert.ok(typeof g.stl_type === 'string', 'stl_type should be a string');
+  assert.ok(g.total_stl_setup_low_usd > 0, 'total_stl_setup_low_usd must be positive');
+});
+
+test('am_studio_transmitter_link_guide KAZM rank-1 IP audio recommendation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_studio_transmitter_link_guide;
+  assert.strictEqual(g.stl_type,                  'ip_audio_internet', 'KAZM rank-1 should use ip_audio_internet');
+  assert.strictEqual(g.stl_fcc_license_required,  false,              'ip_audio STL should not require FCC license');
+  assert.strictEqual(g.fcc_stl_license_fee_usd,   0,                  'FCC STL license fee should be $0 for IP audio');
+});
+
+test('am_studio_transmitter_link_guide KAZM equipment costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_studio_transmitter_link_guide;
+  assert.strictEqual(g.ip_codec_total_low_usd,  4000, 'ip_codec_total_low_usd should be $4,000 (2 × $2,000)');
+  assert.strictEqual(g.monthly_internet_low_usd, 150,  'monthly_internet_low_usd should be $150');
+  assert.strictEqual(g.annual_internet_low_usd,  1800, 'annual_internet_low_usd should be $1,800');
+});
+
+test('am_studio_transmitter_link_guide KAZM total setup cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_studio_transmitter_link_guide;
+  assert.strictEqual(g.total_stl_setup_low_usd,  4500,  'KAZM total_stl_setup_low_usd should be $4,500');
+  assert.strictEqual(g.total_stl_setup_high_usd, 15000, 'KAZM total_stl_setup_high_usd should be $15,000');
+});
+
+test('am_studio_transmitter_link_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('stl_type'                   in row, 'stl_type missing from comparison table');
+    assert.ok('stl_setup_low_usd'          in row, 'stl_setup_low_usd missing from comparison table');
+    assert.ok('stl_annual_internet_low_usd' in row, 'stl_annual_internet_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.stl_type,                   'ip_audio_internet', 'rank-1 stl_type should be ip_audio_internet');
+  assert.strictEqual(r0.stl_setup_low_usd,          4500,                'rank-1 stl_setup_low_usd should be $4,500');
+  assert.strictEqual(r0.stl_annual_internet_low_usd, 1800,               'rank-1 stl_annual_internet_low_usd should be $1,800');
+});
+
 test('am_construction_project_schedule_and_management_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_construction_project_schedule_and_management_guide;

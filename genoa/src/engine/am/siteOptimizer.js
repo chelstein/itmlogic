@@ -1224,7 +1224,10 @@ export async function runSiteOptimizer(body = {}){
     pwr_setup_low_usd:          c.am_utility_power_service_and_metering_guide?.total_utility_setup_low_usd ?? null,
     sch_total_months_low:       c.am_construction_project_schedule_and_management_guide?.total_months_low ?? null,
     sch_fcc_months_low:         c.am_construction_project_schedule_and_management_guide?.fcc_processing_months_low ?? null,
-    sch_pm_cost_low_usd:        c.am_construction_project_schedule_and_management_guide?.pm_cost_low_usd ?? null
+    sch_pm_cost_low_usd:        c.am_construction_project_schedule_and_management_guide?.pm_cost_low_usd ?? null,
+    stl_type:                   c.am_studio_transmitter_link_guide?.stl_type ?? null,
+    stl_setup_low_usd:          c.am_studio_transmitter_link_guide?.total_stl_setup_low_usd ?? null,
+    stl_annual_internet_low_usd: c.am_studio_transmitter_link_guide?.annual_internet_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6959,6 +6962,78 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_studio_transmitter_link_guide: (() => {
+      // STL (Studio-Transmitter Link) carries audio from studio to transmitter site.
+      // Options: IP audio over internet/cellular, dedicated microwave STL (950 MHz/2 GHz),
+      // or leased T1/fiber. IP audio is now standard for most relocations.
+      // Microwave STL requires a separate FCC Part 74 license application.
+      const dist_km = pt.distance_from_current_km;
+
+      // STL type recommendation based on distance and terrain
+      let stl_type, stl_fcc_license_required;
+      if (dist_km < 5) {
+        stl_type = 'ip_audio_internet';      // co-located or near studio
+        stl_fcc_license_required = false;
+      } else if (dist_km < 80) {
+        stl_type = 'ip_audio_internet';      // internet/cellular feasible
+        stl_fcc_license_required = false;
+      } else {
+        stl_type = 'microwave_950mhz';       // long haul may need dedicated microwave
+        stl_fcc_license_required = true;
+      }
+
+      // IP audio codec (one at studio, one at transmitter site)
+      const ip_codec_per_unit_low_usd  = 2000;
+      const ip_codec_per_unit_high_usd = 6000;
+      const ip_codec_total_low_usd  = round2(ip_codec_per_unit_low_usd  * 2);
+      const ip_codec_total_high_usd = round2(ip_codec_per_unit_high_usd * 2);
+
+      // Monthly internet/cellular cost at transmitter site
+      const monthly_internet_low_usd  = stl_type === 'ip_audio_internet' ? 150 : 0;
+      const monthly_internet_high_usd = stl_type === 'ip_audio_internet' ? 500 : 0;
+      const annual_internet_low_usd   = round2(monthly_internet_low_usd  * 12);
+      const annual_internet_high_usd  = round2(monthly_internet_high_usd * 12);
+
+      // Microwave STL hardware (if applicable)
+      const microwave_hw_low_usd  = stl_type === 'microwave_950mhz' ? 8000  : 0;
+      const microwave_hw_high_usd = stl_type === 'microwave_950mhz' ? 25000 : 0;
+
+      // FCC Part 74 STL license (if microwave)
+      const fcc_stl_license_fee_usd = stl_fcc_license_required ? 610 : 0;
+
+      // Audio processing and backup STL (cellular backup)
+      const audio_proc_low_usd  = 500;
+      const audio_proc_high_usd = 3000;
+
+      const total_stl_setup_low_usd  = round2(
+        ip_codec_total_low_usd  + microwave_hw_low_usd  + audio_proc_low_usd  + fcc_stl_license_fee_usd);
+      const total_stl_setup_high_usd = round2(
+        ip_codec_total_high_usd + microwave_hw_high_usd + audio_proc_high_usd + fcc_stl_license_fee_usd);
+
+      return {
+        dist_km: round2(dist_km),
+        stl_type,
+        stl_fcc_license_required,
+        ip_codec_per_unit_low_usd,
+        ip_codec_per_unit_high_usd,
+        ip_codec_total_low_usd,
+        ip_codec_total_high_usd,
+        monthly_internet_low_usd,
+        monthly_internet_high_usd,
+        annual_internet_low_usd,
+        annual_internet_high_usd,
+        microwave_hw_low_usd,
+        microwave_hw_high_usd,
+        fcc_stl_license_fee_usd,
+        audio_proc_low_usd,
+        audio_proc_high_usd,
+        total_stl_setup_low_usd,
+        total_stl_setup_high_usd,
+        reference: '47 CFR Part 74 (STL licensing); FCC Form 601 (Part 74 application); SBE STL engineering guidelines; EIA-542 audio codec standards',
+        note: `${stl_type} STL at ${round2(dist_km)} km${stl_fcc_license_required ? ' (FCC Part 74 license required)' : ' (no FCC STL license required)'}; IP codecs $${ip_codec_total_low_usd.toLocaleString()}–$${ip_codec_total_high_usd.toLocaleString()} + internet $${monthly_internet_low_usd.toLocaleString()}–$${monthly_internet_high_usd.toLocaleString()}/mo; total setup $${total_stl_setup_low_usd.toLocaleString()}–$${total_stl_setup_high_usd.toLocaleString()}`
       };
     })(),
 

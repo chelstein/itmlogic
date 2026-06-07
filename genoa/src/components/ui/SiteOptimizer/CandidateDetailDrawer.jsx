@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Studio-Transmitter Link Guide */}
+        {candidate.am_studio_transmitter_link_guide && (() => {
+          const g = candidate.am_studio_transmitter_link_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="stl-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 8, border: '2px solid #4f46e5' }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>Studio-Transmitter Link (STL) (47 CFR Part 74)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
+                <span style={{ color: '#4f46e5' }}>STL Type:</span><span style={{ fontWeight: 600 }}>{g.stl_type} @ {g.dist_km} km{g.stl_fcc_license_required ? ' (FCC license req.)' : ''}</span>
+                <span style={{ color: '#4f46e5' }}>IP Codec (×2):</span><span>{fmt(g.ip_codec_total_low_usd)} – {fmt(g.ip_codec_total_high_usd)}</span>
+                {g.stl_type === 'microwave_950mhz' && <><span style={{ color: '#4f46e5' }}>Microwave HW:</span><span>{fmt(g.microwave_hw_low_usd)} – {fmt(g.microwave_hw_high_usd)}</span></>}
+                <span style={{ color: '#4f46e5' }}>Internet/Cell:</span><span>{fmt(g.monthly_internet_low_usd)}–{fmt(g.monthly_internet_high_usd)}/mo ({fmt(g.annual_internet_low_usd)}–{fmt(g.annual_internet_high_usd)}/yr)</span>
+                <span style={{ color: '#4f46e5' }}>Audio Processing:</span><span>{fmt(g.audio_proc_low_usd)} – {fmt(g.audio_proc_high_usd)}</span>
+                <span style={{ color: '#4f46e5' }}>Total Setup:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_stl_setup_low_usd)} – {fmt(g.total_stl_setup_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#312e81' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Construction Project Schedule and Management Guide */}
         {candidate.am_construction_project_schedule_and_management_guide && (() => {
           const g = candidate.am_construction_project_schedule_and_management_guide;
