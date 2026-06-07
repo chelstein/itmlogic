@@ -1203,7 +1203,10 @@ export async function runSiteOptimizer(body = {}){
     lnd_annual_lease_total_low_usd: c.am_site_lease_and_land_acquisition_guide?.annual_lease_total_low_usd ?? null,
     shlt_bldg_type:             c.am_transmitter_building_and_equipment_shelter_guide?.bldg_type ?? null,
     shlt_bldg_sqft:             c.am_transmitter_building_and_equipment_shelter_guide?.bldg_sqft ?? null,
-    shlt_total_low_usd:         c.am_transmitter_building_and_equipment_shelter_guide?.total_shelter_low_usd ?? null
+    shlt_total_low_usd:         c.am_transmitter_building_and_equipment_shelter_guide?.total_shelter_low_usd ?? null,
+    mon_monitor_type:           c.am_modulation_monitor_and_station_logging_guide?.monitor_type ?? null,
+    mon_total_low_usd:          c.am_modulation_monitor_and_station_logging_guide?.total_monitoring_low_usd ?? null,
+    mon_readings_per_day:       c.am_modulation_monitor_and_station_logging_guide?.readings_per_day ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6938,6 +6941,64 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_modulation_monitor_and_station_logging_guide: (() => {
+      // 47 CFR §73.1215: All AM broadcast stations must have a modulation monitor installed
+      // at the transmitter, calibrated to read peak percentage modulation.
+      // §73.1820 requires station logs with transmitter readings at prescribed intervals.
+      const is_class_a = /^A$/i.test(fcc_class);
+      const monitor_type = is_class_a ? 'type_accepted_continuous' : 'standard';
+
+      const monitor_cost_low_usd  = is_class_a ? 6000  : 3000;
+      const monitor_cost_high_usd = is_class_a ? 15000 : 8000;
+
+      // §73.1400 / §73.1410: remote control and automatic transmission system (ATS)
+      const remote_control_low_usd  = 2000;
+      const remote_control_high_usd = 6000;
+
+      // Internet-connected monitoring/alerting (industry standard, not required)
+      const internet_monitoring_low_usd  = 500;
+      const internet_monitoring_high_usd = 3000;
+
+      // §73.1215(b): annual calibration/verification against field strength
+      const annual_calibration_low_usd  = 300;
+      const annual_calibration_high_usd = 800;
+
+      // §73.1820 logging system (software + storage)
+      const logging_system_low_usd  = 200;
+      const logging_system_high_usd = 1000;
+
+      const total_monitoring_low_usd  = round2(
+        monitor_cost_low_usd + remote_control_low_usd + internet_monitoring_low_usd + logging_system_low_usd);
+      const total_monitoring_high_usd = round2(
+        monitor_cost_high_usd + remote_control_high_usd + internet_monitoring_high_usd + logging_system_high_usd);
+
+      const log_interval_min = 30; // §73.1820: every 30 minutes
+      const readings_per_day = Math.round(24 * 60 / log_interval_min);
+
+      return {
+        fcc_class,
+        tpo_kw,
+        is_class_a,
+        monitor_type,
+        monitor_cost_low_usd,
+        monitor_cost_high_usd,
+        remote_control_low_usd,
+        remote_control_high_usd,
+        internet_monitoring_low_usd,
+        internet_monitoring_high_usd,
+        annual_calibration_low_usd,
+        annual_calibration_high_usd,
+        logging_system_low_usd,
+        logging_system_high_usd,
+        total_monitoring_low_usd,
+        total_monitoring_high_usd,
+        log_interval_min,
+        readings_per_day,
+        reference: '47 CFR §73.1215 (modulation monitor); §73.1820 (station logs); §73.1400 (remote control); §73.1410 (automatic transmission systems)',
+        note: `Class ${fcc_class} ${tpo_kw} kW station: ${monitor_type} modulation monitor $${monitor_cost_low_usd.toLocaleString()}–$${monitor_cost_high_usd.toLocaleString()}; remote control $${remote_control_low_usd.toLocaleString()}–$${remote_control_high_usd.toLocaleString()}; total monitoring system $${total_monitoring_low_usd.toLocaleString()}–$${total_monitoring_high_usd.toLocaleString()}; log every ${log_interval_min} min (${readings_per_day} readings/day)`
       };
     })(),
 

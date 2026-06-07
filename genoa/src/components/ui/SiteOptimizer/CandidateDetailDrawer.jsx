@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Modulation Monitor and Station Logging Guide */}
+        {candidate.am_modulation_monitor_and_station_logging_guide && (() => {
+          const g = candidate.am_modulation_monitor_and_station_logging_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="mon-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0284c7' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Modulation Monitor &amp; Station Logging (§73.1215 / §73.1820)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0369a1' }}>
+                <span style={{ color: '#0284c7' }}>Monitor Type:</span><span style={{ fontWeight: 600 }}>{g.monitor_type} (Class {g.fcc_class})</span>
+                <span style={{ color: '#0284c7' }}>Monitor Cost:</span><span>{fmt(g.monitor_cost_low_usd)} – {fmt(g.monitor_cost_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Remote Control:</span><span>{fmt(g.remote_control_low_usd)} – {fmt(g.remote_control_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Internet Monitoring:</span><span>{fmt(g.internet_monitoring_low_usd)} – {fmt(g.internet_monitoring_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Annual Calibration:</span><span>{fmt(g.annual_calibration_low_usd)} – {fmt(g.annual_calibration_high_usd)}/yr</span>
+                <span style={{ color: '#0284c7' }}>Total Monitoring:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_monitoring_low_usd)} – {fmt(g.total_monitoring_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Log Schedule:</span><span>every {g.log_interval_min} min ({g.readings_per_day} readings/day)</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#075985' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Building and Equipment Shelter Guide */}
         {candidate.am_transmitter_building_and_equipment_shelter_guide && (() => {
           const g = candidate.am_transmitter_building_and_equipment_shelter_guide;

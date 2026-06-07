@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_modulation_monitor_and_station_logging_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_modulation_monitor_and_station_logging_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_monitor_and_station_logging_guide missing`);
+    assert.ok(g.monitor_cost_low_usd > 0, `rank ${c.rank}: monitor_cost_low_usd must be positive`);
+    assert.ok(g.total_monitoring_low_usd > 0, `rank ${c.rank}: total_monitoring_low_usd must be positive`);
+    assert.strictEqual(g.log_interval_min, 30, `rank ${c.rank}: log_interval_min should be 30`);
+  }
+});
+
 test('am_transmitter_building_and_equipment_shelter_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

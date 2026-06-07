@@ -11439,6 +11439,49 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_modulation_monitor_and_station_logging_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitor_and_station_logging_guide;
+  assert.ok(g !== undefined && g !== null, 'am_modulation_monitor_and_station_logging_guide missing');
+  assert.ok(typeof g.monitor_type === 'string', 'monitor_type should be a string');
+  assert.ok(g.monitor_cost_low_usd > 0, 'monitor_cost_low_usd must be positive');
+});
+
+test('am_modulation_monitor_and_station_logging_guide KAZM Class D monitor classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitor_and_station_logging_guide;
+  assert.strictEqual(g.is_class_a,    false,      'KAZM Class D should not be Class A');
+  assert.strictEqual(g.monitor_type,  'standard', 'KAZM Class D should use standard monitor');
+  assert.strictEqual(g.monitor_cost_low_usd, 3000, 'KAZM standard monitor_cost_low_usd should be $3,000');
+});
+
+test('am_modulation_monitor_and_station_logging_guide KAZM total monitoring costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitor_and_station_logging_guide;
+  assert.strictEqual(g.total_monitoring_low_usd,  5700,  'KAZM total_monitoring_low_usd should be $5,700');
+  assert.strictEqual(g.total_monitoring_high_usd, 18000, 'KAZM total_monitoring_high_usd should be $18,000');
+});
+
+test('am_modulation_monitor_and_station_logging_guide KAZM logging schedule', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitor_and_station_logging_guide;
+  assert.strictEqual(g.log_interval_min,  30, 'log_interval_min should be 30 (§73.1820)');
+  assert.strictEqual(g.readings_per_day,  48, 'readings_per_day should be 48 (every 30 min)');
+});
+
+test('am_modulation_monitor_and_station_logging_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mon_monitor_type'     in row, 'mon_monitor_type missing from comparison table');
+    assert.ok('mon_total_low_usd'    in row, 'mon_total_low_usd missing from comparison table');
+    assert.ok('mon_readings_per_day' in row, 'mon_readings_per_day missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.mon_monitor_type,     'standard', 'rank-1 mon_monitor_type should be standard');
+  assert.strictEqual(r0.mon_total_low_usd,    5700,       'rank-1 mon_total_low_usd should be $5,700');
+  assert.strictEqual(r0.mon_readings_per_day, 48,         'rank-1 mon_readings_per_day should be 48');
+});
+
 test('am_transmitter_building_and_equipment_shelter_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_transmitter_building_and_equipment_shelter_guide;
