@@ -3038,3 +3038,14 @@ test('am_broadcast_proof_of_performance_guide present across colocation candidat
       `rank ${c.rank}: unexpected proof_type: ${g.proof_type}`);
   }
 });
+
+test('am_financial_feasibility_and_roi_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_financial_feasibility_and_roi_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_financial_feasibility_and_roi_guide missing`);
+    assert.ok(g.total_capital_low > 0, `rank ${c.rank}: total_capital_low must be positive`);
+    assert.ok(g.total_capital_high >= g.total_capital_low, `rank ${c.rank}: total_capital_high must be >= low`);
+    assert.ok(g.simple_payback_years_low > 0, `rank ${c.rank}: payback_years_low must be positive`);
+  }
+});

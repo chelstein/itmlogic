@@ -1269,7 +1269,10 @@ export async function runSiteOptimizer(body = {}){
     sky_effective_power_pct:    c.am_nighttime_operation_and_skywave_classification_guide?.effective_power_fraction ?? null,
     pop_proof_type:             c.am_broadcast_proof_of_performance_guide?.proof_type ?? null,
     pop_total_low_usd:          c.am_broadcast_proof_of_performance_guide?.total_low_usd ?? null,
-    pop_num_measured_radials:   c.am_broadcast_proof_of_performance_guide?.num_measured_radials ?? null
+    pop_num_measured_radials:   c.am_broadcast_proof_of_performance_guide?.num_measured_radials ?? null,
+    fin_total_capital_low_usd:  c.am_financial_feasibility_and_roi_guide?.total_capital_low ?? null,
+    fin_total_capital_high_usd: c.am_financial_feasibility_and_roi_guide?.total_capital_high ?? null,
+    fin_payback_years_low:      c.am_financial_feasibility_and_roi_guide?.simple_payback_years_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7004,6 +7007,48 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_financial_feasibility_and_roi_guide: (() => {
+      // Ballpark total capital cost for a complete AM site relocation.
+      // Aggregates major cost categories (tower, ground system, transmitter,
+      // soft costs, site prep) into a single investment summary.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd     = /^[CD]$/i.test(fcc_class);
+      const tower_height_ft = round2((is_class_cd ? wavelength_m / 4 : wavelength_m / 2) * 3.28084);
+      let tower_cap_low, tower_cap_high;
+      if      (tower_height_ft <= 200) { tower_cap_low = 20000;  tower_cap_high = 60000; }
+      else if (tower_height_ft <= 400) { tower_cap_low = 60000;  tower_cap_high = 180000; }
+      else if (tower_height_ft <= 600) { tower_cap_low = 150000; tower_cap_high = 400000; }
+      else                             { tower_cap_low = 350000; tower_cap_high = 900000; }
+      const gnd_low = 20000; const gnd_high = 80000;
+      let tx_low, tx_high;
+      if      (tpo_kw >= 50) { tx_low = 100000; tx_high = 270000; }
+      else if (tpo_kw >= 10) { tx_low = 40000;  tx_high = 100000; }
+      else                   { tx_low = 20000;  tx_high = 70000; }
+      const soft_costs_low  = 30000;
+      const soft_costs_high = 100000;
+      const site_prep_low   = 20000;
+      const site_prep_high  = 80000;
+      const total_capital_low  = round2(tower_cap_low  + gnd_low  + tx_low  + soft_costs_low  + site_prep_low);
+      const total_capital_high = round2(tower_cap_high + gnd_high + tx_high + soft_costs_high + site_prep_high);
+      const annual_revenue_low  = 100000; // small market AM station
+      const annual_revenue_high = 500000; // medium market AM station
+      const simple_payback_years_low  = round2(total_capital_low  / annual_revenue_high);
+      const simple_payback_years_high = round2(total_capital_high / annual_revenue_low);
+      return {
+        frequency_khz, fcc_class, tpo_kw, tower_height_ft,
+        tower_cap_low, tower_cap_high,
+        gnd_low, gnd_high, tx_low, tx_high,
+        soft_costs_low, soft_costs_high,
+        site_prep_low, site_prep_high,
+        total_capital_low, total_capital_high,
+        annual_revenue_low, annual_revenue_high,
+        simple_payback_years_low, simple_payback_years_high,
+        reference: 'BIA Advisory Services AM station revenue data; broadcast industry financial benchmarks',
+        note: `Total capital: ${total_capital_low.toLocaleString()}–${total_capital_high.toLocaleString()}; payback ${simple_payback_years_low}–${simple_payback_years_high} yr at typical AM revenue`
       };
     })(),
 

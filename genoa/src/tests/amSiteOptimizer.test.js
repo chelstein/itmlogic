@@ -12967,3 +12967,49 @@ test('am_broadcast_proof_of_performance_guide comparison table columns present',
   assert.strictEqual(r0.pop_total_low_usd,         2500,                  'rank-1 pop_total_low_usd should be $2,500');
   assert.strictEqual(r0.pop_num_measured_radials,  0,                     'rank-1 pop_num_measured_radials should be 0');
 });
+
+test('am_financial_feasibility_and_roi_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
+  assert.ok(g !== undefined && g !== null, 'am_financial_feasibility_and_roi_guide missing');
+  assert.ok(g.total_capital_low > 0, 'total_capital_low must be positive');
+  assert.ok(g.total_capital_high >= g.total_capital_low, 'total_capital_high must be >= low');
+});
+
+test('KAZM financial capital cost components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
+  assert.strictEqual(g.tower_cap_low,   60000,  '315 ft tower low should be $60,000');
+  assert.strictEqual(g.tower_cap_high,  180000, '315 ft tower high should be $180,000');
+  assert.strictEqual(g.tx_low,          20000,  '5 kW transmitter low should be $20,000');
+  assert.strictEqual(g.gnd_low,         20000,  'ground system low should be $20,000');
+});
+
+test('KAZM total capital cost range', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
+  assert.strictEqual(g.total_capital_low,  150000, 'total_capital_low should be $150,000');
+  assert.strictEqual(g.total_capital_high, 510000, 'total_capital_high should be $510,000');
+});
+
+test('KAZM simple payback years', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_financial_feasibility_and_roi_guide;
+  assert.strictEqual(g.simple_payback_years_low,  0.3, 'payback_years_low should be 0.3');
+  assert.strictEqual(g.simple_payback_years_high, 5.1, 'payback_years_high should be 5.1');
+  assert.strictEqual(g.annual_revenue_low,  100000, 'annual_revenue_low should be $100,000');
+  assert.strictEqual(g.annual_revenue_high, 500000, 'annual_revenue_high should be $500,000');
+});
+
+test('am_financial_feasibility_and_roi_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fin_total_capital_low_usd'  in row, 'fin_total_capital_low_usd missing from comparison table');
+    assert.ok('fin_total_capital_high_usd' in row, 'fin_total_capital_high_usd missing from comparison table');
+    assert.ok('fin_payback_years_low'      in row, 'fin_payback_years_low missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.fin_total_capital_low_usd,  150000, 'rank-1 fin_total_capital_low should be $150,000');
+  assert.strictEqual(r0.fin_total_capital_high_usd, 510000, 'rank-1 fin_total_capital_high should be $510,000');
+  assert.strictEqual(r0.fin_payback_years_low,       0.3,   'rank-1 fin_payback_years_low should be 0.3');
+});

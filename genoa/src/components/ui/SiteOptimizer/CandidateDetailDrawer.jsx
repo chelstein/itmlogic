@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Financial Feasibility and ROI Guide */}
+        {candidate.am_financial_feasibility_and_roi_guide && (() => {
+          const g = candidate.am_financial_feasibility_and_roi_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="fin-guide" style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 8, border: '2px solid #525252' }}>
+              <div style={{ fontWeight: 700, color: '#171717', marginBottom: 6, fontSize: 13 }}>Financial Feasibility &amp; ROI</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#262626' }}>
+                <span>Tower:</span><span>{fmt(g.tower_cap_low)} – {fmt(g.tower_cap_high)}</span>
+                <span>Ground system:</span><span>{fmt(g.gnd_low)} – {fmt(g.gnd_high)}</span>
+                <span>Transmitter:</span><span>{fmt(g.tx_low)} – {fmt(g.tx_high)}</span>
+                <span>Soft costs:</span><span>{fmt(g.soft_costs_low)} – {fmt(g.soft_costs_high)}</span>
+                <span>Site prep:</span><span>{fmt(g.site_prep_low)} – {fmt(g.site_prep_high)}</span>
+                <span style={{ fontWeight: 700, borderTop: '1px solid #d4d4d4', paddingTop: 4 }}>Total capital:</span>
+                <span style={{ fontWeight: 700, borderTop: '1px solid #d4d4d4', paddingTop: 4 }}>{fmt(g.total_capital_low)} – {fmt(g.total_capital_high)}</span>
+                <span>Payback (est.):</span><span>{g.simple_payback_years_low ?? '—'}–{g.simple_payback_years_high ?? '—'} yrs</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#737373', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Broadcast Proof of Performance Guide */}
         {candidate.am_broadcast_proof_of_performance_guide && (() => {
           const g = candidate.am_broadcast_proof_of_performance_guide;
