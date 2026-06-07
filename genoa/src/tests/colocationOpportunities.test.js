@@ -3446,3 +3446,20 @@ test('am_broadcast_facility_security_guide colocation: all colocation candidates
     assert.ok(g.fence_perimeter_ft > 0, `fence_perimeter_ft must be positive`);
   }
 });
+
+test('am_frequency_monitoring_and_technical_compliance_guide colocation: all candidates have valid monitoring data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_frequency_monitoring_and_technical_compliance_guide;
+    assert.ok(g, `candidate missing am_frequency_monitoring_and_technical_compliance_guide`);
+    assert.strictEqual(g.freq_tolerance_hz, 20, `freq_tolerance_hz must be 20 Hz`);
+    assert.ok(g.total_monitoring_equip_low_usd > 0, `total_monitoring_equip_low_usd must be positive`);
+    assert.strictEqual(g.audio_bandwidth_khz, 10, `audio_bandwidth_khz must be 10 kHz (NRSC-2-B)`);
+  }
+});

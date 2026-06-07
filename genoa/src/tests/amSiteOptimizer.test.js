@@ -14309,3 +14309,40 @@ it('candidate_comparison_table sec columns are present and valid for KAZM', asyn
   assert.ok(r0.sec_total_capex_low_usd > 0, 'sec_total_capex_low_usd must be positive');
   assert.strictEqual(r0.sec_monitoring_annual_low_usd, 1200, 'sec_monitoring_annual_low_usd should be 1200');
 });
+
+// ── am_frequency_monitoring_and_technical_compliance_guide ───────────────────
+
+it('am_frequency_monitoring_and_technical_compliance_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_frequency_monitoring_and_technical_compliance_guide, 'fmtc guide missing on candidate');
+  }
+});
+
+it('am_frequency_monitoring_and_technical_compliance_guide freq_tolerance_hz is 20 (§73.1560)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_monitoring_and_technical_compliance_guide;
+  assert.strictEqual(g.freq_tolerance_hz, 20, 'freq_tolerance_hz must be 20 Hz per §73.1560');
+});
+
+it('am_frequency_monitoring_and_technical_compliance_guide mod limits are 100/125 pct (§73.1570)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_monitoring_and_technical_compliance_guide;
+  assert.strictEqual(g.mod_negative_peak_pct, 100, 'negative peak modulation must be 100%');
+  assert.strictEqual(g.mod_positive_peak_pct, 125, 'positive peak modulation must be 125%');
+});
+
+it('am_frequency_monitoring_and_technical_compliance_guide reference cites §73.1560 and NRSC-2-B', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_frequency_monitoring_and_technical_compliance_guide;
+  assert.ok(g.reference.includes('§73.1560'), 'reference must cite §73.1560');
+  assert.ok(g.reference.includes('NRSC-2-B'), 'reference must cite NRSC-2-B');
+});
+
+it('candidate_comparison_table fmtc columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.fmtc_freq_tolerance_hz, 20, 'fmtc_freq_tolerance_hz should be 20');
+  assert.ok(r0.fmtc_total_monitoring_equip_low_usd > 0, 'fmtc_total_monitoring_equip_low_usd must be positive');
+  assert.ok(r0.fmtc_annual_compliance_low_usd > 0, 'fmtc_annual_compliance_low_usd must be positive');
+});

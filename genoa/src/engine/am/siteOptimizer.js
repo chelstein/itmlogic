@@ -1365,7 +1365,10 @@ export async function runSiteOptimizer(body = {}){
     str_design_wind_speed_mph_low:      c.am_tower_structural_analysis_guide?.design_wind_speed_mph_low ?? null,
     sec_fence_perimeter_ft:             c.am_broadcast_facility_security_guide?.fence_perimeter_ft ?? null,
     sec_total_capex_low_usd:            c.am_broadcast_facility_security_guide?.total_security_capex_low_usd ?? null,
-    sec_monitoring_annual_low_usd:      c.am_broadcast_facility_security_guide?.monitoring_annual_low_usd ?? null
+    sec_monitoring_annual_low_usd:      c.am_broadcast_facility_security_guide?.monitoring_annual_low_usd ?? null,
+    fmtc_freq_tolerance_hz:             c.am_frequency_monitoring_and_technical_compliance_guide?.freq_tolerance_hz ?? null,
+    fmtc_total_monitoring_equip_low_usd: c.am_frequency_monitoring_and_technical_compliance_guide?.total_monitoring_equip_low_usd ?? null,
+    fmtc_annual_compliance_low_usd:     c.am_frequency_monitoring_and_technical_compliance_guide?.annual_fcc_compliance_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7100,6 +7103,53 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_frequency_monitoring_and_technical_compliance_guide: (() => {
+      // 47 CFR §73.1560: AM stations must maintain carrier frequency within ±20 Hz of authorized frequency.
+      // 47 CFR §73.1570: Modulation limits — AM modulation must not exceed 100% on negative peaks,
+      //   or 125% on positive peaks (FCC §73.1570(b)(1)).
+      // 47 CFR §73.1580: Transmission system performance — NRSC-2-B (AM Broadcast Technical Standard)
+      //   requires low-pass filter to limit audio bandwidth to 10 kHz.
+      // TARP (Technical Advisory and Rules Panel) guidelines for engineering compliance.
+      const freq_tolerance_hz = 20;
+      const mod_negative_peak_pct = 100;
+      const mod_positive_peak_pct = 125;
+      const audio_bandwidth_khz = 10;
+      // Required monitoring equipment: frequency monitor + modulation monitor
+      const frequency_monitor_low_usd  = 1500;
+      const frequency_monitor_high_usd = 5000;
+      const mod_monitor_low_usd  = 800;
+      const mod_monitor_high_usd = 3500;
+      const nrsc_filter_low_usd  = 500;
+      const nrsc_filter_high_usd = 2500;
+      const total_monitoring_equip_low_usd  = round2(frequency_monitor_low_usd  + mod_monitor_low_usd  + nrsc_filter_low_usd);
+      const total_monitoring_equip_high_usd = round2(frequency_monitor_high_usd + mod_monitor_high_usd + nrsc_filter_high_usd);
+      // Annual FCC license renewal / technical compliance maintenance
+      const annual_fcc_compliance_low_usd  = 500;
+      const annual_fcc_compliance_high_usd = 2000;
+      // FCC license renewal fee (AM stations, per FCC schedule)
+      const fcc_license_fee_usd = 225; // current FCC fee schedule for small AM
+      return {
+        frequency_khz,
+        freq_tolerance_hz,
+        mod_negative_peak_pct,
+        mod_positive_peak_pct,
+        audio_bandwidth_khz,
+        frequency_monitor_low_usd,
+        frequency_monitor_high_usd,
+        mod_monitor_low_usd,
+        mod_monitor_high_usd,
+        nrsc_filter_low_usd,
+        nrsc_filter_high_usd,
+        total_monitoring_equip_low_usd,
+        total_monitoring_equip_high_usd,
+        annual_fcc_compliance_low_usd,
+        annual_fcc_compliance_high_usd,
+        fcc_license_fee_usd,
+        reference: '47 CFR §73.1560 (frequency tolerance ±20 Hz); 47 CFR §73.1570 (modulation limits: 100% neg / 125% pos peak); 47 CFR §73.1580 (NRSC-2-B transmission system performance); 47 CFR §73.1870 (chief operator duties); FCC Form 303-S (license renewal)',
+        note: `${frequency_khz} kHz must stay within ±${freq_tolerance_hz} Hz. Modulation ≤ ${mod_negative_peak_pct}% (neg) / ${mod_positive_peak_pct}% (pos peak). NRSC-2-B: audio BW ≤ ${audio_bandwidth_khz} kHz. Monitoring equipment: $${total_monitoring_equip_low_usd.toLocaleString()}–$${total_monitoring_equip_high_usd.toLocaleString()} capex. Annual compliance: $${annual_fcc_compliance_low_usd.toLocaleString()}–$${annual_fcc_compliance_high_usd.toLocaleString()}/yr.`
       };
     })(),
 

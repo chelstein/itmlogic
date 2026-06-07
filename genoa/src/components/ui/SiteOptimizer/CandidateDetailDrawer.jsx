@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Frequency Monitoring and Technical Compliance Guide */}
+        {candidate.am_frequency_monitoring_and_technical_compliance_guide && (() => {
+          const g = candidate.am_frequency_monitoring_and_technical_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="fmtc-guide" style={{ marginBottom: 16, padding: 12, background: '#faf5ff', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#4c1d95', marginBottom: 6, fontSize: 13 }}>Frequency Monitoring &amp; Technical Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#5b21b6' }}>
+                <span>Carrier frequency:</span><span>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
+                <span>Freq. tolerance (§73.1560):</span><span>±{g.freq_tolerance_hz ?? '—'} Hz</span>
+                <span>Mod. limit neg/pos (§73.1570):</span><span>{g.mod_negative_peak_pct != null ? `${g.mod_negative_peak_pct}% / ${g.mod_positive_peak_pct}%` : '—'}</span>
+                <span>Audio BW (NRSC-2-B):</span><span>{g.audio_bandwidth_khz != null ? `≤ ${g.audio_bandwidth_khz} kHz` : '—'}</span>
+                <span>Frequency monitor:</span><span>{g.frequency_monitor_low_usd != null ? `$${fmt(g.frequency_monitor_low_usd)} – $${fmt(g.frequency_monitor_high_usd)}` : '—'}</span>
+                <span>Modulation monitor:</span><span>{g.mod_monitor_low_usd != null ? `$${fmt(g.mod_monitor_low_usd)} – $${fmt(g.mod_monitor_high_usd)}` : '—'}</span>
+                <span>NRSC-2-B filter:</span><span>{g.nrsc_filter_low_usd != null ? `$${fmt(g.nrsc_filter_low_usd)} – $${fmt(g.nrsc_filter_high_usd)}` : '—'}</span>
+                <span>Total monitoring equip:</span><span style={{ fontWeight: 600 }}>{g.total_monitoring_equip_low_usd != null ? `$${fmt(g.total_monitoring_equip_low_usd)} – $${fmt(g.total_monitoring_equip_high_usd)}` : '—'}</span>
+                <span>Annual compliance:</span><span>{g.annual_fcc_compliance_low_usd != null ? `$${fmt(g.annual_fcc_compliance_low_usd)} – $${fmt(g.annual_fcc_compliance_high_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#6d28d9', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Broadcast Facility Security Guide */}
         {candidate.am_broadcast_facility_security_guide && (() => {
           const g = candidate.am_broadcast_facility_security_guide;
