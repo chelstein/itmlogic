@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_site_lease_and_land_acquisition_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_lease_and_land_acquisition_guide;
+  assert.ok(g !== undefined && g !== null, 'am_site_lease_and_land_acquisition_guide missing');
+  assert.ok(typeof g.land_class === 'string', 'land_class should be a string');
+  assert.ok(g.site_acres > 0, 'site_acres must be positive');
+});
+
+test('am_site_lease_and_land_acquisition_guide KAZM rank-1 suburban classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_lease_and_land_acquisition_guide;
+  assert.strictEqual(g.land_class, 'suburban', 'rank-1 at dist=0 should be suburban');
+  assert.strictEqual(g.purchase_total_low_usd, 150000, 'rank-1 purchase_total_low_usd should be $150,000');
+  assert.strictEqual(g.purchase_total_high_usd, 400000, 'rank-1 purchase_total_high_usd should be $400,000');
+});
+
+test('am_site_lease_and_land_acquisition_guide KAZM rank-1 lease costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_lease_and_land_acquisition_guide;
+  assert.strictEqual(g.annual_lease_total_low_usd, 5000,   'rank-1 annual_lease_total_low_usd should be $5,000');
+  assert.strictEqual(g.lease_20yr_low_usd,          100000, 'rank-1 lease_20yr_low_usd should be $100,000');
+  assert.strictEqual(g.total_due_diligence_low_usd, 4000,   'rank-1 total_due_diligence_low_usd should be $4,000');
+});
+
+test('am_site_lease_and_land_acquisition_guide KAZM rank-1 preferred option', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_lease_and_land_acquisition_guide;
+  assert.strictEqual(g.preferred_option, 'evaluate', 'rank-1 at dist=0 preferred_option should be evaluate');
+  assert.strictEqual(g.site_acres, 10, 'site_acres should be 10');
+});
+
+test('am_site_lease_and_land_acquisition_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lnd_land_class'              in row, 'lnd_land_class missing from comparison table');
+    assert.ok('lnd_purchase_total_low_usd'  in row, 'lnd_purchase_total_low_usd missing from comparison table');
+    assert.ok('lnd_annual_lease_total_low_usd' in row, 'lnd_annual_lease_total_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.lnd_land_class,             'suburban', 'rank-1 lnd_land_class should be suburban');
+  assert.strictEqual(r0.lnd_purchase_total_low_usd, 150000,     'rank-1 lnd_purchase_total_low_usd should be $150,000');
+  assert.strictEqual(r0.lnd_annual_lease_total_low_usd, 5000,   'rank-1 lnd_annual_lease_total_low_usd should be $5,000');
+});
+
 test('am_tower_decommissioning_and_site_remediation_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;

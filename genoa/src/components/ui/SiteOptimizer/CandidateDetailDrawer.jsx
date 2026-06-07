@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Lease and Land Acquisition Guide */}
+        {candidate.am_site_lease_and_land_acquisition_guide && (() => {
+          const g = candidate.am_site_lease_and_land_acquisition_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="lnd-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdfa', borderRadius: 8, border: '2px solid #0d9488' }}>
+              <div style={{ fontWeight: 700, color: '#134e4a', marginBottom: 6, fontSize: 13 }}>Site Lease &amp; Land Acquisition (§73.1125)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0f766e' }}>
+                <span style={{ color: '#0d9488' }}>Land Class:</span><span style={{ fontWeight: 600 }}>{g.land_class} — {g.site_acres} acres @ {g.dist_km} km</span>
+                <span style={{ color: '#0d9488' }}>Purchase (total):</span><span>{fmt(g.purchase_total_low_usd)} – {fmt(g.purchase_total_high_usd)}</span>
+                <span style={{ color: '#0d9488' }}>Annual Lease:</span><span>{fmt(g.annual_lease_total_low_usd)} – {fmt(g.annual_lease_total_high_usd)}/yr</span>
+                <span style={{ color: '#0d9488' }}>20-yr Lease Total:</span><span>{fmt(g.lease_20yr_low_usd)} – {fmt(g.lease_20yr_high_usd)}</span>
+                <span style={{ color: '#0d9488' }}>Due Diligence:</span><span>{fmt(g.total_due_diligence_low_usd)} – {fmt(g.total_due_diligence_high_usd)} (survey, title, zoning)</span>
+                <span style={{ color: '#0d9488' }}>Preferred Option:</span><span style={{ fontWeight: 600, color: g.preferred_option === 'lease' ? '#0d9488' : '#92400e' }}>{g.preferred_option}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#134e4a' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Carrier Frequency Accuracy and Reference Guide */}
         {candidate.am_carrier_frequency_accuracy_and_reference_guide && (() => {
           const g = candidate.am_carrier_frequency_accuracy_and_reference_guide;

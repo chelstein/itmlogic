@@ -1197,7 +1197,10 @@ export async function runSiteOptimizer(body = {}){
     demo_salvage_value_usd:     c.am_tower_decommissioning_and_site_remediation_guide?.salvage_high_usd ?? null,
     cfa_required_accuracy_hz:   c.am_carrier_frequency_accuracy_and_reference_guide?.required_accuracy_hz ?? null,
     cfa_required_ppm:           c.am_carrier_frequency_accuracy_and_reference_guide?.required_accuracy_ppm ?? null,
-    cfa_gpsdo_cost_low_usd:     c.am_carrier_frequency_accuracy_and_reference_guide?.gpsdo_cost_low_usd ?? null
+    cfa_gpsdo_cost_low_usd:     c.am_carrier_frequency_accuracy_and_reference_guide?.gpsdo_cost_low_usd ?? null,
+    lnd_land_class:             c.am_site_lease_and_land_acquisition_guide?.land_class ?? null,
+    lnd_purchase_total_low_usd: c.am_site_lease_and_land_acquisition_guide?.purchase_total_low_usd ?? null,
+    lnd_annual_lease_total_low_usd: c.am_site_lease_and_land_acquisition_guide?.annual_lease_total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6932,6 +6935,80 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_lease_and_land_acquisition_guide: (() => {
+      // AM relocation sites typically require 5–15 acres for tower, ground system, and buffer.
+      // Land costs vary sharply by distance from urban center and zoning classification.
+      // Leasing is preferred for most broadcast relocations; purchase may suit permanent sites.
+      const site_acres = 10;
+      const dist_km = pt.distance_from_current_km;
+
+      let land_class, purchase_per_acre_low_usd, purchase_per_acre_high_usd,
+          annual_lease_per_acre_low_usd, annual_lease_per_acre_high_usd;
+
+      if (dist_km < 10) {
+        land_class = 'suburban';
+        purchase_per_acre_low_usd  = 15000;
+        purchase_per_acre_high_usd = 40000;
+        annual_lease_per_acre_low_usd  = 500;
+        annual_lease_per_acre_high_usd = 1500;
+      } else if (dist_km < 30) {
+        land_class = 'rural_edge';
+        purchase_per_acre_low_usd  = 5000;
+        purchase_per_acre_high_usd = 15000;
+        annual_lease_per_acre_low_usd  = 150;
+        annual_lease_per_acre_high_usd = 500;
+      } else {
+        land_class = 'rural';
+        purchase_per_acre_low_usd  = 1500;
+        purchase_per_acre_high_usd = 6000;
+        annual_lease_per_acre_low_usd  = 50;
+        annual_lease_per_acre_high_usd = 200;
+      }
+
+      const purchase_total_low_usd   = round2(site_acres * purchase_per_acre_low_usd);
+      const purchase_total_high_usd  = round2(site_acres * purchase_per_acre_high_usd);
+      const annual_lease_total_low_usd   = round2(site_acres * annual_lease_per_acre_low_usd);
+      const annual_lease_total_high_usd  = round2(site_acres * annual_lease_per_acre_high_usd);
+      const lease_20yr_low_usd  = round2(annual_lease_total_low_usd * 20);
+      const lease_20yr_high_usd = round2(annual_lease_total_high_usd * 20);
+
+      const title_search_usd             = 1500;
+      const boundary_survey_low_usd      = 2000;
+      const boundary_survey_high_usd     = 5000;
+      const zoning_filing_low_usd        = 500;
+      const zoning_filing_high_usd       = 3000;
+      const total_due_diligence_low_usd  = title_search_usd + boundary_survey_low_usd + zoning_filing_low_usd;
+      const total_due_diligence_high_usd = title_search_usd + boundary_survey_high_usd + zoning_filing_high_usd;
+
+      const preferred_option = dist_km < 5 ? 'evaluate' : 'lease';
+
+      return {
+        dist_km: round2(dist_km),
+        land_class,
+        site_acres,
+        purchase_per_acre_low_usd,
+        purchase_per_acre_high_usd,
+        purchase_total_low_usd,
+        purchase_total_high_usd,
+        annual_lease_per_acre_low_usd,
+        annual_lease_per_acre_high_usd,
+        annual_lease_total_low_usd,
+        annual_lease_total_high_usd,
+        lease_20yr_low_usd,
+        lease_20yr_high_usd,
+        title_search_usd,
+        boundary_survey_low_usd,
+        boundary_survey_high_usd,
+        zoning_filing_low_usd,
+        zoning_filing_high_usd,
+        total_due_diligence_low_usd,
+        total_due_diligence_high_usd,
+        preferred_option,
+        reference: 'USDA NASS Agricultural Land Values; FCC Form 301-AM §73.1125 (station location); local zoning and land use records',
+        note: `${site_acres}-acre ${land_class} site at ${round2(dist_km)} km from current: purchase $${purchase_total_low_usd.toLocaleString()}–$${purchase_total_high_usd.toLocaleString()} vs. 20-yr lease $${lease_20yr_low_usd.toLocaleString()}–$${lease_20yr_high_usd.toLocaleString()} (excl. due-diligence $${total_due_diligence_low_usd.toLocaleString()}–$${total_due_diligence_high_usd.toLocaleString()}); preferred: ${preferred_option}`
       };
     })(),
 

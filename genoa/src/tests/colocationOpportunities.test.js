@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_site_lease_and_land_acquisition_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_site_lease_and_land_acquisition_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_lease_and_land_acquisition_guide missing`);
+    assert.ok(g.site_acres > 0, `rank ${c.rank}: site_acres must be positive`);
+    assert.ok(g.purchase_total_low_usd > 0, `rank ${c.rank}: purchase_total_low_usd must be positive`);
+    assert.ok(['suburban','rural_edge','rural'].includes(g.land_class), `rank ${c.rank}: land_class must be suburban/rural_edge/rural`);
+  }
+});
+
 test('am_carrier_frequency_accuracy_and_reference_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {
