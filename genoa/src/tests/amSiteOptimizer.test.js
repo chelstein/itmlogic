@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_transmitter_building_and_equipment_shelter_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_equipment_shelter_guide;
+  assert.ok(g !== undefined && g !== null, 'am_transmitter_building_and_equipment_shelter_guide missing');
+  assert.ok(typeof g.bldg_type === 'string', 'bldg_type should be a string');
+  assert.ok(g.bldg_sqft > 0, 'bldg_sqft must be positive');
+});
+
+test('am_transmitter_building_and_equipment_shelter_guide KAZM building specs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_equipment_shelter_guide;
+  assert.strictEqual(g.bldg_type, 'prefab_metal', 'KAZM 5kW Class D should use prefab_metal');
+  assert.strictEqual(g.bldg_sqft, 200,  'KAZM 5kW should be 200 sq-ft');
+  assert.strictEqual(g.hvac_tons, 2,    'KAZM 200 sq-ft should require 2-ton HVAC');
+});
+
+test('am_transmitter_building_and_equipment_shelter_guide KAZM construction costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_equipment_shelter_guide;
+  assert.strictEqual(g.bldg_construction_low_usd,  16000, 'KAZM bldg_construction_low_usd should be $16,000');
+  assert.strictEqual(g.bldg_construction_high_usd, 26000, 'KAZM bldg_construction_high_usd should be $26,000');
+  assert.strictEqual(g.hvac_low_usd, 4000, 'KAZM hvac_low_usd should be $4,000');
+});
+
+test('am_transmitter_building_and_equipment_shelter_guide KAZM total shelter costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_equipment_shelter_guide;
+  assert.strictEqual(g.total_shelter_low_usd,  28000, 'KAZM total_shelter_low_usd should be $28,000');
+  assert.strictEqual(g.total_shelter_high_usd, 57000, 'KAZM total_shelter_high_usd should be $57,000');
+});
+
+test('am_transmitter_building_and_equipment_shelter_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('shlt_bldg_type'    in row, 'shlt_bldg_type missing from comparison table');
+    assert.ok('shlt_bldg_sqft'    in row, 'shlt_bldg_sqft missing from comparison table');
+    assert.ok('shlt_total_low_usd' in row, 'shlt_total_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.shlt_bldg_type,     'prefab_metal', 'rank-1 shlt_bldg_type should be prefab_metal');
+  assert.strictEqual(r0.shlt_bldg_sqft,     200,            'rank-1 shlt_bldg_sqft should be 200');
+  assert.strictEqual(r0.shlt_total_low_usd, 28000,          'rank-1 shlt_total_low_usd should be $28,000');
+});
+
 test('am_site_lease_and_land_acquisition_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_lease_and_land_acquisition_guide;

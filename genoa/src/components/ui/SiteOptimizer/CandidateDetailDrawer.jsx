@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Building and Equipment Shelter Guide */}
+        {candidate.am_transmitter_building_and_equipment_shelter_guide && (() => {
+          const g = candidate.am_transmitter_building_and_equipment_shelter_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="shlt-guide" style={{ marginBottom: 16, padding: 12, background: '#f5f3ff', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Transmitter Building &amp; Equipment Shelter</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#6d28d9' }}>
+                <span style={{ color: '#7c3aed' }}>Building Type:</span><span style={{ fontWeight: 600 }}>{g.bldg_type} — {g.bldg_sqft} sq-ft</span>
+                <span style={{ color: '#7c3aed' }}>Construction:</span><span>{fmt(g.bldg_construction_low_usd)} – {fmt(g.bldg_construction_high_usd)} ({fmt(g.bldg_cost_per_sqft_low)}–{fmt(g.bldg_cost_per_sqft_high)}/sq-ft)</span>
+                <span style={{ color: '#7c3aed' }}>HVAC ({g.hvac_tons}-ton):</span><span>{fmt(g.hvac_low_usd)} – {fmt(g.hvac_high_usd)}</span>
+                <span style={{ color: '#7c3aed' }}>Electrical Service:</span><span>{fmt(g.electrical_service_low_usd)} – {fmt(g.electrical_service_high_usd)}</span>
+                <span style={{ color: '#7c3aed' }}>Generator Pad:</span><span>{fmt(g.generator_pad_low_usd)} – {fmt(g.generator_pad_high_usd)}</span>
+                <span style={{ color: '#7c3aed' }}>Total Shelter:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_shelter_low_usd)} – {fmt(g.total_shelter_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#4c1d95' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Site Lease and Land Acquisition Guide */}
         {candidate.am_site_lease_and_land_acquisition_guide && (() => {
           const g = candidate.am_site_lease_and_land_acquisition_guide;
