@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Utility Power and Backup Systems Guide */}
+        {candidate.am_utility_power_and_backup_systems_guide && (() => {
+          const g = candidate.am_utility_power_and_backup_systems_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="pwr-guide" style={{ marginBottom: 16, padding: 12, background: '#faf5ff', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Utility Power &amp; Backup Systems</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#4c1d95' }}>
+                <span>Power extension:</span><span>{g.power_ext_mi != null ? `${g.power_ext_mi.toFixed(2)} mi` : '—'} ({fmt(g.power_ext_low_usd)} – {fmt(g.power_ext_high_usd)})</span>
+                <span>Service panel:</span><span>{fmt(g.service_panel_low_usd)} – {fmt(g.service_panel_high_usd)}</span>
+                <span>Generator ({g.gen_kw != null ? `${g.gen_kw} kW` : '—'}):</span><span>{fmt(g.generator_low_usd)} – {fmt(g.generator_high_usd)}</span>
+                <span>Transfer switch:</span><span>{fmt(g.ats_low_usd)} – {fmt(g.ats_high_usd)}</span>
+                <span>UPS (control):</span><span>{fmt(g.ups_low_usd)} – {fmt(g.ups_high_usd)}</span>
+                <span>Fuel tank:</span><span>{fmt(g.fuel_tank_low_usd)} – {fmt(g.fuel_tank_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#6d28d9', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Site Access and Road Construction Guide */}
         {candidate.am_site_access_and_road_construction_guide && (() => {
           const g = candidate.am_site_access_and_road_construction_guide;

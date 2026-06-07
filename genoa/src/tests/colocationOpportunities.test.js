@@ -3105,3 +3105,14 @@ test('am_site_access_and_road_construction_guide present across colocation candi
     assert.ok(g.road_length_mi <= 2.0, `rank ${c.rank}: road_length_mi must be <= 2.0 (maximum)`);
   }
 });
+
+test('am_utility_power_and_backup_systems_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_utility_power_and_backup_systems_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_utility_power_and_backup_systems_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.gen_kw > 0, `rank ${c.rank}: gen_kw must be positive`);
+    assert.ok(g.power_ext_mi >= 0.1, `rank ${c.rank}: power_ext_mi must be >= 0.1 (minimum)`);
+  }
+});

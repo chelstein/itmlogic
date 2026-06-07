@@ -13236,3 +13236,46 @@ test('am_site_access_and_road_construction_guide comparison table columns presen
   assert.strictEqual(r0.acc_road_length_mi,  0.25, 'rank-1 acc_road_length_mi should be 0.25');
   assert.strictEqual(r0.acc_road_low_usd,   19800, 'rank-1 acc_road_low_usd should be 19800');
 });
+
+test('am_utility_power_and_backup_systems_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
+  assert.ok(g !== undefined && g !== null, 'am_utility_power_and_backup_systems_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM 5 kW TPO yields 15 kW generator', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
+  assert.strictEqual(g.gen_kw,              15,   'KAZM gen_kw should be 15 (3x 5 kW)');
+  assert.strictEqual(g.generator_low_usd,   6000, 'KAZM generator_low_usd should be 6000');
+  assert.strictEqual(g.power_ext_mi,        0.1,  'KAZM power_ext_mi should be 0.1 (minimum)');
+});
+
+test('KAZM utility power total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
+  assert.strictEqual(g.total_low_usd,  23920, 'KAZM total_low_usd should be 23920');
+  assert.strictEqual(g.total_high_usd, 56840, 'KAZM total_high_usd should be 56840');
+});
+
+test('KAZM utility power reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_utility_power_and_backup_systems_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('NFPA'), 'reference must cite NFPA');
+  assert.ok(typeof g.note === 'string' && g.note.includes('15 kW generator'), 'note must mention generator size');
+});
+
+test('am_utility_power_and_backup_systems_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pwr_total_low_usd'     in row, 'pwr_total_low_usd missing from comparison table');
+    assert.ok('pwr_gen_kw'            in row, 'pwr_gen_kw missing from comparison table');
+    assert.ok('pwr_generator_low_usd' in row, 'pwr_generator_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.pwr_total_low_usd,     23920, 'rank-1 pwr_total_low_usd should be 23920');
+  assert.strictEqual(r0.pwr_gen_kw,             15,   'rank-1 pwr_gen_kw should be 15');
+  assert.strictEqual(r0.pwr_generator_low_usd,  6000, 'rank-1 pwr_generator_low_usd should be 6000');
+});

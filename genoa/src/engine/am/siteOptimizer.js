@@ -1287,7 +1287,10 @@ export async function runSiteOptimizer(body = {}){
     asr_tower_height_ft:        c.am_fcc_asr_tower_registration_guide?.tower_height_ft ?? null,
     acc_total_low_usd:          c.am_site_access_and_road_construction_guide?.total_low_usd ?? null,
     acc_road_length_mi:         c.am_site_access_and_road_construction_guide?.road_length_mi ?? null,
-    acc_road_low_usd:           c.am_site_access_and_road_construction_guide?.road_low_usd ?? null
+    acc_road_low_usd:           c.am_site_access_and_road_construction_guide?.road_low_usd ?? null,
+    pwr_total_low_usd:          c.am_utility_power_and_backup_systems_guide?.total_low_usd ?? null,
+    pwr_gen_kw:                 c.am_utility_power_and_backup_systems_guide?.gen_kw ?? null,
+    pwr_generator_low_usd:      c.am_utility_power_and_backup_systems_guide?.generator_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7022,6 +7025,56 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_utility_power_and_backup_systems_guide: (() => {
+      // AM transmitters require a dedicated electrical service, backup generator,
+      // and often a UPS for seamless failover. Power service extension cost depends
+      // on how far the candidate site is from the nearest utility line.
+      const distance_km     = pt.distance_from_current_km ?? 0;
+      const distance_mi     = round2(distance_km * 0.621371);
+      // Power line extension: assume 25% of relocation distance (min 0.1 mi, max 1.5 mi)
+      const power_ext_mi    = Math.min(1.5, Math.max(0.1, round2(distance_mi * 0.25)));
+      const power_ext_ft    = round2(power_ext_mi * 5280);
+      // Overhead utility extension: $15–$30/LF; underground: $30–$60/LF; use overhead assumption
+      const power_low_per_lf  = 15;
+      const power_high_per_lf = 30;
+      const power_ext_low_usd  = round2(power_ext_ft * power_low_per_lf);
+      const power_ext_high_usd = round2(power_ext_ft * power_high_per_lf);
+      // Electrical service panel and meter: 200A 3-phase service
+      const service_panel_low_usd  = 3000;
+      const service_panel_high_usd = 8000;
+      // Backup generator: tpo_kw determines generator size (rule of thumb: 3× TPO in gen kW)
+      const gen_kw     = Math.ceil(tpo_kw * 3);
+      const gen_low_per_kw  = 400;  // $400–$800/kW installed
+      const gen_high_per_kw = 800;
+      const generator_low_usd  = round2(gen_kw * gen_low_per_kw);
+      const generator_high_usd = round2(gen_kw * gen_high_per_kw);
+      // Automatic transfer switch (ATS): $2,500–$8,000
+      const ats_low_usd  = 2500;
+      const ats_high_usd = 8000;
+      // UPS for automation/control: $1,500–$5,000
+      const ups_low_usd  = 1500;
+      const ups_high_usd = 5000;
+      // Fuel tank (diesel): 500-gal above-ground tank: $3,000–$8,000 installed
+      const fuel_tank_low_usd  = 3000;
+      const fuel_tank_high_usd = 8000;
+      const total_low_usd  = round2(power_ext_low_usd  + service_panel_low_usd  + generator_low_usd  + ats_low_usd  + ups_low_usd  + fuel_tank_low_usd);
+      const total_high_usd = round2(power_ext_high_usd + service_panel_high_usd + generator_high_usd + ats_high_usd + ups_high_usd + fuel_tank_high_usd);
+      return {
+        distance_km: round2(distance_km), distance_mi,
+        power_ext_mi, power_ext_ft,
+        gen_kw,
+        power_ext_low_usd, power_ext_high_usd,
+        service_panel_low_usd, service_panel_high_usd,
+        generator_low_usd, generator_high_usd,
+        ats_low_usd, ats_high_usd,
+        ups_low_usd, ups_high_usd,
+        fuel_tank_low_usd, fuel_tank_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'NFPA 70 (NEC); NFPA 110 (emergency power); FCC §73.1590 (equipment performance); RS Means Electrical Cost Data; generator sizing: 3× TPO kW rule',
+        note: `${gen_kw} kW generator (3× ${tpo_kw} kW TPO); ${power_ext_mi.toFixed(2)} mi power extension; total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 
