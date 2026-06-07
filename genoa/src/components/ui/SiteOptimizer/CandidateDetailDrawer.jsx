@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Coverage Improvement vs Current Site Guide */}
+        {candidate.am_coverage_improvement_vs_current_site_guide && (() => {
+          const g = candidate.am_coverage_improvement_vs_current_site_guide;
+          const verdictColor = g.verdict.includes('GAIN') ? '#15803d' : g.verdict.includes('LOSS') ? '#dc2626' : '#374151';
+          return (
+            <div key="ci-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #0ea5e9' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Coverage Improvement vs Current Site</div>
+              <div style={{ marginBottom: 6, padding: '4px 8px', background: '#e0f2fe', borderRadius: 4, fontSize: 13, fontWeight: 700, color: verdictColor }}>{g.verdict.replace(/_/g, ' ')}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Current Site Radius:</span><span>{g.d_current_km} km (σ={g.sigma_current} mS/m)</span>
+                <span style={{ color: '#6b7280' }}>Candidate Radius:</span><span style={{ fontWeight: 600, color: verdictColor }}>{g.d_candidate_km} km (σ={g.sigma_candidate} mS/m)</span>
+                <span style={{ color: '#6b7280' }}>Coverage Change:</span><span style={{ color: verdictColor, fontWeight: 600 }}>{g.coverage_radius_delta_pct >= 0 ? '+' : ''}{g.coverage_radius_delta_pct}% ({g.coverage_delta_km2 >= 0 ? '+' : ''}{g.coverage_delta_km2} km²)</span>
+                <span style={{ color: '#6b7280' }}>Displacement:</span><span>{g.displacement_km} km at {g.bearing_deg_ci}°</span>
+                <span style={{ color: '#6b7280' }}>COL Coverage:</span><span>{g.col_field_improvement}</span>
+                <span style={{ color: '#6b7280' }}>COL in Current:</span><span>{g.col_in_current_contour ? '✓ Yes' : '✗ No'}</span>
+                <span style={{ color: '#6b7280' }}>COL in Candidate:</span><span>{g.col_in_candidate_contour ? '✓ Yes' : '✗ No'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0c4a6e', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Lightning Protection and Surge Suppression Guide */}
         {candidate.am_lightning_protection_and_surge_suppression_guide && (() => {
           const g = candidate.am_lightning_protection_and_surge_suppression_guide;

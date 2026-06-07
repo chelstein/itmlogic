@@ -2602,3 +2602,14 @@ test('am_lightning_protection_and_surge_suppression_guide present across colocat
     assert.ok(g.N_s > 0, `rank ${c.rank}: N_s must be positive`);
   }
 });
+
+test('am_coverage_improvement_vs_current_site_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_coverage_improvement_vs_current_site_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_coverage_improvement_vs_current_site_guide missing`);
+    assert.ok(typeof g.verdict === 'string', `rank ${c.rank}: verdict should be a string`);
+    assert.ok(g.d_candidate_km > 0, `rank ${c.rank}: d_candidate_km must be positive`);
+    assert.ok(['SIGNIFICANT_COVERAGE_GAIN','MARGINAL_COVERAGE_GAIN','EQUIVALENT_COVERAGE','MARGINAL_COVERAGE_LOSS','SIGNIFICANT_COVERAGE_LOSS'].includes(g.verdict), `rank ${c.rank}: verdict should be a valid classification`);
+  }
+});

@@ -1152,7 +1152,10 @@ export async function runSiteOptimizer(body = {}){
     sc_coverage_area_km2:       c.am_soil_conductivity_and_groundwave_coverage_guide?.coverage_area_km2 ?? null,
     lp_N_g_adj:                 c.am_lightning_protection_and_surge_suppression_guide?.N_g_adj ?? null,
     lp_N_s:                     c.am_lightning_protection_and_surge_suppression_guide?.N_s ?? null,
-    lp_total_cost_low_usd:      c.am_lightning_protection_and_surge_suppression_guide?.total_lp_cost_low_usd ?? null
+    lp_total_cost_low_usd:      c.am_lightning_protection_and_surge_suppression_guide?.total_lp_cost_low_usd ?? null,
+    ci_d_candidate_km:          c.am_coverage_improvement_vs_current_site_guide?.d_candidate_km ?? null,
+    ci_coverage_delta_pct:      c.am_coverage_improvement_vs_current_site_guide?.coverage_radius_delta_pct ?? null,
+    ci_verdict:                 c.am_coverage_improvement_vs_current_site_guide?.verdict ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6887,6 +6890,107 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_coverage_improvement_vs_current_site_guide: (() => {
+      // Quantifies the net coverage improvement (or degradation) at this candidate
+      // site relative to the current transmitter location.  This is the primary
+      // decision metric for any relocation: does moving here actually improve service?
+      // Uses the same FCC M3 / Bullington-calibrated model as the soil conductivity
+      // guide, applied to both the current and candidate sites.
+
+      // ---- Helper: FCC M3 soil conductivity by lat/lon ----
+      function getSigma(lat, lon) {
+        if (lon < -115 && lat > 45) return 30;
+        if (lon < -120 && lat < 45) return 15;
+        if (lat < 31 && lon > -97 && lon < -80) return 15;
+        if (lon > -90) return 8;
+        if (lon > -100 && lat > 38) return 5;
+        if (lon > -100) return 5;
+        if (lon > -115 && lat < 37) return 2;
+        if (lon > -115) return 3;
+        return 5;
+      }
+      const K_BY_SIGMA_CI = { 0.5: 12, 2: 18, 5: 23, 8: 27, 15: 30, 30: 35 };
+      function kForSigma(s) {
+        const keys = [0.5, 2, 5, 8, 15, 30];
+        for (let i = 0; i < keys.length - 1; i++) {
+          if (s >= keys[i] && s <= keys[i + 1]) {
+            const t = (s - keys[i]) / (keys[i + 1] - keys[i]);
+            return K_BY_SIGMA_CI[keys[i]] + t * (K_BY_SIGMA_CI[keys[i + 1]] - K_BY_SIGMA_CI[keys[i]]);
+          }
+        }
+        if (s >= 30) return K_BY_SIGMA_CI[30];
+        return K_BY_SIGMA_CI[0.5];
+      }
+
+      const sigma_current   = getSigma(current_site.lat, current_site.lon);
+      const sigma_candidate = getSigma(pt.lat, pt.lon);
+      const freq_scale_ci   = round2(Math.sqrt(1000 / frequency_khz));
+      const erp_factor      = Math.pow(tpo_kw, 0.4);
+
+      const d_current_km   = round2(kForSigma(sigma_current)   * freq_scale_ci * erp_factor);
+      const d_candidate_km = round2(kForSigma(sigma_candidate) * freq_scale_ci * erp_factor);
+      const area_current_km2   = round2(Math.PI * d_current_km   * d_current_km);
+      const area_candidate_km2 = round2(Math.PI * d_candidate_km * d_candidate_km);
+      const coverage_delta_km2 = round2(area_candidate_km2 - area_current_km2);
+      // Positive = more coverage; negative = less coverage
+      const coverage_radius_delta_pct = Math.round((d_candidate_km / d_current_km - 1) * 100);
+
+      // ---- COL centroid coverage at each site ----
+      // Simplified great-circle distance (km) using equirectangular approximation
+      function distKm(lat1, lon1, lat2, lon2) {
+        const dlat = (lat2 - lat1) * 111.32;
+        const dlon = (lon2 - lon1) * 111.32 * Math.cos((lat1 + lat2) / 2 * Math.PI / 180);
+        return round2(Math.sqrt(dlat * dlat + dlon * dlon));
+      }
+      const col_lat = col_centroid?.lat ?? current_site.lat;
+      const col_lon = col_centroid?.lon ?? current_site.lon;
+      const dist_current_to_col_km   = distKm(current_site.lat, current_site.lon, col_lat, col_lon);
+      const dist_candidate_to_col_km = distKm(pt.lat, pt.lon, col_lat, col_lon);
+      const col_in_current_contour   = dist_current_to_col_km   <= d_current_km;
+      const col_in_candidate_contour = dist_candidate_to_col_km <= d_candidate_km;
+      const col_dist_delta_km = round2(dist_candidate_to_col_km - dist_current_to_col_km);
+      const col_field_improvement = col_in_candidate_contour && !col_in_current_contour
+        ? 'COL NOW IN CONTOUR (major improvement)'
+        : col_in_current_contour && col_in_candidate_contour
+        ? (dist_candidate_to_col_km === 0 && dist_current_to_col_km === 0
+           ? 'COL co-located with transmitter site'
+           : col_dist_delta_km < 0
+           ? `COL closer by ${Math.abs(col_dist_delta_km)} km (stronger signal)`
+           : col_dist_delta_km === 0
+           ? 'COL equidistant from candidate and current site'
+           : `COL farther by ${col_dist_delta_km} km (weaker signal)`)
+        : !col_in_current_contour && !col_in_candidate_contour
+        ? 'COL outside both contours'
+        : 'COL lost from contour (degradation)';
+
+      // ---- Displacement ----
+      const displacement_km = round2(pt.distance_from_current_km ?? 0);
+      const bearing_deg_ci  = pt.bearing_deg ?? 0;
+
+      // ---- Overall verdict ----
+      const verdict = coverage_radius_delta_pct >= 5
+        ? 'SIGNIFICANT_COVERAGE_GAIN'
+        : coverage_radius_delta_pct >= 1
+        ? 'MARGINAL_COVERAGE_GAIN'
+        : coverage_radius_delta_pct >= -1
+        ? 'EQUIVALENT_COVERAGE'
+        : coverage_radius_delta_pct >= -5
+        ? 'MARGINAL_COVERAGE_LOSS'
+        : 'SIGNIFICANT_COVERAGE_LOSS';
+
+      return {
+        sigma_current, sigma_candidate,
+        d_current_km, d_candidate_km, freq_scale_ci,
+        area_current_km2, area_candidate_km2, coverage_delta_km2,
+        coverage_radius_delta_pct, displacement_km, bearing_deg_ci,
+        dist_current_to_col_km, dist_candidate_to_col_km,
+        col_in_current_contour, col_in_candidate_contour, col_field_improvement,
+        verdict,
+        reference: 'FCC M3 ground conductivity map; ITU-R P.368-9 (groundwave propagation); 47 CFR §73.182 (AM coverage computation)',
+        note: `Coverage vs current site: radius ${d_candidate_km} km (candidate) vs ${d_current_km} km (current) — ${coverage_radius_delta_pct >= 0 ? '+' : ''}${coverage_radius_delta_pct}% (${coverage_delta_km2 >= 0 ? '+' : ''}${coverage_delta_km2} km²). ${col_field_improvement}. Displacement: ${displacement_km} km at ${bearing_deg_ci}°. Verdict: ${verdict}.`
       };
     })(),
 
