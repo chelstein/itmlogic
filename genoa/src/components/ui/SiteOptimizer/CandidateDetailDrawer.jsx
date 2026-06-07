@@ -2226,6 +2226,42 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Operating Log and Technical Records Compliance Guide */}
+        {candidate.am_operating_log_and_technical_records_compliance_guide && (() => {
+          const g = candidate.am_operating_log_and_technical_records_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="log-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Operating Log &amp; Technical Records — §73.1820 / §73.3527</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#0c4a6e', marginBottom: 8 }}>
+                <span style={{ color: '#0369a1' }}>Log retention:</span><span>≥{g.log_retention_years} years (§73.1840)</span>
+                <span style={{ color: '#0369a1' }}>Recommended:</span><span>{g.log_retention_recommended_years} years</span>
+                <span style={{ color: '#0369a1' }}>EAS log (separate):</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§11.35)</span>
+                <span style={{ color: '#0369a1' }}>Online public file:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§73.3527)</span>
+                <span style={{ color: '#0369a1' }}>Quarterly issues list:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§73.3526)</span>
+                <span style={{ color: '#0369a1' }}>Night sched. log:</span>
+                <span style={{ fontWeight: 700, color: g.nighttime_schedule_logging ? '#b45309' : '#6b7280' }}>
+                  {g.nighttime_schedule_logging ? 'YES (clear ch. / DA)' : 'NO'}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: '#0c4a6e', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#0369a1' }}>Log software:</span><span>${fmt(g.log_software_low_usd)} – ${fmt(g.log_software_high_usd)}</span>
+                <span style={{ color: '#0369a1' }}>Training:</span><span>${fmt(g.training_low_usd)} – ${fmt(g.training_high_usd)}</span>
+                <span style={{ color: '#0369a1' }}>Annual maintenance:</span><span>${fmt(g.maintenance_low_usd)} – ${fmt(g.maintenance_high_usd)}</span>
+                <span style={{ color: '#0369a1' }}>Public file setup:</span><span>${fmt(g.public_file_low_usd)} – ${fmt(g.public_file_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#0369a1', fontWeight: 600 }}>Total first-year:</span>
+                <span style={{ color: '#0c4a6e', fontWeight: 700 }}>${fmt(g.total_setup_low_usd)} – ${fmt(g.total_setup_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#0284c7' }}>Ref: 47 CFR §73.1820, §73.1840, §73.3526(e)(11), §73.3527, §73.1690</div>
+            </div>
+          );
+        })()}
+
         {/* AM Contour Overlap and Co-Channel Interference Guide */}
         {candidate.am_contour_overlap_and_co_channel_interference_guide && (() => {
           const g = candidate.am_contour_overlap_and_co_channel_interference_guide;

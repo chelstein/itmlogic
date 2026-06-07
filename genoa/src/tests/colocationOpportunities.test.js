@@ -3769,3 +3769,20 @@ test('colocation candidates include am_contour_overlap_and_co_channel_interferen
     assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel is 790 kHz');
   }
 });
+
+test('colocation candidates include am_operating_log_and_technical_records_compliance_guide with §73.1840 retention', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_operating_log_and_technical_records_compliance_guide;
+    assert.ok(g, `candidate missing am_operating_log_and_technical_records_compliance_guide`);
+    assert.strictEqual(g.log_retention_years, 2, '§73.1840 retention = 2 years');
+    assert.strictEqual(g.log_public_file_required, true, 'online public file required per §73.3527');
+    assert.ok(g.total_setup_low_usd > 0, 'total_setup_low_usd must be positive');
+  }
+});

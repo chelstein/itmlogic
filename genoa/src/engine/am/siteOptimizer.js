@@ -1422,7 +1422,10 @@ export async function runSiteOptimizer(body = {}){
     pse_total_electrical_low_usd:       c.am_station_power_supply_and_electrical_infrastructure_guide?.total_electrical_low_usd ?? null,
     cca_protection_db_required:         c.am_contour_overlap_and_co_channel_interference_guide?.protection_db_required ?? null,
     cca_overlap_risk_level:             c.am_contour_overlap_and_co_channel_interference_guide?.overlap_risk_level ?? null,
-    cca_total_study_low_usd:            c.am_contour_overlap_and_co_channel_interference_guide?.total_study_low_usd ?? null
+    cca_total_study_low_usd:            c.am_contour_overlap_and_co_channel_interference_guide?.total_study_low_usd ?? null,
+    log_retention_years:                c.am_operating_log_and_technical_records_compliance_guide?.log_retention_years ?? null,
+    log_public_file_required:           c.am_operating_log_and_technical_records_compliance_guide?.log_public_file_required ?? null,
+    log_total_setup_low_usd:            c.am_operating_log_and_technical_records_compliance_guide?.total_setup_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7157,6 +7160,95 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_operating_log_and_technical_records_compliance_guide: (() => {
+      // 47 CFR §73.1820 / §73.3526 — Station operating log and technical records requirements.
+      //
+      // §73.1820: Station log requirements (post-2017 FCC streamlining order):
+      //   AM stations must maintain a log documenting:
+      //   (a)(1) Entries of any events related to station operation required by FCC rules
+      //           (technical malfunctions, corrective action, scheduled maintenance)
+      //   (a)(2) EAS log entries per §11.35 (required weekly and monthly test results)
+      //   (a)(3) Any instruction of the FCC (NOV, order, consent decree compliance)
+      //
+      // §73.1840: Log retention — station logs must be retained for a minimum of 2 years.
+      //
+      // §73.1820(b): Logs may be maintained in electronic format; must be available to FCC
+      //   upon request; must be secure against unauthorized modification.
+      //
+      // §73.3526(e)(11): Quarterly Issues/Programs List:
+      //   Public file document listing community issues addressed by programming, updated quarterly.
+      //   Must be retained in the online public file for the entire license term (8 years).
+      //
+      // §73.3527: Online Public File (publicfiles.fcc.gov):
+      //   All applications, license, renewal, ownership reports, technical exhibits,
+      //   issues/programs lists, EEO reports, and political file must be uploaded and kept current.
+      //   FCC can audit public file compliance; violations can result in fines (up to $10,000/day).
+      //
+      // §73.1690: Technical modification documentation:
+      //   Any technical change (site, power, antenna) must be documented in the station's records
+      //   before the change is made (construction permit + authorization) and after (license to cover).
+      //
+      // §73.1125: Operating schedule log:
+      //   DA-N and nighttime-restricted stations must log sign-on/sign-off times and any
+      //   deviations from the authorized operating schedule.
+      //
+      // §73.1800: Verification of operations within technical parameters is the licensee's
+      //   responsibility; logs support this verification obligation.
+      //
+      // Retention schedule: §73.1840 — 2 years minimum; recommended 5 years for defense against
+      //   complaints and FCC inquiries.
+      //
+      // Setup costs (2024):
+      //   Digital station log software (WideOrbit, BSI, custom): $500–$2,000 setup
+      //   Staff training: $200–$500
+      //   Annual maintenance/support: $200–$500
+      //   FCC online public file setup/audit: $300–$800
+      //   Total first-year: $1,200–$3,800
+      const isDA          = /^DA/i.test(pattern_mode);
+      const isClear       = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // DA-N or restricted nighttime operation adds sign-on/sign-off logging requirement
+      const nighttime_schedule_logging = isDA || isClear;
+
+      const log_retention_years     = 2;   // §73.1840 minimum
+      const log_retention_recommend = 5;   // industry best practice
+      const public_file_retention_years = 8; // full license term (§73.3526)
+
+      const log_software_low_usd  = 500;
+      const log_software_high_usd = 2000;
+      const training_low_usd      = 200;
+      const training_high_usd     = 500;
+      const maintenance_low_usd   = 200;
+      const maintenance_high_usd  = 500;
+      const public_file_low_usd   = 300;
+      const public_file_high_usd  = 800;
+
+      const total_setup_low_usd  = log_software_low_usd  + training_low_usd  + maintenance_low_usd  + public_file_low_usd;
+      const total_setup_high_usd = log_software_high_usd + training_high_usd + maintenance_high_usd + public_file_high_usd;
+
+      return {
+        log_retention_years,
+        log_retention_recommended_years: log_retention_recommend,
+        public_file_retention_years,
+        log_eas_separate_required:  true,           // §11.35 EAS log is separate from station log
+        log_public_file_required:   true,           // §73.3527 online public file mandatory
+        log_quarterly_issues_required: true,        // §73.3526(e)(11) quarterly issues/programs list
+        nighttime_schedule_logging,
+        log_software_low_usd,
+        log_software_high_usd,
+        training_low_usd,
+        training_high_usd,
+        maintenance_low_usd,
+        maintenance_high_usd,
+        public_file_low_usd,
+        public_file_high_usd,
+        total_setup_low_usd,
+        total_setup_high_usd,
+        reference: '47 CFR §73.1820 (station log); §73.1840 (log retention 2 years); §73.3526(e)(11) (quarterly issues list); §73.3527 (online public file); §73.1690 (technical modification records); §73.1800',
+        note: `Station log required per §73.1820; retain ≥${log_retention_years} years (§73.1840); recommended ${log_retention_recommend} years. EAS log separate (§11.35). Online public file at publicfiles.fcc.gov must be kept current (§73.3527); quarterly issues/programs list required (§73.3526(e)(11)). ${nighttime_schedule_logging ? 'Station has nighttime/schedule restrictions — sign-on/sign-off times must be logged.' : ''}`
       };
     })(),
 

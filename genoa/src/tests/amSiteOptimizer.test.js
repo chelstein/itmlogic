@@ -14999,3 +14999,38 @@ it('candidate_comparison_table cca columns are present and valid for KAZM', asyn
   assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(r0.cca_overlap_risk_level), 'cca_overlap_risk_level must be valid');
   assert.ok(r0.cca_total_study_low_usd >= 0, 'cca_total_study_low_usd must be non-negative');
 });
+
+it('am_operating_log_and_technical_records_compliance_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_operating_log_and_technical_records_compliance_guide, `candidate missing am_operating_log_and_technical_records_compliance_guide`);
+  }
+});
+
+it('am_operating_log_and_technical_records_compliance_guide log_retention_years is 2 per §73.1840', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_log_and_technical_records_compliance_guide;
+  assert.strictEqual(g.log_retention_years, 2, '§73.1840 — station logs must be retained ≥ 2 years');
+});
+
+it('am_operating_log_and_technical_records_compliance_guide EAS and public file both required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_log_and_technical_records_compliance_guide;
+  assert.strictEqual(g.log_eas_separate_required, true, 'EAS log separate from station log per §11.35');
+  assert.strictEqual(g.log_public_file_required, true, 'Online public file required per §73.3527');
+  assert.strictEqual(g.log_quarterly_issues_required, true, 'Quarterly issues list required per §73.3526(e)(11)');
+});
+
+it('am_operating_log_and_technical_records_compliance_guide 780 kHz clear channel triggers nighttime schedule logging', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_operating_log_and_technical_records_compliance_guide;
+  assert.strictEqual(g.nighttime_schedule_logging, true, '780 kHz is clear channel → nighttime sign-on/off logging');
+});
+
+it('candidate_comparison_table log columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.log_retention_years, 2, 'log_retention_years must be 2');
+  assert.strictEqual(r0.log_public_file_required, true, 'log_public_file_required must be true');
+  assert.ok(r0.log_total_setup_low_usd > 0, 'log_total_setup_low_usd must be positive');
+});
