@@ -1717,6 +1717,35 @@ const DEMO_RESULT = {
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
       },
+      am_coverage_optimization_by_tower_height_guide: {
+        frequency_khz: 780, wavelength_m: 384.6,
+        lambda_eighth_m: 48,  lambda_eighth_ft: 157,
+        lambda_quarter_m: 96, lambda_quarter_ft: 315,
+        lambda_half_m: 192,   lambda_half_ft: 630,
+        five_eighth_m: 240,   five_eighth_ft: 787,
+        current_height_m: 96, current_height_ft: 315, current_elec_deg: 90,
+        optimal_height_m: 240, optimal_height_ft: 787,
+        height_increase_m: 144,
+        max_field_gain_rel: 1.16, max_coverage_gain_pct: 16,
+        asr_required: true, faa_lighting_required: true,
+        n_height_milestones: 5,
+        height_milestones: [
+          { label: 'λ/8  (45°)',  height_m: 48,  height_ft: 157, elec_deg: 45,  rr_ohm: 10.5, field_gain_rel: 0.71, notes: 'Short; requires large inductive loading coil; low efficiency; typical of land-locked urban sites' },
+          { label: 'λ/4  (90°)',  height_m: 96,  height_ft: 315, elec_deg: 90,  rr_ohm: 36.6, field_gain_rel: 1.00, notes: 'Standard reference height; excellent efficiency; used by most Class D/C stations' },
+          { label: '3λ/8 (135°)', height_m: 144, height_ft: 472, elec_deg: 135, rr_ohm: 55.0, field_gain_rel: 1.10, notes: 'Medium height; field gain +10% over λ/4; requires FAA lighting study above 200 ft (§17.23)' },
+          { label: 'λ/2  (180°)', height_m: 192, height_ft: 630, elec_deg: 180, rr_ohm: 74.0, field_gain_rel: 1.14, notes: 'Half-wave; peak at 5λ/8 approaching; FAA ASR required (>61 m per §17.7); major tower project' },
+          { label: '5λ/8 (225°)', height_m: 240, height_ft: 787, elec_deg: 225, rr_ohm: 37.0, field_gain_rel: 1.16, notes: 'Near-optimal field strength; Rr returns to ~37 Ω; most efficient coverage per watt; rarely practical for Class D' }
+        ],
+        coverage_estimates: [
+          { label: 'λ/8  (45°)',  height_m: 48,  height_ft: 157, field_gain_rel: 0.71, coverage_radius_ratio: 0.71, coverage_gain_pct: -29, rr_ohm: 10.5 },
+          { label: 'λ/4  (90°)',  height_m: 96,  height_ft: 315, field_gain_rel: 1.00, coverage_radius_ratio: 1.00, coverage_gain_pct: 0,   rr_ohm: 36.6 },
+          { label: '3λ/8 (135°)', height_m: 144, height_ft: 472, field_gain_rel: 1.10, coverage_radius_ratio: 1.10, coverage_gain_pct: 10,  rr_ohm: 55.0 },
+          { label: 'λ/2  (180°)', height_m: 192, height_ft: 630, field_gain_rel: 1.14, coverage_radius_ratio: 1.14, coverage_gain_pct: 14,  rr_ohm: 74.0 },
+          { label: '5λ/8 (225°)', height_m: 240, height_ft: 787, field_gain_rel: 1.16, coverage_radius_ratio: 1.16, coverage_gain_pct: 16,  rr_ohm: 37.0 }
+        ],
+        reference: '47 CFR §73.160 (antenna height); §17.7 (ASR); §17.23 (FAA marking); ITU-R BS.346-1 (antenna gain vs height)',
+        note: 'For 780 kHz (λ=385 m): current tower 315 ft (λ/4, 90°) achieves baseline field strength. Increasing to 5λ/8 (787 ft) yields +16% field gain. Towers above 200 ft require FAA ASR registration (§17.7) and painting/lighting per §17.23.'
+      },
       spectrum_monitoring_and_frequency_drift_guide: {
         frequency_khz: 780, freq_hz: 780000, tolerance_hz: 20, tolerance_ppm: 25.64,
         lower_limit_hz: 779980, upper_limit_hz: 780020,

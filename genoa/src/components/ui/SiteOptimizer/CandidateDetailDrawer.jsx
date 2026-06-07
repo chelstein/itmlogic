@@ -2226,6 +2226,56 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Coverage Optimization by Tower Height Guide */}
+        {candidate.am_coverage_optimization_by_tower_height_guide && (() => {
+          const g = candidate.am_coverage_optimization_by_tower_height_guide;
+          const qtrMilestone = g.height_milestones?.find(m => m.elec_deg === 90);
+          const optMilestone = g.height_milestones?.find(m => m.elec_deg === 225);
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#166534', marginBottom: 8 }}>
+                AM Coverage vs Tower Height — §73.160 / ITU-R BS.346
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Wavelength (λ):</span> <strong>{g.wavelength_m} m @ {g.frequency_khz} kHz</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Current height (λ/4):</span> <strong>{g.current_height_m} m / {g.current_height_ft} ft</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Optimal height (5λ/8):</span> <strong>{g.optimal_height_m} m / {g.optimal_height_ft} ft</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Max field gain:</span> <strong>+{g.max_coverage_gain_pct}% vs λ/4</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Height increase needed:</span> <strong>{g.height_increase_m} m ({Math.round(g.height_increase_m * 3.28084)} ft)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: g.asr_required ? '#dc2626' : '#16a34a' }}>{g.asr_required ? 'Yes (§17.7)' : 'No'}</strong></div>
+              </div>
+              {g.height_milestones && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#166534', marginBottom: 4 }}>Height Milestones vs Field Gain</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#bbf7d0' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Height</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>m / ft</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Rr (Ω)</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Field Gain</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Coverage +%</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.height_milestones.map((m, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #86efac', background: m.elec_deg === 90 ? '#dcfce7' : m.elec_deg === 225 ? '#f0fdf4' : 'transparent' }}>
+                          <td style={{ padding: '3px 6px', fontWeight: m.elec_deg === 90 ? 700 : 400 }}>{m.label}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.height_m} / {m.height_ft}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.rr_ohm}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>×{m.field_gain_rel.toFixed(2)}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.elec_deg === 90 ? '—' : `+${Math.round((m.field_gain_rel - 1) * 100)}%`}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#166534' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* Spectrum Monitoring and Frequency Drift Guide */}
         {candidate.spectrum_monitoring_and_frequency_drift_guide && (() => {
           const g = candidate.spectrum_monitoring_and_frequency_drift_guide;

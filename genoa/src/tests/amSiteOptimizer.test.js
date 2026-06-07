@@ -5683,6 +5683,59 @@ test('proof_of_performance_requirements comparison table columns present', async
   }
 });
 
+// ---- am_coverage_optimization_by_tower_height_guide ----
+
+test('am_coverage_optimization_by_tower_height_guide presence and structure', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const c = res.candidates[0];
+  assert.ok(c.am_coverage_optimization_by_tower_height_guide != null, 'am_coverage_optimization_by_tower_height_guide missing');
+  const g = c.am_coverage_optimization_by_tower_height_guide;
+  assert.ok(Array.isArray(g.height_milestones), 'height_milestones not array');
+  assert.ok(Array.isArray(g.coverage_estimates), 'coverage_estimates not array');
+  assert.ok(typeof g.wavelength_m === 'number', 'wavelength_m not number');
+  assert.ok(typeof g.max_coverage_gain_pct === 'number', 'max_coverage_gain_pct not number');
+});
+
+test('am_coverage_optimization_by_tower_height_guide KAZM 780 kHz wavelength and height values', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].am_coverage_optimization_by_tower_height_guide;
+  assert.ok(g.wavelength_m > 384 && g.wavelength_m < 385, `wavelength_m should be ~384.6 m, got ${g.wavelength_m}`);
+  assert.strictEqual(g.lambda_quarter_m, 96, 'lambda_quarter_m should be 96 m at 780 kHz');
+  assert.strictEqual(g.lambda_half_m, 192, 'lambda_half_m should be 192 m at 780 kHz');
+  assert.strictEqual(g.five_eighth_m, 240, 'five_eighth_m should be 240 m at 780 kHz');
+  assert.strictEqual(g.lambda_eighth_m, 48, 'lambda_eighth_m should be 48 m at 780 kHz');
+});
+
+test('am_coverage_optimization_by_tower_height_guide height milestones count and gains', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].am_coverage_optimization_by_tower_height_guide;
+  assert.strictEqual(g.n_height_milestones, 5, 'should have 5 height milestones');
+  const qtr = g.height_milestones.find(m => m.elec_deg === 90);
+  assert.ok(qtr != null, 'λ/4 (90°) milestone must be present');
+  assert.strictEqual(qtr.field_gain_rel, 1.00, 'λ/4 baseline gain should be 1.00');
+  const fiveEighth = g.height_milestones.find(m => m.elec_deg === 225);
+  assert.ok(fiveEighth != null, '5λ/8 (225°) milestone must be present');
+  assert.ok(fiveEighth.field_gain_rel >= 1.15, `5λ/8 gain should be >=1.15, got ${fiveEighth.field_gain_rel}`);
+});
+
+test('am_coverage_optimization_by_tower_height_guide current and optimal height', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const g = res.candidates[0].am_coverage_optimization_by_tower_height_guide;
+  assert.strictEqual(g.current_height_m, 96, 'current height should be λ/4 = 96 m');
+  assert.strictEqual(g.current_elec_deg, 90, 'current electrical degrees should be 90');
+  assert.strictEqual(g.optimal_height_m, 240, 'optimal height should be 5λ/8 = 240 m');
+  assert.ok(g.asr_required === true, 'ASR should be required at 96m (>61m §17.7)');
+  assert.ok(g.max_coverage_gain_pct > 0, 'max coverage gain should be positive');
+});
+
+test('am_coverage_optimization_by_tower_height_guide comparison table columns', async () => {
+  const res = await runSiteOptimizer(KAZM);
+  const ct = res.candidate_comparison_table[0];
+  assert.strictEqual(ct.acobth_lambda_quarter_m, 96, 'acobth_lambda_quarter_m in comparison table');
+  assert.strictEqual(ct.acobth_five_eighth_m, 240, 'acobth_five_eighth_m in comparison table');
+  assert.ok(typeof ct.acobth_max_coverage_gain_pct === 'number', 'acobth_max_coverage_gain_pct in comparison table');
+});
+
 // ---- spectrum_monitoring_and_frequency_drift_guide ----
 
 test('spectrum_monitoring_and_frequency_drift_guide presence and structure', async () => {

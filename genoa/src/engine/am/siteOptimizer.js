@@ -1044,7 +1044,10 @@ export async function runSiteOptimizer(body = {}){
     bacg_combined_typ_usd:      c.broadcast_attorney_and_consulting_guide?.combined_total_usd?.typical ?? null,
     smfdg_tolerance_hz:         c.spectrum_monitoring_and_frequency_drift_guide?.tolerance_hz ?? null,
     smfdg_tolerance_ppm:        c.spectrum_monitoring_and_frequency_drift_guide?.tolerance_ppm ?? null,
-    smfdg_n_monitoring_methods: c.spectrum_monitoring_and_frequency_drift_guide?.n_monitoring_methods ?? null
+    smfdg_n_monitoring_methods: c.spectrum_monitoring_and_frequency_drift_guide?.n_monitoring_methods ?? null,
+    acobth_lambda_quarter_m:    c.am_coverage_optimization_by_tower_height_guide?.lambda_quarter_m ?? null,
+    acobth_five_eighth_m:       c.am_coverage_optimization_by_tower_height_guide?.five_eighth_m ?? null,
+    acobth_max_coverage_gain_pct: c.am_coverage_optimization_by_tower_height_guide?.max_coverage_gain_pct ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6779,6 +6782,94 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_coverage_optimization_by_tower_height_guide: (() => {
+      // Tower height significantly affects AM coverage through radiation resistance and
+      // antenna efficiency. This guide models key height milestones for AM monopoles.
+      //
+      // Physics summary:
+      //   - Radiation resistance (Rr) is maximized near 5λ/8 (228°): Rr ≈ 36–37 Ω
+      //   - At λ/4 (90°): Rr ≈ 36.6 Ω (good efficiency but ~15% less field than 5λ/8)
+      //   - At λ/8 (45°): Rr ≈ 10.5 Ω (requires inductive loading; lower efficiency)
+      //   - Below λ/8: Rr drops sharply → very high inductive loading → losses dominate
+      //   - Above 5λ/8: base current distribution inverts → coverage decreases
+      //   - Coverage radius ∝ E_ground ∝ √(TPO / Rr) × antenna_gain_factor(h)
+      //
+      // KAZM physics: 780 kHz → λ = 384.6 m
+      //   λ/8 = 48 m (157 ft), λ/4 = 96 m (315 ft), λ/2 = 192 m (630 ft), 5λ/8 = 240 m (787 ft)
+      //
+      // Class D NDA: 5 kW TPO, current site = λ/4 (315 ft tower)
+      // Antenna gain (relative to isotropic ground wave) varies with electrical height θ (degrees):
+      //   G(θ) ≈ field_ratio relative to λ/4 standard (ITU-R BS.346-1, Table 1)
+      //   θ = 90°  (λ/4)   → G = 1.000 (baseline)
+      //   θ = 135° (3λ/8)  → G ≈ 1.10 (+10%)
+      //   θ = 180° (λ/2)   → G ≈ 1.14 (+14%)
+      //   θ = 225° (5λ/8)  → G ≈ 1.16 (+16%)
+
+      const freq_khz          = frequency_khz;           // 780
+      const wavelength_m      = 300000 / freq_khz;       // 384.615...
+      const lambda_eighth_m   = Math.round(wavelength_m / 8);   //  48 m
+      const lambda_quarter_m  = Math.round(wavelength_m / 4);   //  96 m
+      const lambda_half_m     = Math.round(wavelength_m / 2);   // 192 m
+      const five_eighth_m     = Math.round(5 * wavelength_m / 8); // 240 m
+
+      const m_to_ft = h => Math.round(h * 3.28084);
+
+      // Height milestone table — ITU-R BS.346 field gain relative to λ/4
+      const HEIGHT_MILESTONES = [
+        { label: 'λ/8  (45°)',  height_m: lambda_eighth_m,  height_ft: m_to_ft(lambda_eighth_m),  elec_deg: 45,  rr_ohm: 10.5, field_gain_rel: 0.71, notes: 'Short; requires large inductive loading coil; low efficiency; typical of land-locked urban sites' },
+        { label: 'λ/4  (90°)',  height_m: lambda_quarter_m, height_ft: m_to_ft(lambda_quarter_m), elec_deg: 90,  rr_ohm: 36.6, field_gain_rel: 1.00, notes: 'Standard reference height; excellent efficiency; used by most Class D/C stations' },
+        { label: '3λ/8 (135°)', height_m: Math.round(3 * wavelength_m / 8), height_ft: m_to_ft(Math.round(3 * wavelength_m / 8)), elec_deg: 135, rr_ohm: 55.0, field_gain_rel: 1.10, notes: 'Medium height; field gain +10% over λ/4; requires FAA lighting study above 200 ft (§17.23)' },
+        { label: 'λ/2  (180°)', height_m: lambda_half_m,   height_ft: m_to_ft(lambda_half_m),   elec_deg: 180, rr_ohm: 74.0, field_gain_rel: 1.14, notes: 'Half-wave; peak at 5λ/8 approaching; FAA ASR required (>61 m per §17.7); major tower project' },
+        { label: '5λ/8 (225°)', height_m: five_eighth_m,   height_ft: m_to_ft(five_eighth_m),   elec_deg: 225, rr_ohm: 37.0, field_gain_rel: 1.16, notes: 'Near-optimal field strength; Rr returns to ~37 Ω; most efficient coverage per watt; rarely practical for Class D' },
+      ];
+
+      // Coverage radius improvement vs. λ/4 baseline
+      // E_ground ∝ field_gain × √TPO; radius at ½ mV/m contour ∝ E_ground
+      const COVERAGE_ESTIMATES = HEIGHT_MILESTONES.map(m => ({
+        label: m.label,
+        height_m: m.height_m,
+        height_ft: m.height_ft,
+        field_gain_rel: m.field_gain_rel,
+        coverage_radius_ratio: Math.round(m.field_gain_rel * 100) / 100,
+        coverage_gain_pct: Math.round((m.field_gain_rel - 1.0) * 100),
+        rr_ohm: m.rr_ohm,
+        notes: m.notes
+      }));
+
+      const current_height_m     = lambda_quarter_m;   // KAZM current tower = λ/4
+      const current_height_ft    = m_to_ft(lambda_quarter_m);
+      const current_elec_deg     = 90;
+      const optimal_height_m     = five_eighth_m;      // 5λ/8 for maximum field strength
+      const optimal_height_ft    = m_to_ft(five_eighth_m);
+      const height_increase_m    = optimal_height_m - current_height_m;  // 144 m
+      const max_field_gain_rel   = 1.16;
+      const max_coverage_gain_pct = 16;
+      const asr_required         = lambda_quarter_m > 60;   // §17.7: >200 ft requires ASR
+      const faa_lighting_required = lambda_quarter_m > 60;  // §17.23
+
+      return {
+        frequency_khz,
+        wavelength_m: Math.round(wavelength_m * 10) / 10,
+        lambda_eighth_m, lambda_quarter_m, lambda_half_m, five_eighth_m,
+        lambda_eighth_ft: m_to_ft(lambda_eighth_m),
+        lambda_quarter_ft: m_to_ft(lambda_quarter_m),
+        lambda_half_ft: m_to_ft(lambda_half_m),
+        five_eighth_ft: m_to_ft(five_eighth_m),
+        current_height_m, current_height_ft, current_elec_deg,
+        optimal_height_m, optimal_height_ft,
+        height_increase_m,
+        max_field_gain_rel,
+        max_coverage_gain_pct,
+        asr_required,
+        faa_lighting_required,
+        n_height_milestones: HEIGHT_MILESTONES.length,
+        height_milestones: HEIGHT_MILESTONES,
+        coverage_estimates: COVERAGE_ESTIMATES,
+        reference: '47 CFR §73.160 (antenna height); §17.7 (ASR); §17.23 (FAA marking); ITU-R BS.346-1 (antenna gain vs height)',
+        note: `For ${freq_khz} kHz (λ=${Math.round(wavelength_m)} m): current tower ${current_height_ft} ft (λ/4, ${current_elec_deg}°) achieves baseline field strength. Increasing to 5λ/8 (${m_to_ft(five_eighth_m)} ft) yields +${max_coverage_gain_pct}% field gain. Towers above ${m_to_ft(61)} ft require FAA ASR registration (§17.7) and painting/lighting per §17.23.`
       };
     })(),
 
