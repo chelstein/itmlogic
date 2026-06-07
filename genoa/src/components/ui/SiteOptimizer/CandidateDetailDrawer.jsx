@@ -2226,6 +2226,37 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Station Power Supply and Electrical Infrastructure Guide */}
+        {candidate.am_station_power_supply_and_electrical_infrastructure_guide && (() => {
+          const g = candidate.am_station_power_supply_and_electrical_infrastructure_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="pse-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #ca8a04' }}>
+              <div style={{ fontWeight: 700, color: '#713f12', marginBottom: 6, fontSize: 13 }}>Power Supply &amp; Electrical Infrastructure — NEC / §73.1215</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#713f12', marginBottom: 8 }}>
+                <span style={{ color: '#ca8a04' }}>TX efficiency:</span><span>{g.tx_efficiency_pct}%</span>
+                <span style={{ color: '#ca8a04' }}>AC input:</span><span>{fmtF(g.ac_input_kw, 2)} kW</span>
+                <span style={{ color: '#ca8a04' }}>Site load (×1.3):</span><span>{fmtF(g.site_load_kw, 1)} kW</span>
+                <span style={{ color: '#ca8a04' }}>Service:</span><span style={{ fontWeight: 600 }}>{g.service_phase}</span>
+                <span style={{ color: '#ca8a04' }}>Generator req:</span><span>{fmtF(g.generator_kw_required, 1)} kW → {g.generator_tier}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#713f12', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#ca8a04' }}>Service upgrade:</span><span>${fmt(g.service_upgrade_low_usd)} – ${fmt(g.service_upgrade_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Generator:</span><span>${fmt(g.generator_low_usd)} – ${fmt(g.generator_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>ATS:</span><span>${fmt(g.ats_low_usd)} – ${fmt(g.ats_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>SPD (NEC 230.67):</span><span>${fmt(g.spd_low_usd)} – ${fmt(g.spd_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Permit/inspection:</span><span>${fmt(g.permit_low_usd)} – ${fmt(g.permit_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fde68a', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#ca8a04', fontWeight: 600 }}>Total electrical:</span>
+                <span style={{ color: '#713f12', fontWeight: 700 }}>${fmt(g.total_electrical_low_usd)} – ${fmt(g.total_electrical_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b45309' }}>Ref: §73.1215, §11.35; NEC Art. 702, NEC 230.67, NEC 250</div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmission Line and ATU Engineering Guide */}
         {candidate.am_transmission_line_and_atu_engineering_guide && (() => {
           const g = candidate.am_transmission_line_and_atu_engineering_guide;

@@ -3735,3 +3735,20 @@ test('colocation candidates include am_transmission_line_and_atu_engineering_gui
     assert.ok(g.total_atu_low_usd > 0, 'total_atu_low_usd must be positive');
   }
 });
+
+test('colocation candidates include am_station_power_supply_and_electrical_infrastructure_guide with NEC 702.5 sizing', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_station_power_supply_and_electrical_infrastructure_guide;
+    assert.ok(g, `candidate missing am_station_power_supply_and_electrical_infrastructure_guide`);
+    assert.ok(g.ac_input_kw > 0, 'ac_input_kw must be positive');
+    assert.ok(g.generator_kw_required >= g.site_load_kw * 1.25 - 0.1, 'generator must be ≥ 125% of site load (NEC 702.5)');
+    assert.ok(g.total_electrical_low_usd > 0, 'total_electrical_low_usd must be positive');
+  }
+});

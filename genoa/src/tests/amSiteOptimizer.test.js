@@ -14930,3 +14930,38 @@ it('candidate_comparison_table atu columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.atu_vswr_target, 1.3, 'atu_vswr_target must be 1.3');
   assert.ok(r0.atu_total_low_usd > 0, 'atu_total_low_usd must be positive');
 });
+
+it('am_station_power_supply_and_electrical_infrastructure_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_station_power_supply_and_electrical_infrastructure_guide, `candidate missing am_station_power_supply_and_electrical_infrastructure_guide`);
+  }
+});
+
+it('am_station_power_supply_and_electrical_infrastructure_guide ac_input_kw = tpo / 0.65', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_power_supply_and_electrical_infrastructure_guide;
+  const expected = 5 / 0.65;
+  assert.ok(Math.abs(g.ac_input_kw - expected) < 0.1, `ac_input_kw ${g.ac_input_kw} should be ~${expected.toFixed(2)} kW`);
+});
+
+it('am_station_power_supply_and_electrical_infrastructure_guide generator_kw_required = site_load × 1.25', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_power_supply_and_electrical_infrastructure_guide;
+  const expected = g.site_load_kw * 1.25;
+  assert.ok(Math.abs(g.generator_kw_required - expected) < 0.1, `generator_kw_required should be site_load × 1.25 (NEC 702.5)`);
+});
+
+it('am_station_power_supply_and_electrical_infrastructure_guide 5 kW station requires 3-phase service', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_station_power_supply_and_electrical_infrastructure_guide;
+  assert.ok(g.service_phase.includes('3-phase'), '5 kW site load > 3 kW requires 3-phase service');
+});
+
+it('candidate_comparison_table pse columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.pse_ac_input_kw > 0, 'pse_ac_input_kw must be positive');
+  assert.ok(r0.pse_generator_kw_required > 0, 'pse_generator_kw_required must be positive');
+  assert.ok(r0.pse_total_electrical_low_usd > 0, 'pse_total_electrical_low_usd must be positive');
+});

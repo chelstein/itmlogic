@@ -1416,7 +1416,10 @@ export async function runSiteOptimizer(body = {}){
     dav_total_da_low_usd:               c.am_directional_antenna_phase_and_ratio_verification_guide?.total_da_low_usd ?? null,
     atu_type:                           c.am_transmission_line_and_atu_engineering_guide?.atu_type ?? null,
     atu_vswr_target:                    c.am_transmission_line_and_atu_engineering_guide?.vswr_target ?? null,
-    atu_total_low_usd:                  c.am_transmission_line_and_atu_engineering_guide?.total_atu_low_usd ?? null
+    atu_total_low_usd:                  c.am_transmission_line_and_atu_engineering_guide?.total_atu_low_usd ?? null,
+    pse_ac_input_kw:                    c.am_station_power_supply_and_electrical_infrastructure_guide?.ac_input_kw ?? null,
+    pse_generator_kw_required:          c.am_station_power_supply_and_electrical_infrastructure_guide?.generator_kw_required ?? null,
+    pse_total_electrical_low_usd:       c.am_station_power_supply_and_electrical_infrastructure_guide?.total_electrical_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7151,6 +7154,97 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_station_power_supply_and_electrical_infrastructure_guide: (() => {
+      // AM transmitter site electrical infrastructure requirements.
+      //
+      // §73.1215: Transmitter and supporting equipment must be maintained in good operating condition.
+      //   Includes power supply, rectifier, HV power supply, and all ancillary electrical equipment.
+      //
+      // AC input power requirements:
+      //   Typical AM transmitter efficiency: 60–75% (solid state) or 50–65% (tube-based legacy).
+      //   AC input = TPO / η; for a 5 kW transmitter at 65% efficiency → AC_in = 5000/0.65 = 7,692 W ≈ 7.7 kW.
+      //   Full-site load (transmitter + ATU control + monitors + HVAC + lighting): add 30% overhead.
+      //   Total site load = AC_in × 1.3.
+      //
+      // Service voltage and phase:
+      //   < 1 kW: single-phase 120/240V typical
+      //   1–5 kW: three-phase 208V or 240V delta preferred (most AM transmitters above 1 kW)
+      //   > 5 kW: three-phase 480V may be required
+      //   For relocation: utility service at new site must match TX requirements; upgrade cost if not.
+      //
+      // Generator backup (strongly recommended per §11.35 EAS, and industry standard):
+      //   Generator must power full site load (transmitter + EAS + HVAC + base monitors).
+      //   Minimum generator size: site_load_kw × 1.25 (NEC 702.5 sizing requirement).
+      //   Typical: 15–25 kW diesel genset for 5 kW AM transmitter site.
+      //   Automatic Transfer Switch (ATS): NEC Article 702; must be properly labeled.
+      //   Fuel: diesel, 50-gallon tank ≈ 24 hours at 50% genset load.
+      //
+      // Surge Protection Device (SPD): NEC 230.67 — required at service entrance since 2020 NEC.
+      //   Type 1 SPD: installed before main OCPD; protects against direct lightning stroke.
+      //   Type 2 SPD: downstream protection for equipment.
+      //
+      // Grounding electrode system: NEC 250; at transmitter site must bond to RF ground system
+      //   (same ground electrode for both power and RF ground — reduces potential differences).
+      //
+      // Cost (2024):
+      //   Utility 3-phase service upgrade (if needed): $3,000–$12,000
+      //   Generator (15 kW diesel, 50-gal tank, weatherproof enclosure): $8,000–$15,000
+      //   ATS (Kohler 30RCLB or equivalent): $2,000–$5,000
+      //   SPD Type 1 at service entrance: $500–$1,500
+      //   Electrical inspection + permit: $500–$1,500
+      //   Total electrical infrastructure: $14,000–$35,000
+      const p_kw      = tpo_kw;
+      const eta       = 0.65;                              // typical solid-state TX efficiency
+      const ac_input_kw = round2(p_kw / eta);
+      const overhead  = 1.30;                              // 30% for ancillary loads
+      const site_load_kw = round2(ac_input_kw * overhead);
+
+      // Service phase: 3-phase required if site_load_kw > 3 kW (practical threshold)
+      const service_phase = site_load_kw > 3 ? '3-phase 208/240V' : '1-phase 120/240V';
+
+      // Generator sizing: NEC 702.5 — 125% of site load
+      const gen_kw_required = round2(site_load_kw * 1.25);
+      const gen_tier = gen_kw_required <= 15 ? '15 kW' : gen_kw_required <= 25 ? '25 kW' : '35+ kW';
+
+      const service_upgrade_low_usd  = 3000;
+      const service_upgrade_high_usd = 12000;
+      const generator_low_usd        = gen_kw_required <= 15 ? 8000  : 12000;
+      const generator_high_usd       = gen_kw_required <= 15 ? 15000 : 25000;
+      const ats_low_usd              = 2000;
+      const ats_high_usd             = 5000;
+      const spd_low_usd              = 500;
+      const spd_high_usd             = 1500;
+      const permit_low_usd           = 500;
+      const permit_high_usd          = 1500;
+
+      const total_electrical_low_usd  = service_upgrade_low_usd  + generator_low_usd  + ats_low_usd  + spd_low_usd  + permit_low_usd;
+      const total_electrical_high_usd = service_upgrade_high_usd + generator_high_usd + ats_high_usd + spd_high_usd + permit_high_usd;
+
+      return {
+        tx_efficiency_pct:      round2(eta * 100),
+        ac_input_kw,
+        overhead_factor:        overhead,
+        site_load_kw,
+        service_phase,
+        generator_kw_required:  gen_kw_required,
+        generator_tier:         gen_tier,
+        service_upgrade_low_usd,
+        service_upgrade_high_usd,
+        generator_low_usd,
+        generator_high_usd,
+        ats_low_usd,
+        ats_high_usd,
+        spd_low_usd,
+        spd_high_usd,
+        permit_low_usd,
+        permit_high_usd,
+        total_electrical_low_usd,
+        total_electrical_high_usd,
+        reference: '47 CFR §73.1215 (equipment maintenance); §11.35 (EAS backup power); NEC Art. 702 (optional standby); NEC 230.67 (SPD); NEC 250 (grounding)',
+        note: `${p_kw} kW TPO at ${round2(eta * 100)}% TX efficiency → AC input ${ac_input_kw} kW + 30% overhead = ${site_load_kw} kW site load. ${service_phase} service. Generator: ${gen_tier} diesel (NEC 702.5 ×1.25 sizing = ${gen_kw_required} kW required). NEC 230.67 SPD required at service entrance. RF and power grounds must be bonded per NEC 250.`
       };
     })(),
 
