@@ -3616,3 +3616,20 @@ test('colocation candidates include am_tower_structural_load_and_wind_survival_g
     assert.ok(g.total_structural_low_usd > 0, `total_structural_low_usd must be positive`);
   }
 });
+
+test('colocation candidates include am_eas_equipment_readiness_guide with §11.56 CAP/IPAWS required', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_eas_equipment_readiness_guide;
+    assert.ok(g, `candidate missing am_eas_equipment_readiness_guide`);
+    assert.strictEqual(g.eas_cap_ipaws_required, true, '§11.56 CAP/IPAWS required for all AM stations since 2012');
+    assert.strictEqual(g.eas_monthly_test_min_sec, 120, '§11.61 RMT ≥ 120 s');
+    assert.ok(g.total_eas_low_usd > 0, `total_eas_low_usd must be positive`);
+  }
+});

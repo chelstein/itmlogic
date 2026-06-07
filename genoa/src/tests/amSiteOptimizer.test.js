@@ -14682,3 +14682,38 @@ it('candidate_comparison_table tsw columns are present and valid for KAZM', asyn
   assert.ok(r0.tsw_wind_force_kn > 0, 'tsw_wind_force_kn must be positive');
   assert.ok(r0.tsw_total_structural_low_usd > 0, 'tsw_total_structural_low_usd must be positive');
 });
+
+it('am_eas_equipment_readiness_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_eas_equipment_readiness_guide, `candidate missing am_eas_equipment_readiness_guide`);
+  }
+});
+
+it('am_eas_equipment_readiness_guide encoder_decoder and CAP/IPAWS required per §11.11 and §11.56', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_eas_equipment_readiness_guide;
+  assert.strictEqual(g.eas_encoder_decoder_required, true, '§11.11 requires encoder/decoder');
+  assert.strictEqual(g.eas_cap_ipaws_required, true, '§11.56 requires CAP/IPAWS since 2012');
+});
+
+it('am_eas_equipment_readiness_guide monthly test minimum is 120 seconds per §11.61', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_eas_equipment_readiness_guide;
+  assert.strictEqual(g.eas_monthly_test_min_sec, 120, '§11.61 RMT must be ≥ 2 min (120 s)');
+});
+
+it('am_eas_equipment_readiness_guide total_eas_low_usd > 0 for KAZM NDA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_eas_equipment_readiness_guide;
+  assert.ok(g.total_eas_low_usd > 0, `total_eas_low_usd must be positive`);
+  assert.ok(g.total_eas_high_usd >= g.total_eas_low_usd, `high must be >= low`);
+});
+
+it('candidate_comparison_table eas columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.eas_cap_ipaws_required, true, 'eas_cap_ipaws_required must be true');
+  assert.ok(r0.eas_total_eas_low_usd > 0, 'eas_total_eas_low_usd must be positive');
+  assert.strictEqual(r0.eas_stl_path_verification_needed, true, 'STL path verification needed');
+});

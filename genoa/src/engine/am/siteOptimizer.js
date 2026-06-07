@@ -1395,7 +1395,10 @@ export async function runSiteOptimizer(body = {}){
     gcp_cp_recommended:                 c.am_broadcast_tower_grounding_and_cathodic_protection_guide?.cp_recommended ?? null,
     tsw_tower_height_m:                 c.am_tower_structural_load_and_wind_survival_guide?.tower_height_m ?? null,
     tsw_wind_force_kn:                  c.am_tower_structural_load_and_wind_survival_guide?.wind_force_kn ?? null,
-    tsw_total_structural_low_usd:       c.am_tower_structural_load_and_wind_survival_guide?.total_structural_low_usd ?? null
+    tsw_total_structural_low_usd:       c.am_tower_structural_load_and_wind_survival_guide?.total_structural_low_usd ?? null,
+    eas_cap_ipaws_required:             c.am_eas_equipment_readiness_guide?.eas_cap_ipaws_required ?? null,
+    eas_total_eas_low_usd:              c.am_eas_equipment_readiness_guide?.total_eas_low_usd ?? null,
+    eas_stl_path_verification_needed:   c.am_eas_equipment_readiness_guide?.eas_stl_path_verification_needed ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7130,6 +7133,95 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_eas_equipment_readiness_guide: (() => {
+      // 47 CFR Part 11 — Emergency Alert System (EAS) obligations for AM broadcast stations.
+      //
+      // §11.11(a): All AM stations must install and maintain an EAS decoder.
+      // §11.11(b): All AM stations with more than one employee must also have an EAS encoder.
+      //   (Single-operator AM stations may still need an encoder for origination.)
+      // §11.35:  EAS equipment must be installed and operational at all times the station
+      //   is operating; any equipment malfunction must be remedied within 60 days.
+      // §11.61:  Required tests:
+      //   • RWT (Required Weekly Test): every station, every week (typically Saturday 8–9 AM local)
+      //   • RMT (Required Monthly Test): all EAS participants, duration ≥ 2 min
+      //   These are logged in the station's EAS log (§11.35(a)(2)).
+      // CAP/IPAWS: Since June 30, 2012, EAS decoders must process CAP-formatted alerts from FEMA
+      //   IPAWS (§11.56). Requires internet connectivity at the studio with a CAP polling client.
+      // STL path: EAS audio must reach the transmitter site, typically via the
+      //   studio-transmitter link (STL); relocation may require STL re-engineering.
+      // Backup power: §11.35(a) — if station has a standby power system (generator/UPS),
+      //   EAS equipment must be on that backup circuit.
+      //
+      // Equipment cost (2024 market):
+      //   EAS encoder/decoder combo (e.g., Sage ENDEC, TFT EAS-1, Monroe Electronics R189): $1,500–$3,500
+      //   CAP/IPAWS interface hardware or software client: $500–$1,500
+      //   Audio routing interface (balun, Burr-Brown, passive): $200–$600
+      //   UPS for EAS equipment (APC 500VA): $200–$400
+      //   Installation + programming + IPAWS enrollment: $500–$1,200
+      //   Annual IPAWS compliance audit (optional but recommended): $300–$500
+      //   Total first-year (new site): $2,900–$7,200
+      //
+      // Compliance risk at new site: any relocation requires EAS equipment re-installation,
+      //   STL verification, IPAWS re-enrollment with new technical parameters if frequency
+      //   or location changes the studio address (FCC Form 319 or CDBS update).
+      const isDA = /^DA/i.test(pattern_mode);
+      const eas_encoder_decoder_required     = true;           // §11.11(a) — all AM stations
+      const eas_cap_ipaws_required           = true;           // §11.56 — since 2012
+      const eas_weekly_test_required         = true;           // §11.61 RWT
+      const eas_monthly_test_min_sec         = 120;            // §11.61 RMT ≥ 2 min
+      const eas_stl_path_verification_needed = true;           // EAS audio must reach TX site
+
+      // Backup power obligation: triggered if tpo_kw > 0.25 (any non-trivial station)
+      const backup_power_required = tpo_kw > 0.25;
+
+      const encoder_decoder_low_usd      = 1500;
+      const encoder_decoder_high_usd     = 3500;
+      const cap_interface_low_usd        = 500;
+      const cap_interface_high_usd       = 1500;
+      const audio_routing_low_usd        = 200;
+      const audio_routing_high_usd       = 600;
+      const ups_low_usd                  = 200;
+      const ups_high_usd                 = 400;
+      const install_program_low_usd      = 500;
+      const install_program_high_usd     = 1200;
+      const total_equip_low_usd          = encoder_decoder_low_usd + cap_interface_low_usd + audio_routing_low_usd + ups_low_usd + install_program_low_usd;
+      const total_equip_high_usd         = encoder_decoder_high_usd + cap_interface_high_usd + audio_routing_high_usd + ups_high_usd + install_program_high_usd;
+
+      // Relocation-specific risk: DA stations have more complex STL requirements (multiple
+      //   antenna elements may have individual monitoring feeds that must be verified at new site).
+      const stl_reverification_low_usd  = isDA ? 2000 : 800;
+      const stl_reverification_high_usd = isDA ? 6000 : 2500;
+      const total_eas_low_usd           = total_equip_low_usd  + stl_reverification_low_usd;
+      const total_eas_high_usd          = total_equip_high_usd + stl_reverification_high_usd;
+
+      return {
+        eas_encoder_decoder_required,
+        eas_cap_ipaws_required,
+        eas_weekly_test_required,
+        eas_monthly_test_min_sec,
+        eas_stl_path_verification_needed,
+        backup_power_required,
+        encoder_decoder_low_usd,
+        encoder_decoder_high_usd,
+        cap_interface_low_usd,
+        cap_interface_high_usd,
+        audio_routing_low_usd,
+        audio_routing_high_usd,
+        ups_low_usd,
+        ups_high_usd,
+        install_program_low_usd,
+        install_program_high_usd,
+        stl_reverification_low_usd,
+        stl_reverification_high_usd,
+        total_equip_low_usd,
+        total_equip_high_usd,
+        total_eas_low_usd,
+        total_eas_high_usd,
+        reference: '47 CFR Part 11 (EAS); §11.11 (equipment); §11.35 (operational); §11.56 (CAP/IPAWS); §11.61 (tests); FEMA IPAWS enrollment guide',
+        note: `EAS encoder/decoder + CAP/IPAWS client required at all times per §11.11 and §11.56. RWT every week, RMT every month (≥${eas_monthly_test_min_sec} s) per §11.61. STL path from studio to ${current_site ? `(${round2(current_site.lat)}, ${round2(current_site.lon)})` : 'TX site'} must carry EAS audio. Relocation STL re-verification: $${stl_reverification_low_usd.toLocaleString()}–$${stl_reverification_high_usd.toLocaleString()}${isDA ? ' (DA — multi-element STL verification)' : ''}.`
       };
     })(),
 

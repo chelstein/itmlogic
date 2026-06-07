@@ -2226,6 +2226,42 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM EAS Equipment Readiness Guide */}
+        {candidate.am_eas_equipment_readiness_guide && (() => {
+          const g = candidate.am_eas_equipment_readiness_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="eas-guide" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', borderRadius: 8, border: '2px solid #1d4ed8' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>EAS Equipment Readiness — 47 CFR Part 11 / IPAWS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#1e3a8a', marginBottom: 8 }}>
+                <span style={{ color: '#1d4ed8' }}>Encoder/decoder:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§11.11)</span>
+                <span style={{ color: '#1d4ed8' }}>CAP/IPAWS:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§11.56)</span>
+                <span style={{ color: '#1d4ed8' }}>Weekly test (RWT):</span><span>Every week §11.61</span>
+                <span style={{ color: '#1d4ed8' }}>Monthly test (RMT):</span><span>≥{g.eas_monthly_test_min_sec} s §11.61</span>
+                <span style={{ color: '#1d4ed8' }}>STL verification:</span>
+                <span style={{ fontWeight: 700, color: g.eas_stl_path_verification_needed ? '#b45309' : '#6b7280' }}>
+                  {g.eas_stl_path_verification_needed ? 'NEEDED' : 'NO'}
+                </span>
+                <span style={{ color: '#1d4ed8' }}>Backup power:</span>
+                <span>{g.backup_power_required ? 'Required (§11.35)' : 'Not required'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#1e3a8a', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#1d4ed8' }}>Encoder/decoder:</span><span>${fmt(g.encoder_decoder_low_usd)} – ${fmt(g.encoder_decoder_high_usd)}</span>
+                <span style={{ color: '#1d4ed8' }}>CAP interface:</span><span>${fmt(g.cap_interface_low_usd)} – ${fmt(g.cap_interface_high_usd)}</span>
+                <span style={{ color: '#1d4ed8' }}>Install + program:</span><span>${fmt(g.install_program_low_usd)} – ${fmt(g.install_program_high_usd)}</span>
+                <span style={{ color: '#1d4ed8' }}>STL reverification:</span><span>${fmt(g.stl_reverification_low_usd)} – ${fmt(g.stl_reverification_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#1d4ed8', fontWeight: 600 }}>Total EAS (new site):</span>
+                <span style={{ color: '#1e3a8a', fontWeight: 700 }}>${fmt(g.total_eas_low_usd)} – ${fmt(g.total_eas_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#3b82f6' }}>Ref: 47 CFR §11.11, §11.35, §11.56, §11.61; FEMA IPAWS enrollment</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Structural Load and Wind Survival Guide */}
         {candidate.am_tower_structural_load_and_wind_survival_guide && (() => {
           const g = candidate.am_tower_structural_load_and_wind_survival_guide;
