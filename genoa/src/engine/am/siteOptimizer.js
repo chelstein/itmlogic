@@ -1194,7 +1194,10 @@ export async function runSiteOptimizer(body = {}){
     grm_annual_maint_low_usd:   c.am_ground_system_resistance_and_maintenance_guide?.total_annual_ground_maint_low_usd ?? null,
     demo_tower_cost_low_usd:    c.am_tower_decommissioning_and_site_remediation_guide?.tower_demo_cost_low_usd ?? null,
     demo_total_low_usd:         c.am_tower_decommissioning_and_site_remediation_guide?.total_demo_cost_low_usd ?? null,
-    demo_salvage_value_usd:     c.am_tower_decommissioning_and_site_remediation_guide?.salvage_high_usd ?? null
+    demo_salvage_value_usd:     c.am_tower_decommissioning_and_site_remediation_guide?.salvage_high_usd ?? null,
+    cfa_required_accuracy_hz:   c.am_carrier_frequency_accuracy_and_reference_guide?.required_accuracy_hz ?? null,
+    cfa_required_ppm:           c.am_carrier_frequency_accuracy_and_reference_guide?.required_accuracy_ppm ?? null,
+    cfa_gpsdo_cost_low_usd:     c.am_carrier_frequency_accuracy_and_reference_guide?.gpsdo_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6929,6 +6932,67 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_carrier_frequency_accuracy_and_reference_guide: (() => {
+      // 47 CFR §73.1545: AM broadcast stations must maintain carrier frequency accuracy
+      // within ±20 Hz of the assigned frequency.  The reference oscillator is the
+      // heart of this compliance, and GPS-disciplined oscillators (GPSDOs) have become
+      // the practical standard for all new AM installations.
+
+      // FCC required accuracy per §73.1545(a): ±20 Hz for AM broadcast
+      const required_accuracy_hz = 20;
+      const required_accuracy_ppm = round2(required_accuracy_hz / frequency_khz * 1000);  // convert kHz to Hz
+
+      // GPS-disciplined oscillator (GPSDO): < 0.001 ppm = excellent margin
+      const gpsdo_cost_low_usd  = 500;
+      const gpsdo_cost_high_usd = 2000;
+      const gpsdo_accuracy_ppb  = 1;   // 1 ppb = 0.001 ppm = 0.00078 Hz at 780 kHz
+
+      // Rubidium frequency standard (backup/holdover for GPS outages)
+      const rubidium_cost_low_usd  = 1500;
+      const rubidium_cost_high_usd = 4000;
+      const rubidium_accuracy_ppb  = 50;  // 50 ppb typical after warmup
+
+      // OCXO (oven-controlled crystal): lowest cost, moderate accuracy
+      const ocxo_cost_low_usd  = 200;
+      const ocxo_cost_high_usd = 800;
+      const ocxo_accuracy_ppb  = 10000;  // 0.01 ppm typical; still meets FCC limit easily
+
+      // Recommended reference for new installations
+      const recommended_reference = 'GPSDO';
+
+      // Annual calibration verification cost
+      const annual_calibration_low_usd  = 500;
+      const annual_calibration_high_usd = 1500;
+
+      // Frequency error at max drift for each oscillator type at this frequency (Hz)
+      const gpsdo_error_hz     = round2(gpsdo_accuracy_ppb  * 1e-9 * frequency_khz * 1000);
+      const rubidium_error_hz  = round2(rubidium_accuracy_ppb * 1e-9 * frequency_khz * 1000);
+      const ocxo_error_hz      = round2(ocxo_accuracy_ppb    * 1e-9 * frequency_khz * 1000);
+
+      return {
+        frequency_khz,
+        required_accuracy_hz,
+        required_accuracy_ppm,
+        gpsdo_cost_low_usd,
+        gpsdo_cost_high_usd,
+        gpsdo_accuracy_ppb,
+        gpsdo_error_hz,
+        rubidium_cost_low_usd,
+        rubidium_cost_high_usd,
+        rubidium_accuracy_ppb,
+        rubidium_error_hz,
+        ocxo_cost_low_usd,
+        ocxo_cost_high_usd,
+        ocxo_accuracy_ppb,
+        ocxo_error_hz,
+        recommended_reference,
+        annual_calibration_low_usd,
+        annual_calibration_high_usd,
+        reference: '47 CFR §73.1545(a) (carrier frequency tolerance: ±20 Hz for AM); §73.1545(b) (modulation monitor required within 24 hours of operation); IEEE Std 1139-2008 (frequency stability terminology); ITU-R SM.1539 (frequency measurement and monitoring)',
+        note: `Carrier frequency accuracy: ${frequency_khz} kHz AM, §73.1545 limit ±${required_accuracy_hz} Hz (±${required_accuracy_ppm} ppm). GPSDO ≈${gpsdo_error_hz} Hz error ($${gpsdo_cost_low_usd.toLocaleString()}–$${gpsdo_cost_high_usd.toLocaleString()}), Rubidium ≈${rubidium_error_hz} Hz ($${rubidium_cost_low_usd.toLocaleString()}–$${rubidium_cost_high_usd.toLocaleString()}), OCXO ≈${ocxo_error_hz} Hz ($${ocxo_cost_low_usd}–$${ocxo_cost_high_usd}). Recommended: ${recommended_reference}. Annual calibration: $${annual_calibration_low_usd}–$${annual_calibration_high_usd}.`
       };
     })(),
 

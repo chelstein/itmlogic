@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Carrier Frequency Accuracy and Reference Guide */}
+        {candidate.am_carrier_frequency_accuracy_and_reference_guide && (() => {
+          const g = candidate.am_carrier_frequency_accuracy_and_reference_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const fmtHz = (n) => n != null ? (n < 1 ? `${n} Hz` : `${n} Hz`) : '—';
+          return (
+            <div key="cfa-guide" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', borderRadius: 8, border: '2px solid #2563eb' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>Carrier Frequency Accuracy &amp; Reference (§73.1545)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#1d4ed8' }}>
+                <span style={{ color: '#2563eb' }}>Frequency:</span><span>{g.frequency_khz} kHz (±{g.required_accuracy_hz} Hz / {g.required_accuracy_ppm} ppm max)</span>
+                <span style={{ color: '#2563eb' }}>Recommended Ref:</span><span style={{ fontWeight: 600 }}>{g.recommended_reference}</span>
+                <span style={{ color: '#2563eb' }}>GPSDO Error:</span><span>{fmtHz(g.gpsdo_error_hz)} ({g.gpsdo_accuracy_ppb} ppb) — {fmt(g.gpsdo_cost_low_usd)}–{fmt(g.gpsdo_cost_high_usd)}</span>
+                <span style={{ color: '#2563eb' }}>Rubidium Error:</span><span>{fmtHz(g.rubidium_error_hz)} ({g.rubidium_accuracy_ppb} ppb) — {fmt(g.rubidium_cost_low_usd)}–{fmt(g.rubidium_cost_high_usd)}</span>
+                <span style={{ color: '#2563eb' }}>OCXO Error:</span><span>{fmtHz(g.ocxo_error_hz)} ({g.ocxo_accuracy_ppb.toLocaleString()} ppb) — {fmt(g.ocxo_cost_low_usd)}–{fmt(g.ocxo_cost_high_usd)}</span>
+                <span style={{ color: '#2563eb' }}>Annual Calibration:</span><span>{fmt(g.annual_calibration_low_usd)} – {fmt(g.annual_calibration_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#1e40af' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Decommissioning and Site Remediation Guide */}
         {candidate.am_tower_decommissioning_and_site_remediation_guide && (() => {
           const g = candidate.am_tower_decommissioning_and_site_remediation_guide;

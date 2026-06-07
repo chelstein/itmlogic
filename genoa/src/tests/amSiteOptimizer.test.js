@@ -11393,6 +11393,52 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_carrier_frequency_accuracy_and_reference_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_carrier_frequency_accuracy_and_reference_guide;
+  assert.ok(g !== undefined && g !== null, 'am_carrier_frequency_accuracy_and_reference_guide missing');
+  assert.ok(typeof g.required_accuracy_hz === 'number', 'required_accuracy_hz should be a number');
+  assert.ok(typeof g.gpsdo_cost_low_usd === 'number', 'gpsdo_cost_low_usd should be a number');
+});
+
+test('am_carrier_frequency_accuracy_and_reference_guide KAZM FCC accuracy requirement', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_carrier_frequency_accuracy_and_reference_guide;
+  assert.strictEqual(g.required_accuracy_hz,  20,    'AM §73.1545 requires ±20 Hz accuracy');
+  assert.strictEqual(g.required_accuracy_ppm, 25.64, '±20 Hz at 780 kHz = ±25.64 ppm');
+  assert.strictEqual(g.frequency_khz,         780,   'frequency_khz should be 780');
+});
+
+test('am_carrier_frequency_accuracy_and_reference_guide KAZM oscillator error comparison', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_carrier_frequency_accuracy_and_reference_guide;
+  assert.strictEqual(g.rubidium_error_hz, 0.04, 'Rubidium at 50 ppb × 780 kHz = 0.04 Hz error');
+  assert.strictEqual(g.ocxo_error_hz,     7.8,  'OCXO at 10000 ppb × 780 kHz = 7.8 Hz error');
+  assert.ok(g.ocxo_error_hz < g.required_accuracy_hz, 'OCXO error must be < FCC limit');
+});
+
+test('am_carrier_frequency_accuracy_and_reference_guide KAZM GPSDO recommendation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_carrier_frequency_accuracy_and_reference_guide;
+  assert.strictEqual(g.recommended_reference, 'GPSDO', 'GPSDO should be recommended reference');
+  assert.strictEqual(g.gpsdo_cost_low_usd,  500,  'GPSDO low cost should be $500');
+  assert.strictEqual(g.gpsdo_cost_high_usd, 2000, 'GPSDO high cost should be $2,000');
+  assert.ok(g.annual_calibration_low_usd > 0, 'Annual calibration cost must be positive');
+});
+
+test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cfa_required_accuracy_hz' in row, 'cfa_required_accuracy_hz missing from comparison table');
+    assert.ok('cfa_required_ppm'         in row, 'cfa_required_ppm missing from comparison table');
+    assert.ok('cfa_gpsdo_cost_low_usd'   in row, 'cfa_gpsdo_cost_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cfa_required_accuracy_hz, 20,    'rank-1 cfa_required_accuracy_hz should be 20');
+  assert.strictEqual(r0.cfa_required_ppm,         25.64, 'rank-1 cfa_required_ppm should be 25.64');
+  assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
+});
+
 test('am_tower_decommissioning_and_site_remediation_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_decommissioning_and_site_remediation_guide;

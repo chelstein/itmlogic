@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_carrier_frequency_accuracy_and_reference_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_carrier_frequency_accuracy_and_reference_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_carrier_frequency_accuracy_and_reference_guide missing`);
+    assert.ok(g.required_accuracy_hz > 0, `rank ${c.rank}: required_accuracy_hz must be positive`);
+    assert.ok(g.gpsdo_cost_low_usd > 0, `rank ${c.rank}: gpsdo_cost_low_usd must be positive`);
+    assert.strictEqual(g.recommended_reference, 'GPSDO', `rank ${c.rank}: recommended_reference should be GPSDO`);
+  }
+});
+
 test('am_tower_decommissioning_and_site_remediation_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {
