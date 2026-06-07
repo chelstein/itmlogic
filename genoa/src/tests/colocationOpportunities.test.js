@@ -3193,3 +3193,14 @@ test('am_community_impact_and_coverage_shift_guide present across colocation can
       `rank ${c.rank}: unexpected col_proximity_status: ${g.col_proximity_status}`);
   }
 });
+
+test('am_transmitter_decommission_and_site_remediation_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_decommission_and_site_remediation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_decommission_and_site_remediation_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.num_towers >= 1, `rank ${c.rank}: num_towers must be >= 1`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+  }
+});

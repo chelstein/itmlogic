@@ -1311,7 +1311,10 @@ export async function runSiteOptimizer(body = {}){
     tpc_total_with_contingency: c.am_total_project_cost_summary_guide?.total_with_contingency_low_usd ?? null,
     cis_dist_to_col_km:         c.am_community_impact_and_coverage_shift_guide?.dist_candidate_to_col_km ?? null,
     cis_col_dist_delta_km:      c.am_community_impact_and_coverage_shift_guide?.col_dist_delta_km ?? null,
-    cis_col_proximity_improves: c.am_community_impact_and_coverage_shift_guide?.col_proximity_improves ?? null
+    cis_col_proximity_improves: c.am_community_impact_and_coverage_shift_guide?.col_proximity_improves ?? null,
+    dcom_total_low_usd:         c.am_transmitter_decommission_and_site_remediation_guide?.total_low_usd ?? null,
+    dcom_total_demo_low_usd:    c.am_transmitter_decommission_and_site_remediation_guide?.total_demo_low_usd ?? null,
+    dcom_num_towers:            c.am_transmitter_decommission_and_site_remediation_guide?.num_towers ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7046,6 +7049,60 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_decommission_and_site_remediation_guide: (() => {
+      // When an AM station relocates, the old transmitter site must be decommissioned.
+      // This includes tower demolition, building removal, ground system removal,
+      // soil remediation (if fuel spills or hazmat present), and FCC license modification.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m   = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd_dc = /^[CD]$/i.test(fcc_class);
+      const isDA_dc        = /^DA/i.test(pattern_mode);
+      const tower_h_m      = round2(is_class_cd_dc ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_h_ft     = round2(tower_h_m * 3.28084);
+      // Tower demolition cost varies by height:
+      // <200 ft: $15,000–$50,000; 200–400 ft: $40,000–$150,000; >400 ft: $100,000–$400,000
+      const tower_demo_low_usd  = tower_h_ft < 200 ? 15000 : tower_h_ft < 400 ? 40000 : 100000;
+      const tower_demo_high_usd = tower_h_ft < 200 ? 50000 : tower_h_ft < 400 ? 150000 : 400000;
+      // DA: additional towers (assume avg 3 towers for DA)
+      const num_towers     = isDA_dc ? 3 : 1;
+      const total_demo_low_usd  = round2(tower_demo_low_usd  * num_towers);
+      const total_demo_high_usd = round2(tower_demo_high_usd * num_towers);
+      // Building removal: $5,000–$20,000
+      const building_removal_low_usd  = 5000;
+      const building_removal_high_usd = 20000;
+      // Ground system removal (copper radials): scrap value may offset some cost
+      // Removal labor: $10,000–$40,000; scrap offset: ~$2,000–$8,000
+      const ground_removal_low_usd  = 8000;   // net of scrap
+      const ground_removal_high_usd = 35000;
+      // Environmental phase I/II assessment: $2,000–$8,000
+      const env_assessment_low_usd  = 2000;
+      const env_assessment_high_usd = 8000;
+      // Soil remediation (if needed, e.g., fuel spill): $10,000–$100,000
+      const remediation_low_usd  = 0;    // not always needed
+      const remediation_high_usd = 50000;
+      // FCC license modification filing (Form 301-AM or modification application): $500–$2,000
+      const fcc_mod_low_usd  = 500;
+      const fcc_mod_high_usd = 2000;
+      const total_low_usd  = round2(total_demo_low_usd  + building_removal_low_usd  + ground_removal_low_usd  + env_assessment_low_usd  + remediation_low_usd  + fcc_mod_low_usd);
+      const total_high_usd = round2(total_demo_high_usd + building_removal_high_usd + ground_removal_high_usd + env_assessment_high_usd + remediation_high_usd + fcc_mod_high_usd);
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        isDA: isDA_dc,
+        tower_height_ft: tower_h_ft,
+        num_towers,
+        tower_demo_low_usd, tower_demo_high_usd,
+        total_demo_low_usd, total_demo_high_usd,
+        building_removal_low_usd, building_removal_high_usd,
+        ground_removal_low_usd, ground_removal_high_usd,
+        env_assessment_low_usd, env_assessment_high_usd,
+        remediation_low_usd, remediation_high_usd,
+        fcc_mod_low_usd, fcc_mod_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'NESHAP (asbestos); RCRA (hazardous waste); FCC Form 301-AM (license modification); EPA Phase I/II ESA standards (ASTM E1527); broadcast tower demolition industry practice; scrap metal market rates',
+        note: `${num_towers > 1 ? `${num_towers}-tower DA` : 'Single'} tower (${tower_h_ft.toFixed(0)} ft): demo $${total_demo_low_usd.toLocaleString()}–$${total_demo_high_usd.toLocaleString()}. Total decommission: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 

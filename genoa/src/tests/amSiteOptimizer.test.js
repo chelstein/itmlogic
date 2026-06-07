@@ -13585,3 +13585,46 @@ test('am_community_impact_and_coverage_shift_guide comparison table columns pres
   assert.strictEqual(r0.cis_col_dist_delta_km,      0,     'rank-1 cis_col_dist_delta_km should be 0');
   assert.strictEqual(r0.cis_col_proximity_improves, false, 'rank-1 cis_col_proximity_improves should be false');
 });
+
+test('am_transmitter_decommission_and_site_remediation_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_decommission_and_site_remediation_guide;
+  assert.ok(g !== undefined && g !== null, 'am_transmitter_decommission_and_site_remediation_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM NDA 315 ft tower demolition cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_decommission_and_site_remediation_guide;
+  assert.strictEqual(g.tower_height_ft,      315.26, 'KAZM tower_height_ft should be 315.26');
+  assert.strictEqual(g.num_towers,            1,     'NDA has 1 tower');
+  assert.strictEqual(g.tower_demo_low_usd,   40000,  '315 ft tower demo low should be 40000');
+});
+
+test('KAZM total decommission cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_decommission_and_site_remediation_guide;
+  assert.strictEqual(g.total_low_usd,  55500,  'KAZM total_low_usd should be 55500');
+  assert.strictEqual(g.total_high_usd, 265000, 'KAZM total_high_usd should be 265000');
+});
+
+test('KAZM decommission reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_decommission_and_site_remediation_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('NESHAP'), 'reference must cite NESHAP');
+  assert.ok(typeof g.note === 'string' && g.note.includes('decommission'), 'note must mention decommission');
+});
+
+test('am_transmitter_decommission_and_site_remediation_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('dcom_total_low_usd'      in row, 'dcom_total_low_usd missing from comparison table');
+    assert.ok('dcom_total_demo_low_usd' in row, 'dcom_total_demo_low_usd missing from comparison table');
+    assert.ok('dcom_num_towers'         in row, 'dcom_num_towers missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.dcom_total_low_usd,      55500, 'rank-1 dcom_total_low should be 55500');
+  assert.strictEqual(r0.dcom_total_demo_low_usd, 40000, 'rank-1 dcom_total_demo_low should be 40000');
+  assert.strictEqual(r0.dcom_num_towers,          1,    'rank-1 dcom_num_towers should be 1');
+});

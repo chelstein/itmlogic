@@ -2226,6 +2226,29 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Decommission and Site Remediation Guide */}
+        {candidate.am_transmitter_decommission_and_site_remediation_guide && (() => {
+          const g = candidate.am_transmitter_decommission_and_site_remediation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="dcom-guide" style={{ marginBottom: 16, padding: 12, background: '#fef2f2', borderRadius: 8, border: '2px solid #dc2626' }}>
+              <div style={{ fontWeight: 700, color: '#7f1d1d', marginBottom: 6, fontSize: 13 }}>Old Site Decommission &amp; Remediation</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#991b1b' }}>
+                <span>Tower type:</span><span>{g.isDA ? `DA (${g.num_towers} towers)` : 'NDA (1 tower)'} — {g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Tower demolition:</span><span>{fmt(g.total_demo_low_usd)} – {fmt(g.total_demo_high_usd)}</span>
+                <span>Building removal:</span><span>{fmt(g.building_removal_low_usd)} – {fmt(g.building_removal_high_usd)}</span>
+                <span>Ground system removal:</span><span>{fmt(g.ground_removal_low_usd)} – {fmt(g.ground_removal_high_usd)}</span>
+                <span>Env. assessment:</span><span>{fmt(g.env_assessment_low_usd)} – {fmt(g.env_assessment_high_usd)}</span>
+                <span>Soil remediation:</span><span>{g.remediation_high_usd > 0 ? `${fmt(g.remediation_low_usd)} – ${fmt(g.remediation_high_usd)} (if needed)` : 'Not anticipated'}</span>
+                <span>FCC modification:</span><span>{fmt(g.fcc_mod_low_usd)} – {fmt(g.fcc_mod_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b91c1c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Community Impact and Coverage Shift Guide */}
         {candidate.am_community_impact_and_coverage_shift_guide && (() => {
           const g = candidate.am_community_impact_and_coverage_shift_guide;
