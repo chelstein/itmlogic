@@ -3239,3 +3239,14 @@ test('am_ground_system_radial_design_guide present across colocation candidates'
     assert.ok(g.radial_length_ft > 0, `rank ${c.rank}: radial_length_ft must be positive`);
   }
 });
+
+test('am_tpo_and_antenna_efficiency_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tpo_and_antenna_efficiency_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tpo_and_antenna_efficiency_guide missing`);
+    assert.ok(g.eta_excellent > 0.9, `rank ${c.rank}: eta_excellent must be > 0.9`);
+    assert.ok(g.erp_excellent_kw > 0, `rank ${c.rank}: erp_excellent_kw must be positive`);
+    assert.ok(g.erp_excellent_kw <= g.tpo_kw, `rank ${c.rank}: erp must be <= tpo (losses exist)`);
+  }
+});

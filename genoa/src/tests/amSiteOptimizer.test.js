@@ -13759,3 +13759,47 @@ test('am_ground_system_radial_design_guide comparison table columns present', as
   assert.strictEqual(r0.grd_radial_length_ft,  315.26,  'rank-1 grd_radial_length_ft should be 315.26');
   assert.strictEqual(r0.grd_total_low_usd,     9566.24, 'rank-1 grd_total_low_usd should be 9566.24');
 });
+
+test('am_tpo_and_antenna_efficiency_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tpo_and_antenna_efficiency_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tpo_and_antenna_efficiency_guide missing');
+  assert.ok(g.eta_excellent > 0.9, 'eta_excellent should be > 0.9 (excellent ground)');
+  assert.ok(g.eta_poor < g.eta_excellent, 'eta_poor must be < eta_excellent');
+});
+
+test('KAZM 5 kW ERP with excellent vs poor ground', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tpo_and_antenna_efficiency_guide;
+  assert.strictEqual(g.tpo_kw,             5,    'tpo_kw should be 5');
+  assert.strictEqual(g.erp_excellent_kw,   4.68, 'erp_excellent_kw should be 4.68');
+  assert.strictEqual(g.erp_poor_kw,        3.32, 'erp_poor_kw should be 3.32');
+});
+
+test('KAZM base current values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tpo_and_antenna_efficiency_guide;
+  assert.strictEqual(g.base_current_excellent_a, 11.32, 'base_current_excellent_a should be 11.32');
+  assert.ok(g.base_current_poor_a < g.base_current_excellent_a, 'poor ground base current must be < excellent');
+  assert.strictEqual(g.radiation_resistance_ohms, 36.5, 'Rr should be 36.5 ohms');
+});
+
+test('KAZM antenna efficiency reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tpo_and_antenna_efficiency_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.51'), 'reference must cite §73.51');
+  assert.ok(typeof g.note === 'string' && g.note.includes('ERP'), 'note must mention ERP');
+});
+
+test('am_tpo_and_antenna_efficiency_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tae_eta_excellent'          in row, 'tae_eta_excellent missing from comparison table');
+    assert.ok('tae_erp_excellent_kw'       in row, 'tae_erp_excellent_kw missing from comparison table');
+    assert.ok('tae_base_current_excellent' in row, 'tae_base_current_excellent missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(Math.abs(r0.tae_eta_excellent - 0.9359) < 0.001, 'rank-1 tae_eta_excellent should be ~0.9359');
+  assert.strictEqual(r0.tae_erp_excellent_kw,        4.68,  'rank-1 tae_erp_excellent_kw should be 4.68');
+  assert.strictEqual(r0.tae_base_current_excellent,  11.32, 'rank-1 tae_base_current_excellent should be 11.32');
+});

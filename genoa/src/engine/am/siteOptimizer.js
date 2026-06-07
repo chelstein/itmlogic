@@ -1323,7 +1323,10 @@ export async function runSiteOptimizer(body = {}){
     tpm_num_bands:              c.am_tower_painting_and_marking_guide?.num_bands ?? null,
     grd_num_radials_ideal:      c.am_ground_system_radial_design_guide?.num_radials_ideal ?? null,
     grd_radial_length_ft:       c.am_ground_system_radial_design_guide?.radial_length_ft ?? null,
-    grd_total_low_usd:          c.am_ground_system_radial_design_guide?.total_low_usd ?? null
+    grd_total_low_usd:          c.am_ground_system_radial_design_guide?.total_low_usd ?? null,
+    tae_eta_excellent:          c.am_tpo_and_antenna_efficiency_guide?.eta_excellent ?? null,
+    tae_erp_excellent_kw:       c.am_tpo_and_antenna_efficiency_guide?.erp_excellent_kw ?? null,
+    tae_base_current_excellent: c.am_tpo_and_antenna_efficiency_guide?.base_current_excellent_a ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7058,6 +7061,48 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tpo_and_antenna_efficiency_guide: (() => {
+      // TPO (Transmitter Power Output) is the licensed power into the antenna system.
+      // Actual radiated power = TPO × antenna efficiency (η), where η accounts for:
+      // - Ground resistance losses in the radial system (Rg)
+      // - ATU losses (already covered in transmission line budget)
+      // - Antenna radiation resistance (Rr) vs. total resistance (Rr + Rg + Ra)
+      // η = Rr / (Rr + Rg + Rground_resistance)
+      // For a quarter-wave monopole on ideal ground: Rr ≈ 36.5 Ω
+      // Ground resistance with 120 λ/4 radials: Rg ≈ 1–3 Ω (excellent)
+      // Ground resistance with 32 radials: Rg ≈ 10–20 Ω (poor)
+      const Rr    = 36.5;   // Ω, radiation resistance for λ/4 monopole
+      const Rg_excellent = 2;    // Ω, 120 radials (best practice)
+      const Rg_good      = 8;    // Ω, 60–90 radials
+      const Rg_poor      = 18;   // Ω, <32 radials
+      const Ra    = 0.5;   // Ω, antenna conductor and base resistance (typical)
+      const eta_excellent = round2(Rr / (Rr + Rg_excellent + Ra) * 100) / 100;  // fraction
+      const eta_good      = round2(Rr / (Rr + Rg_good      + Ra) * 100) / 100;
+      const eta_poor      = round2(Rr / (Rr + Rg_poor      + Ra) * 100) / 100;
+      const erp_excellent_kw = round2(tpo_kw * eta_excellent);
+      const erp_good_kw      = round2(tpo_kw * eta_good);
+      const erp_poor_kw      = round2(tpo_kw * eta_poor);
+      // Power loss in ground system (watts):
+      const p_loss_excellent_w = round2((1 - eta_excellent) * tpo_kw * 1000);
+      const p_loss_poor_w      = round2((1 - eta_poor)      * tpo_kw * 1000);
+      // FCC §73.51 base current monitoring: I = sqrt(P / Rr) at the antenna base
+      const base_current_excellent_a = round2(Math.sqrt(erp_excellent_kw * 1000 / Rr));
+      const base_current_poor_a      = round2(Math.sqrt(erp_poor_kw      * 1000 / Rr));
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        radiation_resistance_ohms: Rr,
+        Rg_excellent_ohms: Rg_excellent,
+        Rg_good_ohms:      Rg_good,
+        Rg_poor_ohms:      Rg_poor,
+        eta_excellent, eta_good, eta_poor,
+        erp_excellent_kw, erp_good_kw, erp_poor_kw,
+        p_loss_excellent_w, p_loss_poor_w,
+        base_current_excellent_a, base_current_poor_a,
+        reference: '47 CFR §73.51 (base current monitoring); §73.54 (antenna resistance); §73.190 (ground system); Terman "Radio Engineers Handbook" Ch. 9; Brown/Lewis/Epstein (1937) ground system study; NAB Engineering Handbook (10th ed.)',
+        note: `${tpo_kw} kW TPO at ${frequency_khz} kHz: ERP ${erp_excellent_kw} kW (120-radial η=${(eta_excellent*100).toFixed(1)}%) to ${erp_poor_kw} kW (poor ground η=${(eta_poor*100).toFixed(1)}%). Base current: ${base_current_excellent_a}–${base_current_poor_a} A.`
       };
     })(),
 

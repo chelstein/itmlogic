@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM TPO and Antenna Efficiency Guide */}
+        {candidate.am_tpo_and_antenna_efficiency_guide && (() => {
+          const g = candidate.am_tpo_and_antenna_efficiency_guide;
+          return (
+            <div key="tae-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 8, border: '2px solid #4338ca' }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>TPO &amp; Antenna Efficiency</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
+                <span>TPO:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'}</span>
+                <span>Radiation resistance (Rr):</span><span>{g.radiation_resistance_ohms != null ? `${g.radiation_resistance_ohms} Ω` : '—'}</span>
+                <span>120-radial ground (Rg=2Ω):</span>
+                <span style={{ color: '#15803d' }}>η={g.eta_excellent != null ? `${(g.eta_excellent*100).toFixed(1)}%` : '—'} → ERP {g.erp_excellent_kw != null ? `${g.erp_excellent_kw} kW` : '—'}</span>
+                <span>60-radial ground (Rg=8Ω):</span>
+                <span style={{ color: '#d97706' }}>η={g.eta_good != null ? `${(g.eta_good*100).toFixed(1)}%` : '—'} → ERP {g.erp_good_kw != null ? `${g.erp_good_kw} kW` : '—'}</span>
+                <span>Poor ground (Rg=18Ω):</span>
+                <span style={{ color: '#dc2626' }}>η={g.eta_poor != null ? `${(g.eta_poor*100).toFixed(1)}%` : '—'} → ERP {g.erp_poor_kw != null ? `${g.erp_poor_kw} kW` : '—'}</span>
+                <span>Base current (excellent):</span><span>{g.base_current_excellent_a != null ? `${g.base_current_excellent_a} A` : '—'}</span>
+                <span>Ground loss (excellent):</span><span>{g.p_loss_excellent_w != null ? `${g.p_loss_excellent_w} W` : '—'}</span>
+                <span>Ground loss (poor):</span><span>{g.p_loss_poor_w != null ? `${g.p_loss_poor_w} W` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4338ca', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Ground System Radial Design Guide */}
         {candidate.am_ground_system_radial_design_guide && (() => {
           const g = candidate.am_ground_system_radial_design_guide;
