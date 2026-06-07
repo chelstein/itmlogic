@@ -2226,6 +2226,33 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Community Impact and Coverage Shift Guide */}
+        {candidate.am_community_impact_and_coverage_shift_guide && (() => {
+          const g = candidate.am_community_impact_and_coverage_shift_guide;
+          const statusColor = g.col_proximity_status?.startsWith('excellent') ? '#16a34a'
+            : g.col_proximity_status?.startsWith('acceptable') ? '#d97706' : '#dc2626';
+          return (
+            <div key="cis-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4f8', borderRadius: 8, border: '2px solid #64748b' }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Community of License Coverage Shift</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>CoL centroid:</span><span>{g.col_lat != null ? `${g.col_lat}°N, ${g.col_lon}°W` : '—'}</span>
+                <span>Candidate → CoL:</span><span>{g.dist_candidate_to_col_km != null ? `${g.dist_candidate_to_col_km} km` : '—'}</span>
+                <span>Current → CoL:</span><span>{g.dist_current_to_col_km != null ? `${g.dist_current_to_col_km} km` : '—'}</span>
+                <span>Distance delta:</span>
+                <span style={{ color: g.col_proximity_improves ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                  {g.col_dist_delta_km != null ? `${g.col_dist_delta_km > 0 ? '+' : ''}${g.col_dist_delta_km} km` : '—'}
+                  {g.col_proximity_improves ? ' ✓ closer' : g.col_dist_delta_km === 0 ? ' (no change)' : ' ⚠ farther'}
+                </span>
+                <span style={{ fontWeight: 600 }}>Proximity status:</span>
+                <span style={{ fontWeight: 600, color: statusColor }}>{g.col_proximity_status ?? '—'}</span>
+                <span>Bearing to CoL:</span><span>{g.bearing_to_col_deg != null ? `${g.bearing_to_col_deg}°` : '—'}</span>
+                <span>Aligned to CoL:</span><span>{g.bearing_aligned_to_col ? 'Yes' : 'No'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#475569', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Total Project Cost Summary Guide */}
         {candidate.am_total_project_cost_summary_guide && (() => {
           const g = candidate.am_total_project_cost_summary_guide;

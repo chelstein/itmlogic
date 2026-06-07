@@ -13543,3 +13543,45 @@ test('am_total_project_cost_summary_guide comparison table columns present', asy
   assert.strictEqual(r0.tpc_grand_total_high_usd,   1817175,   'rank-1 tpc_grand_total_high should be 1817175');
   assert.strictEqual(r0.tpc_total_with_contingency, 434257.25, 'rank-1 tpc_total_with_contingency should be 434257.25');
 });
+
+test('am_community_impact_and_coverage_shift_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_community_impact_and_coverage_shift_guide;
+  assert.ok(g !== undefined && g !== null, 'am_community_impact_and_coverage_shift_guide missing');
+  assert.ok(typeof g.col_proximity_status === 'string', 'col_proximity_status must be string');
+  assert.ok(typeof g.col_proximity_improves === 'boolean', 'col_proximity_improves must be boolean');
+});
+
+test('KAZM rank-1 CoL distance (current site proximity)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_community_impact_and_coverage_shift_guide;
+  assert.strictEqual(g.dist_candidate_to_col_km, 0, 'rank-1 dist_candidate_to_col_km should be 0');
+  assert.strictEqual(g.dist_current_to_col_km,   0, 'dist_current_to_col_km should be 0');
+  assert.strictEqual(g.col_proximity_status,     'excellent (<15 km)', 'status should be excellent');
+});
+
+test('KAZM CoL delta for rank-1 (no movement)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_community_impact_and_coverage_shift_guide;
+  assert.strictEqual(g.col_dist_delta_km, 0, 'rank-1 col_dist_delta_km should be 0 (no move)');
+});
+
+test('KAZM community impact reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_community_impact_and_coverage_shift_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.24'), 'reference must cite §73.24');
+  assert.ok(typeof g.note === 'string' && g.note.includes('km from CoL'), 'note must mention CoL distance');
+});
+
+test('am_community_impact_and_coverage_shift_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cis_dist_to_col_km'        in row, 'cis_dist_to_col_km missing from comparison table');
+    assert.ok('cis_col_dist_delta_km'     in row, 'cis_col_dist_delta_km missing from comparison table');
+    assert.ok('cis_col_proximity_improves' in row, 'cis_col_proximity_improves missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cis_dist_to_col_km,        0,     'rank-1 cis_dist_to_col_km should be 0');
+  assert.strictEqual(r0.cis_col_dist_delta_km,      0,     'rank-1 cis_col_dist_delta_km should be 0');
+  assert.strictEqual(r0.cis_col_proximity_improves, false, 'rank-1 cis_col_proximity_improves should be false');
+});

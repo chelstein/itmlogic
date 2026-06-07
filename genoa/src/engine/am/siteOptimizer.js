@@ -1308,7 +1308,10 @@ export async function runSiteOptimizer(body = {}){
     re_lease_low_per_month:     c.am_real_estate_and_land_acquisition_guide?.lease_low_per_month ?? null,
     tpc_grand_total_low_usd:    c.am_total_project_cost_summary_guide?.grand_total_low_usd ?? null,
     tpc_grand_total_high_usd:   c.am_total_project_cost_summary_guide?.grand_total_high_usd ?? null,
-    tpc_total_with_contingency: c.am_total_project_cost_summary_guide?.total_with_contingency_low_usd ?? null
+    tpc_total_with_contingency: c.am_total_project_cost_summary_guide?.total_with_contingency_low_usd ?? null,
+    cis_dist_to_col_km:         c.am_community_impact_and_coverage_shift_guide?.dist_candidate_to_col_km ?? null,
+    cis_col_dist_delta_km:      c.am_community_impact_and_coverage_shift_guide?.col_dist_delta_km ?? null,
+    cis_col_proximity_improves: c.am_community_impact_and_coverage_shift_guide?.col_proximity_improves ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7043,6 +7046,63 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_community_impact_and_coverage_shift_guide: (() => {
+      // Analyzes how the candidate site affects the station's ability to serve
+      // its community of license (CoL) as defined by FCC §73.24(i) and AM rules.
+      // Uses the candidate location relative to the CoL centroid to estimate:
+      // 1. Whether the new site moves the transmitter closer to or farther from the CoL.
+      // 2. Whether the coverage improvement is predominantly directed toward the CoL.
+      // 3. Population coverage implications (proxy via distance).
+      const col_lat = col_centroid?.[1] ?? pt.lat;
+      const col_lon = col_centroid?.[0] ?? pt.lon;
+      const curr_lat = current_site?.lat ?? pt.lat;
+      const curr_lon = current_site?.lon ?? pt.lon;
+      // Haversine distance from candidate to CoL centroid
+      const toRad = d => d * Math.PI / 180;
+      const haversine = (lat1, lon1, lat2, lon2) => {
+        const R = 6371;
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+        return round2(2 * R * Math.asin(Math.sqrt(a)));
+      };
+      const dist_candidate_to_col_km   = haversine(pt.lat, pt.lon, col_lat, col_lon);
+      const dist_current_to_col_km     = haversine(curr_lat, curr_lon, col_lat, col_lon);
+      const col_dist_delta_km          = round2(dist_candidate_to_col_km - dist_current_to_col_km);
+      const col_proximity_improves     = col_dist_delta_km < 0;  // negative = closer to CoL
+      const col_proximity_pct_change   = round2((col_dist_delta_km / Math.max(dist_current_to_col_km, 0.1)) * 100);
+      // FCC §73.24(i): transmitter must be located in or near the community of license.
+      // Rule of thumb: within 0–15 km is ideal; 15–30 km acceptable; >30 km may require waiver.
+      const col_proximity_status = dist_candidate_to_col_km < 15 ? 'excellent (<15 km)' :
+        dist_candidate_to_col_km < 30 ? 'acceptable (15–30 km)' : 'needs_waiver_review (>30 km)';
+      // Coverage shift bearing (from current to candidate, relative to CoL direction)
+      const bearing_to_col_deg = round2((Math.atan2(
+        Math.sin(toRad(col_lon - curr_lon)) * Math.cos(toRad(col_lat)),
+        Math.cos(toRad(curr_lat)) * Math.sin(toRad(col_lat)) -
+        Math.sin(toRad(curr_lat)) * Math.cos(toRad(col_lat)) * Math.cos(toRad(col_lon - curr_lon))
+      ) * 180 / Math.PI + 360) % 360);
+      const candidate_bearing_deg = round2(pt.bearing_deg ?? 0);
+      const bearing_alignment_deg = round2(Math.abs(candidate_bearing_deg - bearing_to_col_deg) % 360);
+      const bearing_aligned_to_col = bearing_alignment_deg <= 45 || bearing_alignment_deg >= 315;
+      return {
+        candidate_lat: round2(pt.lat),
+        candidate_lon: round2(pt.lon),
+        col_lat: round2(col_lat),
+        col_lon: round2(col_lon),
+        dist_candidate_to_col_km,
+        dist_current_to_col_km,
+        col_dist_delta_km,
+        col_proximity_improves,
+        col_proximity_pct_change,
+        col_proximity_status,
+        bearing_to_col_deg,
+        candidate_bearing_deg,
+        bearing_aligned_to_col,
+        reference: '47 CFR §73.24(i) (transmitter location relative to CoL); §73.182 (service contour); FCC AM Improvement Report and Order (MB Docket 13-249); NRSC coverage engineering guidelines',
+        note: `Candidate is ${dist_candidate_to_col_km} km from CoL centroid (current: ${dist_current_to_col_km} km). ${col_proximity_improves ? 'Moves closer to CoL ✓' : 'Moves farther from CoL ⚠'}. Proximity status: ${col_proximity_status}.`
       };
     })(),
 

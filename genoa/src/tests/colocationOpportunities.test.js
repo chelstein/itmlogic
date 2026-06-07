@@ -3182,3 +3182,14 @@ test('am_total_project_cost_summary_guide present across colocation candidates',
     assert.ok(typeof g.line_items_low === 'object', `rank ${c.rank}: line_items_low must be object`);
   }
 });
+
+test('am_community_impact_and_coverage_shift_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_community_impact_and_coverage_shift_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_community_impact_and_coverage_shift_guide missing`);
+    assert.ok(typeof g.col_proximity_status === 'string', `rank ${c.rank}: col_proximity_status must be string`);
+    assert.ok(['excellent (<15 km)','acceptable (15–30 km)','needs_waiver_review (>30 km)'].includes(g.col_proximity_status),
+      `rank ${c.rank}: unexpected col_proximity_status: ${g.col_proximity_status}`);
+  }
+});
