@@ -1143,7 +1143,10 @@ export async function runSiteOptimizer(body = {}){
     tw_tia_class:               c.am_tower_structural_and_wind_loading_guide?.tia_class ?? null,
     env_nepa_level:             c.am_nepa_and_environmental_permitting_guide?.nepa_level ?? null,
     env_total_cost_low_usd:     c.am_nepa_and_environmental_permitting_guide?.total_env_cost_low_usd ?? null,
-    env_weeks_low:              c.am_nepa_and_environmental_permitting_guide?.env_review_weeks_low ?? null
+    env_weeks_low:              c.am_nepa_and_environmental_permitting_guide?.env_review_weeks_low ?? null,
+    es_service_amps:            c.am_electrical_service_and_power_infrastructure_guide?.service_amps ?? null,
+    es_transformer_kva:         c.am_electrical_service_and_power_infrastructure_guide?.transformer_kva ?? null,
+    es_total_utility_low_usd:   c.am_electrical_service_and_power_infrastructure_guide?.total_utility_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6878,6 +6881,54 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_electrical_service_and_power_infrastructure_guide: (() => {
+      // Models the utility electrical service entrance requirements for the AM
+      // transmitter site: service size, transformer kVA, power conditioning, and
+      // line extension cost.  Separate from the emergency generator (ep guide).
+      const tx_draw_kw_es    = round2(tpo_kw / 0.85);
+      const hvac_kw_es       = round2(Math.max(2.0, tx_draw_kw_es * 0.15));
+      const total_load_kw_es = round2(tx_draw_kw_es + hvac_kw_es + 1.5);
+      // NEC 230.42 requires 125% demand factor for continuous loads
+      const demand_kw        = round2(total_load_kw_es * 1.25);
+      // Phase: single-phase 240V for ≤15 kW; 3-phase for larger
+      const service_phase    = demand_kw > 15 ? '3-phase 480/277V' : 'single-phase 240/120V';
+      const service_voltage  = demand_kw > 15 ? 480 : 240;
+      const service_amps_raw = Math.ceil((demand_kw * 1000) / service_voltage);
+      const STD_AMPS         = [60, 100, 200, 400, 600, 800, 1200];
+      const service_amps     = STD_AMPS.find(a => a >= service_amps_raw) ?? 1200;
+      // Utility transformer: next standard kVA above demand
+      const KVA_SIZES        = [10, 15, 25, 37.5, 50, 75, 100, 167, 250];
+      const transformer_kva  = KVA_SIZES.find(k => k >= demand_kw) ?? 250;
+      const transformer_cost_low_usd  = transformer_kva <= 25 ? 2000 : (transformer_kva <= 75 ? 4000 : 8000);
+      const transformer_cost_high_usd = Math.round(transformer_cost_low_usd * 2.5);
+      // Service entrance: meter socket, main disconnect, distribution panel
+      const service_entrance_low_usd  = 3000;
+      const service_entrance_high_usd = 10000;
+      // Voltage regulator protects sensitive AM transmitter RF output stability
+      const voltage_regulator_low_usd  = Math.round(total_load_kw_es * 200);
+      const voltage_regulator_high_usd = Math.round(total_load_kw_es * 500);
+      // Line extension: industry average ~$15–40/ft for primary distribution line
+      const est_line_ext_ft       = 500; // baseline 500 ft; field verify
+      const line_ext_cost_low_usd  = Math.round(est_line_ext_ft * 15);
+      const line_ext_cost_high_usd = Math.round(est_line_ext_ft * 40);
+      const total_utility_low_usd  = transformer_cost_low_usd + service_entrance_low_usd
+                                   + voltage_regulator_low_usd + line_ext_cost_low_usd;
+      const total_utility_high_usd = transformer_cost_high_usd + service_entrance_high_usd
+                                   + voltage_regulator_high_usd + line_ext_cost_high_usd;
+      return {
+        tx_draw_kw_es, total_load_kw_es, demand_kw,
+        service_phase, service_voltage, service_amps,
+        transformer_kva,
+        transformer_cost_low_usd, transformer_cost_high_usd,
+        service_entrance_low_usd, service_entrance_high_usd,
+        voltage_regulator_low_usd, voltage_regulator_high_usd,
+        est_line_ext_ft, line_ext_cost_low_usd, line_ext_cost_high_usd,
+        total_utility_low_usd, total_utility_high_usd,
+        reference: 'NEC 2023 Articles 230, 250, 702; NFPA 70 (National Electrical Code); IEEE Std 519-2022 (harmonic limits); utility tariff requirements; 47 CFR §73.1202 (station records — metered power data)',
+        note: `${tpo_kw} kW TPO: facility load ${total_load_kw_es} kW, demand ${demand_kw} kW (NEC 125%). Service: ${service_phase}, ${service_amps}A, ${transformer_kva} kVA transformer. Total utility infrastructure: $${total_utility_low_usd.toLocaleString()}–$${total_utility_high_usd.toLocaleString()} (includes ~${est_line_ext_ft} ft line extension baseline).`
       };
     })(),
 

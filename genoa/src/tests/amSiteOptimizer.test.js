@@ -11060,3 +11060,54 @@ test('am_nepa_and_environmental_permitting_guide comparison table columns presen
   assert.strictEqual(r0.env_total_cost_low_usd, 12500, 'rank-1 env_total_cost_low_usd should be $12,500');
   assert.strictEqual(r0.env_weeks_low, 12, 'rank-1 env_weeks_low should be 12');
 });
+
+test('am_electrical_service_and_power_infrastructure_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_electrical_service_and_power_infrastructure_guide;
+  assert.ok(g !== undefined && g !== null, 'am_electrical_service_and_power_infrastructure_guide should be present');
+  assert.ok(typeof g.service_amps === 'number', 'service_amps should be a number');
+  assert.ok(g.transformer_kva > 0, 'transformer_kva must be positive');
+});
+
+test('am_electrical_service_and_power_infrastructure_guide KAZM service sizing', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_electrical_service_and_power_infrastructure_guide;
+  // 5 kW / 0.85 = 5.88 kW TX; HVAC = max(2.0, 5.88×0.15)=2.0; misc 1.5 → total 9.38 kW
+  // demand = 9.38 × 1.25 = 11.73 kW → 60A service; 15 kVA transformer
+  assert.strictEqual(g.tx_draw_kw_es, 5.88, 'tx_draw_kw_es should be 5.88');
+  assert.strictEqual(g.total_load_kw_es, 9.38, 'total_load_kw_es should be 9.38');
+  assert.strictEqual(g.demand_kw, 11.73, 'demand_kw should be 11.73');
+  assert.strictEqual(g.service_amps, 60, 'service_amps should be 60A for KAZM');
+  assert.strictEqual(g.transformer_kva, 15, 'transformer_kva should be 15 kVA');
+});
+
+test('am_electrical_service_and_power_infrastructure_guide KAZM single-phase service', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_electrical_service_and_power_infrastructure_guide;
+  // 11.73 kW demand ≤ 15 kW → single-phase
+  assert.ok(g.service_phase.includes('single-phase'), `service_phase should be single-phase, got: ${g.service_phase}`);
+  assert.strictEqual(g.service_voltage, 240, 'service_voltage should be 240V');
+  assert.ok(g.voltage_regulator_low_usd > 0, 'voltage_regulator_low_usd must be positive');
+});
+
+test('am_electrical_service_and_power_infrastructure_guide KAZM cost estimates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_electrical_service_and_power_infrastructure_guide;
+  assert.strictEqual(g.transformer_cost_low_usd, 2000, 'transformer_cost_low_usd = $2,000 for 15 kVA');
+  assert.strictEqual(g.total_utility_low_usd, 14376, 'total_utility_low_usd should be $14,376');
+  assert.ok(g.total_utility_high_usd > g.total_utility_low_usd, 'high cost must exceed low');
+  assert.ok(g.line_ext_cost_low_usd > 0, 'line_ext_cost_low_usd must be positive');
+});
+
+test('am_electrical_service_and_power_infrastructure_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('es_service_amps'          in row, 'es_service_amps missing from comparison table');
+    assert.ok('es_transformer_kva'       in row, 'es_transformer_kva missing from comparison table');
+    assert.ok('es_total_utility_low_usd' in row, 'es_total_utility_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.es_service_amps, 60, 'rank-1 es_service_amps should be 60A');
+  assert.strictEqual(r0.es_transformer_kva, 15, 'rank-1 es_transformer_kva should be 15 kVA');
+  assert.strictEqual(r0.es_total_utility_low_usd, 14376, 'rank-1 es_total_utility_low_usd should be $14,376');
+});

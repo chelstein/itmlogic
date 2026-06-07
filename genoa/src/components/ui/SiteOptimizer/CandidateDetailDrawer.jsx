@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Electrical Service and Power Infrastructure Guide */}
+        {candidate.am_electrical_service_and_power_infrastructure_guide && (() => {
+          const g = candidate.am_electrical_service_and_power_infrastructure_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="es-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfeff', borderRadius: 8, border: '1px solid #06b6d4' }}>
+              <div style={{ fontWeight: 700, color: '#0e4f5f', marginBottom: 6, fontSize: 13 }}>Electrical Service &amp; Power Infrastructure</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Facility Load:</span><span>{g.total_load_kw_es} kW ({g.tx_draw_kw_es} kW TX)</span>
+                <span style={{ color: '#6b7280' }}>NEC 125% Demand:</span><span>{g.demand_kw} kW</span>
+                <span style={{ color: '#6b7280' }}>Service:</span><span style={{ fontWeight: 600 }}>{g.service_phase}, {g.service_amps}A</span>
+                <span style={{ color: '#6b7280' }}>Transformer:</span><span>{g.transformer_kva} kVA ({fmt(g.transformer_cost_low_usd)} – {fmt(g.transformer_cost_high_usd)})</span>
+                <span style={{ color: '#6b7280' }}>Service Entrance:</span><span>{fmt(g.service_entrance_low_usd)} – {fmt(g.service_entrance_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Voltage Regulator:</span><span>{fmt(g.voltage_regulator_low_usd)} – {fmt(g.voltage_regulator_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Line Extension (~{g.est_line_ext_ft} ft):</span><span>{fmt(g.line_ext_cost_low_usd)} – {fmt(g.line_ext_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Utility Cost:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_utility_low_usd)} – {fmt(g.total_utility_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0e4f5f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM NEPA and Environmental Permitting Guide */}
         {candidate.am_nepa_and_environmental_permitting_guide && (() => {
           const g = candidate.am_nepa_and_environmental_permitting_guide;

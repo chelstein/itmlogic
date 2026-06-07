@@ -2569,3 +2569,14 @@ test('am_nepa_and_environmental_permitting_guide present across colocation candi
     assert.ok(g.env_review_weeks_low > 0, `rank ${c.rank}: env_review_weeks_low must be positive`);
   }
 });
+
+test('am_electrical_service_and_power_infrastructure_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_electrical_service_and_power_infrastructure_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_electrical_service_and_power_infrastructure_guide missing`);
+    assert.ok(g.service_amps > 0, `rank ${c.rank}: service_amps must be positive`);
+    assert.ok(g.transformer_kva > 0, `rank ${c.rank}: transformer_kva must be positive`);
+    assert.ok(g.total_utility_low_usd > 0, `rank ${c.rank}: total_utility_low_usd must be positive`);
+  }
+});
