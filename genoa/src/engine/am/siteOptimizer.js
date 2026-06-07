@@ -1134,7 +1134,10 @@ export async function runSiteOptimizer(body = {}){
     ant_ground_loss_ohm_high:   c.am_antenna_electrical_design_and_efficiency_guide?.ground_loss_ohm_high ?? null,
     opex_annual_low_usd:        c.am_annual_operating_cost_analysis_guide?.total_annual_low_usd ?? null,
     opex_annual_kwh:            c.am_annual_operating_cost_analysis_guide?.annual_kwh_total ?? null,
-    opex_10yr_pv_low_usd:       c.am_annual_operating_cost_analysis_guide?.opex_10yr_pv_low_usd ?? null
+    opex_10yr_pv_low_usd:       c.am_annual_operating_cost_analysis_guide?.opex_10yr_pv_low_usd ?? null,
+    ep_generator_size_kw:       c.am_emergency_power_and_backup_systems_guide?.generator_size_kw ?? null,
+    ep_total_backup_low_usd:    c.am_emergency_power_and_backup_systems_guide?.total_backup_low_usd ?? null,
+    ep_fuel_for_72h_gal:        c.am_emergency_power_and_backup_systems_guide?.fuel_for_72h_gal ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6869,6 +6872,54 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_emergency_power_and_backup_systems_guide: (() => {
+      // Sizes the emergency generator, fuel storage, and automatic transfer switch
+      // required to maintain continuous operation during grid outages.  EAS
+      // compliance (47 CFR §11.35) demands uninterrupted transmission capability;
+      // this block quantifies the hardware investment and NFPA 110 level.
+      const tx_draw_kw_ep     = round2(tpo_kw / 0.85);
+      const hvac_draw_kw_ep   = round2(Math.max(2.0, tx_draw_kw_ep * 0.15));
+      const lighting_misc_kw  = 1.5;
+      const total_load_kw     = round2(tx_draw_kw_ep + hvac_draw_kw_ep + lighting_misc_kw);
+      // Size generator with 25 % margin, rounded up to nearest 10 kW
+      const generator_size_kw = Math.ceil(total_load_kw * 1.25 / 10) * 10;
+      // Diesel consumption ≈ 0.07 gal/kW·hr (EPA Tier 4 genset)
+      const fuel_burn_gph     = round2(generator_size_kw * 0.07);
+      const fuel_for_72h_gal  = Math.round(fuel_burn_gph * 72);
+      const fuel_for_30d_gal  = Math.round(fuel_burn_gph * 24 * 30);
+      // NFPA 110: Level 1 if ≤ 500 gal on-site; Level 2 otherwise
+      const nfpa_level        = fuel_for_72h_gal <= 500 ? 'Level 1' : 'Level 2';
+      const ats_type          = generator_size_kw > 100
+        ? 'Automatic Transfer Switch (3-phase)'
+        : 'Automatic Transfer Switch (single-phase)';
+      // Cost: larger gensets are cheaper per kW; installation is 60 % adder at high end
+      const gen_cost_per_kw       = generator_size_kw > 150 ? 350 : 500;
+      const gen_install_low_usd   = Math.round(generator_size_kw * gen_cost_per_kw);
+      const gen_install_high_usd  = Math.round(generator_size_kw * gen_cost_per_kw * 1.6);
+      const fuel_tank_low_usd     = fuel_for_72h_gal <= 500 ? 3000 : 8000;
+      const fuel_tank_high_usd    = fuel_for_72h_gal <= 500 ? 8000 : 20000;
+      const ats_cost_low_usd      = generator_size_kw > 100 ? 4000 : 2000;
+      const ats_cost_high_usd     = generator_size_kw > 100 ? 10000 : 5000;
+      const total_backup_low_usd  = gen_install_low_usd  + fuel_tank_low_usd  + ats_cost_low_usd;
+      const total_backup_high_usd = gen_install_high_usd + fuel_tank_high_usd + ats_cost_high_usd;
+      // Annual preventive maintenance (oil change, load-bank test, filter)
+      const annual_maint_low_usd  = Math.round(generator_size_kw * 20);
+      const annual_maint_high_usd = Math.round(generator_size_kw * 40);
+      const eas_continuity_required = true;
+      return {
+        tx_draw_kw_ep, hvac_draw_kw_ep, total_load_kw, generator_size_kw,
+        fuel_burn_gph, fuel_for_72h_gal, fuel_for_30d_gal, nfpa_level, ats_type,
+        gen_install_low_usd, gen_install_high_usd,
+        fuel_tank_low_usd, fuel_tank_high_usd,
+        ats_cost_low_usd, ats_cost_high_usd,
+        total_backup_low_usd, total_backup_high_usd,
+        annual_maint_low_usd, annual_maint_high_usd,
+        eas_continuity_required,
+        reference: '47 CFR §11.35 (EAS equipment operation); NFPA 110 (emergency/standby power systems); EPA Tier 4 diesel emission standards; NEC Article 702 (optional standby systems)',
+        note: `Emergency power: ${generator_size_kw} kW diesel generator (${ats_type}) for ${round2(total_load_kw)} kW facility load. Fuel storage ${fuel_for_72h_gal} gal supports 72-hr operation at ${fuel_burn_gph} gal/hr; 30-day reserve requires ${fuel_for_30d_gal} gal. NFPA 110 ${nfpa_level}. Capital: $${total_backup_low_usd.toLocaleString()}–$${total_backup_high_usd.toLocaleString()}; annual PM: $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}.`
       };
     })(),
 

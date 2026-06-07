@@ -10909,3 +10909,53 @@ test('am_annual_operating_cost_analysis_guide comparison table columns present',
     assert.ok('opex_10yr_pv_low_usd' in row, 'opex_10yr_pv_low_usd missing from comparison table');
   }
 });
+
+test('am_emergency_power_and_backup_systems_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_power_and_backup_systems_guide;
+  assert.ok(g !== undefined && g !== null, 'am_emergency_power_and_backup_systems_guide should be present');
+  assert.ok(typeof g.generator_size_kw === 'number', 'generator_size_kw should be a number');
+  assert.ok(g.eas_continuity_required === true, 'EAS continuity must be required');
+});
+
+test('am_emergency_power_and_backup_systems_guide KAZM 20 kW generator correctly sized', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_power_and_backup_systems_guide;
+  // KAZM 5 kW: tx_draw=5.88, hvac=2.0, misc=1.5 → total=9.38 kW × 1.25=11.73 → rounded to 20 kW
+  assert.strictEqual(g.tx_draw_kw_ep, 5.88, 'tx_draw_kw_ep should be 5.88');
+  assert.strictEqual(g.total_load_kw, 9.38, 'total_load_kw should be 9.38');
+  assert.strictEqual(g.generator_size_kw, 20, 'generator_size_kw should be 20 for 9.38 kW load');
+  assert.strictEqual(g.nfpa_level, 'Level 1', 'NFPA 110 Level 1 for ≤500 gal fuel storage');
+});
+
+test('am_emergency_power_and_backup_systems_guide KAZM 72-hour fuel storage', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_power_and_backup_systems_guide;
+  // 20 kW × 0.07 gal/kW·hr = 1.4 gph × 72 hr = 100.8 → 101 gal
+  assert.strictEqual(g.fuel_burn_gph, 1.4, 'fuel_burn_gph should be 1.4 for 20 kW generator');
+  assert.strictEqual(g.fuel_for_72h_gal, 101, 'fuel_for_72h_gal should be 101');
+  assert.ok(g.fuel_for_30d_gal > 1000, 'fuel_for_30d_gal should exceed 1000 gal');
+});
+
+test('am_emergency_power_and_backup_systems_guide KAZM total backup cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_emergency_power_and_backup_systems_guide;
+  // gen $10k + fuel tank $3k + ATS $2k = $15k low
+  assert.strictEqual(g.gen_install_low_usd, 10000, 'gen_install_low_usd should be $10,000');
+  assert.strictEqual(g.total_backup_low_usd, 15000, 'total_backup_low_usd should be $15,000');
+  assert.ok(g.total_backup_high_usd > g.total_backup_low_usd, 'high cost must exceed low');
+  assert.ok(g.annual_maint_low_usd > 0, 'annual maintenance cost must be positive');
+});
+
+test('am_emergency_power_and_backup_systems_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ep_generator_size_kw'    in row, 'ep_generator_size_kw missing from comparison table');
+    assert.ok('ep_total_backup_low_usd' in row, 'ep_total_backup_low_usd missing from comparison table');
+    assert.ok('ep_fuel_for_72h_gal'     in row, 'ep_fuel_for_72h_gal missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ep_generator_size_kw, 20, 'rank-1 generator_size_kw should be 20');
+  assert.strictEqual(r0.ep_total_backup_low_usd, 15000, 'rank-1 total_backup_low_usd should be $15,000');
+  assert.strictEqual(r0.ep_fuel_for_72h_gal, 101, 'rank-1 fuel_for_72h_gal should be 101');
+});

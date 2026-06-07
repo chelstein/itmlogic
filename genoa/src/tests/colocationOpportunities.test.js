@@ -2536,3 +2536,14 @@ test('am_annual_operating_cost_analysis_guide present across colocation candidat
     assert.ok(g.opex_10yr_pv_low_usd > g.total_annual_low_usd, `rank ${c.rank}: 10yr NPV must exceed 1 year`);
   }
 });
+
+test('am_emergency_power_and_backup_systems_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_emergency_power_and_backup_systems_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_emergency_power_and_backup_systems_guide missing`);
+    assert.ok(g.generator_size_kw >= 10, `rank ${c.rank}: generator_size_kw should be ≥10 kW`);
+    assert.ok(g.total_backup_low_usd > 0, `rank ${c.rank}: total_backup_low_usd must be positive`);
+    assert.ok(g.fuel_for_72h_gal > 0, `rank ${c.rank}: fuel_for_72h_gal must be positive`);
+  }
+});

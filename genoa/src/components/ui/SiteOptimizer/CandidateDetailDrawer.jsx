@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Emergency Power and Backup Systems Guide */}
+        {candidate.am_emergency_power_and_backup_systems_guide && (() => {
+          const g = candidate.am_emergency_power_and_backup_systems_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ep-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdfa', borderRadius: 8, border: '1px solid #2dd4bf' }}>
+              <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 6, fontSize: 13 }}>Emergency Power &amp; Backup Systems</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Facility Load:</span><span>{g.total_load_kw} kW total ({g.tx_draw_kw_ep} kW TX + {g.hvac_draw_kw_ep} kW HVAC)</span>
+                <span style={{ color: '#6b7280' }}>Generator Size:</span><span style={{ fontWeight: 600 }}>{g.generator_size_kw} kW diesel (25% margin)</span>
+                <span style={{ color: '#6b7280' }}>Transfer Switch:</span><span>{g.ats_type}</span>
+                <span style={{ color: '#6b7280' }}>Fuel Burn:</span><span>{g.fuel_burn_gph} gal/hr</span>
+                <span style={{ color: '#6b7280' }}>72-hr Fuel:</span><span>{g.fuel_for_72h_gal} gal — NFPA 110 {g.nfpa_level}</span>
+                <span style={{ color: '#6b7280' }}>30-day Reserve:</span><span>{g.fuel_for_30d_gal.toLocaleString()} gal</span>
+                <span style={{ color: '#6b7280' }}>Generator Install:</span><span>{fmt(g.gen_install_low_usd)} – {fmt(g.gen_install_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Fuel Tank:</span><span>{fmt(g.fuel_tank_low_usd)} – {fmt(g.fuel_tank_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>ATS Cost:</span><span>{fmt(g.ats_cost_low_usd)} – {fmt(g.ats_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_backup_low_usd)} – {fmt(g.total_backup_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual PM:</span><span>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>EAS Continuity:</span><span>{g.eas_continuity_required ? '✓ Required (47 CFR §11.35)' : 'Not required'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0f766e', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Annual Operating Cost Analysis Guide */}
         {candidate.am_annual_operating_cost_analysis_guide && (() => {
           const g = candidate.am_annual_operating_cost_analysis_guide;
