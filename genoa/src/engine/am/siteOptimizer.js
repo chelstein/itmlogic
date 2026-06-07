@@ -1266,7 +1266,10 @@ export async function runSiteOptimizer(body = {}){
     opc_annual_power_kw_input:  c.am_operating_cost_and_annual_expense_guide?.annual_power_kw_input ?? null,
     sky_nighttime_status:       c.am_nighttime_operation_and_skywave_classification_guide?.nighttime_status ?? null,
     sky_nighttime_power_kw_max: c.am_nighttime_operation_and_skywave_classification_guide?.nighttime_power_kw_max ?? null,
-    sky_effective_power_pct:    c.am_nighttime_operation_and_skywave_classification_guide?.effective_power_fraction ?? null
+    sky_effective_power_pct:    c.am_nighttime_operation_and_skywave_classification_guide?.effective_power_fraction ?? null,
+    pop_proof_type:             c.am_broadcast_proof_of_performance_guide?.proof_type ?? null,
+    pop_total_low_usd:          c.am_broadcast_proof_of_performance_guide?.total_low_usd ?? null,
+    pop_num_measured_radials:   c.am_broadcast_proof_of_performance_guide?.num_measured_radials ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7001,6 +7004,36 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_broadcast_proof_of_performance_guide: (() => {
+      // 47 CFR §73.153-73.154: DA stations must file a proof of performance with
+      // measured radials verifying the pattern after construction.  NDA stations file
+      // a simpler reference field strength check.  Cost includes consulting engineer,
+      // measurement equipment, and field travel.
+      const is_da = /^DA/i.test(pattern_mode);
+      const num_measured_radials    = is_da ? 12 : 0;
+      const num_theoretical_radials = is_da ? 8  : 0;
+      const num_measurement_points  = is_da ? 108 : 6; // 12 radials × 9 distances for DA
+      const proof_type = is_da ? 'full_directional_proof' : 'nda_reference_check';
+      const engineer_low_usd  = is_da ? 10000 : 1500;
+      const engineer_high_usd = is_da ? 35000 : 6000;
+      const equipment_low_usd  = is_da ? 3000 : 500;
+      const equipment_high_usd = is_da ? 10000 : 2000;
+      const travel_low_usd  = is_da ? 3000 : 500;
+      const travel_high_usd = is_da ? 8000 : 2000;
+      const total_low_usd  = round2(engineer_low_usd  + equipment_low_usd  + travel_low_usd);
+      const total_high_usd = round2(engineer_high_usd + equipment_high_usd + travel_high_usd);
+      return {
+        frequency_khz, fcc_class, pattern_mode, is_da,
+        proof_type, num_measured_radials, num_theoretical_radials, num_measurement_points,
+        engineer_low_usd, engineer_high_usd,
+        equipment_low_usd, equipment_high_usd,
+        travel_low_usd, travel_high_usd,
+        total_low_usd, total_high_usd,
+        reference: '47 CFR §73.153; 47 CFR §73.154; FCC DA proof of performance requirements',
+        note: `${pattern_mode}: ${proof_type}; ${is_da ? `${num_measured_radials} measured radials; ` : ''}total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 

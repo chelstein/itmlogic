@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Broadcast Proof of Performance Guide */}
+        {candidate.am_broadcast_proof_of_performance_guide && (() => {
+          const g = candidate.am_broadcast_proof_of_performance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const proofLabel = {
+            nda_reference_check:     'NDA Reference Check',
+            full_directional_proof:  'Full Directional Proof',
+          }[g.proof_type] ?? g.proof_type ?? '—';
+          return (
+            <div key="pop-guide" style={{ marginBottom: 16, padding: 12, background: '#fffbeb', borderRadius: 8, border: '2px solid #92400e' }}>
+              <div style={{ fontWeight: 700, color: '#451a03', marginBottom: 6, fontSize: 13 }}>Proof of Performance (§73.153-154)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#78350f' }}>
+                <span>Proof type:</span><span>{proofLabel}</span>
+                <span>Measured radials:</span><span>{g.num_measured_radials ?? '—'}</span>
+                {g.is_da && <><span>Meas. points:</span><span>{g.num_measurement_points ?? '—'}</span></>}
+                <span>Engineer:</span><span>{fmt(g.engineer_low_usd)} – {fmt(g.engineer_high_usd)}</span>
+                <span>Equipment:</span><span>{fmt(g.equipment_low_usd)} – {fmt(g.equipment_high_usd)}</span>
+                <span>Travel:</span><span>{fmt(g.travel_low_usd)} – {fmt(g.travel_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Nighttime Operation and Skywave Classification Guide */}
         {candidate.am_nighttime_operation_and_skywave_classification_guide && (() => {
           const g = candidate.am_nighttime_operation_and_skywave_classification_guide;

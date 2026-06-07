@@ -12923,3 +12923,47 @@ test('am_nighttime_operation_and_skywave_classification_guide comparison table c
   assert.strictEqual(r0.sky_nighttime_power_kw_max,  1,                       'rank-1 sky_nighttime_power_kw_max should be 1');
   assert.strictEqual(r0.sky_effective_power_pct,     0.6,                     'rank-1 sky_effective_power_pct should be 0.6');
 });
+
+test('am_broadcast_proof_of_performance_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_proof_of_performance_guide;
+  assert.ok(g !== undefined && g !== null, 'am_broadcast_proof_of_performance_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM proof of performance type (NDA station)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_proof_of_performance_guide;
+  assert.strictEqual(g.proof_type,            'nda_reference_check', 'NDA station should use nda_reference_check');
+  assert.strictEqual(g.is_da,                 false,                  'NDA pattern should set is_da=false');
+  assert.strictEqual(g.num_measured_radials,  0,                      'NDA proof needs 0 measured radials');
+});
+
+test('KAZM proof of performance cost components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_proof_of_performance_guide;
+  assert.strictEqual(g.engineer_low_usd,  1500, 'NDA engineer_low should be $1,500');
+  assert.strictEqual(g.equipment_low_usd, 500,  'NDA equipment_low should be $500');
+  assert.strictEqual(g.travel_low_usd,    500,  'NDA travel_low should be $500');
+});
+
+test('KAZM proof of performance total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_proof_of_performance_guide;
+  assert.strictEqual(g.total_low_usd,  2500,  'NDA total_low should be $2,500');
+  assert.strictEqual(g.total_high_usd, 10000, 'NDA total_high should be $10,000');
+});
+
+test('am_broadcast_proof_of_performance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pop_proof_type'           in row, 'pop_proof_type missing from comparison table');
+    assert.ok('pop_total_low_usd'        in row, 'pop_total_low_usd missing from comparison table');
+    assert.ok('pop_num_measured_radials' in row, 'pop_num_measured_radials missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.pop_proof_type,           'nda_reference_check', 'rank-1 pop_proof_type should be nda_reference_check');
+  assert.strictEqual(r0.pop_total_low_usd,         2500,                  'rank-1 pop_total_low_usd should be $2,500');
+  assert.strictEqual(r0.pop_num_measured_radials,  0,                     'rank-1 pop_num_measured_radials should be 0');
+});

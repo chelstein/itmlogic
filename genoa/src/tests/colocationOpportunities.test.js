@@ -3026,3 +3026,15 @@ test('am_nighttime_operation_and_skywave_classification_guide present across col
       `rank ${c.rank}: unexpected nighttime_status: ${g.nighttime_status}`);
   }
 });
+
+test('am_broadcast_proof_of_performance_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_proof_of_performance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_broadcast_proof_of_performance_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['nda_reference_check','full_directional_proof'].includes(g.proof_type),
+      `rank ${c.rank}: unexpected proof_type: ${g.proof_type}`);
+  }
+});
