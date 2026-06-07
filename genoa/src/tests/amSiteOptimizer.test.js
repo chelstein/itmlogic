@@ -14717,3 +14717,39 @@ it('candidate_comparison_table eas columns are present and valid for KAZM', asyn
   assert.ok(r0.eas_total_eas_low_usd > 0, 'eas_total_eas_low_usd must be positive');
   assert.strictEqual(r0.eas_stl_path_verification_needed, true, 'STL path verification needed');
 });
+
+it('am_auxiliary_backup_transmitter_compliance_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_auxiliary_backup_transmitter_compliance_guide, `candidate missing am_auxiliary_backup_transmitter_compliance_guide`);
+  }
+});
+
+it('am_auxiliary_backup_transmitter_compliance_guide backup_tpo_kw matches station TPO', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_backup_transmitter_compliance_guide;
+  assert.strictEqual(g.backup_tpo_kw, KAZM_FIXTURE.tpo_kw, 'backup_tpo_kw must match authorized tpo_kw');
+});
+
+it('am_auxiliary_backup_transmitter_compliance_guide power tolerance is ±10% per §73.1560', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_backup_transmitter_compliance_guide;
+  assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 AM power tolerance is ±10%');
+  assert.ok(Math.abs(g.tpo_authorized_low_kw - KAZM_FIXTURE.tpo_kw * 0.9) < 0.01, 'tpo_authorized_low_kw = tpo × 0.9');
+  assert.ok(Math.abs(g.tpo_authorized_high_kw - KAZM_FIXTURE.tpo_kw * 1.1) < 0.01, 'tpo_authorized_high_kw = tpo × 1.1');
+});
+
+it('am_auxiliary_backup_transmitter_compliance_guide total_backup_low_usd > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_backup_transmitter_compliance_guide;
+  assert.ok(g.total_backup_low_usd > 0, 'total_backup_low_usd must be positive');
+  assert.ok(g.total_backup_high_usd >= g.total_backup_low_usd, 'high must be >= low');
+});
+
+it('candidate_comparison_table bxt columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.bxt_backup_tpo_kw, KAZM_FIXTURE.tpo_kw, 'bxt_backup_tpo_kw must equal tpo_kw');
+  assert.ok(r0.bxt_total_backup_low_usd > 0, 'bxt_total_backup_low_usd must be positive');
+  assert.ok(r0.bxt_separate_antenna_needed != null, 'bxt_separate_antenna_needed must not be null');
+});

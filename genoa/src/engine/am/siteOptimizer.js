@@ -1398,7 +1398,10 @@ export async function runSiteOptimizer(body = {}){
     tsw_total_structural_low_usd:       c.am_tower_structural_load_and_wind_survival_guide?.total_structural_low_usd ?? null,
     eas_cap_ipaws_required:             c.am_eas_equipment_readiness_guide?.eas_cap_ipaws_required ?? null,
     eas_total_eas_low_usd:              c.am_eas_equipment_readiness_guide?.total_eas_low_usd ?? null,
-    eas_stl_path_verification_needed:   c.am_eas_equipment_readiness_guide?.eas_stl_path_verification_needed ?? null
+    eas_stl_path_verification_needed:   c.am_eas_equipment_readiness_guide?.eas_stl_path_verification_needed ?? null,
+    bxt_backup_tpo_kw:                  c.am_auxiliary_backup_transmitter_compliance_guide?.backup_tpo_kw ?? null,
+    bxt_separate_antenna_needed:        c.am_auxiliary_backup_transmitter_compliance_guide?.separate_antenna_needed ?? null,
+    bxt_total_backup_low_usd:           c.am_auxiliary_backup_transmitter_compliance_guide?.total_backup_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7133,6 +7136,108 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_auxiliary_backup_transmitter_compliance_guide: (() => {
+      // 47 CFR §73.1675 — Auxiliary transmitters for AM broadcast stations.
+      //
+      // §73.1675: Licensees are "encouraged" to maintain an auxiliary (backup) transmitter;
+      //   not technically mandatory, but practically essential for continuity.  The auxiliary
+      //   must be capable of operating the station within the technical parameters of the license.
+      //
+      // §73.1560: Operating power must be maintained within ±10% of authorized power (AM stations).
+      //   During a main transmitter failure the station must IMMEDIATELY reduce power or go silent
+      //   unless an authorized auxiliary is available.
+      //
+      // §73.1350(e): Any operation outside license parameters (frequency, power, pattern) is a
+      //   violation regardless of cause — transmitter failure is not an excuse.
+      //
+      // Authorization: Auxiliary transmitter must be listed on the station license (FCC Form 302-AM,
+      //   Exhibit for auxiliary transmitters) or covered by a separate CP / authorization.
+      //   Same antenna system: no new CP needed.
+      //   Separate auxiliary antenna: needs new CP (FCC Form 301-AM) + ASR if > 6 m AGL.
+      //
+      // Automatic Transfer Switch (ATS): transfers RF feed from main to aux transmitter;
+      //   some stations run a manual changeover; ATS is best practice for unattended sites.
+      //
+      // Class D on clear channel (e.g., 780 kHz): secondary status — backup transmitter must
+      //   still honor all Class D secondary-service restrictions; no increased interference allowed.
+      //
+      // DA stations: backup transmitter must replicate the approved pattern or obtain a
+      //   waiver; §73.1675(b) allows reduced power on same pattern during emergency ops
+      //   without a new CP if power does not exceed authorized.
+      //
+      // Equipment cost (2024 market):
+      //   Backup TX < 1 kW: $3,000–$8,000 (Nautel, BE, Crown/BW Broadcast)
+      //   Backup TX 1–5 kW:  $8,000–$20,000
+      //   Backup TX 5–10 kW: $15,000–$35,000
+      //   Automatic transfer switch: $2,000–$5,000
+      //   Transmission line for backup TX (if co-mounted): $1,500–$4,000
+      //   FCC authorization exhibit prep (attorney/engineer): $500–$1,500
+      //   Total (1–5 kW NDA): $12,000–$30,500
+      const isDA = /^DA/i.test(pattern_mode);
+      const p_kw = tpo_kw;
+
+      // Backup TX power tier
+      let backup_tx_low_usd, backup_tx_high_usd;
+      if (p_kw < 1) {
+        backup_tx_low_usd = 3000; backup_tx_high_usd = 8000;
+      } else if (p_kw <= 5) {
+        backup_tx_low_usd = 8000; backup_tx_high_usd = 20000;
+      } else {
+        backup_tx_low_usd = 15000; backup_tx_high_usd = 35000;
+      }
+
+      const ats_low_usd          = 2000;
+      const ats_high_usd         = 5000;
+      const feedline_low_usd     = 1500;
+      const feedline_high_usd    = 4000;
+      const fcc_exhibit_low_usd  = 500;
+      const fcc_exhibit_high_usd = 1500;
+
+      // DA adds pattern verification cost at backup power level
+      const da_verify_low_usd  = isDA ? 3000 : 0;
+      const da_verify_high_usd = isDA ? 8000 : 0;
+
+      const total_backup_low_usd  = backup_tx_low_usd  + ats_low_usd  + feedline_low_usd  + fcc_exhibit_low_usd  + da_verify_low_usd;
+      const total_backup_high_usd = backup_tx_high_usd + ats_high_usd + feedline_high_usd + fcc_exhibit_high_usd + da_verify_high_usd;
+
+      // Power tolerance: ±10% AM per §73.1560
+      const power_tolerance_pct = 10;
+      const tpo_low_kw          = round2(p_kw * (1 - power_tolerance_pct / 100));
+      const tpo_high_kw         = round2(p_kw * (1 + power_tolerance_pct / 100));
+
+      // Separate backup antenna needed? Flag if PT candidate is at significant distance from TX
+      const separate_antenna_needed = (pt.distance_from_current_km ?? 0) > 5;
+      const separate_antenna_low_usd  = separate_antenna_needed ? 5000  : 0;
+      const separate_antenna_high_usd = separate_antenna_needed ? 25000 : 0;
+
+      return {
+        backup_transmitter_authorized_required: true,          // best practice; §73.1675 encouraged
+        backup_tpo_kw:                          p_kw,          // must not exceed authorized
+        power_tolerance_pct,
+        tpo_authorized_low_kw:                  tpo_low_kw,
+        tpo_authorized_high_kw:                 tpo_high_kw,
+        is_da_station:                          isDA,
+        da_pattern_verification_required:       isDA,
+        separate_antenna_needed,
+        backup_tx_low_usd,
+        backup_tx_high_usd,
+        ats_low_usd,
+        ats_high_usd,
+        feedline_low_usd,
+        feedline_high_usd,
+        fcc_exhibit_low_usd,
+        fcc_exhibit_high_usd,
+        da_verify_low_usd,
+        da_verify_high_usd,
+        separate_antenna_low_usd,
+        separate_antenna_high_usd,
+        total_backup_low_usd:  total_backup_low_usd  + separate_antenna_low_usd,
+        total_backup_high_usd: total_backup_high_usd + separate_antenna_high_usd,
+        reference: '47 CFR §73.1675 (auxiliary transmitters); §73.1560 (power tolerances); §73.1350(e) (technical violations); §73.49 (antenna enclosure)',
+        note: `${p_kw} kW ${isDA ? 'DA' : 'NDA'} auxiliary transmitter at ≤${p_kw} kW authorized power per §73.1675. §73.1560: ±${power_tolerance_pct}% tolerance → operating range ${tpo_low_kw}–${tpo_high_kw} kW. ${separate_antenna_needed ? 'Candidate > 5 km from current site — separate backup antenna likely needed (add $' + separate_antenna_low_usd.toLocaleString() + '–$' + separate_antenna_high_usd.toLocaleString() + ').' : 'Same antenna system usable — no new CP for aux TX.'}${isDA ? ' DA station: backup must replicate approved pattern or operate at reduced power per §73.1675(b).' : ''}`
       };
     })(),
 

@@ -2226,6 +2226,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Auxiliary Backup Transmitter Compliance Guide */}
+        {candidate.am_auxiliary_backup_transmitter_compliance_guide && (() => {
+          const g = candidate.am_auxiliary_backup_transmitter_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="bxt-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #7e22ce' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Auxiliary / Backup Transmitter — §73.1675 / §73.1560</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#3b0764', marginBottom: 8 }}>
+                <span style={{ color: '#7e22ce' }}>Backup TPO:</span><span>{fmtF(g.backup_tpo_kw, 1)} kW (≤ authorized)</span>
+                <span style={{ color: '#7e22ce' }}>Power tolerance:</span><span>±{g.power_tolerance_pct}% (§73.1560)</span>
+                <span style={{ color: '#7e22ce' }}>Authorized range:</span><span>{fmtF(g.tpo_authorized_low_kw, 1)}–{fmtF(g.tpo_authorized_high_kw, 1)} kW</span>
+                <span style={{ color: '#7e22ce' }}>DA station:</span><span>{g.is_da_station ? 'YES — pattern required' : 'NDA'}</span>
+                <span style={{ color: '#7e22ce' }}>Sep. antenna:</span>
+                <span style={{ fontWeight: 700, color: g.separate_antenna_needed ? '#b91c1c' : '#15803d' }}>
+                  {g.separate_antenna_needed ? 'NEEDED (>5 km)' : 'NOT NEEDED'}
+                </span>
+              </div>
+              {g.separate_antenna_needed && (
+                <div style={{ fontSize: 11, color: '#7e22ce', background: '#fae8ff', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Candidate &gt;5 km from current site — separate backup antenna needed (new CP + ASR required).
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#3b0764', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#7e22ce' }}>Backup TX:</span><span>${fmt(g.backup_tx_low_usd)} – ${fmt(g.backup_tx_high_usd)}</span>
+                <span style={{ color: '#7e22ce' }}>Transfer switch:</span><span>${fmt(g.ats_low_usd)} – ${fmt(g.ats_high_usd)}</span>
+                <span style={{ color: '#7e22ce' }}>Feedline:</span><span>${fmt(g.feedline_low_usd)} – ${fmt(g.feedline_high_usd)}</span>
+                <span style={{ color: '#7e22ce' }}>FCC exhibit:</span><span>${fmt(g.fcc_exhibit_low_usd)} – ${fmt(g.fcc_exhibit_high_usd)}</span>
+                {g.is_da_station && <><span style={{ color: '#7e22ce' }}>DA verification:</span><span>${fmt(g.da_verify_low_usd)} – ${fmt(g.da_verify_high_usd)}</span></>}
+                {g.separate_antenna_needed && <><span style={{ color: '#7e22ce' }}>Sep. antenna:</span><span>${fmt(g.separate_antenna_low_usd)} – ${fmt(g.separate_antenna_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e9d5ff', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#7e22ce', fontWeight: 600 }}>Total backup system:</span>
+                <span style={{ color: '#3b0764', fontWeight: 700 }}>${fmt(g.total_backup_low_usd)} – ${fmt(g.total_backup_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#a855f7' }}>Ref: 47 CFR §73.1675, §73.1560, §73.1350(e)</div>
+            </div>
+          );
+        })()}
+
         {/* AM EAS Equipment Readiness Guide */}
         {candidate.am_eas_equipment_readiness_guide && (() => {
           const g = candidate.am_eas_equipment_readiness_guide;
