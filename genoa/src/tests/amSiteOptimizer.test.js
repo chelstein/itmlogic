@@ -11010,3 +11010,53 @@ test('am_tower_structural_and_wind_loading_guide comparison table columns presen
   assert.strictEqual(r0.tw_guyed_low_usd, 235500, 'rank-1 tw_guyed_low_usd should be $235,500');
   assert.strictEqual(r0.tw_tia_class, 'Class II', 'rank-1 tw_tia_class should be Class II');
 });
+
+test('am_nepa_and_environmental_permitting_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
+  assert.ok(g !== undefined && g !== null, 'am_nepa_and_environmental_permitting_guide should be present');
+  assert.ok(typeof g.nepa_level === 'string', 'nepa_level should be a string');
+  assert.ok(g.triggers_section_106 === true, 'KAZM 315 ft tower must trigger Section 106');
+});
+
+test('am_nepa_and_environmental_permitting_guide KAZM tower height and NEPA determination', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
+  // Class D 0.25λ at 780 kHz = 315 ft → triggers Section 106 (>200 ft) but not EA (≤450 ft)
+  assert.strictEqual(g.tower_height_ft_env, 315, 'tower_height_ft_env should be 315');
+  assert.strictEqual(g.triggers_section_106, true, 'Section 106 triggered at 315 ft (>200 ft ASR threshold)');
+  assert.strictEqual(g.triggers_ea, false, 'EA not triggered at 315 ft (≤450 ft threshold)');
+  assert.ok(g.nepa_level.includes('Categorical Exclusion'), 'NEPA level should indicate CE eligibility');
+});
+
+test('am_nepa_and_environmental_permitting_guide KAZM Section 106 timeline', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
+  assert.ok(g.shpo_review_weeks_low > 0, 'SHPO review must have positive low timeline');
+  assert.ok(g.shpo_review_weeks_high >= g.shpo_review_weeks_low, 'SHPO high must be ≥ low');
+  assert.ok(g.tribal_consult_weeks_high >= g.tribal_consult_weeks_low, 'tribal consult high must be ≥ low');
+  assert.strictEqual(g.env_review_weeks_low, 12, 'CE path timeline low should be 12 weeks');
+  assert.strictEqual(g.env_review_weeks_high, 32, 'CE path timeline high should be 32 weeks');
+});
+
+test('am_nepa_and_environmental_permitting_guide KAZM environmental cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nepa_and_environmental_permitting_guide;
+  // Phase1 $2500 + wetland $3000 + S106 survey $5000 + ESA $2000 = $12,500 low
+  assert.strictEqual(g.total_env_cost_low_usd, 12500, 'total_env_cost_low_usd should be $12,500');
+  assert.ok(g.total_env_cost_high_usd > g.total_env_cost_low_usd, 'high cost must exceed low');
+  assert.ok(g.section_106_survey_low_usd > 0, 'Section 106 survey cost must be positive');
+});
+
+test('am_nepa_and_environmental_permitting_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('env_nepa_level'         in row, 'env_nepa_level missing from comparison table');
+    assert.ok('env_total_cost_low_usd' in row, 'env_total_cost_low_usd missing from comparison table');
+    assert.ok('env_weeks_low'          in row, 'env_weeks_low missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.env_nepa_level.length > 0, 'rank-1 env_nepa_level should be non-empty');
+  assert.strictEqual(r0.env_total_cost_low_usd, 12500, 'rank-1 env_total_cost_low_usd should be $12,500');
+  assert.strictEqual(r0.env_weeks_low, 12, 'rank-1 env_weeks_low should be 12');
+});

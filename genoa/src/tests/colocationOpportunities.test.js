@@ -2558,3 +2558,14 @@ test('am_tower_structural_and_wind_loading_guide present across colocation candi
     assert.ok(typeof g.tia_class === 'string', `rank ${c.rank}: tia_class should be a string`);
   }
 });
+
+test('am_nepa_and_environmental_permitting_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_nepa_and_environmental_permitting_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nepa_and_environmental_permitting_guide missing`);
+    assert.ok(typeof g.nepa_level === 'string', `rank ${c.rank}: nepa_level should be a string`);
+    assert.ok(g.total_env_cost_low_usd > 0, `rank ${c.rank}: total_env_cost_low_usd must be positive`);
+    assert.ok(g.env_review_weeks_low > 0, `rank ${c.rank}: env_review_weeks_low must be positive`);
+  }
+});

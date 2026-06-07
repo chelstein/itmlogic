@@ -1140,7 +1140,10 @@ export async function runSiteOptimizer(body = {}){
     ep_fuel_for_72h_gal:        c.am_emergency_power_and_backup_systems_guide?.fuel_for_72h_gal ?? null,
     tw_height_ft:               c.am_tower_structural_and_wind_loading_guide?.tower_height_ft ?? null,
     tw_guyed_low_usd:           c.am_tower_structural_and_wind_loading_guide?.total_guyed_low_usd ?? null,
-    tw_tia_class:               c.am_tower_structural_and_wind_loading_guide?.tia_class ?? null
+    tw_tia_class:               c.am_tower_structural_and_wind_loading_guide?.tia_class ?? null,
+    env_nepa_level:             c.am_nepa_and_environmental_permitting_guide?.nepa_level ?? null,
+    env_total_cost_low_usd:     c.am_nepa_and_environmental_permitting_guide?.total_env_cost_low_usd ?? null,
+    env_weeks_low:              c.am_nepa_and_environmental_permitting_guide?.env_review_weeks_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6875,6 +6878,75 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_nepa_and_environmental_permitting_guide: (() => {
+      // Models NEPA and related federal environmental review obligations for the
+      // AM tower at this candidate site per 47 CFR §§1.1301–1.1319 (FCC environmental
+      // rules), the FCC/ACHP/NCSHPO Nationwide Programmatic Agreement (NPA), and
+      // the Endangered Species Act §7 consultation process.
+      const lambda_m_env        = round2(299792.458 / frequency_khz);
+      const hf_env              = fcc_class === 'D' ? 0.25 : (fcc_class === 'A' ? 0.525 : 0.375);
+      const tower_height_m_env  = round2(lambda_m_env * hf_env);
+      const tower_height_ft_env = Math.round(tower_height_m_env * 3.28084);
+      // FCC ASR threshold = 200 ft; towers above this height trigger Section 106
+      // (NHPA) review and require FCC concurrence before construction.
+      const triggers_section_106 = tower_height_ft_env > 200;
+      // Towers > 450 ft in environmentally sensitive areas typically require a full
+      // Environmental Assessment (EA) rather than a Categorical Exclusion (CE).
+      const triggers_ea          = tower_height_ft_env > 450;
+      const nepa_level           = triggers_ea
+        ? 'Environmental Assessment (EA) required'
+        : 'Categorical Exclusion (CE) eligible (subject to Section 106 outcome)';
+      // Section 106 NHPA: SHPO review + tribal consultation
+      const shpo_review_weeks_low       = 8;
+      const shpo_review_weeks_high      = 24;
+      const tribal_consult_weeks_low    = 6;
+      const tribal_consult_weeks_high   = 52;
+      // Phase I Environmental Site Assessment (ASTM E1527-21)
+      const phase1_esa_cost_low_usd     = 2500;
+      const phase1_esa_cost_high_usd    = 6000;
+      // Wetland delineation (USACE §404 / Clean Water Act)
+      const wetland_delineation_cost_low_usd  = 3000;
+      const wetland_delineation_cost_high_usd = 8000;
+      // Section 106 archaeological survey (ground survey + report)
+      const section_106_survey_low_usd  = 5000;
+      const section_106_survey_high_usd = 25000;
+      // ESA §7 informal consultation with USFWS (biological assessment)
+      const esa_consult_cost_low_usd    = 2000;
+      const esa_consult_cost_high_usd   = 12000;
+      // Full EA preparation (if triggered)
+      const ea_prep_low_usd             = 25000;
+      const ea_prep_high_usd            = 150000;
+      const total_env_cost_low_usd      = phase1_esa_cost_low_usd
+                                        + wetland_delineation_cost_low_usd
+                                        + section_106_survey_low_usd
+                                        + esa_consult_cost_low_usd;
+      const total_env_cost_high_usd     = triggers_ea
+        ? (phase1_esa_cost_high_usd + wetland_delineation_cost_high_usd
+           + section_106_survey_high_usd + esa_consult_cost_high_usd + ea_prep_high_usd)
+        : (phase1_esa_cost_high_usd + wetland_delineation_cost_high_usd
+           + section_106_survey_high_usd + esa_consult_cost_high_usd);
+      // Overall environmental review timeline (weeks)
+      const env_review_weeks_low  = triggers_ea ? 26 : 12;
+      const env_review_weeks_high = triggers_ea ? 104 : 32;
+      // FCC NEPA review added to CP processing time
+      const fcc_env_add_months_low  = triggers_ea ? 6  : 0;
+      const fcc_env_add_months_high = triggers_ea ? 24 : 3;
+      return {
+        tower_height_ft_env, triggers_section_106, triggers_ea, nepa_level,
+        shpo_review_weeks_low, shpo_review_weeks_high,
+        tribal_consult_weeks_low, tribal_consult_weeks_high,
+        phase1_esa_cost_low_usd, phase1_esa_cost_high_usd,
+        wetland_delineation_cost_low_usd, wetland_delineation_cost_high_usd,
+        section_106_survey_low_usd, section_106_survey_high_usd,
+        esa_consult_cost_low_usd, esa_consult_cost_high_usd,
+        total_env_cost_low_usd, total_env_cost_high_usd,
+        env_review_weeks_low, env_review_weeks_high,
+        fcc_env_add_months_low, fcc_env_add_months_high,
+        reference: '47 CFR §§1.1301–1.1319 (FCC NEPA rules); 42 U.S.C. §4321 (NEPA); 54 U.S.C. §306108 (Section 106 NHPA); FCC/ACHP/NCSHPO Nationwide Programmatic Agreement (NPA); 16 U.S.C. §1536 (ESA §7); 33 U.S.C. §1344 (USACE §404 wetland permit)',
+        note: `${tower_height_ft_env} ft tower: ${nepa_level}. ${triggers_section_106 ? 'Section 106 (NHPA) review required — SHPO consultation ' + shpo_review_weeks_low + '–' + shpo_review_weeks_high + ' weeks; tribal consultation ' + tribal_consult_weeks_low + '–' + tribal_consult_weeks_high + ' weeks.' : 'No Section 106 review required (<200 ft).'} Total environmental cost: $${total_env_cost_low_usd.toLocaleString()}–$${total_env_cost_high_usd.toLocaleString()}; timeline: ${env_review_weeks_low}–${env_review_weeks_high} weeks.`
       };
     })(),
 

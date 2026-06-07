@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM NEPA and Environmental Permitting Guide */}
+        {candidate.am_nepa_and_environmental_permitting_guide && (() => {
+          const g = candidate.am_nepa_and_environmental_permitting_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="env-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfdf5', borderRadius: 8, border: '1px solid #059669' }}>
+              <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>NEPA &amp; Environmental Permitting</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Tower Height:</span><span>{g.tower_height_ft_env} ft</span>
+                <span style={{ color: '#6b7280' }}>NEPA Level:</span><span style={{ fontWeight: 600 }}>{g.nepa_level}</span>
+                <span style={{ color: '#6b7280' }}>Section 106 (NHPA):</span><span>{g.triggers_section_106 ? '✓ Required (>200 ft ASR)' : 'Not required'}</span>
+                <span style={{ color: '#6b7280' }}>Full EA Required:</span><span>{g.triggers_ea ? '✓ Yes (>450 ft)' : 'No'}</span>
+                <span style={{ color: '#6b7280' }}>SHPO Review:</span><span>{g.shpo_review_weeks_low}–{g.shpo_review_weeks_high} weeks</span>
+                <span style={{ color: '#6b7280' }}>Tribal Consultation:</span><span>{g.tribal_consult_weeks_low}–{g.tribal_consult_weeks_high} weeks</span>
+                <span style={{ color: '#6b7280' }}>Phase I ESA:</span><span>{fmt(g.phase1_esa_cost_low_usd)} – {fmt(g.phase1_esa_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Wetland Delineation:</span><span>{fmt(g.wetland_delineation_cost_low_usd)} – {fmt(g.wetland_delineation_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Section 106 Survey:</span><span>{fmt(g.section_106_survey_low_usd)} – {fmt(g.section_106_survey_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>ESA §7 Consultation:</span><span>{fmt(g.esa_consult_cost_low_usd)} – {fmt(g.esa_consult_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Env. Cost:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_env_cost_low_usd)} – {fmt(g.total_env_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Timeline:</span><span>{g.env_review_weeks_low}–{g.env_review_weeks_high} weeks</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#064e3b', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Tower Structural and Wind Loading Guide */}
         {candidate.am_tower_structural_and_wind_loading_guide && (() => {
           const g = candidate.am_tower_structural_and_wind_loading_guide;
