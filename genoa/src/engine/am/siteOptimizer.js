@@ -1335,7 +1335,10 @@ export async function runSiteOptimizer(body = {}){
     map_total_basic_low_usd:    c.am_modulation_and_audio_processing_guide?.total_basic_low_usd ?? null,
     aoc_total_low_usd:          c.am_annual_operating_cost_breakdown_guide?.total_low_usd ?? null,
     aoc_electricity_low_usd:    c.am_annual_operating_cost_breakdown_guide?.electricity_low_usd ?? null,
-    aoc_kwh_per_year:           c.am_annual_operating_cost_breakdown_guide?.kwh_per_year ?? null
+    aoc_kwh_per_year:           c.am_annual_operating_cost_breakdown_guide?.kwh_per_year ?? null,
+    ter_conductivity_low:       c.am_terrain_and_propagation_assessment_guide?.conductivity_ms_per_m_low ?? null,
+    ter_penalty_db_low:         c.am_terrain_and_propagation_assessment_guide?.conductivity_penalty_db_low ?? null,
+    ter_terrain_study_low_usd:  c.am_terrain_and_propagation_assessment_guide?.terrain_study_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7070,6 +7073,50 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_terrain_and_propagation_assessment_guide: (() => {
+      // AM ground-wave propagation is affected by terrain, soil conductivity, and land cover.
+      // Key factors:
+      // 1. Soil conductivity (σ): low conductivity = higher attenuation; FCC M3 maps classify
+      //    conductivity zones from 1–30 mS/m; arid Southwest typically 2–5 mS/m (poor)
+      // 2. Terrain roughness: mountainous terrain causes additional diffraction loss
+      // 3. Water bodies (high conductivity) enhance coverage in certain directions
+      // Sedona/Cottonwood AZ area (KAZM region): predominantly rocky desert, σ ≈ 2–4 mS/m
+      const candidate_lat = pt.lat;
+      const candidate_lon = pt.lon;
+      const bearing_deg   = round2(pt.bearing_deg ?? 0);
+      const distance_km   = round2(pt.distance_from_current_km ?? 0);
+      // Elevation at candidate (derive from lat/lon proxy — Arizona high desert)
+      // Use latitude as a proxy for elevation zone: 34–36°N = 1,000–2,200m elevation
+      const elev_proxy_m  = round2(Math.min(2200, Math.max(500, (candidate_lat - 30) * 200)));
+      // Conductivity: Arizona high desert typically 2–5 mS/m (FCC M3 zone C/D)
+      const conductivity_ms_per_m_low  = 2;
+      const conductivity_ms_per_m_high = 5;
+      const fcc_m3_zone    = 'C/D';   // typical for arid Southwest
+      // Ground-wave attenuation function correction for low conductivity:
+      // At 1000 kHz, signal at 100 km over σ=2 mS/m may be 6–12 dB weaker than σ=30 mS/m
+      const conductivity_penalty_db_low  = 6;
+      const conductivity_penalty_db_high = 12;
+      // Engineering study cost for terrain/conductivity analysis:
+      const terrain_study_low_usd  = 2500;
+      const terrain_study_high_usd = 8000;
+      // Recommended study tools:
+      const study_tools = ['FCC Groundwave Assistant (GWA)', 'USGS National Elevation Dataset (NED)', 'FCC AM M3 Ground Conductivity Map', 'ITU-R P.368 curves'];
+      return {
+        candidate_lat: round2(candidate_lat),
+        candidate_lon: round2(candidate_lon),
+        bearing_deg,
+        distance_from_current_km: distance_km,
+        elevation_proxy_m: elev_proxy_m,
+        conductivity_ms_per_m_low, conductivity_ms_per_m_high,
+        fcc_m3_zone,
+        conductivity_penalty_db_low, conductivity_penalty_db_high,
+        terrain_study_low_usd, terrain_study_high_usd,
+        study_tools,
+        reference: '47 CFR §73.183 (AM groundwave tables); ITU-R P.368 (ground-wave propagation); FCC M3 ground conductivity map; USGS National Elevation Dataset; Rotheram (1992) terrain diffraction correction; ITU-R P.526 (diffraction loss)',
+        note: `Candidate (${round2(candidate_lat)}°N, ${Math.abs(round2(candidate_lon))}°W): est. conductivity ${conductivity_ms_per_m_low}–${conductivity_ms_per_m_high} mS/m (FCC M3 zone ${fcc_m3_zone}); penalty ${conductivity_penalty_db_low}–${conductivity_penalty_db_high} dB vs. ideal ground. Engineering study: $${terrain_study_low_usd.toLocaleString()}–$${terrain_study_high_usd.toLocaleString()}`
       };
     })(),
 

@@ -2226,6 +2226,31 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Terrain and Propagation Assessment Guide */}
+        {candidate.am_terrain_and_propagation_assessment_guide && (() => {
+          const g = candidate.am_terrain_and_propagation_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ter-guide" style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8, border: '2px solid #737373' }}>
+              <div style={{ fontWeight: 700, color: '#1c1917', marginBottom: 6, fontSize: 13 }}>Terrain &amp; Propagation Assessment</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#44403c' }}>
+                <span>Candidate location:</span><span>{g.candidate_lat != null ? `${g.candidate_lat}°N, ${Math.abs(g.candidate_lon)}°W` : '—'}</span>
+                <span>Est. elevation:</span><span>{g.elevation_proxy_m != null ? `~${g.elevation_proxy_m.toFixed(0)} m` : '—'}</span>
+                <span>FCC M3 zone:</span><span>{g.fcc_m3_zone ?? '—'}</span>
+                <span>Conductivity (σ):</span><span>{g.conductivity_ms_per_m_low != null ? `${g.conductivity_ms_per_m_low}–${g.conductivity_ms_per_m_high} mS/m` : '—'}</span>
+                <span>Conductivity penalty:</span><span style={{ color: '#dc2626' }}>{g.conductivity_penalty_db_low != null ? `${g.conductivity_penalty_db_low}–${g.conductivity_penalty_db_high} dB vs ideal ground` : '—'}</span>
+                <span>Engineering study:</span><span>{fmt(g.terrain_study_low_usd)} – {fmt(g.terrain_study_high_usd)}</span>
+              </div>
+              {g.study_tools && g.study_tools.length > 0 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: '#57534e' }}>
+                  Tools: {g.study_tools.join('; ')}
+                </div>
+              )}
+              {g.note && <div style={{ marginTop: 4, fontSize: 11, color: '#78716c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Annual Operating Cost Breakdown Guide */}
         {candidate.am_annual_operating_cost_breakdown_guide && (() => {
           const g = candidate.am_annual_operating_cost_breakdown_guide;

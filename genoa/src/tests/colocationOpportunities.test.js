@@ -3282,3 +3282,14 @@ test('am_annual_operating_cost_breakdown_guide present across colocation candida
     assert.ok(g.electricity_draw_kw >= 3, `rank ${c.rank}: electricity_draw_kw must be >= 3 (3× TPO min 1 kW)`);
   }
 });
+
+test('am_terrain_and_propagation_assessment_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_terrain_and_propagation_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_terrain_and_propagation_assessment_guide missing`);
+    assert.ok(g.conductivity_ms_per_m_low > 0, `rank ${c.rank}: conductivity_ms_per_m_low must be positive`);
+    assert.ok(Array.isArray(g.study_tools), `rank ${c.rank}: study_tools must be array`);
+    assert.ok(g.terrain_study_low_usd > 0, `rank ${c.rank}: terrain_study_low_usd must be positive`);
+  }
+});
