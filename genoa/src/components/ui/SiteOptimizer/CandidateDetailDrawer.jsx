@@ -2226,6 +2226,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Contour Overlap and Co-Channel Interference Guide */}
+        {candidate.am_contour_overlap_and_co_channel_interference_guide && (() => {
+          const g = candidate.am_contour_overlap_and_co_channel_interference_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const riskColor = { LOW: '#15803d', MEDIUM: '#b45309', HIGH: '#b91c1c' }[g.overlap_risk_level] || '#6b7280';
+          return (
+            <div key="cca-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: `2px solid ${riskColor}` }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Co-Channel &amp; Adjacent Interference — §73.37 / §73.182</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#881337', marginBottom: 8 }}>
+                <span style={{ color: '#be123c' }}>Channel:</span><span>{g.frequency_khz} kHz</span>
+                <span style={{ color: '#be123c' }}>Adjacent ch:</span><span>{g.adjacent_ch_low_khz} / {g.adjacent_ch_high_khz} kHz</span>
+                <span style={{ color: '#be123c' }}>D/U protection:</span><span>≥{g.protection_db_required} dB (§73.182(c))</span>
+                <span style={{ color: '#be123c' }}>Reach estimate:</span><span>{g.reach_estimate_km} km</span>
+                <span style={{ color: '#be123c' }}>Overlap risk:</span>
+                <span style={{ fontWeight: 700, color: riskColor }}>{g.overlap_risk_level}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#881337', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#be123c' }}>Screen tool:</span><span>${fmt(g.screen_tool_low_usd)} – ${fmt(g.screen_tool_high_usd)}</span>
+                {g.full_study_low_usd > 0 && <><span style={{ color: '#be123c' }}>Full D/U study:</span><span>${fmt(g.full_study_low_usd)} – ${fmt(g.full_study_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fecdd3', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#be123c', fontWeight: 600 }}>Total study:</span>
+                <span style={{ color: '#881337', fontWeight: 700 }}>${fmt(g.total_study_low_usd)} – ${fmt(g.total_study_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#e11d48' }}>Ref: 47 CFR §73.37, §73.182(c)–(d), §73.184</div>
+            </div>
+          );
+        })()}
+
         {/* AM Station Power Supply and Electrical Infrastructure Guide */}
         {candidate.am_station_power_supply_and_electrical_infrastructure_guide && (() => {
           const g = candidate.am_station_power_supply_and_electrical_infrastructure_guide;

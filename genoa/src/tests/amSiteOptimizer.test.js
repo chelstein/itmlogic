@@ -14965,3 +14965,37 @@ it('candidate_comparison_table pse columns are present and valid for KAZM', asyn
   assert.ok(r0.pse_generator_kw_required > 0, 'pse_generator_kw_required must be positive');
   assert.ok(r0.pse_total_electrical_low_usd > 0, 'pse_total_electrical_low_usd must be positive');
 });
+
+it('am_contour_overlap_and_co_channel_interference_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_contour_overlap_and_co_channel_interference_guide, `candidate missing am_contour_overlap_and_co_channel_interference_guide`);
+  }
+});
+
+it('am_contour_overlap_and_co_channel_interference_guide adjacent channels are ±10 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_contour_overlap_and_co_channel_interference_guide;
+  assert.strictEqual(g.adjacent_ch_low_khz, 770, 'adjacent lower channel must be 770 kHz');
+  assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel must be 790 kHz');
+});
+
+it('am_contour_overlap_and_co_channel_interference_guide protection_db_required is 20 dB per §73.182(c)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_contour_overlap_and_co_channel_interference_guide;
+  assert.strictEqual(g.protection_db_required, 20, '§73.182(c) requires 20 dB co-channel D/U');
+});
+
+it('am_contour_overlap_and_co_channel_interference_guide overlap_risk_level is LOW/MEDIUM/HIGH', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_contour_overlap_and_co_channel_interference_guide;
+  assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(g.overlap_risk_level), `overlap_risk_level must be LOW/MEDIUM/HIGH`);
+});
+
+it('candidate_comparison_table cca columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cca_protection_db_required, 20, 'cca_protection_db_required must be 20 dB');
+  assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(r0.cca_overlap_risk_level), 'cca_overlap_risk_level must be valid');
+  assert.ok(r0.cca_total_study_low_usd >= 0, 'cca_total_study_low_usd must be non-negative');
+});

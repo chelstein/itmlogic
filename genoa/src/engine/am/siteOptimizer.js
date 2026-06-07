@@ -1419,7 +1419,10 @@ export async function runSiteOptimizer(body = {}){
     atu_total_low_usd:                  c.am_transmission_line_and_atu_engineering_guide?.total_atu_low_usd ?? null,
     pse_ac_input_kw:                    c.am_station_power_supply_and_electrical_infrastructure_guide?.ac_input_kw ?? null,
     pse_generator_kw_required:          c.am_station_power_supply_and_electrical_infrastructure_guide?.generator_kw_required ?? null,
-    pse_total_electrical_low_usd:       c.am_station_power_supply_and_electrical_infrastructure_guide?.total_electrical_low_usd ?? null
+    pse_total_electrical_low_usd:       c.am_station_power_supply_and_electrical_infrastructure_guide?.total_electrical_low_usd ?? null,
+    cca_protection_db_required:         c.am_contour_overlap_and_co_channel_interference_guide?.protection_db_required ?? null,
+    cca_overlap_risk_level:             c.am_contour_overlap_and_co_channel_interference_guide?.overlap_risk_level ?? null,
+    cca_total_study_low_usd:            c.am_contour_overlap_and_co_channel_interference_guide?.total_study_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7154,6 +7157,80 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_contour_overlap_and_co_channel_interference_guide: (() => {
+      // 47 CFR §73.182 / §73.37 — Co-channel and adjacent-channel interference analysis.
+      //
+      // §73.37(a): No station's daytime 2 mV/m contour may overlap another station's
+      //   daytime 2 mV/m contour on the same channel.  (Grandfathered existing overlaps excepted.)
+      //
+      // §73.37(b): Adjacent channel (±10 kHz) protection:
+      //   A station's 2 mV/m contour must not overlap the 0.5 mV/m contour of an adjacent-channel
+      //   station (in the same direction of propagation).  This is the first-adjacent rule.
+      //
+      // §73.182(c): Minimum D/U (Desired/Undesired) ratios (co-channel, daytime):
+      //   Class B/D: must protect Class A's 0.5 mV/m contour with D/U ≥ 20 dB (10:1 field strength).
+      //   The FCC uses the groundwave method (§73.184 / FCC gwave.js) to compute D and U.
+      //
+      // §73.182(d): The interfering signal of the undesired station (U) at the reference point
+      //   (the desired's 0.5 mV/m contour boundary) must be ≤ D/10 (20 dB below desired).
+      //
+      // Candidate site risk assessment:
+      //   The closer a candidate is to co-channel or adjacent-channel stations, the higher the
+      //   risk of contour overlap.  This guide uses the candidate's daytime reach (reach_scale_km)
+      //   as a proxy for the 0.5 mV/m contour radius.
+      //   Adjacent channel risk: ±10 kHz (770 and 790 kHz from 780 kHz, for KAZM).
+      //
+      // Adjacent channels to 780 kHz: 770 kHz (KKLA Los Angeles, Class A 50 kW) and 790 kHz.
+      //   Any candidate that extends its 2 mV/m contour toward a co-channel or adjacent station
+      //   must file a contour overlap study before the FCC will process the application.
+      //
+      // Study cost: $6,000–$18,000 (full FCC groundwave propagation study + D/U analysis).
+      //   Simple screening: software tool (REC Networks, FCC AMAS tool): $500–$1,500.
+      //   Full engineering exhibit for FCC filing: $6,000–$18,000.
+      //
+      // Overlap risk heuristic for screening:
+      //   LOW: candidate reach < 50 km (small 0.5 mV/m contour, low D/U risk)
+      //   MEDIUM: 50–100 km reach
+      //   HIGH: > 100 km reach (extended coverage increases co-channel interference risk)
+      const isDA = /^DA/i.test(pattern_mode);
+      const reach_km = reach_scale_km ?? 0;
+
+      const protection_db_required = 20;   // §73.182(c) — 20 dB co-channel D/U minimum
+      const adjacent_channel_hz    = 10;   // ±10 kHz for AM (§73.37(b))
+      const adjacent_ch_low        = frequency_khz - adjacent_channel_hz;
+      const adjacent_ch_high       = frequency_khz + adjacent_channel_hz;
+
+      let overlap_risk_level = 'LOW';
+      if (reach_km > 100)     overlap_risk_level = 'HIGH';
+      else if (reach_km > 50) overlap_risk_level = 'MEDIUM';
+
+      const screen_tool_low_usd   = 500;
+      const screen_tool_high_usd  = 1500;
+      const full_study_low_usd    = isDA ? 8000  : 6000;
+      const full_study_high_usd   = isDA ? 20000 : 18000;
+
+      const total_study_low_usd  = screen_tool_low_usd  + (overlap_risk_level !== 'LOW' ? full_study_low_usd  : 0);
+      const total_study_high_usd = screen_tool_high_usd + (overlap_risk_level !== 'LOW' ? full_study_high_usd : 0);
+
+      return {
+        frequency_khz,
+        adjacent_ch_low_khz:     adjacent_ch_low,
+        adjacent_ch_high_khz:    adjacent_ch_high,
+        protection_db_required,
+        adjacent_channel_check:  true,
+        reach_estimate_km:       round2(reach_km),
+        overlap_risk_level,
+        screen_tool_low_usd,
+        screen_tool_high_usd,
+        full_study_low_usd:      overlap_risk_level !== 'LOW' ? full_study_low_usd  : 0,
+        full_study_high_usd:     overlap_risk_level !== 'LOW' ? full_study_high_usd : 0,
+        total_study_low_usd,
+        total_study_high_usd,
+        reference: '47 CFR §73.37 (contour protection); §73.182(c)–(d) (D/U ratios); §73.184 (groundwave propagation); FCC AMAS contour analysis tool',
+        note: `${frequency_khz} kHz candidate; adjacent channels ±10 kHz (${adjacent_ch_low}/${adjacent_ch_high} kHz). Reach ≈${round2(reach_km)} km → overlap risk: ${overlap_risk_level}. Co-channel D/U protection: ≥${protection_db_required} dB per §73.182(c). ${overlap_risk_level !== 'LOW' ? 'Full FCC groundwave D/U study required before filing.' : 'Screening tool may suffice at this reach.'}`
       };
     })(),
 

@@ -3752,3 +3752,20 @@ test('colocation candidates include am_station_power_supply_and_electrical_infra
     assert.ok(g.total_electrical_low_usd > 0, 'total_electrical_low_usd must be positive');
   }
 });
+
+test('colocation candidates include am_contour_overlap_and_co_channel_interference_guide with §73.182 D/U check', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_contour_overlap_and_co_channel_interference_guide;
+    assert.ok(g, `candidate missing am_contour_overlap_and_co_channel_interference_guide`);
+    assert.strictEqual(g.protection_db_required, 20, '§73.182(c) D/U requirement = 20 dB');
+    assert.strictEqual(g.adjacent_ch_low_khz, 770, 'adjacent lower channel is 770 kHz');
+    assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel is 790 kHz');
+  }
+});
