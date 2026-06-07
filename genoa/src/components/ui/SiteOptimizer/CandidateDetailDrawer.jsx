@@ -2226,6 +2226,55 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Acquisition & Real Property Guide */}
+        {candidate.am_site_acquisition_and_real_property_guide && (() => {
+          const g = candidate.am_site_acquisition_and_real_property_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const classColor = { RURAL: '#166534', SUBURBAN: '#92400e', URBAN: '#991b1b' };
+          return (
+            <div style={{ background: '#f7fee7', border: '1px solid #a3e635', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#365314', marginBottom: 8, fontSize: 13 }}>
+                Site Acquisition &amp; Real Property
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3f6212' }}>
+                <span>Site class</span>
+                <span style={{ fontWeight: 700, color: classColor[g.site_class] ?? '#3f6212' }}>{g.site_class} ({g.dist_from_col_km}km from COL)</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
+                <span>Min. site area</span>
+                <span style={{ fontWeight: 600 }}>{g.min_site_acres_low}–{g.min_site_acres_high} acres</span>
+                <span>Land purchase</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.purchase_cost_low_usd)} – {fmt(g.purchase_cost_high_usd)}</span>
+                <span>Transaction costs</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.transaction_costs_low_usd)} – {fmt(g.transaction_costs_high_usd)}</span>
+                <span>Title &amp; closing</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.title_and_closing_low_usd)} – {fmt(g.title_and_closing_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#365314' }}>Total purchase</span>
+                <span style={{ fontWeight: 700, color: '#365314' }}>{fmt(g.total_purchase_low_usd)} – {fmt(g.total_purchase_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #d9f99d', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3f6212' }}>
+                <span>Annual lease</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_lease_low_usd)} – {fmt(g.annual_lease_high_usd)}/yr</span>
+                <span>20-yr lease PV (5%)</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.lease_20yr_pv_low_usd)} – {fmt(g.lease_20yr_pv_high_usd)}</span>
+                <span>Phase I ESA</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.env_assessment_cost_low_usd)} – {fmt(g.env_assessment_cost_high_usd)}</span>
+                <span>Zoning / CUP</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.zoning_permit_cost_low_usd)} – {fmt(g.zoning_permit_cost_high_usd)}</span>
+                <span>Survey</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.survey_cost_low_usd)} – {fmt(g.survey_cost_high_usd)}</span>
+                <span>Access road</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.access_road_cost_low_usd)} – {fmt(g.access_road_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#365314', borderTop: '1px solid #d9f99d', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Antenna Tower Lighting & FAA Guide */}
         {candidate.am_antenna_tower_lighting_and_faa_guide && (() => {
           const g = candidate.am_antenna_tower_lighting_and_faa_guide;

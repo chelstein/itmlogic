@@ -2385,3 +2385,20 @@ test('am_antenna_tower_lighting_and_faa_guide present across colocation candidat
     assert.ok(g.total_initial_cost_low_usd >= 0, `rank ${c.rank}: total_initial_cost_low_usd must be non-negative`);
   }
 });
+
+test('am_site_acquisition_and_real_property_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_site_acquisition_and_real_property_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_site_acquisition_and_real_property_guide`);
+    assert.ok(['RURAL', 'SUBURBAN', 'URBAN'].includes(g.site_class), `rank ${c.rank}: invalid site_class`);
+    assert.ok(g.total_purchase_low_usd > 0, `rank ${c.rank}: total_purchase_low_usd must be positive`);
+    assert.ok(g.annual_lease_low_usd > 0, `rank ${c.rank}: annual_lease_low_usd must be positive`);
+  }
+});

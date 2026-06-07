@@ -1107,7 +1107,10 @@ export async function runSiteOptimizer(body = {}){
     gnd_exclusion_zone_m:       c.am_grounding_system_and_rf_safety_guide?.exclusion_zone_m ?? null,
     ltg_type:                   c.am_antenna_tower_lighting_and_faa_guide?.lighting_type ?? null,
     ltg_asr_required:           c.am_antenna_tower_lighting_and_faa_guide?.asr_required ?? null,
-    ltg_total_initial_cost_low: c.am_antenna_tower_lighting_and_faa_guide?.total_initial_cost_low_usd ?? null
+    ltg_total_initial_cost_low: c.am_antenna_tower_lighting_and_faa_guide?.total_initial_cost_low_usd ?? null,
+    acq_site_class:             c.am_site_acquisition_and_real_property_guide?.site_class ?? null,
+    acq_purchase_low_usd:       c.am_site_acquisition_and_real_property_guide?.total_purchase_low_usd ?? null,
+    acq_annual_lease_low_usd:   c.am_site_acquisition_and_real_property_guide?.annual_lease_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6842,6 +6845,112 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_acquisition_and_real_property_guide: (() => {
+      // Models real-property acquisition costs and lease economics for the
+      // candidate tower site.  Site class (RURAL/SUBURBAN/URBAN) is inferred
+      // from the candidate's distance to the community-of-license centroid.
+      // Covers land purchase vs. lease NPV, Phase I ESA, zoning/CUP, survey,
+      // and access-road construction.
+
+      const isDA_acq = /^DA/i.test(pattern_mode);
+
+      // Distance from COL centroid (if available) or fall back to distance from
+      // current site as proxy for urban density
+      const dist_from_col_km = (() => {
+        if (col_centroid) {
+          const dLat = pt.lat - col_centroid.lat;
+          const dLon = pt.lon - col_centroid.lon;
+          return round2(Math.sqrt(dLat * dLat + dLon * dLon) * 111);
+        }
+        return round2(pt.distance_from_current_km ?? 20);
+      })();
+
+      // Site class by distance from the urban core
+      let site_class = 'RURAL';
+      if      (dist_from_col_km <  5) site_class = 'URBAN';
+      else if (dist_from_col_km < 20) site_class = 'SUBURBAN';
+
+      // Minimum site area based on antenna configuration
+      // NDA single tower: 1–2 acres; DA array: ~2 acres per element
+      const n_tower_elements = isDA_acq
+        ? ((fcc_class === 'A' || fcc_class === 'B') ? 4 : 3)
+        : 1;
+      const min_site_acres_low  = isDA_acq ? n_tower_elements * 2 : 1;
+      const min_site_acres_high = isDA_acq ? n_tower_elements * 5 : 2;
+
+      // Land purchase cost per acre by site class
+      const LAND_LOW  = { RURAL:   5000, SUBURBAN:  50000, URBAN:  500000 };
+      const LAND_HIGH = { RURAL: 25000, SUBURBAN: 200000, URBAN: 2000000 };
+      const purchase_cost_low_usd  = Math.round(min_site_acres_low  * (LAND_LOW[site_class]  ?? 5000));
+      const purchase_cost_high_usd = Math.round(min_site_acres_high * (LAND_HIGH[site_class] ?? 25000));
+
+      // Annual lease rate per acre by site class
+      const LEASE_LOW  = { RURAL: 3000, SUBURBAN: 12000, URBAN:  50000 };
+      const LEASE_HIGH = { RURAL: 8000, SUBURBAN: 30000, URBAN: 150000 };
+      const annual_lease_low_usd  = Math.round(min_site_acres_low  * (LEASE_LOW[site_class]  ?? 3000));
+      const annual_lease_high_usd = Math.round(min_site_acres_high * (LEASE_HIGH[site_class] ?? 8000));
+
+      // 20-year lease PV at 5% discount rate (present-value of annuity)
+      const PV_FACTOR_20YR = round2((1 - Math.pow(1.05, -20)) / 0.05);  // ≈ 12.46
+      const lease_20yr_pv_low_usd  = Math.round(annual_lease_low_usd  * PV_FACTOR_20YR);
+      const lease_20yr_pv_high_usd = Math.round(annual_lease_high_usd * PV_FACTOR_20YR);
+
+      // Transaction / due-diligence costs (shared by both purchase and lease)
+      const env_assessment_cost_low_usd  = 2000;   // Phase I ESA
+      const env_assessment_cost_high_usd = 5000;
+      const zoning_permit_cost_low_usd   = 5000;   // CUP or special use permit
+      const zoning_permit_cost_high_usd  = 20000;
+      const survey_cost_low_usd          = 2000;   // boundary + topographic
+      const survey_cost_high_usd         = 6000;
+      const access_road_cost_low_usd     = site_class === 'RURAL'    ? 15000 : 5000;
+      const access_road_cost_high_usd    = site_class === 'RURAL'    ? 50000 : 15000;
+      const transaction_costs_low_usd    = env_assessment_cost_low_usd  + zoning_permit_cost_low_usd  + survey_cost_low_usd  + access_road_cost_low_usd;
+      const transaction_costs_high_usd   = env_assessment_cost_high_usd + zoning_permit_cost_high_usd + survey_cost_high_usd + access_road_cost_high_usd;
+
+      // Purchase-specific: title search + closing costs
+      const title_and_closing_low_usd  = 3000;
+      const title_and_closing_high_usd = 8000;
+
+      const total_purchase_low_usd  = purchase_cost_low_usd  + transaction_costs_low_usd  + title_and_closing_low_usd;
+      const total_purchase_high_usd = purchase_cost_high_usd + transaction_costs_high_usd + title_and_closing_high_usd;
+
+      // Lease: same transaction costs but no purchase price or title/closing
+      const total_lease_setup_low_usd  = transaction_costs_low_usd;
+      const total_lease_setup_high_usd = transaction_costs_high_usd;
+
+      return {
+        dist_from_col_km,
+        site_class,
+        n_tower_elements,
+        min_site_acres_low,
+        min_site_acres_high,
+        purchase_cost_low_usd,
+        purchase_cost_high_usd,
+        title_and_closing_low_usd,
+        title_and_closing_high_usd,
+        total_purchase_low_usd,
+        total_purchase_high_usd,
+        annual_lease_low_usd,
+        annual_lease_high_usd,
+        pv_annuity_factor_20yr: PV_FACTOR_20YR,
+        lease_20yr_pv_low_usd,
+        lease_20yr_pv_high_usd,
+        env_assessment_cost_low_usd,
+        env_assessment_cost_high_usd,
+        zoning_permit_cost_low_usd,
+        zoning_permit_cost_high_usd,
+        survey_cost_low_usd,
+        survey_cost_high_usd,
+        access_road_cost_low_usd,
+        access_road_cost_high_usd,
+        transaction_costs_low_usd,
+        transaction_costs_high_usd,
+        total_lease_setup_low_usd,
+        total_lease_setup_high_usd,
+        note: `Site class: ${site_class} (${dist_from_col_km}km from COL centroid); ${min_site_acres_low}–${min_site_acres_high} acres needed for ${n_tower_elements}-element ${isDA_acq ? 'DA array' : 'NDA tower'}. Purchase: $${purchase_cost_low_usd.toLocaleString()}–$${purchase_cost_high_usd.toLocaleString()} land + $${transaction_costs_low_usd.toLocaleString()}–$${transaction_costs_high_usd.toLocaleString()} transaction costs. Lease: $${annual_lease_low_usd.toLocaleString()}–$${annual_lease_high_usd.toLocaleString()}/yr (20-yr PV at 5%: $${lease_20yr_pv_low_usd.toLocaleString()}–$${lease_20yr_pv_high_usd.toLocaleString()}).`
       };
     })(),
 

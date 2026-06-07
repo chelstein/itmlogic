@@ -10457,3 +10457,56 @@ test('am_antenna_tower_lighting_and_faa_guide comparison table columns present',
     assert.ok('ltg_total_initial_cost_low' in row, 'ltg_total_initial_cost_low missing from comparison table');
   }
 });
+
+test('am_site_acquisition_and_real_property_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_acquisition_and_real_property_guide;
+  assert.ok(g != null, 'am_site_acquisition_and_real_property_guide must be present');
+  assert.ok(['RURAL', 'SUBURBAN', 'URBAN'].includes(g.site_class), `site_class "${g.site_class}" must be RURAL/SUBURBAN/URBAN`);
+  assert.ok(typeof g.total_purchase_low_usd === 'number', 'total_purchase_low_usd must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_site_acquisition_and_real_property_guide KAZM site dimensions are valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_acquisition_and_real_property_guide;
+  // NDA single tower: 1–2 acres minimum
+  assert.strictEqual(g.n_tower_elements, 1, 'NDA station should have 1 tower element');
+  assert.strictEqual(g.min_site_acres_low, 1, 'NDA site minimum should be 1 acre');
+  assert.strictEqual(g.min_site_acres_high, 2, 'NDA site maximum should be 2 acres');
+  assert.ok(g.dist_from_col_km >= 0, 'dist_from_col_km must be non-negative');
+});
+
+test('am_site_acquisition_and_real_property_guide purchase cost exceeds transaction costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const g = c.am_site_acquisition_and_real_property_guide;
+    // total = purchase + transaction + title/closing
+    const expected_low = g.purchase_cost_low_usd + g.transaction_costs_low_usd + g.title_and_closing_low_usd;
+    assert.strictEqual(g.total_purchase_low_usd, expected_low,
+      `rank ${c.rank}: total_purchase_low should equal purchase + transaction + title`);
+    assert.ok(g.total_purchase_high_usd > g.total_purchase_low_usd,
+      `rank ${c.rank}: high cost must exceed low cost`);
+  }
+});
+
+test('am_site_acquisition_and_real_property_guide lease PV uses correct annuity factor', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_acquisition_and_real_property_guide;
+  // 20-yr annuity at 5%: PV_factor ≈ 12.46
+  assert.ok(g.pv_annuity_factor_20yr > 12 && g.pv_annuity_factor_20yr < 13,
+    `pv_annuity_factor_20yr ${g.pv_annuity_factor_20yr} should be ~12.46`);
+  // lease_20yr_pv ≈ annual_lease × pv_factor
+  const expected_low = Math.round(g.annual_lease_low_usd * g.pv_annuity_factor_20yr);
+  assert.strictEqual(g.lease_20yr_pv_low_usd, expected_low,
+    'lease_20yr_pv_low should equal annual_lease × pv_factor');
+});
+
+test('am_site_acquisition_and_real_property_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('acq_site_class'           in row, 'acq_site_class missing from comparison table');
+    assert.ok('acq_purchase_low_usd'     in row, 'acq_purchase_low_usd missing from comparison table');
+    assert.ok('acq_annual_lease_low_usd' in row, 'acq_annual_lease_low_usd missing from comparison table');
+  }
+});
