@@ -2226,6 +2226,26 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Ground System Resistance and Maintenance Guide */}
+        {candidate.am_ground_system_resistance_and_maintenance_guide && (() => {
+          const g = candidate.am_ground_system_resistance_and_maintenance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="grm-guide" style={{ marginBottom: 16, padding: 12, background: '#f7fee7', borderRadius: 8, border: '2px solid #65a30d' }}>
+              <div style={{ fontWeight: 700, color: '#365314', marginBottom: 6, fontSize: 13 }}>Ground System Resistance &amp; Maintenance (§73.190)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3f6212' }}>
+                <span style={{ color: '#65a30d' }}>Soil Conductivity:</span><span>{g.sigma_msm} mS/m → Rg≈{g.rg_est_ohm} Ω</span>
+                <span style={{ color: '#65a30d' }}>Resistance Status:</span><span style={{ fontWeight: 600, color: g.rg_acceptable ? '#16a34a' : '#dc2626' }}>{g.rg_acceptable ? `Acceptable (< ${g.rg_target_ohm} Ω)` : `Exceeds ${g.rg_target_ohm} Ω target`}</span>
+                <span style={{ color: '#65a30d' }}>Annual Check:</span><span>{fmt(g.annual_resistance_check_low_usd)} – {fmt(g.annual_resistance_check_high_usd)}</span>
+                <span style={{ color: '#65a30d' }}>Radial Repair:</span><span>{g.n_radials_annual_replace_low}–{g.n_radials_annual_replace_high} /yr × {fmt(g.radial_repair_cost_per_radial_usd)}</span>
+                <span style={{ color: '#65a30d' }}>5-yr Inspection:</span><span>{fmt(g.comprehensive_inspection_low_usd)} – {fmt(g.comprehensive_inspection_high_usd)} ({fmt(g.comprehensive_amortized_annual_usd)}/yr amortized)</span>
+                <span style={{ color: '#65a30d' }}>Annual Reserve:</span><span>{fmt(g.total_annual_ground_maint_low_usd)} – {fmt(g.total_annual_ground_maint_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#365314' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Commissioning and Acceptance Testing Guide */}
         {candidate.am_commissioning_and_acceptance_testing_guide && (() => {
           const g = candidate.am_commissioning_and_acceptance_testing_guide;

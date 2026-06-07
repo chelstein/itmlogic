@@ -1188,7 +1188,10 @@ export async function runSiteOptimizer(body = {}){
     insp_3yr_detail_low_usd:    c.am_broadcast_tower_structural_inspection_guide?.detailed_inspection_low_usd ?? null,
     com_total_low_usd:          c.am_commissioning_and_acceptance_testing_guide?.total_commissioning_low_usd ?? null,
     com_weeks_low:              c.am_commissioning_and_acceptance_testing_guide?.commissioning_weeks_low ?? null,
-    com_mpe_required:           c.am_commissioning_and_acceptance_testing_guide?.mpe_evaluation_required ?? null
+    com_mpe_required:           c.am_commissioning_and_acceptance_testing_guide?.mpe_evaluation_required ?? null,
+    grm_rg_est_ohm:             c.am_ground_system_resistance_and_maintenance_guide?.rg_est_ohm ?? null,
+    grm_rg_acceptable:          c.am_ground_system_resistance_and_maintenance_guide?.rg_acceptable ?? null,
+    grm_annual_maint_low_usd:   c.am_ground_system_resistance_and_maintenance_guide?.total_annual_ground_maint_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6923,6 +6926,67 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_ground_system_resistance_and_maintenance_guide: (() => {
+      // Ongoing ground system maintenance and resistance monitoring per §73.190(c).
+      // Annual resistance measurements track changes in the buried radial system
+      // due to corrosion, soil disturbance, or seasonal moisture variation.
+
+      // Estimate ground resistance from site soil conductivity (empirical table)
+      // Based on a 120-radial λ/4 system (standard per §73.190)
+      const rg_est_ohm = sigma_msm >= 10 ? 2
+        : sigma_msm >= 4  ? 5
+        : sigma_msm >= 2  ? 12
+        : 20;
+
+      // Acceptable threshold: < 10 Ω for Class A/B, < 25 Ω for C/D
+      const rg_target_ohm  = ['A','B'].includes(fcc_class) ? 10 : 25;
+      const rg_acceptable  = rg_est_ohm <= rg_target_ohm;
+
+      // Annual ground resistance check cost (Clamp-on meter + engineer visit)
+      const annual_resistance_check_low_usd  = 1000;
+      const annual_resistance_check_high_usd = 2500;
+
+      // Radial repair: replace corroded/damaged radials
+      const radial_repair_cost_per_radial_usd  = 150;
+      const n_radials_annual_replace_low   = Math.round(120 * 0.02);  // 2% annual failure
+      const n_radials_annual_replace_high  = Math.round(120 * 0.05);  // 5% annual failure
+      const radial_repair_annual_low_usd   = n_radials_annual_replace_low  * radial_repair_cost_per_radial_usd;
+      const radial_repair_annual_high_usd  = n_radials_annual_replace_high * radial_repair_cost_per_radial_usd;
+
+      // 5-year comprehensive inspection (trench/probe multiple radials, corrosion assessment)
+      const comprehensive_cycle_years         = 5;
+      const comprehensive_inspection_low_usd  = 3000;
+      const comprehensive_inspection_high_usd = 8000;
+      const comprehensive_amortized_annual_usd = Math.round(comprehensive_inspection_high_usd / comprehensive_cycle_years);
+
+      const total_annual_ground_maint_low_usd  = annual_resistance_check_low_usd  + radial_repair_annual_low_usd;
+      const total_annual_ground_maint_high_usd = annual_resistance_check_high_usd + radial_repair_annual_high_usd
+                                                + comprehensive_amortized_annual_usd;
+
+      return {
+        fcc_class,
+        sigma_msm,
+        rg_est_ohm,
+        rg_target_ohm,
+        rg_acceptable,
+        annual_resistance_check_low_usd,
+        annual_resistance_check_high_usd,
+        radial_repair_cost_per_radial_usd,
+        n_radials_annual_replace_low,
+        n_radials_annual_replace_high,
+        radial_repair_annual_low_usd,
+        radial_repair_annual_high_usd,
+        comprehensive_cycle_years,
+        comprehensive_inspection_low_usd,
+        comprehensive_inspection_high_usd,
+        comprehensive_amortized_annual_usd,
+        total_annual_ground_maint_low_usd,
+        total_annual_ground_maint_high_usd,
+        reference: '47 CFR §73.190 (ground system — buried radials); §73.190(c) (ground resistance monitoring); §73.61 (base current log); NAB Engineering Handbook 11th Ed. Ch. 6 (AM ground system maintenance); TIA-222-H (antenna structure standards)',
+        note: `Ground system maintenance: σ=${sigma_msm} mS/m → Rg≈${rg_est_ohm} Ω (${rg_acceptable ? 'meets' : 'EXCEEDS'} ${rg_target_ohm} Ω target for Class ${fcc_class}). Annual resistance check: $${annual_resistance_check_low_usd.toLocaleString()}–$${annual_resistance_check_high_usd.toLocaleString()}. Radial replacement: ${n_radials_annual_replace_low}–${n_radials_annual_replace_high}/yr × $${radial_repair_cost_per_radial_usd}. Total annual reserve: $${total_annual_ground_maint_low_usd.toLocaleString()}–$${total_annual_ground_maint_high_usd.toLocaleString()}.`
       };
     })(),
 

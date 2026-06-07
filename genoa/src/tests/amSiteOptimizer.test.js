@@ -11393,6 +11393,51 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_ground_system_resistance_and_maintenance_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_resistance_and_maintenance_guide;
+  assert.ok(g !== undefined && g !== null, 'am_ground_system_resistance_and_maintenance_guide missing');
+  assert.ok(typeof g.rg_est_ohm === 'number', 'rg_est_ohm should be a number');
+  assert.ok(typeof g.total_annual_ground_maint_low_usd === 'number', 'total_annual_ground_maint_low_usd should be a number');
+});
+
+test('am_ground_system_resistance_and_maintenance_guide KAZM resistance estimate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_resistance_and_maintenance_guide;
+  assert.strictEqual(g.rg_est_ohm, 12, 'σ=2 mS/m should give Rg estimate of 12 Ω');
+  assert.strictEqual(g.rg_target_ohm, 25, 'Class D target resistance should be 25 Ω');
+  assert.strictEqual(g.rg_acceptable, true, 'Rg=12 Ω meets Class D 25 Ω target');
+});
+
+test('am_ground_system_resistance_and_maintenance_guide KAZM radial replacement', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_resistance_and_maintenance_guide;
+  assert.strictEqual(g.n_radials_annual_replace_low,  2, '2% of 120 radials = 2 replaced/yr (low)');
+  assert.strictEqual(g.n_radials_annual_replace_high, 6, '5% of 120 radials = 6 replaced/yr (high)');
+  assert.strictEqual(g.radial_repair_annual_low_usd, 300, '2 × $150 = $300 annual radial repair low');
+});
+
+test('am_ground_system_resistance_and_maintenance_guide KAZM total maintenance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_system_resistance_and_maintenance_guide;
+  assert.strictEqual(g.total_annual_ground_maint_low_usd,  1300, 'Total annual low should be $1,300');
+  assert.strictEqual(g.total_annual_ground_maint_high_usd, 5000, 'Total annual high should be $5,000');
+  assert.ok(g.total_annual_ground_maint_high_usd > g.total_annual_ground_maint_low_usd, 'High must exceed low');
+});
+
+test('am_ground_system_resistance_and_maintenance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('grm_rg_est_ohm'          in row, 'grm_rg_est_ohm missing from comparison table');
+    assert.ok('grm_rg_acceptable'       in row, 'grm_rg_acceptable missing from comparison table');
+    assert.ok('grm_annual_maint_low_usd' in row, 'grm_annual_maint_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.grm_rg_est_ohm,          12,   'rank-1 grm_rg_est_ohm should be 12');
+  assert.strictEqual(r0.grm_rg_acceptable,        true, 'rank-1 grm_rg_acceptable should be true');
+  assert.strictEqual(r0.grm_annual_maint_low_usd, 1300, 'rank-1 grm_annual_maint_low_usd should be $1,300');
+});
+
 test('am_commissioning_and_acceptance_testing_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_commissioning_and_acceptance_testing_guide;

@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_ground_system_resistance_and_maintenance_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_resistance_and_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_resistance_and_maintenance_guide missing`);
+    assert.ok(g.rg_est_ohm > 0, `rank ${c.rank}: rg_est_ohm must be positive`);
+    assert.ok(typeof g.rg_acceptable === 'boolean', `rank ${c.rank}: rg_acceptable must be a boolean`);
+    assert.ok(g.total_annual_ground_maint_high_usd >= g.total_annual_ground_maint_low_usd, `rank ${c.rank}: high cost >= low`);
+  }
+});
+
 test('am_commissioning_and_acceptance_testing_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {
