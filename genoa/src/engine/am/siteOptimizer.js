@@ -1158,7 +1158,10 @@ export async function runSiteOptimizer(body = {}){
     ci_verdict:                 c.am_coverage_improvement_vs_current_site_guide?.verdict ?? null,
     tel_n_monitoring_points:    c.am_rf_system_monitoring_and_telemetry_guide?.n_base_meters ?? null,
     tel_total_cost_low_usd:     c.am_rf_system_monitoring_and_telemetry_guide?.total_telemetry_low_usd ?? null,
-    tel_annual_connectivity_usd: c.am_rf_system_monitoring_and_telemetry_guide?.annual_connectivity_usd ?? null
+    tel_annual_connectivity_usd: c.am_rf_system_monitoring_and_telemetry_guide?.annual_connectivity_usd ?? null,
+    gt_frost_depth_in:          c.am_geotechnical_and_soil_investigation_guide?.frost_depth_in ?? null,
+    gt_bearing_cap_psf_low:     c.am_geotechnical_and_soil_investigation_guide?.bearing_capacity_psf_low ?? null,
+    gt_total_geotech_low_usd:   c.am_geotechnical_and_soil_investigation_guide?.total_geotech_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6893,6 +6896,92 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_geotechnical_and_soil_investigation_guide: (() => {
+      // Models the geotechnical investigation requirements and foundation design
+      // parameters for the AM monopole at this candidate site.  Soil bearing capacity,
+      // frost depth, and USCS soil class determine the foundation type and drive costs
+      // for tower piers, guy anchors, and the ATU building slab.
+      const lat_gt = pt.lat, lon_gt = pt.lon;
+
+      // ---- Frost penetration depth (USDA/ASCE 7-22 Figure C-26) ----
+      const is_desert_sw_gt = lon_gt > -115 && lat_gt < 37;
+      const frost_depth_in  = is_desert_sw_gt ? 0
+                            : lat_gt < 35     ? 0
+                            : lat_gt < 38     ? 6
+                            : lat_gt < 41     ? 18
+                            : lat_gt < 44     ? 36
+                            : lat_gt < 46     ? 48
+                                              : 60;
+
+      // ---- USCS soil class and allowable bearing capacity (simplified) ----
+      let uscs_class, bearing_capacity_psf_low, bearing_capacity_psf_high, soil_description;
+      if (is_desert_sw_gt) {
+        uscs_class = 'SM/SC (silty/clayey sand with caliche)';
+        bearing_capacity_psf_low  = 2000;
+        bearing_capacity_psf_high = 8000;
+        soil_description = 'Arid desert — caliche hardpan typical below 1–3 ft; excellent bearing when encountered';
+      } else if (lat_gt < 31 && lon_gt > -97) {
+        uscs_class = 'CH/CL (high-plasticity clay)';
+        bearing_capacity_psf_low  = 1000;
+        bearing_capacity_psf_high = 2000;
+        soil_description = 'Gulf Coast — soft to medium marine clay; pile foundation likely required';
+      } else if (lat_gt > 44) {
+        uscs_class = 'ML/CL (silt/lean clay, glacial till)';
+        bearing_capacity_psf_low  = 1500;
+        bearing_capacity_psf_high = 3000;
+        soil_description = 'Northern US — glacial till common; freeze-thaw active layer must be penetrated';
+      } else if (lon_gt > -90) {
+        uscs_class = 'SM/SP (silty/poorly-graded sand)';
+        bearing_capacity_psf_low  = 2000;
+        bearing_capacity_psf_high = 4000;
+        soil_description = 'Eastern US — variable silty sand to dense alluvial deposit; generally adequate';
+      } else {
+        uscs_class = 'SW/SM (well-graded sand, Mountain West)';
+        bearing_capacity_psf_low  = 2000;
+        bearing_capacity_psf_high = 5000;
+        soil_description = 'Great Plains/Mountain West — granular soils, generally competent for tower foundations';
+      }
+
+      // ---- Foundation type ----
+      const min_embed_ft  = Math.max(4, Math.ceil(frost_depth_in / 12) + 2);
+      let foundation_type, foundation_depth_ft_low, foundation_depth_ft_high;
+      if (bearing_capacity_psf_low >= 3000) {
+        foundation_type           = 'Drilled pier (caisson) into bearing stratum';
+        foundation_depth_ft_low   = min_embed_ft + 4;
+        foundation_depth_ft_high  = foundation_depth_ft_low + 6;
+      } else if (bearing_capacity_psf_low >= 1500) {
+        foundation_type           = 'Spread footing or drilled pier';
+        foundation_depth_ft_low   = min_embed_ft + 2;
+        foundation_depth_ft_high  = foundation_depth_ft_low + 8;
+      } else {
+        foundation_type           = 'Helical pile or auger-cast pile (poor soils)';
+        foundation_depth_ft_low   = 20;
+        foundation_depth_ft_high  = 40;
+      }
+
+      // ---- Geotechnical investigation cost ----
+      // Standard: 3 borings (SPT N-value) to refusal or 50 ft, lab analysis, PE report
+      const n_borings       = 3;
+      const boring_depth_ft = Math.max(30, foundation_depth_ft_high + 20);
+      const borings_cost_low_usd  = Math.round(n_borings * boring_depth_ft * 25);
+      const borings_cost_high_usd = Math.round(n_borings * boring_depth_ft * 75);
+      const lab_analysis_cost_usd  = 2000;
+      const geotech_report_cost_usd = 3000;
+      const total_geotech_low_usd  = borings_cost_low_usd  + lab_analysis_cost_usd + geotech_report_cost_usd;
+      const total_geotech_high_usd = borings_cost_high_usd + lab_analysis_cost_usd + geotech_report_cost_usd + 2000;
+      return {
+        frost_depth_in, uscs_class, soil_description,
+        bearing_capacity_psf_low, bearing_capacity_psf_high,
+        foundation_type, foundation_depth_ft_low, foundation_depth_ft_high,
+        n_borings, boring_depth_ft,
+        borings_cost_low_usd, borings_cost_high_usd,
+        lab_analysis_cost_usd, geotech_report_cost_usd,
+        total_geotech_low_usd, total_geotech_high_usd,
+        reference: 'ASCE 7-22 Figure C-26 (frost depth); ASTM D2487 (USCS classification); ASTM D1586 (SPT test); IBC 2021 §1806 (allowable bearing pressures); TIA-222-H §4.3 (foundation design)',
+        note: `${uscs_class} — bearing ${bearing_capacity_psf_low}–${bearing_capacity_psf_high} psf; frost ${frost_depth_in} in. Foundation: ${foundation_type}, ${foundation_depth_ft_low}–${foundation_depth_ft_high} ft depth. Geotech investigation (${n_borings} borings × ${boring_depth_ft} ft): $${total_geotech_low_usd.toLocaleString()}–$${total_geotech_high_usd.toLocaleString()}.`
       };
     })(),
 

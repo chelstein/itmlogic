@@ -11306,3 +11306,54 @@ test('am_rf_system_monitoring_and_telemetry_guide comparison table columns prese
   assert.strictEqual(r0.tel_total_cost_low_usd, 5000, 'rank-1 tel_total_cost_low_usd should be $5,000');
   assert.strictEqual(r0.tel_annual_connectivity_usd, 2400, 'rank-1 tel_annual_connectivity_usd should be $2,400');
 });
+
+test('am_geotechnical_and_soil_investigation_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_geotechnical_and_soil_investigation_guide;
+  assert.ok(g !== undefined && g !== null, 'am_geotechnical_and_soil_investigation_guide should be present');
+  assert.ok(typeof g.total_geotech_low_usd === 'number', 'total_geotech_low_usd should be a number');
+  assert.ok(typeof g.foundation_type === 'string', 'foundation_type should be a string');
+});
+
+test('am_geotechnical_and_soil_investigation_guide KAZM Desert SW soil classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_geotechnical_and_soil_investigation_guide;
+  // Sedona AZ (lat 34.86, lon -111.82): Desert SW → frost 0, SM/SC caliche, bearing 2000-8000 psf
+  assert.strictEqual(g.frost_depth_in, 0, 'Arizona has 0 frost depth');
+  assert.ok(g.uscs_class.includes('SM/SC'), `uscs_class should include SM/SC, got: ${g.uscs_class}`);
+  assert.strictEqual(g.bearing_capacity_psf_low, 2000, 'bearing_capacity_psf_low should be 2000 psf');
+  assert.strictEqual(g.bearing_capacity_psf_high, 8000, 'bearing_capacity_psf_high should be 8000 psf');
+});
+
+test('am_geotechnical_and_soil_investigation_guide KAZM foundation design', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_geotechnical_and_soil_investigation_guide;
+  // bearing 2000 psf (1500-3000 range) → 'Spread footing or drilled pier'
+  assert.ok(g.foundation_type.includes('Spread footing'), `foundation_type should mention spread footing, got: ${g.foundation_type}`);
+  assert.strictEqual(g.foundation_depth_ft_low, 6, 'foundation_depth_ft_low should be 6 ft');
+  assert.strictEqual(g.foundation_depth_ft_high, 14, 'foundation_depth_ft_high should be 14 ft');
+  assert.strictEqual(g.boring_depth_ft, 34, 'boring_depth_ft should be 34 ft');
+});
+
+test('am_geotechnical_and_soil_investigation_guide KAZM investigation cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_geotechnical_and_soil_investigation_guide;
+  // 3 borings × 34 ft × $25 = $2,550 + $2,000 lab + $3,000 report = $7,550 low
+  assert.strictEqual(g.n_borings, 3, 'n_borings should be 3');
+  assert.strictEqual(g.borings_cost_low_usd, 2550, 'borings_cost_low_usd = 3×34×$25 = $2,550');
+  assert.strictEqual(g.total_geotech_low_usd, 7550, 'total_geotech_low_usd should be $7,550');
+  assert.ok(g.total_geotech_high_usd > g.total_geotech_low_usd, 'high cost must exceed low');
+});
+
+test('am_geotechnical_and_soil_investigation_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gt_frost_depth_in'       in row, 'gt_frost_depth_in missing from comparison table');
+    assert.ok('gt_bearing_cap_psf_low'  in row, 'gt_bearing_cap_psf_low missing from comparison table');
+    assert.ok('gt_total_geotech_low_usd' in row, 'gt_total_geotech_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.gt_frost_depth_in, 0, 'rank-1 gt_frost_depth_in should be 0');
+  assert.strictEqual(r0.gt_bearing_cap_psf_low, 2000, 'rank-1 gt_bearing_cap_psf_low should be 2000 psf');
+  assert.strictEqual(r0.gt_total_geotech_low_usd, 7550, 'rank-1 gt_total_geotech_low_usd should be $7,550');
+});

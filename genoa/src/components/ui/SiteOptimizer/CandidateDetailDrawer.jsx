@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Geotechnical and Soil Investigation Guide */}
+        {candidate.am_geotechnical_and_soil_investigation_guide && (() => {
+          const g = candidate.am_geotechnical_and_soil_investigation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="gt-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf8f0', borderRadius: 8, border: '1px solid #b45309' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Geotechnical &amp; Soil Investigation</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>USCS Soil Class:</span><span style={{ fontWeight: 600 }}>{g.uscs_class}</span>
+                <span style={{ color: '#6b7280' }}>Bearing Capacity:</span><span>{g.bearing_capacity_psf_low.toLocaleString()}–{g.bearing_capacity_psf_high.toLocaleString()} psf</span>
+                <span style={{ color: '#6b7280' }}>Frost Depth:</span><span>{g.frost_depth_in} in.</span>
+                <span style={{ color: '#6b7280' }}>Foundation Type:</span><span>{g.foundation_type}</span>
+                <span style={{ color: '#6b7280' }}>Foundation Depth:</span><span>{g.foundation_depth_ft_low}–{g.foundation_depth_ft_high} ft</span>
+                <span style={{ color: '#6b7280' }}>Boring Program:</span><span>{g.n_borings} borings × {g.boring_depth_ft} ft (SPT)</span>
+                <span style={{ color: '#6b7280' }}>Borings Cost:</span><span>{fmt(g.borings_cost_low_usd)} – {fmt(g.borings_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Lab + Report:</span><span>{fmt(g.lab_analysis_cost_usd + g.geotech_report_cost_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Geotech:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_geotech_low_usd)} – {fmt(g.total_geotech_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, color: '#92400e' }}>{g.soil_description}</div>
+              {g.note && <div style={{ marginTop: 4, fontSize: 11, color: '#78350f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM RF System Monitoring and Telemetry Guide */}
         {candidate.am_rf_system_monitoring_and_telemetry_guide && (() => {
           const g = candidate.am_rf_system_monitoring_and_telemetry_guide;
