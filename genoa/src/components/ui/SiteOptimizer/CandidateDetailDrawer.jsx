@@ -2226,6 +2226,45 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Translator & Booster Strategy Guide */}
+        {candidate.am_translator_and_booster_strategy_guide && (() => {
+          const g = candidate.am_translator_and_booster_strategy_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#ecfdf5', borderRadius: 8, border: '1px solid #6ee7b7' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#065f46', marginBottom: 8 }}>
+                FM Translator & AM Booster Strategy
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>FM Translator Eligible:</span> <strong style={{ color: '#065f46' }}>{g.fm_translator_eligible ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Revitalization:</span> <strong style={{ color: '#065f46' }}>{g.am_revitalization_eligible ? 'Eligible' : 'N/A'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Recommended ERP:</span> <strong>{g.recommended_translator_erp_w}W ({g.recommended_translator_coverage_km} km)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Translator Cost:</span> <strong>${g.translator_total_cost_low_usd?.toLocaleString()}–${g.translator_total_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Annual OpEx:</span> <strong>${g.translator_annual_opex_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#64748b' }}>Max Distance from AM:</span> <strong>{g.translator_max_distance_from_am_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Operable During Silence:</span> <strong style={{ color: '#065f46' }}>{g.translator_operable_during_silence ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Audience Multiplier:</span> <strong>×{g.translator_audience_multiplier}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Booster (new):</span> <strong style={{ color: '#b91c1c' }}>{g.am_booster_new_license_available ? 'Available' : 'NOT AVAILABLE'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Booster (grandfathered):</span> <strong>{g.am_booster_existing_grandfathered ? 'Yes' : 'No'}</strong></div>
+              </div>
+              {g.translator_power_tiers?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#065f46', marginBottom: 4 }}>Translator Power Tiers</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {g.translator_power_tiers.map((t, i) => (
+                      <span key={i} style={{ background: '#a7f3d0', color: '#064e3b', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                        {t.power_w}W ERP · {t.coverage_radius_km} km
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Digital HD Radio Upgrade Pathway Guide */}
         {candidate.am_digital_hd_radio_upgrade_pathway_guide && (() => {
           const g = candidate.am_digital_hd_radio_upgrade_pathway_guide;

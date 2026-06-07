@@ -1092,7 +1092,10 @@ export async function runSiteOptimizer(body = {}){
     eas_automation:             c.am_automation_and_emergency_alert_system_guide?.recommended_automation ?? null,
     hd_n_applicable_modes:      c.am_digital_hd_radio_upgrade_pathway_guide?.n_applicable_hd_modes ?? null,
     hd_cost_low_usd:            c.am_digital_hd_radio_upgrade_pathway_guide?.total_hd_upgrade_cost_low_usd ?? null,
-    hd_adj_interference_risk:   c.am_digital_hd_radio_upgrade_pathway_guide?.adjacent_ch_interference_risk ?? null
+    hd_adj_interference_risk:   c.am_digital_hd_radio_upgrade_pathway_guide?.adjacent_ch_interference_risk ?? null,
+    xltr_erp_w:                 c.am_translator_and_booster_strategy_guide?.recommended_translator_erp_w ?? null,
+    xltr_total_cost_low_usd:    c.am_translator_and_booster_strategy_guide?.translator_total_cost_low_usd ?? null,
+    xltr_coverage_km:           c.am_translator_and_booster_strategy_guide?.recommended_translator_coverage_km ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6827,6 +6830,129 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_translator_and_booster_strategy_guide: (() => {
+      // Models the FM translator and AM booster strategy for extending reach
+      // of the candidate AM relocation site.
+      //
+      // FM Translator overview (47 CFR §74.1200–§74.1204):
+      //   - FM translators rebroadcast AM station programming on FM band
+      //   - AM stations may use translators under §74.1201(g) (AM-to-FM rule)
+      //   - FCC issued ~8,000+ AM-to-FM translator authorizations since 2013
+      //   - Power limit for AM-only translators: generally 250 W ERP (local)
+      //   - AM Revitalization §74.1201(g): AM station may use LP-FM translator
+      //     within primary service contour (without the usual 250-mile rule)
+      //   - FM translator can operate while AM station is silent (§74.1263)
+      //
+      // AM Booster overview (47 CFR §74.1262):
+      //   - Boosters retransmit on same AM frequency as parent station
+      //   - Rare and geographically limited (must be within primary contour)
+      //   - Cannot be used to extend service outside primary contour
+      //   - No longer issued new AM booster licenses; existing licenses grandfathered
+      //
+      // FM translator cost (2024):
+      //   Translator license (purchase/assignment): $5,000–$100,000
+      //   FM transmitter (100W–250W): $2,000–$8,000
+      //   Antenna and feedline: $1,500–$5,000
+      //   Tower (if new): $10,000–$40,000
+      //   Studio-transmitter link (IP): $500–$2,000
+      //   Total turnkey (without tower): $8,000–$25,000
+      //
+      // Coverage: FM translator at 250W ERP covers ~10–15 mile radius.
+      // LP-FM (Low-Power FM) alternative: ~3.5 mile radius at 100W.
+      //
+      // FCC Form 314 (Assignment) or Form 315 (Transfer) for translator
+      // acquisition; FCC Form 350 for construction permit modification.
+
+      const isDA_tr         = /^DA/i.test(pattern_mode);
+      const is_clear_ch_tr  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_local_ch_tr  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+
+      // Translator eligibility: AM-to-FM rule applies to all AM licensees
+      const fm_translator_eligible = true; // All AM stations eligible since 2013
+
+      // AM Revitalization Act translator priority
+      const am_revitalization_eligible = true; // All AM stations since 2016 Order
+
+      // Silent period translator benefit: translator may remain on air
+      const translator_operable_during_silence = true;
+
+      // FM translator power tiers
+      const translator_power_tiers = [
+        { power_w: 100, erp_w: 100, coverage_radius_km: 14, description: 'LP-FM minimum, urban fill-in' },
+        { power_w: 250, erp_w: 250, coverage_radius_km: 22, description: 'Standard AM-to-FM translator; most common' },
+        { power_w: 3000, erp_w: 3000, coverage_radius_km: 60, description: 'LP-FM maximum (Class A FM equivalent)' }
+      ];
+
+      // Recommended translator power by class
+      const recommended_translator_erp_w =
+        fcc_class === 'A' || fcc_class === 'B' ? 3000 :
+        is_local_ch_tr                          ? 100  : 250;
+
+      const recommended_tier = translator_power_tiers.find(t => t.erp_w === recommended_translator_erp_w)
+        ?? translator_power_tiers[1]; // fallback to 250W
+
+      // Cost estimates
+      const translator_license_cost_low  = 5000;
+      const translator_license_cost_high = 60000;
+      const translator_equipment_cost_low  = 8000;
+      const translator_equipment_cost_high = 25000;
+      const translator_total_cost_low  = translator_license_cost_low  + translator_equipment_cost_low;
+      const translator_total_cost_high = translator_license_cost_high + translator_equipment_cost_high;
+
+      // AM Booster status
+      const am_booster_new_license_available = false; // No new AM boosters since 1990s
+      const am_booster_existing_grandfathered = true;
+
+      // FCC filing forms for translator
+      const fcc_forms = [
+        { form: 'FCC Form 350', purpose: 'Translator construction permit application' },
+        { form: 'FCC Form 314', purpose: 'Assignment of translator authorization' },
+        { form: 'FCC Form 315', purpose: 'Transfer of control of translator license' },
+        { form: 'FCC Form 316', purpose: 'Minor modification of translator authorization' }
+      ];
+
+      // Translator technical constraints
+      const translator_must_be_within_primary_contour = true;
+      const translator_max_distance_from_am_km =
+        is_clear_ch_tr ? 320 : is_local_ch_tr ? 80 : 160; // relaxed under AM Revitalization
+
+      // Financial benefit: translator typically doubles effective listeners
+      const translator_audience_multiplier = 1.8; // 80% audience increase typical
+      const translator_annual_opex_usd = 3600; // power + connectivity
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        fm_translator_eligible,
+        am_revitalization_eligible,
+        translator_operable_during_silence,
+        translator_power_tiers,
+        n_translator_power_tiers:          translator_power_tiers.length,
+        recommended_translator_erp_w,
+        recommended_translator_coverage_km: recommended_tier.coverage_radius_km,
+        translator_license_cost_low_usd:    translator_license_cost_low,
+        translator_license_cost_high_usd:   translator_license_cost_high,
+        translator_equipment_cost_low_usd:  translator_equipment_cost_low,
+        translator_equipment_cost_high_usd: translator_equipment_cost_high,
+        translator_total_cost_low_usd:      translator_total_cost_low,
+        translator_total_cost_high_usd:     translator_total_cost_high,
+        translator_annual_opex_usd,
+        am_booster_new_license_available,
+        am_booster_existing_grandfathered,
+        translator_must_be_within_primary_contour,
+        translator_max_distance_from_am_km,
+        translator_audience_multiplier,
+        fcc_forms,
+        n_fcc_forms:                       fcc_forms.length,
+        is_clear_channel:                  is_clear_ch_tr,
+        is_local_channel:                  is_local_ch_tr,
+        is_da:                             isDA_tr,
+        reference: '47 CFR §74.1200–§74.1263; FCC AM Revitalization Order (MB Docket 13-249, 2016); FCC Form 350/314/315/316; FCC Fact Sheet: AM Radio Revitalization (2015)',
+        note: `FM translator eligible (AM Revitalization): yes. Recommended: ${recommended_translator_erp_w}W ERP (${recommended_tier.coverage_radius_km} km). ` +
+              `Total translator cost: $${translator_total_cost_low.toLocaleString()}–$${translator_total_cost_high.toLocaleString()}. ` +
+              `Translator operable during AM silence: yes.`
       };
     })(),
 

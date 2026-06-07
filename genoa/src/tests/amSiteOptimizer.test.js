@@ -10220,3 +10220,46 @@ test('am_digital_hd_radio_upgrade_pathway_guide comparison table columns present
     assert.ok('hd_adj_interference_risk' in row, 'hd_adj_interference_risk missing from comparison table');
   }
 });
+
+test('am_translator_and_booster_strategy_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_translator_and_booster_strategy_guide;
+  assert.ok(g, 'translator guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fm_translator_eligible, true, 'all AM stations must be FM translator eligible');
+  assert.strictEqual(g.translator_operable_during_silence, true, 'translator must be operable during silence');
+});
+
+test('am_translator_and_booster_strategy_guide KAZM Class D gets 250W recommended translator', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_translator_and_booster_strategy_guide;
+  assert.strictEqual(g.recommended_translator_erp_w, 250, 'Class D clear must get 250W translator recommendation');
+  assert.strictEqual(g.recommended_translator_coverage_km, 22, '250W translator must cover 22 km');
+  assert.strictEqual(g.am_revitalization_eligible, true, 'AM Revitalization eligibility must be true');
+});
+
+test('am_translator_and_booster_strategy_guide cost range is valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_translator_and_booster_strategy_guide;
+  assert.ok(g.translator_total_cost_low_usd > 0, 'total cost must be positive');
+  assert.ok(g.translator_total_cost_high_usd >= g.translator_total_cost_low_usd, 'high >= low');
+  assert.ok(g.n_translator_power_tiers >= 3, 'must have at least 3 translator power tiers');
+  assert.ok(g.n_fcc_forms >= 4, 'must list at least 4 FCC forms');
+});
+
+test('am_translator_and_booster_strategy_guide AM booster status correct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_translator_and_booster_strategy_guide;
+  assert.strictEqual(g.am_booster_new_license_available, false, 'no new AM booster licenses available');
+  assert.strictEqual(g.am_booster_existing_grandfathered, true, 'existing AM boosters must be grandfathered');
+  assert.ok(g.translator_audience_multiplier > 1, 'translator must increase audience');
+});
+
+test('am_translator_and_booster_strategy_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('xltr_erp_w'             in row, 'xltr_erp_w missing from comparison table');
+    assert.ok('xltr_total_cost_low_usd' in row, 'xltr_total_cost_low_usd missing from comparison table');
+    assert.ok('xltr_coverage_km'        in row, 'xltr_coverage_km missing from comparison table');
+  }
+});

@@ -2302,3 +2302,19 @@ test('am_digital_hd_radio_upgrade_pathway_guide present across colocation candid
     assert.ok(g.total_hd_upgrade_cost_low_usd > 0, `rank ${c.rank}: HD upgrade cost must be positive`);
   }
 });
+
+test('am_translator_and_booster_strategy_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_translator_and_booster_strategy_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_translator_and_booster_strategy_guide`);
+    assert.ok(g.fm_translator_eligible, `rank ${c.rank}: must be FM translator eligible`);
+    assert.ok(g.recommended_translator_erp_w > 0, `rank ${c.rank}: recommended ERP must be > 0`);
+  }
+});
