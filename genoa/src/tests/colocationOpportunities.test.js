@@ -2956,3 +2956,15 @@ test('am_environmental_impact_assessment_guide present across colocation candida
       `rank ${c.rank}: unexpected assessment_type: ${g.assessment_type}`);
   }
 });
+
+test('am_tower_lighting_and_aviation_compliance_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tower_lighting_and_aviation_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_lighting_and_aviation_compliance_guide missing`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_install_high_usd >= g.total_install_low_usd, `rank ${c.rank}: high must be >= low`);
+    assert.ok(['none_required','medium_intensity_white_or_red','high_intensity_white_dual_red'].includes(g.lighting_type),
+      `rank ${c.rank}: unexpected lighting_type: ${g.lighting_type}`);
+  }
+});

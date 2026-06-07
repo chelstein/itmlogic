@@ -2226,6 +2226,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Lighting and Aviation Compliance Guide */}
+        {candidate.am_tower_lighting_and_aviation_compliance_guide && (() => {
+          const g = candidate.am_tower_lighting_and_aviation_compliance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const lightLabel = {
+            none_required:                  'None Required',
+            medium_intensity_white_or_red:  'Medium Intensity (White/Red)',
+            high_intensity_white_dual_red:  'High Intensity (White + Dual Red)',
+          }[g.lighting_type] ?? g.lighting_type ?? '—';
+          return (
+            <div key="lit-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: '2px solid #6366f1' }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>Tower Lighting &amp; Aviation Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#312e81' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft (${g.tower_height_m != null ? g.tower_height_m.toFixed(1) : '—'} m)` : '—'}</span>
+                <span>FAA notice:</span><span>{g.needs_faa_notice ? 'Required' : 'Not required'}</span>
+                <span>ASR registration:</span><span>{g.needs_asr ? `Yes ($${g.asr_fee_usd ?? '—'})` : 'No'}</span>
+                <span>Lighting:</span><span>{lightLabel}</span>
+                <span>Lighting cost:</span><span>{fmt(g.lighting_cost_low_usd)} – {fmt(g.lighting_cost_high_usd)}</span>
+                <span>FAA filing:</span><span>{fmt(g.faa_notice_cost_low_usd)} – {fmt(g.faa_notice_cost_high_usd)}</span>
+                <span>Annual maint:</span><span>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total install:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_install_low_usd)} – {fmt(g.total_install_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4338ca', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Environmental Impact Assessment Guide */}
         {candidate.am_environmental_impact_assessment_guide && (() => {
           const g = candidate.am_environmental_impact_assessment_guide;

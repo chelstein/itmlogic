@@ -12659,3 +12659,48 @@ test('am_environmental_impact_assessment_guide comparison table columns present'
   assert.strictEqual(r0.env_total_low_usd,        5000,                   'rank-1 env_total_low_usd should be $5,000');
   assert.strictEqual(r0.env_section_106_low_usd,  2000,                   'rank-1 env_section_106_low_usd should be $2,000');
 });
+
+test('am_tower_lighting_and_aviation_compliance_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_lighting_and_aviation_compliance_guide missing');
+  assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+  assert.ok(g.total_install_high_usd >= g.total_install_low_usd, 'high must be >= low');
+});
+
+test('KAZM tower height and FAA notice requirement', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
+  assert.strictEqual(g.tower_height_m,    96.09,  'KAZM 780 kHz Class D tower should be 96.09 m (λ/4)');
+  assert.strictEqual(g.tower_height_ft,   315.26, 'KAZM tower should be 315.26 ft');
+  assert.strictEqual(g.needs_faa_notice,  true,   '315 ft tower requires FAA notice');
+  assert.strictEqual(g.needs_asr,         true,   '315 ft tower requires ASR registration');
+});
+
+test('KAZM tower lighting type and costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
+  assert.strictEqual(g.lighting_type,          'medium_intensity_white_or_red', '315 ft tower should use medium-intensity lighting');
+  assert.strictEqual(g.lighting_cost_low_usd,  5000, 'lighting_cost_low should be $5,000');
+  assert.strictEqual(g.asr_fee_usd,            125,  'ASR fee should be $125');
+});
+
+test('KAZM tower lighting total install cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_aviation_compliance_guide;
+  assert.strictEqual(g.total_install_low_usd,  6125,  'total_install_low should be $6,125');
+  assert.strictEqual(g.total_install_high_usd, 25125, 'total_install_high should be $25,125');
+});
+
+test('am_tower_lighting_and_aviation_compliance_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lit_tower_height_ft'       in row, 'lit_tower_height_ft missing from comparison table');
+    assert.ok('lit_total_install_low_usd' in row, 'lit_total_install_low_usd missing from comparison table');
+    assert.ok('lit_lighting_type'         in row, 'lit_lighting_type missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.lit_tower_height_ft,       315.26,                       'rank-1 lit_tower_height_ft should be 315.26');
+  assert.strictEqual(r0.lit_total_install_low_usd,  6125,                         'rank-1 lit_total_install_low_usd should be $6,125');
+  assert.strictEqual(r0.lit_lighting_type,          'medium_intensity_white_or_red', 'rank-1 lit_lighting_type mismatch');
+});
