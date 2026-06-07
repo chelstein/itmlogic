@@ -1215,7 +1215,10 @@ export async function runSiteOptimizer(body = {}){
     eas_n_required_sources:     c.am_emergency_alert_system_equipment_guide?.n_required_sources ?? null,
     rfi_tower_height_ft:        c.am_tower_base_insulator_and_rf_isolation_guide?.tower_height_ft ?? null,
     rfi_total_low_usd:          c.am_tower_base_insulator_and_rf_isolation_guide?.total_rf_isolation_low_usd ?? null,
-    rfi_n_guy_levels:           c.am_tower_base_insulator_and_rf_isolation_guide?.n_guy_levels ?? null
+    rfi_n_guy_levels:           c.am_tower_base_insulator_and_rf_isolation_guide?.n_guy_levels ?? null,
+    atu_is_da:                  c.am_transmission_line_and_antenna_tuning_unit_guide?.is_da ?? null,
+    atu_total_low_usd:          c.am_transmission_line_and_antenna_tuning_unit_guide?.total_atu_system_low_usd ?? null,
+    atu_r_base_ohm:             c.am_transmission_line_and_antenna_tuning_unit_guide?.r_base_est_ohm ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6950,6 +6953,62 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmission_line_and_antenna_tuning_unit_guide: (() => {
+      // ATU (Antenna Tuning Unit) converts 50 Ω transmitter output to tower base impedance.
+      // NDA stations: single ATU. DA stations: ATU + phasor network for each tower.
+      // §73.51 requires base current measurement for power monitoring.
+      const is_da = /^DA/i.test(pattern_mode);
+
+      // Estimated tower base impedance (λ/4 reference; actual varies with tower height and ground)
+      const r_radiation_est_ohm = 36;
+      const r_ground_est_ohm    = is_da ? 12 : 8;
+      const r_base_est_ohm      = round2(r_radiation_est_ohm + r_ground_est_ohm);
+
+      const n_towers = is_da ? 2 : 1;
+      const atu_cost_low_usd  = is_da ? 8000  : 3000;
+      const atu_cost_high_usd = is_da ? 25000 : 12000;
+
+      // §73.51: base current meter required for power monitoring
+      const base_current_meter_low_usd  = 500;
+      const base_current_meter_high_usd = 2000;
+
+      // Transmission line from transmitter to ATU (short run; heavy bus bar or low-Z coax)
+      const tx_line_low_usd  = 1000;
+      const tx_line_high_usd = 5000;
+
+      // Phasor: required for DA, controls amplitude and phase of current at each tower base
+      const phasor_low_usd  = is_da ? 5000  : 0;
+      const phasor_high_usd = is_da ? 15000 : 0;
+
+      const total_atu_system_low_usd  = round2(
+        atu_cost_low_usd  + base_current_meter_low_usd  + tx_line_low_usd  + phasor_low_usd);
+      const total_atu_system_high_usd = round2(
+        atu_cost_high_usd + base_current_meter_high_usd + tx_line_high_usd + phasor_high_usd);
+
+      return {
+        frequency_khz,
+        tpo_kw,
+        fcc_class,
+        is_da,
+        n_towers,
+        r_radiation_est_ohm,
+        r_ground_est_ohm,
+        r_base_est_ohm,
+        atu_cost_low_usd,
+        atu_cost_high_usd,
+        base_current_meter_low_usd,
+        base_current_meter_high_usd,
+        tx_line_low_usd,
+        tx_line_high_usd,
+        phasor_low_usd,
+        phasor_high_usd,
+        total_atu_system_low_usd,
+        total_atu_system_high_usd,
+        reference: '47 CFR §73.51 (antenna current measurement); §73.54 (antenna resistance); §73.1560 (operating power); NRSC AM antenna standards',
+        note: `${is_da ? 'DA' : 'NDA'} ${n_towers}-tower: ATU $${atu_cost_low_usd.toLocaleString()}–$${atu_cost_high_usd.toLocaleString()}${is_da ? ` + phasor $${phasor_low_usd.toLocaleString()}–$${phasor_high_usd.toLocaleString()}` : ''} + base current meter + tx line; total $${total_atu_system_low_usd.toLocaleString()}–$${total_atu_system_high_usd.toLocaleString()}; est. Rbase=${r_base_est_ohm} Ω (Rrad=${r_radiation_est_ohm} Ω + Rg=${r_ground_est_ohm} Ω)`
       };
     })(),
 

@@ -2636,6 +2636,17 @@ test('am_geotechnical_and_soil_investigation_guide present across colocation can
   }
 });
 
+test('am_transmission_line_and_antenna_tuning_unit_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_antenna_tuning_unit_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmission_line_and_antenna_tuning_unit_guide missing`);
+    assert.ok(g.r_base_est_ohm > 0, `rank ${c.rank}: r_base_est_ohm must be positive`);
+    assert.ok(g.total_atu_system_low_usd > 0, `rank ${c.rank}: total_atu_system_low_usd must be positive`);
+    assert.ok(g.total_atu_system_high_usd >= g.total_atu_system_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
 test('am_tower_base_insulator_and_rf_isolation_guide present across colocation candidates', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
   for (const c of out.candidates) {

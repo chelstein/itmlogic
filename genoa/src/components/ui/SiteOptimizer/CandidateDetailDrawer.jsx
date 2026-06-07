@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmission Line and Antenna Tuning Unit Guide */}
+        {candidate.am_transmission_line_and_antenna_tuning_unit_guide && (() => {
+          const g = candidate.am_transmission_line_and_antenna_tuning_unit_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="atu-guide" style={{ marginBottom: 16, padding: 12, background: '#fef9c3', borderRadius: 8, border: '2px solid #ca8a04' }}>
+              <div style={{ fontWeight: 700, color: '#713f12', marginBottom: 6, fontSize: 13 }}>Transmission Line &amp; Antenna Tuning Unit (§73.51 / §73.54)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span style={{ color: '#ca8a04' }}>Configuration:</span><span style={{ fontWeight: 600 }}>{g.is_da ? 'DA' : 'NDA'} — {g.n_towers} tower{g.n_towers > 1 ? 's' : ''}</span>
+                <span style={{ color: '#ca8a04' }}>Est. Rbase:</span><span>{g.r_base_est_ohm} Ω (Rrad={g.r_radiation_est_ohm} Ω + Rg={g.r_ground_est_ohm} Ω)</span>
+                <span style={{ color: '#ca8a04' }}>ATU:</span><span>{fmt(g.atu_cost_low_usd)} – {fmt(g.atu_cost_high_usd)}</span>
+                {g.is_da && <><span style={{ color: '#ca8a04' }}>Phasor:</span><span>{fmt(g.phasor_low_usd)} – {fmt(g.phasor_high_usd)}</span></>}
+                <span style={{ color: '#ca8a04' }}>Base Current Meter:</span><span>{fmt(g.base_current_meter_low_usd)} – {fmt(g.base_current_meter_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Tx Line:</span><span>{fmt(g.tx_line_low_usd)} – {fmt(g.tx_line_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Total ATU System:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_atu_system_low_usd)} – {fmt(g.total_atu_system_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#78350f' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Base Insulator and RF Isolation Guide */}
         {candidate.am_tower_base_insulator_and_rf_isolation_guide && (() => {
           const g = candidate.am_tower_base_insulator_and_rf_isolation_guide;

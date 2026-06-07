@@ -11439,6 +11439,51 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_transmission_line_and_antenna_tuning_unit_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_antenna_tuning_unit_guide;
+  assert.ok(g !== undefined && g !== null, 'am_transmission_line_and_antenna_tuning_unit_guide missing');
+  assert.ok(g.total_atu_system_low_usd > 0, 'total_atu_system_low_usd must be positive');
+  assert.ok(g.r_base_est_ohm > 0, 'r_base_est_ohm must be positive');
+});
+
+test('am_transmission_line_and_antenna_tuning_unit_guide KAZM NDA configuration', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_antenna_tuning_unit_guide;
+  assert.strictEqual(g.is_da,    false, 'KAZM NDA should have is_da=false');
+  assert.strictEqual(g.n_towers, 1,     'KAZM NDA should have 1 tower');
+  assert.strictEqual(g.phasor_low_usd, 0, 'KAZM NDA phasor_low_usd should be 0');
+});
+
+test('am_transmission_line_and_antenna_tuning_unit_guide KAZM impedance estimate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_antenna_tuning_unit_guide;
+  assert.strictEqual(g.r_radiation_est_ohm, 36, 'r_radiation_est_ohm should be 36 Ω (λ/4 reference)');
+  assert.strictEqual(g.r_ground_est_ohm,    8,  'KAZM NDA r_ground_est_ohm should be 8 Ω');
+  assert.strictEqual(g.r_base_est_ohm,      44, 'KAZM NDA r_base_est_ohm should be 44 Ω');
+});
+
+test('am_transmission_line_and_antenna_tuning_unit_guide KAZM total ATU system costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_antenna_tuning_unit_guide;
+  assert.strictEqual(g.atu_cost_low_usd,         3000,  'KAZM NDA atu_cost_low_usd should be $3,000');
+  assert.strictEqual(g.total_atu_system_low_usd,  4500,  'KAZM NDA total_atu_system_low_usd should be $4,500');
+  assert.strictEqual(g.total_atu_system_high_usd, 19000, 'KAZM NDA total_atu_system_high_usd should be $19,000');
+});
+
+test('am_transmission_line_and_antenna_tuning_unit_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('atu_is_da'        in row, 'atu_is_da missing from comparison table');
+    assert.ok('atu_total_low_usd' in row, 'atu_total_low_usd missing from comparison table');
+    assert.ok('atu_r_base_ohm'   in row, 'atu_r_base_ohm missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.atu_is_da,         false, 'rank-1 atu_is_da should be false');
+  assert.strictEqual(r0.atu_total_low_usd, 4500,  'rank-1 atu_total_low_usd should be $4,500');
+  assert.strictEqual(r0.atu_r_base_ohm,    44,    'rank-1 atu_r_base_ohm should be 44 Ω');
+});
+
 test('am_tower_base_insulator_and_rf_isolation_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_tower_base_insulator_and_rf_isolation_guide;
