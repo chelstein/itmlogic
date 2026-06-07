@@ -2226,6 +2226,30 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Annual Operating Cost Breakdown Guide */}
+        {candidate.am_annual_operating_cost_breakdown_guide && (() => {
+          const g = candidate.am_annual_operating_cost_breakdown_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="aoc-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Annual Operating Cost Breakdown</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Grid draw:</span><span>{g.electricity_draw_kw != null ? `${g.electricity_draw_kw} kW` : '—'} ({g.kwh_per_year != null ? `${g.kwh_per_year.toLocaleString()} kWh/yr` : '—'})</span>
+                <span>Electricity:</span><span>{fmt(g.electricity_low_usd)} – {fmt(g.electricity_high_usd)}/yr</span>
+                <span>Diesel fuel:</span><span>{fmt(g.diesel_low_usd)} – {fmt(g.diesel_high_usd)}/yr ({g.diesel_gal_per_year != null ? `${g.diesel_gal_per_year} gal` : '—'})</span>
+                <span>Land lease:</span><span>{fmt(g.land_lease_low_usd)} – {fmt(g.land_lease_high_usd)}/yr</span>
+                <span>Tower inspection:</span><span>{fmt(g.tower_inspection_low_usd)} – {fmt(g.tower_inspection_high_usd)}/yr</span>
+                <span>FCC annual fee:</span><span>{fmt(g.fcc_annual_fee_low_usd)} – {fmt(g.fcc_annual_fee_high_usd)}/yr</span>
+                <span>Maintenance:</span><span>{fmt(g.maintenance_low_usd)} – {fmt(g.maintenance_high_usd)}/yr</span>
+                <span>Security:</span><span>{fmt(g.security_low_usd)} – {fmt(g.security_high_usd)}/yr</span>
+                <span style={{ fontWeight: 600 }}>Total annual:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}/yr</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#15803d', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Modulation and Audio Processing Guide */}
         {candidate.am_modulation_and_audio_processing_guide && (() => {
           const g = candidate.am_modulation_and_audio_processing_guide;

@@ -1332,7 +1332,10 @@ export async function runSiteOptimizer(body = {}){
     fac_upgrade_potential_kw:   c.am_frequency_allocation_class_and_channel_guide?.upgrade_potential_kw ?? null,
     map_pos_mod_limit_pct:      c.am_modulation_and_audio_processing_guide?.pos_mod_limit_pct ?? null,
     map_iboc_digital_kw:        c.am_modulation_and_audio_processing_guide?.iboc_digital_kw ?? null,
-    map_total_basic_low_usd:    c.am_modulation_and_audio_processing_guide?.total_basic_low_usd ?? null
+    map_total_basic_low_usd:    c.am_modulation_and_audio_processing_guide?.total_basic_low_usd ?? null,
+    aoc_total_low_usd:          c.am_annual_operating_cost_breakdown_guide?.total_low_usd ?? null,
+    aoc_electricity_low_usd:    c.am_annual_operating_cost_breakdown_guide?.electricity_low_usd ?? null,
+    aoc_kwh_per_year:           c.am_annual_operating_cost_breakdown_guide?.kwh_per_year ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7067,6 +7070,62 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_annual_operating_cost_breakdown_guide: (() => {
+      // Detailed annual site operating cost breakdown for the candidate location.
+      // Differentiates from the financial feasibility guide by focusing on
+      // site-specific costs rather than capital expenditure.
+      // Electricity consumption: AM transmitter draws ~3× TPO in kW from the grid (33% efficiency)
+      const electricity_draw_kw    = round2(tpo_kw * 3);   // grid draw ≈ 3× TPO
+      const hours_per_year         = 8760;
+      const kwh_per_year           = round2(electricity_draw_kw * hours_per_year);
+      const electricity_rate_low   = 0.08;   // $/kWh (rural commercial)
+      const electricity_rate_high  = 0.18;   // $/kWh (high-cost markets)
+      const electricity_low_usd    = round2(kwh_per_year * electricity_rate_low);
+      const electricity_high_usd   = round2(kwh_per_year * electricity_rate_high);
+      // Diesel fuel for backup generator (assume 200 hrs/yr testing + outage):
+      const diesel_hours_per_yr    = 200;
+      const diesel_gal_per_hr      = round2(gen_kw_approx => gen_kw_approx * 0.07)( electricity_draw_kw );  // 0.07 gal/kW-hr
+      const diesel_low_per_gal     = 3.50;
+      const diesel_high_per_gal    = 5.50;
+      const diesel_gal_per_year    = round2(diesel_hours_per_yr * diesel_gal_per_hr);
+      const diesel_low_usd         = round2(diesel_gal_per_year * diesel_low_per_gal);
+      const diesel_high_usd        = round2(diesel_gal_per_year * diesel_high_per_gal);
+      // Land lease (if leasing, not purchasing):
+      const land_lease_low_usd   = 6000;   // $500/mo
+      const land_lease_high_usd  = 36000;  // $3,000/mo
+      // Tower inspection (annual): $2,000–$5,000
+      const tower_inspection_low  = 2000;
+      const tower_inspection_high = 5000;
+      // FCC annual regulatory fee (Class D ~$1,050–$2,200):
+      const fcc_annual_fee_low  = 1050;
+      const fcc_annual_fee_high = 2200;
+      // Transmitter maintenance contract: $3,000–$8,000/yr
+      const maintenance_low  = 3000;
+      const maintenance_high = 8000;
+      // Security monitoring: $500–$2,000/yr
+      const security_low  = 500;
+      const security_high = 2000;
+      const total_low_usd  = round2(electricity_low_usd  + diesel_low_usd  + land_lease_low_usd  + tower_inspection_low  + fcc_annual_fee_low  + maintenance_low  + security_low);
+      const total_high_usd = round2(electricity_high_usd + diesel_high_usd + land_lease_high_usd + tower_inspection_high + fcc_annual_fee_high + maintenance_high + security_high);
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        electricity_draw_kw,
+        kwh_per_year,
+        electricity_rate_low, electricity_rate_high,
+        electricity_low_usd, electricity_high_usd,
+        diesel_hours_per_yr, diesel_gal_per_hour: diesel_gal_per_hr, diesel_gal_per_year,
+        diesel_low_usd, diesel_high_usd,
+        land_lease_low_usd, land_lease_high_usd,
+        tower_inspection_low_usd: tower_inspection_low, tower_inspection_high_usd: tower_inspection_high,
+        fcc_annual_fee_low_usd: fcc_annual_fee_low, fcc_annual_fee_high_usd: fcc_annual_fee_high,
+        maintenance_low_usd: maintenance_low, maintenance_high_usd: maintenance_high,
+        security_low_usd: security_low, security_high_usd: security_high,
+        total_low_usd, total_high_usd,
+        reference: '47 CFR §73.3585 (annual FCC regulatory fee schedule); EIA commercial electricity rates; diesel fuel consumption (0.07 gal/kW-hr at 33% efficiency); RS Means facilities maintenance data',
+        note: `${tpo_kw} kW TPO → ${electricity_draw_kw} kW grid draw (${kwh_per_year.toLocaleString()} kWh/yr). Annual total: $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}`
       };
     })(),
 

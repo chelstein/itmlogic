@@ -3271,3 +3271,14 @@ test('am_modulation_and_audio_processing_guide present across colocation candida
     assert.ok(g.total_basic_low_usd > 0, `rank ${c.rank}: total_basic_low_usd must be positive`);
   }
 });
+
+test('am_annual_operating_cost_breakdown_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_annual_operating_cost_breakdown_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_operating_cost_breakdown_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.kwh_per_year > 0, `rank ${c.rank}: kwh_per_year must be positive`);
+    assert.ok(g.electricity_draw_kw >= 3, `rank ${c.rank}: electricity_draw_kw must be >= 3 (3× TPO min 1 kW)`);
+  }
+});

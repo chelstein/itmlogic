@@ -13892,3 +13892,46 @@ test('am_modulation_and_audio_processing_guide comparison table columns present'
   assert.strictEqual(r0.map_iboc_digital_kw,     0.05, 'rank-1 map_iboc_digital_kw should be 0.05');
   assert.strictEqual(r0.map_total_basic_low_usd, 4500, 'rank-1 map_total_basic_low_usd should be 4500');
 });
+
+test('am_annual_operating_cost_breakdown_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
+  assert.ok(g !== undefined && g !== null, 'am_annual_operating_cost_breakdown_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM 5 kW electricity consumption', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
+  assert.strictEqual(g.electricity_draw_kw, 15,     'KAZM 5 kW × 3 = 15 kW grid draw');
+  assert.strictEqual(g.kwh_per_year,        131400, 'KAZM 15 kW × 8760 hr = 131400 kWh/yr');
+  assert.strictEqual(g.electricity_low_usd, 10512,  'KAZM electricity low should be 10512');
+});
+
+test('KAZM annual operating cost totals', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
+  assert.strictEqual(g.total_low_usd,  23797, 'KAZM total_low_usd should be 23797');
+  assert.strictEqual(g.total_high_usd, 78007, 'KAZM total_high_usd should be 78007');
+});
+
+test('KAZM annual ops reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_annual_operating_cost_breakdown_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.includes('§73.3585'), 'reference must cite §73.3585');
+  assert.ok(typeof g.note === 'string' && g.note.includes('kWh/yr'), 'note must mention kWh/yr');
+});
+
+test('am_annual_operating_cost_breakdown_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('aoc_total_low_usd'       in row, 'aoc_total_low_usd missing from comparison table');
+    assert.ok('aoc_electricity_low_usd' in row, 'aoc_electricity_low_usd missing from comparison table');
+    assert.ok('aoc_kwh_per_year'        in row, 'aoc_kwh_per_year missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.aoc_total_low_usd,       23797,  'rank-1 aoc_total_low_usd should be 23797');
+  assert.strictEqual(r0.aoc_electricity_low_usd,  10512,  'rank-1 aoc_electricity_low_usd should be 10512');
+  assert.strictEqual(r0.aoc_kwh_per_year,         131400, 'rank-1 aoc_kwh_per_year should be 131400');
+});
