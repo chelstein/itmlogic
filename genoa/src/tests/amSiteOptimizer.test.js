@@ -10959,3 +10959,54 @@ test('am_emergency_power_and_backup_systems_guide comparison table columns prese
   assert.strictEqual(r0.ep_total_backup_low_usd, 15000, 'rank-1 total_backup_low_usd should be $15,000');
   assert.strictEqual(r0.ep_fuel_for_72h_gal, 101, 'rank-1 fuel_for_72h_gal should be 101');
 });
+
+test('am_tower_structural_and_wind_loading_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
+  assert.ok(g !== undefined && g !== null, 'am_tower_structural_and_wind_loading_guide should be present');
+  assert.ok(typeof g.tower_height_ft === 'number', 'tower_height_ft should be a number');
+  assert.ok(g.pe_stamp_required === true, 'PE stamp must be required');
+});
+
+test('am_tower_structural_and_wind_loading_guide KAZM wavelength and tower height', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
+  // 780 kHz: λ = 299792.458/780 = 384.35 m; 0.25λ = 96.09 m = 315 ft
+  assert.strictEqual(g.lambda_m, 384.35, 'lambda_m should be 384.35 m for 780 kHz');
+  assert.strictEqual(g.quarter_wave_ft, 315, 'quarter_wave_ft should be 315 ft');
+  assert.strictEqual(g.tower_height_ft, 315, 'Class D uses 0.25λ = 315 ft tower');
+  assert.strictEqual(g.tia_class, 'Class II', '315 ft tower should be TIA-222-H Class II');
+});
+
+test('am_tower_structural_and_wind_loading_guide KAZM wind and ice zone', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
+  // Sedona AZ (lat 34.86, lon -111.82): continental, not coastal
+  assert.ok(g.wind_zone.startsWith('Zone B'), `wind_zone should be Zone B, got: ${g.wind_zone}`);
+  assert.ok(g.design_wind_speed_mph > 0, 'design_wind_speed_mph must be positive');
+  assert.ok(g.ice_zone.length > 0, 'ice_zone should be defined');
+  assert.ok(g.faa_marking_required === true, '315 ft tower requires FAA marking (>200 ft)');
+});
+
+test('am_tower_structural_and_wind_loading_guide KAZM tower cost estimates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_structural_and_wind_loading_guide;
+  // 315 ft Class II guyed: $500/ft low + foundation $200/ft + 3 guy anchors $5k each
+  assert.strictEqual(g.guyed_low_usd, 157500, 'guyed_low_usd = 315 × $500 = $157,500');
+  assert.strictEqual(g.total_guyed_low_usd, 235500, 'total_guyed_low_usd should be $235,500');
+  assert.ok(g.total_guyed_high_usd > g.total_guyed_low_usd, 'high cost must exceed low');
+  assert.ok(g.selfsupport_low_usd > g.guyed_low_usd, 'self-supporting must cost more than guyed');
+});
+
+test('am_tower_structural_and_wind_loading_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tw_height_ft'      in row, 'tw_height_ft missing from comparison table');
+    assert.ok('tw_guyed_low_usd'  in row, 'tw_guyed_low_usd missing from comparison table');
+    assert.ok('tw_tia_class'      in row, 'tw_tia_class missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.tw_height_ft, 315, 'rank-1 tw_height_ft should be 315');
+  assert.strictEqual(r0.tw_guyed_low_usd, 235500, 'rank-1 tw_guyed_low_usd should be $235,500');
+  assert.strictEqual(r0.tw_tia_class, 'Class II', 'rank-1 tw_tia_class should be Class II');
+});

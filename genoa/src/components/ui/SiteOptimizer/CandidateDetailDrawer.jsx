@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Structural and Wind Loading Guide */}
+        {candidate.am_tower_structural_and_wind_loading_guide && (() => {
+          const g = candidate.am_tower_structural_and_wind_loading_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="tw-guide" style={{ marginBottom: 16, padding: 12, background: '#f5f3ff', borderRadius: 8, border: '1px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 6, fontSize: 13 }}>Tower Structural &amp; Wind Loading</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Wavelength:</span><span>λ = {g.lambda_m} m &nbsp;|&nbsp; λ/4 = {g.quarter_wave_ft} ft</span>
+                <span style={{ color: '#6b7280' }}>Tower Height:</span><span style={{ fontWeight: 600 }}>{g.tower_height_ft} ft ({Math.round(g.height_fraction * 100)}% λ, Class D optimized)</span>
+                <span style={{ color: '#6b7280' }}>TIA-222-H Class:</span><span>{g.tia_class} / Exposure {g.exposure_cat}</span>
+                <span style={{ color: '#6b7280' }}>Wind Zone:</span><span>{g.wind_zone} ({g.design_wind_speed_mph} mph)</span>
+                <span style={{ color: '#6b7280' }}>Ice Zone:</span><span>{g.ice_zone}</span>
+                <span style={{ color: '#6b7280' }}>Preferred Type:</span><span>{g.preferred_type}</span>
+                <span style={{ color: '#6b7280' }}>Guyed Tower:</span><span>{fmt(g.guyed_low_usd)} – {fmt(g.guyed_high_usd)} (steel + erection)</span>
+                <span style={{ color: '#6b7280' }}>Foundation:</span><span>{fmt(g.foundation_low_usd)} – {fmt(g.foundation_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Guy Anchors ({g.guy_anchor_count} tiers):</span><span>{fmt(g.guy_anchor_low_usd)} – {fmt(g.guy_anchor_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Guyed:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_guyed_low_usd)} – {fmt(g.total_guyed_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Self-Supporting:</span><span>{fmt(g.selfsupport_low_usd)} – {fmt(g.selfsupport_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>FAA Marking:</span><span>{g.faa_marking_required ? '✓ Required (>200 ft AGL)' : 'Not required'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#5b21b6', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Emergency Power and Backup Systems Guide */}
         {candidate.am_emergency_power_and_backup_systems_guide && (() => {
           const g = candidate.am_emergency_power_and_backup_systems_guide;

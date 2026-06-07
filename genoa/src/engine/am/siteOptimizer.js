@@ -1137,7 +1137,10 @@ export async function runSiteOptimizer(body = {}){
     opex_10yr_pv_low_usd:       c.am_annual_operating_cost_analysis_guide?.opex_10yr_pv_low_usd ?? null,
     ep_generator_size_kw:       c.am_emergency_power_and_backup_systems_guide?.generator_size_kw ?? null,
     ep_total_backup_low_usd:    c.am_emergency_power_and_backup_systems_guide?.total_backup_low_usd ?? null,
-    ep_fuel_for_72h_gal:        c.am_emergency_power_and_backup_systems_guide?.fuel_for_72h_gal ?? null
+    ep_fuel_for_72h_gal:        c.am_emergency_power_and_backup_systems_guide?.fuel_for_72h_gal ?? null,
+    tw_height_ft:               c.am_tower_structural_and_wind_loading_guide?.tower_height_ft ?? null,
+    tw_guyed_low_usd:           c.am_tower_structural_and_wind_loading_guide?.total_guyed_low_usd ?? null,
+    tw_tia_class:               c.am_tower_structural_and_wind_loading_guide?.tia_class ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6872,6 +6875,75 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_structural_and_wind_loading_guide: (() => {
+      // Analyzes structural requirements for the AM monopole tower at this candidate
+      // site under TIA-222-H (Rev. H, 2017) and ASCE 7-22 loading criteria.
+      // Determines wind zone, ice zone, structural class, and estimated tower costs
+      // for a guyed and self-supporting configuration at the recommended height.
+      const lambda_m        = round2(299792.458 / frequency_khz);
+      const quarter_wave_m  = round2(lambda_m / 4);
+      const quarter_wave_ft = Math.round(quarter_wave_m * 3.28084);
+      // Class D secondary stations minimize capex with 0.25λ; full-power classes
+      // benefit from 0.525λ (5λ/8) for maximum radiation resistance (~36.6 Ω).
+      const height_fraction = fcc_class === 'D' ? 0.25 : (fcc_class === 'A' ? 0.525 : 0.375);
+      const tower_height_m  = round2(lambda_m * height_fraction);
+      const tower_height_ft = Math.round(tower_height_m * 3.28084);
+      // Wind zone per ASCE 7-22 Figure 26.5-1D (simplified by latitude/longitude)
+      const is_gulf_coast  = pt.lat < 31 && pt.lon > -98 && pt.lon < -80;
+      const is_east_coast  = pt.lon > -81 && pt.lat < 45;
+      const is_high_plains = pt.lat > 44 && pt.lon > -104 && pt.lon < -82;
+      const is_coastal_wind = is_gulf_coast || is_east_coast || is_high_plains;
+      const wind_zone              = is_gulf_coast  ? 'Zone D (hurricane, >130 mph)'
+                                   : is_east_coast  ? 'Zone C (115–130 mph coastal)'
+                                   : is_high_plains ? 'Zone C (115–130 mph high-plains)'
+                                                    : 'Zone B (90–115 mph, continental)';
+      const design_wind_speed_mph  = is_gulf_coast ? 150 : (is_coastal_wind ? 120 : 105);
+      // Ice zone per TIA-222-H Figure B-2 (simplified by latitude)
+      const ice_zone = pt.lat > 44 ? 'Zone 3 (≥1-inch radial ice)'
+                     : pt.lat > 38 ? 'Zone 2 (0.5-inch radial ice)'
+                     : pt.lat > 32 ? 'Zone 1 (trace ice)'
+                                   : 'Zone 0 (negligible ice)';
+      // TIA-222-H structural class (exposure category and reliability factor)
+      const tia_class      = tower_height_ft > 500 ? 'Class III'
+                           : tower_height_ft > 200 ? 'Class II'
+                                                   : 'Class I';
+      const exposure_cat   = is_coastal_wind ? 'D' : 'C';
+      const isDA_tw        = /^DA/i.test(pattern_mode);
+      // Guyed towers are standard for AM; DA requires series-fed (no base insulator)
+      const preferred_type = isDA_tw ? 'guyed (series-fed, DA pattern requirement)'
+                                     : 'guyed or self-supporting';
+      // Cost per foot: steel + erection + guy wires (guyed); multiply for self-supporting
+      const GUYED_LOW_PER_FT  = { 'Class I': 300, 'Class II': 500, 'Class III': 900 };
+      const GUYED_HIGH_PER_FT = { 'Class I': 700, 'Class II': 1200, 'Class III': 2200 };
+      const guyed_low_usd          = Math.round(tower_height_ft * GUYED_LOW_PER_FT[tia_class]);
+      const guyed_high_usd         = Math.round(tower_height_ft * GUYED_HIGH_PER_FT[tia_class]);
+      const selfsupport_low_usd    = Math.round(guyed_low_usd * 2.2);
+      const selfsupport_high_usd   = Math.round(guyed_high_usd * 2.2);
+      const foundation_low_usd     = Math.round(tower_height_ft * 200);
+      const foundation_high_usd    = Math.round(tower_height_ft * 500);
+      const guy_anchor_count       = tower_height_ft > 400 ? 4 : 3; // tiers
+      const guy_anchor_low_usd     = guy_anchor_count * 5000;
+      const guy_anchor_high_usd    = guy_anchor_count * 15000;
+      const faa_marking_required   = tower_height_ft > 200;
+      const pe_stamp_required      = true; // TIA-222-H requires licensed PE
+      const total_guyed_low_usd    = guyed_low_usd + foundation_low_usd + guy_anchor_low_usd;
+      const total_guyed_high_usd   = guyed_high_usd + foundation_high_usd + guy_anchor_high_usd;
+      return {
+        lambda_m, quarter_wave_m, quarter_wave_ft,
+        tower_height_m, tower_height_ft, height_fraction,
+        wind_zone, design_wind_speed_mph, ice_zone,
+        tia_class, exposure_cat, preferred_type,
+        guyed_low_usd, guyed_high_usd,
+        selfsupport_low_usd, selfsupport_high_usd,
+        foundation_low_usd, foundation_high_usd,
+        guy_anchor_count, guy_anchor_low_usd, guy_anchor_high_usd,
+        total_guyed_low_usd, total_guyed_high_usd,
+        faa_marking_required, pe_stamp_required,
+        reference: 'TIA-222-H (structural standard for antenna supporting structures); ASCE 7-22 (minimum design loads); 47 CFR §17.7 (FCC ASR tower registration); FAA AC 70/7460-1M (obstruction marking); IBC 2021 (building code for foundations)',
+        note: `${frequency_khz} kHz λ=${lambda_m} m; recommended tower ${tower_height_ft} ft (${round2(height_fraction * 100)}% λ). ${wind_zone}; ${ice_zone}. TIA-222-H ${tia_class} / Exposure ${exposure_cat}. Guyed tower: $${total_guyed_low_usd.toLocaleString()}–$${total_guyed_high_usd.toLocaleString()} installed (${guy_anchor_count} guy tiers). ${faa_marking_required ? 'FAA obstruction marking required (>200 ft AGL).' : 'No FAA marking required (<200 ft).'} PE-stamped drawings required.`
       };
     })(),
 

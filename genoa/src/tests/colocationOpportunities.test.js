@@ -2547,3 +2547,14 @@ test('am_emergency_power_and_backup_systems_guide present across colocation cand
     assert.ok(g.fuel_for_72h_gal > 0, `rank ${c.rank}: fuel_for_72h_gal must be positive`);
   }
 });
+
+test('am_tower_structural_and_wind_loading_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_and_wind_loading_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_structural_and_wind_loading_guide missing`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_guyed_low_usd > 0, `rank ${c.rank}: total_guyed_low_usd must be positive`);
+    assert.ok(typeof g.tia_class === 'string', `rank ${c.rank}: tia_class should be a string`);
+  }
+});
