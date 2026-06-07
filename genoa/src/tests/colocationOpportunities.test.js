@@ -3650,3 +3650,20 @@ test('colocation candidates include am_auxiliary_backup_transmitter_compliance_g
     assert.ok(g.total_backup_low_usd > 0, `total_backup_low_usd must be positive`);
   }
 });
+
+test('colocation candidates include am_license_renewal_and_regulatory_history_guide with §73.1125 main studio check', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_license_renewal_and_regulatory_history_guide;
+    assert.ok(g, `candidate missing am_license_renewal_and_regulatory_history_guide`);
+    assert.strictEqual(g.renewal_cycle_years, 8, '§73.3539 renewal cycle = 8 years');
+    assert.ok(Math.abs(g.main_studio_max_distance_km - 40.23) < 0.01, '§73.1125 limit = 40.23 km');
+    assert.ok(g.total_renewal_low_usd > 0, `total_renewal_low_usd must be positive`);
+  }
+});

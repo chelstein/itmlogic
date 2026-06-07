@@ -1401,7 +1401,10 @@ export async function runSiteOptimizer(body = {}){
     eas_stl_path_verification_needed:   c.am_eas_equipment_readiness_guide?.eas_stl_path_verification_needed ?? null,
     bxt_backup_tpo_kw:                  c.am_auxiliary_backup_transmitter_compliance_guide?.backup_tpo_kw ?? null,
     bxt_separate_antenna_needed:        c.am_auxiliary_backup_transmitter_compliance_guide?.separate_antenna_needed ?? null,
-    bxt_total_backup_low_usd:           c.am_auxiliary_backup_transmitter_compliance_guide?.total_backup_low_usd ?? null
+    bxt_total_backup_low_usd:           c.am_auxiliary_backup_transmitter_compliance_guide?.total_backup_low_usd ?? null,
+    rlh_main_studio_compliant:          c.am_license_renewal_and_regulatory_history_guide?.main_studio_compliant ?? null,
+    rlh_distance_to_col_km:             c.am_license_renewal_and_regulatory_history_guide?.distance_to_col_km ?? null,
+    rlh_total_renewal_low_usd:          c.am_license_renewal_and_regulatory_history_guide?.total_renewal_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7136,6 +7139,98 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_license_renewal_and_regulatory_history_guide: (() => {
+      // 47 CFR §73.3539 — License renewal for AM broadcast stations.
+      //
+      // §73.3539(a): Renewal applications filed on FCC Form 303-S, electronically via CDBS/LMS.
+      // §73.3539(b): Filed no later than the first day of the fourth full calendar month before
+      //   the license expires.  AM stations renew on 8-year cycles; expiration dates are grouped
+      //   by state per FCC schedule.
+      //
+      // §73.3527: Online public inspection file must include:
+      //   • All applications and related materials (including renewals)
+      //   • Quarterly issues-programs lists (§73.3526(e)(11))
+      //   • Any citizen agreements
+      //   Accessible via FCC online public file system (publicfiles.fcc.gov).
+      //
+      // §1.65: Duty to report material changes to the FCC within 30 days:
+      //   • Transmitter site change (lat/lon, address)
+      //   • Power change
+      //   • Antenna change (height, pattern)
+      //   • Any change that makes license data inaccurate
+      //   Filing: FCC Form 302-AM (license application) or amendment to pending CP.
+      //
+      // §73.1125 — Main Studio Rule:
+      //   AM station must maintain a staffed main studio within its principal community contour
+      //   OR within 25 miles of the reference coordinates of the community of license (CoL).
+      //   Waiver (§73.1125(a)): available if no suitable location in or near service area.
+      //   FCC has relaxed main studio rule since 2017 FCC streamlining order, but the
+      //   CoL proximity requirement remains in the rules.
+      //   Distance check: haversine from candidate pt to CoL centroid vs 40.23 km (25 miles).
+      //
+      // §73.3538: License modifications — any technical change requires amended construction
+      //   permit or license (Form 302-AM) and FCC approval before operation.
+      //
+      // Renewal/amendment cost (2024 market):
+      //   Form 303-S renewal filing (attorney/broadcast consultant): $1,500–$4,000
+      //   FCC filing fee (AM renewal): $110 (FCC Fee Schedule, 2024)
+      //   Form 302-AM amendment (technical change at new site): $2,000–$5,000
+      //   §1.65 material-change notification (attorney letter): $500–$1,500
+      //   Total regulatory/renewal budget for relocation: $4,110–$10,500
+      const MAIN_STUDIO_MAX_DIST_KM = 40.23;                   // 25 statute miles in km
+      const renewal_cycle_years = 8;
+      const form_renewal_fee_usd = 110;                        // FCC Schedule of Application Fees
+
+      // Distance from candidate to CoL centroid (col_centroid supplied in scope).
+      // If col_centroid is not available fall back to distance from current_site.
+      const ref_lat = col_centroid?.lat ?? current_site?.lat ?? pt.lat;
+      const ref_lon = col_centroid?.lon ?? current_site?.lon ?? pt.lon;
+      const dlat    = (pt.lat - ref_lat) * Math.PI / 180;
+      const dlon    = (pt.lon - ref_lon) * Math.PI / 180;
+      const a       = Math.sin(dlat / 2) ** 2 +
+                      Math.cos(ref_lat * Math.PI / 180) * Math.cos(pt.lat * Math.PI / 180) *
+                      Math.sin(dlon / 2) ** 2;
+      const dist_col_km = round2(6371.0088 * 2 * Math.asin(Math.sqrt(a)));
+
+      const main_studio_compliant      = dist_col_km <= MAIN_STUDIO_MAX_DIST_KM;
+      const main_studio_waiver_needed  = !main_studio_compliant;
+
+      const waiver_low_usd  = main_studio_waiver_needed ? 3000 : 0;
+      const waiver_high_usd = main_studio_waiver_needed ? 8000 : 0;
+
+      const renewal_prep_low_usd  = 1500;
+      const renewal_prep_high_usd = 4000;
+      const tech_amendment_low_usd  = 2000;
+      const tech_amendment_high_usd = 5000;
+      const material_change_low_usd  = 500;
+      const material_change_high_usd = 1500;
+
+      const total_renewal_low_usd  = form_renewal_fee_usd + renewal_prep_low_usd  + tech_amendment_low_usd  + material_change_low_usd  + waiver_low_usd;
+      const total_renewal_high_usd = form_renewal_fee_usd + renewal_prep_high_usd + tech_amendment_high_usd + material_change_high_usd + waiver_high_usd;
+
+      return {
+        renewal_cycle_years,
+        form_renewal_fee_usd,
+        main_studio_max_distance_km:  MAIN_STUDIO_MAX_DIST_KM,
+        distance_to_col_km:           dist_col_km,
+        main_studio_compliant,
+        main_studio_waiver_needed,
+        renewal_prep_low_usd,
+        renewal_prep_high_usd,
+        form_renewal_fee_usd,
+        tech_amendment_low_usd,
+        tech_amendment_high_usd,
+        material_change_low_usd,
+        material_change_high_usd,
+        waiver_low_usd,
+        waiver_high_usd,
+        total_renewal_low_usd,
+        total_renewal_high_usd,
+        reference: '47 CFR §73.3539 (renewal); §73.3527 (public file); §73.1125 (main studio); §1.65 (material change); §73.3538 (license modification)',
+        note: `Candidate ${dist_col_km} km from CoL centroid (limit: ${MAIN_STUDIO_MAX_DIST_KM} km / 25 miles per §73.1125). ${main_studio_waiver_needed ? 'MAIN STUDIO WAIVER NEEDED — candidate exceeds 25-mile limit; §73.1125(a) waiver required.' : 'Main studio rule compliant at this candidate.'} Technical change at new site requires Form 302-AM amendment within 30 days of move per §1.65. License renews on 8-year cycle (Form 303-S); renewal fee $${form_renewal_fee_usd}.`
       };
     })(),
 

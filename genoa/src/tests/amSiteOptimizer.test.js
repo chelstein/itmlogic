@@ -14753,3 +14753,38 @@ it('candidate_comparison_table bxt columns are present and valid for KAZM', asyn
   assert.ok(r0.bxt_total_backup_low_usd > 0, 'bxt_total_backup_low_usd must be positive');
   assert.ok(r0.bxt_separate_antenna_needed != null, 'bxt_separate_antenna_needed must not be null');
 });
+
+it('am_license_renewal_and_regulatory_history_guide is present on each candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE });
+  for (const c of out.candidates) {
+    assert.ok(c.am_license_renewal_and_regulatory_history_guide, `candidate missing am_license_renewal_and_regulatory_history_guide`);
+  }
+});
+
+it('am_license_renewal_and_regulatory_history_guide renewal_cycle_years is 8 per §73.3539', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_license_renewal_and_regulatory_history_guide;
+  assert.strictEqual(g.renewal_cycle_years, 8, '§73.3539 — AM license renewal cycle is 8 years');
+});
+
+it('am_license_renewal_and_regulatory_history_guide main_studio_max_distance_km is 40.23 km (25 miles)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_license_renewal_and_regulatory_history_guide;
+  assert.ok(Math.abs(g.main_studio_max_distance_km - 40.23) < 0.01, '§73.1125 limit = 25 miles = 40.23 km');
+});
+
+it('am_license_renewal_and_regulatory_history_guide main_studio_compliant for candidate near CoL', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_license_renewal_and_regulatory_history_guide;
+  // candidate within 50 km grid at center should be compliant
+  assert.ok(g.main_studio_compliant != null, 'main_studio_compliant must be defined');
+  assert.ok(g.distance_to_col_km != null, 'distance_to_col_km must be defined');
+});
+
+it('candidate_comparison_table rlh columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.rlh_main_studio_compliant != null, 'rlh_main_studio_compliant must not be null');
+  assert.ok(r0.rlh_distance_to_col_km != null, 'rlh_distance_to_col_km must not be null');
+  assert.ok(r0.rlh_total_renewal_low_usd > 0, 'rlh_total_renewal_low_usd must be positive');
+});

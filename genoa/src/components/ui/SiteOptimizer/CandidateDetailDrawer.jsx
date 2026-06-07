@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM License Renewal and Regulatory History Guide */}
+        {candidate.am_license_renewal_and_regulatory_history_guide && (() => {
+          const g = candidate.am_license_renewal_and_regulatory_history_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="rlh-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>License Renewal &amp; Regulatory Compliance — §73.3539 / §73.1125</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#14532d', marginBottom: 8 }}>
+                <span style={{ color: '#15803d' }}>Renewal cycle:</span><span>{g.renewal_cycle_years} years (§73.3539)</span>
+                <span style={{ color: '#15803d' }}>Renewal fee:</span><span>${fmt(g.form_renewal_fee_usd)} (FCC fee)</span>
+                <span style={{ color: '#15803d' }}>CoL distance:</span><span>{fmtF(g.distance_to_col_km, 1)} km of {fmtF(g.main_studio_max_distance_km, 1)} km limit</span>
+                <span style={{ color: '#15803d' }}>Main studio rule:</span>
+                <span style={{ fontWeight: 700, color: g.main_studio_compliant ? '#15803d' : '#b91c1c' }}>
+                  {g.main_studio_compliant ? '✓ COMPLIANT' : '✗ WAIVER NEEDED'}
+                </span>
+              </div>
+              {g.main_studio_waiver_needed && (
+                <div style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Candidate exceeds 25-mile (40.23 km) limit from CoL per §73.1125 — main studio waiver required.
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#14532d', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#15803d' }}>Renewal prep:</span><span>${fmt(g.renewal_prep_low_usd)} – ${fmt(g.renewal_prep_high_usd)}</span>
+                <span style={{ color: '#15803d' }}>Tech amendment:</span><span>${fmt(g.tech_amendment_low_usd)} – ${fmt(g.tech_amendment_high_usd)}</span>
+                <span style={{ color: '#15803d' }}>§1.65 notification:</span><span>${fmt(g.material_change_low_usd)} – ${fmt(g.material_change_high_usd)}</span>
+                {g.main_studio_waiver_needed && <><span style={{ color: '#15803d' }}>Waiver petition:</span><span>${fmt(g.waiver_low_usd)} – ${fmt(g.waiver_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#15803d', fontWeight: 600 }}>Total regulatory:</span>
+                <span style={{ color: '#14532d', fontWeight: 700 }}>${fmt(g.total_renewal_low_usd)} – ${fmt(g.total_renewal_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#16a34a' }}>Ref: 47 CFR §73.3539, §73.3527, §73.1125, §1.65, §73.3538</div>
+            </div>
+          );
+        })()}
+
         {/* AM Auxiliary Backup Transmitter Compliance Guide */}
         {candidate.am_auxiliary_backup_transmitter_compliance_guide && (() => {
           const g = candidate.am_auxiliary_backup_transmitter_compliance_guide;
