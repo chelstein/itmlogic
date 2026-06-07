@@ -2226,6 +2226,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Public Inspection File and Online Compliance Guide */}
+        {candidate.am_public_inspection_file_and_online_compliance_guide && (() => {
+          const g = candidate.am_public_inspection_file_and_online_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#b45309', marginBottom: 8 }}>
+                Public Inspection File &amp; Online OPIF Compliance
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>OPIF Required:</b> {g.opif_mandatory ? `Yes — all AMs since ${g.opif_transition_deadline}` : 'No'}</div>
+                <div><b>Political File Upload:</b> Within {g.political_file_upload_days} business day (§73.1943)</div>
+                <div><b>Political File Retention:</b> {g.political_file_retention_years} years</div>
+                <div><b>Letters Retention:</b> {g.letters_retention_years} years</div>
+                <div><b>Issues/Programs List:</b> Within {g.issues_programs_list_filing_days} days of quarter end</div>
+                <div><b>Quarter Deadlines:</b> {g.quarter_deadlines?.join(', ')}</div>
+                <div><b>Ownership Report:</b> {g.ownership_report_form} every {g.ownership_report_cycle_years} yrs</div>
+                <div><b>EEO Report:</b> {g.eeo_report_required ? `${g.eeo_report_form} at renewal` : 'Exempt'}</div>
+                <div><b>Contour Map Required:</b> {g.contour_map_required ? `Yes — ${g.contour_map_contour_mv_m} mV/m daytime` : 'No'}</div>
+                <div><b>Children's Report:</b> {g.childrens_programming_report_required ? 'Required' : 'Exempt (AM)'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #fde68a', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>Setup/Audit:</b> ${fmt(g.setup_audit_low_usd)}–${fmt(g.setup_audit_high_usd)}</span>
+                  <span><b>Annual Labor:</b> ${fmt(g.annual_labor_low_usd)}–${fmt(g.annual_labor_high_usd)}/yr</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Modulation Monitoring and Audio Processing Guide */}
         {candidate.am_modulation_monitoring_and_audio_processing_guide && (() => {
           const g = candidate.am_modulation_monitoring_and_audio_processing_guide;

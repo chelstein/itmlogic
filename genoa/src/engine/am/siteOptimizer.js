@@ -1431,7 +1431,10 @@ export async function runSiteOptimizer(body = {}){
     prl_total_acquisition_low_usd:      c.am_transmitter_site_lease_and_property_rights_guide?.total_acquisition_low_usd ?? null,
     mod_max_positive_peak_pct:          c.am_modulation_monitoring_and_audio_processing_guide?.max_positive_peak_pct ?? null,
     mod_power_tolerance_pct:            c.am_modulation_monitoring_and_audio_processing_guide?.power_tolerance_pct ?? null,
-    mod_total_audio_low_usd:            c.am_modulation_monitoring_and_audio_processing_guide?.total_audio_low_usd ?? null
+    mod_total_audio_low_usd:            c.am_modulation_monitoring_and_audio_processing_guide?.total_audio_low_usd ?? null,
+    opf_political_file_upload_days:     c.am_public_inspection_file_and_online_compliance_guide?.political_file_upload_days ?? null,
+    opf_issues_programs_filing_days:    c.am_public_inspection_file_and_online_compliance_guide?.issues_programs_list_filing_days ?? null,
+    opf_total_setup_low_usd:            c.am_public_inspection_file_and_online_compliance_guide?.total_setup_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7167,6 +7170,138 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_public_inspection_file_and_online_compliance_guide: (() => {
+      // AM public inspection file (PIF) and FCC online public file (OPF) compliance.
+      //
+      // 47 CFR §73.3526: Every commercial AM station must maintain a public inspection file
+      // available at the main studio or online via the FCC's LMS/OPIF portal.
+      //
+      // Online public file transition:
+      //   - FCC Order (MB Docket 17-105): All commercial AM/FM stations >25 kW in Top-50 DMAs
+      //     required to use online OPIF starting March 1, 2018. All remaining AM stations
+      //     were required to transition to the FCC online file by March 1, 2020.
+      //   - After March 1, 2020: No AM station may maintain a physical-only local PIF.
+      //     The FCC OPIF portal (station.fcc.gov) is the sole required location.
+      //   - Exception: Letters from the public received at the main studio still retained locally.
+      //
+      // Required contents of AM public inspection file (§73.3526(e)):
+      //   (1)  Authorization documents (license, construction permits, STA letters)
+      //   (2)  Applications and related materials (pending, granted, denied)
+      //   (3)  Citizen agreements (if any exist)
+      //   (4)  Contour maps (principal community coverage contour, 0.1 mV/m groundwave)
+      //   (5)  Ownership reports and related materials (Form 323)
+      //   (6)  EEO public file report (Form 396)
+      //   (7)  Time brokerage agreements (if applicable)
+      //   (8)  Main studio waivers (if applicable)
+      //   (9)  Political file — broadcast messages (§73.1943; §73.3526(e)(6))
+      //  (10)  Issues/programs list — quarterly, within 10 days after quarter ends (§73.3526(e)(12))
+      //  (11)  Children's educational programming reports (not applicable to AM: §73.3526(e)(11)(iii) exempts AMs from children's programming report)
+      //  (12)  Letters and email from the public (retained 3 years)
+      //  (13)  Class A designation orders (if applicable)
+      //
+      // Quarterly issues/programs list:
+      //   Deadlines: January 10, April 10, July 10, October 10.
+      //   Content: 5–10 community issues addressed; programs responding to each issue;
+      //   description, time, day, duration of each program.
+      //
+      // Political file:
+      //   §73.1943 / §73.3526(e)(6): Must be uploaded within 1 business day of any political ad request
+      //   or execution of a political advertising agreement.
+      //   Must remain in file for 2 years after broadcast date.
+      //
+      // License renewal relevance:
+      //   §73.3555 / §73.3526: FCC reviews OPF completeness during renewal.
+      //   Missing quarterly reports or late political file entries trigger §73.3526(e) violation risk.
+      //   Consistent OPF maintenance is a "character" indicator evaluated in §309(d) renewal standard.
+      //
+      // Cost to maintain (ongoing):
+      //   - OPIF upload labor (quarterly reports, political file): ~2–4 hrs/quarter at market rates
+      //     FCC-certified attorney or station manager: $75–$200/hr
+      //   - Initial OPF setup / content audit (on relocation): $500–$2,000 one-time
+      //   - Political file software or broadcast management system: $0–$2,500/yr
+      //   - FCC filing fees (ownership reports, renewal): $0 (commercial AM below $100M revenue threshold)
+      //     Note: §1.1102 FCC fee schedule applies to certain petitions/filings; routine renewals are free for AMs.
+
+      // Determine today's quarter deadline context
+      //   Dates are relative to now — for a relocation planning tool this is informational
+      const quarterDeadlines = ['January 10', 'April 10', 'July 10', 'October 10'];
+
+      // Political file upload window per §73.1943
+      const political_file_upload_days      = 1;   // 1 business day from request/agreement
+
+      // Political file retention per §73.3526(e)(6)
+      const political_file_retention_years  = 2;
+
+      // Letters from public retention per §73.3526(e)(16)
+      const letters_retention_years         = 3;
+
+      // Issues/programs list — quarterly, filed within 10 days of quarter end
+      const issues_programs_list_filing_days = 10;  // §73.3526(e)(12)
+
+      // Children's programming exemption: AM stations are exempt from §73.3526(e)(11)(iii)
+      const childrens_programming_report_required = false;
+
+      // Ownership report: Form 323, filed biannually (every 2 years) per §73.3615(d)
+      const ownership_report_form          = 'FCC Form 323';
+      const ownership_report_cycle_years   = 2;
+
+      // EEO public file report: Form 396, filed with renewal per §73.2080(c)(6)
+      //   For stations with 5 or more full-time employees: must file Form 396
+      //   Class D AM stations with fewer than 5 FTEs: exempt from EEO program requirements (§73.2080(b)(1))
+      const eeo_report_required            = true;   // required unless FTE count exempts it
+      const eeo_report_form                = 'FCC Form 396';
+
+      // Online public file: all AMs must use OPIF portal as of March 1, 2020
+      const opif_mandatory                 = true;
+      const opif_transition_deadline       = '2020-03-01';
+
+      // Contour map requirement:
+      //   §73.3526(e)(1): Principal community coverage contour map must be in file.
+      //   For AM, this means the daytime 0.5 mV/m groundwave contour (§73.24(h)).
+      //   Contour map must be updated whenever a change in facilities is authorized.
+      const contour_map_required           = true;
+      const contour_map_contour_mv_m       = 0.5;   // daytime §73.24(h) community contour
+      const contour_map_update_trigger     = 'Any licensed facilities change (power, antenna, location)';
+
+      // Cost estimates (2024):
+      const setup_audit_low_usd    = 500;
+      const setup_audit_high_usd   = 2000;
+      const quarterly_labor_low_usd = 150;   // ~2 hrs × $75/hr
+      const quarterly_labor_high_usd = 800;  // ~4 hrs × $200/hr (attorney rate)
+      const annual_labor_low_usd   = quarterly_labor_low_usd  * 4;  // 4 quarters
+      const annual_labor_high_usd  = quarterly_labor_high_usd * 4;
+      const total_setup_low_usd    = setup_audit_low_usd;
+      const total_setup_high_usd   = setup_audit_high_usd;
+
+      return {
+        opif_mandatory,
+        opif_transition_deadline,
+        political_file_upload_days,
+        political_file_retention_years,
+        letters_retention_years,
+        issues_programs_list_filing_days,
+        quarter_deadlines: quarterDeadlines,
+        childrens_programming_report_required,
+        ownership_report_form,
+        ownership_report_cycle_years,
+        eeo_report_required,
+        eeo_report_form,
+        contour_map_required,
+        contour_map_contour_mv_m,
+        contour_map_update_trigger,
+        setup_audit_low_usd,
+        setup_audit_high_usd,
+        quarterly_labor_low_usd,
+        quarterly_labor_high_usd,
+        annual_labor_low_usd,
+        annual_labor_high_usd,
+        total_setup_low_usd,
+        total_setup_high_usd,
+        reference: '47 CFR §73.3526 (public inspection file); §73.1943 (political file); §73.3615 (ownership reports Form 323); §73.2080 (EEO Form 396); §73.3526(e)(12) (issues/programs list); FCC MB Docket 17-105 (OPIF transition order)',
+        note: `All AM stations must maintain online public file via FCC OPIF portal (station.fcc.gov) as of March 1, 2020. Quarterly issues/programs lists due within ${issues_programs_list_filing_days} days of quarter end (${quarterDeadlines.join(', ')}). Political file entries must be uploaded within ${political_file_upload_days} business day. Contour map (${contour_map_contour_mv_m} mV/m daytime) must reflect current licensed facilities. On relocation, all authorization documents must be updated in OPIF. Budget ~$${total_setup_low_usd.toLocaleString()}–$${total_setup_high_usd.toLocaleString()} for initial OPF audit and upload.`
       };
     })(),
 

@@ -3814,3 +3814,14 @@ test('am_modulation_monitoring_and_audio_processing_guide present across colocat
     assert.ok(g.total_audio_low_usd > 0, 'total_audio_low_usd must be positive');
   }
 });
+
+test('am_public_inspection_file_and_online_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_public_inspection_file_and_online_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_public_inspection_file_and_online_compliance_guide`);
+    assert.strictEqual(g.opif_mandatory, true, 'OPIF mandatory for all AM stations since 2020');
+    assert.strictEqual(g.political_file_upload_days, 1, 'political file upload within 1 business day');
+    assert.ok(g.total_setup_low_usd > 0, 'total_setup_low_usd must be positive');
+  }
+});

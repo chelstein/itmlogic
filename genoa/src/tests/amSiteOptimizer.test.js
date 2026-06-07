@@ -15115,3 +15115,46 @@ it('candidate_comparison_table mod columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.mod_power_tolerance_pct, 2.0, 'mod_power_tolerance_pct must be 2.0');
   assert.ok(r0.mod_total_audio_low_usd > 0, 'mod_total_audio_low_usd must be positive');
 });
+
+it('am_public_inspection_file_and_online_compliance_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_public_inspection_file_and_online_compliance_guide !== undefined &&
+      c.am_public_inspection_file_and_online_compliance_guide !== null,
+      `rank ${c.rank}: am_public_inspection_file_and_online_compliance_guide must be present`
+    );
+  }
+});
+
+it('KAZM OPIF mandate and political file upload window per §73.3526 / §73.1943', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_public_inspection_file_and_online_compliance_guide;
+  assert.strictEqual(g.opif_mandatory, true, 'online public file is mandatory for all AMs since 2020');
+  assert.strictEqual(g.political_file_upload_days, 1, 'political file must be uploaded within 1 business day §73.1943');
+  assert.strictEqual(g.political_file_retention_years, 2, 'political file retained 2 years per §73.3526(e)(6)');
+});
+
+it('KAZM quarterly issues/programs list deadline and letters retention', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_public_inspection_file_and_online_compliance_guide;
+  assert.strictEqual(g.issues_programs_list_filing_days, 10, 'issues/programs list due within 10 days of quarter end per §73.3526(e)(12)');
+  assert.strictEqual(g.letters_retention_years, 3, 'letters from public retained 3 years');
+  assert.ok(Array.isArray(g.quarter_deadlines) && g.quarter_deadlines.length === 4, 'must have 4 quarter deadlines');
+});
+
+it('KAZM contour map and children\'s programming exemption', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_public_inspection_file_and_online_compliance_guide;
+  assert.strictEqual(g.contour_map_required, true, 'contour map required in public file per §73.3526(e)(1)');
+  assert.strictEqual(g.contour_map_contour_mv_m, 0.5, 'community contour is 0.5 mV/m daytime per §73.24(h)');
+  assert.strictEqual(g.childrens_programming_report_required, false, 'AM stations exempt from children\'s programming report per §73.3526(e)(11)(iii)');
+});
+
+it('candidate_comparison_table opf columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.opf_political_file_upload_days, 1, 'opf_political_file_upload_days must be 1');
+  assert.strictEqual(r0.opf_issues_programs_filing_days, 10, 'opf_issues_programs_filing_days must be 10');
+  assert.ok(r0.opf_total_setup_low_usd >= 500, 'opf_total_setup_low_usd must be ≥$500');
+});
