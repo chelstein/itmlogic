@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Grounding and Lightning Protection Guide */}
+        {candidate.am_grounding_and_lightning_protection_guide && (() => {
+          const g = candidate.am_grounding_and_lightning_protection_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ltp-guide" style={{ marginBottom: 16, padding: 12, background: '#e2e8f0', borderRadius: 8, border: '2px solid #4a5568' }}>
+              <div style={{ fontWeight: 700, color: '#1a202c', marginBottom: 6, fontSize: 13 }}>Grounding &amp; Lightning Protection</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#2d3748' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Ground ring:</span><span>{g.ground_ring_ft != null ? `${g.ground_ring_ft.toFixed(0)} ft` : '—'} ({fmt(g.ground_ring_low_usd)} – {fmt(g.ground_ring_high_usd)})</span>
+                <span>Ground rods:</span><span>{g.num_ground_rods ?? '—'} ({fmt(g.ground_rod_low_usd)} – {fmt(g.ground_rod_high_usd)})</span>
+                <span>Building bonding:</span><span>{fmt(g.building_low_usd)} – {fmt(g.building_high_usd)}</span>
+                <span>TVSS / SPDs:</span><span>{fmt(g.tvss_low_usd)} – {fmt(g.tvss_high_usd)}</span>
+                <span>Inspection:</span><span>{fmt(g.inspection_low_usd)} – {fmt(g.inspection_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4a5568', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Transmission Loss Budget Guide */}
         {candidate.am_transmission_loss_budget_guide && (() => {
           const g = candidate.am_transmission_loss_budget_guide;

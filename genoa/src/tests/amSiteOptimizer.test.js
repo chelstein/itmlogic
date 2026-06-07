@@ -13105,3 +13105,47 @@ test('am_transmission_loss_budget_guide comparison table columns present', async
   assert.strictEqual(r0.txl_total_low_usd, 3529.71, 'rank-1 txl_total_low_usd should be $3,529.71');
   assert.strictEqual(r0.txl_coax_run_ft,   207.63,  'rank-1 txl_coax_run_ft should be 207.63');
 });
+
+test('am_grounding_and_lightning_protection_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_and_lightning_protection_guide;
+  assert.ok(g !== undefined && g !== null, 'am_grounding_and_lightning_protection_guide missing');
+  assert.ok(g.total_low_usd > 0, 'total_low_usd must be positive');
+  assert.ok(g.total_high_usd >= g.total_low_usd, 'total_high must be >= total_low');
+});
+
+test('KAZM grounding ring and rod values', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_and_lightning_protection_guide;
+  assert.strictEqual(g.ground_ring_ft,   94.25, 'KAZM ground_ring_ft should be 94.25');
+  assert.strictEqual(g.num_ground_rods,  10,    'KAZM num_ground_rods should be 10');
+  assert.strictEqual(g.ground_ring_low_usd, 1885, 'KAZM ground_ring_low_usd should be 1885');
+  assert.strictEqual(g.ground_rod_low_usd,  2000, 'KAZM ground_rod_low_usd should be 2000');
+});
+
+test('KAZM grounding system total cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_and_lightning_protection_guide;
+  assert.strictEqual(g.total_low_usd,  9385,  'KAZM total_low_usd should be 9385');
+  assert.strictEqual(g.total_high_usd, 33655, 'KAZM total_high_usd should be 33655');
+});
+
+test('KAZM grounding guide reference and note fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_grounding_and_lightning_protection_guide;
+  assert.ok(typeof g.reference === 'string' && g.reference.length > 0, 'reference must be non-empty string');
+  assert.ok(typeof g.note === 'string' && g.note.includes('315'), 'note must mention tower height ~315 ft');
+});
+
+test('am_grounding_and_lightning_protection_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ltp_total_low_usd'   in row, 'ltp_total_low_usd missing from comparison table');
+    assert.ok('ltp_ground_ring_ft'  in row, 'ltp_ground_ring_ft missing from comparison table');
+    assert.ok('ltp_num_ground_rods' in row, 'ltp_num_ground_rods missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ltp_total_low_usd,   9385,  'rank-1 ltp_total_low_usd should be 9385');
+  assert.strictEqual(r0.ltp_ground_ring_ft,   94.25, 'rank-1 ltp_ground_ring_ft should be 94.25');
+  assert.strictEqual(r0.ltp_num_ground_rods,  10,    'rank-1 ltp_num_ground_rods should be 10');
+});

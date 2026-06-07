@@ -3072,3 +3072,14 @@ test('am_transmission_loss_budget_guide present across colocation candidates', a
       `rank ${c.rank}: unexpected coax_diameter: ${g.coax_diameter}`);
   }
 });
+
+test('am_grounding_and_lightning_protection_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_grounding_and_lightning_protection_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_grounding_and_lightning_protection_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(g.num_ground_rods > 0, `rank ${c.rank}: num_ground_rods must be positive`);
+  }
+});

@@ -1278,7 +1278,10 @@ export async function runSiteOptimizer(body = {}){
     gwy_tower_height_ft:        c.am_tower_guy_wire_and_anchor_system_guide?.tower_height_ft ?? null,
     txl_total_loss_db:          c.am_transmission_loss_budget_guide?.total_loss_db ?? null,
     txl_total_low_usd:          c.am_transmission_loss_budget_guide?.total_low_usd ?? null,
-    txl_coax_run_ft:            c.am_transmission_loss_budget_guide?.coax_run_ft ?? null
+    txl_coax_run_ft:            c.am_transmission_loss_budget_guide?.coax_run_ft ?? null,
+    ltp_total_low_usd:          c.am_grounding_and_lightning_protection_guide?.total_low_usd ?? null,
+    ltp_ground_ring_ft:         c.am_grounding_and_lightning_protection_guide?.ground_ring_ft ?? null,
+    ltp_num_ground_rods:        c.am_grounding_and_lightning_protection_guide?.num_ground_rods ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7013,6 +7016,43 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_grounding_and_lightning_protection_guide: (() => {
+      // NFPA 780 / IEEE Std 142: AM towers are prime lightning targets.
+      // System includes a ground ring around the tower base, driven ground rods,
+      // building air terminals, and TVSS at service entrance.
+      const speed_of_light_m_per_s = 299792458;
+      const wavelength_m    = round2(speed_of_light_m_per_s / (frequency_khz * 1000));
+      const is_class_cd     = /^[CD]$/i.test(fcc_class);
+      const tower_height_m  = round2(is_class_cd ? wavelength_m / 4 : wavelength_m / 2);
+      const tower_height_ft = round2(tower_height_m * 3.28084);
+      const ground_ring_ft  = round2(Math.PI * 30); // ~30 ft radius buried copper ring
+      const ground_ring_low_usd  = round2(ground_ring_ft * 20);
+      const ground_ring_high_usd = round2(ground_ring_ft * 60);
+      const num_ground_rods     = 10;
+      const ground_rod_low_usd  = num_ground_rods * 200;
+      const ground_rod_high_usd = num_ground_rods * 600;
+      const building_low_usd    = 3000;
+      const building_high_usd   = 12000;
+      const tvss_low_usd        = 1500;
+      const tvss_high_usd       = 6000;
+      const inspection_low_usd  = 1000;
+      const inspection_high_usd = 4000;
+      const total_low_usd  = round2(ground_ring_low_usd  + ground_rod_low_usd  + building_low_usd  + tvss_low_usd  + inspection_low_usd);
+      const total_high_usd = round2(ground_ring_high_usd + ground_rod_high_usd + building_high_usd + tvss_high_usd + inspection_high_usd);
+      return {
+        frequency_khz, fcc_class, tower_height_ft,
+        ground_ring_ft, num_ground_rods,
+        ground_ring_low_usd, ground_ring_high_usd,
+        ground_rod_low_usd, ground_rod_high_usd,
+        building_low_usd, building_high_usd,
+        tvss_low_usd, tvss_high_usd,
+        inspection_low_usd, inspection_high_usd,
+        total_low_usd, total_high_usd,
+        reference: 'NFPA 780; IEEE Std 142; NEC Article 800; broadcast tower lightning protection practices',
+        note: `${tower_height_ft.toFixed(0)} ft tower: ${ground_ring_ft.toFixed(0)} ft ground ring, ${num_ground_rods} rods; total ${total_low_usd.toLocaleString()}–${total_high_usd.toLocaleString()}`
       };
     })(),
 
