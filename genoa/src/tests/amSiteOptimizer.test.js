@@ -10409,3 +10409,51 @@ test('am_grounding_system_and_rf_safety_guide comparison table columns present',
     assert.ok('gnd_exclusion_zone_m'   in row, 'gnd_exclusion_zone_m missing from comparison table');
   }
 });
+
+test('am_antenna_tower_lighting_and_faa_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_faa_guide;
+  assert.ok(g != null, 'am_antenna_tower_lighting_and_faa_guide must be present');
+  assert.ok(typeof g.lighting_type === 'string' && g.lighting_type.length > 0, 'lighting_type must be a string');
+  assert.ok(typeof g.total_initial_cost_low_usd === 'number', 'total_initial_cost_low_usd must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_antenna_tower_lighting_and_faa_guide KAZM tower height and FAA obligations', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_faa_guide;
+  // 780 kHz λ/4 ≈ 315 ft → above FAA 200 ft threshold
+  assert.ok(g.std_tower_height_ft > 200, `tower height ${g.std_tower_height_ft}ft should exceed 200ft`);
+  assert.ok(g.std_tower_height_ft < 500, `tower height ${g.std_tower_height_ft}ft should be under 500ft`);
+  assert.strictEqual(g.faa_notification_required, true, 'KAZM requires FAA Form 7460-1');
+  assert.strictEqual(g.asr_required, true, 'KAZM tower requires FCC ASR registration');
+  assert.strictEqual(g.notam_required, true, 'NOTAM required for FAA-registered structure');
+});
+
+test('am_antenna_tower_lighting_and_faa_guide KAZM lighting type is medium intensity', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_faa_guide;
+  // 315 ft tower → medium intensity red/white (200–500 ft range)
+  assert.strictEqual(g.lighting_type, 'MEDIUM_INTENSITY_RED_WHITE', 'KAZM should require medium intensity lighting');
+  assert.strictEqual(g.n_light_levels, 2, 'medium intensity requires 2 light levels');
+  assert.strictEqual(g.n_tower_elements, 1, 'NDA station has 1 tower element');
+});
+
+test('am_antenna_tower_lighting_and_faa_guide cost structure is internally consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_tower_lighting_and_faa_guide;
+  // total = FAA filing + ASR filing + lighting install
+  const expected_low = g.faa_filing_cost_low_usd + g.asr_filing_cost_low_usd + g.lighting_install_cost_low_usd;
+  assert.strictEqual(g.total_initial_cost_low_usd, expected_low, 'total_initial_cost_low should be sum of components');
+  assert.ok(g.total_initial_cost_high_usd > g.total_initial_cost_low_usd, 'high cost must exceed low cost');
+  assert.ok(g.annual_maintenance_cost_low_usd > 0, 'medium intensity lighting has annual maintenance cost');
+});
+
+test('am_antenna_tower_lighting_and_faa_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ltg_type'                   in row, 'ltg_type missing from comparison table');
+    assert.ok('ltg_asr_required'           in row, 'ltg_asr_required missing from comparison table');
+    assert.ok('ltg_total_initial_cost_low' in row, 'ltg_total_initial_cost_low missing from comparison table');
+  }
+});

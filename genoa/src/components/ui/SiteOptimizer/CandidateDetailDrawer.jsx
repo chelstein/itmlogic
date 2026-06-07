@@ -2226,6 +2226,57 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna Tower Lighting & FAA Guide */}
+        {candidate.am_antenna_tower_lighting_and_faa_guide && (() => {
+          const g = candidate.am_antenna_tower_lighting_and_faa_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const ltgLabel = { NONE: 'None', LOW_INTENSITY_RED: 'Low intensity red', MEDIUM_INTENSITY_RED_WHITE: 'Medium intensity red/white', HIGH_INTENSITY_WHITE_STROBE: 'High intensity white strobe' };
+          return (
+            <div style={{ background: '#f0f9ff', border: '1px solid #38bdf8', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 8, fontSize: 13 }}>
+                Tower Lighting &amp; FAA Registration (14 CFR Part 77 / §17.7)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#075985' }}>
+                <span>Est. tower height</span>
+                <span style={{ fontWeight: 600 }}>{g.std_tower_height_ft}ft ({g.std_tower_height_m}m) at {Math.round(1000 * g.lambda_m / 300)}kHz</span>
+                <span>FAA Form 7460-1</span>
+                <span style={{ fontWeight: 600, color: g.faa_notification_required ? '#b45309' : '#166534' }}>
+                  {g.faa_notification_required ? 'Required' : 'Not required'}
+                </span>
+                <span>FCC ASR registration</span>
+                <span style={{ fontWeight: 600, color: g.asr_required ? '#b45309' : '#166534' }}>
+                  {g.asr_required ? 'Required (§17.7)' : 'Not required'}
+                </span>
+                <span>NOTAM coordination</span>
+                <span style={{ fontWeight: 600 }}>{g.notam_required ? 'Required during construction' : 'Not required'}</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
+                <span>Lighting type</span>
+                <span style={{ fontWeight: 600 }}>{ltgLabel[g.lighting_type] ?? g.lighting_type}</span>
+                <span>Light levels</span>
+                <span style={{ fontWeight: 600 }}>{g.n_light_levels > 0 ? g.n_light_levels : 'None'}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #bae6fd', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#075985' }}>
+                <span>FAA filing cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.faa_filing_cost_low_usd)} – {fmt(g.faa_filing_cost_high_usd)}</span>
+                <span>ASR filing cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.asr_filing_cost_low_usd)} – {fmt(g.asr_filing_cost_high_usd)}</span>
+                <span>Lighting install</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.lighting_install_cost_low_usd)} – {fmt(g.lighting_install_cost_high_usd)}</span>
+                <span>Annual maintenance</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_maintenance_cost_low_usd)} – {fmt(g.annual_maintenance_cost_high_usd)}/yr</span>
+                <span style={{ fontWeight: 700, color: '#0c4a6e' }}>Total initial cost</span>
+                <span style={{ fontWeight: 700, color: '#0c4a6e' }}>{fmt(g.total_initial_cost_low_usd)} – {fmt(g.total_initial_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#0c4a6e', borderTop: '1px solid #bae6fd', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Grounding System & RF Safety Guide */}
         {candidate.am_grounding_system_and_rf_safety_guide && (() => {
           const g = candidate.am_grounding_system_and_rf_safety_guide;

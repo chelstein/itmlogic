@@ -2368,3 +2368,20 @@ test('am_grounding_system_and_rf_safety_guide present across colocation candidat
     assert.ok(g.exclusion_zone_m > 0, `rank ${c.rank}: exclusion_zone_m must be positive`);
   }
 });
+
+test('am_antenna_tower_lighting_and_faa_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_tower_lighting_and_faa_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_antenna_tower_lighting_and_faa_guide`);
+    assert.ok(typeof g.lighting_type === 'string', `rank ${c.rank}: lighting_type must be a string`);
+    assert.ok(g.std_tower_height_ft > 0, `rank ${c.rank}: std_tower_height_ft must be positive`);
+    assert.ok(g.total_initial_cost_low_usd >= 0, `rank ${c.rank}: total_initial_cost_low_usd must be non-negative`);
+  }
+});

@@ -1104,7 +1104,10 @@ export async function runSiteOptimizer(body = {}){
     ins_bond_amount_usd:        c.am_station_insurance_and_bonding_guide?.performance_bond_amount_usd ?? null,
     gnd_n_radials:              c.am_grounding_system_and_rf_safety_guide?.n_radials ?? null,
     gnd_total_cost_low_usd:     c.am_grounding_system_and_rf_safety_guide?.total_cost_low_usd ?? null,
-    gnd_exclusion_zone_m:       c.am_grounding_system_and_rf_safety_guide?.exclusion_zone_m ?? null
+    gnd_exclusion_zone_m:       c.am_grounding_system_and_rf_safety_guide?.exclusion_zone_m ?? null,
+    ltg_type:                   c.am_antenna_tower_lighting_and_faa_guide?.lighting_type ?? null,
+    ltg_asr_required:           c.am_antenna_tower_lighting_and_faa_guide?.asr_required ?? null,
+    ltg_total_initial_cost_low: c.am_antenna_tower_lighting_and_faa_guide?.total_initial_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6839,6 +6842,97 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_tower_lighting_and_faa_guide: (() => {
+      // Models FAA tower lighting requirements (14 CFR Part 77, FCC §17.21) and
+      // FCC Antenna Structure Registration (ASR) obligations under §17.7 for the
+      // candidate tower.  Tower height is estimated from the standard λ/4 monopole
+      // height at the station frequency.
+
+      const isDA_ltg = /^DA/i.test(pattern_mode);
+
+      // Wavelength and standard quarter-wave tower height estimate
+      const lambda_m            = round2(300000 / frequency_khz);
+      const std_tower_height_m  = round2(lambda_m * 0.25);
+      const std_tower_height_ft = round2(std_tower_height_m * 3.28084);
+
+      // FAA notification and FCC ASR threshold: 200 ft (60.96m) AGL per 14 CFR
+      // §77.9 and 47 CFR §17.7
+      const FAA_THRESHOLD_M = 60.96;
+      const faa_notification_required = std_tower_height_m > FAA_THRESHOLD_M;
+      const asr_required              = std_tower_height_m > FAA_THRESHOLD_M;
+
+      // NOTAM coordination required for construction on FAA-registered structures
+      const notam_required = faa_notification_required;
+
+      // Lighting classification per 14 CFR Part 77 / FCC §17.21
+      // < 200 ft: none required (unless FAA prescribes otherwise)
+      // 200–500 ft: medium intensity red/white flashing
+      // > 500 ft: high intensity white strobe
+      let lighting_type  = 'NONE';
+      let n_light_levels = 0;
+      if (std_tower_height_ft > 500) {
+        lighting_type  = 'HIGH_INTENSITY_WHITE_STROBE';
+        n_light_levels = 3; // top, two-thirds, one-third
+      } else if (std_tower_height_ft > 200) {
+        lighting_type  = 'MEDIUM_INTENSITY_RED_WHITE';
+        n_light_levels = 2; // top + midpoint
+      } else if (std_tower_height_ft > 50) {
+        lighting_type  = 'LOW_INTENSITY_RED';
+        n_light_levels = 1; // top only
+      }
+
+      // DA arrays: each tower element requires independent lighting
+      const n_tower_elements = isDA_ltg
+        ? ((fcc_class === 'A' || fcc_class === 'B') ? 4 : 3)
+        : 1;
+
+      // FAA Form 7460-1 engineering + filing fee
+      const faa_filing_cost_low_usd  = faa_notification_required ? 2000 : 0;
+      const faa_filing_cost_high_usd = faa_notification_required ? 5000 : 0;
+
+      // FCC ASR registration cost (FCC Form 854)
+      const asr_filing_cost_low_usd  = asr_required ? 500  : 0;
+      const asr_filing_cost_high_usd = asr_required ? 1500 : 0;
+
+      // Tower lighting installation cost per element
+      const INSTALL_LOW  = { NONE: 0, LOW_INTENSITY_RED: 3000,  MEDIUM_INTENSITY_RED_WHITE: 15000, HIGH_INTENSITY_WHITE_STROBE: 50000 };
+      const INSTALL_HIGH = { NONE: 0, LOW_INTENSITY_RED: 8000,  MEDIUM_INTENSITY_RED_WHITE: 40000, HIGH_INTENSITY_WHITE_STROBE: 120000 };
+      const lighting_install_cost_low_usd  = (INSTALL_LOW[lighting_type]  ?? 0) * n_tower_elements;
+      const lighting_install_cost_high_usd = (INSTALL_HIGH[lighting_type] ?? 0) * n_tower_elements;
+
+      // Annual maintenance: lamp monitoring, NOTAM filing, inspection per §17.47
+      const MAINT_LOW  = { NONE: 0, LOW_INTENSITY_RED: 500,  MEDIUM_INTENSITY_RED_WHITE: 2000, HIGH_INTENSITY_WHITE_STROBE: 6000 };
+      const MAINT_HIGH = { NONE: 0, LOW_INTENSITY_RED: 1500, MEDIUM_INTENSITY_RED_WHITE: 5000, HIGH_INTENSITY_WHITE_STROBE: 15000 };
+      const annual_maintenance_cost_low_usd  = (MAINT_LOW[lighting_type]  ?? 0) * n_tower_elements;
+      const annual_maintenance_cost_high_usd = (MAINT_HIGH[lighting_type] ?? 0) * n_tower_elements;
+
+      const total_initial_cost_low_usd  = faa_filing_cost_low_usd  + asr_filing_cost_low_usd  + lighting_install_cost_low_usd;
+      const total_initial_cost_high_usd = faa_filing_cost_high_usd + asr_filing_cost_high_usd + lighting_install_cost_high_usd;
+
+      return {
+        lambda_m,
+        std_tower_height_m,
+        std_tower_height_ft,
+        faa_notification_required,
+        asr_required,
+        notam_required,
+        n_tower_elements,
+        lighting_type,
+        n_light_levels,
+        faa_filing_cost_low_usd,
+        faa_filing_cost_high_usd,
+        asr_filing_cost_low_usd,
+        asr_filing_cost_high_usd,
+        lighting_install_cost_low_usd,
+        lighting_install_cost_high_usd,
+        annual_maintenance_cost_low_usd,
+        annual_maintenance_cost_high_usd,
+        total_initial_cost_low_usd,
+        total_initial_cost_high_usd,
+        note: `Tower height (λ/4 estimate): ${std_tower_height_ft}ft (${std_tower_height_m}m) at ${frequency_khz} kHz${faa_notification_required ? ` — FAA Form 7460-1 required (14 CFR §77.9); FCC ASR registration required (§17.7); lighting: ${lighting_type.replace(/_/g, ' ')} on ${n_tower_elements} structure${n_tower_elements > 1 ? 's' : ''} per §17.21; annual maintenance obligation per §17.47` : ' — below 200 ft FAA notification threshold; no ASR registration required'}.`
       };
     })(),
 
