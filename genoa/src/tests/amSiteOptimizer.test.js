@@ -10556,3 +10556,52 @@ test('am_construction_permit_and_buildout_timeline_guide comparison table column
     assert.ok('cp_engineering_cost_low' in row, 'cp_engineering_cost_low missing from comparison table');
   }
 });
+
+test('am_transmitter_and_equipment_selection_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_and_equipment_selection_guide;
+  assert.ok(g != null, 'am_transmitter_and_equipment_selection_guide must be present');
+  assert.ok(typeof g.power_class_tx === 'string', 'power_class_tx must be a string');
+  assert.ok(typeof g.total_equipment_low_usd === 'number', 'total_equipment_low_usd must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_transmitter_and_equipment_selection_guide KAZM transmitter classification', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_and_equipment_selection_guide;
+  // KAZM: 5 kW TPO → MEDIUM power class
+  assert.strictEqual(g.power_class_tx, 'MEDIUM', 'KAZM 5kW should be MEDIUM power class');
+  assert.strictEqual(g.nominal_tx_kw, 5, 'KAZM nominal tx power should be 5 kW');
+  assert.strictEqual(g.n_base_current_meters, 1, 'NDA station needs 1 base current meter');
+  // Backup: floor(5/2) = 2 kW → LOW power class
+  assert.strictEqual(g.backup_tx_kw, 2, 'Backup transmitter should be 2 kW');
+});
+
+test('am_transmitter_and_equipment_selection_guide total cost is sum of components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_and_equipment_selection_guide;
+  const expected = g.main_tx_cost_low_usd + g.backup_tx_cost_low_usd +
+    g.phasing_cabinet_cost_low_usd + g.remote_control_cost_low_usd +
+    g.meter_cost_low_usd + g.dummy_load_cost_low_usd + g.feedline_cost_low_usd;
+  assert.strictEqual(g.total_equipment_low_usd, expected, 'total_equipment_low should be sum of components');
+  assert.ok(g.total_equipment_high_usd > g.total_equipment_low_usd, 'high cost must exceed low cost');
+  // NDA: no phasing cabinet
+  assert.strictEqual(g.phasing_cabinet_cost_low_usd, 0, 'NDA station should have no phasing cabinet cost');
+});
+
+test('am_transmitter_and_equipment_selection_guide annual maintenance is 5-10% of equipment', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_and_equipment_selection_guide;
+  const expected_maint_low = Math.round(g.total_equipment_low_usd * 0.05);
+  assert.strictEqual(g.annual_maint_low_usd, expected_maint_low, 'annual maintenance low should be 5% of total');
+  assert.ok(g.annual_maint_high_usd > g.annual_maint_low_usd, 'high maintenance must exceed low');
+});
+
+test('am_transmitter_and_equipment_selection_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tx_power_class'          in row, 'tx_power_class missing from comparison table');
+    assert.ok('tx_total_equip_low_usd'  in row, 'tx_total_equip_low_usd missing from comparison table');
+    assert.ok('tx_annual_maint_low_usd' in row, 'tx_annual_maint_low_usd missing from comparison table');
+  }
+});

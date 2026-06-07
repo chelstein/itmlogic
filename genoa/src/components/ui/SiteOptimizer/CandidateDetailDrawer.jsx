@@ -2226,6 +2226,55 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter & Equipment Selection Guide */}
+        {candidate.am_transmitter_and_equipment_selection_guide && (() => {
+          const g = candidate.am_transmitter_and_equipment_selection_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const pcLabel = { LOW: 'Low (≤1 kW)', MEDIUM: 'Medium (1–10 kW)', HIGH: 'High (10–50 kW)', VERY_HIGH: 'Very High (>50 kW)' };
+          return (
+            <div style={{ background: '#fff5f5', border: '1px solid #fc8181', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#7f1d1d', marginBottom: 8, fontSize: 13 }}>
+                Transmitter &amp; Equipment Selection (§73.61 / §73.1400)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#991b1b' }}>
+                <span>Power class</span>
+                <span style={{ fontWeight: 600 }}>{pcLabel[g.power_class_tx] ?? g.power_class_tx}</span>
+                <span>Nominal transmitter</span>
+                <span style={{ fontWeight: 600 }}>{g.nominal_tx_kw} kW AM (TPO: {g.total_equipment_low_usd > 0 ? `${g.nominal_tx_kw}` : '—'} kW)</span>
+                <span>Backup transmitter</span>
+                <span style={{ fontWeight: 600 }}>{g.backup_tx_kw} kW (recommended)</span>
+                <span>Base current meters</span>
+                <span style={{ fontWeight: 600 }}>{g.n_base_current_meters} (§73.61)</span>
+                <span>DA phasing cabinet</span>
+                <span style={{ fontWeight: 600 }}>{g.phasing_cabinet_cost_low_usd > 0 ? `${fmt(g.phasing_cabinet_cost_low_usd)} – ${fmt(g.phasing_cabinet_cost_high_usd)}` : 'Not required (NDA)'}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #fecaca', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#991b1b' }}>
+                <span>Main transmitter</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.main_tx_cost_low_usd)} – {fmt(g.main_tx_cost_high_usd)}</span>
+                <span>Backup transmitter</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.backup_tx_cost_low_usd)} – {fmt(g.backup_tx_cost_high_usd)}</span>
+                <span>Remote control</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.remote_control_cost_low_usd)} – {fmt(g.remote_control_cost_high_usd)} (§73.1400)</span>
+                <span>Current meters</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.meter_cost_low_usd)} – {fmt(g.meter_cost_high_usd)}</span>
+                <span>Dummy load</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.dummy_load_cost_low_usd)} – {fmt(g.dummy_load_cost_high_usd)}</span>
+                <span>RF feedline</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.feedline_cost_low_usd)} – {fmt(g.feedline_cost_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#7f1d1d' }}>Total equipment</span>
+                <span style={{ fontWeight: 700, color: '#7f1d1d' }}>{fmt(g.total_equipment_low_usd)} – {fmt(g.total_equipment_high_usd)}</span>
+                <span>Annual maintenance</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}/yr</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#7f1d1d', borderTop: '1px solid #fecaca', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Construction Permit & Buildout Timeline Guide */}
         {candidate.am_construction_permit_and_buildout_timeline_guide && (() => {
           const g = candidate.am_construction_permit_and_buildout_timeline_guide;

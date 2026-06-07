@@ -2419,3 +2419,20 @@ test('am_construction_permit_and_buildout_timeline_guide present across colocati
     assert.ok(g.fcc_filing_fee_usd > 0, `rank ${c.rank}: fcc_filing_fee_usd must be positive`);
   }
 });
+
+test('am_transmitter_and_equipment_selection_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_and_equipment_selection_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_transmitter_and_equipment_selection_guide`);
+    assert.ok(['LOW','MEDIUM','HIGH','VERY_HIGH'].includes(g.power_class_tx), `rank ${c.rank}: invalid power_class_tx`);
+    assert.ok(g.total_equipment_low_usd > 0, `rank ${c.rank}: total_equipment_low_usd must be positive`);
+    assert.ok(g.backup_tx_kw >= 1, `rank ${c.rank}: backup_tx_kw must be at least 1`);
+  }
+});

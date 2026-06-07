@@ -1113,7 +1113,10 @@ export async function runSiteOptimizer(body = {}){
     acq_annual_lease_low_usd:   c.am_site_acquisition_and_real_property_guide?.annual_lease_low_usd ?? null,
     cp_total_months_low:        c.am_construction_permit_and_buildout_timeline_guide?.total_months_low ?? null,
     cp_expiration_risk:         c.am_construction_permit_and_buildout_timeline_guide?.cp_expiration_risk ?? null,
-    cp_engineering_cost_low:    c.am_construction_permit_and_buildout_timeline_guide?.engineering_cost_low_usd ?? null
+    cp_engineering_cost_low:    c.am_construction_permit_and_buildout_timeline_guide?.engineering_cost_low_usd ?? null,
+    tx_power_class:             c.am_transmitter_and_equipment_selection_guide?.power_class_tx ?? null,
+    tx_total_equip_low_usd:     c.am_transmitter_and_equipment_selection_guide?.total_equipment_low_usd ?? null,
+    tx_annual_maint_low_usd:    c.am_transmitter_and_equipment_selection_guide?.annual_maint_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6848,6 +6851,101 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_and_equipment_selection_guide: (() => {
+      // Models transmitter selection, backup power, and ancillary equipment
+      // requirements for the candidate site.  Covers main and backup transmitters,
+      // DA phasing cabinet (if applicable), remote control (§73.1400), base current
+      // meters (§73.61), dummy load, RF feedline, and annual maintenance.
+
+      const isDA_tx = /^DA/i.test(pattern_mode);
+
+      // Power class from TPO
+      let power_class_tx = 'LOW';
+      if      (tpo_kw > 50) power_class_tx = 'VERY_HIGH';
+      else if (tpo_kw > 10) power_class_tx = 'HIGH';
+      else if (tpo_kw > 1 ) power_class_tx = 'MEDIUM';
+
+      // Nominal transmitter rated power (round up to nearest standard unit)
+      const nominal_tx_kw = tpo_kw <= 1  ? 1
+                          : tpo_kw <= 5  ? tpo_kw
+                          : tpo_kw <= 10 ? 10
+                          : tpo_kw <= 25 ? 25
+                          : tpo_kw <= 50 ? 50
+                          : 100;
+
+      // Main transmitter cost by power class
+      const TX_COST = {
+        LOW:       { low:   8000, high:  25000 },
+        MEDIUM:    { low:  25000, high:  80000 },
+        HIGH:      { low:  80000, high: 250000 },
+        VERY_HIGH: { low: 250000, high: 600000 }
+      };
+      const main_tx_cost_low_usd  = TX_COST[power_class_tx].low;
+      const main_tx_cost_high_usd = TX_COST[power_class_tx].high;
+
+      // Backup transmitter (half-power floor at 1 kW)
+      const backup_tx_kw         = Math.max(1, Math.floor(tpo_kw / 2));
+      const backup_power_class   = backup_tx_kw > 10 ? 'HIGH' : (backup_tx_kw > 2 ? 'MEDIUM' : 'LOW');
+      const backup_tx_cost_low_usd  = TX_COST[backup_power_class].low;
+      const backup_tx_cost_high_usd = TX_COST[backup_power_class].high;
+
+      // DA phasing / antenna-switching cabinet (required for DA arrays)
+      const phasing_cabinet_cost_low_usd  = isDA_tx ? 20000 : 0;
+      const phasing_cabinet_cost_high_usd = isDA_tx ? 60000 : 0;
+
+      // Remote control system (required per §73.1400)
+      const remote_control_cost_low_usd  = 3000;
+      const remote_control_cost_high_usd = 8000;
+
+      // Base current meters (1 per tower element per §73.61)
+      const n_base_current_meters = isDA_tx
+        ? ((fcc_class === 'A' || fcc_class === 'B') ? 4 : 3)
+        : 1;
+      const meter_cost_low_usd  = n_base_current_meters * 1500;
+      const meter_cost_high_usd = n_base_current_meters * 4000;
+
+      // Dummy load for commissioning and testing
+      const dummy_load_cost_low_usd  = tpo_kw > 10 ? 5000  : 2000;
+      const dummy_load_cost_high_usd = tpo_kw > 10 ? 15000 : 6000;
+
+      // RF feedline (coaxial for low/medium power; open-wire for high/very-high)
+      const feedline_cost_low_usd  = tpo_kw > 50 ? 15000 : (tpo_kw > 10 ? 8000 : 3000);
+      const feedline_cost_high_usd = tpo_kw > 50 ? 40000 : (tpo_kw > 10 ? 20000 : 8000);
+
+      const total_equipment_low_usd  = main_tx_cost_low_usd  + backup_tx_cost_low_usd  + phasing_cabinet_cost_low_usd  + remote_control_cost_low_usd  + meter_cost_low_usd  + dummy_load_cost_low_usd  + feedline_cost_low_usd;
+      const total_equipment_high_usd = main_tx_cost_high_usd + backup_tx_cost_high_usd + phasing_cabinet_cost_high_usd + remote_control_cost_high_usd + meter_cost_high_usd + dummy_load_cost_high_usd + feedline_cost_high_usd;
+
+      // Annual maintenance: 5–10% of equipment value
+      const annual_maint_low_usd  = Math.round(total_equipment_low_usd  * 0.05);
+      const annual_maint_high_usd = Math.round(total_equipment_high_usd * 0.10);
+
+      return {
+        power_class_tx,
+        nominal_tx_kw,
+        n_base_current_meters,
+        main_tx_cost_low_usd,
+        main_tx_cost_high_usd,
+        backup_tx_kw,
+        backup_tx_cost_low_usd,
+        backup_tx_cost_high_usd,
+        phasing_cabinet_cost_low_usd,
+        phasing_cabinet_cost_high_usd,
+        remote_control_cost_low_usd,
+        remote_control_cost_high_usd,
+        meter_cost_low_usd,
+        meter_cost_high_usd,
+        dummy_load_cost_low_usd,
+        dummy_load_cost_high_usd,
+        feedline_cost_low_usd,
+        feedline_cost_high_usd,
+        total_equipment_low_usd,
+        total_equipment_high_usd,
+        annual_maint_low_usd,
+        annual_maint_high_usd,
+        note: `${nominal_tx_kw} kW ${power_class_tx} power class AM transmitter (TPO: ${tpo_kw} kW); backup at ${backup_tx_kw} kW recommended${isDA_tx ? '; DA phasing cabinet required' : ''}. ${n_base_current_meters} base current meter${n_base_current_meters > 1 ? 's' : ''} (§73.61); remote control required (§73.1400). Total equipment: $${total_equipment_low_usd.toLocaleString()}–$${total_equipment_high_usd.toLocaleString()} excl. ATU/ground system; annual maintenance: $${annual_maint_low_usd.toLocaleString()}–$${annual_maint_high_usd.toLocaleString()}.`
       };
     })(),
 
