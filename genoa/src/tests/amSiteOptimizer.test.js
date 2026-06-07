@@ -14568,3 +14568,42 @@ it('candidate_comparison_table tbrf columns are present and valid for KAZM', asy
   assert.ok(r0.tbrf_fence_perimeter_ft > 0, 'tbrf_fence_perimeter_ft must be positive');
   assert.ok(r0.tbrf_total_rf_safety_low_usd > 0, 'tbrf_total_rf_safety_low_usd must be positive');
 });
+
+// ── Feature #52: am_antenna_base_current_and_impedance_monitoring_guide ──────
+
+it('am_antenna_base_current_and_impedance_monitoring_guide is present on each candidate for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_antenna_base_current_and_impedance_monitoring_guide != null,
+      'am_antenna_base_current_and_impedance_monitoring_guide must be present on every candidate');
+  }
+});
+
+it('am_antenna_base_current_and_impedance_monitoring_guide i_base_authorized_a is plausible for 5 kW KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_base_current_and_impedance_monitoring_guide;
+  // 5000 W / 36.6 Ω = 136.6 → sqrt ≈ 11.69 A
+  assert.ok(g.i_base_authorized_a > 8 && g.i_base_authorized_a < 20,
+    `i_base_authorized_a ${g.i_base_authorized_a} should be 8–20 A for 5 kW NDA`);
+});
+
+it('am_antenna_base_current_and_impedance_monitoring_guide §73.61 tolerance is ±2%', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_base_current_and_impedance_monitoring_guide;
+  assert.strictEqual(g.i_base_tolerance_pct, 2, '§73.61 requires ±2% base current tolerance');
+});
+
+it('am_antenna_base_current_and_impedance_monitoring_guide reference cites §73.61 and §73.68', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_base_current_and_impedance_monitoring_guide;
+  assert.ok(g.reference.includes('§73.61'), 'reference must cite §73.61');
+  assert.ok(g.reference.includes('§73.68'), 'reference must cite §73.68');
+});
+
+it('candidate_comparison_table bcim columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.bcim_i_base_authorized_a > 0, 'bcim_i_base_authorized_a must be positive');
+  assert.ok(r0.bcim_total_monitoring_equip_low_usd > 0, 'bcim_total_monitoring_equip_low_usd must be positive');
+  assert.strictEqual(r0.bcim_calibration_interval_months, 12, 'calibration_interval_months should be 12 (annual)');
+});

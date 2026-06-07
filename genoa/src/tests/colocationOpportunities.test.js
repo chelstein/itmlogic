@@ -3565,3 +3565,20 @@ test('colocation candidates include am_tower_base_rf_safety_and_detuning_guide w
     assert.ok(g.total_rf_safety_low_usd > 0, `total_rf_safety_low_usd must be positive`);
   }
 });
+
+test('colocation candidates include am_antenna_base_current_and_impedance_monitoring_guide with §73.61 tolerance', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_base_current_and_impedance_monitoring_guide;
+    assert.ok(g, `candidate missing am_antenna_base_current_and_impedance_monitoring_guide`);
+    assert.strictEqual(g.i_base_tolerance_pct, 2, '§73.61 requires ±2% base current tolerance');
+    assert.ok(g.total_monitoring_equip_low_usd > 0, `total_monitoring_equip_low_usd must be positive`);
+    assert.ok(g.calibration_interval_months === 12, `calibration_interval_months must be 12`);
+  }
+});

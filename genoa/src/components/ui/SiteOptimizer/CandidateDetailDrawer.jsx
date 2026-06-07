@@ -2226,6 +2226,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna Base Current and Impedance Monitoring Guide */}
+        {candidate.am_antenna_base_current_and_impedance_monitoring_guide && (() => {
+          const g = candidate.am_antenna_base_current_and_impedance_monitoring_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="bcim-guide" style={{ marginBottom: 16, padding: 12, background: '#fef9f0', borderRadius: 8, border: '2px solid #b45309' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Base Current &amp; Impedance Monitoring — §73.61 / §73.68</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>λ/4 tower height:</span><span>{g.standard_height_m != null ? `${g.standard_height_m} m (${g.elec_deg}°)` : '—'}</span>
+                <span>R_rad (λ/4):</span><span>{g.r_rad_est_ohm != null ? `${g.r_rad_est_ohm} Ω` : '—'}</span>
+                <span>Authorized I_base:</span><span style={{ fontWeight: 700 }}>{g.i_base_authorized_a != null ? `${g.i_base_authorized_a} A` : '—'}</span>
+                <span>§73.61 ±2% range:</span><span>{g.i_base_authorized_range_a ?? '—'}</span>
+                <span>Meter type:</span><span>{g.meter_type ?? '—'}</span>
+                <span>Calibration interval:</span><span>{g.calibration_interval_months != null ? `${g.calibration_interval_months} months` : '—'}</span>
+                <span>Monitoring towers:</span><span>{g.n_monitoring_towers ?? '—'}</span>
+                {g.phase_monitor_cost_usd != null && <><span>Phase/ratio monitor:</span><span>${fmt(g.phase_monitor_cost_usd)}</span></>}
+                <span>Telemetry (SCADA):</span><span>${fmt(g.remote_telemetry_cost_usd)}</span>
+                <span>Total equip. capex:</span><span style={{ fontWeight: 700 }}>${fmt(g.total_monitoring_equip_low_usd)}–${fmt(g.total_monitoring_equip_high_usd)}</span>
+                <span>Annual calibration:</span><span>${fmt(g.calibration_cost_per_yr_usd)}/yr</span>
+                <span>ATU retune trigger:</span><span style={{ fontSize: 10 }}>{g.atu_retune_trigger ?? '—'}</span>
+                {g.field_meas_required_after_change && <><span>§73.68 field proof:</span><span style={{ color: '#b45309', fontWeight: 700 }}>Required after ATU change (${fmt(g.field_meas_cost_usd)})</span></>}
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#92400e', fontStyle: 'italic' }}>{g.note}</div>}
+              <div style={{ marginTop: 4, fontSize: 10, color: '#d97706' }}>Ref: {g.reference}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Base RF Safety and Detuning Guide */}
         {candidate.am_tower_base_rf_safety_and_detuning_guide && (() => {
           const g = candidate.am_tower_base_rf_safety_and_detuning_guide;

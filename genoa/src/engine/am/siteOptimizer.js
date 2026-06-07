@@ -1386,7 +1386,10 @@ export async function runSiteOptimizer(body = {}){
     iboc_benefit_rating:                c.am_digital_broadcasting_iboc_guide?.iboc_benefit_rating ?? null,
     tbrf_v_base_high_vrms:              c.am_tower_base_rf_safety_and_detuning_guide?.v_base_high_vrms ?? null,
     tbrf_fence_perimeter_ft:            c.am_tower_base_rf_safety_and_detuning_guide?.fence_perimeter_ft ?? null,
-    tbrf_total_rf_safety_low_usd:       c.am_tower_base_rf_safety_and_detuning_guide?.total_rf_safety_low_usd ?? null
+    tbrf_total_rf_safety_low_usd:       c.am_tower_base_rf_safety_and_detuning_guide?.total_rf_safety_low_usd ?? null,
+    bcim_i_base_authorized_a:           c.am_antenna_base_current_and_impedance_monitoring_guide?.i_base_authorized_a ?? null,
+    bcim_total_monitoring_equip_low_usd: c.am_antenna_base_current_and_impedance_monitoring_guide?.total_monitoring_equip_low_usd ?? null,
+    bcim_calibration_interval_months:   c.am_antenna_base_current_and_impedance_monitoring_guide?.calibration_interval_months ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7121,6 +7124,75 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_base_current_and_impedance_monitoring_guide: (() => {
+      // Base current and impedance monitoring — §73.61, §73.68, §73.150.
+      // 47 CFR §73.61: AM stations must maintain the licensed base current at each tower
+      //   within 2% of the authorized value at all times (tolerance), with continuous monitoring.
+      //   Each AM tower requires a calibrated base current meter (thermocouple or RF ammeter).
+      // 47 CFR §73.68: DA stations must perform field-intensity measurements after any change
+      //   to the antenna system to verify the array is operating within authorized limits.
+      // 47 CFR §73.150(b)(3): antenna monitoring points (AMPs) at each tower or phase/ratio
+      //   monitor required for DA systems to track base current and phase continuously.
+      // Base current I_base = sqrt(P_w / R_rad_Ω).  Typical R_rad for vertical monopole:
+      //   λ/4 → R_rad ≈ 36.6 Ω; 0.2λ (short) → R_rad ≈ 10 Ω; 0.6λ → R_rad ≈ 74 Ω.
+      // ATU re-tuning trigger: base current deviation > 2% or SWR change > 10%.
+      const is_da_bcim = /^DA/i.test(pattern_mode);
+      // Electrical length fraction (proxy from frequency and typical tower height)
+      const lambda_m_bcim = round2(300000 / frequency_khz);
+      const standard_height_m_bcim = round2(lambda_m_bcim / 4); // λ/4 standard
+      const elec_deg_bcim = 90; // λ/4 = 90 electrical degrees
+      // R_rad for λ/4 monopole over perfect ground ≈ 36.6 Ω
+      const r_rad_est_ohm = 36.6;
+      const i_base_a = round2(Math.sqrt((tpo_kw * 1000) / r_rad_est_ohm));
+      // §73.61 tolerance: ±2% of authorized base current
+      const i_base_tolerance_a   = round2(i_base_a * 0.02);
+      const i_base_low_a         = round2(i_base_a - i_base_tolerance_a);
+      const i_base_high_a        = round2(i_base_a + i_base_tolerance_a);
+      // Monitoring system specs
+      const meter_type = is_da_bcim ? 'RF phase/ratio monitor (§73.150)' : 'thermocouple RF ammeter';
+      const calibration_interval_months = 12; // annual calibration required
+      const n_monitoring_towers = is_da_bcim ? 2 : 1;
+      // Equipment costs (2024 USD)
+      const base_current_meter_cost_usd   = is_da_bcim ? 8500  : 2800;  // per tower
+      const phase_monitor_cost_usd        = is_da_bcim ? 12000 : 0;     // DA only: phase/ratio monitor
+      const remote_telemetry_cost_usd     = 3500;                        // SCADA/telemetry
+      const calibration_cost_per_yr_usd   = n_monitoring_towers * 650;
+      const total_monitoring_equip_low_usd = n_monitoring_towers * base_current_meter_cost_usd
+                                           + phase_monitor_cost_usd
+                                           + remote_telemetry_cost_usd;
+      const total_monitoring_equip_high_usd = round2(total_monitoring_equip_low_usd * 1.35);
+      // §73.68 post-change field measurement (DA only): full proof of performance triggered
+      const field_meas_required_after_change = is_da_bcim;
+      const field_meas_cost_usd = is_da_bcim ? 18000 : 5000; // DA full proof vs. NDA spot check
+      return {
+        frequency_khz,
+        tpo_kw,
+        is_directional: is_da_bcim,
+        n_monitoring_towers,
+        standard_height_m: standard_height_m_bcim,
+        lambda_m: lambda_m_bcim,
+        elec_deg: elec_deg_bcim,
+        r_rad_est_ohm,
+        i_base_authorized_a: i_base_a,
+        i_base_tolerance_pct: 2,
+        i_base_tolerance_a,
+        i_base_authorized_range_a: `${i_base_low_a}–${i_base_high_a} A`,
+        meter_type,
+        calibration_interval_months,
+        base_current_meter_cost_usd,
+        phase_monitor_cost_usd: is_da_bcim ? phase_monitor_cost_usd : null,
+        remote_telemetry_cost_usd,
+        total_monitoring_equip_low_usd,
+        total_monitoring_equip_high_usd,
+        calibration_cost_per_yr_usd,
+        field_meas_required_after_change,
+        field_meas_cost_usd,
+        atu_retune_trigger: 'base current deviation >2% OR SWR change >10%',
+        reference: '47 CFR §73.61 (base current monitoring, ±2% tolerance); §73.68 (DA field measurements after change); §73.150(b)(3) (antenna monitoring points for DA); §73.154 (proof of performance); FCC Form 302-AM; ARRL Antenna Impedance Handbook (typical R_rad values for vertical monopoles)',
+        note: `${frequency_khz} kHz, ${tpo_kw} kW, λ/4 = ${standard_height_m_bcim} m: I_base ≈ ${i_base_a} A (R_rad ≈ ${r_rad_est_ohm} Ω). §73.61 tolerance ±2% → ${i_base_low_a}–${i_base_high_a} A. ${is_da_bcim ? `DA: §73.150 phase/ratio monitor required. §73.68 full field proof triggered after any ATU change. Field meas. budget ~$${field_meas_cost_usd.toLocaleString()}.` : 'NDA: single thermocouple ammeter + annual calibration.'}`
       };
     })(),
 
