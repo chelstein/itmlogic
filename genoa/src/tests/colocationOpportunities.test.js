@@ -3429,3 +3429,20 @@ test('am_tower_structural_analysis_guide colocation: all colocation candidates h
     assert.ok(g.total_structural_low_usd > 0, `total_structural_low_usd must be positive`);
   }
 });
+
+test('am_broadcast_facility_security_guide colocation: all colocation candidates have valid security data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_facility_security_guide;
+    assert.ok(g, `candidate missing am_broadcast_facility_security_guide`);
+    assert.strictEqual(g.fence_height_ft, 8, `fence_height_ft must be 8 per §73.49`);
+    assert.ok(g.total_security_capex_low_usd > 0, `total_security_capex_low_usd must be positive`);
+    assert.ok(g.fence_perimeter_ft > 0, `fence_perimeter_ft must be positive`);
+  }
+});

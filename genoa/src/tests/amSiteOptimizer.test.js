@@ -14273,3 +14273,39 @@ it('candidate_comparison_table str columns are present and valid for KAZM', asyn
   assert.strictEqual(r0.str_guy_levels, 4, 'str_guy_levels should be 4 for KAZM');
   assert.strictEqual(r0.str_design_wind_speed_mph_low, 90, 'str_design_wind_speed_mph_low should be 90');
 });
+
+// ── am_broadcast_facility_security_guide ─────────────────────────────────────
+
+it('am_broadcast_facility_security_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_broadcast_facility_security_guide, 'security guide missing on candidate');
+  }
+});
+
+it('am_broadcast_facility_security_guide fence_height_ft is 8 (§73.49 minimum)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_facility_security_guide;
+  assert.strictEqual(g.fence_height_ft, 8, 'fence_height_ft must be 8 per §73.49');
+});
+
+it('am_broadcast_facility_security_guide fence_perimeter_ft is positive and reflects tower size', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_facility_security_guide;
+  assert.ok(g.fence_perimeter_ft > 500, `fence_perimeter_ft should be > 500 ft for 315 ft tower, got ${g.fence_perimeter_ft}`);
+  assert.ok(g.fence_cost_low_usd > 0, 'fence_cost_low_usd must be positive');
+});
+
+it('am_broadcast_facility_security_guide reference cites §73.49', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_broadcast_facility_security_guide;
+  assert.ok(g.reference.includes('§73.49'), 'reference must cite §73.49');
+});
+
+it('candidate_comparison_table sec columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.sec_fence_perimeter_ft > 0, 'sec_fence_perimeter_ft must be positive');
+  assert.ok(r0.sec_total_capex_low_usd > 0, 'sec_total_capex_low_usd must be positive');
+  assert.strictEqual(r0.sec_monitoring_annual_low_usd, 1200, 'sec_monitoring_annual_low_usd should be 1200');
+});

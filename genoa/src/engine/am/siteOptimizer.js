@@ -1362,7 +1362,10 @@ export async function runSiteOptimizer(body = {}){
     ins_total_insured_low_usd:          c.am_insurance_and_liability_guide?.total_insured_value_low_usd ?? null,
     str_total_structural_low_usd:       c.am_tower_structural_analysis_guide?.total_structural_low_usd ?? null,
     str_guy_levels:                     c.am_tower_structural_analysis_guide?.guy_levels ?? null,
-    str_design_wind_speed_mph_low:      c.am_tower_structural_analysis_guide?.design_wind_speed_mph_low ?? null
+    str_design_wind_speed_mph_low:      c.am_tower_structural_analysis_guide?.design_wind_speed_mph_low ?? null,
+    sec_fence_perimeter_ft:             c.am_broadcast_facility_security_guide?.fence_perimeter_ft ?? null,
+    sec_total_capex_low_usd:            c.am_broadcast_facility_security_guide?.total_security_capex_low_usd ?? null,
+    sec_monitoring_annual_low_usd:      c.am_broadcast_facility_security_guide?.monitoring_annual_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7097,6 +7100,54 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_broadcast_facility_security_guide: (() => {
+      // 47 CFR §73.49: AM towers with ground systems must be enclosed by fences of adequate height
+      // to prevent accidental contact with the antenna or its base. Minimum fence height: 8 ft.
+      // Fence perimeter: based on site area required for guy anchor radius at tower height.
+      const freq_mhz_sec = frequency_khz / 1000;
+      const lambda_m_sec = 299.792458 / freq_mhz_sec;
+      const isHighClass_sec = /^[AB]/i.test(fcc_class);
+      const tower_height_m_sec = round2(isHighClass_sec ? lambda_m_sec / 2 : lambda_m_sec / 4);
+      const tower_height_ft_sec = round2(tower_height_m_sec * 3.28084);
+      // Guy anchor radius: typically 70–80% of tower height for guyed AM monopoles
+      const guy_radius_ft_low  = round2(tower_height_ft_sec * 0.70);
+      const guy_radius_ft_high = round2(tower_height_ft_sec * 0.80);
+      // Fence perimeter: square enclosure around max guy radius + 20 ft buffer
+      const fence_perimeter_ft = round2(4 * (guy_radius_ft_high + 20) * 2); // rough square
+      const fence_height_ft = 8; // §73.49 minimum
+      // Chain-link fence with anti-climb topping: $15–$35 per linear foot installed
+      const fence_cost_per_lf_low  = 15;
+      const fence_cost_per_lf_high = 35;
+      const fence_cost_low_usd  = round2(fence_perimeter_ft * fence_cost_per_lf_low);
+      const fence_cost_high_usd = round2(fence_perimeter_ft * fence_cost_per_lf_high);
+      // Security gate, lock, anti-climb device
+      const gate_and_access_low_usd  = 2000;
+      const gate_and_access_high_usd = 8000;
+      // Remote monitoring (camera + alarm, annual): $1,200–$3,600/yr
+      const monitoring_annual_low_usd  = 1200;
+      const monitoring_annual_high_usd = 3600;
+      const total_security_capex_low_usd  = round2(fence_cost_low_usd  + gate_and_access_low_usd);
+      const total_security_capex_high_usd = round2(fence_cost_high_usd + gate_and_access_high_usd);
+      return {
+        tower_height_ft: tower_height_ft_sec,
+        tower_height_m: tower_height_m_sec,
+        fence_height_ft,
+        fence_perimeter_ft,
+        guy_radius_ft_low,
+        guy_radius_ft_high,
+        fence_cost_low_usd,
+        fence_cost_high_usd,
+        gate_and_access_low_usd,
+        gate_and_access_high_usd,
+        monitoring_annual_low_usd,
+        monitoring_annual_high_usd,
+        total_security_capex_low_usd,
+        total_security_capex_high_usd,
+        reference: '47 CFR §73.49 (AM tower fence/marking required); 47 CFR §17.4 (ASR painting/lighting); NFPA 70 (NEC) Article 810 (broadcast antenna installation safety); ASIS International Physical Security Standard (PSP)',
+        note: `§73.49 requires ≥ ${fence_height_ft} ft fence around AM tower and ground system. Est. perimeter: ${fence_perimeter_ft} ft (based on ${guy_radius_ft_high} ft guy radius + buffer). Fence: $${fence_cost_low_usd.toLocaleString()}–$${fence_cost_high_usd.toLocaleString()}. Total security capex: $${total_security_capex_low_usd.toLocaleString()}–$${total_security_capex_high_usd.toLocaleString()} + $${monitoring_annual_low_usd.toLocaleString()}–$${monitoring_annual_high_usd.toLocaleString()}/yr monitoring.`
       };
     })(),
 

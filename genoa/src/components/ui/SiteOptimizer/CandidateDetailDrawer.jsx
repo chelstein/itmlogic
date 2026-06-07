@@ -2226,6 +2226,28 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Broadcast Facility Security Guide */}
+        {candidate.am_broadcast_facility_security_guide && (() => {
+          const g = candidate.am_broadcast_facility_security_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="sec-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Broadcast Facility Security (§73.49)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft` : '—'}</span>
+                <span>Fence height (§73.49 min):</span><span>{g.fence_height_ft != null ? `${g.fence_height_ft} ft` : '—'}</span>
+                <span>Guy anchor radius:</span><span>{g.guy_radius_ft_low != null ? `${g.guy_radius_ft_low}–${g.guy_radius_ft_high} ft` : '—'}</span>
+                <span>Fence perimeter (est.):</span><span>{g.fence_perimeter_ft != null ? `${fmt(g.fence_perimeter_ft)} ft` : '—'}</span>
+                <span>Fence cost:</span><span>{g.fence_cost_low_usd != null ? `$${fmt(Math.round(g.fence_cost_low_usd))} – $${fmt(Math.round(g.fence_cost_high_usd))}` : '—'}</span>
+                <span>Gate &amp; access control:</span><span>{g.gate_and_access_low_usd != null ? `$${fmt(g.gate_and_access_low_usd)} – $${fmt(g.gate_and_access_high_usd)}` : '—'}</span>
+                <span>Security capex total:</span><span style={{ fontWeight: 600 }}>{g.total_security_capex_low_usd != null ? `$${fmt(Math.round(g.total_security_capex_low_usd))} – $${fmt(Math.round(g.total_security_capex_high_usd))}` : '—'}</span>
+                <span>Monitoring (annual):</span><span>{g.monitoring_annual_low_usd != null ? `$${fmt(g.monitoring_annual_low_usd)} – $${fmt(g.monitoring_annual_high_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Tower Structural Analysis Guide */}
         {candidate.am_tower_structural_analysis_guide && (() => {
           const g = candidate.am_tower_structural_analysis_guide;
