@@ -1233,7 +1233,10 @@ export async function runSiteOptimizer(body = {}){
     ins_wc_construction_low_usd: c.am_insurance_and_bonding_guide?.wc_during_construction_low_usd ?? null,
     grd_terrain_class:          c.am_site_grading_and_drainage_guide?.terrain_class ?? null,
     grd_total_low_usd:          c.am_site_grading_and_drainage_guide?.total_site_prep_low_usd ?? null,
-    grd_grading_low_usd:        c.am_site_grading_and_drainage_guide?.grading_low_usd ?? null
+    grd_grading_low_usd:        c.am_site_grading_and_drainage_guide?.grading_low_usd ?? null,
+    txp_tx_type:                c.am_transmitter_procurement_and_upgrade_guide?.tx_type ?? null,
+    txp_total_low_usd:          c.am_transmitter_procurement_and_upgrade_guide?.total_tx_low_usd ?? null,
+    txp_tx_cost_low_usd:        c.am_transmitter_procurement_and_upgrade_guide?.tx_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6968,6 +6971,54 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_procurement_and_upgrade_guide: (() => {
+      // Solid-state AM transmitters are now standard; tube transmitters are legacy.
+      // Cost scales with TPO; Class D (5 kW) typically uses a single solid-state unit.
+      // Exciter may be included or sold separately; installation and commissioning add cost.
+      let tx_type, tx_cost_low_usd, tx_cost_high_usd;
+      if (tpo_kw >= 50) {
+        tx_type = 'solid_state_high_power';
+        tx_cost_low_usd  = 80000;
+        tx_cost_high_usd = 250000;
+      } else if (tpo_kw >= 10) {
+        tx_type = 'solid_state_medium_power';
+        tx_cost_low_usd  = 30000;
+        tx_cost_high_usd = 80000;
+      } else {
+        tx_type = 'solid_state_low_power';
+        tx_cost_low_usd  = 15000;
+        tx_cost_high_usd = 50000;
+      }
+
+      const exciter_low_usd  = 3000;
+      const exciter_high_usd = 12000;
+      const install_low_usd  = 2000;
+      const install_high_usd = 8000;
+      const shipping_low_usd  = 500;
+      const shipping_high_usd = 3000;
+
+      const total_tx_low_usd  = round2(tx_cost_low_usd  + exciter_low_usd  + install_low_usd  + shipping_low_usd);
+      const total_tx_high_usd = round2(tx_cost_high_usd + exciter_high_usd + install_high_usd + shipping_high_usd);
+
+      return {
+        tpo_kw,
+        fcc_class,
+        tx_type,
+        tx_cost_low_usd,
+        tx_cost_high_usd,
+        exciter_low_usd,
+        exciter_high_usd,
+        install_low_usd,
+        install_high_usd,
+        shipping_low_usd,
+        shipping_high_usd,
+        total_tx_low_usd,
+        total_tx_high_usd,
+        reference: 'GatesAir, Harris Broadcast, Continental Electronics transmitter pricing; SBE procurement guidelines; 47 CFR §73.1660 (transmitter standards)',
+        note: `${tpo_kw} kW Class ${fcc_class} ${tx_type}: transmitter $${tx_cost_low_usd.toLocaleString()}–$${tx_cost_high_usd.toLocaleString()} + exciter $${exciter_low_usd.toLocaleString()}–$${exciter_high_usd.toLocaleString()} + install $${install_low_usd.toLocaleString()}–$${install_high_usd.toLocaleString()} + shipping; total $${total_tx_low_usd.toLocaleString()}–$${total_tx_high_usd.toLocaleString()}`
       };
     })(),
 

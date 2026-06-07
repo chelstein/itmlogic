@@ -11439,6 +11439,50 @@ test('am_carrier_frequency_accuracy_and_reference_guide comparison table columns
   assert.strictEqual(r0.cfa_gpsdo_cost_low_usd,   500,   'rank-1 cfa_gpsdo_cost_low_usd should be $500');
 });
 
+test('am_transmitter_procurement_and_upgrade_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_procurement_and_upgrade_guide;
+  assert.ok(g !== undefined && g !== null, 'am_transmitter_procurement_and_upgrade_guide missing');
+  assert.ok(typeof g.tx_type === 'string', 'tx_type should be a string');
+  assert.ok(g.total_tx_low_usd > 0, 'total_tx_low_usd must be positive');
+});
+
+test('am_transmitter_procurement_and_upgrade_guide KAZM transmitter class', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_procurement_and_upgrade_guide;
+  assert.strictEqual(g.tx_type,          'solid_state_low_power', 'KAZM 5kW should be solid_state_low_power');
+  assert.strictEqual(g.tx_cost_low_usd,  15000,                   'KAZM tx_cost_low_usd should be $15,000');
+  assert.strictEqual(g.tx_cost_high_usd, 50000,                   'KAZM tx_cost_high_usd should be $50,000');
+});
+
+test('am_transmitter_procurement_and_upgrade_guide KAZM ancillary costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_procurement_and_upgrade_guide;
+  assert.strictEqual(g.exciter_low_usd,   3000, 'exciter_low_usd should be $3,000');
+  assert.strictEqual(g.install_low_usd,   2000, 'install_low_usd should be $2,000');
+  assert.strictEqual(g.shipping_low_usd,  500,  'shipping_low_usd should be $500');
+});
+
+test('am_transmitter_procurement_and_upgrade_guide KAZM total procurement cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_procurement_and_upgrade_guide;
+  assert.strictEqual(g.total_tx_low_usd,  20500, 'KAZM total_tx_low_usd should be $20,500');
+  assert.strictEqual(g.total_tx_high_usd, 73000, 'KAZM total_tx_high_usd should be $73,000');
+});
+
+test('am_transmitter_procurement_and_upgrade_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('txp_tx_type'        in row, 'txp_tx_type missing from comparison table');
+    assert.ok('txp_total_low_usd'  in row, 'txp_total_low_usd missing from comparison table');
+    assert.ok('txp_tx_cost_low_usd' in row, 'txp_tx_cost_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.txp_tx_type,         'solid_state_low_power', 'rank-1 txp_tx_type should be solid_state_low_power');
+  assert.strictEqual(r0.txp_total_low_usd,   20500,                   'rank-1 txp_total_low_usd should be $20,500');
+  assert.strictEqual(r0.txp_tx_cost_low_usd, 15000,                   'rank-1 txp_tx_cost_low_usd should be $15,000');
+});
+
 test('am_site_grading_and_drainage_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_site_grading_and_drainage_guide;

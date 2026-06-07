@@ -2226,6 +2226,33 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Procurement and Upgrade Guide */}
+        {candidate.am_transmitter_procurement_and_upgrade_guide && (() => {
+          const g = candidate.am_transmitter_procurement_and_upgrade_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const txLabel = {
+            solid_state_low_power:    'Solid-State Low Power',
+            solid_state_medium_power: 'Solid-State Medium Power',
+            solid_state_high_power:   'Solid-State High Power',
+          }[g.tx_type] ?? g.tx_type ?? '—';
+          return (
+            <div key="txp-guide" style={{ marginBottom: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, border: '2px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Transmitter Procurement &amp; Upgrade</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>Type:</span><span>{txLabel}</span>
+                <span>Power:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'} Class {g.fcc_class ?? '—'}</span>
+                <span>Transmitter:</span><span>{fmt(g.tx_cost_low_usd)} – {fmt(g.tx_cost_high_usd)}</span>
+                <span>Exciter:</span><span>{fmt(g.exciter_low_usd)} – {fmt(g.exciter_high_usd)}</span>
+                <span>Install:</span><span>{fmt(g.install_low_usd)} – {fmt(g.install_high_usd)}</span>
+                <span>Shipping:</span><span>{fmt(g.shipping_low_usd)} – {fmt(g.shipping_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_tx_low_usd)} – {fmt(g.total_tx_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Site Grading and Drainage Guide */}
         {candidate.am_site_grading_and_drainage_guide && (() => {
           const g = candidate.am_site_grading_and_drainage_guide;
