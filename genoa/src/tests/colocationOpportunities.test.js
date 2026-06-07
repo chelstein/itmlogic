@@ -2150,3 +2150,20 @@ test('silent_period_revenue_impact_and_audience_retention_guide present across c
     assert.ok(g.silence_scenarios.length === 4, `rank ${c.rank}: must have 4 silence scenarios`);
   }
 });
+
+test('community_of_license_population_change_trend_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['RAPID_GROWTH', 'GROWING', 'STABLE', 'DECLINING', 'RAPID_DECLINE'];
+  for (const c of out.candidates) {
+    const g = c.community_of_license_population_change_trend_guide;
+    assert.ok(g != null, `rank ${c.rank} missing community_of_license_population_change_trend_guide`);
+    assert.ok(valid_tiers.includes(g.growth_tier), `rank ${c.rank}: growth_tier '${g.growth_tier}' invalid`);
+    assert.ok(g.col_pop_estimate_now >= 0, `rank ${c.rank}: col_pop_estimate_now must be >= 0`);
+  }
+});

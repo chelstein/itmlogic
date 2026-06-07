@@ -9834,3 +9834,45 @@ test('silent_period_revenue_impact_and_audience_retention_guide comparison table
     assert.ok('sprg_monthly_net_low_usd'  in row, 'sprg_monthly_net_low_usd missing from comparison table');
   }
 });
+
+test('community_of_license_population_change_trend_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_population_change_trend_guide;
+  assert.ok(g, 'COL population trend guide must be present');
+  assert.strictEqual(g.frequency_khz, 780, 'frequency must be 780 kHz');
+  assert.strictEqual(g.fcc_class, 'D', 'fcc_class must be D');
+  assert.strictEqual(g.coverage_radius_km, 30, 'Class D clear coverage radius must be 30 km');
+});
+
+test('community_of_license_population_change_trend_guide growth_tier is valid enum value', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_population_change_trend_guide;
+  const valid_tiers = ['RAPID_GROWTH', 'GROWING', 'STABLE', 'DECLINING', 'RAPID_DECLINE'];
+  assert.ok(valid_tiers.includes(g.growth_tier), `growth_tier '${g.growth_tier}' must be a valid enum`);
+  assert.ok(typeof g.estimated_col_growth_pct_per_yr === 'number', 'growth pct must be numeric');
+});
+
+test('community_of_license_population_change_trend_guide sect_307b_preference_risk is valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_population_change_trend_guide;
+  const valid_risks = ['LOW', 'MODERATE', 'HIGH'];
+  assert.ok(valid_risks.includes(g.sect_307b_preference_risk), '307b risk must be LOW, MODERATE, or HIGH');
+});
+
+test('community_of_license_population_change_trend_guide population fields are non-negative numbers', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].community_of_license_population_change_trend_guide;
+  assert.ok(g.col_pop_estimate_now >= 0, 'pop now must be >= 0');
+  assert.ok(g.col_pop_estimate_10yr >= 0, '10yr pop must be >= 0');
+  assert.ok(g.pop_served_fraction >= 0 && g.pop_served_fraction <= 1, 'served fraction must be in [0,1]');
+  assert.ok(g.ihb_radius_km === 3.2, 'IHB radius must be 3.2 km (2 mi)');
+});
+
+test('community_of_license_population_change_trend_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('colpop_growth_pct_per_yr' in row, 'colpop_growth_pct_per_yr missing from comparison table');
+    assert.ok('colpop_growth_tier'       in row, 'colpop_growth_tier missing from comparison table');
+    assert.ok('colpop_307b_risk'         in row, 'colpop_307b_risk missing from comparison table');
+  }
+});

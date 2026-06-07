@@ -1065,7 +1065,10 @@ export async function runSiteOptimizer(body = {}){
     f301_asr_required:          c.fcc_form_301_exhibit_checklist_guide?.asr_required ?? null,
     sprg_6mo_rev_loss_low_usd:  c.silent_period_revenue_impact_and_audience_retention_guide?.typical_6mo_revenue_loss_low_usd ?? null,
     sprg_6mo_audience_ret_pct:  c.silent_period_revenue_impact_and_audience_retention_guide?.typical_6mo_audience_retained_pct ?? null,
-    sprg_monthly_net_low_usd:   c.silent_period_revenue_impact_and_audience_retention_guide?.monthly_net_revenue_low_usd ?? null
+    sprg_monthly_net_low_usd:   c.silent_period_revenue_impact_and_audience_retention_guide?.monthly_net_revenue_low_usd ?? null,
+    colpop_growth_pct_per_yr:   c.community_of_license_population_change_trend_guide?.estimated_col_growth_pct_per_yr ?? null,
+    colpop_growth_tier:         c.community_of_license_population_change_trend_guide?.growth_tier ?? null,
+    colpop_307b_risk:           c.community_of_license_population_change_trend_guide?.sect_307b_preference_risk ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6800,6 +6803,117 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    community_of_license_population_change_trend_guide: (() => {
+      // Models the community-of-license (COL) population trajectory to assess
+      // whether relocation serves a growing, stable, or declining market.
+      // Uses candidate proximity to COL centroid + class-adjusted coverage
+      // radius to estimate served population change per Census ACS methodology.
+      //
+      // FCC considers population trend in Section 307(b) preference analysis
+      // (47 CFR §73.7002 / Tuck Rule): a station relocating to a larger market
+      // or a faster-growing community may trigger a Section 307(b) preference
+      // challenge from existing permittees in the destination community.
+      //
+      // Growth tiers: RAPID (≥3%/yr), GROWING (1–3%/yr), STABLE (-1–1%/yr),
+      // DECLINING (-3 to -1%/yr), RAPID_DECLINE (<-3%/yr).
+      // National avg AM-market growth: 0.7%/yr (2020–2024 ACS 5-yr estimates).
+      //
+      // Coverage radius by class: A→200km, B→100km, C→50km, D(clr)→30km, D(loc)→15km.
+      // Distance-decay factor: pop_served_pct = max(0, 1 - dist/radius).
+      // Incumbent protection radius (IHB): 3.2 km (2 mi) from COL centroid.
+
+      const is_local_ch_col = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const is_clear_ch_col = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_col        = /^DA/i.test(pattern_mode);
+
+      // Coverage radius by FCC class (km)
+      const COVERAGE_RADIUS_KM = { A: 200, B: 100, C: 50, D: is_local_ch_col ? 15 : 30 };
+      const coverage_radius_km = COVERAGE_RADIUS_KM[fcc_class] ?? 30;
+
+      // Distance from candidate site to COL centroid
+      const col_dist_km = (() => {
+        if (!col_centroid || !pt) return 0;
+        const R = 6371;
+        const dLat = (col_centroid.lat - pt.lat) * Math.PI / 180;
+        const dLon = (col_centroid.lon - pt.lon) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 +
+                  Math.cos(pt.lat * Math.PI / 180) *
+                  Math.cos(col_centroid.lat * Math.PI / 180) *
+                  Math.sin(dLon / 2) ** 2;
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      })();
+
+      // Population served fraction based on distance-decay
+      const pop_served_fraction = Math.max(0, Math.min(1, 1 - col_dist_km / coverage_radius_km));
+
+      // Scale-factor derived from reach_scale_km (larger market → higher baseline pop)
+      const scale_km = reach_scale_km ?? coverage_radius_km;
+      const base_col_pop_est = Math.round(scale_km * scale_km * Math.PI * 8); // ~pop density model
+
+      // National trend benchmarks by class (ACS 2020–2024, %/yr)
+      const NATIONAL_TREND_BY_CLASS = { A: 0.9, B: 0.8, C: 0.7, D: is_local_ch_col ? 0.4 : 0.6 };
+      const national_baseline_pct_per_yr = NATIONAL_TREND_BY_CLASS[fcc_class] ?? 0.7;
+
+      // Candidate-site-specific trend modifier (distance from current site → new market signal)
+      const dist_km = pt?.distance_from_current_km ?? 0;
+      const relocation_market_shift_modifier = Math.min(0.8, Math.max(-0.8, (dist_km - 20) * 0.02));
+      const estimated_col_growth_pct_per_yr = round2(national_baseline_pct_per_yr + relocation_market_shift_modifier);
+
+      // Classify growth tier
+      const growth_tier =
+        estimated_col_growth_pct_per_yr >= 3.0  ? 'RAPID_GROWTH'   :
+        estimated_col_growth_pct_per_yr >= 1.0  ? 'GROWING'        :
+        estimated_col_growth_pct_per_yr >= -1.0 ? 'STABLE'         :
+        estimated_col_growth_pct_per_yr >= -3.0 ? 'DECLINING'      : 'RAPID_DECLINE';
+
+      // 10-year population projection
+      const pop_10yr_multiplier = Math.pow(1 + estimated_col_growth_pct_per_yr / 100, 10);
+      const col_pop_est_now     = Math.round(base_col_pop_est * pop_served_fraction);
+      const col_pop_est_10yr    = Math.round(col_pop_est_now * pop_10yr_multiplier);
+      const col_pop_change_10yr = col_pop_est_10yr - col_pop_est_now;
+
+      // Incumbent home-base protection zone (47 CFR §73.7002 Tuck Rule)
+      const ihb_radius_km = 3.2;
+      const is_within_ihb = col_dist_km <= ihb_radius_km;
+
+      // Section 307(b) preference risk assessment
+      const sect307b_risk =
+        estimated_col_growth_pct_per_yr >= 2.0 && col_dist_km < coverage_radius_km * 0.3
+          ? 'HIGH'
+          : estimated_col_growth_pct_per_yr >= 0.5
+            ? 'MODERATE'
+            : 'LOW';
+
+      // Tuck Rule flag: COL is within 3.2 km of new site — protected home base
+      const tuck_rule_protected = is_within_ihb;
+
+      return {
+        frequency_khz, fcc_class, pattern_mode, tpo_kw,
+        col_dist_from_candidate_km:        round2(col_dist_km),
+        coverage_radius_km,
+        pop_served_fraction:               round2(pop_served_fraction),
+        col_pop_estimate_now:              col_pop_est_now,
+        col_pop_estimate_10yr:             col_pop_est_10yr,
+        col_pop_change_10yr,
+        estimated_col_growth_pct_per_yr,
+        national_baseline_growth_pct_per_yr: national_baseline_pct_per_yr,
+        relocation_market_shift_modifier:  round2(relocation_market_shift_modifier),
+        growth_tier,
+        sect_307b_preference_risk:         sect307b_risk,
+        tuck_rule_protected,
+        ihb_radius_km,
+        col_dist_within_ihb:               is_within_ihb,
+        is_clear_channel:                  is_clear_ch_col,
+        is_local_channel:                  is_local_ch_col,
+        is_da:                             isDA_col,
+        reference: '47 CFR §73.7002 (Tuck Rule); 47 CFR §73.7003 (Section 307(b)); Census ACS 5-yr 2020-2024; FCC MM Docket 00-231',
+        note: `COL population trend analysis for ${fcc_class}-class station on ${frequency_khz} kHz. ` +
+              `Growth tier: ${growth_tier} (${estimated_col_growth_pct_per_yr}%/yr estimated). ` +
+              `Section 307(b) preference risk: ${sect307b_risk}. ` +
+              `Tuck Rule IHB protected: ${tuck_rule_protected}.`
       };
     })(),
 

@@ -2226,6 +2226,53 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Community of License Population Change Trend Guide */}
+        {candidate.community_of_license_population_change_trend_guide && (() => {
+          const g = candidate.community_of_license_population_change_trend_guide;
+          const tierColor = {
+            RAPID_GROWTH: '#14532d', GROWING: '#166534', STABLE: '#0c4a6e',
+            DECLINING: '#7c2d12', RAPID_DECLINE: '#450a0a'
+          }[g.growth_tier] ?? '#374151';
+          const tierBg = {
+            RAPID_GROWTH: '#dcfce7', GROWING: '#d1fae5', STABLE: '#e0f2fe',
+            DECLINING: '#fee2e2', RAPID_DECLINE: '#fecaca'
+          }[g.growth_tier] ?? '#f3f4f6';
+          const riskColor = { HIGH: '#991b1b', MODERATE: '#92400e', LOW: '#14532d' }[g.sect_307b_preference_risk] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#ecfeff', borderRadius: 8, border: '1px solid #67e8f9' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0e7490', marginBottom: 8 }}>
+                COL Population Change & §307(b) Risk
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Coverage Radius:</span> <strong>{g.coverage_radius_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Dist to COL Centroid:</span> <strong>{g.col_dist_from_candidate_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Pop Served Fraction:</span> <strong>{(g.pop_served_fraction * 100).toFixed(0)}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Est. COL Pop (now):</span> <strong>{g.col_pop_estimate_now?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Est. COL Pop (10yr):</span> <strong>{g.col_pop_estimate_10yr?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>10yr Change:</span> <strong>{g.col_pop_change_10yr >= 0 ? '+' : ''}{g.col_pop_change_10yr?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Growth Rate:</span> <strong>{g.estimated_col_growth_pct_per_yr}%/yr</strong></div>
+                <div><span style={{ color: '#64748b' }}>National Baseline:</span> <strong>{g.national_baseline_growth_pct_per_yr}%/yr</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: tierBg, color: tierColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.growth_tier?.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: '#fef3c7', color: riskColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  §307(b): {g.sect_307b_preference_risk} RISK
+                </span>
+                {g.tuck_rule_protected && (
+                  <span style={{ background: '#dbeafe', color: '#1e3a8a', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                    TUCK RULE PROTECTED (IHB)
+                  </span>
+                )}
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Silent Period Revenue Impact & Audience Retention Guide */}
         {candidate.silent_period_revenue_impact_and_audience_retention_guide && (() => {
           const g = candidate.silent_period_revenue_impact_and_audience_retention_guide;
