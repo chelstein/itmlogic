@@ -2226,6 +2226,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Building & Utilities Guide */}
+        {candidate.am_transmitter_building_and_utilities_guide && (() => {
+          const g = candidate.am_transmitter_building_and_utilities_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#fdf6e3', border: '1px solid #d97706', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 8, fontSize: 13 }}>
+                Transmitter Building &amp; Utilities
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#92400e' }}>
+                <span>Building footprint</span>
+                <span style={{ fontWeight: 600 }}>{g.bld_sqft_low}–{g.bld_sqft_high} sq ft</span>
+                <span>Building construction</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.building_cost_low_usd)} – {fmt(g.building_cost_high_usd)}</span>
+                <span>Electrical service</span>
+                <span style={{ fontWeight: 600 }}>{g.electrical_service_amps}A / {g.electrical_service_volts}V</span>
+                <span>Utility extension</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.utility_extension_cost_low_usd)} – {fmt(g.utility_extension_cost_high_usd)}</span>
+                <span>HVAC</span>
+                <span style={{ fontWeight: 600 }}>{g.hvac_tons}-ton ({fmt(g.hvac_cost_low_usd)} – {fmt(g.hvac_cost_high_usd)}; service {fmt(g.hvac_annual_service_usd)}/yr)</span>
+                <span>Emergency generator</span>
+                <span style={{ fontWeight: 600 }}>{g.generator_kw} kW ({fmt(g.generator_cost_low_usd)} – {fmt(g.generator_cost_high_usd)})</span>
+                <span>Fuel storage</span>
+                <span style={{ fontWeight: 600 }}>{g.fuel_tank_gal} gal ({fmt(g.fuel_tank_cost_usd)})</span>
+                <span>Building permit</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.building_permit_cost_low_usd)} – {fmt(g.building_permit_cost_high_usd)}</span>
+                <span>Site prep/grading</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.site_prep_cost_low_usd)} – {fmt(g.site_prep_cost_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#78350f' }}>Total infrastructure</span>
+                <span style={{ fontWeight: 700, color: '#78350f' }}>{fmt(g.total_infrastructure_low_usd)} – {fmt(g.total_infrastructure_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#78350f', borderTop: '1px solid #fde68a', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter & Equipment Selection Guide */}
         {candidate.am_transmitter_and_equipment_selection_guide && (() => {
           const g = candidate.am_transmitter_and_equipment_selection_guide;

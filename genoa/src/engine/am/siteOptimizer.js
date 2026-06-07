@@ -1116,7 +1116,10 @@ export async function runSiteOptimizer(body = {}){
     cp_engineering_cost_low:    c.am_construction_permit_and_buildout_timeline_guide?.engineering_cost_low_usd ?? null,
     tx_power_class:             c.am_transmitter_and_equipment_selection_guide?.power_class_tx ?? null,
     tx_total_equip_low_usd:     c.am_transmitter_and_equipment_selection_guide?.total_equipment_low_usd ?? null,
-    tx_annual_maint_low_usd:    c.am_transmitter_and_equipment_selection_guide?.annual_maint_low_usd ?? null
+    tx_annual_maint_low_usd:    c.am_transmitter_and_equipment_selection_guide?.annual_maint_low_usd ?? null,
+    bld_sqft_low:               c.am_transmitter_building_and_utilities_guide?.bld_sqft_low ?? null,
+    bld_generator_kw:           c.am_transmitter_building_and_utilities_guide?.generator_kw ?? null,
+    bld_total_infra_low_usd:    c.am_transmitter_building_and_utilities_guide?.total_infrastructure_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6851,6 +6854,94 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_building_and_utilities_guide: (() => {
+      // Models transmitter building size, construction cost, electrical service,
+      // HVAC, emergency generator, and utility infrastructure requirements for
+      // the candidate site.  Building size scales with power class and antenna
+      // configuration.
+
+      const isDA_bld = /^DA/i.test(pattern_mode);
+
+      // Building footprint by power and antenna configuration (sq ft)
+      // Low power NDA: minimal equipment room (~400 sq ft)
+      // High power DA: larger building with phasing equipment, offices (~1,200 sq ft)
+      const bld_sqft_low  = isDA_bld
+        ? (tpo_kw >= 50 ? 1000 : 700)
+        : (tpo_kw >= 50 ? 700  : 400);
+      const bld_sqft_high = isDA_bld
+        ? (tpo_kw >= 50 ? 2000 : 1200)
+        : (tpo_kw >= 50 ? 1200 : 800);
+
+      // Construction cost per sq ft (prefab metal/concrete masonry)
+      const cost_per_sqft_low  = 120;  // rural/simple prefab
+      const cost_per_sqft_high = 250;  // site-built / architectural
+      const building_cost_low_usd  = Math.round(bld_sqft_low  * cost_per_sqft_low);
+      const building_cost_high_usd = Math.round(bld_sqft_high * cost_per_sqft_high);
+
+      // Electrical service requirements
+      // 5 kW AM transmitter: ~7.5 kVA @ ~70% efficiency → 200A 240V service adequate
+      const electrical_service_amps = tpo_kw >= 50 ? 400 : (tpo_kw >= 10 ? 300 : 200);
+      const electrical_service_volts = 240;
+      const utility_extension_cost_low_usd  = 5000;   // short run
+      const utility_extension_cost_high_usd = 40000;  // remote site, long run
+
+      // HVAC (equipment generates significant heat)
+      const hvac_tons = tpo_kw >= 50 ? 5 : (tpo_kw >= 10 ? 3 : 2);
+      const hvac_cost_low_usd  = hvac_tons * 2500;
+      const hvac_cost_high_usd = hvac_tons * 6000;
+      const hvac_annual_service_usd = Math.round(hvac_cost_low_usd * 0.10);
+
+      // Emergency generator (cover at minimum 72h of operation per §73.1740 guidance)
+      // Generator capacity: ~3× transmitter TPO for realistic site load
+      const generator_kw = tpo_kw >= 50 ? 100 : (tpo_kw >= 10 ? 50 : (tpo_kw >= 5 ? 30 : 15));
+      const generator_cost_low_usd  = generator_kw * 200;   // $200/kW installed low
+      const generator_cost_high_usd = generator_kw * 500;   // $500/kW installed high
+      const fuel_tank_gal = generator_kw * 4;               // ~4 gal per kW for 72h
+      const fuel_tank_cost_usd = Math.round(fuel_tank_gal * 1.5);  // ~$1.50/gal capacity
+
+      // Building permit and site prep (grading, foundation)
+      const building_permit_cost_low_usd  = 2000;
+      const building_permit_cost_high_usd = 8000;
+      const site_prep_cost_low_usd  = 5000;
+      const site_prep_cost_high_usd = 20000;
+
+      const total_infrastructure_low_usd  = building_cost_low_usd  + utility_extension_cost_low_usd  + hvac_cost_low_usd  + generator_cost_low_usd  + fuel_tank_cost_usd + building_permit_cost_low_usd  + site_prep_cost_low_usd;
+      const total_infrastructure_high_usd = building_cost_high_usd + utility_extension_cost_high_usd + hvac_cost_high_usd + generator_cost_high_usd + fuel_tank_cost_usd + building_permit_cost_high_usd + site_prep_cost_high_usd;
+
+      return {
+        // Building
+        bld_sqft_low,
+        bld_sqft_high,
+        building_cost_low_usd,
+        building_cost_high_usd,
+        // Electrical
+        electrical_service_amps,
+        electrical_service_volts,
+        utility_extension_cost_low_usd,
+        utility_extension_cost_high_usd,
+        // HVAC
+        hvac_tons,
+        hvac_cost_low_usd,
+        hvac_cost_high_usd,
+        hvac_annual_service_usd,
+        // Generator
+        generator_kw,
+        generator_cost_low_usd,
+        generator_cost_high_usd,
+        fuel_tank_gal,
+        fuel_tank_cost_usd,
+        // Permits / site prep
+        building_permit_cost_low_usd,
+        building_permit_cost_high_usd,
+        site_prep_cost_low_usd,
+        site_prep_cost_high_usd,
+        // Totals
+        total_infrastructure_low_usd,
+        total_infrastructure_high_usd,
+        note: `Transmitter building: ${bld_sqft_low}–${bld_sqft_high} sq ft ${isDA_bld ? '(DA phasing room included)' : '(NDA)'}; electrical service: ${electrical_service_amps}A/${electrical_service_volts}V; HVAC: ${hvac_tons}-ton; emergency generator: ${generator_kw} kW (${fuel_tank_gal}-gal fuel storage). Total site infrastructure: $${total_infrastructure_low_usd.toLocaleString()}–$${total_infrastructure_high_usd.toLocaleString()}.`
       };
     })(),
 

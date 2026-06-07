@@ -10605,3 +10605,49 @@ test('am_transmitter_and_equipment_selection_guide comparison table columns pres
     assert.ok('tx_annual_maint_low_usd' in row, 'tx_annual_maint_low_usd missing from comparison table');
   }
 });
+
+test('am_transmitter_building_and_utilities_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_utilities_guide;
+  assert.ok(g != null, 'am_transmitter_building_and_utilities_guide must be present');
+  assert.ok(typeof g.bld_sqft_low === 'number', 'bld_sqft_low must be a number');
+  assert.ok(typeof g.total_infrastructure_low_usd === 'number', 'total_infrastructure_low_usd must be a number');
+  assert.ok(typeof g.note === 'string' && g.note.length > 0, 'note must be non-empty');
+});
+
+test('am_transmitter_building_and_utilities_guide KAZM NDA building dimensions', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_utilities_guide;
+  // KAZM: 5 kW NDA → 400-800 sq ft, 200A service, 2-ton HVAC, 30 kW generator
+  assert.strictEqual(g.bld_sqft_low, 400, 'KAZM NDA 5kW should have 400 sq ft minimum building');
+  assert.strictEqual(g.electrical_service_amps, 200, 'KAZM should have 200A electrical service');
+  assert.strictEqual(g.hvac_tons, 2, 'KAZM 5kW should have 2-ton HVAC');
+  assert.strictEqual(g.generator_kw, 30, 'KAZM 5kW should have 30kW generator');
+});
+
+test('am_transmitter_building_and_utilities_guide cost structure is internally consistent', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_utilities_guide;
+  const expected_low = g.building_cost_low_usd + g.utility_extension_cost_low_usd +
+    g.hvac_cost_low_usd + g.generator_cost_low_usd + g.fuel_tank_cost_usd +
+    g.building_permit_cost_low_usd + g.site_prep_cost_low_usd;
+  assert.strictEqual(g.total_infrastructure_low_usd, expected_low, 'total_infrastructure_low should sum correctly');
+  assert.ok(g.total_infrastructure_high_usd > g.total_infrastructure_low_usd, 'high cost must exceed low');
+});
+
+test('am_transmitter_building_and_utilities_guide HVAC annual service is 10% of HVAC cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_utilities_guide;
+  const expected = Math.round(g.hvac_cost_low_usd * 0.10);
+  assert.strictEqual(g.hvac_annual_service_usd, expected, 'HVAC annual service should be 10% of HVAC cost');
+  assert.ok(g.fuel_tank_gal >= g.generator_kw * 4, 'fuel tank should be at least 4 gal/kW capacity');
+});
+
+test('am_transmitter_building_and_utilities_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bld_sqft_low'           in row, 'bld_sqft_low missing from comparison table');
+    assert.ok('bld_generator_kw'       in row, 'bld_generator_kw missing from comparison table');
+    assert.ok('bld_total_infra_low_usd' in row, 'bld_total_infra_low_usd missing from comparison table');
+  }
+});

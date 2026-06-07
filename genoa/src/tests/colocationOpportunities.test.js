@@ -2436,3 +2436,20 @@ test('am_transmitter_and_equipment_selection_guide present across colocation can
     assert.ok(g.backup_tx_kw >= 1, `rank ${c.rank}: backup_tx_kw must be at least 1`);
   }
 });
+
+test('am_transmitter_building_and_utilities_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_building_and_utilities_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_transmitter_building_and_utilities_guide`);
+    assert.ok(g.bld_sqft_low > 0, `rank ${c.rank}: bld_sqft_low must be positive`);
+    assert.ok(g.generator_kw > 0, `rank ${c.rank}: generator_kw must be positive`);
+    assert.ok(g.total_infrastructure_low_usd > 0, `rank ${c.rank}: total_infrastructure_low_usd must be positive`);
+  }
+});
