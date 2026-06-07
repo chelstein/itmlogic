@@ -3803,3 +3803,14 @@ test('colocation candidates include am_transmitter_site_lease_and_property_right
     assert.ok(g.total_acquisition_low_usd > 0, 'total_acquisition must be positive');
   }
 });
+
+test('am_modulation_monitoring_and_audio_processing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_modulation_monitoring_and_audio_processing_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_modulation_monitoring_and_audio_processing_guide`);
+    assert.strictEqual(g.max_positive_peak_pct, 125, 'positive peak limit must be 125% per §73.1570(b)');
+    assert.strictEqual(g.max_negative_peak_pct, 100, 'negative peak limit must be 100% per §73.1570(b)');
+    assert.ok(g.total_audio_low_usd > 0, 'total_audio_low_usd must be positive');
+  }
+});

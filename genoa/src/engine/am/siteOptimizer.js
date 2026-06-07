@@ -1428,7 +1428,10 @@ export async function runSiteOptimizer(body = {}){
     log_total_setup_low_usd:            c.am_operating_log_and_technical_records_compliance_guide?.total_setup_low_usd ?? null,
     prl_site_area_required_acres:       c.am_transmitter_site_lease_and_property_rights_guide?.site_area_required_acres ?? null,
     prl_lease_annual_low_usd:           c.am_transmitter_site_lease_and_property_rights_guide?.lease_annual_low_usd ?? null,
-    prl_total_acquisition_low_usd:      c.am_transmitter_site_lease_and_property_rights_guide?.total_acquisition_low_usd ?? null
+    prl_total_acquisition_low_usd:      c.am_transmitter_site_lease_and_property_rights_guide?.total_acquisition_low_usd ?? null,
+    mod_max_positive_peak_pct:          c.am_modulation_monitoring_and_audio_processing_guide?.max_positive_peak_pct ?? null,
+    mod_power_tolerance_pct:            c.am_modulation_monitoring_and_audio_processing_guide?.power_tolerance_pct ?? null,
+    mod_total_audio_low_usd:            c.am_modulation_monitoring_and_audio_processing_guide?.total_audio_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7164,6 +7167,129 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_modulation_monitoring_and_audio_processing_guide: (() => {
+      // AM modulation monitoring and audio processing compliance guide.
+      //
+      // FCC §73.1570(a): A modulation monitor is required at each AM transmitter location.
+      // §73.1570(b): Positive peak modulation must not exceed 125%; negative peak must not exceed 100%.
+      // §73.1560(a): Transmitter output power must remain within ±2% of authorized TPO at all times.
+      // §73.51:      For directional antennas, antenna base currents must be maintained within ±5%
+      //              of licensed values; monitor and log ratios and phases continuously.
+      //
+      // Modulation monitor selection:
+      //   - Inline (series) monitor: inserted in transmission line — most accurate, slightly lossy.
+      //   - Sampling (pickup loop) monitor: non-intrusive, preferred for ATU installations.
+      //   For Class D low-power stations (≤250 W), a sampling-type monitor is standard.
+      //   For Class A / B (10–50 kW), an inline or high-accuracy sampling monitor is required.
+      //
+      // Audio processing chain:
+      //   - Pre-emphasis: AM does NOT use standard 75 µs pre-emphasis (that is FM/IBOC).
+      //     Unprocessed AM bandwidth is typically 10 kHz (§73.44 bandwidth limits).
+      //   - Audio processor functions: AGC (automatic gain control), limiting, clipper.
+      //   - NRSC-1-A (1990): Audio bandwidth must be controlled to prevent modulation sidebands
+      //     from exceeding ±10 kHz of carrier frequency.
+      //   - Clipper/limiter threshold: set so positive peaks ≤125%, negative ≤100%.
+      //   - Overmodulation: triggers §73.1570(d) reporting obligation if sustained.
+      //
+      // Power compliance:
+      //   ±2% tolerance on TPO per §73.1560(a) means if licensed at 5.00 kW, acceptable range
+      //   is 4.90–5.10 kW. Power monitors (wattmeters, directional couplers) must be calibrated.
+      //
+      // Cost basis (2024 broadcast market):
+      //   - Sampling-type modulation monitor (e.g., Inovonics 531, Belar AMM-1): $2,000–$5,000
+      //   - Broadcast audio processor (Orban 9400, Wheatstone FM-55, BSW AM processor): $3,000–$15,000
+      //   - Installation, wiring, calibration: $500–$1,500
+      //   - Low-power Class D stations may use basic INOVONICS-class units; Class A stations
+      //     may require DaySequerra or Belar rack-mount units.
+
+      const isDA_mm          = /^DA/i.test(pattern_mode);
+      const isHighPower      = tpo_kw >= 10;    // Class A/B: 10–50 kW
+      const isMedPower       = tpo_kw >= 1 && tpo_kw < 10;  // 1–9.9 kW
+      // isLowPower           = tpo_kw < 1 kW (Class C/D low end)
+
+      // Positive and negative modulation limits per §73.1570(b)
+      const max_positive_peak_pct = 125;
+      const max_negative_peak_pct = 100;
+
+      // Power tolerance per §73.1560(a)
+      const power_tolerance_pct   = 2.0;
+
+      // TPO operating range
+      const tpo_min_kw = round2(tpo_kw * (1 - power_tolerance_pct / 100));
+      const tpo_max_kw = round2(tpo_kw * (1 + power_tolerance_pct / 100));
+
+      // Carrier frequency bandwidth limit per NRSC-1-A §73.44:
+      //   Audio bandwidth controlled to ≤10 kHz to keep sidebands within ±10 kHz of carrier.
+      const audio_bandwidth_khz = 10.0;   // NRSC-1-A / §73.44
+
+      // Monitor type recommendation:
+      //   Class A (high power, ≥10 kW): inline or high-accuracy sampling required
+      //   Class D (≤5 kW): sampling-type acceptable
+      const monitor_type         = isHighPower ? 'INLINE_OR_HIGH_ACCURACY_SAMPLING' : 'SAMPLING';
+      const monitor_required     = true;   // §73.1570(a) — always required
+
+      // DA-specific: base current ratios and phases must also be monitored per §73.69
+      const da_base_current_monitoring_required = isDA_mm;
+      const da_ratio_tolerance_pct              = isDA_mm ? 5.0  : null;  // §73.51(b)
+      const da_phase_tolerance_deg              = isDA_mm ? 3.0  : null;  // §73.51(b)
+
+      // Audio processor recommendation:
+      //   High-power stations: professional broadcast processor ($8,000–$15,000)
+      //   Mid-power: mid-range processor ($3,000–$8,000)
+      //   Low-power Class D: entry processor ($1,500–$3,000)
+      const audio_processor_recommended = true;   // best practice for modulation headroom
+      const agc_compression_ratio       = 4;      // typical AM AGC 4:1 (not as aggressive as FM)
+      const clipper_threshold_pct       = 110;    // clip at 110% before limiting to 125% hard ceiling
+
+      // NRSC-1-A compliance:
+      //   Stations operating with IBOC (HD Radio) must additionally comply with NRSC-5-D
+      //   and iBiquity/Xperi mask compliance. Not applicable to analog-only AM.
+      const iboc_applicable = false;  // analog-only screening (no HD Radio flag in inputs)
+
+      // Overmodulation reporting: §73.1570(d) requires reporting if carrier is modulated
+      // in excess of 100% negative peak for more than 10 seconds consecutively.
+      const overmodulation_reporting_threshold_sec = 10;
+
+      // Cost estimates (2024):
+      const monitor_low_usd  = isHighPower ? 3500 : 1800;
+      const monitor_high_usd = isHighPower ? 5500 : 3200;
+      const processor_low_usd  = isHighPower ? 7500 : (isMedPower ? 3000 : 1500);
+      const processor_high_usd = isHighPower ? 15000 : (isMedPower ? 8000 : 3000);
+      const install_low_usd    = 500;
+      const install_high_usd   = 1500;
+      const total_audio_low_usd  = monitor_low_usd  + processor_low_usd  + install_low_usd;
+      const total_audio_high_usd = monitor_high_usd + processor_high_usd + install_high_usd;
+
+      return {
+        monitor_required,
+        monitor_type,
+        max_positive_peak_pct,
+        max_negative_peak_pct,
+        power_tolerance_pct,
+        tpo_min_kw,
+        tpo_max_kw,
+        audio_bandwidth_khz,
+        audio_processor_recommended,
+        agc_compression_ratio,
+        clipper_threshold_pct,
+        da_base_current_monitoring_required,
+        da_ratio_tolerance_pct,
+        da_phase_tolerance_deg,
+        iboc_applicable,
+        overmodulation_reporting_threshold_sec,
+        monitor_low_usd,
+        monitor_high_usd,
+        processor_low_usd,
+        processor_high_usd,
+        install_low_usd,
+        install_high_usd,
+        total_audio_low_usd,
+        total_audio_high_usd,
+        reference: '47 CFR §73.1570 (modulation monitor requirement); §73.1560(a) (power tolerance ±2%); §73.51(b) (DA base current tolerances); §73.44 (audio bandwidth NRSC-1-A); §73.1570(d) (overmodulation reporting)',
+        note: `Modulation monitor (${monitor_type}) and broadcast audio processor are required at this site. Licensed TPO of ${tpo_kw} kW must be maintained within ±${power_tolerance_pct}% (${tpo_min_kw}–${tpo_max_kw} kW). Positive peaks must not exceed ${max_positive_peak_pct}%; negative peaks must not exceed ${max_negative_peak_pct}%. NRSC-1-A audio bandwidth limit: ±${audio_bandwidth_khz} kHz sidebands from carrier.${isDA_mm ? ` DA station (${pattern_mode}): §73.51(b) base current ratios must remain within ±${da_ratio_tolerance_pct}%, phases within ±${da_phase_tolerance_deg}°.` : ''}`
       };
     })(),
 

@@ -15070,3 +15070,48 @@ it('candidate_comparison_table prl columns are present and valid for KAZM', asyn
   assert.ok(r0.prl_lease_annual_low_usd > 0, 'prl_lease_annual_low_usd must be positive');
   assert.ok(r0.prl_total_acquisition_low_usd > 0, 'prl_total_acquisition_low_usd must be positive');
 });
+
+it('am_modulation_monitoring_and_audio_processing_guide is present and non-null for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(
+      c.am_modulation_monitoring_and_audio_processing_guide !== undefined &&
+      c.am_modulation_monitoring_and_audio_processing_guide !== null,
+      `rank ${c.rank}: am_modulation_monitoring_and_audio_processing_guide must be present`
+    );
+  }
+});
+
+it('KAZM modulation limits match FCC §73.1570(b)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitoring_and_audio_processing_guide;
+  assert.strictEqual(g.max_positive_peak_pct, 125, 'positive peak limit must be 125% per §73.1570(b)');
+  assert.strictEqual(g.max_negative_peak_pct, 100, 'negative peak limit must be 100% per §73.1570(b)');
+  assert.strictEqual(g.power_tolerance_pct, 2.0, 'power tolerance must be ±2% per §73.1560(a)');
+});
+
+it('KAZM TPO operating range reflects ±2% tolerance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitoring_and_audio_processing_guide;
+  // KAZM fixture: tpo_kw = 5.0 → min 4.90, max 5.10
+  assert.ok(Math.abs(g.tpo_min_kw - 4.9) < 0.01, `tpo_min_kw should be ~4.90, got ${g.tpo_min_kw}`);
+  assert.ok(Math.abs(g.tpo_max_kw - 5.1) < 0.01, `tpo_max_kw should be ~5.10, got ${g.tpo_max_kw}`);
+  assert.strictEqual(g.audio_bandwidth_khz, 10.0, 'NRSC-1-A audio bandwidth must be 10 kHz');
+});
+
+it('KAZM terrain conductivity penalty', async () => {
+  // NDA station: DA base current monitoring not required
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitoring_and_audio_processing_guide;
+  assert.strictEqual(g.da_base_current_monitoring_required, false, 'NDA station: DA base current monitoring not required');
+  assert.strictEqual(g.da_ratio_tolerance_pct, null, 'NDA: da_ratio_tolerance_pct must be null');
+  assert.ok(g.monitor_required === true, 'modulation monitor always required per §73.1570(a)');
+});
+
+it('candidate_comparison_table mod columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.mod_max_positive_peak_pct, 125, 'mod_max_positive_peak_pct must be 125');
+  assert.strictEqual(r0.mod_power_tolerance_pct, 2.0, 'mod_power_tolerance_pct must be 2.0');
+  assert.ok(r0.mod_total_audio_low_usd > 0, 'mod_total_audio_low_usd must be positive');
+});

@@ -2226,6 +2226,43 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Modulation Monitoring and Audio Processing Guide */}
+        {candidate.am_modulation_monitoring_and_audio_processing_guide && (() => {
+          const g = candidate.am_modulation_monitoring_and_audio_processing_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d', marginBottom: 8 }}>
+                Modulation Monitoring &amp; Audio Processing
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#166534' }}>
+                <div><b>Monitor Required:</b> {g.monitor_required ? 'Yes — §73.1570(a)' : 'No'}</div>
+                <div><b>Monitor Type:</b> {g.monitor_type?.replace(/_/g, ' ')}</div>
+                <div><b>Positive Peak Limit:</b> {g.max_positive_peak_pct}% (§73.1570(b))</div>
+                <div><b>Negative Peak Limit:</b> {g.max_negative_peak_pct}% (§73.1570(b))</div>
+                <div><b>Power Tolerance:</b> ±{g.power_tolerance_pct}% (§73.1560(a))</div>
+                <div><b>TPO Range:</b> {fmtF(g.tpo_min_kw)}–{fmtF(g.tpo_max_kw)} kW</div>
+                <div><b>Audio BW (NRSC-1-A):</b> ±{g.audio_bandwidth_khz} kHz</div>
+                <div><b>AGC Compression:</b> {g.agc_compression_ratio}:1</div>
+                <div><b>Clipper Threshold:</b> {g.clipper_threshold_pct}%</div>
+                <div><b>Overmod Reporting:</b> &gt;{g.overmodulation_reporting_threshold_sec}s (§73.1570(d))</div>
+                {g.da_base_current_monitoring_required && (
+                  <>
+                    <div><b>DA Current Monitor:</b> Required — §73.51(b)</div>
+                    <div><b>Ratio Tolerance:</b> ±{g.da_ratio_tolerance_pct}% / ±{g.da_phase_tolerance_deg}°</div>
+                  </>
+                )}
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #bbf7d0', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>Monitor:</b> ${fmt(g.monitor_low_usd)}–${fmt(g.monitor_high_usd)}</span>
+                  <span><b>Processor:</b> ${fmt(g.processor_low_usd)}–${fmt(g.processor_high_usd)}</span>
+                  <span><b>Total Audio:</b> ${fmt(g.total_audio_low_usd)}–${fmt(g.total_audio_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Site Lease and Property Rights Guide */}
         {candidate.am_transmitter_site_lease_and_property_rights_guide && (() => {
           const g = candidate.am_transmitter_site_lease_and_property_rights_guide;
