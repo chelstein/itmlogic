@@ -11393,6 +11393,52 @@ test('am_site_access_road_and_security_guide KAZM annual monitoring cost', async
   assert.ok(g.total_security_high_usd > g.total_security_low_usd, 'high cost must exceed low');
 });
 
+test('am_commissioning_and_acceptance_testing_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_commissioning_and_acceptance_testing_guide;
+  assert.ok(g !== undefined && g !== null, 'am_commissioning_and_acceptance_testing_guide missing');
+  assert.ok(typeof g.total_commissioning_low_usd === 'number', 'total_commissioning_low_usd should be a number');
+  assert.ok(typeof g.commissioning_weeks_low === 'number', 'commissioning_weeks_low should be a number');
+});
+
+test('am_commissioning_and_acceptance_testing_guide KAZM NDA cost components', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_commissioning_and_acceptance_testing_guide;
+  assert.strictEqual(g.is_da,                false, 'KAZM NDA pattern should not be flagged as DA');
+  assert.strictEqual(g.fat_cost_low_usd,     2000,  'FAT low cost should be $2,000 for 5 kW');
+  assert.strictEqual(g.sat_cost_low_usd,     5000,  'SAT low cost should be $5,000 for NDA');
+  assert.strictEqual(g.harmonic_test_low_usd, 1500, 'Harmonic test low should be $1,500');
+});
+
+test('am_commissioning_and_acceptance_testing_guide KAZM MPE and total costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_commissioning_and_acceptance_testing_guide;
+  assert.strictEqual(g.mpe_evaluation_required, true,  'MPE evaluation required for all AM broadcast stations');
+  assert.strictEqual(g.total_commissioning_low_usd,  11000, 'Total commissioning low should be $11,000');
+  assert.strictEqual(g.total_commissioning_high_usd, 27500, 'Total commissioning high should be $27,500');
+});
+
+test('am_commissioning_and_acceptance_testing_guide KAZM timeline', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_commissioning_and_acceptance_testing_guide;
+  assert.strictEqual(g.commissioning_weeks_low,  2, 'NDA commissioning low should be 2 weeks');
+  assert.strictEqual(g.commissioning_weeks_high, 4, 'NDA commissioning high should be 4 weeks');
+  assert.ok(g.total_commissioning_high_usd > g.total_commissioning_low_usd, 'High cost must exceed low');
+});
+
+test('am_commissioning_and_acceptance_testing_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('com_total_low_usd'  in row, 'com_total_low_usd missing from comparison table');
+    assert.ok('com_weeks_low'      in row, 'com_weeks_low missing from comparison table');
+    assert.ok('com_mpe_required'   in row, 'com_mpe_required missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.com_total_low_usd, 11000, 'rank-1 com_total_low_usd should be $11,000');
+  assert.strictEqual(r0.com_weeks_low,         2, 'rank-1 com_weeks_low should be 2');
+  assert.strictEqual(r0.com_mpe_required,   true, 'rank-1 com_mpe_required should be true');
+});
+
 test('am_broadcast_tower_structural_inspection_guide present on KAZM candidate', async () => {
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_broadcast_tower_structural_inspection_guide;

@@ -2226,6 +2226,27 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Commissioning and Acceptance Testing Guide */}
+        {candidate.am_commissioning_and_acceptance_testing_guide && (() => {
+          const g = candidate.am_commissioning_and_acceptance_testing_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="com-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#701a75', marginBottom: 6, fontSize: 13 }}>Commissioning &amp; Acceptance Testing (§73.44 / §73.61 / OET-65)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7e22ce' }}>
+                <span style={{ color: '#a21caf' }}>Station:</span><span>{g.tpo_kw} kW {g.is_da ? 'DA' : 'NDA'} Class {g.fcc_class} at {g.pattern_mode}</span>
+                <span style={{ color: '#a21caf' }}>FAT (factory):</span><span>{fmt(g.fat_cost_low_usd)} – {fmt(g.fat_cost_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>SAT (site):</span><span>{fmt(g.sat_cost_low_usd)} – {fmt(g.sat_cost_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>Harmonic Test:</span><span>{fmt(g.harmonic_test_low_usd)} – {fmt(g.harmonic_test_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>MPE Survey:</span><span>{fmt(g.mpe_survey_low_usd)} – {fmt(g.mpe_survey_high_usd)} {g.mpe_evaluation_required ? '(required)' : '(optional)'}</span>
+                <span style={{ color: '#a21caf' }}>Total:</span><span>{fmt(g.total_commissioning_low_usd)} – {fmt(g.total_commissioning_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>Timeline:</span><span>{g.commissioning_weeks_low}–{g.commissioning_weeks_high} weeks</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#701a75' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Broadcast Tower Structural Inspection Guide */}
         {candidate.am_broadcast_tower_structural_inspection_guide && (() => {
           const g = candidate.am_broadcast_tower_structural_inspection_guide;

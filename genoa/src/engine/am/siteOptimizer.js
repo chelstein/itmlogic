@@ -1185,7 +1185,10 @@ export async function runSiteOptimizer(body = {}){
     reg_renewal_years:          c.am_annual_regulatory_compliance_and_fee_guide?.license_renewal_cycle_years ?? null,
     insp_tower_height_ft:       c.am_broadcast_tower_structural_inspection_guide?.tower_insp_ft ?? null,
     insp_annual_reserve_low:    c.am_broadcast_tower_structural_inspection_guide?.total_annual_inspection_low_usd ?? null,
-    insp_3yr_detail_low_usd:    c.am_broadcast_tower_structural_inspection_guide?.detailed_inspection_low_usd ?? null
+    insp_3yr_detail_low_usd:    c.am_broadcast_tower_structural_inspection_guide?.detailed_inspection_low_usd ?? null,
+    com_total_low_usd:          c.am_commissioning_and_acceptance_testing_guide?.total_commissioning_low_usd ?? null,
+    com_weeks_low:              c.am_commissioning_and_acceptance_testing_guide?.commissioning_weeks_low ?? null,
+    com_mpe_required:           c.am_commissioning_and_acceptance_testing_guide?.mpe_evaluation_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6920,6 +6923,69 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_commissioning_and_acceptance_testing_guide: (() => {
+      // Factory Acceptance Test (FAT) + Site Acceptance Test (SAT) commissioning costs.
+      // Covers initial transmitter commissioning, harmonic distortion verification (§73.44),
+      // RF exposure (MPE) final survey (§1.1310), and base current verification (§73.61).
+
+      const isDA_com = /^DA/i.test(pattern_mode);
+
+      // Factory Acceptance Test: performed at transmitter manufacturer before shipment
+      const fat_cost_low_usd  = tpo_kw >= 50 ? 5000 : tpo_kw >= 10 ? 3000 : 2000;
+      const fat_cost_high_usd = tpo_kw >= 50 ? 12000 : tpo_kw >= 10 ? 7000 : 5000;
+
+      // Site Acceptance Test: transmitter alignment, power levels, efficiency verification
+      const sat_cost_low_usd  = isDA_com ? 10000 : 5000;
+      const sat_cost_high_usd = isDA_com ? 25000 : 15000;
+
+      // Harmonic and spurious emissions measurement per §73.44
+      const harmonic_test_low_usd  = 1500;
+      const harmonic_test_high_usd = 3000;
+
+      // MPE survey: required at all AM broadcast stations (§1.1310)
+      const mpe_evaluation_required = true;  // required for all AM broadcast stations
+      const mpe_survey_low_usd  = 2000;
+      const mpe_survey_high_usd = 4000;
+
+      // Base current verification (§73.61): reference modulation + carrier levels
+      const base_current_verification_cost_usd = 500;
+
+      // Total commissioning cost
+      const total_commissioning_low_usd  = fat_cost_low_usd  + sat_cost_low_usd
+                                          + harmonic_test_low_usd + mpe_survey_low_usd
+                                          + base_current_verification_cost_usd;
+      const total_commissioning_high_usd = fat_cost_high_usd + sat_cost_high_usd
+                                          + harmonic_test_high_usd + mpe_survey_high_usd
+                                          + base_current_verification_cost_usd;
+
+      // Timeline: NDA ~2-3 weeks, DA ~4-8 weeks
+      const commissioning_weeks_low  = isDA_com ? 4 : 2;
+      const commissioning_weeks_high = isDA_com ? 8 : 4;
+
+      return {
+        fcc_class,
+        tpo_kw,
+        pattern_mode,
+        is_da:                          isDA_com,
+        fat_cost_low_usd,
+        fat_cost_high_usd,
+        sat_cost_low_usd,
+        sat_cost_high_usd,
+        harmonic_test_low_usd,
+        harmonic_test_high_usd,
+        mpe_evaluation_required,
+        mpe_survey_low_usd,
+        mpe_survey_high_usd,
+        base_current_verification_cost_usd,
+        total_commissioning_low_usd,
+        total_commissioning_high_usd,
+        commissioning_weeks_low,
+        commissioning_weeks_high,
+        reference: '47 CFR §73.44 (harmonic and spurious emissions); §73.61 (base current monitoring); §1.1310 (RF exposure — MPE); OET Bulletin 65 (MPE evaluation); §73.1590 (equipment performance measurement); IEC 60215 (safety of radio transmitting equipment)',
+        note: `Commissioning: ${tpo_kw} kW ${isDA_com ? 'DA' : 'NDA'} Class ${fcc_class} at ${frequency_khz} kHz. FAT: $${fat_cost_low_usd.toLocaleString()}–$${fat_cost_high_usd.toLocaleString()}. SAT: $${sat_cost_low_usd.toLocaleString()}–$${sat_cost_high_usd.toLocaleString()}. Harmonic: $${harmonic_test_low_usd.toLocaleString()}–$${harmonic_test_high_usd.toLocaleString()}. MPE survey: $${mpe_survey_low_usd.toLocaleString()}–$${mpe_survey_high_usd.toLocaleString()}. Total: $${total_commissioning_low_usd.toLocaleString()}–$${total_commissioning_high_usd.toLocaleString()} / ${commissioning_weeks_low}–${commissioning_weeks_high} weeks.`
       };
     })(),
 
