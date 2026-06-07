@@ -3014,3 +3014,15 @@ test('am_operating_cost_and_annual_expense_guide present across colocation candi
     assert.ok(g.annual_power_kw_input > 0, `rank ${c.rank}: annual_power_kw_input must be positive`);
   }
 });
+
+test('am_nighttime_operation_and_skywave_classification_guide present across colocation candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_nighttime_operation_and_skywave_classification_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nighttime_operation_and_skywave_classification_guide missing`);
+    assert.ok(g.effective_power_fraction > 0 && g.effective_power_fraction <= 1,
+      `rank ${c.rank}: effective_power_fraction must be in (0,1]`);
+    assert.ok(['secondary_limited_time','secondary_standard','dominant_unlimited'].includes(g.nighttime_status),
+      `rank ${c.rank}: unexpected nighttime_status: ${g.nighttime_status}`);
+  }
+});

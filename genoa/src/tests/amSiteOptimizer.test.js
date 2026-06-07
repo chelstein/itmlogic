@@ -12879,3 +12879,47 @@ test('am_operating_cost_and_annual_expense_guide comparison table columns presen
   assert.strictEqual(r0.opc_annual_total_low,        11466.98,'rank-1 opc_annual_total_low should be $11,466.98');
   assert.strictEqual(r0.opc_annual_power_kw_input,   7.69,    'rank-1 opc_annual_power_kw_input should be 7.69');
 });
+
+test('am_nighttime_operation_and_skywave_classification_guide present on KAZM candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
+  assert.ok(g !== undefined && g !== null, 'am_nighttime_operation_and_skywave_classification_guide missing');
+  assert.ok(g.nighttime_power_kw_max >= 0, 'nighttime_power_kw_max must be non-negative');
+  assert.ok(g.effective_power_fraction > 0, 'effective_power_fraction must be positive');
+});
+
+test('KAZM clear channel secondary status at night (780 kHz Class D)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
+  assert.strictEqual(g.is_clear_channel,   true,                      '780 kHz should be clear channel');
+  assert.strictEqual(g.is_secondary,       true,                      'Class D should be secondary');
+  assert.strictEqual(g.nighttime_status,   'secondary_limited_time',  'Class D on clear channel = secondary_limited_time');
+});
+
+test('KAZM nighttime power limit (5 kW Class D → 1 kW max at night)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
+  assert.strictEqual(g.nighttime_power_kw_max,    1,   'Class D on clear channel capped at 1 kW night');
+  assert.strictEqual(g.nighttime_power_fraction,  0.2, 'nighttime_power_fraction = 1/5 = 0.2');
+  assert.strictEqual(g.daytime_power_kw,          5,   'daytime_power_kw should equal tpo_kw=5');
+});
+
+test('KAZM effective power fraction (60% = average of 100% day + 20% night)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_nighttime_operation_and_skywave_classification_guide;
+  assert.strictEqual(g.effective_power_fraction, 0.6, 'effective_power_fraction should be 0.6');
+  assert.strictEqual(g.daytime_hours_per_year,   4380, 'daytime_hours_per_year = 365×12 = 4380');
+});
+
+test('am_nighttime_operation_and_skywave_classification_guide comparison table columns present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sky_nighttime_status'       in row, 'sky_nighttime_status missing from comparison table');
+    assert.ok('sky_nighttime_power_kw_max' in row, 'sky_nighttime_power_kw_max missing from comparison table');
+    assert.ok('sky_effective_power_pct'    in row, 'sky_effective_power_pct missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.sky_nighttime_status,       'secondary_limited_time', 'rank-1 sky_nighttime_status mismatch');
+  assert.strictEqual(r0.sky_nighttime_power_kw_max,  1,                       'rank-1 sky_nighttime_power_kw_max should be 1');
+  assert.strictEqual(r0.sky_effective_power_pct,     0.6,                     'rank-1 sky_effective_power_pct should be 0.6');
+});

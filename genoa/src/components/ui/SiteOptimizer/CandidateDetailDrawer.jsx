@@ -2226,6 +2226,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Nighttime Operation and Skywave Classification Guide */}
+        {candidate.am_nighttime_operation_and_skywave_classification_guide && (() => {
+          const g = candidate.am_nighttime_operation_and_skywave_classification_guide;
+          const statusLabel = {
+            secondary_limited_time: 'Secondary — Limited Time',
+            secondary_standard:     'Secondary — Standard',
+            dominant_unlimited:     'Dominant — Unlimited',
+          }[g.nighttime_status] ?? g.nighttime_status ?? '—';
+          return (
+            <div key="sky-guide" style={{ marginBottom: 16, padding: 12, background: '#e8edf5', borderRadius: 8, border: '2px solid #1e3a8a' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>Nighttime &amp; Skywave Classification</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#1e40af' }}>
+                <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear Channel' : 'Regional/Local'}</span>
+                <span>Station class:</span><span>{g.fcc_class} ({g.is_secondary ? 'Secondary' : 'Dominant'})</span>
+                <span>Night status:</span><span>{statusLabel}</span>
+                <span>Day power:</span><span>{g.daytime_power_kw != null ? `${g.daytime_power_kw} kW` : '—'}</span>
+                <span>Night power max:</span><span>{g.nighttime_power_kw_max != null ? `${g.nighttime_power_kw_max} kW` : '—'}</span>
+                <span>Night fraction:</span><span>{g.nighttime_power_fraction != null ? `${(g.nighttime_power_fraction * 100).toFixed(0)}%` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>Effective power:</span>
+                <span style={{ fontWeight: 600 }}>{g.effective_power_fraction != null ? `${(g.effective_power_fraction * 100).toFixed(0)}%` : '—'} of TPO</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#3b82f6', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Operating Cost and Annual Expense Guide */}
         {candidate.am_operating_cost_and_annual_expense_guide && (() => {
           const g = candidate.am_operating_cost_and_annual_expense_guide;

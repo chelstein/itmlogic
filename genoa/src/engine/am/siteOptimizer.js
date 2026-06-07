@@ -1263,7 +1263,10 @@ export async function runSiteOptimizer(body = {}){
     cot_10yr_low_usd:           c.am_colocation_sharing_and_tower_lease_guide?.colocation_10yr_low ?? null,
     opc_annual_power_cost_low:  c.am_operating_cost_and_annual_expense_guide?.annual_power_cost_low ?? null,
     opc_annual_total_low:       c.am_operating_cost_and_annual_expense_guide?.annual_total_low ?? null,
-    opc_annual_power_kw_input:  c.am_operating_cost_and_annual_expense_guide?.annual_power_kw_input ?? null
+    opc_annual_power_kw_input:  c.am_operating_cost_and_annual_expense_guide?.annual_power_kw_input ?? null,
+    sky_nighttime_status:       c.am_nighttime_operation_and_skywave_classification_guide?.nighttime_status ?? null,
+    sky_nighttime_power_kw_max: c.am_nighttime_operation_and_skywave_classification_guide?.nighttime_power_kw_max ?? null,
+    sky_effective_power_pct:    c.am_nighttime_operation_and_skywave_classification_guide?.effective_power_fraction ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -6998,6 +7001,45 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_nighttime_operation_and_skywave_classification_guide: (() => {
+      // At night, AM groundwave reach shrinks but skywave extends thousands of miles.
+      // Class D secondary stations on clear channels must protect Class A dominant stations;
+      // many are restricted to 1 kW night or daytime-only operation.
+      const is_clear_channel = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const is_secondary     = fcc_class === 'D';
+      let nighttime_status, nighttime_power_kw_max;
+      if (is_secondary && is_clear_channel) {
+        nighttime_status       = 'secondary_limited_time';
+        nighttime_power_kw_max = round2(Math.min(tpo_kw, 1.0)); // max 1 kW at night on clear channel
+      } else if (/^[AB]$/i.test(fcc_class)) {
+        nighttime_status       = 'dominant_unlimited';
+        nighttime_power_kw_max = tpo_kw;
+      } else {
+        nighttime_status       = 'secondary_standard';
+        nighttime_power_kw_max = tpo_kw;
+      }
+      const daytime_hours_per_year   = round2(365 * 12);
+      const nighttime_hours_per_year = round2(365 * 12);
+      const nighttime_power_fraction  = round2(nighttime_power_kw_max / tpo_kw);
+      const effective_power_fraction  = round2(
+        (1.0 * daytime_hours_per_year + nighttime_power_fraction * nighttime_hours_per_year) /
+        (daytime_hours_per_year + nighttime_hours_per_year)
+      );
+      return {
+        frequency_khz, fcc_class, tpo_kw,
+        is_clear_channel, is_secondary,
+        nighttime_status,
+        nighttime_power_kw_max,
+        daytime_power_kw: tpo_kw,
+        nighttime_power_fraction,
+        effective_power_fraction,
+        daytime_hours_per_year,
+        nighttime_hours_per_year,
+        reference: '47 CFR §73.21-73.37; FCC AM clear channel station rules; AM technical standards',
+        note: `Class ${fcc_class} on ${frequency_khz} kHz: ${nighttime_status}; night max ${nighttime_power_kw_max} kW; effective power fraction ${(effective_power_fraction * 100).toFixed(0)}%`
       };
     })(),
 
