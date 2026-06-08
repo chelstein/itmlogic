@@ -1522,7 +1522,11 @@ export async function runSiteOptimizer(body = {}){
     mpe_eval_required:                  c.am_rf_exposure_mpe_evaluation_guide?.eval_required ?? null,
     mpe_r_gp_exclusion_m:               c.am_rf_exposure_mpe_evaluation_guide?.r_gp_exclusion_m ?? null,
     mpe_r_gp_exclusion_ft:              c.am_rf_exposure_mpe_evaluation_guide?.r_gp_exclusion_ft ?? null,
-    mpe_fence_cost_low_usd:             c.am_rf_exposure_mpe_evaluation_guide?.fence_cost_low_usd ?? null
+    mpe_fence_cost_low_usd:             c.am_rf_exposure_mpe_evaluation_guide?.fence_cost_low_usd ?? null,
+    str_tower_height_ft:                c.am_tower_structural_load_analysis_guide?.tower_height_ft ?? null,
+    str_is_guyed:                       c.am_tower_structural_load_analysis_guide?.is_guyed ?? null,
+    str_total_wind_load_lbf:            c.am_tower_structural_load_analysis_guide?.total_wind_load_lbf ?? null,
+    str_total_structural_low_usd:       c.am_tower_structural_load_analysis_guide?.total_structural_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7365,6 +7369,130 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_structural_load_analysis_guide: (() => {
+      // AM tower structural load analysis guide — TIA-222-H / ASCE 7-22.
+      //
+      // Regulatory framework:
+      //   ANSI/TIA-222-H (2017, with Addendum 1 2021): Structural Standard for
+      //     Antenna Supporting Structures and Antennas.  Current edition as of 2023.
+      //     Replaces TIA-222-G and earlier.
+      //   ASCE 7-22 (Minimum Design Loads for Buildings): wind speed map referenced
+      //     by TIA-222-H for basic wind speed V (3-sec gust, mph) by geographic
+      //     location (Exposure Category C assumed for open terrain).
+      //   Building permit requirements: most US jurisdictions require a licensed
+      //     structural engineer (PE) to stamp tower drawings per TIA-222-H before
+      //     a building permit is issued.
+      //
+      // Simplified structural model:
+      //   For a self-supporting (self-support) or guyed monopole (AM standard):
+      //     Tower height h  = λ/4 in feet (from station frequency)
+      //     Tower diameter  ≈ 2 ft at base (typical 300 ft AM tower, tapered)
+      //     Wind pressure   per TIA-222-H: P = 0.00256 × K_z × K_zt × K_d × V² × G × C_f × A_f
+      //       V = basic wind speed (assume 115 mph for continental US – AZ/NM typical)
+      //       K_z = 1.27 (exposure C, h = 315 ft)
+      //       K_zt = 1.0 (no topographic factor assumed – flat terrain)
+      //       K_d = 0.85 (wind directionality factor for towers)
+      //       G = 0.85 (gust factor for flexible structures, TIA-222-H)
+      //       C_f = 1.3 (force coefficient, open truss tower)
+      //       A_f = effective projected area per foot of height = 1.2 ft²/ft (triangular lattice est.)
+      //     Total wind load on tower (simplified): W = P × A_total
+      //       where A_total = A_f × h
+      //     Base moment M_base = W × (h/2)  [ft-lbf]  (resultant at midheight)
+      //
+      //   Foundation depth model (empirical):
+      //     D_foundation ≈ h / 12  (empirical ratio, verified against TIA-222-H Table A1)
+      //     Guy wire quantity: 3 anchor points × 2 levels for guyed towers
+      //       (towers < 200 ft may be self-supporting; > 200 ft almost always guyed)
+      //
+      //   Steel weight estimate:
+      //     Lattice tower: ~0.6 lbs/ft² × projected area + 15% for connections
+      //     Approximate total steel: 0.6 × A_f × h × 1.15  [lbs]
+      //
+      //   Cost model (2023):
+      //     Tower fabrication + erection: $50–$120 / ft installed
+      //     PE structural study (TIA-222-H stamped): $8,000–$25,000
+      //     Foundation (spread footing or drilled pier): $20,000–$80,000
+      //     Guy anchors (each): $2,000–$6,000  (6 total for 2-level guys)
+
+      const lambda_m       = 299792.458 / frequency_khz;
+      const h_ft           = round2(lambda_m / 4 * 3.28084);   // λ/4 tower height in feet
+      const h_m            = round2(lambda_m / 4);
+
+      // Wind load parameters (TIA-222-H / ASCE 7-22, Exposure C, V=115 mph, Z≈315ft)
+      const V_mph          = 115;   // basic wind speed 3-sec gust (Flagstaff area typical)
+      const K_z            = round2(2.01 * Math.pow(h_ft / 1200, 2/7));  // TIA-222-H eq (Exp C)
+      const K_zt           = 1.0;
+      const K_d            = 0.85;
+      const G              = 0.85;
+      const C_f            = 1.3;
+      const A_f_per_ft     = 1.2;   // projected area per foot of height (ft²/ft), triangular lattice
+
+      // Velocity pressure q_z = 0.00256 × K_z × K_zt × K_d × V²  [psf]
+      const q_z            = round2(0.00256 * K_z * K_zt * K_d * V_mph * V_mph);
+
+      // Total wind load on tower [lbf]
+      const W_total        = round2(q_z * G * C_f * A_f_per_ft * h_ft);
+
+      // Base moment [ft-kip]  (resultant at midheight, triangular distribution → 2/3 h)
+      const M_base_ftkip   = round2(W_total * (2/3 * h_ft) / 1000);
+
+      // Steel weight estimate — empirical for guyed lattice AM tower
+      // (~110 lbs/ft for 300 ft guyed tower; self-supporting ~200 lbs/ft)
+      const lbs_per_ft     = h_ft > 200 ? 110 : 200;
+      const steel_lbs      = Math.round(h_ft * lbs_per_ft);
+      const steel_tons     = round2(steel_lbs / 2000);
+
+      // Foundation depth
+      const foundation_depth_ft = round2(h_ft / 12);
+
+      // Tower type
+      const is_guyed       = h_ft > 200;
+      const n_guy_levels   = h_ft > 400 ? 3 : h_ft > 200 ? 2 : 0;
+      const n_guy_anchors  = n_guy_levels * 3;  // 3 anchor points per level
+
+      // Cost model
+      const fabrication_low  = Math.round(h_ft * 50);
+      const fabrication_high = Math.round(h_ft * 120);
+      const foundation_low   = 20000;
+      const foundation_high  = 80000;
+      const pe_study_low     = 8000;
+      const pe_study_high    = 25000;
+      const guy_anchor_low   = n_guy_anchors * 2000;
+      const guy_anchor_high  = n_guy_anchors * 6000;
+
+      const total_low  = fabrication_low  + foundation_low  + pe_study_low  + guy_anchor_low;
+      const total_high = fabrication_high + foundation_high + pe_study_high + guy_anchor_high;
+
+      return {
+        frequency_khz,
+        tower_height_ft:      h_ft,
+        tower_height_m:       h_m,
+        wind_speed_mph:       V_mph,
+        k_z: K_z,
+        velocity_pressure_psf: q_z,
+        total_wind_load_lbf:  W_total,
+        base_moment_ft_kip:   M_base_ftkip,
+        steel_weight_lbs:     steel_lbs,
+        steel_weight_tons:    steel_tons,
+        is_guyed,
+        n_guy_levels,
+        n_guy_anchors,
+        foundation_depth_ft,
+        fabrication_low_usd:  fabrication_low,
+        fabrication_high_usd: fabrication_high,
+        foundation_low_usd:   foundation_low,
+        foundation_high_usd:  foundation_high,
+        pe_study_low_usd:     pe_study_low,
+        pe_study_high_usd:    pe_study_high,
+        guy_anchor_low_usd:   guy_anchor_low,
+        guy_anchor_high_usd:  guy_anchor_high,
+        total_structural_low_usd:  total_low,
+        total_structural_high_usd: total_high,
+        reference: 'ANSI/TIA-222-H (2017, Addendum 1 2021) – Structural Standard for Antenna Supporting Structures; ASCE 7-22 – Minimum Design Loads; TIA-222-H §2.6 (wind load); TIA-222-H Table A1 (foundation depth); 47 CFR §73.49 (tower fencing)',
+        note: `Tower: ${h_ft} ft (${h_m} m) λ/4 at ${frequency_khz} kHz. Wind load: ${W_total} lbf (V=${V_mph} mph, Exp C). Base moment: ${M_base_ftkip} ft-kip. Steel: ~${steel_tons} tons. ${is_guyed ? `Guyed (${n_guy_levels} levels, ${n_guy_anchors} anchors)` : 'Self-supporting'}. Total estimated: $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),
 

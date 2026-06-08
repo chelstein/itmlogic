@@ -2356,6 +2356,39 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Structural Load Analysis Guide */}
+        {candidate.am_tower_structural_load_analysis_guide && (() => {
+          const g = candidate.am_tower_structural_load_analysis_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f8fafc', border: '1px solid #94a3b8', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', marginBottom: 8 }}>
+                Tower Structural Load Analysis (TIA-222-H / ASCE 7-22)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#334155' }}>
+                <div><b>Tower height (λ/4):</b> {fmtF(g.tower_height_ft, 0)} ft ({fmtF(g.tower_height_m, 0)} m)</div>
+                <div><b>Design wind speed:</b> {g.wind_speed_mph} mph (Exp C)</div>
+                <div><b>K_z (TIA-222-H):</b> {fmtF(g.k_z, 2)}</div>
+                <div><b>Velocity pressure q_z:</b> {fmtF(g.velocity_pressure_psf, 1)} psf</div>
+                <div><b>Total wind load:</b> {fmt(Math.round(g.total_wind_load_lbf))} lbf</div>
+                <div><b>Base moment:</b> {fmt(Math.round(g.base_moment_ft_kip))} ft-kip</div>
+                <div><b>Steel weight:</b> ~{fmt(g.steel_weight_lbs)} lbs ({fmtF(g.steel_weight_tons, 1)} tons)</div>
+                <div><b>Tower type:</b> {g.is_guyed ? `Guyed (${g.n_guy_levels} levels, ${g.n_guy_anchors} anchors)` : 'Self-supporting'}</div>
+                <div><b>Foundation depth:</b> ~{fmtF(g.foundation_depth_ft, 0)} ft</div>
+                <div><b>PE study (TIA-222-H stamped):</b> ${fmt(g.pe_study_low_usd)}–${fmt(g.pe_study_high_usd)}</div>
+                <div><b>Fabrication + erection:</b> ${fmt(g.fabrication_low_usd)}–${fmt(g.fabrication_high_usd)}</div>
+                <div><b>Foundation:</b> ${fmt(g.foundation_low_usd)}–${fmt(g.foundation_high_usd)}</div>
+                {g.n_guy_anchors > 0 && (
+                  <div><b>Guy anchors ({g.n_guy_anchors}):</b> ${fmt(g.guy_anchor_low_usd)}–${fmt(g.guy_anchor_high_usd)}</div>
+                )}
+                <div style={{ gridColumn: '1/-1' }}><b>Total structural:</b> ${fmt(g.total_structural_low_usd)}–${fmt(g.total_structural_high_usd)}</div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#64748b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM RF Exposure MPE Evaluation Guide */}
         {candidate.am_rf_exposure_mpe_evaluation_guide && (() => {
           const g = candidate.am_rf_exposure_mpe_evaluation_guide;

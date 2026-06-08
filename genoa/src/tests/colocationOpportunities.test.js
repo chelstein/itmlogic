@@ -3990,3 +3990,14 @@ test('am_rf_exposure_mpe_evaluation_guide present across colocation candidates',
     assert.strictEqual(g.e_limit_gp_vm, 614, 'GP limit must be 614 V/m');
   }
 });
+
+test('am_tower_structural_load_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_load_analysis_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_tower_structural_load_analysis_guide`);
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.ok(g.total_wind_load_lbf > 0, 'total_wind_load_lbf must be positive');
+    assert.ok(g.total_structural_low_usd > 0, 'total_structural_low_usd must be positive');
+  }
+});
