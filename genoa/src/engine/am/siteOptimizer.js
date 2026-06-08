@@ -352,6 +352,28 @@ export async function runSiteOptimizer(body = {}){
     notes: confidenceNotes
   };
 
+  // v1 structured warnings for data-quality conditions
+  if (!rasterLoaded){
+    warnings.push({
+      code: 'CONDUCTIVITY_UNVERIFIED',
+      message: 'Conductivity data sourced from FCC M3 zone table (15 zones, ±50% uncertainty). Deploy AM_m3.tif GeoTIFF raster for filing-grade σ. Candidates can still rank but conductivity sub-score carries ±12 pt uncertainty.',
+      blocking: false
+    });
+  }
+  if (!community_of_license_polygon && !col_centroid){
+    warnings.push({
+      code: 'COL_CENTROID_UNVERIFIED',
+      message: 'No community_of_license_polygon or col_centroid supplied. COL service coverage uses a 10-km disc proxy centered on the current site. Provide the COL polygon for §73.24(j) filing-grade overlap analysis.',
+      blocking: false
+    });
+  } else if (!community_of_license_polygon && col_centroid){
+    warnings.push({
+      code: 'COL_CENTROID_UNVERIFIED',
+      message: 'col_centroid provided without community_of_license_polygon. Coverage uses a 10-km disc proxy centered on col_centroid. Supply full COL polygon for filing-grade analysis.',
+      blocking: false
+    });
+  }
+
   // Baseline = the score row for the current site (search by coord match).
   const baseline = scored.find((c) => coordsEqual(c, current_site)) || null;
 
@@ -379,6 +401,23 @@ export async function runSiteOptimizer(body = {}){
       c.score_delta_explanation = {
         total: c.score_delta_vs_baseline,
         components: componentDeltas
+      };
+      // v1 contract: standardized delta object
+      c.delta = {
+        score:            c.score_delta_vs_baseline ?? null,
+        population_served: c.population_delta_vs_baseline ?? null,
+        col_field_mv_m:   (c.field_at_col_centroid_mvm != null && baseline.field_at_col_centroid_mvm != null)
+          ? round2(c.field_at_col_centroid_mvm - baseline.field_at_col_centroid_mvm)
+          : null,
+        conductivity_ms_m: (c.ground_sigma_mS_m != null && baseline.ground_sigma_mS_m != null)
+          ? round2(c.ground_sigma_mS_m - baseline.ground_sigma_mS_m)
+          : null,
+        col_coverage_pct:  (c.col_coverage_pct != null && baseline.col_coverage_pct != null)
+          ? round2(c.col_coverage_pct - baseline.col_coverage_pct)
+          : null,
+        daytime_reach_km:  (c.daytime_reach_km != null && baseline.daytime_reach_km != null)
+          ? round2(c.daytime_reach_km - baseline.daytime_reach_km)
+          : null,
       };
     }
   }
@@ -1961,7 +2000,27 @@ export async function runSiteOptimizer(body = {}){
     };
   })();
 
+  const _generated_at = new Date().toISOString();
+  const _baselineSummary = baselineSummary(baseline);
+
   return {
+    // v1 API contract envelope
+    schema:          'genoa.am_relocation_optimizer.v1',
+    generated_at:    _generated_at,
+    screening_only:  true,
+    filing_ready:    false,
+    input: {
+      callsign, frequency_khz, current_site, search_radius_km,
+      grid_spacing_km, tpo_kw, pattern_mode, fcc_class,
+      goals_enabled: Object.entries(goals).filter(([_, v]) => v).map(([k]) => k),
+      community_of_license_polygon_provided: !!community_of_license_polygon,
+      col_centroid_provided: !!col_centroid,
+      col_centroid: col_centroid || null,
+      candidate_limit,
+      reach_scale_km: round2(reach_scale_km)
+    },
+    // v1 standardized baseline (mirrors current_site_baseline; both included for compat)
+    baseline: _baselineSummary,
     available: true,
     method: 'grid-search + per-goal sub-scoring (SCREENING ONLY)',
     n_candidates_evaluated: scored.length,
@@ -2582,6 +2641,75 @@ async function scoreCandidate(pt, ctx, warnings){
   const _confPenalty = round2(score_final - score);
   if (_confPenalty !== 0) score_breakdown.confidence_penalty = _confPenalty;
 
+  // --- score_breakdown_detail: transparent array format ---
+  // Each entry: { key, label, points, max_points, reason }
+  // Enables "no hidden scoring" principle: every rank is explainable.
+  const SCORE_LABELS = {
+    col_coverage:  'COL service coverage (§73.24(j))',
+    population:    'Daytime population served',
+    blanket:       'Blanket population risk (§73.24(g))',
+    conductivity:  'Ground conductivity (σ mS/m)',
+    wildfire:      'Wildfire / environmental risk',
+    treaty_zone:   'Treaty zone proximity',
+  };
+  const SCORE_MAX_POOL = {
+    maximize_col_coverage:       35,
+    maximize_population:         28,
+    minimize_blanket_population: 14,
+    prefer_high_conductivity:    10,
+    avoid_wildfire_risk:          4,
+    minimize_int_treaty_zone:     4,
+  };
+  const score_breakdown_detail = [];
+  for (const [goal, sk] of Object.entries(subKey)){
+    const rawMax    = SCORE_MAX_POOL[goal] ?? 0;
+    const maxPts    = round2(rawMax * normFactor);
+    const pts       = round2(score_breakdown[sk] ?? 0);
+    const subVal    = sub[sk];
+    let reason = '';
+    if (sk === 'col_coverage'){
+      reason = coverage_pct == null
+        ? 'COL polygon not provided — using 10-km disc proxy (low confidence)'
+        : `${Math.round(coverage_pct * 100)}% of community polygon covered (§73.24(j) floor: 80%)`;
+    } else if (sk === 'population'){
+      reason = daytime_reach_km == null
+        ? 'Reach estimate unavailable'
+        : `0.5 mV/m contour ~${round2(daytime_reach_km)} km; est. ${estimated_daytime_population_served != null ? fmtPopCompact(estimated_daytime_population_served) : '?'} people served`;
+    } else if (sk === 'blanket'){
+      reason = blanket_population_pct == null
+        ? 'Blanket population not evaluated'
+        : `Blanket pop ${round2(blanket_population_pct)}% (§73.24(g) limit: 1%)`;
+    } else if (sk === 'conductivity'){
+      reason = `σ=${sigma_msm} mS/m (${sigmaQuality(sigma_msm)}) — source: ${ground_sigma_source}`;
+    } else if (sk === 'wildfire'){
+      reason = 'Wildfire risk not yet integrated (USFS FIA / LANDFIRE placeholder)';
+    } else if (sk === 'treaty_zone'){
+      reason = treaty_zone
+        ? `In treaty zone: ${treaty_zone}`
+        : treaty_min_border_km != null
+          ? `${round2(treaty_min_border_km)} km from nearest treaty boundary`
+          : 'Treaty boundary distance not evaluated';
+    }
+    score_breakdown_detail.push({
+      key:        `${sk}_score`,
+      label:      SCORE_LABELS[sk] ?? sk,
+      points:     pts,
+      max_points: weightPool[goal] > 0 ? maxPts : 0,
+      enabled:    weightPool[goal] > 0,
+      reason,
+    });
+  }
+  if (_confPenalty !== 0){
+    score_breakdown_detail.push({
+      key:        'confidence_penalty',
+      label:      'Data confidence adjustment',
+      points:     _confPenalty,
+      max_points: 0,
+      enabled:    true,
+      reason:     `Score dampened by ${Math.abs(_confPenalty).toFixed(1)} pts — ${_confTier} confidence tier (${ground_sigma_filing_grade} σ, COL polygon ${community_of_license_polygon ? 'supplied' : 'missing'})`,
+    });
+  }
+
   // --- compliance & label flags ---
   const flags = [];
   if (coverage_pct != null && coverage_pct < COL_COVERAGE_HARD_FLOOR){
@@ -2599,6 +2727,7 @@ async function scoreCandidate(pt, ctx, warnings){
   }
   limitations.push('Parcel / zoning availability not checked.');
   limitations.push('NIF status is SCREENING-grade only — full §73.182 nighttime analysis required for filing.');
+
 
   // --- candidate narrative summary (plain-English 3-sentence briefing) ---
   const candidate_narrative_summary = (() => {
@@ -2696,7 +2825,24 @@ async function scoreCandidate(pt, ctx, warnings){
     treaty_zone, flags, score: score_final, score_breakdown
   });
 
+  // v1 contract fields
+  const candidate_id = `${round6(pt.lat)}_${round6(pt.lon)}`.replace(/\./g, 'd');
+  const candidate_type = pt.candidate_type ?? 'grid';
+  const blockers = flags.filter(f => f.includes('§73.24')).map(f => ({ code: 'COMPLIANCE_FAIL', message: f }));
+  const required_next_studies = [
+    '47 CFR §73.183 daytime groundwave study',
+    '47 CFR §73.184 groundwave field-strength curves',
+    '47 CFR §73.182 nighttime NIF/RSS interference study',
+    'RF safety / OET-65 review',
+    'ASR / FAA / zoning review',
+    'Tower-owner lease and structural review'
+  ];
+  if (/^DA/i.test(pattern_mode)) required_next_studies.push('§73.150 directional antenna pattern design and §73.154 proof of performance');
+  if (CLEAR_CHANNEL_KHZ.has(frequency_khz) && fcc_class !== 'A') required_next_studies.push('§73.182 dominant-station NIF analysis (clear channel — secondary operation)');
+
   return {
+    id: candidate_id,
+    candidate_type,
     lat: round6(pt.lat),
     lon: round6(pt.lon),
     distance_from_current_km: round2(pt.distance_from_current_km),
@@ -24574,6 +24720,7 @@ async function scoreCandidate(pt, ctx, warnings){
     notes: buildNotes({ coverage_pct, sigma_msm, blanket_population_pct, distance_from_current_km: pt.distance_from_current_km }),
     explanation: {
       score_breakdown: roundBreakdown(score_breakdown),
+      score_breakdown_detail,   // v1 array format: [{key,label,points,max_points,reason}]
       // Raw (unweighted) sub-scores: each on 0–100 scale before goal weighting.
       // These show the underlying physical metric regardless of which goals are enabled.
       score_components_raw: {
@@ -24588,6 +24735,11 @@ async function scoreCandidate(pt, ctx, warnings){
       weights_pool: weightPool,
       coverage_computed_from
     },
+    // v1 contract fields
+    blockers,
+    required_next_studies,
+    screening_only: true,
+    filing_ready:   false,
     status_labels: [LABEL_SCREENING, LABEL_ENGINEER_REVIEW],  // base set; finalizeLabels() adds more
     _flags: flags,                                            // private: removed in finalizeLabels
     limitations
@@ -25688,6 +25840,7 @@ function quantile(arr, q){
 
 function round2(x){ return Number.isFinite(x) ? Math.round(x * 100) / 100 : x; }
 function round6(x){ return Number.isFinite(x) ? Math.round(x * 1e6) / 1e6 : x; }
+function fmtPopCompact(n){ return n >= 1e6 ? `${(n/1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n/1e3)}K` : String(Math.round(n)); }
 function roundBreakdown(b){
   const o = {};
   for (const [k, v] of Object.entries(b)) o[k] = round2(v);
@@ -25775,6 +25928,38 @@ export function buildFilingComplexityScore({ chanClass, fcc_class, frequency_khz
 // ---------- public test-only export ----------
 // Exposed for unit tests.  Not part of the public API contract.
 export { buildTopSummary, frequencyChannelClass, buildRegulatoryTimeline };
+
+// v1 conductivity abstraction — resolveConductivityAtPoint({ lat, lon })
+// Returns { value_ms_m, source, confidence, blocking }
+// When the GeoTIFF raster is loaded: high confidence, filing-grade.
+// When using zone-table fallback: low confidence, marked mock/screening.
+// When both fail: null value, confidence=none, blocking=false (candidate may still rank).
+export async function resolveConductivityAtPoint({ lat, lon }){
+  let _m3 = await lookupM3Conductivity(lat, lon).catch(() => null);
+  if (_m3?.available && _m3.sigma_mS_m != null){
+    return {
+      value_ms_m:  _m3.sigma_mS_m,
+      source:      _m3.zone_label ? `m3_raster:${_m3.zone_label}` : 'm3_raster',
+      confidence:  _m3.filing_grade === 'filing' ? 'high' : 'medium',
+      blocking:    false
+    };
+  }
+  const zone = lookupM3ZoneFallback(lat, lon);
+  if (zone?.available && zone.sigma_mS_m != null){
+    return {
+      value_ms_m:  zone.sigma_mS_m,
+      source:      'mock_conductivity_raster',
+      confidence:  'low',
+      blocking:    false
+    };
+  }
+  return {
+    value_ms_m:  null,
+    source:      'unavailable',
+    confidence:  'none',
+    blocking:    false
+  };
+}
 
 export const __test__ = {
   buildGridCandidates,
