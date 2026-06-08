@@ -1506,7 +1506,11 @@ export async function runSiteOptimizer(body = {}){
     gw_study_cost_low_usd:              c.am_propagation_groundwave_field_strength_estimate_guide?.study_cost_low_usd ?? null,
     ltg_asr_required:                   c.am_tower_lighting_and_painting_compliance_guide?.asr_required ?? null,
     ltg_lighting_type:                  c.am_tower_lighting_and_painting_compliance_guide?.lighting_type ?? null,
-    ltg_total_lighting_low_usd:         c.am_tower_lighting_and_painting_compliance_guide?.total_lighting_low_usd ?? null
+    ltg_total_lighting_low_usd:         c.am_tower_lighting_and_painting_compliance_guide?.total_lighting_low_usd ?? null,
+    gnd_n_radials_full:                 c.am_ground_radial_system_design_guide?.n_radials_full ?? null,
+    gnd_r_loss_full_ohm:                c.am_ground_radial_system_design_guide?.r_loss_full_ohm ?? null,
+    gnd_efficiency_full_pct:            c.am_ground_radial_system_design_guide?.efficiency_full_pct ?? null,
+    gnd_total_system_low_usd:           c.am_ground_radial_system_design_guide?.total_radial_system_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7349,6 +7353,134 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_ground_radial_system_design_guide: (() => {
+      // AM ground radial system design guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.68: Grounding requirements for AM antenna systems.  The rules do
+      //     not mandate a specific number of radials, but the FCC engineering standard
+      //     model assumes a 120-radial, quarter-wave (λ/4) buried copper system as the
+      //     reference for the 36.5 Ω radiation resistance used in §73.68(b) base-current
+      //     calculations.  Fewer radials elevate ground-loss resistance and increase
+      //     base current.
+      //   §73.190: FCC ground conductivity measurement program (σ map). The realized
+      //     ground resistance at a site depends on soil resistivity, moisture, and the
+      //     number and length of buried radials.
+      //   §73.154: Proof of performance requires base-current measurements to within
+      //     ±2% of licensed value; ground resistance directly impacts that calibration.
+      //   NEC technical standard: 120 × λ/4 radials is the conventional "full" system
+      //     benchmark (Sevick, Antenna Engineering Handbook).  Each radial ≈ λ/4 in
+      //     length; trenching, copper wire, and termination labour dominate cost.
+      //
+      // Physics model:
+      //   λ/4 radial length  = c / (4 × f_kHz × 1000)  [metres]
+      //   Copper #10 AWG mass per radial ≈ 3.14 g/m → lb/radial for material pricing
+      //   Ground system R_loss heuristic (Terman):
+      //     R_loss ≈ 400 / (n_radials ^ 0.8)   [Ω]   (empirical, valid 20–240 radials)
+      //   Effective R_base = R_rad + R_loss = 36.5 + R_loss
+      //   Efficiency = R_rad / R_base  ∈ (0,1)
+      //   Cost model:
+      //     Trench labour   ≈ $4–$8 / linear ft × n_radials × radial_ft
+      //     Wire (10 AWG)   ≈ $0.12–$0.22 / ft
+      //     Connectors      ≈ $8–$15 / radial
+      //     Total installed ≈ sum above per 120-radial "full" system
+
+      const lambda_m           = 299792.458 / frequency_khz;        // wavelength in metres
+      const quarter_wave_m     = lambda_m / 4;                       // λ/4 radial length
+      const quarter_wave_ft    = round2(quarter_wave_m * 3.28084);   // in feet
+
+      // Standard system sizes: economy (60), standard (120), full (120) – choose by conductivity
+      const sigmaQ = sigma_msm;                // site σ from conductivity IIFE already computed
+      // Recommend 120 radials universally; show economics for 60 vs 120 comparison
+      const n_radials_full     = 120;
+      const n_radials_economy  = 60;
+
+      // Ground-loss resistance heuristic  R_loss ≈ 400 / n^0.8
+      const r_loss_full    = round2(400 / Math.pow(n_radials_full,    0.8));
+      const r_loss_economy = round2(400 / Math.pow(n_radials_economy, 0.8));
+
+      const r_rad          = 36.5;  // lossless λ/4 monopole over perfect ground
+      const r_base_full    = round2(r_rad + r_loss_full);
+      const r_base_economy = round2(r_rad + r_loss_economy);
+
+      const efficiency_full    = round2(r_rad / r_base_full    * 100);  // %
+      const efficiency_economy = round2(r_rad / r_base_economy * 100);  // %
+
+      // Base current with full / economy radial system
+      const p_watts     = tpo_kw * 1000;
+      const i_full      = round2(Math.sqrt(p_watts / r_base_full));
+      const i_economy   = round2(Math.sqrt(p_watts / r_base_economy));
+
+      // ── Cost model (120-radial full system) ──────────────────────────────────
+      // Wire material: 10 AWG solid copper ≈ $0.12–$0.22 / ft
+      const total_radial_ft   = n_radials_full * quarter_wave_ft;
+      const wire_low          = Math.round(total_radial_ft * 0.12);
+      const wire_high         = Math.round(total_radial_ft * 0.22);
+
+      // Trenching labour: $4–$8 / linear ft
+      const trench_low        = Math.round(total_radial_ft * 4);
+      const trench_high       = Math.round(total_radial_ft * 8);
+
+      // Connectors / lugs / grounding plate: $8–$15 × n_radials
+      const connector_low     = Math.round(n_radials_full * 8);
+      const connector_high    = Math.round(n_radials_full * 15);
+
+      // Buss ring + ground rod array + bonding: flat $1,200–$3,500
+      const buss_low          = 1200;
+      const buss_high         = 3500;
+
+      const total_radial_system_low_usd  = wire_low  + trench_low  + connector_low  + buss_low;
+      const total_radial_system_high_usd = wire_high + trench_high + connector_high + buss_high;
+
+      // Economy (60-radial) cost
+      const total_radial_ft_eco   = n_radials_economy * quarter_wave_ft;
+      const total_radial_eco_low  = Math.round(total_radial_ft_eco * (0.12 + 4) + n_radials_economy * 8  + buss_low);
+      const total_radial_eco_high = Math.round(total_radial_ft_eco * (0.22 + 8) + n_radials_economy * 15 + buss_high);
+
+      // Site area constraint: radials fan out 360°; need ≥ quarter_wave_m radius clear
+      const min_site_radius_m  = round2(quarter_wave_m);
+      const min_site_radius_ft = quarter_wave_ft;
+
+      // Power lost to ground (informational)
+      const p_loss_full_w    = Math.round(p_watts * (1 - r_rad / r_base_full));
+      const p_loss_economy_w = Math.round(p_watts * (1 - r_rad / r_base_economy));
+
+      return {
+        frequency_khz,
+        lambda_m:                  round2(lambda_m),
+        quarter_wave_m:            round2(quarter_wave_m),
+        quarter_wave_ft,
+        n_radials_full,
+        n_radials_economy,
+        r_loss_full_ohm:           r_loss_full,
+        r_loss_economy_ohm:        r_loss_economy,
+        r_base_full_ohm:           r_base_full,
+        r_base_economy_ohm:        r_base_economy,
+        efficiency_full_pct:       efficiency_full,
+        efficiency_economy_pct:    efficiency_economy,
+        base_current_full_a:       i_full,
+        base_current_economy_a:    i_economy,
+        p_loss_full_w,
+        p_loss_economy_w,
+        min_site_radius_m,
+        min_site_radius_ft,
+        total_radial_ft:           Math.round(total_radial_ft),
+        wire_cost_low:             wire_low,
+        wire_cost_high:            wire_high,
+        trench_cost_low:           trench_low,
+        trench_cost_high:          trench_high,
+        connector_cost_low:        connector_low,
+        connector_cost_high:       connector_high,
+        total_radial_system_low_usd,
+        total_radial_system_high_usd,
+        total_radial_eco_low_usd:  total_radial_eco_low,
+        total_radial_eco_high_usd: total_radial_eco_high,
+        recommended_n_radials:     n_radials_full,
+        reference: '47 CFR §73.68 (grounding); §73.190 (conductivity map); §73.154 (proof of performance); Sevick, Antenna Engineering Handbook ch. 3 (ground radial systems); ITU-R BS.598 (AM transmitting antennas)',
+        note: `At ${frequency_khz} kHz, λ/4 radial length ≈ ${quarter_wave_ft} ft (${round2(quarter_wave_m)} m). 120-radial full system: R_loss=${r_loss_full} Ω, η=${efficiency_full}%, I_base=${i_full} A. Installed cost ≈ $${total_radial_system_low_usd.toLocaleString()}–$${total_radial_system_high_usd.toLocaleString()}. Site must clear ≥${min_site_radius_ft} ft radius for full radial fan.`
       };
     })(),
 

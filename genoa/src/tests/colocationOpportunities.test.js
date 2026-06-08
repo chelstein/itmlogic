@@ -3946,3 +3946,14 @@ test('am_tower_lighting_and_painting_compliance_guide present across colocation 
     assert.ok(g.total_lighting_low_usd > 0, 'total_lighting_low_usd must be positive');
   }
 });
+
+test('am_ground_radial_system_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_radial_system_design_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_ground_radial_system_design_guide`);
+    assert.ok(g.quarter_wave_ft > 0, 'quarter_wave_ft must be positive');
+    assert.ok(g.efficiency_full_pct > 50, 'efficiency_full_pct must be > 50%');
+    assert.ok(g.total_radial_system_low_usd > 0, 'total_radial_system_low_usd must be positive');
+  }
+});

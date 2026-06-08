@@ -15785,3 +15785,56 @@ test('candidate_comparison_table ltg columns present and valid for KAZM', async 
   assert.strictEqual(r0.ltg_asr_required, true, 'ltg_asr_required must be true for 780 kHz tower');
   assert.ok(r0.ltg_total_lighting_low_usd > 0, 'ltg_total_lighting_low_usd must be positive');
 });
+
+// ── Feature #79: am_ground_radial_system_design_guide ────────────────────────
+test('KAZM 780 kHz: am_ground_radial_system_design_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_ground_radial_system_design_guide, 'ground radial guide missing on candidate');
+  }
+});
+
+test('KAZM 780 kHz: quarter_wave_ft ≈ 315 ft and min_site_radius_ft matches', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_radial_system_design_guide;
+  assert.ok(g.quarter_wave_ft > 300 && g.quarter_wave_ft < 330,
+    `quarter_wave_ft should be ~315 ft for 780 kHz, got ${g.quarter_wave_ft}`);
+  assert.strictEqual(g.min_site_radius_ft, g.quarter_wave_ft, 'min_site_radius_ft must equal quarter_wave_ft');
+  assert.strictEqual(g.n_radials_full, 120, 'n_radials_full must be 120');
+  assert.strictEqual(g.n_radials_economy, 60, 'n_radials_economy must be 60');
+});
+
+test('KAZM 780 kHz: 120-radial efficiency > 60-radial efficiency and both reasonable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_radial_system_design_guide;
+  assert.ok(g.efficiency_full_pct > g.efficiency_economy_pct,
+    '120-radial system must be more efficient than 60-radial');
+  assert.ok(g.efficiency_full_pct > 70 && g.efficiency_full_pct < 95,
+    `efficiency_full_pct should be 70–95%, got ${g.efficiency_full_pct}`);
+  assert.ok(g.r_loss_full_ohm < g.r_loss_economy_ohm,
+    'R_loss must be lower with more radials');
+});
+
+test('KAZM 780 kHz: total_radial_system_low_usd < high and both positive', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_ground_radial_system_design_guide;
+  assert.ok(g.total_radial_system_low_usd > 0,
+    `total_radial_system_low_usd must be > 0, got ${g.total_radial_system_low_usd}`);
+  assert.ok(g.total_radial_system_high_usd >= g.total_radial_system_low_usd,
+    'high must be >= low');
+  assert.ok(g.total_radial_eco_low_usd < g.total_radial_system_low_usd,
+    '60-radial economy cost must be less than 120-radial full cost');
+});
+
+test('candidate_comparison_table gnd columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gnd_n_radials_full'       in row, 'gnd_n_radials_full missing from comparison table');
+    assert.ok('gnd_r_loss_full_ohm'      in row, 'gnd_r_loss_full_ohm missing from comparison table');
+    assert.ok('gnd_efficiency_full_pct'  in row, 'gnd_efficiency_full_pct missing from comparison table');
+    assert.ok('gnd_total_system_low_usd' in row, 'gnd_total_system_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.gnd_n_radials_full, 120, 'gnd_n_radials_full must be 120');
+  assert.ok(r0.gnd_total_system_low_usd > 50000, 'gnd_total_system_low_usd must be >$50K');
+});

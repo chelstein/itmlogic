@@ -2291,6 +2291,39 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Ground Radial System Design Guide */}
+        {candidate.am_ground_radial_system_design_guide && (() => {
+          const g = candidate.am_ground_radial_system_design_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const effColor = g.efficiency_full_pct >= 75 ? '#15803d' : g.efficiency_full_pct >= 60 ? '#d97706' : '#dc2626';
+          return (
+            <div style={{ background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5b21b6', marginBottom: 8 }}>
+                Ground Radial System Design (§73.68 / §73.190)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#3b0764' }}>
+                <div><b>λ/4 radial length:</b> {fmtF(g.quarter_wave_ft, 1)} ft ({fmtF(g.quarter_wave_m, 1)} m)</div>
+                <div><b>Recommended radials:</b> {g.n_radials_full} (full) / {g.n_radials_economy} (economy)</div>
+                <div><b>R_loss — 120 radials:</b> {fmtF(g.r_loss_full_ohm)} Ω</div>
+                <div><b>R_loss — 60 radials:</b> {fmtF(g.r_loss_economy_ohm)} Ω</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>Efficiency (120-radial):</b>
+                  <span style={{ color: effColor, fontWeight: 600 }}>{fmtF(g.efficiency_full_pct, 1)}%</span>
+                </div>
+                <div><b>Efficiency (60-radial):</b> {fmtF(g.efficiency_economy_pct, 1)}%</div>
+                <div><b>Base current (full):</b> {fmtF(g.base_current_full_a)} A</div>
+                <div><b>Base current (economy):</b> {fmtF(g.base_current_economy_a)} A</div>
+                <div><b>Min site radius:</b> {fmtF(g.min_site_radius_ft, 0)} ft ({fmtF(g.min_site_radius_m, 0)} m)</div>
+                <div><b>Total radial footage:</b> {fmt(g.total_radial_ft)} ft</div>
+                <div><b>Full system installed:</b> ${fmt(g.total_radial_system_low_usd)}–${fmt(g.total_radial_system_high_usd)}</div>
+                <div><b>Economy (60-radial):</b> ${fmt(g.total_radial_eco_low_usd)}–${fmt(g.total_radial_eco_high_usd)}</div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#6d28d9' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Lighting and Painting Compliance Guide */}
         {candidate.am_tower_lighting_and_painting_compliance_guide && (() => {
           const g = candidate.am_tower_lighting_and_painting_compliance_guide;
