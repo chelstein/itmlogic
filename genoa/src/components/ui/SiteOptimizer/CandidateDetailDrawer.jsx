@@ -274,14 +274,39 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         <div className="flex flex-col gap-1.5 shrink-0">
           {onPromoteToStudio && candidate.status_category !== 'NON_COMPLIANT' && (
             <button
-              onClick={() => onPromoteToStudio({
-                lat: candidate.lat, lon: candidate.lon,
-                callsign, frequency_khz, tpo_kw,
-                fcc_class: fcc_class ?? candidate.fcc_class,
-                pattern_mode: pattern_mode ?? candidate.pattern_mode,
-                rank: candidate.rank,
-                status_category: candidate.status_category
-              })}
+              onClick={() => {
+                const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
+                const gnd = candidate.am_ground_radial_system_design_guide;
+                const imp = candidate.am_antenna_system_impedance_and_base_current_guide;
+                const gw  = candidate.am_propagation_groundwave_field_strength_estimate_guide;
+                const env = candidate.am_site_environmental_impact_and_permitting_guide;
+                onPromoteToStudio({
+                  lat: candidate.lat, lon: candidate.lon,
+                  callsign, frequency_khz, tpo_kw,
+                  fcc_class: fcc_class ?? candidate.fcc_class,
+                  pattern_mode: pattern_mode ?? candidate.pattern_mode,
+                  rank: candidate.rank,
+                  status_category: candidate.status_category,
+                  // Auto-fill values derived from engine guides
+                  autofill: {
+                    tower_overall_height_agl_m:  ltg?.tower_height_m   ?? null,
+                    tower_overall_height_agl_ft: ltg?.tower_height_ft  ?? null,
+                    asr_required:                ltg?.asr_required     ?? null,
+                    tower_lighting_type:         ltg?.lighting_type    ?? null,
+                    tower_painting_standard:     ltg?.asr_required     ? 'AC 70/7460-1L Chapter 3' : null,
+                    faa_notification_required:   ltg?.faa_notification_required ?? null,
+                    n_radials_recommended:       gnd?.n_radials_full   ?? null,
+                    radial_length_ft:            gnd?.quarter_wave_ft  ?? null,
+                    ground_conductivity_msm:     gw?.conductivity_msm  ?? null,
+                    base_current_a:              imp?.base_current_a   ?? null,
+                    ct_rating_a:                 imp?.ct_rating_a      ?? null,
+                    r_base_ohm:                  imp?.r_base_ohm       ?? null,
+                    estimated_erp_kw:            candidate.antenna_system_summary?.estimated_erp_kw ?? null,
+                    nepa_trigger:                env?.nepa_trigger     ?? null,
+                    asr_required_by_env:         env?.section_106_required ?? null,
+                  }
+                });
+              }}
               className="font-mono text-[11px] uppercase tracking-rack border rounded-sm px-2 py-1 transition-colors"
               style={{ color: '#63d471', borderColor: 'rgba(99,212,113,0.45)', background: 'rgba(99,212,113,0.08)' }}
               title="Load this candidate into the Contour Studio for full-physics analysis"
@@ -300,6 +325,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
       </header>
 
       <section className="px-4 py-4 space-y-5">
+        {/* FCC Filing Auto-Fill Preview */}
+        {(() => {
+          const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
+          const gnd = candidate.am_ground_radial_system_design_guide;
+          const imp = candidate.am_antenna_system_impedance_and_base_current_guide;
+          const gw  = candidate.am_propagation_groundwave_field_strength_estimate_guide;
+          if (!ltg && !gnd && !imp) return null;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmtN = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fields = [
+            { label: 'Tower height AGL', value: ltg ? `${fmtF(ltg.tower_height_m)} m (${fmtF(ltg.tower_height_ft, 0)} ft)` : '—', auto: !!ltg },
+            { label: 'ASR required (§17.7)', value: ltg ? (ltg.asr_required ? 'YES' : 'No') : '—', auto: !!ltg, warn: ltg?.asr_required },
+            { label: 'Tower lighting', value: ltg?.lighting_type?.replace(/_/g, ' ') ?? '—', auto: !!ltg },
+            { label: 'Tower painting', value: ltg?.asr_required ? 'AC 70/7460-1L Ch. 3' : 'Not required', auto: !!ltg },
+            { label: 'Radials recommended', value: gnd ? `${gnd.n_radials_full} × ${fmtF(gnd.quarter_wave_ft, 0)} ft` : '—', auto: !!gnd },
+            { label: 'Base current (RMS)', value: imp ? `${fmtF(imp.base_current_a, 2)} A` : '—', auto: !!imp },
+            { label: 'CT rating required', value: imp ? `${imp.ct_rating_a} A` : '—', auto: !!imp },
+            { label: 'Ground conductivity', value: gw ? `${fmtF(gw.conductivity_msm, 1)} mS/m` : '—', auto: !!gw },
+          ].filter(f => f.auto);
+          return (
+            <div style={{ background: 'rgba(99,212,113,0.05)', border: '1px solid rgba(99,212,113,0.25)', borderRadius: 6, padding: '10px 14px' }}>
+              <div style={{ fontWeight: 700, fontSize: 11, color: '#63d471', marginBottom: 8, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                Auto-Fill → Filing Form
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11 }}>
+                {fields.map(f => (
+                  <div key={f.label} style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                    <span style={{ color: '#63d471', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>AUTO</span>
+                    <span style={{ color: '#a89c84' }}>{f.label}:</span>
+                    <span style={{ color: f.warn ? '#ffb347' : '#e2d9c5', fontWeight: 600 }}>{f.value}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#63d47199' }}>
+                Fields tagged AUTO pre-fill from engine data on Promote. Verify before filing; edits persist in localStorage per facility.
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Go / No-Go viability banner */}
         {candidate.site_viability_summary && (() => {
           const svs = candidate.site_viability_summary;
