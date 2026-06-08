@@ -2356,6 +2356,50 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM RF Exposure MPE Evaluation Guide */}
+        {candidate.am_rf_exposure_mpe_evaluation_guide && (() => {
+          const g = candidate.am_rf_exposure_mpe_evaluation_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const evalColor = g.eval_required ? '#ef4444' : '#22c55e';
+          return (
+            <div style={{ background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 8 }}>
+                RF Exposure / MPE Evaluation (§1.1310 / OET Bulletin 65)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#7f1d1d' }}>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>Evaluation:</b>
+                  <span style={{ color: evalColor, fontWeight: 700 }}>{g.eval_required ? 'REQUIRED (TPO > 1 kW)' : 'Categorically excluded'}</span>
+                </div>
+                <div><b>Base current:</b> {fmtF(g.i_base_a, 2)} A</div>
+                <div><b>GP limit (§1.1310):</b> {g.e_limit_gp_vm} V/m</div>
+                <div><b>OC limit:</b> {g.e_limit_oc_vm} V/m</div>
+                <div><b>GP exclusion radius:</b> {fmtF(g.r_gp_exclusion_m, 2)} m ({fmtF(g.r_gp_exclusion_ft, 1)} ft)</div>
+                <div><b>OC exclusion radius:</b> {fmtF(g.r_oc_exclusion_m, 2)} m ({fmtF(g.r_oc_exclusion_ft, 1)} ft)</div>
+                {g.fence_needed && (<>
+                  <div><b>Fence perimeter:</b> {fmtF(g.perimeter_ft, 0)} ft</div>
+                  <div><b>Fence cost:</b> ${fmt(g.fence_cost_low_usd)}–${fmt(g.fence_cost_high_usd)}</div>
+                </>)}
+                <div><b>Study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
+              </div>
+              {g.field_table && (
+                <div style={{ marginTop: 8, fontSize: 11 }}>
+                  <div style={{ color: '#991b1b', fontWeight: 600, marginBottom: 4 }}>E-field at reference distances:</div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {g.field_table.map(row => (
+                      <span key={row.r_m} style={{ color: row.exceeds_gp ? '#dc2626' : '#15803d', fontFamily: 'monospace', fontSize: 10 }}>
+                        {row.r_m}m: {fmtF(row.e_vm, 0)} V/m {row.exceeds_gp ? '⚠' : '✓'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b91c1c' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmission Line and Coaxial Feed Guide */}
         {candidate.am_transmission_line_and_coaxial_feed_guide && (() => {
           const g = candidate.am_transmission_line_and_coaxial_feed_guide;

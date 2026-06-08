@@ -1518,7 +1518,11 @@ export async function runSiteOptimizer(body = {}){
     txl_recommended_cable:              c.am_transmission_line_and_coaxial_feed_guide?.recommended_cable ?? null,
     txl_loss_78_db:                     c.am_transmission_line_and_coaxial_feed_guide?.loss_78_db ?? null,
     txl_efficiency_78_pct:              c.am_transmission_line_and_coaxial_feed_guide?.efficiency_78_pct ?? null,
-    txl_total_78_low_usd:               c.am_transmission_line_and_coaxial_feed_guide?.total_78_low_usd ?? null
+    txl_total_78_low_usd:               c.am_transmission_line_and_coaxial_feed_guide?.total_78_low_usd ?? null,
+    mpe_eval_required:                  c.am_rf_exposure_mpe_evaluation_guide?.eval_required ?? null,
+    mpe_r_gp_exclusion_m:               c.am_rf_exposure_mpe_evaluation_guide?.r_gp_exclusion_m ?? null,
+    mpe_r_gp_exclusion_ft:              c.am_rf_exposure_mpe_evaluation_guide?.r_gp_exclusion_ft ?? null,
+    mpe_fence_cost_low_usd:             c.am_rf_exposure_mpe_evaluation_guide?.fence_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7361,6 +7365,105 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_rf_exposure_mpe_evaluation_guide: (() => {
+      // RF exposure maximum permissible exposure (MPE) evaluation for AM broadcast.
+      //
+      // Regulatory framework:
+      //   47 CFR §1.1310: RF exposure limits — establishes general-population (GP)
+      //     and occupational/controlled (OC) MPE levels.  For AM broadcast, the
+      //     relevant limit is the general-population time-averaged E-field limit.
+      //   §1.1307(b): Categorical exclusion threshold for AM stations.  A station is
+      //     categorically excluded from MPE evaluation if it does not exceed:
+      //       - AM stations: TPO ≤ 1 kW AND site not in publicly accessible area
+      //       (Note: OET Bulletin 65, Edition 97-01, Table 1 gives specific thresholds
+      //        by band; AM stations with TPO > 1 kW typically must evaluate.)
+      //   OET Bulletin 65 (Ed. 97-01):
+      //     For AM broadcast monopole antenna, near-field E-field at distance r from
+      //     the base of the tower:
+      //       E(r) ≈ 60 × I_base × k_h / r   [V/m]   (far-field approximation, r >> λ)
+      //     where k_h = pattern factor (≈ 1 for λ/4 monopole, NDA)
+      //     This is OET Bulletin 65 Section 4.2 formula for near-field AM tower.
+      //   General-population MPE limit at AM frequencies (0.3–3 MHz):
+      //     E_limit_gp = 614 V/m  (from FCC §1.1310 Table 1, 0.3–3.0 MHz band)
+      //     H_limit_gp = 163 mA/m
+      //   Occupational/controlled limit: E_limit_oc = 1842 V/m (3× GP)
+      //   Required exclusion radius: r_gp = 60 × I_base × k_h / E_limit_gp
+      //   Evaluation required if: TPO > 1 kW (§1.1307 categorical exclusion threshold)
+      //
+      // Near-field correction: At distances < 0.16λ, E-field falls as 1/r² (reactive
+      // near-field); the 1/r model overestimates risk at very close range.  For fencing
+      // purposes, the OET Bulletin 65 formula is the FCC-accepted method.
+
+      const f_mhz     = frequency_khz / 1000;
+      const lambda_m  = 299792.458 / frequency_khz;  // wavelength in metres
+
+      // Base current from impedance guide values (36.5 Ω R_rad + ~8.7 Ω R_loss for 120 radials)
+      // Use the same formula as impedance guide for consistency
+      const r_base_approx = 36.5 + round2(400 / Math.pow(120, 0.8));  // 120-radial system
+      const i_base        = round2(Math.sqrt((tpo_kw * 1000) / r_base_approx));
+
+      // E-field at distance r (near-field monopole, OET Bulletin 65 §4.2)
+      // E(r) = 60 × I_base / r  [V/m]  (pattern factor k_h = 1, NDA)
+      const eField = (r_m) => round2(60 * i_base / r_m);
+
+      // FCC MPE limits per §1.1310 Table 1 (0.3–3.0 MHz band)
+      const e_limit_gp_vm = 614;   // V/m general population
+      const e_limit_oc_vm = 1842;  // V/m occupational/controlled
+
+      // Required exclusion radii
+      const r_gp_m  = round2(60 * i_base / e_limit_gp_vm);   // general-population fence
+      const r_oc_m  = round2(60 * i_base / e_limit_oc_vm);   // controlled zone (workers)
+
+      const r_gp_ft = round2(r_gp_m  * 3.28084);
+      const r_oc_ft = round2(r_oc_m  * 3.28084);
+
+      // Evaluation required?
+      const eval_required = tpo_kw > 1;  // §1.1307(b) categorical exclusion at ≤ 1 kW
+
+      // E-field at several reference distances for the report table
+      const distances_m = [3, 5, 10, 15, 30];
+      const field_table = distances_m.map(r => ({
+        r_m: r,
+        r_ft: round2(r * 3.28084),
+        e_vm: eField(r),
+        exceeds_gp: eField(r) > e_limit_gp_vm,
+        exceeds_oc: eField(r) > e_limit_oc_vm
+      }));
+
+      // Fencing cost (if exclusion radius > 10 ft, perimeter = 2π × r_gp)
+      const fence_needed    = r_gp_ft > 10;
+      const perimeter_ft    = round2(2 * Math.PI * r_gp_ft);
+      const fence_cost_low  = fence_needed ? Math.round(perimeter_ft * 25) : 0;   // $25–$60/ft installed
+      const fence_cost_high = fence_needed ? Math.round(perimeter_ft * 60) : 0;
+
+      // MPE study / consultant cost
+      const study_cost_low  = eval_required ? 1500  : 0;
+      const study_cost_high = eval_required ? 5000  : 0;
+
+      return {
+        frequency_khz,
+        f_mhz,
+        i_base_a:              i_base,
+        r_base_approx_ohm:     round2(r_base_approx),
+        e_limit_gp_vm,
+        e_limit_oc_vm,
+        r_gp_exclusion_m:      r_gp_m,
+        r_gp_exclusion_ft:     r_gp_ft,
+        r_oc_exclusion_m:      r_oc_m,
+        r_oc_exclusion_ft:     r_oc_ft,
+        eval_required,
+        field_table,
+        fence_needed,
+        perimeter_ft:          fence_needed ? perimeter_ft : 0,
+        fence_cost_low_usd:    fence_cost_low,
+        fence_cost_high_usd:   fence_cost_high,
+        study_cost_low_usd:    study_cost_low,
+        study_cost_high_usd:   study_cost_high,
+        reference: '47 CFR §1.1310 (MPE limits); §1.1307(b) (categorical exclusion); OET Bulletin 65 Ed. 97-01 §4.2 (AM near-field formula); FCC §1.1310 Table 1 (0.3–3.0 MHz E-field limits: 614 V/m GP, 1842 V/m OC)',
+        note: `${eval_required ? 'MPE evaluation REQUIRED' : 'Categorically excluded (TPO ≤ 1 kW)'} at ${tpo_kw} kW. GP exclusion radius: ${r_gp_m} m (${r_gp_ft} ft). OC exclusion: ${r_oc_m} m (${r_oc_ft} ft). I_base ≈ ${i_base} A. ${fence_needed ? `Perimeter fence ≈ ${perimeter_ft} ft ($${fence_cost_low.toLocaleString()}–$${fence_cost_high.toLocaleString()}).` : 'Fence may not be required.'}`
       };
     })(),
 

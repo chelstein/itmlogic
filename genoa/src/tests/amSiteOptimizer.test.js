@@ -15937,3 +15937,51 @@ test('candidate_comparison_table txl columns present and valid for KAZM', async 
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.txl_efficiency_78_pct > 95, 'txl_efficiency_78_pct must be > 95%');
 });
+
+// ── Feature #82: am_rf_exposure_mpe_evaluation_guide ─────────────────────────
+test('KAZM 780 kHz: am_rf_exposure_mpe_evaluation_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_rf_exposure_mpe_evaluation_guide, 'MPE guide missing on candidate');
+  }
+});
+
+test('KAZM 5 kW: eval_required = true and GP exclusion radius physically reasonable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
+  assert.strictEqual(g.eval_required, true, 'MPE eval required for TPO > 1 kW');
+  assert.ok(g.r_gp_exclusion_m > 0 && g.r_gp_exclusion_m < 10,
+    `GP exclusion radius at 5 kW 780 kHz should be 0–10 m, got ${g.r_gp_exclusion_m}`);
+  assert.ok(g.r_oc_exclusion_m < g.r_gp_exclusion_m,
+    'OC exclusion must be smaller than GP exclusion (higher power limit)');
+});
+
+test('KAZM 780 kHz: FCC limits are exactly 614 V/m GP and 1842 V/m OC', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
+  assert.strictEqual(g.e_limit_gp_vm, 614,  'GP limit must be 614 V/m per §1.1310 Table 1');
+  assert.strictEqual(g.e_limit_oc_vm, 1842, 'OC limit must be 1842 V/m (3× GP)');
+});
+
+test('KAZM 780 kHz: field_table has 5 rows and E decreases with distance', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_rf_exposure_mpe_evaluation_guide;
+  assert.strictEqual(g.field_table.length, 5, 'field_table must have 5 rows');
+  for (let i = 1; i < g.field_table.length; i++) {
+    assert.ok(g.field_table[i].e_vm < g.field_table[i-1].e_vm,
+      `E-field must decrease with distance (row ${i}: ${g.field_table[i].e_vm} vs ${g.field_table[i-1].e_vm})`);
+  }
+});
+
+test('candidate_comparison_table mpe columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mpe_eval_required'       in row, 'mpe_eval_required missing from comparison table');
+    assert.ok('mpe_r_gp_exclusion_m'    in row, 'mpe_r_gp_exclusion_m missing from comparison table');
+    assert.ok('mpe_r_gp_exclusion_ft'   in row, 'mpe_r_gp_exclusion_ft missing from comparison table');
+    assert.ok('mpe_fence_cost_low_usd'  in row, 'mpe_fence_cost_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.mpe_eval_required, true, 'mpe_eval_required must be true for 5 kW');
+  assert.ok(r0.mpe_r_gp_exclusion_m > 0, 'mpe_r_gp_exclusion_m must be positive');
+});

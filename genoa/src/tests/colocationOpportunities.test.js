@@ -3979,3 +3979,14 @@ test('am_transmission_line_and_coaxial_feed_guide present across colocation cand
     assert.ok(typeof g.recommended_cable === 'string', 'recommended_cable must be a string');
   }
 });
+
+test('am_rf_exposure_mpe_evaluation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_rf_exposure_mpe_evaluation_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_rf_exposure_mpe_evaluation_guide`);
+    assert.ok(typeof g.eval_required === 'boolean', 'eval_required must be boolean');
+    assert.ok(g.r_gp_exclusion_m > 0, 'r_gp_exclusion_m must be positive');
+    assert.strictEqual(g.e_limit_gp_vm, 614, 'GP limit must be 614 V/m');
+  }
+});
