@@ -13,7 +13,7 @@
 //   - NON-COMPLIANT label and HARD CHECK FAIL limitations fire when
 //     coverage_pct < 0.80 (forced via input).
 
-import test from 'node:test';
+import { test, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { runSiteOptimizer, __test__ } from '../engine/am/siteOptimizer.js';
@@ -15430,4 +15430,133 @@ it('candidate_comparison_table pwe columns are present and valid for KAZM', asyn
   assert.ok(Math.abs(r0.pwe_ac_input_kw - 6.94) < 0.05, 'pwe_ac_input_kw should be ~6.94 kW');
   assert.ok(r0.pwe_annual_electric_usd > 3000, 'pwe_annual_electric_usd must be >$3,000');
   assert.strictEqual(r0.pwe_overall_efficiency_pct, 72, 'pwe_overall_efficiency_pct must be 72');
+});
+
+// ── v1 API contract tests ─────────────────────────────────────────────────────
+
+const KAZM_V1 = {
+  callsign: 'KAZM', frequency_khz: 780,
+  current_site: { lat: 34.8606, lon: -111.8206 },
+  search_radius_km: 50, grid_spacing_km: 25,
+  tpo_kw: 5, pattern_mode: 'NDA', fcc_class: 'D',
+  optimization_goals: {
+    maximize_col_coverage:       true,
+    maximize_population:         true,
+    minimize_blanket_population: true,
+    prefer_high_conductivity:    true,
+    avoid_wildfire_risk:         false,
+    minimize_int_treaty_zone:    false
+  }
+};
+
+test('v1: score_breakdown_detail sums to candidate.score for all returned candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 5 });
+  assert.ok(out.candidates.length > 0, 'must have candidates');
+  for (const c of out.candidates) {
+    const sbd = c.explanation?.score_breakdown_detail;
+    assert.ok(Array.isArray(sbd) && sbd.length > 0, `score_breakdown_detail must be non-empty array on rank ${c.rank}`);
+    const sum = sbd.reduce((acc, row) => acc + row.points, 0);
+    assert.ok(Math.abs(sum - c.score) < 0.01, `sbd sum ${sum.toFixed(4)} must equal score ${c.score} on rank ${c.rank}`);
+  }
+});
+
+test('v1: candidates sorted by score descending', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 5 });
+  for (let i = 1; i < out.candidates.length; i++) {
+    assert.ok(
+      out.candidates[i - 1].score >= out.candidates[i].score,
+      `candidates must be sorted descending: rank ${i} score ${out.candidates[i-1].score} < rank ${i+1} score ${out.candidates[i].score}`
+    );
+  }
+});
+
+test('v1: candidate_limit is respected', async () => {
+  const LIMIT = 3;
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: LIMIT });
+  assert.ok(out.candidates.length <= LIMIT, `expected ≤ ${LIMIT} candidates, got ${out.candidates.length}`);
+});
+
+test('v1: GRID mode returns only candidate_type grid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, search_mode: 'GRID', candidate_limit: 5 });
+  for (const c of out.candidates) {
+    assert.strictEqual(c.candidate_type, 'grid', `GRID mode must yield candidate_type 'grid', got '${c.candidate_type}' on rank ${c.rank}`);
+  }
+});
+
+test('v1: API always returns screening_only: true at top level', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 1 });
+  assert.strictEqual(out.screening_only, true, 'top-level screening_only must be true');
+});
+
+test('v1: API never returns filing_ready: true at top level', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 1 });
+  assert.notStrictEqual(out.filing_ready, true, 'top-level filing_ready must not be true');
+});
+
+test('v1: each candidate carries screening_only: true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    assert.strictEqual(c.screening_only, true, `candidate rank ${c.rank} must have screening_only: true`);
+  }
+});
+
+test('v1: no candidate has filing_ready: true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    assert.notStrictEqual(c.filing_ready, true, `candidate rank ${c.rank} must not have filing_ready: true`);
+  }
+});
+
+test('v1: missing conductivity raster emits CONDUCTIVITY_UNVERIFIED warning', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 1 });
+  const warns = out.warnings ?? [];
+  const cw = warns.find(w => (typeof w === 'object' ? w.code : w) === 'CONDUCTIVITY_UNVERIFIED');
+  assert.ok(cw, 'must emit CONDUCTIVITY_UNVERIFIED warning when zone-table σ is used');
+  if (typeof cw === 'object') {
+    assert.strictEqual(cw.blocking, false, 'CONDUCTIVITY_UNVERIFIED must be non-blocking');
+    assert.ok(typeof cw.message === 'string' && cw.message.length > 0, 'CONDUCTIVITY_UNVERIFIED must have message');
+  }
+});
+
+test('v1: missing COL polygon emits COL_CENTROID_UNVERIFIED warning', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, community_of_license_polygon: null, col_centroid: null, candidate_limit: 1 });
+  const warns = out.warnings ?? [];
+  const cw = warns.find(w => (typeof w === 'object' ? w.code : w) === 'COL_CENTROID_UNVERIFIED');
+  assert.ok(cw, 'must emit COL_CENTROID_UNVERIFIED warning when no polygon and no col_centroid');
+  if (typeof cw === 'object') {
+    assert.strictEqual(cw.blocking, false, 'COL_CENTROID_UNVERIFIED must be non-blocking');
+  }
+});
+
+test('v1: each candidate has required_next_studies array with ≥ 4 items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(Array.isArray(c.required_next_studies), `required_next_studies must be an array on rank ${c.rank}`);
+    assert.ok(c.required_next_studies.length >= 4, `required_next_studies must have ≥ 4 items on rank ${c.rank}, got ${c.required_next_studies.length}`);
+    for (const s of c.required_next_studies) {
+      assert.ok(typeof s === 'string' && s.length > 5, `every required_next_study must be a non-trivial string`);
+    }
+  }
+});
+
+test('v1: score_breakdown_detail has one entry per enabled optimization goal', async () => {
+  const enabledGoals = Object.entries(KAZM_V1.optimization_goals).filter(([, v]) => v);
+  const out = await runSiteOptimizer({ ...KAZM_V1, candidate_limit: 1 });
+  const sbd = out.candidates[0].explanation?.score_breakdown_detail ?? [];
+  const enabledEntries = sbd.filter(r => r.enabled);
+  assert.ok(
+    enabledEntries.length >= enabledGoals.length,
+    `expected ≥ ${enabledGoals.length} enabled sbd entries, got ${enabledEntries.length}`
+  );
+  for (const row of enabledEntries) {
+    assert.ok(typeof row.label === 'string' && row.label.length > 0, 'sbd entry must have label');
+    assert.ok(typeof row.key   === 'string' && row.key.length   > 0, 'sbd entry must have key');
+    assert.ok(typeof row.max_points === 'number', 'sbd entry must have numeric max_points');
+    // penalty entries (e.g. confidence_penalty) have max_points=0 by design; goal entries must be positive
+    const isPenalty = row.key.includes('penalty');
+    if (!isPenalty) {
+      assert.ok(row.max_points > 0, `sbd goal entry '${row.key}' must have positive max_points, got ${row.max_points}`);
+    }
+    assert.ok(typeof row.points === 'number', 'sbd entry must have numeric points');
+  }
 });

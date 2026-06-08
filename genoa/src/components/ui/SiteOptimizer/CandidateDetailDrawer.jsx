@@ -214,7 +214,7 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
 // from the chip row when status_category already carries the key signal.
 const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
 
-export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw }){
+export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
@@ -260,6 +260,12 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             {candidate.status_category && (
               <StatusChip status={candidate.status_category} dense />
             )}
+            {candidate.candidate_type && (
+              <span className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                style={{ color: candidate.candidate_type === 'grid' ? '#7ec8e3' : '#b8a4e3', background: 'rgba(126,200,227,0.08)', borderColor: 'rgba(126,200,227,0.35)' }}>
+                {candidate.candidate_type.replace(/_/g, ' ')}
+              </span>
+            )}
             {supplementalLabels.map(s => (
               <StatusChip key={s} label={s} dense />
             ))}
@@ -271,6 +277,8 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               onClick={() => onPromoteToStudio({
                 lat: candidate.lat, lon: candidate.lon,
                 callsign, frequency_khz, tpo_kw,
+                fcc_class: fcc_class ?? candidate.fcc_class,
+                pattern_mode: pattern_mode ?? candidate.pattern_mode,
                 rank: candidate.rank,
                 status_category: candidate.status_category
               })}
@@ -426,6 +434,63 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             </div>
           );
         })()}
+
+        {/* Blockers — compliance/regulatory flags */}
+        {Array.isArray(candidate.blockers) && candidate.blockers.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1" style={{ color: '#ff7a7a' }}>Compliance blockers</div>
+            <div className="space-y-1">
+              {candidate.blockers.map((b, i) => (
+                <div key={i} className="border rounded-sm px-2.5 py-1.5 font-mono text-[10px]"
+                  style={{ borderColor: 'rgba(255,90,90,0.5)', background: 'rgba(255,90,90,0.06)', color: '#ff9090' }}>
+                  <span className="font-semibold mr-1.5 text-[9px] uppercase tracking-rack text-red-400">{b.code}</span>
+                  {b.message}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Score breakdown detail — transparent explainer per goal */}
+        {Array.isArray(e.score_breakdown_detail) && e.score_breakdown_detail.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1.5">Score breakdown</div>
+            <div className="space-y-1">
+              {e.score_breakdown_detail.map((row) => {
+                if (!row.enabled) return null;
+                const pct = row.max_points > 0 ? (row.points / row.max_points) * 100 : 0;
+                const barColor = pct >= 80 ? '#63d471' : pct >= 50 ? '#ffb347' : '#ff7a7a';
+                return (
+                  <div key={row.key} className="border border-rule/60 rounded-sm px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="font-mono text-[10px] text-cream">{row.label}</span>
+                      <span className="font-mono text-[10px] shrink-0" style={{ color: barColor }}>
+                        {row.points.toFixed(1)} / {row.max_points.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="relative h-[3px] bg-rule/50 rounded-full mb-1">
+                      <div className="absolute top-0 left-0 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
+                    </div>
+                    {row.reason && (
+                      <div className="font-mono text-[9px] text-textDim leading-snug">{row.reason}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Required next studies */}
+        {Array.isArray(candidate.required_next_studies) && candidate.required_next_studies.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">Required next studies</div>
+            <ul className="font-mono text-[10px] text-textDim list-disc list-inside space-y-0.5">
+              {candidate.required_next_studies.map((s, i) => <li key={i}>{s}</li>)}
+            </ul>
+          </div>
+        )}
 
         {/* Why it ranked */}
         <div>

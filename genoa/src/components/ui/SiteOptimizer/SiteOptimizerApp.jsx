@@ -530,6 +530,8 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
         callsign={inputs.callsign}
         frequency_khz={inputs.frequency_khz}
         tpo_kw={inputs.tpo_kw}
+        fcc_class={inputs.fcc_class}
+        pattern_mode={inputs.pattern_mode}
       />
     </>
   );
