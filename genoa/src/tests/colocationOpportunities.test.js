@@ -3913,3 +3913,14 @@ test('am_site_access_and_utility_infrastructure_guide present across colocation 
     assert.ok(g.total_infra_low_usd > 0, 'total_infra_low_usd must be positive');
   }
 });
+
+test('am_antenna_system_impedance_and_base_current_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_antenna_system_impedance_and_base_current_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_antenna_system_impedance_and_base_current_guide`);
+    assert.ok(g.base_current_a > 0, 'base_current_a must be positive');
+    assert.ok(g.ct_rating_a >= g.base_current_peak_a, 'CT must cover peak base current');
+    assert.strictEqual(g.r_rad, 36.5, 'r_rad must be 36.5 Ω for λ/4 monopole');
+  }
+});

@@ -1497,7 +1497,10 @@ export async function runSiteOptimizer(body = {}){
     env_total_permitting_low_usd:       c.am_site_environmental_impact_and_permitting_guide?.total_permitting_low_usd ?? null,
     acc_generator_kw:                   c.am_site_access_and_utility_infrastructure_guide?.generator_kw ?? null,
     acc_road_access_type:               c.am_site_access_and_utility_infrastructure_guide?.road_access_type ?? null,
-    acc_total_infra_low_usd:            c.am_site_access_and_utility_infrastructure_guide?.total_infra_low_usd ?? null
+    acc_total_infra_low_usd:            c.am_site_access_and_utility_infrastructure_guide?.total_infra_low_usd ?? null,
+    imp_base_current_a:                 c.am_antenna_system_impedance_and_base_current_guide?.base_current_a ?? null,
+    imp_r_base_ohm:                     c.am_antenna_system_impedance_and_base_current_guide?.r_base_ohm ?? null,
+    imp_ct_rating_a:                    c.am_antenna_system_impedance_and_base_current_guide?.ct_rating_a ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7340,6 +7343,118 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_antenna_system_impedance_and_base_current_guide: (() => {
+      // AM antenna system impedance and base current guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.68: Base current measurement.  Every AM station must have a
+      //     calibrated base current meter or equivalent.
+      //   §73.1215: Measurement accuracy: base current meters must be accurate to ±2%
+      //     of full scale reading.
+      //   §73.150(b): Directional antenna operation — base current ratios must match
+      //     licensed values ±5%; any variance > 5% requires corrective action.
+      //   §73.51(e): Determining operating power — either indirect method (base current²
+      //     × radiation resistance) or direct method (licensed field strength survey).
+      //
+      // Base resistance model:
+      //   For a quarter-wave vertical monopole over a ground plane:
+      //     Theoretical radiation resistance R_rad ≈ 36.5 Ω (free space, λ/4 height)
+      //     With ground plane: actual R_rad varies 35–50 Ω depending on height deviation
+      //     Ground loss R_loss: depends on soil conductivity σ and ground system quality
+      //       - Excellent radial ground system (≥ 120 radials × λ/4): R_loss ≈ 1–4 Ω
+      //       - Good system (60–120 radials): R_loss ≈ 4–8 Ω
+      //       - Minimum FCC (16 buried radials): R_loss ≈ 8–20 Ω
+      //       - Poor soils (σ < 2 mS/m): add 2–5 Ω additional ground loss
+      //     R_base = R_rad + R_loss
+      //
+      // Base current:
+      //   P = I² × R_base  →  I_base = √(P_watts / R_base)
+      //   where P_watts = TPO_kW × 1000
+      //
+      // Current transformer (CT) sizing:
+      //   CTs for AM base current monitoring (RF current transformers):
+      //   Standard ratings: 5A, 10A, 15A, 20A, 25A, 30A, 40A, 50A
+      //   Choose CT rated at ≥ 1.5× I_base (safety factor for modulation peaks)
+      //   Peak base current at 100% positive modulation: I_peak = I_base × √2 × (1 + m)
+      //     where m = 1.0 → I_peak = I_base × 2√2 ≈ I_base × 2.83
+      //   CT must handle peak current without saturation.
+      //
+      // Phasing/matching network (for series-tuned base):
+      //   Antenna reactance X_a at resonance (λ/4) ≈ 0 Ω
+      //   Detuning from λ/4: X_a ≈ 2 × R_rad × (h/λ_quarter - 1) × cot(90° × h/λ_quarter) [approx]
+      //   For small height deviations (< 10%): X_a varies ±20–50 Ω
+      //   Matching network cost estimate: $2,000–$10,000 (series-L or T/π network)
+
+      // --- impedance calculation ---
+      // Conductivity-dependent ground loss:
+      const conductivityMsm     = sigma_msm ?? 2.0;  // fallback to poor-soil default
+      const r_ground_loss       = conductivityMsm >= 8  ? 2.0   // excellent soil
+                                : conductivityMsm >= 4  ? 4.5   // good soil
+                                : conductivityMsm >= 2  ? 8.0   // average soil
+                                :                        15.0;   // poor soil (< 2 mS/m)
+
+      // Ground system quality modifier (default: FCC minimum 16 radials)
+      const r_radial_loss       = 10.0;  // FCC minimum 16-radial ground system assumed
+      const r_loss              = round2(r_ground_loss + r_radial_loss);
+
+      // Radiation resistance at λ/4:
+      const r_rad               = 36.5;  // Ω, theoretical λ/4 monopole
+      const r_base_ohm          = round2(r_rad + r_loss);
+
+      // Base current at rated TPO:
+      const tpo_watts           = tpo_kw * 1000;
+      const base_current_a      = round2(Math.sqrt(tpo_watts / r_base_ohm));
+
+      // Peak base current (100% modulation, positive peak):
+      const base_current_peak_a = round2(base_current_a * 2 * Math.SQRT2);
+
+      // CT sizing: choose standard rating ≥ I_peak
+      const CT_STANDARD_A       = [5, 10, 15, 20, 25, 30, 40, 50, 75, 100];
+      const ct_rating_a         = CT_STANDARD_A.find(r => r >= base_current_peak_a) ?? 100;
+
+      // §73.150(b) DA tolerance band:
+      const da_current_tolerance_pct = /^DA/i.test(pattern_mode) ? 5.0 : null;
+
+      // CT cost estimate (RF current transformer, calibrated):
+      const ct_cost_low         = ct_rating_a <= 25 ? 300  : ct_rating_a <= 50 ? 600  : 1200;
+      const ct_cost_high        = ct_rating_a <= 25 ? 800  : ct_rating_a <= 50 ? 1500 : 3000;
+
+      // Matching network (series-tuned):
+      const matching_net_low    = 2000;
+      const matching_net_high   = 10000;
+
+      // AM base ammeter (panel meter + CT):
+      const base_ammeter_low    = 500;
+      const base_ammeter_high   = 2500;
+
+      // Total base system cost:
+      const total_base_system_low_usd  = ct_cost_low  + base_ammeter_low  + matching_net_low;
+      const total_base_system_high_usd = ct_cost_high + base_ammeter_high + matching_net_high;
+
+      return {
+        r_rad,
+        r_ground_loss,
+        r_radial_loss,
+        r_loss,
+        r_base_ohm,
+        tpo_watts,
+        base_current_a,
+        base_current_peak_a,
+        ct_rating_a,
+        da_current_tolerance_pct,
+        ct_cost_low,
+        ct_cost_high,
+        matching_net_low,
+        matching_net_high,
+        base_ammeter_low,
+        base_ammeter_high,
+        total_base_system_low_usd,
+        total_base_system_high_usd,
+        reference: '47 CFR §73.68 (base current measurement); §73.1215 (measurement accuracy ±2%); §73.150(b) (DA base current tolerance ±5%); §73.51(e) (indirect power determination via I²R); Terman (1955) p.895 (radiation resistance λ/4 monopole, 36.5 Ω); Laport (1952) Ch.3 (ground loss and radial systems)',
+        note: `At ${tpo_kw} kW TPO: R_base = ${r_base_ohm} Ω (R_rad=${r_rad} + R_loss=${r_loss}). Base current: ${base_current_a} A RMS. Peak at 100% modulation: ${base_current_peak_a} A → ${ct_rating_a} A CT required. Total base system: $${total_base_system_low_usd.toLocaleString()}–$${total_base_system_high_usd.toLocaleString()}.`
       };
     })(),
 

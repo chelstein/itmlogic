@@ -2291,6 +2291,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Antenna System Impedance and Base Current Guide */}
+        {candidate.am_antenna_system_impedance_and_base_current_guide && (() => {
+          const g = candidate.am_antenna_system_impedance_and_base_current_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#fdf4ff', border: '1px solid #d8b4fe', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#7e22ce', marginBottom: 8 }}>
+                Antenna Impedance &amp; Base Current (§73.68 / §73.1215)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#4a044e' }}>
+                <div><b>R_rad (λ/4 theoretical):</b> {g.r_rad} Ω</div>
+                <div><b>Ground + radial loss:</b> {g.r_loss} Ω</div>
+                <div><b>R_base total:</b> {g.r_base_ohm} Ω</div>
+                <div><b>Base current (RMS):</b> {fmtF(g.base_current_a)} A</div>
+                <div><b>Peak (100% mod):</b> {fmtF(g.base_current_peak_a)} A</div>
+                <div><b>CT rating required:</b> {g.ct_rating_a} A</div>
+                {g.da_current_tolerance_pct != null && (
+                  <div><b>DA tolerance (§73.150(b)):</b> ±{g.da_current_tolerance_pct}%</div>
+                )}
+                <div><b>CT cost:</b> ${fmt(g.ct_cost_low)}–${fmt(g.ct_cost_high)}</div>
+                <div><b>Matching network:</b> ${fmt(g.matching_net_low)}–${fmt(g.matching_net_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total base system:</b> ${fmt(g.total_base_system_low_usd)}–${fmt(g.total_base_system_high_usd)}</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Site Access and Utility Infrastructure Guide */}
         {candidate.am_site_access_and_utility_infrastructure_guide && (() => {
           const g = candidate.am_site_access_and_utility_infrastructure_guide;

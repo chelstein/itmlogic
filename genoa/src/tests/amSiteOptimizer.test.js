@@ -15649,3 +15649,47 @@ test('candidate_comparison_table acc columns are present and valid for KAZM', as
   assert.strictEqual(r0.acc_generator_kw, 15, 'rank-1 acc_generator_kw should be 15 kW');
   assert.strictEqual(r0.acc_road_access_type, 'EXISTING', 'rank-1 acc_road_access_type should be EXISTING');
 });
+
+// ── am_antenna_system_impedance_and_base_current_guide ───────────────────────
+
+test('am_antenna_system_impedance_and_base_current_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_antenna_system_impedance_and_base_current_guide, 'imp guide missing on candidate');
+  }
+});
+
+test('KAZM 5 kW base current is ~9.58 A at R_base = 54.5 Ω', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_system_impedance_and_base_current_guide;
+  assert.ok(Math.abs(g.base_current_a - 9.58) < 0.1, `base_current_a expected ~9.58 A, got ${g.base_current_a}`);
+  assert.strictEqual(g.r_rad, 36.5, 'r_rad must be 36.5 Ω for λ/4 monopole');
+  assert.ok(g.r_base_ohm > g.r_rad, 'r_base_ohm must exceed r_rad (ground loss always positive)');
+});
+
+test('KAZM base current CT rating is 30 A (covers 27.1 A peak at 100% mod)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_system_impedance_and_base_current_guide;
+  assert.ok(g.ct_rating_a >= g.base_current_peak_a, 'CT must cover peak base current');
+  assert.strictEqual(g.ct_rating_a, 30, 'KAZM should require 30 A CT');
+  assert.strictEqual(g.da_current_tolerance_pct, null, 'NDA station should have null DA tolerance');
+});
+
+test('KAZM total_base_system_low_usd is positive and high >= low', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_system_impedance_and_base_current_guide;
+  assert.ok(g.total_base_system_low_usd > 0, 'total_base_system_low_usd must be positive');
+  assert.ok(g.total_base_system_high_usd >= g.total_base_system_low_usd, 'high must be >= low');
+});
+
+test('candidate_comparison_table imp columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('imp_base_current_a' in row, 'imp_base_current_a missing from comparison table');
+    assert.ok('imp_r_base_ohm'     in row, 'imp_r_base_ohm missing from comparison table');
+    assert.ok('imp_ct_rating_a'    in row, 'imp_ct_rating_a missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(Math.abs(r0.imp_base_current_a - 9.58) < 0.1, `imp_base_current_a should be ~9.58, got ${r0.imp_base_current_a}`);
+  assert.strictEqual(r0.imp_ct_rating_a, 30, 'imp_ct_rating_a should be 30 A');
+});
