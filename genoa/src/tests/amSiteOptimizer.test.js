@@ -15606,3 +15606,46 @@ test('candidate_comparison_table env columns are present and valid for KAZM', as
   assert.strictEqual(r0.env_section_106_required, false, 'rank-1 env_section_106_required should be false');
   assert.ok(r0.env_total_permitting_low_usd > 0, 'rank-1 env_total_permitting_low_usd must be positive');
 });
+
+// ── am_site_access_and_utility_infrastructure_guide ──────────────────────────
+
+test('am_site_access_and_utility_infrastructure_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_site_access_and_utility_infrastructure_guide, 'acc guide missing on candidate');
+  }
+});
+
+test('KAZM 5 kW generator_kw is 15 kW (next standard above 10.55 kW load × 1.25)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_utility_infrastructure_guide;
+  assert.strictEqual(g.generator_kw, 15, 'KAZM 5 kW solid-state requires 15 kW generator');
+  assert.ok(g.generator_kw >= g.generator_load_kw, 'selected generator must cover required load');
+  assert.ok(g.generator_cost_low > 0 && g.generator_cost_high >= g.generator_cost_low, 'generator cost range must be valid');
+});
+
+test('KAZM current-site candidate has EXISTING road access (distance = 0)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_utility_infrastructure_guide;
+  assert.strictEqual(g.road_access_type, 'EXISTING', 'current site (distance 0) must have EXISTING road access');
+  assert.strictEqual(g.road_miles, 0, 'current site road_miles must be 0');
+});
+
+test('KAZM total_infra_low_usd is positive and high >= low', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_access_and_utility_infrastructure_guide;
+  assert.ok(g.total_infra_low_usd > 0, 'total_infra_low_usd must be positive');
+  assert.ok(g.total_infra_high_usd >= g.total_infra_low_usd, 'total_infra_high must be >= low');
+});
+
+test('candidate_comparison_table acc columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('acc_generator_kw'          in row, 'acc_generator_kw missing from comparison table');
+    assert.ok('acc_road_access_type'      in row, 'acc_road_access_type missing from comparison table');
+    assert.ok('acc_total_infra_low_usd'   in row, 'acc_total_infra_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.acc_generator_kw, 15, 'rank-1 acc_generator_kw should be 15 kW');
+  assert.strictEqual(r0.acc_road_access_type, 'EXISTING', 'rank-1 acc_road_access_type should be EXISTING');
+});

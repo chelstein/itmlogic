@@ -3902,3 +3902,14 @@ test('am_site_environmental_impact_and_permitting_guide present across colocatio
     assert.ok(g.total_permitting_low_usd > 0, 'total_permitting_low_usd must be positive');
   }
 });
+
+test('am_site_access_and_utility_infrastructure_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_access_and_utility_infrastructure_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_site_access_and_utility_infrastructure_guide`);
+    assert.ok(g.generator_kw > 0, 'generator_kw must be positive');
+    assert.ok(typeof g.road_access_type === 'string', 'road_access_type must be a string');
+    assert.ok(g.total_infra_low_usd > 0, 'total_infra_low_usd must be positive');
+  }
+});

@@ -2291,6 +2291,32 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Access and Utility Infrastructure Guide */}
+        {candidate.am_site_access_and_utility_infrastructure_guide && (() => {
+          const g = candidate.am_site_access_and_utility_infrastructure_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f0f9ff', border: '1px solid #7dd3fc', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0369a1', marginBottom: 8 }}>
+                Site Access &amp; Utility Infrastructure (Generator / Road / Power)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#0c4a6e' }}>
+                <div><b>Total Site Load:</b> {fmtF(g.total_load_kw)} kW</div>
+                <div><b>Generator Size (NFPA 110):</b> {g.generator_kw} kW</div>
+                <div><b>Generator Cost:</b> ${fmt(g.generator_cost_low)}–${fmt(g.generator_cost_high)}</div>
+                <div><b>ATS Cost:</b> ${fmt(g.ats_cost_low)}–${fmt(g.ats_cost_high)}</div>
+                <div><b>Road Access Type:</b> {g.road_access_type?.replace(/_/g, ' ')}</div>
+                <div><b>Road Cost:</b> ${fmt(g.road_cost_low)}–${fmt(g.road_cost_high)}</div>
+                <div><b>Electric Extension ({fmtF(g.power_extension_miles)} mi):</b> ${fmt(g.elec_cost_low)}–${fmt(g.elec_cost_high)}</div>
+                <div><b>Broadband + EAS:</b> ${fmt(g.broadband_install_low + g.eas_equip_low)}–${fmt(g.broadband_install_high + g.eas_equip_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total one-time infrastructure:</b> ${fmt(g.total_infra_low_usd)}–${fmt(g.total_infra_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Annual recurring:</b> ${fmt(g.annual_recurring_low_usd)}–${fmt(g.annual_recurring_high_usd)}/yr</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Site Environmental Impact and Permitting Guide */}
         {candidate.am_site_environmental_impact_and_permitting_guide && (() => {
           const g = candidate.am_site_environmental_impact_and_permitting_guide;

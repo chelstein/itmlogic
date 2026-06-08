@@ -1494,7 +1494,10 @@ export async function runSiteOptimizer(body = {}){
     pwe_overall_efficiency_pct:         c.am_transmitter_power_efficiency_and_operating_cost_guide?.overall_efficiency_pct ?? null,
     env_nepa_trigger:                   c.am_site_environmental_impact_and_permitting_guide?.nepa_trigger ?? null,
     env_section_106_required:           c.am_site_environmental_impact_and_permitting_guide?.section_106_required ?? null,
-    env_total_permitting_low_usd:       c.am_site_environmental_impact_and_permitting_guide?.total_permitting_low_usd ?? null
+    env_total_permitting_low_usd:       c.am_site_environmental_impact_and_permitting_guide?.total_permitting_low_usd ?? null,
+    acc_generator_kw:                   c.am_site_access_and_utility_infrastructure_guide?.generator_kw ?? null,
+    acc_road_access_type:               c.am_site_access_and_utility_infrastructure_guide?.road_access_type ?? null,
+    acc_total_infra_low_usd:            c.am_site_access_and_utility_infrastructure_guide?.total_infra_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7337,6 +7340,144 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_access_and_utility_infrastructure_guide: (() => {
+      // AM site access and utility infrastructure guide.
+      //
+      // Regulatory basis:
+      //   47 CFR §73.1535: Remote control and auxiliary operation require unobstructed
+      //     site access for unattended operation inspections.
+      //   47 CFR §73.1870: Emergency operation provisions.  Class A/B stations in critical
+      //     areas effectively need standby power to maintain operations.  Best practice
+      //     for all classes.  FCC inspectors verify standby power capability.
+      //   47 CFR §73.1560(b): Power reductions > 10% must be reported; STA required
+      //     if power is reduced for > 30 days — underscores need for reliable primary power.
+      //   NFPA 110 (2021): Emergency and standby power systems.  Level 1 systems must
+      //     transfer within 10 seconds.  Generator ATS (Automatic Transfer Switch) required.
+      //
+      // Generator sizing:
+      //   Load = transmitter AC input + HVAC cooling + site lighting + remote monitoring
+      //   Transmitter AC input: tpo_kw / overall_efficiency (72% solid-state)
+      //   HVAC (if needed): assume 1 ton per 3 kW waste heat, each ton = 1.2 kW electrical
+      //   Site base load: 1.5 kW (lighting, remote control, SCADA, security camera)
+      //   Design factor: 1.25× (25% headroom per NFPA 110 sizing guidelines)
+      //
+      // Road access:
+      //   Rural gravel road (new construction): $15,000–$80,000 per mile
+      //   Urban/suburban paved road (new driveway/access): $30,000–$120,000 total
+      //   Most rural AM sites: ≤ 0.5 mile access road needed
+      //   Conservative estimate: assume 0.5 miles gravel access
+      //
+      // Electric utility service extension:
+      //   Overhead rural (new tap): $25,000–$50,000 per mile (utility estimate)
+      //   Underground: $80,000–$200,000 per mile
+      //   Site preparation (transformer pad, meter socket, conduit): $5,000–$15,000
+      //   Conservation assumption: 0.5 mile overhead extension
+      //
+      // Fiber / broadband for remote monitoring / EAS:
+      //   Fixed wireless broadband (rural): $500–$2,000 installation; $100–$250/month
+      //   Starlink (satellite): $599 hardware + ~$120/month (2024 rates)
+      //   DSL/fiber (where available): $500–$2,000 install; $80–$200/month
+      //   Cellular-based STL backup: $800–$3,000 equipment; $50–$150/month
+      //   EAS equipment (CAP-compliant receiver): $2,000–$5,000
+      //
+      // Total infrastructure cost estimate (one-time + first-year):
+      //   One-time: generator + ATS + road + electric extension + fiber install + EAS gear
+      //   Annual recurring: electricity + service contracts + broadband
+
+      // --- transmitter load from PWE guide ---
+      const overall_efficiency    = 0.72;
+      const ac_input_kw           = round2(tpo_kw / overall_efficiency);
+      const waste_heat_kw         = round2(ac_input_kw - tpo_kw);
+
+      // --- HVAC load ---
+      const hvac_tons             = waste_heat_kw < 5 ? 0 : round2(waste_heat_kw / 3);
+      const hvac_load_kw          = round2(hvac_tons * 1.2);
+
+      // --- site base load ---
+      const site_base_kw          = 1.5;
+
+      // --- total generator sizing load ---
+      const total_load_kw         = round2(ac_input_kw + hvac_load_kw + site_base_kw);
+      // NFPA 110: 25% headroom
+      const generator_load_kw     = round2(total_load_kw * 1.25);
+      // Round up to next standard generator size (15, 20, 30, 40, 60, 80, 100, 125 kW):
+      const STANDARD_GEN_KW       = [15, 20, 30, 40, 60, 80, 100, 125, 150, 200];
+      const generator_kw          = STANDARD_GEN_KW.find(s => s >= generator_load_kw) ?? 200;
+
+      // --- generator cost ---
+      // Diesel standby generator (KOHLER / Generac / Cummins) USD/kW installed:
+      //   < 30 kW: $1,500–$3,000/kW installed
+      //   30–100 kW: $900–$1,800/kW installed
+      //   > 100 kW: $600–$1,200/kW installed
+      const gen_cost_per_kw_low   = generator_kw <= 30 ? 1500 : generator_kw <= 100 ? 900 : 600;
+      const gen_cost_per_kw_high  = generator_kw <= 30 ? 3000 : generator_kw <= 100 ? 1800 : 1200;
+      const generator_cost_low    = generator_kw * gen_cost_per_kw_low;
+      const generator_cost_high   = generator_kw * gen_cost_per_kw_high;
+
+      // --- ATS (Automatic Transfer Switch) ---
+      const ats_cost_low  = 2500;
+      const ats_cost_high = 8000;
+
+      // --- road access ---
+      // Proxy: distance from current site as a fraction of search radius
+      // Remote candidates (> 30 km out) assumed to need more access work.
+      const distKm                = pt.distance_from_current_km ?? 0;
+      const road_access_type      = distKm > 30 ? 'GRAVEL_NEW' : distKm > 10 ? 'GRAVEL_IMPROVE' : 'EXISTING';
+      const road_miles            = road_access_type === 'GRAVEL_NEW' ? 0.5 : road_access_type === 'GRAVEL_IMPROVE' ? 0.25 : 0;
+      const road_cost_low         = road_access_type === 'GRAVEL_NEW' ? Math.round(road_miles * 15000) : road_access_type === 'GRAVEL_IMPROVE' ? Math.round(road_miles * 8000) : 0;
+      const road_cost_high        = road_access_type === 'GRAVEL_NEW' ? Math.round(road_miles * 80000) : road_access_type === 'GRAVEL_IMPROVE' ? Math.round(road_miles * 30000) : 5000;
+
+      // --- electric service extension ---
+      const power_extension_miles = road_access_type === 'GRAVEL_NEW' ? 0.5 : 0.25;
+      const elec_cost_low         = Math.round(power_extension_miles * 25000) + 5000;
+      const elec_cost_high        = Math.round(power_extension_miles * 50000) + 15000;
+
+      // --- fiber / broadband ---
+      const broadband_install_low  = 500;
+      const broadband_install_high = 2000;
+      const eas_equip_low          = 2000;
+      const eas_equip_high         = 5000;
+
+      // --- total one-time infrastructure cost ---
+      const total_infra_low_usd  = generator_cost_low  + ats_cost_low  + road_cost_low  + elec_cost_low  + broadband_install_low  + eas_equip_low;
+      const total_infra_high_usd = generator_cost_high + ats_cost_high + road_cost_high + elec_cost_high + broadband_install_high + eas_equip_high;
+
+      // --- annual recurring (broadband + service contract) ---
+      const annual_broadband_usd_low  = 1200;  // $100/mo
+      const annual_broadband_usd_high = 3000;  // $250/mo
+      const annual_service_low        = Math.round(generator_cost_low  * 0.03);  // 3% of install
+      const annual_service_high       = Math.round(generator_cost_high * 0.05);  // 5% of install
+      const annual_recurring_low_usd  = annual_broadband_usd_low  + annual_service_low;
+      const annual_recurring_high_usd = annual_broadband_usd_high + annual_service_high;
+
+      return {
+        total_load_kw,
+        generator_load_kw,
+        generator_kw,
+        generator_cost_low,
+        generator_cost_high,
+        ats_cost_low,
+        ats_cost_high,
+        road_access_type,
+        road_miles,
+        road_cost_low,
+        road_cost_high,
+        power_extension_miles,
+        elec_cost_low,
+        elec_cost_high,
+        broadband_install_low,
+        broadband_install_high,
+        eas_equip_low,
+        eas_equip_high,
+        total_infra_low_usd,
+        total_infra_high_usd,
+        annual_recurring_low_usd,
+        annual_recurring_high_usd,
+        reference: '47 CFR §73.1535 (remote control); §73.1870 (emergency operation); §73.1560(b) (power reduction STA); NFPA 110 (2021) §7.2 (generator sizing, 25% headroom, Level 1 ≤10 s transfer); EIA-840 utility extension cost estimates; USDA RUS (rural utility service) construction standards',
+        note: `${generator_kw} kW standby generator (NFPA 110 Level 1) required for ${tpo_kw} kW station: TX ${ac_input_kw} kW + HVAC ${hvac_load_kw} kW + base ${site_base_kw} kW = ${total_load_kw} kW × 1.25 headroom = ${generator_load_kw} kW. Road: ${road_access_type.replace(/_/g, ' ')}. Total one-time infrastructure: $${total_infra_low_usd.toLocaleString()}–$${total_infra_high_usd.toLocaleString()}.`
       };
     })(),
 
