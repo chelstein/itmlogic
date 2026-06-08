@@ -14839,7 +14839,7 @@ it('am_antenna_insulator_and_base_voltage_protection_guide v_base_rms matches sq
 });
 
 it('am_antenna_insulator_and_base_voltage_protection_guide v_peak_kv = v_rms × sqrt(2) / 1000', async () => {
-  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_antenna_insulator_and_base_voltage_protection_guide;
   const expected_peak = g.v_base_rms_vrms * Math.SQRT2 / 1000;
   assert.ok(Math.abs(g.v_peak_kv - expected_peak) < 0.01, `v_peak_kv ${g.v_peak_kv} should equal v_rms × √2 / 1000`);
@@ -15888,4 +15888,52 @@ test('candidate_comparison_table nt columns present and valid for KAZM', async (
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.nt_is_clear_channel, true, 'nt_is_clear_channel must be true for 780 kHz');
   assert.strictEqual(r0.nt_night_power_kw, 0, 'nt_night_power_kw must be 0 for clear channel');
+});
+
+// ── Feature #81: am_transmission_line_and_coaxial_feed_guide ─────────────────
+test('KAZM 780 kHz: am_transmission_line_and_coaxial_feed_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_transmission_line_and_coaxial_feed_guide, 'txl guide missing on candidate');
+  }
+});
+
+test('KAZM 780 kHz: 7/8" coax loss < 0.1 dB/100ft and efficiency > 97%', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_coaxial_feed_guide;
+  assert.ok(g.alpha_78_db_per100ft < 0.1,
+    `7/8" attenuation at 780 kHz should be < 0.1 dB/100ft, got ${g.alpha_78_db_per100ft}`);
+  assert.ok(g.efficiency_78_pct > 97,
+    `7/8" efficiency over 100ft should be > 97%, got ${g.efficiency_78_pct}`);
+  assert.ok(g.alpha_158_db_per100ft < g.alpha_78_db_per100ft,
+    '1-5/8" must have lower attenuation than 7/8"');
+});
+
+test('KAZM 780 kHz 5 kW: recommended cable is 7/8" LDF4-50A', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_coaxial_feed_guide;
+  assert.ok(g.recommended_cable.includes('7/8"'),
+    `5 kW TPO should recommend 7/8" cable, got "${g.recommended_cable}"`);
+  assert.ok(g.power_margin_78_pct > 50, 'power margin on 7/8" must be > 50% for 5 kW TPO');
+});
+
+test('KAZM 780 kHz: v_peak and cost fields are positive and ordered', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmission_line_and_coaxial_feed_guide;
+  assert.ok(g.v_peak_78_v > 0, 'v_peak_78_v must be positive');
+  assert.ok(g.total_78_low_usd > 0, 'total_78_low_usd must be positive');
+  assert.ok(g.total_78_high_usd >= g.total_78_low_usd, 'high must be >= low for 7/8"');
+  assert.ok(g.total_158_low_usd > g.total_78_low_usd, '1-5/8" must cost more than 7/8" per 100ft');
+});
+
+test('candidate_comparison_table txl columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('txl_recommended_cable'  in row, 'txl_recommended_cable missing from comparison table');
+    assert.ok('txl_loss_78_db'         in row, 'txl_loss_78_db missing from comparison table');
+    assert.ok('txl_efficiency_78_pct'  in row, 'txl_efficiency_78_pct missing from comparison table');
+    assert.ok('txl_total_78_low_usd'   in row, 'txl_total_78_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.txl_efficiency_78_pct > 95, 'txl_efficiency_78_pct must be > 95%');
 });

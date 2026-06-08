@@ -2356,6 +2356,37 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmission Line and Coaxial Feed Guide */}
+        {candidate.am_transmission_line_and_coaxial_feed_guide && (() => {
+          const g = candidate.am_transmission_line_and_coaxial_feed_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const recColor = g.recommended_cable?.includes('1-5/8') ? '#f59e0b' : '#22c55e';
+          return (
+            <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#a5b4fc', marginBottom: 8 }}>
+                Transmission Line / Coaxial Feed (§73.68)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#c7d2fe' }}>
+                <div><b>Frequency:</b> {g.frequency_khz} kHz ({fmtF(g.f_mhz, 3)} MHz)</div>
+                <div><b>Reference run:</b> {g.typical_line_ft} ft</div>
+                <div><b>7/8" α:</b> {fmtF(g.alpha_78_db_per100ft, 3)} dB/100ft → {fmtF(g.loss_78_db, 3)} dB loss</div>
+                <div><b>7/8" η:</b> {fmtF(g.efficiency_78_pct, 2)}% (V_peak {fmtF(g.v_peak_78_v, 0)} V)</div>
+                <div><b>1-5/8" α:</b> {fmtF(g.alpha_158_db_per100ft, 3)} dB/100ft → {fmtF(g.loss_158_db, 3)} dB loss</div>
+                <div><b>1-5/8" η:</b> {fmtF(g.efficiency_158_pct, 2)}% (V_peak {fmtF(g.v_peak_158_v, 0)} V)</div>
+                <div><b>7/8" installed (100 ft):</b> ${fmt(g.total_78_low_usd)}–${fmt(g.total_78_high_usd)}</div>
+                <div><b>1-5/8" installed (100 ft):</b> ${fmt(g.total_158_low_usd)}–${fmt(g.total_158_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <b>Recommended:</b>
+                  <span style={{ color: recColor, fontWeight: 700 }}>{g.recommended_cable}</span>
+                  <span style={{ fontSize: 10, color: '#818cf8' }}>for {g.frequency_khz} kHz / {tpo_kw} kW TPO</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#6366f1' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Daytime / Nighttime Power Reduction Guide */}
         {candidate.am_daytime_nighttime_power_reduction_guide && (() => {
           const g = candidate.am_daytime_nighttime_power_reduction_guide;

@@ -1514,7 +1514,11 @@ export async function runSiteOptimizer(body = {}){
     nt_is_clear_channel:                c.am_daytime_nighttime_power_reduction_guide?.is_clear_channel ?? null,
     nt_night_power_kw:                  c.am_daytime_nighttime_power_reduction_guide?.night_power_kw ?? null,
     nt_summer_sunset_utc:               c.am_daytime_nighttime_power_reduction_guide?.summer_sunset_utc ?? null,
-    nt_winter_sunset_utc:               c.am_daytime_nighttime_power_reduction_guide?.winter_sunset_utc ?? null
+    nt_winter_sunset_utc:               c.am_daytime_nighttime_power_reduction_guide?.winter_sunset_utc ?? null,
+    txl_recommended_cable:              c.am_transmission_line_and_coaxial_feed_guide?.recommended_cable ?? null,
+    txl_loss_78_db:                     c.am_transmission_line_and_coaxial_feed_guide?.loss_78_db ?? null,
+    txl_efficiency_78_pct:              c.am_transmission_line_and_coaxial_feed_guide?.efficiency_78_pct ?? null,
+    txl_total_78_low_usd:               c.am_transmission_line_and_coaxial_feed_guide?.total_78_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7357,6 +7361,109 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmission_line_and_coaxial_feed_guide: (() => {
+      // AM transmission line and coaxial feed system guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.68: AM antenna system — the transmission line is part of the
+      //     "antenna system" and its impedance characteristics must be accounted for
+      //     in the base-current calculations submitted with FCC Form 302-AM.
+      //   §73.1215: Antenna resistance measurements; feed system must maintain repeatable
+      //     impedance to within prescribed tolerances.
+      //
+      // Engineering model:
+      //   AM band (0.53–1.7 MHz) typically uses one of:
+      //     A. 7/8" corrugated hardline coax (Andrews LDF4-50A or equivalent)
+      //        • Attenuation α ≈ 0.066 dB/100ft at 1 MHz  (manufacturer spec)
+      //        • Scales as √f: α(f) ≈ 0.066 × √(f_MHz) dB/100ft
+      //     B. 1-5/8" corrugated hardline coax (Andrews LDF6-50A or equivalent)
+      //        • Attenuation α ≈ 0.038 dB/100ft at 1 MHz
+      //        • Scales as √f: α(f) ≈ 0.038 × √(f_MHz) dB/100ft
+      //     C. Open-wire (600 Ω balanced) line — nearly lossless at AM frequencies
+      //        (rarely used for new construction; requires weatherproof spreaders)
+      //   Line length ≈ distance from transmitter building to tower base.
+      //   Transmitter building typically 50–150 ft from tower base.
+      //
+      //   Power loss: P_loss = P_in × (1 − 10^(−α_total_dB/10))
+      //   Voltage standing wave ratio: VSWR assumed ≤ 1.5:1 for well-matched systems
+      //   Peak voltage: V_peak = √(2 × Z_0 × P_in)  — must be < cable rating
+
+      const f_mhz          = frequency_khz / 1000;
+      const sqrt_f         = Math.sqrt(f_mhz);
+
+      // Attenuation at operating frequency (dB/100 ft)
+      const alpha_78_per100ft  = round2(0.066 * sqrt_f);   // 7/8" hardline
+      const alpha_158_per100ft = round2(0.038 * sqrt_f);   // 1-5/8" hardline
+
+      // Assumed typical line length (50–150 ft typical, use 100 ft as reference)
+      const typical_line_ft    = 100;
+
+      const loss_78_db_typical  = round2(alpha_78_per100ft  * typical_line_ft / 100);
+      const loss_158_db_typical = round2(alpha_158_per100ft * typical_line_ft / 100);
+
+      // Convert dB loss to power efficiency
+      const eff_78  = round2(Math.pow(10, -loss_78_db_typical  / 10) * 100);
+      const eff_158 = round2(Math.pow(10, -loss_158_db_typical / 10) * 100);
+
+      // Power into line required to get tpo_kw to tower base
+      const p_kw          = tpo_kw;
+      const p_in_78_kw    = round2(p_kw / (eff_78  / 100));
+      const p_in_158_kw   = round2(p_kw / (eff_158 / 100));
+
+      // Peak voltage at transmitter end (Z0 = 50 Ω coax)
+      const v_peak_78     = round2(Math.sqrt(2 * 50 * p_in_78_kw  * 1000));
+      const v_peak_158    = round2(Math.sqrt(2 * 50 * p_in_158_kw * 1000));
+
+      // Cable power ratings (typ): 7/8" ~10 kW average at 1 MHz, 1-5/8" ~25 kW
+      const rating_78_kw  = 10;
+      const rating_158_kw = 25;
+      const margin_78_pct  = round2((rating_78_kw  / p_kw - 1) * 100);
+      const margin_158_pct = round2((rating_158_kw / p_kw - 1) * 100);
+
+      // Cost model (per foot installed, includes connectors, weatherproofing, burial)
+      const cost_78_low_per_ft  = 12;   // $12–$28 /ft installed (labour + materials)
+      const cost_78_high_per_ft = 28;
+      const cost_158_low_per_ft = 20;
+      const cost_158_high_per_ft = 45;
+      const base_connector_low  = 400;   // 2 × N-connectors or flange
+      const base_connector_high = 1200;
+
+      const total_78_low   = Math.round(typical_line_ft * cost_78_low_per_ft  + base_connector_low);
+      const total_78_high  = Math.round(typical_line_ft * cost_78_high_per_ft + base_connector_high);
+      const total_158_low  = Math.round(typical_line_ft * cost_158_low_per_ft  + base_connector_low);
+      const total_158_high = Math.round(typical_line_ft * cost_158_high_per_ft + base_connector_high);
+
+      // Recommendation: 7/8" adequate for tpo ≤ 5 kW at AM freqs; 1-5/8" for > 5 kW
+      const recommended = p_kw > 5 ? '1-5/8" LDF6-50A' : '7/8" LDF4-50A';
+
+      return {
+        frequency_khz,
+        f_mhz,
+        typical_line_ft,
+        alpha_78_db_per100ft:    alpha_78_per100ft,
+        alpha_158_db_per100ft:   alpha_158_per100ft,
+        loss_78_db:              loss_78_db_typical,
+        loss_158_db:             loss_158_db_typical,
+        efficiency_78_pct:       eff_78,
+        efficiency_158_pct:      eff_158,
+        p_in_required_78_kw:     p_in_78_kw,
+        p_in_required_158_kw:    p_in_158_kw,
+        v_peak_78_v:             v_peak_78,
+        v_peak_158_v:            v_peak_158,
+        cable_rating_78_kw:      rating_78_kw,
+        cable_rating_158_kw:     rating_158_kw,
+        power_margin_78_pct:     margin_78_pct,
+        power_margin_158_pct:    margin_158_pct,
+        total_78_low_usd:        total_78_low,
+        total_78_high_usd:       total_78_high,
+        total_158_low_usd:       total_158_low,
+        total_158_high_usd:      total_158_high,
+        recommended_cable:       recommended,
+        reference: '47 CFR §73.68 (antenna system); §73.1215 (impedance measurements); Andrew/CommScope LDF4-50A, LDF6-50A data sheets (attenuation vs frequency); ARRL Antenna Book ch. 24 (feed line loss)',
+        note: `At ${frequency_khz} kHz (${f_mhz} MHz): 7/8" loss=${loss_78_db_typical} dB/100ft, 1-5/8" loss=${loss_158_db_typical} dB/100ft for ${typical_line_ft}-ft run. Recommended: ${recommended} for ${p_kw} kW TPO.`
       };
     })(),
 

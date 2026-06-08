@@ -3968,3 +3968,14 @@ test('am_daytime_nighttime_power_reduction_guide present across colocation candi
     assert.ok(g.summer_day_length_h > g.winter_day_length_h, 'summer must be longer than winter');
   }
 });
+
+test('am_transmission_line_and_coaxial_feed_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_coaxial_feed_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_transmission_line_and_coaxial_feed_guide`);
+    assert.ok(g.alpha_78_db_per100ft > 0, 'alpha_78_db_per100ft must be positive');
+    assert.ok(g.efficiency_78_pct > 90, 'efficiency_78_pct must be > 90% at AM frequencies');
+    assert.ok(typeof g.recommended_cable === 'string', 'recommended_cable must be a string');
+  }
+});
