@@ -14451,7 +14451,7 @@ it('am_antenna_tower_lighting_and_marking_guide reference cites §17.21 and AC 7
 });
 
 it('candidate_comparison_table ltg columns are present and valid for KAZM', async () => {
-  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.ltg_lighting_required, true, 'ltg_lighting_required should be true');
   assert.ok(r0.ltg_led_system_cost_low_usd > 0, 'ltg_led_system_cost_low_usd must be positive');
@@ -15737,4 +15737,51 @@ test('candidate_comparison_table gw columns are present and valid for KAZM', asy
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.gw_05mvm_radius_km > 50, 'gw_05mvm_radius_km must be > 50 km for 5 kW');
   assert.ok(r0.gw_01mvm_radius_km > r0.gw_05mvm_radius_km, '0.1 mV/m must be farther than 0.5 mV/m');
+});
+
+// ── Feature #78: am_tower_lighting_and_painting_compliance_guide ──────────────
+test('KAZM 780 kHz: am_tower_lighting_and_painting_compliance_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_tower_lighting_and_painting_compliance_guide, 'ltg guide missing on candidate');
+  }
+});
+
+test('KAZM 780 kHz: tower_height_ft ≈ 315 ft and ASR required (>200 ft)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_painting_compliance_guide;
+  assert.ok(g.tower_height_ft > 300 && g.tower_height_ft < 330,
+    `tower_height_ft should be ~315 ft for 780 kHz, got ${g.tower_height_ft}`);
+  assert.strictEqual(g.asr_required, true, 'ASR must be required when tower > 200 ft');
+  assert.strictEqual(g.asr_threshold_ft, 200, 'asr_threshold_ft must be 200 ft (§17.7)');
+});
+
+test('KAZM 780 kHz: lighting_type is MEDIUM_INTENSITY_L864_L865', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_painting_compliance_guide;
+  assert.strictEqual(g.lighting_type, 'MEDIUM_INTENSITY_L864_L865',
+    `780 kHz tower ~315 ft should require MEDIUM_INTENSITY_L864_L865, got ${g.lighting_type}`);
+  assert.strictEqual(g.faa_notification_required, true, 'FAA notice required when ASR required');
+});
+
+test('KAZM 780 kHz: total_lighting_low_usd and high are positive and ordered', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tower_lighting_and_painting_compliance_guide;
+  assert.ok(g.total_lighting_low_usd > 0, `total_lighting_low_usd must be > 0, got ${g.total_lighting_low_usd}`);
+  assert.ok(g.total_lighting_high_usd >= g.total_lighting_low_usd,
+    'total_lighting_high_usd must be >= low');
+  assert.ok(g.annual_maintenance_low > 0, 'annual_maintenance_low must be > 0');
+  assert.ok(g.annual_maintenance_high >= g.annual_maintenance_low, 'annual_maintenance_high must be >= low');
+});
+
+test('candidate_comparison_table ltg columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ltg_asr_required'          in row, 'ltg_asr_required missing from comparison table');
+    assert.ok('ltg_lighting_type'         in row, 'ltg_lighting_type missing from comparison table');
+    assert.ok('ltg_total_lighting_low_usd' in row, 'ltg_total_lighting_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.ltg_asr_required, true, 'ltg_asr_required must be true for 780 kHz tower');
+  assert.ok(r0.ltg_total_lighting_low_usd > 0, 'ltg_total_lighting_low_usd must be positive');
 });

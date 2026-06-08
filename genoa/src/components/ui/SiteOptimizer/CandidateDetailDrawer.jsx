@@ -2291,6 +2291,38 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Tower Lighting and Painting Compliance Guide */}
+        {candidate.am_tower_lighting_and_painting_compliance_guide && (() => {
+          const g = candidate.am_tower_lighting_and_painting_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const asrColor = g.asr_required ? '#dc2626' : '#15803d';
+          return (
+            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>
+                Tower Lighting &amp; Painting Compliance (§17.7 / FAA AC 70/7460-1L)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>Tower height (λ/4):</b> {fmtF(g.tower_height_ft)} ft / {fmtF(g.tower_height_m)} m</div>
+                <div><b>ASR threshold:</b> {g.asr_threshold_ft} ft AGL</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>ASR required (§17.7):</b>
+                  <span style={{ color: asrColor, fontWeight: 600 }}>{g.asr_required ? 'YES' : 'No'}</span>
+                </div>
+                <div><b>Lighting type:</b> {g.lighting_type?.replace(/_/g, ' ')}</div>
+                <div><b>FAA 30-day notice (§17.49):</b> {g.faa_notification_required ? 'REQUIRED' : 'N/A'}</div>
+                <div><b>Paint bands:</b> {g.n_paint_bands ?? '—'}</div>
+                <div><b>Capital (lighting + painting):</b> ${fmt(g.total_lighting_low_usd)}–${fmt(g.total_lighting_high_usd)}</div>
+                <div><b>Annual maintenance:</b> ${fmt(g.annual_maintenance_low)}–${fmt(g.annual_maintenance_high)}/yr</div>
+              </div>
+              {g.faa_notification_note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#92400e' }}>{g.faa_notification_note}</div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b45309' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Propagation Groundwave Field Strength Estimate Guide */}
         {candidate.am_propagation_groundwave_field_strength_estimate_guide && (() => {
           const g = candidate.am_propagation_groundwave_field_strength_estimate_guide;

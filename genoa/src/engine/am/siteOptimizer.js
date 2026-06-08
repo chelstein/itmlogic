@@ -1503,7 +1503,10 @@ export async function runSiteOptimizer(body = {}){
     imp_ct_rating_a:                    c.am_antenna_system_impedance_and_base_current_guide?.ct_rating_a ?? null,
     gw_05mvm_radius_km:                 c.am_propagation_groundwave_field_strength_estimate_guide?.contour_05mvm_radius_km ?? null,
     gw_01mvm_radius_km:                 c.am_propagation_groundwave_field_strength_estimate_guide?.contour_01mvm_radius_km ?? null,
-    gw_study_cost_low_usd:              c.am_propagation_groundwave_field_strength_estimate_guide?.study_cost_low_usd ?? null
+    gw_study_cost_low_usd:              c.am_propagation_groundwave_field_strength_estimate_guide?.study_cost_low_usd ?? null,
+    ltg_asr_required:                   c.am_tower_lighting_and_painting_compliance_guide?.asr_required ?? null,
+    ltg_lighting_type:                  c.am_tower_lighting_and_painting_compliance_guide?.lighting_type ?? null,
+    ltg_total_lighting_low_usd:         c.am_tower_lighting_and_painting_compliance_guide?.total_lighting_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7346,6 +7349,135 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_tower_lighting_and_painting_compliance_guide: (() => {
+      // AM tower lighting and painting compliance guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §17.7: Any structure > 200 ft (60.96 m) AGL or within 20,000 ft of
+      //     an airport requires FCC Antenna Structure Registration (ASR) filing.
+      //   47 CFR §17.21: Antenna structures requiring painting and lighting — FAA
+      //     determination is the controlling authority.
+      //   47 CFR §17.23: Painting specifications — aviation orange and white alternating
+      //     bands; 7 bands minimum for structures > 700 ft; fewer bands for shorter towers.
+      //     Band width proportional to structure height.
+      //   47 CFR §17.47: Periodic inspections — lighting system must be checked at least
+      //     once every 24 hours (automated monitor acceptable); physical inspection quarterly.
+      //   47 CFR §17.48: Records of illumination — maintain records showing all outages
+      //     and lighting status for preceding 2 years.
+      //   47 CFR §17.49: Notification within 30 minutes of light failure (L-864 red beacon
+      //     or white strobe) to FAA (1-877-487-6867) and FCC Operations Center.
+      //
+      // FAA Advisory Circular AC 70/7460-1L (Obstruction Marking and Lighting, 2015):
+      //   Tables 1–4 specify lighting system by tower height:
+      //   Towers < 200 ft:      Painting only (no lighting required unless FAA-designated)
+      //   200–499 ft:           Medium intensity white strobe (L-865) by day OR
+      //                         Red L-864 beacon by night + red side lights if > 499 ft
+      //                         (dual lighting system)
+      //   500–999 ft:           Medium intensity dual (L-864 night, L-865 day)
+      //   ≥ 1,000 ft:           High intensity strobe (L-856) day, L-864 night
+      //
+      //   LED conversions: FAA encourages LED-based L-864 and L-865 systems.
+      //     LED L-864 red beacon (medium): $1,500–$3,500 fixture; lifespan 10–15 years
+      //     LED L-865 white strobe: $2,500–$5,500 per fixture
+      //     Controller/flasher unit: $800–$2,500
+      //     Installation: $2,000–$6,000 per fixture (scaffolding/lift)
+      //
+      // Painting cost:
+      //   Aviation orange/white banding, 7-band: $8,000–$25,000 for a 300 ft tower
+      //   High-build polyurethane paint system; re-paint every 5–7 years
+      //
+      // Ongoing compliance:
+      //   Annual lighting maintenance contract: $500–$2,000/yr
+      //   FAA/FCC light outage notification service (automated monitor): $300–$800/yr
+      //   Lighting inspection log + recordkeeping: engineer time, $500–$1,500/yr
+
+      // --- tower height from λ/4 ---
+      const lambda_m           = 299792.458 / frequency_khz;
+      const quarter_wave_m     = lambda_m / 4;
+      const tower_height_ft    = round2(quarter_wave_m * 3.28084);
+
+      // --- ASR threshold ---
+      // 47 CFR §17.7: > 200 ft (60.96 m) AGL requires ASR
+      const asr_threshold_ft   = 200;
+      const asr_threshold_m    = 60.96;
+      const asr_required       = tower_height_ft > asr_threshold_ft;
+
+      // --- FAA lighting determination ---
+      // Based on AC 70/7460-1L Table 1 (unmarked, no aviation use)
+      let lighting_type;
+      if (tower_height_ft < 200) {
+        lighting_type = 'NONE_PAINTING_ONLY';
+      } else if (tower_height_ft < 500) {
+        lighting_type = 'MEDIUM_INTENSITY_L864_L865';
+      } else if (tower_height_ft < 1000) {
+        lighting_type = 'DUAL_MEDIUM_INTENSITY';
+      } else {
+        lighting_type = 'HIGH_INTENSITY_L856';
+      }
+
+      // --- Number of lights required ---
+      // Simplified: medium intensity — 1 beacon + side markers at mid and 2/3 height if > 350 ft
+      const n_beacons          = asr_required ? 1 : 0;
+      const n_side_lights      = tower_height_ft > 350 ? 2 : 0;
+
+      // --- Fixture costs (LED) ---
+      const beacon_cost_low    = asr_required ? (1500 * n_beacons) : 0;
+      const beacon_cost_high   = asr_required ? (3500 * n_beacons) : 0;
+      const strobe_cost_low    = asr_required ? 2500 : 0;
+      const strobe_cost_high   = asr_required ? 5500 : 0;
+      const side_cost_low      = n_side_lights * 1200;
+      const side_cost_high     = n_side_lights * 2800;
+      const controller_low     = asr_required ? 800  : 0;
+      const controller_high    = asr_required ? 2500 : 0;
+      const install_low        = asr_required ? 2000 * (n_beacons + 1) : 0;
+      const install_high       = asr_required ? 6000 * (n_beacons + 1) : 0;
+
+      // --- Painting cost ---
+      // Band count: §17.23 specifies band width = structure height / (2n − 1) where n = bands
+      const n_paint_bands      = tower_height_ft <= 300 ? 5 : tower_height_ft <= 500 ? 7 : 9;
+      const painting_low       = Math.round(tower_height_ft * 25);   // ~$25/ft lower range
+      const painting_high      = Math.round(tower_height_ft * 80);   // ~$80/ft upper range
+
+      // --- Total capital cost ---
+      const total_lighting_low_usd  = beacon_cost_low + strobe_cost_low + side_cost_low + controller_low + install_low + painting_low;
+      const total_lighting_high_usd = beacon_cost_high + strobe_cost_high + side_cost_high + controller_high + install_high + painting_high;
+
+      // --- Annual recurring cost ---
+      const annual_maintenance_low  = asr_required ? 800  : 300;
+      const annual_maintenance_high = asr_required ? 2000 : 800;
+
+      // --- FAA notification requirement ---
+      const faa_notification_required = asr_required;
+      const faa_notification_note      = faa_notification_required
+        ? 'Light failure must be reported within 30 min to FAA (1-877-487-6867) and FCC Operations Center per §17.49. Automated 24-hr monitor strongly recommended.'
+        : 'Tower below ASR threshold — no mandatory FAA light outage reporting. Painting only if required by local permits.';
+
+      return {
+        tower_height_ft,
+        tower_height_m:          round2(quarter_wave_m),
+        asr_threshold_ft,
+        asr_required,
+        lighting_type,
+        n_beacons,
+        n_side_lights,
+        n_paint_bands,
+        beacon_cost_low,
+        beacon_cost_high,
+        strobe_cost_low,
+        strobe_cost_high,
+        painting_low,
+        painting_high,
+        total_lighting_low_usd,
+        total_lighting_high_usd,
+        annual_maintenance_low,
+        annual_maintenance_high,
+        faa_notification_required,
+        faa_notification_note,
+        reference: '47 CFR §17.7 (ASR ≥200 ft); §17.21–§17.23 (painting and lighting); §17.47 (24-hr monitoring); §17.48 (2-year illumination records); §17.49 (30-min outage notification); FAA AC 70/7460-1L (2015) Tables 1–4 (obstruction marking and lighting)',
+        note: `Tower: ~${tower_height_ft} ft (${round2(quarter_wave_m)} m). ASR ${asr_required ? 'REQUIRED' : 'not required'}. Lighting: ${lighting_type.replace(/_/g, ' ')}. ${n_paint_bands} paint bands. Capital: $${total_lighting_low_usd.toLocaleString()}–$${total_lighting_high_usd.toLocaleString()}. Annual maintenance: $${annual_maintenance_low}–$${annual_maintenance_high}/yr.`
       };
     })(),
 

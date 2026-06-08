@@ -3935,3 +3935,14 @@ test('am_propagation_groundwave_field_strength_estimate_guide present across col
     assert.ok(g.study_cost_low_usd > 0, 'study_cost_low_usd must be positive');
   }
 });
+
+test('am_tower_lighting_and_painting_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_lighting_and_painting_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_tower_lighting_and_painting_compliance_guide`);
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+    assert.ok(g.total_lighting_low_usd > 0, 'total_lighting_low_usd must be positive');
+  }
+});
