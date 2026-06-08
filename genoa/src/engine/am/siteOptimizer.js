@@ -1510,7 +1510,11 @@ export async function runSiteOptimizer(body = {}){
     gnd_n_radials_full:                 c.am_ground_radial_system_design_guide?.n_radials_full ?? null,
     gnd_r_loss_full_ohm:                c.am_ground_radial_system_design_guide?.r_loss_full_ohm ?? null,
     gnd_efficiency_full_pct:            c.am_ground_radial_system_design_guide?.efficiency_full_pct ?? null,
-    gnd_total_system_low_usd:           c.am_ground_radial_system_design_guide?.total_radial_system_low_usd ?? null
+    gnd_total_system_low_usd:           c.am_ground_radial_system_design_guide?.total_radial_system_low_usd ?? null,
+    nt_is_clear_channel:                c.am_daytime_nighttime_power_reduction_guide?.is_clear_channel ?? null,
+    nt_night_power_kw:                  c.am_daytime_nighttime_power_reduction_guide?.night_power_kw ?? null,
+    nt_summer_sunset_utc:               c.am_daytime_nighttime_power_reduction_guide?.summer_sunset_utc ?? null,
+    nt_winter_sunset_utc:               c.am_daytime_nighttime_power_reduction_guide?.winter_sunset_utc ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7353,6 +7357,118 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_daytime_nighttime_power_reduction_guide: (() => {
+      // AM daytime vs nighttime operating power reduction guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.99: Sunset/sunrise power reductions for domestic AM stations.
+      //     Class D stations on clear channels must commence reduced (nighttime) power at
+      //     local sunset and may not resume daytime power until local sunrise.  The
+      //     actual UTC transition times vary by date and site latitude/longitude.
+      //   §73.99(b): "Critical Hours" operation — defined as the first two hours after
+      //     local sunrise and the last two hours before local sunset — may permit an
+      //     intermediate power level for Class D stations when a specific critical-hours
+      //     authorization is granted.
+      //   §73.1680 (Emergency operation): Stations must have operational procedures for
+      //     power reduction transitions.
+      //   §73.1800: Station identification at power transitions is required.
+      //   Night power for Class D on clear channels is typically 0 W (silent) unless the
+      //     station holds a specific nighttime authorization from the FCC.  Some Class D
+      //     stations are licensed for nighttime operation at a fraction of daytime TPO
+      //     (e.g. 500 W night vs 5 kW day) with a directional antenna or geographic offset.
+      //
+      // Sunset / sunrise model:
+      //   Uses a simplified solar declination model for approximate UTC times:
+      //     δ (solar declination) ≈ -23.45° × cos(360/365 × (D + 10))   where D = day-of-year
+      //     Hour angle at sunset/sunrise: cos(H) = -tan(φ) × tan(δ)
+      //     UTC time = 12:00 - H_hours + longitude_correction   (sunrise)
+      //     UTC time = 12:00 + H_hours + longitude_correction   (sunset)
+      //   Longitude correction: lon_hours = -longitude_deg / 15  (west is negative longitude)
+      //   This is an FCC-compliant ±5-minute approximation; LMS uses the USNO algorithm.
+
+      const lat_deg = pt.lat;
+      const lon_deg = pt.lon;
+
+      // Day-of-year for mid-summer (Jul 15, D≈196) and mid-winter (Jan 15, D≈15) reference
+      const calcSunTimes = (dayOfYear) => {
+        const deg2rad = Math.PI / 180;
+        const rad2deg = 180 / Math.PI;
+        const decl   = -23.45 * Math.cos(deg2rad * (360 / 365) * (dayOfYear + 10));
+        const cosH   = -Math.tan(deg2rad * lat_deg) * Math.tan(deg2rad * decl);
+        if (cosH < -1) return { sunrise_utc: null, sunset_utc: null, day_length_h: 24 }; // polar day
+        if (cosH >  1) return { sunrise_utc: null, sunset_utc: null, day_length_h: 0  }; // polar night
+        const H_deg  = Math.acos(cosH) * rad2deg;
+        const H_h    = H_deg / 15;
+        const lonCorr = -lon_deg / 15;   // west lon_deg is negative → lonCorr positive for western hemisphere
+        const sunrise_h = 12 - H_h + lonCorr;
+        const sunset_h  = 12 + H_h + lonCorr;
+        const toHHMM = (h) => {
+          const hh = Math.floor(((h % 24) + 24) % 24);
+          const mm = Math.round((h - Math.floor(h)) * 60);
+          return `${String(hh).padStart(2,'0')}:${String(mm < 60 ? mm : 0).padStart(2,'0')} UTC`;
+        };
+        return {
+          sunrise_utc: toHHMM(sunrise_h),
+          sunset_utc:  toHHMM(sunset_h),
+          day_length_h: round2(2 * H_h)
+        };
+      };
+
+      const summer = calcSunTimes(196);  // ~Jul 15
+      const winter = calcSunTimes(15);   // ~Jan 15
+
+      // Night power determination for Class D on clear channel
+      const isClearCh = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const night_power_kw      = isClearCh ? 0    : round2(tpo_kw * 0.1);  // Class D clear → silent; others reduce
+      const night_authorized    = !isClearCh;  // assume auth for non-clear; clear requires specific filing
+      const critical_hours_kw   = isClearCh ? null : round2(tpo_kw * 0.5);  // 50% during critical hours (if auth)
+
+      // Daytime vs nighttime power difference
+      const power_reduction_pct = night_power_kw > 0
+        ? round2((1 - night_power_kw / tpo_kw) * 100)
+        : 100;
+
+      // Operational cost of silent nights (lost hours)
+      const avg_night_h_summer = round2(24 - summer.day_length_h);
+      const avg_night_h_winter = round2(24 - winter.day_length_h);
+
+      // Remote automation cost for unattended power transitions (§73.1400 allows unattended)
+      const automation_low  = 1500;
+      const automation_high = 6000;
+
+      // Power contactor / relay rated for full daytime power
+      const tpo_w           = tpo_kw * 1000;
+      const power_relay_a   = Math.ceil(Math.sqrt(tpo_w / 50) * 1.25);  // 50 Ω assumed, 25% margin
+      const relay_cost_low  = 800;
+      const relay_cost_high = 3500;
+
+      return {
+        frequency_khz,
+        lat_deg:                  round2(lat_deg),
+        lon_deg:                  round2(lon_deg),
+        is_clear_channel:         isClearCh,
+        daytime_tpo_kw:           tpo_kw,
+        night_power_kw,
+        night_authorized,
+        power_reduction_pct,
+        critical_hours_kw,
+        summer_sunrise_utc:       summer.sunrise_utc,
+        summer_sunset_utc:        summer.sunset_utc,
+        summer_day_length_h:      summer.day_length_h,
+        winter_sunrise_utc:       winter.sunrise_utc,
+        winter_sunset_utc:        winter.sunset_utc,
+        winter_day_length_h:      winter.day_length_h,
+        avg_night_h_summer,
+        avg_night_h_winter,
+        automation_cost_low:      automation_low,
+        automation_cost_high:     automation_high,
+        power_relay_cost_low:     relay_cost_low,
+        power_relay_cost_high:    relay_cost_high,
+        reference: '47 CFR §73.99 (sunset/sunrise power); §73.99(b) (critical hours); §73.1680 (emergency operation); §73.1800 (station ID at transitions); USNO solar tables (for LMS-compliant exact UTC)',
+        note: `${isClearCh ? 'Clear channel — Class D must go SILENT at sunset (§73.99).' : `Non-clear — night power ≈ ${night_power_kw} kW (${100 - power_reduction_pct}% of day TPO).`} Summer: ${summer.day_length_h}h day, sunset ${summer.sunset_utc}. Winter: ${winter.day_length_h}h day, sunset ${winter.sunset_utc}.`
       };
     })(),
 

@@ -15022,7 +15022,7 @@ it('am_operating_log_and_technical_records_compliance_guide EAS and public file 
 });
 
 it('am_operating_log_and_technical_records_compliance_guide 780 kHz clear channel triggers nighttime schedule logging', async () => {
-  const out = await runSiteOptimizer({ ...KAZM_FIXTURE, candidate_limit: 1 });
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const g = out.candidates[0].am_operating_log_and_technical_records_compliance_guide;
   assert.strictEqual(g.nighttime_schedule_logging, true, '780 kHz is clear channel → nighttime sign-on/off logging');
 });
@@ -15837,4 +15837,55 @@ test('candidate_comparison_table gnd columns present and valid for KAZM', async 
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.gnd_n_radials_full, 120, 'gnd_n_radials_full must be 120');
   assert.ok(r0.gnd_total_system_low_usd > 50000, 'gnd_total_system_low_usd must be >$50K');
+});
+
+// ── Feature #80: am_daytime_nighttime_power_reduction_guide ──────────────────
+test('KAZM 780 kHz: am_daytime_nighttime_power_reduction_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_daytime_nighttime_power_reduction_guide, 'nighttime guide missing on candidate');
+  }
+});
+
+test('KAZM 780 kHz clear channel: night_power_kw = 0 and power_reduction_pct = 100', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_nighttime_power_reduction_guide;
+  assert.strictEqual(g.is_clear_channel, true, '780 kHz must be flagged as clear channel');
+  assert.strictEqual(g.night_power_kw, 0, 'Clear channel Class D night power must be 0 kW');
+  assert.strictEqual(g.power_reduction_pct, 100, 'power_reduction_pct must be 100% for silent nights');
+  assert.strictEqual(g.daytime_tpo_kw, 5, 'daytime_tpo_kw must equal input tpo_kw (5 kW)');
+});
+
+test('KAZM 780 kHz: summer day longer than winter day at 34.86°N', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_nighttime_power_reduction_guide;
+  assert.ok(g.summer_day_length_h > g.winter_day_length_h,
+    `summer day must be longer than winter at 34.86°N, got summer=${g.summer_day_length_h} winter=${g.winter_day_length_h}`);
+  assert.ok(g.summer_day_length_h > 12 && g.summer_day_length_h < 16,
+    `summer day at 34.86°N should be 12–16 h, got ${g.summer_day_length_h}`);
+  assert.ok(g.winter_day_length_h > 8 && g.winter_day_length_h < 12,
+    `winter day at 34.86°N should be 8–12 h, got ${g.winter_day_length_h}`);
+});
+
+test('KAZM 780 kHz: sunset/sunrise UTC strings are present and formatted HH:MM UTC', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_daytime_nighttime_power_reduction_guide;
+  const utcPattern = /^\d{2}:\d{2} UTC$/;
+  assert.ok(utcPattern.test(g.summer_sunset_utc),  `summer_sunset_utc format invalid: ${g.summer_sunset_utc}`);
+  assert.ok(utcPattern.test(g.summer_sunrise_utc), `summer_sunrise_utc format invalid: ${g.summer_sunrise_utc}`);
+  assert.ok(utcPattern.test(g.winter_sunset_utc),  `winter_sunset_utc format invalid: ${g.winter_sunset_utc}`);
+  assert.ok(utcPattern.test(g.winter_sunrise_utc), `winter_sunrise_utc format invalid: ${g.winter_sunrise_utc}`);
+});
+
+test('candidate_comparison_table nt columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('nt_is_clear_channel'   in row, 'nt_is_clear_channel missing from comparison table');
+    assert.ok('nt_night_power_kw'     in row, 'nt_night_power_kw missing from comparison table');
+    assert.ok('nt_summer_sunset_utc'  in row, 'nt_summer_sunset_utc missing from comparison table');
+    assert.ok('nt_winter_sunset_utc'  in row, 'nt_winter_sunset_utc missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.nt_is_clear_channel, true, 'nt_is_clear_channel must be true for 780 kHz');
+  assert.strictEqual(r0.nt_night_power_kw, 0, 'nt_night_power_kw must be 0 for clear channel');
 });

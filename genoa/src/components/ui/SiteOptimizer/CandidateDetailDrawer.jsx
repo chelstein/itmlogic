@@ -2356,6 +2356,39 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Daytime / Nighttime Power Reduction Guide */}
+        {candidate.am_daytime_nighttime_power_reduction_guide && (() => {
+          const g = candidate.am_daytime_nighttime_power_reduction_guide;
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const nightColor = g.is_clear_channel ? '#dc2626' : '#d97706';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>
+                Daytime / Nighttime Power Reduction (§73.99)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#cbd5e1' }}>
+                <div><b>Channel class:</b> <span style={{ color: g.is_clear_channel ? '#f87171' : '#86efac' }}>{g.is_clear_channel ? 'CLEAR — dominant protection' : 'Regional / Local'}</span></div>
+                <div><b>Daytime TPO:</b> {g.daytime_tpo_kw} kW</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>Night power:</b>
+                  <span style={{ color: nightColor, fontWeight: 700 }}>{g.night_power_kw > 0 ? `${g.night_power_kw} kW` : 'SILENT'}</span>
+                </div>
+                <div><b>Reduction:</b> {g.power_reduction_pct}%</div>
+                {g.critical_hours_kw != null && (
+                  <div><b>Critical hours (§73.99b):</b> {g.critical_hours_kw} kW</div>
+                )}
+                <div><b>Summer sunset / sunrise:</b> {g.summer_sunset_utc} / {g.summer_sunrise_utc}</div>
+                <div><b>Summer day length:</b> {fmtF(g.summer_day_length_h, 1)} h</div>
+                <div><b>Winter sunset / sunrise:</b> {g.winter_sunset_utc} / {g.winter_sunrise_utc}</div>
+                <div><b>Winter day length:</b> {fmtF(g.winter_day_length_h, 1)} h</div>
+                <div><b>Automation cost:</b> ${g.automation_cost_low.toLocaleString()}–${g.automation_cost_high.toLocaleString()}</div>
+                <div><b>Power relay cost:</b> ${g.power_relay_cost_low.toLocaleString()}–${g.power_relay_cost_high.toLocaleString()}</div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#64748b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Ground Radial System Design Guide */}
         {candidate.am_ground_radial_system_design_guide && (() => {
           const g = candidate.am_ground_radial_system_design_guide;

@@ -3957,3 +3957,14 @@ test('am_ground_radial_system_design_guide present across colocation candidates'
     assert.ok(g.total_radial_system_low_usd > 0, 'total_radial_system_low_usd must be positive');
   }
 });
+
+test('am_daytime_nighttime_power_reduction_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_daytime_nighttime_power_reduction_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_daytime_nighttime_power_reduction_guide`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', 'is_clear_channel must be boolean');
+    assert.ok(g.summer_day_length_h > 0, 'summer_day_length_h must be positive');
+    assert.ok(g.summer_day_length_h > g.winter_day_length_h, 'summer must be longer than winter');
+  }
+});
