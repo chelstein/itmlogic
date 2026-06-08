@@ -3924,3 +3924,14 @@ test('am_antenna_system_impedance_and_base_current_guide present across colocati
     assert.strictEqual(g.r_rad, 36.5, 'r_rad must be 36.5 Ω for λ/4 monopole');
   }
 });
+
+test('am_propagation_groundwave_field_strength_estimate_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_propagation_groundwave_field_strength_estimate_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_propagation_groundwave_field_strength_estimate_guide`);
+    assert.ok(g.contour_05mvm_radius_km > 0, 'contour_05mvm_radius_km must be positive');
+    assert.ok(g.contour_01mvm_radius_km > g.contour_05mvm_radius_km, '0.1 mV/m must be farther than 0.5 mV/m');
+    assert.ok(g.study_cost_low_usd > 0, 'study_cost_low_usd must be positive');
+  }
+});

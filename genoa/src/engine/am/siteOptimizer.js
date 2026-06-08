@@ -1500,7 +1500,10 @@ export async function runSiteOptimizer(body = {}){
     acc_total_infra_low_usd:            c.am_site_access_and_utility_infrastructure_guide?.total_infra_low_usd ?? null,
     imp_base_current_a:                 c.am_antenna_system_impedance_and_base_current_guide?.base_current_a ?? null,
     imp_r_base_ohm:                     c.am_antenna_system_impedance_and_base_current_guide?.r_base_ohm ?? null,
-    imp_ct_rating_a:                    c.am_antenna_system_impedance_and_base_current_guide?.ct_rating_a ?? null
+    imp_ct_rating_a:                    c.am_antenna_system_impedance_and_base_current_guide?.ct_rating_a ?? null,
+    gw_05mvm_radius_km:                 c.am_propagation_groundwave_field_strength_estimate_guide?.contour_05mvm_radius_km ?? null,
+    gw_01mvm_radius_km:                 c.am_propagation_groundwave_field_strength_estimate_guide?.contour_01mvm_radius_km ?? null,
+    gw_study_cost_low_usd:              c.am_propagation_groundwave_field_strength_estimate_guide?.study_cost_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7343,6 +7346,112 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_propagation_groundwave_field_strength_estimate_guide: (() => {
+      // AM groundwave field strength estimate — §73.183 / §73.184 FCC M3 curves.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.183: Groundwave service contours.  Applicants must calculate the
+      //     predicted groundwave field strength contour at 0.5 mV/m (daytime service)
+      //     and 0.1 mV/m (nighttime service) using the FCC groundwave curves.
+      //   §73.184: FCC groundwave field strength curves (M3 curves, ITU-R P.368-9).
+      //     Curves are tabulated by frequency (MHz) and ground conductivity (mS/m).
+      //   §73.24(b)–(c): Minimum field strength requirements at community of license:
+      //     Class D: 2 mV/m minimum daytime; 0.5 mV/m minimum nighttime.
+      //   §73.37: Co-channel and adjacent-channel separation rules use the 0.5 mV/m
+      //     contour for daytime and 0.1 mV/m contour for nighttime interference calculations.
+      //
+      // M3 groundwave curve approximation (FCC published curves):
+      //   The FCC provides tables of field strength vs distance for each conductivity class.
+      //   For the range of frequencies and conductivities relevant here, we use polynomial
+      //   approximations derived from published FCC/ITU M3 curve data:
+      //
+      //   At 1 kW ERP (reference), 780 kHz:
+      //     σ = 1 mS/m:  0.5 mV/m at ~42 km,  0.1 mV/m at ~110 km
+      //     σ = 2 mS/m:  0.5 mV/m at ~52 km,  0.1 mV/m at ~140 km
+      //     σ = 4 mS/m:  0.5 mV/m at ~65 km,  0.1 mV/m at ~175 km
+      //     σ = 8 mS/m:  0.5 mV/m at ~82 km,  0.1 mV/m at ~215 km
+      //     σ = 16 mS/m: 0.5 mV/m at ~100 km, 0.1 mV/m at ~260 km
+      //   (Sources: FCC AM Station Query / LMS, §73.184 Tables; ITU-R P.368-9 Annex 1)
+      //
+      //   Scaling with power: contour radius ∝ √(P/1kW) for a given field strength
+      //   (groundwave field ∝ 1/d in the near field, so distance ∝ field × d → radius ∝ √P
+      //   in the quasi-far-field approximation).
+      //
+      //   Scaling with frequency: lower frequencies travel farther; approximate
+      //   radius ∝ (f_ref/f)^0.5 relative to the 780 kHz reference values.
+      //
+      //   These are screening-grade estimates (±30%).  A formal §73.183 study using
+      //   FCC published M3 curves is required for filing.
+
+      // --- M3 reference radii at 1 kW, 780 kHz (km) ---
+      // Conductivity breakpoints: [1, 2, 4, 8, 16] mS/m
+      const SIGMA_BP     = [1, 2, 4,  8,  16];
+      const R05_REF_1KW  = [42, 52, 65, 82, 100];  // 0.5 mV/m contour radius at 1 kW, km
+      const R01_REF_1KW  = [110, 140, 175, 215, 260]; // 0.1 mV/m contour radius at 1 kW, km
+
+      // Interpolate to sigma_msm:
+      const condMsm = sigma_msm ?? 2.0;
+      let r05_1kw = R05_REF_1KW[0];
+      let r01_1kw = R01_REF_1KW[0];
+      for (let i = 0; i < SIGMA_BP.length - 1; i++) {
+        if (condMsm >= SIGMA_BP[i] && condMsm <= SIGMA_BP[i + 1]) {
+          const t = (condMsm - SIGMA_BP[i]) / (SIGMA_BP[i + 1] - SIGMA_BP[i]);
+          r05_1kw = R05_REF_1KW[i] + t * (R05_REF_1KW[i + 1] - R05_REF_1KW[i]);
+          r01_1kw = R01_REF_1KW[i] + t * (R01_REF_1KW[i + 1] - R01_REF_1KW[i]);
+          break;
+        } else if (condMsm > SIGMA_BP[SIGMA_BP.length - 1]) {
+          r05_1kw = R05_REF_1KW[SIGMA_BP.length - 1];
+          r01_1kw = R01_REF_1KW[SIGMA_BP.length - 1];
+        } else if (condMsm < SIGMA_BP[0]) {
+          r05_1kw = R05_REF_1KW[0];
+          r01_1kw = R01_REF_1KW[0];
+        }
+      }
+
+      // Frequency scaling (relative to 780 kHz):
+      const freq_scale = Math.sqrt(780 / frequency_khz);
+
+      // Power scaling:
+      const power_scale = Math.sqrt(tpo_kw / 1.0);
+
+      // Scaled contour radii:
+      const contour_05mvm_radius_km = round2(r05_1kw * power_scale * freq_scale);
+      const contour_01mvm_radius_km = round2(r01_1kw * power_scale * freq_scale);
+
+      // Field strength at specific distances (for community of license check):
+      // E ∝ 1/d in screening approximation: E(d) = E_ref × (d_ref/d)
+      // E at 2 km (typical near-field urban):
+      // E_ref at d_ref = contour_05mvm_radius_km is 0.5 mV/m
+      const field_at_col_dist_mvm = round2(0.5 * contour_05mvm_radius_km / Math.max(reach_scale_km ?? 20, 5));
+      const field_at_col_dist_km  = round2(reach_scale_km ?? 20);
+
+      // §73.24(b) minimum field at community of license:
+      const col_minimum_mvm          = 2.0;   // Class D daytime minimum
+      const col_field_compliant       = field_at_col_dist_mvm >= col_minimum_mvm;
+
+      // Study cost:
+      const study_cost_low_usd   = 4000;
+      const study_cost_high_usd  = 15000;
+
+      return {
+        conductivity_msm:          condMsm,
+        contour_05mvm_radius_km,
+        contour_01mvm_radius_km,
+        r05_reference_1kw_km:      round2(r05_1kw),
+        r01_reference_1kw_km:      round2(r01_1kw),
+        power_scale:               round2(power_scale),
+        freq_scale:                round2(freq_scale),
+        field_at_col_dist_km,
+        field_at_col_dist_mvm,
+        col_minimum_daytime_mvm:   col_minimum_mvm,
+        col_field_compliant,
+        study_cost_low_usd,
+        study_cost_high_usd,
+        reference: '47 CFR §73.183 (groundwave service contours); §73.184 (M3 groundwave curves, ITU-R P.368-9); §73.24(b) (Class D min field strength 2 mV/m daytime); §73.37 (0.5 mV/m co-channel separation); ITU-R P.368-9 Annex 1 tables',
+        note: `Screening-grade M3 estimate (±30%) at ${condMsm} mS/m, ${tpo_kw} kW. 0.5 mV/m contour: ~${contour_05mvm_radius_km} km. 0.1 mV/m contour: ~${contour_01mvm_radius_km} km. Formal §73.183 study required for FCC filing: $${study_cost_low_usd.toLocaleString()}–$${study_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

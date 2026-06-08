@@ -15693,3 +15693,48 @@ test('candidate_comparison_table imp columns are present and valid for KAZM', as
   assert.ok(Math.abs(r0.imp_base_current_a - 9.58) < 0.1, `imp_base_current_a should be ~9.58, got ${r0.imp_base_current_a}`);
   assert.strictEqual(r0.imp_ct_rating_a, 30, 'imp_ct_rating_a should be 30 A');
 });
+
+// ── am_propagation_groundwave_field_strength_estimate_guide ──────────────────
+
+test('am_propagation_groundwave_field_strength_estimate_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_propagation_groundwave_field_strength_estimate_guide, 'gw guide missing on candidate');
+  }
+});
+
+test('KAZM 5 kW 780 kHz 2 mS/m: 0.5 mV/m contour ~116 km', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_propagation_groundwave_field_strength_estimate_guide;
+  assert.ok(g.contour_05mvm_radius_km > 80 && g.contour_05mvm_radius_km < 150,
+    `0.5 mV/m contour at 5 kW, 2 mS/m, 780 kHz should be 80–150 km, got ${g.contour_05mvm_radius_km}`);
+  assert.ok(g.contour_01mvm_radius_km > g.contour_05mvm_radius_km,
+    '0.1 mV/m contour must be farther than 0.5 mV/m contour');
+  assert.strictEqual(g.conductivity_msm, 2, 'conductivity_msm must reflect zone-table value (2 mS/m)');
+});
+
+test('KAZM groundwave power_scale is √5 ≈ 2.24 for 5 kW reference', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_propagation_groundwave_field_strength_estimate_guide;
+  assert.ok(Math.abs(g.power_scale - Math.sqrt(5)) < 0.02, `power_scale expected ~${Math.sqrt(5).toFixed(2)}, got ${g.power_scale}`);
+  assert.ok(Math.abs(g.freq_scale - 1.0) < 0.01, 'freq_scale must be 1.0 at 780 kHz reference frequency');
+});
+
+test('KAZM study_cost_low_usd and high are positive and reasonable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_propagation_groundwave_field_strength_estimate_guide;
+  assert.ok(g.study_cost_low_usd >= 1000 && g.study_cost_low_usd <= 20000, `study_cost_low should be $1K–$20K, got ${g.study_cost_low_usd}`);
+  assert.ok(g.study_cost_high_usd >= g.study_cost_low_usd, 'study_cost_high must be >= low');
+});
+
+test('candidate_comparison_table gw columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gw_05mvm_radius_km'     in row, 'gw_05mvm_radius_km missing from comparison table');
+    assert.ok('gw_01mvm_radius_km'     in row, 'gw_01mvm_radius_km missing from comparison table');
+    assert.ok('gw_study_cost_low_usd'  in row, 'gw_study_cost_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.gw_05mvm_radius_km > 50, 'gw_05mvm_radius_km must be > 50 km for 5 kW');
+  assert.ok(r0.gw_01mvm_radius_km > r0.gw_05mvm_radius_km, '0.1 mV/m must be farther than 0.5 mV/m');
+});

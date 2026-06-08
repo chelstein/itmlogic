@@ -2291,6 +2291,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Propagation Groundwave Field Strength Estimate Guide */}
+        {candidate.am_propagation_groundwave_field_strength_estimate_guide && (() => {
+          const g = candidate.am_propagation_groundwave_field_strength_estimate_guide;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const compColor = g.col_field_compliant ? '#15803d' : '#dc2626';
+          return (
+            <div style={{ background: '#fff7f0', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>
+                Groundwave Field Strength Estimate (§73.183 / §73.184 M3 Curves)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>σ (conductivity):</b> {fmtF(g.conductivity_msm)} mS/m</div>
+                <div><b>Power scale factor:</b> ×{fmtF(g.power_scale)}</div>
+                <div><b>0.5 mV/m daytime contour:</b> ~{fmtF(g.contour_05mvm_radius_km)} km</div>
+                <div><b>0.1 mV/m nighttime contour:</b> ~{fmtF(g.contour_01mvm_radius_km)} km</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>COL field ({fmtF(g.field_at_col_dist_km)} km):</b>
+                  <span style={{ color: compColor, fontWeight: 600 }}>{fmtF(g.field_at_col_dist_mvm, 2)} mV/m</span>
+                </div>
+                <div><b>§73.24(b) min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
+                <div style={{ gridColumn: '1/-1' }}><b>Formal §73.183 study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1', fontSize: 10, color: '#b45309' }}>Screening estimate ±30%. Formal M3 study required for FCC filing.</div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Antenna System Impedance and Base Current Guide */}
         {candidate.am_antenna_system_impedance_and_base_current_guide && (() => {
           const g = candidate.am_antenna_system_impedance_and_base_current_guide;
