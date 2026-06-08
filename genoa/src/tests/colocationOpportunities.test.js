@@ -3891,3 +3891,14 @@ test('am_transmitter_power_efficiency_and_operating_cost_guide present across co
     assert.ok(g.annual_electric_usd > 0, 'annual_electric_usd must be positive');
   }
 });
+
+test('am_site_environmental_impact_and_permitting_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_environmental_impact_and_permitting_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_site_environmental_impact_and_permitting_guide`);
+    assert.ok(typeof g.nepa_trigger === 'string', 'nepa_trigger must be a string');
+    assert.strictEqual(g.cup_required, true, 'cup_required must be true for colocation candidate');
+    assert.ok(g.total_permitting_low_usd > 0, 'total_permitting_low_usd must be positive');
+  }
+});

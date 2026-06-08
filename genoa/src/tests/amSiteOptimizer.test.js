@@ -15560,3 +15560,49 @@ test('v1: score_breakdown_detail has one entry per enabled optimization goal', a
     assert.ok(typeof row.points === 'number', 'sbd entry must have numeric points');
   }
 });
+
+// ── am_site_environmental_impact_and_permitting_guide ────────────────────────
+
+test('am_site_environmental_impact_and_permitting_guide is present on every candidate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_site_environmental_impact_and_permitting_guide, 'env guide missing on candidate');
+  }
+});
+
+test('KAZM tower_height_ft is ~315.25 ft for 780 kHz (λ/4)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
+  assert.ok(Math.abs(g.tower_height_ft - 315.25) < 0.5, `tower_height_ft expected ~315.25, got ${g.tower_height_ft}`);
+  assert.strictEqual(g.height_exceeds_450ft, false, '315 ft tower must not exceed 450 ft §1.1307(b) trigger');
+});
+
+test('KAZM NEPA trigger is UNLIKELY for standard rural NDA site', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
+  assert.strictEqual(g.nepa_trigger, 'UNLIKELY', 'standard rural site should show UNLIKELY NEPA trigger');
+  assert.strictEqual(g.ea_cost_low, 0, 'no EA cost when trigger is UNLIKELY');
+  assert.strictEqual(g.ea_cost_high, 0, 'no EA cost when trigger is UNLIKELY');
+});
+
+test('KAZM cup_required is true and cost range is reasonable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_environmental_impact_and_permitting_guide;
+  assert.strictEqual(g.cup_required, true, 'CUP must always be required for broadcast tower');
+  assert.ok(g.cup_filing_fee_low >= 2000 && g.cup_filing_fee_low <= 5000, `cup_filing_fee_low should be $2,000–$5,000, got ${g.cup_filing_fee_low}`);
+  assert.ok(g.total_permitting_low_usd > 0, 'total_permitting_low_usd must be positive');
+  assert.ok(g.total_permitting_high_usd >= g.total_permitting_low_usd, 'high must be >= low');
+});
+
+test('candidate_comparison_table env columns are present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('env_nepa_trigger'             in row, 'env_nepa_trigger missing from comparison table');
+    assert.ok('env_section_106_required'     in row, 'env_section_106_required missing from comparison table');
+    assert.ok('env_total_permitting_low_usd' in row, 'env_total_permitting_low_usd missing from comparison table');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.env_nepa_trigger, 'UNLIKELY', 'rank-1 env_nepa_trigger should be UNLIKELY');
+  assert.strictEqual(r0.env_section_106_required, false, 'rank-1 env_section_106_required should be false');
+  assert.ok(r0.env_total_permitting_low_usd > 0, 'rank-1 env_total_permitting_low_usd must be positive');
+});

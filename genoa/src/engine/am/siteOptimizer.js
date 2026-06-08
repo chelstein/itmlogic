@@ -1491,7 +1491,10 @@ export async function runSiteOptimizer(body = {}){
     nif_fraction_pct_low:               c.am_nighttime_nif_service_contour_analysis_guide?.nif_fraction_pct_low ?? null,
     pwe_ac_input_kw:                    c.am_transmitter_power_efficiency_and_operating_cost_guide?.ac_input_kw ?? null,
     pwe_annual_electric_usd:            c.am_transmitter_power_efficiency_and_operating_cost_guide?.annual_electric_usd ?? null,
-    pwe_overall_efficiency_pct:         c.am_transmitter_power_efficiency_and_operating_cost_guide?.overall_efficiency_pct ?? null
+    pwe_overall_efficiency_pct:         c.am_transmitter_power_efficiency_and_operating_cost_guide?.overall_efficiency_pct ?? null,
+    env_nepa_trigger:                   c.am_site_environmental_impact_and_permitting_guide?.nepa_trigger ?? null,
+    env_section_106_required:           c.am_site_environmental_impact_and_permitting_guide?.section_106_required ?? null,
+    env_total_permitting_low_usd:       c.am_site_environmental_impact_and_permitting_guide?.total_permitting_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7334,6 +7337,159 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_environmental_impact_and_permitting_guide: (() => {
+      // AM site environmental impact and permitting guide.
+      //
+      // The FCC's environmental rules (47 CFR §1.1301–§1.1319) implement NEPA for
+      // communications licensing.  Applications that "may have a significant
+      // environmental effect" must include an Environmental Assessment (EA).
+      //
+      // Categorical exclusions (§1.1306): Most routine antenna/facility changes
+      // are categorically excluded (no EA required) UNLESS they fall within a
+      // §1.1307 exception.
+      //
+      // 47 CFR §1.1307 — EA required when any of the following applies:
+      //   (a)(1) Wilderness areas (Wilderness Act)
+      //   (a)(2) Wildlife preserves, national refuges
+      //   (a)(3) Threatened or endangered species habitat (ESA)
+      //   (a)(4) Historical sites / properties in or eligible for NRHP (NHPA §106)
+      //   (a)(5) Floodplains (100-year) or wetlands (CWA §404)
+      //   (a)(6) Sole-source aquifer areas (SDWA)
+      //   (a)(7) Wilderness study areas
+      //   (a)(8) Tribal lands / sacred sites (NHPA / AIRFA)
+      //   (b)   Structures > 450 ft (137 m) AGL always require EA regardless
+      //
+      // NHPA Section 106 (36 CFR Part 800):
+      //   FCC has Nationwide Programmatic Agreement (NPA) for tower siting.
+      //   Towers < 200 ft outside historic districts: typically covered by NPA
+      //   exclusion categories (no individual §106 required).
+      //   Towers within 0.5 mi of NRHP-listed/eligible properties: individual §106.
+      //   Urban environments with historic districts: §106 review very likely.
+      //
+      // USACE Section 404 (CWA): Discharge of dredge/fill into waters of the US.
+      //   Individual permit: $25,000–$60,000 + timeline 1–3 years in complex cases.
+      //   Nationwide Permit (NWP-12, NWP-57): applicable for utility/communication lines;
+      //   NWP-57 (telecom) allows minor fills in wetlands with verification.
+      //   Typical cost with NWP: $5,000–$20,000 for verification.
+      //
+      // Zoning / local approvals:
+      //   Conditional Use Permit (CUP): required in most municipalities for tower > 35 ft.
+      //   Telecom Act §704 limits local governments from prohibiting wireless facilities
+      //   but does NOT preempt zoning for broadcast towers (unlike wireless).
+      //   Typical CUP: $2,000–$8,000 filing fee + $5,000–$25,000 consultant/legal.
+      //   Timeline: 60–180 days after complete application.
+      //
+      // EA preparation cost (when triggered):
+      //   Simple EA (no wetlands/Section 106 issues): $8,000–$20,000; 60–90 days.
+      //   Full EA with wetlands + §106: $25,000–$75,000; 4–12 months.
+      //   EIS (if Finding Of No Significant Impact not possible): $200,000+; 1–3 years.
+      //   For AM transmitter towers < 450 ft (no §1.1307(b) trigger):
+      //     Categorical exclusion if none of (a)(1)–(a)(8) apply → $0 EA cost.
+      //     EA if any (a) trigger → $8,000–$40,000 typical.
+
+      // --- tower height for triggering ---
+      // λ/4 at frequency_khz:
+      const lambda_m         = 299792.458 / frequency_khz;
+      const quarter_wave_m   = lambda_m / 4;
+      const tower_height_ft  = round2(quarter_wave_m * 3.28084);
+      const height_exceeds_450ft = tower_height_ft > 450;
+
+      // --- §1.1307(b) hard trigger ---
+      const nepa_struct_trigger = height_exceeds_450ft;
+
+      // --- NEPA trigger assessment ---
+      // Without site-specific data we screen against: floodplain (fuel_risk proxy),
+      // wildfire zone (environmental sensitivity), and treaty zone.
+      // These are conservative proxies — only a site-specific Phase I ESA can confirm.
+      const inFloodplainProxy = (pt.fuel_risk === 'HIGH' || pt.fuel_risk === 'EXTREME');
+      const inTreatyZone      = !!(pt.treaty_zone);
+      const nepa_trigger_reasons = [];
+      if (nepa_struct_trigger)  nepa_trigger_reasons.push(`§1.1307(b): tower height ~${tower_height_ft} ft exceeds 450 ft AGL`);
+      if (inFloodplainProxy)    nepa_trigger_reasons.push('§1.1307(a)(5): high fuel/wildfire risk zone may indicate sensitive habitat (confirm floodplain/wetland via NWIS/NWI)');
+      if (inTreatyZone)         nepa_trigger_reasons.push('§1.1307(a)(4)/(a)(8): treaty zone proximity — NHPA §106 and AIRFA consultation likely required');
+      const nepa_trigger        = nepa_struct_trigger || inFloodplainProxy || inTreatyZone ? 'POSSIBLE' : 'UNLIKELY';
+      const nepa_trigger_note   = nepa_trigger === 'POSSIBLE'
+        ? `Preliminary screening indicates EA may be required: ${nepa_trigger_reasons.join('; ')}.`
+        : `No §1.1307 triggers identified in preliminary screening. Categorical exclusion (§1.1306) likely if Phase I ESA confirms no sensitive features at this site.`;
+
+      // --- NHPA Section 106 ---
+      // Conservative screen: towers > 200 ft in rural areas are typically within NPA
+      // exclusion. Urban/suburban towers or towers near NRHP properties require individual review.
+      // Without address-level NRHP data we apply a conservative heuristic:
+      //   - Class D clear channel stations are often rural → NPA likely applicable.
+      //   - Towers within city centers → individual §106 more likely.
+      const tower_height_m        = round2(quarter_wave_m);
+      const section_106_likely    = tower_height_ft > 200 && inTreatyZone;
+      const section_106_required  = section_106_likely;
+      const section_106_note      = section_106_required
+        ? 'Individual NHPA §106 review required: treaty zone proximity and tower height indicate NPA exclusions may not apply. Budget for tribal consultation and SHPO coordination.'
+        : `FCC Nationwide Programmatic Agreement (NPA) exclusion likely applicable for tower at ~${tower_height_ft} ft outside known NRHP districts. Verify with SHPO before filing.`;
+
+      // --- Section 404 / wetlands ---
+      const wetlands_screen       = inFloodplainProxy ? 'SCREEN_REQUIRED' : 'UNLIKELY';
+      const wetlands_note         = wetlands_screen === 'SCREEN_REQUIRED'
+        ? 'High environmental sensitivity — verify wetland/floodplain status via USACE NWI and FEMA FIRM before tower construction. USACE Section 404 Nationwide Permit 57 may apply for minor fills.'
+        : 'No wetland/floodplain indicators in preliminary screening. Confirm with USACE NWI mapper before site survey.';
+
+      // --- Zoning / local approvals ---
+      // Conditional Use Permit (CUP) almost always required for broadcast towers.
+      const cup_required          = true;
+      const cup_filing_fee_low    = 2000;
+      const cup_filing_fee_high   = 8000;
+      const cup_consultant_low    = 5000;
+      const cup_consultant_high   = 25000;
+      const cup_timeline_days_low = 60;
+      const cup_timeline_days_high = 180;
+
+      // --- EA cost estimate ---
+      const ea_cost_low  = nepa_trigger === 'POSSIBLE' ? 8000  : 0;
+      const ea_cost_high = nepa_trigger === 'POSSIBLE' ? 40000 : 0;
+      const s106_cost_low  = section_106_required ? 15000 : 2000;   // tribal consult vs. NPA check
+      const s106_cost_high = section_106_required ? 60000 : 8000;
+      const wetlands_cost_low  = wetlands_screen === 'SCREEN_REQUIRED' ? 5000  : 500;
+      const wetlands_cost_high = wetlands_screen === 'SCREEN_REQUIRED' ? 20000 : 2000;
+
+      // Total permitting cost range (EA + §106 + wetlands + CUP):
+      const total_permitting_low_usd  = ea_cost_low  + s106_cost_low  + wetlands_cost_low  + cup_filing_fee_low  + cup_consultant_low;
+      const total_permitting_high_usd = ea_cost_high + s106_cost_high + wetlands_cost_high + cup_filing_fee_high + cup_consultant_high;
+
+      // --- Total timeline ---
+      const timeline_days_low  = nepa_trigger === 'POSSIBLE' ? 120 : cup_timeline_days_low;
+      const timeline_days_high = nepa_trigger === 'POSSIBLE' ? 365 : cup_timeline_days_high;
+
+      return {
+        tower_height_ft,
+        tower_height_m,
+        height_exceeds_450ft,
+        nepa_trigger,
+        nepa_trigger_reasons,
+        nepa_trigger_note,
+        section_106_required,
+        section_106_note,
+        wetlands_screen,
+        wetlands_note,
+        cup_required,
+        cup_filing_fee_low,
+        cup_filing_fee_high,
+        cup_consultant_low,
+        cup_consultant_high,
+        cup_timeline_days_low,
+        cup_timeline_days_high,
+        ea_cost_low,
+        ea_cost_high,
+        s106_cost_low,
+        s106_cost_high,
+        wetlands_cost_low,
+        wetlands_cost_high,
+        total_permitting_low_usd,
+        total_permitting_high_usd,
+        timeline_days_low,
+        timeline_days_high,
+        reference: '47 CFR §1.1301–§1.1319 (NEPA environmental rules); §1.1307 (EA triggers); FCC Nationwide Programmatic Agreement for Tower Siting (2004, rev. 2013); 36 CFR Part 800 (NHPA §106); 33 USC §1344 (CWA §404); USACE NWP-57 (Utility Line Activities incl. telecom, 2021)',
+        note: `NEPA preliminary screen: ${nepa_trigger}. Tower at ~${tower_height_ft} ft (${tower_height_m} m). Total permitting budget: $${total_permitting_low_usd.toLocaleString()}–$${total_permitting_high_usd.toLocaleString()} over ${timeline_days_low}–${timeline_days_high} days. ${nepa_trigger_note}`
       };
     })(),
 

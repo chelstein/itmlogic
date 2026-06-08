@@ -2291,6 +2291,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Environmental Impact and Permitting Guide */}
+        {candidate.am_site_environmental_impact_and_permitting_guide && (() => {
+          const g = candidate.am_site_environmental_impact_and_permitting_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const nepaColor = g.nepa_trigger === 'UNLIKELY' ? '#15803d' : g.nepa_trigger === 'POSSIBLE' ? '#d97706' : '#dc2626';
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#166534', marginBottom: 8 }}>
+                Environmental Impact &amp; Permitting (NEPA / NHPA / Zoning)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#14532d' }}>
+                <div><b>Tower Height (λ/4):</b> {fmtF(g.tower_height_ft)} ft / {fmtF(g.tower_height_m)} m</div>
+                <div><b>&gt;450 ft trigger (§1.1307(b)):</b> {g.height_exceeds_450ft ? 'YES — EA required' : 'No'}</div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <b>NEPA trigger:</b>
+                  <span style={{ color: nepaColor, fontWeight: 600 }}>{g.nepa_trigger}</span>
+                </div>
+                <div><b>§106 (NHPA) review:</b> {g.section_106_required ? 'REQUIRED' : 'NPA exclusion likely'}</div>
+                <div><b>Wetlands screen:</b> {g.wetlands_screen?.replace(/_/g, ' ')}</div>
+                <div><b>CUP required:</b> {g.cup_required ? 'Yes' : 'No'}</div>
+                <div><b>CUP cost:</b> ${fmt(g.cup_filing_fee_low)}–${fmt(g.cup_filing_fee_high)} (filing) + ${fmt(g.cup_consultant_low)}–${fmt(g.cup_consultant_high)} (consultant)</div>
+                <div><b>EA cost:</b> ${fmt(g.ea_cost_low)}–${fmt(g.ea_cost_high)}</div>
+                <div><b>§106 cost:</b> ${fmt(g.s106_cost_low)}–${fmt(g.s106_cost_high)}</div>
+                <div><b>Wetlands cost:</b> ${fmt(g.wetlands_cost_low)}–${fmt(g.wetlands_cost_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total permitting:</b> ${fmt(g.total_permitting_low_usd)}–${fmt(g.total_permitting_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Timeline:</b> {g.timeline_days_low}–{g.timeline_days_high} days</div>
+              </div>
+              {g.nepa_trigger_note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#166534' }}><b>NEPA:</b> {g.nepa_trigger_note}</div>
+              )}
+              {g.section_106_note && (
+                <div style={{ marginTop: 4, fontSize: 11, color: '#166534' }}><b>§106:</b> {g.section_106_note}</div>
+              )}
+              {g.wetlands_note && (
+                <div style={{ marginTop: 4, fontSize: 11, color: '#166534' }}><b>Wetlands:</b> {g.wetlands_note}</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Power Efficiency and Operating Cost Guide */}
         {candidate.am_transmitter_power_efficiency_and_operating_cost_guide && (() => {
           const g = candidate.am_transmitter_power_efficiency_and_operating_cost_guide;
