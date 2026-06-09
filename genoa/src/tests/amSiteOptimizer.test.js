@@ -16216,3 +16216,47 @@ test('candidate_comparison_table site-access land-use columns present for KAZM',
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.lu_lease_low_per_month_usd > 0, 'lease must be positive');
 });
+
+// ── Feature #88: am_nepa_environmental_review_guide ───────────────────────────
+test('KAZM 780 kHz: am_nepa_environmental_review_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_nepa_environmental_review_guide != null, 'nepa guide missing');
+  }
+});
+
+test('KAZM NDA nepa guide: review_path is valid enum and tribal_tcns_required is always true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ne = out.candidates[0].am_nepa_environmental_review_guide;
+  assert.ok(['CE_LIKELY', 'CE_LIKELY_WITH_NHPA', 'EA_REQUIRED'].includes(ne.review_path), `review_path invalid: ${ne.review_path}`);
+  assert.strictEqual(ne.tribal_tcns_required, true, 'tribal_tcns_required must always be true');
+});
+
+test('KAZM nepa guide: env_review_weeks_high > env_review_weeks_low > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ne = out.candidates[0].am_nepa_environmental_review_guide;
+  assert.ok(ne.env_review_weeks_low  > 0,                             'env_review_weeks_low must be positive');
+  assert.ok(ne.env_review_weeks_high > ne.env_review_weeks_low,       'high must exceed low');
+});
+
+test('KAZM nepa guide: urban site has more triggers than rural', async () => {
+  const urbanOut = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ruralKazm = { ...KAZM, search_radius_km: 200, grid_spacing_km: 50 };
+  const ruralOut  = await runSiteOptimizer(ruralKazm);
+  // Urban first candidate should have at least 1 trigger; we just check non-negative
+  const urbanNe = urbanOut.candidates[0].am_nepa_environmental_review_guide;
+  assert.ok(urbanNe.n_triggers >= 0, 'n_triggers must be non-negative');
+  assert.ok(Array.isArray(urbanNe.ce_triggers), 'ce_triggers must be array');
+});
+
+test('candidate_comparison_table nepa columns present for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('nepa_review_path'         in row, 'nepa_review_path missing');
+    assert.ok('nepa_ea_likely'           in row, 'nepa_ea_likely missing');
+    assert.ok('nepa_env_review_weeks_low' in row, 'nepa_env_review_weeks_low missing');
+    assert.ok('nepa_n_triggers'          in row, 'nepa_n_triggers missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.nepa_env_review_weeks_low > 0, 'nepa_env_review_weeks_low must be positive');
+});

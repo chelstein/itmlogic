@@ -4045,3 +4045,14 @@ test('am_site_access_and_land_use_guide present across colocation candidates', a
     assert.ok(lu.site_control_weeks_low > 0, 'site_control_weeks_low must be positive');
   }
 });
+
+test('am_nepa_environmental_review_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const ne = c.am_nepa_environmental_review_guide;
+    assert.ok(ne !== undefined && ne !== null, `candidate missing am_nepa_environmental_review_guide`);
+    assert.ok(['CE_LIKELY', 'CE_LIKELY_WITH_NHPA', 'EA_REQUIRED'].includes(ne.review_path), `review_path invalid: ${ne.review_path}`);
+    assert.strictEqual(ne.tribal_tcns_required, true, 'tribal_tcns_required must always be true');
+    assert.ok(ne.env_review_weeks_low > 0, 'env_review_weeks_low must be positive');
+  }
+});

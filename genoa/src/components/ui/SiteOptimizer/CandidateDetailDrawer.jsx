@@ -2356,6 +2356,64 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM NEPA Environmental Review Guide */}
+        {candidate.am_nepa_environmental_review_guide && (() => {
+          const ne = candidate.am_nepa_environmental_review_guide;
+          const pathColor = ne.review_path === 'EA_REQUIRED' ? '#ef4444' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? '#f59e0b' : '#22c55e';
+          const pathBg    = ne.review_path === 'EA_REQUIRED' ? '#450a0a' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? '#451a03' : '#052e16';
+          const sevColor  = (s) => s === 'HIGH' ? '#ef4444' : s === 'MODERATE' ? '#f59e0b' : '#94a3b8';
+          return (
+            <div style={{ background: '#0c1007', border: `1px solid ${pathColor}40`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#f0fdf4', letterSpacing: '0.08em', textTransform: 'uppercase' }}>NEPA Environmental Review</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: pathColor, background: pathBg, border: `1px solid ${pathColor}60`, borderRadius: 3, padding: '2px 6px' }}>
+                  {ne.review_path === 'EA_REQUIRED' ? 'EA REQUIRED' : ne.review_path === 'CE_LIKELY_WITH_NHPA' ? 'CE + NHPA §106' : 'CE ELIGIBLE'}
+                </span>
+              </div>
+
+              {/* Review path description */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: pathColor, background: pathBg, borderRadius: 4, padding: '6px 8px', marginBottom: 8, lineHeight: 1.5 }}>
+                {ne.review_path_description}
+              </div>
+
+              {/* Metrics grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+                {[
+                  { label: 'Review timeline', value: `${ne.env_review_weeks_low}–${ne.env_review_weeks_high} wks` },
+                  { label: '§1.1307 triggers', value: String(ne.n_triggers) },
+                  { label: 'Consultant est.', value: `$${Math.round(ne.env_consultant_cost_low_usd/1000)}K–$${Math.round(ne.env_consultant_cost_high_usd/1000)}K` },
+                  { label: 'NHPA §106', value: ne.nhpa_106_triggered ? 'TRIGGERED' : 'Not triggered' },
+                  { label: 'TCNS tribal', value: 'Required (all towers)' },
+                  { label: 'Tower height', value: `${ne.tower_height_ft} ft` }
+                ].map(m => (
+                  <div key={m.label} style={{ background: '#0f1c0a', borderRadius: 4, padding: '6px 8px', border: '1px solid #1a2e14' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#d1fae5', fontWeight: 600 }}>{m.value}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#4d7c52', marginTop: 1 }}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Triggers list */}
+              {ne.ce_triggers && ne.ce_triggers.length > 0 && (
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#4d7c52', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>§1.1307 triggers</div>
+                  <div>
+                    {ne.ce_triggers.map((t, i) => (
+                      <div key={i} style={{ padding: '5px 8px', background: i % 2 === 0 ? '#0f1c0a' : '#0c1007', borderBottom: '1px solid #1a2e14', display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                        <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: sevColor(t.severity), whiteSpace: 'nowrap', minWidth: 80 }}>{t.severity}</span>
+                        <div>
+                          <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#86efac', fontWeight: 600 }}>{t.factor}</div>
+                          <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#4d7c52', lineHeight: 1.4 }}>{t.description}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Site Access and Land Use Guide */}
         {candidate.am_site_access_and_land_use_guide && (() => {
           const lu = candidate.am_site_access_and_land_use_guide;

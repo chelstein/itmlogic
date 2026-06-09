@@ -1535,6 +1535,10 @@ export async function runSiteOptimizer(body = {}){
     fcc_total_soft_cost_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.total_soft_cost_low ?? null,
     fcc_processing_days_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.fcc_processing_days_low ?? null,
     fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null,
+    nepa_review_path:                   c.am_nepa_environmental_review_guide?.review_path ?? null,
+    nepa_ea_likely:                     c.am_nepa_environmental_review_guide?.ea_likely ?? null,
+    nepa_env_review_weeks_low:          c.am_nepa_environmental_review_guide?.env_review_weeks_low ?? null,
+    nepa_n_triggers:                    c.am_nepa_environmental_review_guide?.n_triggers ?? null,
     lu_zone_risk_tier:                  c.am_site_access_and_land_use_guide?.zone_risk_tier ?? null,
     lu_lease_low_per_month_usd:         c.am_site_access_and_land_use_guide?.lease_low_per_month_usd ?? null,
     lu_site_control_weeks_low:          c.am_site_access_and_land_use_guide?.site_control_weeks_low ?? null,
@@ -7387,6 +7391,126 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_nepa_environmental_review_guide: (() => {
+      // AM station relocation NEPA environmental review guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §1.1306:  FCC environmental processing — lists actions that require
+      //     an Environmental Assessment (EA) before Commission action.
+      //   §1.1307(a):  A tower requires an EA if it is in or affects any of:
+      //     (1) Wilderness area (16 USC 1131)
+      //     (2) Wildlife refuge, national park, or forest
+      //     (3) Threatened/endangered species or designated critical habitat (ESA)
+      //     (4) Historic properties or districts (NHPA §106, 16 USC 470f)
+      //     (5) Native American or Alaskan Native sacred sites
+      //     (6) Floodplain / 100-year floodplain (EO 11988)
+      //     (7) Wetlands (Clean Water Act §404 / EO 11990)
+      //     (8) High-intensity white lights in residential neighborhoods
+      //   §1.1307(b):  Categorical exclusion (CE) — no EA required if the action
+      //     does not trigger any §1.1307(a) factors AND falls within a CE category.
+      //     For AM broadcast: new tower or modification typically CE-eligible
+      //     unless site-specific triggers apply.
+      //   §1.1311:  If EA required, applicant must prepare EA, publish notice,
+      //     accept 30-day comment period, submit to FCC with Form 301-AM.
+      //   §1.1314:  FCC may issue Finding of No Significant Impact (FONSI) or
+      //     require full Environmental Impact Statement (EIS) — rare for broadcast.
+      //
+      // Programmatic Agreement (PA): Under FCC/ACHP/NCSHPO PA (2014, amended 2018),
+      //   broadcast towers use the Tower Construction Notification System (TCNS)
+      //   for tribal consultation.  TCNS review: 30 days; comment resolution adds 30–60 days.
+      //
+      // Tower height thresholds:
+      //   ≤ 200 ft AGL: CE typically available; reduced §1.1307 exposure.
+      //   > 200 ft AGL: ASR required (§17.7); FAA study; higher NHPA §106 exposure.
+      //   > 450 ft AGL: FAA Obstruction Evaluation Study (OES) required; National
+      //     Interest Airspace Review (NIAR); significant EA trigger probability.
+
+      const is_da_ne    = /^DA/i.test(pattern_mode);
+      const lambda_ne   = round2(300000 / frequency_khz);
+      const h_frac_ne   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_m_ne      = round2(h_frac_ne * lambda_ne);
+      const h_ft_ne     = Math.round(h_m_ne * 3.28084);
+
+      const density_ne  = pt.land_use_classification?.density_per_km2 ?? 200;
+      const lu_ne       = pt.land_use_classification?.class ?? 'suburban';
+      const isRural_ne  = density_ne < 50  || /rural|industrial|agricultural/i.test(lu_ne);
+      const isUrban_ne  = density_ne > 500 || /urban|downtown/i.test(lu_ne);
+
+      // ── CE eligibility assessment ──
+      const ce_triggers = [];
+
+      // §1.1307(a)(4) NHPA §106 — urban/historic district risk
+      const nhpa_trigger = isUrban_ne;
+      if (nhpa_trigger) ce_triggers.push({ factor: 'NHPA_106', severity: 'MODERATE', description: 'Urban site — National Historic Preservation Act §106 consultation required; SHPO review (30 days + possible objection period).' });
+
+      // §1.1307(a)(5) Tribal lands / sacred sites — TCNS required for all new towers
+      ce_triggers.push({ factor: 'TRIBAL_TCNS', severity: 'LOW', description: 'TCNS tribal notification required for all new AM tower sites under FCC/ACHP/NCSHPO PA (2014). 30-day review; additional 30–60 days if comments received.' });
+
+      // §1.1307(a)(6) Floodplain — rural sites have moderate floodplain exposure
+      const floodplain_trigger = isRural_ne;
+      if (floodplain_trigger) ce_triggers.push({ factor: 'FLOODPLAIN_EO11988', severity: 'LOW', description: 'Rural site — 100-year floodplain intersection possible. FEMA FIRM map review required. Wetlands delineation may be needed.' });
+
+      // §1.1307(a)(8) High-intensity lights in residential area
+      const hi_lights_trigger = h_ft_ne > 200 && isUrban_ne;
+      if (hi_lights_trigger) ce_triggers.push({ factor: 'HI_INTENSITY_LIGHTS', severity: 'MODERATE', description: `Tower ${h_ft_ne} ft in urban area — FAA may require Type A high-intensity white lights; §1.1307(a)(8) trigger if adjacent to residential.` });
+
+      // > 450 ft tower height trigger
+      const tall_tower_trigger = h_ft_ne > 450;
+      if (tall_tower_trigger) ce_triggers.push({ factor: 'TALL_TOWER_OES', severity: 'HIGH', description: `Tower ${h_ft_ne} ft > 450 ft — FAA Obstruction Evaluation Study (OES) + possible NIAR required. Significant EA trigger probability per §1.1307(a).` });
+
+      // Determine CE eligibility
+      const high_severity_count = ce_triggers.filter(t => t.severity === 'HIGH').length;
+      const mod_severity_count  = ce_triggers.filter(t => t.severity === 'MODERATE').length;
+
+      const ce_eligible      = high_severity_count === 0 && mod_severity_count === 0;
+      const ea_likely        = high_severity_count > 0 || mod_severity_count >= 2;
+      const review_path      = ea_likely ? 'EA_REQUIRED' : ce_eligible ? 'CE_LIKELY' : 'CE_LIKELY_WITH_NHPA';
+
+      const review_path_desc = {
+        CE_LIKELY:             'Categorical exclusion (CE) likely — no EA required if site does not intersect §1.1307(a) triggers. TCNS tribal notification still required.',
+        CE_LIKELY_WITH_NHPA:   'CE likely but NHPA §106 or other consultation required — no formal EA, but SHPO and/or TCNS review adds 30–90 days to pre-filing timeline.',
+        EA_REQUIRED:           'Environmental Assessment likely required — site triggers one or more §1.1307(a) factors. Prepare EA, publish notice, allow 30-day comment period, submit with Form 301-AM.'
+      }[review_path];
+
+      // ── Timeline ──
+      const tcns_weeks_low  = 4;
+      const tcns_weeks_high = 12;
+      const nhpa_add_weeks  = nhpa_trigger ? 6 : 0;
+      const ea_add_weeks    = ea_likely    ? 18 : 0;
+      const env_review_weeks_low  = tcns_weeks_low  + nhpa_add_weeks + ea_add_weeks;
+      const env_review_weeks_high = tcns_weeks_high + nhpa_add_weeks * 2 + ea_add_weeks * 2;
+
+      // ── Cost estimate ──
+      const env_consultant_low  = ea_likely ? 18000 : 4500;
+      const env_consultant_high = ea_likely ? 55000 : 12000;
+
+      return {
+        fcc_class,
+        frequency_khz,
+        pattern_mode,
+        tower_height_ft:          h_ft_ne,
+        tower_height_m:           h_m_ne,
+        land_use_class:           lu_ne,
+        land_use_density_per_km2: round2(density_ne),
+        ce_eligible,
+        ea_likely,
+        review_path,
+        review_path_description:  review_path_desc,
+        ce_triggers,
+        n_triggers:               ce_triggers.length,
+        nhpa_106_triggered:       nhpa_trigger,
+        tribal_tcns_required:     true,     // always required for new AM tower
+        floodplain_check_required: floodplain_trigger,
+        tall_tower_oes_required:  tall_tower_trigger,
+        env_review_weeks_low,
+        env_review_weeks_high,
+        env_consultant_cost_low_usd:  env_consultant_low,
+        env_consultant_cost_high_usd: env_consultant_high,
+        reference: '47 CFR §1.1306; §1.1307(a)(1)–(8); §1.1311 (EA preparation); §1.1314 (FONSI/EIS); FCC/ACHP/NCSHPO Nationwide PA (2014, amended 2018); NEPA 42 USC §4321; NHPA §106 (16 USC §470f); ESA §7 (16 USC §1536); EO 11988 (floodplains); EO 11990 (wetlands)',
+        note: `${review_path === 'EA_REQUIRED' ? '⚠ EA required' : 'CE likely eligible'}. Environmental review: ${env_review_weeks_low}–${env_review_weeks_high} weeks. Triggers: ${ce_triggers.map(t => t.factor).join(', ') || 'none beyond TCNS'}. Consultant cost: $${(env_consultant_low/1000).toFixed(0)}K–$${(env_consultant_high/1000).toFixed(0)}K.`
       };
     })(),
 
