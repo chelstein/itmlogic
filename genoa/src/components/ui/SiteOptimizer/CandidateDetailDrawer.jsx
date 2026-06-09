@@ -2356,6 +2356,56 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Interference Budget and NIF Guide */}
+        {candidate.am_interference_budget_and_nif_guide && (() => {
+          const ib = candidate.am_interference_budget_and_nif_guide;
+          const passColor = ib.nif_screening_ok ? '#22c55e' : '#ef4444';
+          const passBg    = ib.nif_screening_ok ? '#052e16' : '#450a0a';
+          return (
+            <div style={{ background: '#0a0f1a', border: `1px solid ${passColor}40`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#e2e8f0', letterSpacing: '0.08em', textTransform: 'uppercase' }}>§73.182 NIF / Interference Budget</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: passColor, background: passBg, border: `1px solid ${passColor}60`, borderRadius: 3, padding: '2px 6px' }}>
+                  {ib.nif_screening_ok ? 'NIF SCREEN PASS' : 'NIF FLAG'}
+                </span>
+                {ib.da_night_operation_likely_required && (
+                  <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#fbbf24', background: '#451a03', border: '1px solid #fbbf2440', borderRadius: 3, padding: '2px 6px' }}>DA NIGHT LIKELY</span>
+                )}
+              </div>
+
+              {/* Channel class info */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#94a3b8', background: '#0f1629', borderRadius: 4, padding: '6px 8px', marginBottom: 8 }}>
+                {ib.is_clear_channel
+                  ? `CLEAR CHANNEL — full §73.182 NIF study required. D/U margin: ${ib.co_channel_du_margin_db} dB (need ≥ 0 for 20 dB criterion).`
+                  : `${ib.is_regional_channel ? 'REGIONAL' : 'LOCAL'} channel — ${ib.nif_study_complexity} NIF study. Min co-channel separation: ${ib.min_sep_co_channel_km} km.`}
+              </div>
+
+              {/* Metrics grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 8 }}>
+                {[
+                  { label: 'NIF complexity',   value: ib.nif_study_complexity },
+                  { label: 'D/U margin',        value: `${ib.co_channel_du_margin_db} dB` },
+                  { label: 'NIF study cost',    value: `$${Math.round((ib.nif_study_cost_low_usd??0)/1000)}K–$${Math.round((ib.nif_study_cost_high_usd??0)/1000)}K` },
+                  { label: 'NIF study time',    value: `${ib.nif_study_weeks_low}–${ib.nif_study_weeks_high} wks` },
+                  { label: 'Min co-ch sep',     value: `${ib.min_sep_co_channel_km} km` },
+                  { label: '1st adj D/U req',   value: `${ib.first_adj_du_req_db} dB` }
+                ].map(m => (
+                  <div key={m.label} style={{ background: '#0f1629', borderRadius: 4, padding: '6px 8px', border: '1px solid #1e2d4a' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#93c5fd', fontWeight: 600 }}>{m.value}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#3b5278', marginTop: 1 }}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {ib.da_night_operation_likely_required && (
+                <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#fbbf24', background: '#451a03', borderRadius: 4, padding: '6px 8px', border: '1px solid #fbbf2440', lineHeight: 1.5 }}>
+                  DA night operation likely required — {ib.frequency_khz} kHz clear channel NDA station typically must operate as DA-N at night to limit skywave interference to the dominant Class A station per §73.182(l).
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM NEPA Environmental Review Guide */}
         {candidate.am_nepa_environmental_review_guide && (() => {
           const ne = candidate.am_nepa_environmental_review_guide;

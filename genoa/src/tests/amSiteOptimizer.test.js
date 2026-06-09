@@ -16260,3 +16260,44 @@ test('candidate_comparison_table nepa columns present for KAZM', async () => {
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.nepa_env_review_weeks_low > 0, 'nepa_env_review_weeks_low must be positive');
 });
+
+// ── Feature #89: am_interference_budget_and_nif_guide ────────────────────────
+test('KAZM 780 kHz: am_interference_budget_and_nif_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_interference_budget_and_nif_guide != null, 'interference budget guide missing');
+  }
+});
+
+test('KAZM 780 kHz clear-channel: NIF complexity is FULL and nif_study_weeks_low >= 8', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ib = out.candidates[0].am_interference_budget_and_nif_guide;
+  assert.strictEqual(ib.nif_study_complexity, 'FULL', '780 kHz clear channel must have FULL NIF study');
+  assert.ok(ib.nif_study_weeks_low >= 8, 'FULL NIF study must be >= 8 weeks');
+  assert.strictEqual(ib.is_clear_channel, true, '780 kHz must be flagged as clear channel');
+});
+
+test('KAZM NDA clear-channel: da_night_operation_likely_required is true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ib = out.candidates[0].am_interference_budget_and_nif_guide;
+  assert.strictEqual(ib.da_night_operation_likely_required, true, 'NDA on clear channel must flag DA night required');
+});
+
+test('local-channel station has SIMPLIFIED NIF study', async () => {
+  const localResult = await runSiteOptimizer({ ...KAZM, frequency_khz: 1490, candidate_limit: 1 });
+  const ib = localResult.candidates[0].am_interference_budget_and_nif_guide;
+  assert.strictEqual(ib.is_local_channel, true, '1490 kHz must be local channel');
+  assert.strictEqual(ib.nif_study_complexity, 'SIMPLIFIED', 'local channel must have SIMPLIFIED NIF study');
+});
+
+test('candidate_comparison_table interference budget columns present for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ib_nif_complexity'    in row, 'ib_nif_complexity missing');
+    assert.ok('ib_nif_ok_screen'     in row, 'ib_nif_ok_screen missing');
+    assert.ok('ib_co_ch_du_margin_db' in row, 'ib_co_ch_du_margin_db missing');
+    assert.ok('ib_nif_cost_low_usd'  in row, 'ib_nif_cost_low_usd missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.ib_nif_cost_low_usd > 0, 'ib_nif_cost_low_usd must be positive');
+});

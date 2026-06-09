@@ -1535,6 +1535,10 @@ export async function runSiteOptimizer(body = {}){
     fcc_total_soft_cost_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.total_soft_cost_low ?? null,
     fcc_processing_days_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.fcc_processing_days_low ?? null,
     fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null,
+    ib_nif_complexity:                  c.am_interference_budget_and_nif_guide?.nif_study_complexity ?? null,
+    ib_nif_ok_screen:                   c.am_interference_budget_and_nif_guide?.nif_screening_ok ?? null,
+    ib_co_ch_du_margin_db:              c.am_interference_budget_and_nif_guide?.co_channel_du_margin_db ?? null,
+    ib_nif_cost_low_usd:                c.am_interference_budget_and_nif_guide?.nif_study_cost_low_usd ?? null,
     nepa_review_path:                   c.am_nepa_environmental_review_guide?.review_path ?? null,
     nepa_ea_likely:                     c.am_nepa_environmental_review_guide?.ea_likely ?? null,
     nepa_env_review_weeks_low:          c.am_nepa_environmental_review_guide?.env_review_weeks_low ?? null,
@@ -7391,6 +7395,131 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_interference_budget_and_nif_guide: (() => {
+      // AM co-channel and adjacent-channel interference budget guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.182:  Engineering standards for AM station modifications.
+      //     Nighttime Interference to Others (NIF) is the primary filing gate.
+      //     NIF is the aggregate skywave field contributed to co-channel and
+      //     first/second adjacent-channel stations' 0.5 mV/m (50% skywave contour).
+      //     A relocation application must demonstrate that the proposed NIF does NOT
+      //     exceed the existing NIF at any affected station's 0.5 mV/m contour.
+      //   §73.21 / §73.25:  Class A (dominant) clear-channel stations receive
+      //     maximum protected skywave coverage; Class B/D stations on the same
+      //     clear channel must limit NIF contribution to ≤ 25% of the nighttime
+      //     interference criterion.
+      //   §73.37:  Co-channel and first adjacent-channel minimum distance
+      //     separations (Table I) between stations of various classes.
+      //     These are ABSOLUTE MINIMUMS; FCC routinely requires larger separations.
+      //   §73.182(l):  The "nighttime interference-free" (NIF) contour for a
+      //     Class A station is the area within which the 50% skywave signal ≥ 0.5 mV/m
+      //     and is interference-free.  Other classes use 25 μV/m for NIF.
+      //   §73.182(k):  "Dominant" clear channel stations (10 Class A): 660, 720, 770,
+      //     780, 820, 870, 880, 1020, 1100, 1120 kHz and others per §73.25(a).
+      //
+      // Interference calculation model (screening-grade):
+      //   FCC uses Midnight Summer groundwave + skywave propagation curves (M3/SkyWave).
+      //   This guide uses a simplified proxy:
+      //     D/U criterion: desired/undesired signal ratio at the reference contour.
+      //       Co-channel: D/U ≥ 20 dB (10:1 field strength ratio)
+      //       First adjacent (±10 kHz): D/U ≥ 6 dB (2:1)
+      //       Second adjacent (±20 kHz): D/U ≥ 0 dB (1:1) — generally no constraint
+      //     Required separation from co-channel station (Class A):
+      //       §73.37 Table I minimum for Class D vs Class A co-channel ≈ 50–100 km.
+      //     Nighttime skywave screening:
+      //       For clear-channel dominant at 780 kHz (KKOB, Albuquerque NM, 50 kW Class A):
+      //         KKOB 0.5 mV/m 50% skywave contour ≈ radius 600–800 km from KKOB.
+      //         Any new Class D operation within this contour must limit skywave contribution.
+      //
+      // NIF computation approach:
+      //   NIF_contribution = (P_proposed / P_dominant) × (1/d²) × sky_factor
+      //   where sky_factor accounts for skywave efficiency vs groundwave.
+      //   Full NIF requires running FCC propagation curves (Skywave model).
+      //   This guide produces a directional screening flag + estimated D/U margin.
+
+      const is_da_ib  = /^DA/i.test(pattern_mode);
+      const chanCls   = frequencyChannelClass(frequency_khz);
+      const isClear   = chanCls === 'clear_channel';
+      const isLocal   = chanCls === 'local';
+      const isRegional = chanCls === 'regional';
+
+      // ── Dominant station (clear channel only) ──
+      const dominant = isClear ? {
+        callsign:    'N/A (FCC lookup required)',
+        power_kw:    50,
+        class:       'A',
+        description: `The dominant Class A station on ${frequency_khz} kHz must be identified from FCC ULS. Clear-channel dominant stations are protected to their 0.5 mV/m 50% skywave contour (§73.182(l)).`
+      } : null;
+
+      // ── Co-channel D/U screening ──
+      // Rough proxy: at distance d_km, skywave field contribution from tpo_kw:
+      //   E_sky(d) ≈ C × sqrt(P_kw) / d   [mV/m]  where C ≈ 100 for Class D NDA
+      // D/U ratio at dominant station's 0.5 mV/m contour (r_dom ≈ 700 km for 50 kW Class A):
+      const r_dom_km   = isClear ? 700 : isRegional ? 400 : 200; // approximate protected contour radius
+      const du_req_db  = 20; // co-channel D/U requirement in dB
+      const du_req_lin = Math.pow(10, du_req_db / 20); // 10× field strength
+      // For the PROPOSED station to NOT violate NIF at r_dom_km,
+      // its skywave field at r_dom_km must be < (0.5 mV/m) / du_req_lin = 0.05 mV/m
+      const sky_c      = 100; // simplified sky constant for Class D NDA
+      const e_sky_at_rdom = round2(sky_c * Math.sqrt(tpo_kw) / r_dom_km);
+      const e_limit_sky   = round2(0.5 / du_req_lin);    // 0.05 mV/m for 20 dB
+      const du_margin_db  = round2(20 * Math.log10(e_limit_sky / e_sky_at_rdom));
+      const nif_ok_screen = du_margin_db >= 0;
+
+      // ── §73.37 minimum distance separations ──
+      // Class D vs Class A co-channel (simplified §73.37 Table I):
+      const min_sep_co_channel_km = isClear ? (fcc_class === 'D' ? 38 : 56) : (fcc_class === 'D' ? 28 : 38);
+      // Class D vs Class A first adjacent:
+      const min_sep_adj1_km       = isClear ? 14 : 8;
+
+      // ── Adjacent channel budget ──
+      const adj_du_req_db_1  = 6;   // first adjacent D/U: 6 dB
+      const adj_du_req_db_2  = 0;   // second adjacent: 0 dB (no separation requirement)
+
+      // ── NIF study complexity ──
+      const nif_complexity = isClear ? 'FULL' : isRegional ? 'STANDARD' : 'SIMPLIFIED';
+      const nif_study_weeks_low  = nif_complexity === 'FULL' ? 8  : nif_complexity === 'STANDARD' ? 4 : 2;
+      const nif_study_weeks_high = nif_complexity === 'FULL' ? 20 : nif_complexity === 'STANDARD' ? 10 : 5;
+      const nif_cost_low  = nif_complexity === 'FULL' ? 12000 : nif_complexity === 'STANDARD' ? 6000 : 3000;
+      const nif_cost_high = nif_complexity === 'FULL' ? 28000 : nif_complexity === 'STANDARD' ? 15000 : 8000;
+
+      // ── DA night authorization ──
+      // If clear-channel and proposing NDA nighttime, new station will likely require
+      // nighttime DA to protect the dominant Class A from skywave interference.
+      const da_night_likely = isClear && !is_da_ib;
+
+      return {
+        fcc_class,
+        frequency_khz,
+        pattern_mode,
+        channel_class:              chanCls,
+        is_clear_channel:           isClear,
+        is_regional_channel:        isRegional,
+        is_local_channel:           isLocal,
+        dominant_station:           dominant,
+        protected_contour_radius_km: r_dom_km,
+        co_channel_du_req_db:       du_req_db,
+        co_channel_du_req_linear:   du_req_lin,
+        e_sky_at_contour_mvm:       e_sky_at_rdom,
+        e_limit_sky_mvm:            e_limit_sky,
+        co_channel_du_margin_db:    du_margin_db,
+        nif_screening_ok:           nif_ok_screen,
+        min_sep_co_channel_km,
+        min_sep_first_adj_km:       min_sep_adj1_km,
+        first_adj_du_req_db:        adj_du_req_db_1,
+        second_adj_du_req_db:       adj_du_req_db_2,
+        nif_study_complexity:       nif_complexity,
+        nif_study_weeks_low,
+        nif_study_weeks_high,
+        nif_study_cost_low_usd:     nif_cost_low,
+        nif_study_cost_high_usd:    nif_cost_high,
+        da_night_operation_likely_required: da_night_likely,
+        reference: '47 CFR §73.182 (AM engineering standards / NIF); §73.37 (minimum separations); §73.25 (clear channel dominant stations); §73.21 (AM station classes); FCC M3 / SkyWave propagation curves; OET Bulletin No. 73 (AM propagation)',
+        note: `${isClear ? `CLEAR CHANNEL (${frequency_khz} kHz) — full §73.182 NIF study required. D/U margin screening: ${nif_ok_screen ? `PASS (${du_margin_db} dB margin)` : `FLAG (${du_margin_db} dB — may require DA night authorization)`}.` : `${isRegional ? 'REGIONAL' : 'LOCAL'} channel — ${nif_complexity} NIF study. Min co-channel sep: ${min_sep_co_channel_km} km.`} DA night operation: ${da_night_likely ? 'LIKELY REQUIRED for clear-channel NDA' : 'Not required by this screening'}.`
       };
     })(),
 

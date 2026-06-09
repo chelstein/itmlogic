@@ -4056,3 +4056,14 @@ test('am_nepa_environmental_review_guide present across colocation candidates', 
     assert.ok(ne.env_review_weeks_low > 0, 'env_review_weeks_low must be positive');
   }
 });
+
+test('am_interference_budget_and_nif_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const ib = c.am_interference_budget_and_nif_guide;
+    assert.ok(ib !== undefined && ib !== null, `candidate missing am_interference_budget_and_nif_guide`);
+    assert.ok(['FULL', 'STANDARD', 'SIMPLIFIED'].includes(ib.nif_study_complexity), `nif_study_complexity invalid: ${ib.nif_study_complexity}`);
+    assert.ok(ib.nif_study_cost_low_usd > 0, 'nif_study_cost_low_usd must be positive');
+    assert.ok(ib.min_sep_co_channel_km > 0, 'min_sep_co_channel_km must be positive');
+  }
+});
