@@ -3506,6 +3506,26 @@ export async function computeExhibit(req){
   const { readiness } = await import('../../types/readiness.js');
   exhibit.filing_readiness = readiness({ warnings: exhibit.warnings, exhibit });
 
+  // ---- Source Attestation Framework v2 ----
+  // Attested values for every filing-relevant field: deterministic
+  // operative-value selection by source authority, per-field tolerance
+  // conflicts, and the five separated status dimensions (math/source/
+  // rule/evidence/filing).  Runs LAST so all lineages, evidence, and
+  // filing_readiness are stamped.  Feeds the provenance chain: the
+  // deterministic payload hash is committed into replay_digest so the
+  // attestation payload is part of the replay/provenance record.
+  // (v1 source_attestation above is unchanged — v2 is additive.)
+  {
+    const { buildAttestedExhibitValues } = await import('../../attestation/index.js');
+    exhibit.source_attestation_v2 = buildAttestedExhibitValues(exhibit, exhibit.evidence, {
+      evidence_required: options.evidence_required === true
+    });
+    if (exhibit.replay_digest){
+      exhibit.replay_digest.source_attestation_v2_sha256 =
+        exhibit.source_attestation_v2.payload_sha256;
+    }
+  }
+
   exhibit.narrative = renderNarrative(exhibit);
 
   // Surface pattern provenance at the exhibit top level for consumers that

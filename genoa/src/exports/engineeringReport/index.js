@@ -16,6 +16,7 @@ import { buildValidationVerdictSection }  from './sections/validationVerdict.js'
 import { buildRfExposureSection }         from './sections/rfExposure.js';
 import { buildTowerStudySection }         from './sections/towerStudy.js';
 import { buildBuildAttestationSection }   from './sections/buildAttestation.js';
+import { buildSourceAttestationSection }  from './sections/sourceAttestation.js';
 import { buildConclusionSection }         from './sections/conclusion.js';
 import { buildCertificationSection }      from './sections/certification.js';
 import { buildEngineerDeclarationSection } from './sections/engineerDeclaration.js';
@@ -138,6 +139,13 @@ export function buildEngineeringReport(exhibit, options){
   // recommendation.  Self-deferring when upstream evidence is absent.
   push(buildTowerStudySection(exhibit, opt));
   push(buildConclusionSection(exhibit, opt));
+  // Source attestation (framework v2) — operative-value table with
+  // authority levels, confidence, and conflict status for every
+  // filing-relevant value.  Sits immediately BEFORE the provenance/
+  // build-attestation section so the reviewer sees WHICH values
+  // control the filing before the cryptographic chain that commits
+  // them.  Self-deferring on legacy exhibits without the v2 block.
+  push(buildSourceAttestationSection(exhibit, opt));
   // Build attestation — engine SHA + fingerprint + HMAC signature so a
   // tampered build cannot pass through unnoticed and a PE-reviewed
   // exhibit is reproducible from the inputs + the SHA at attestation

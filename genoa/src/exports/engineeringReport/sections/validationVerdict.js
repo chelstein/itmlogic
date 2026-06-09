@@ -653,6 +653,74 @@ export function buildValidationVerdictSection(exhibit){
     filing = { status: 'REVIEW',     detail: 'computational verified; re-run with live FCC parity before filing if definitive cross-verification is required' };
   }
 
+  // ----- Source / Rule / Evidence validation (attestation framework v2) -----
+  // Three additional orthogonal categories sourced from
+  // exhibit.source_attestation_v2.statuses.  SOURCE VALIDATION reflects
+  // the deterministic operative-value resolution across all filing-
+  // relevant fields; RULE VALIDATION reflects regulatory rule outcomes;
+  // EVIDENCE VALIDATION reflects measurement evidence.  An unresolved
+  // source conflict CAPS filing readiness — a report with conflicting
+  // primary-source values can never display as cleanly filing-ready.
+  const av2 = exhibit.source_attestation_v2 || null;
+  let source_validation, rule_validation, evidence_validation;
+  if (av2 && av2.statuses){
+    const st = av2.statuses;
+    const nConf  = Object.values(av2.fields || {}).filter(r =>
+      r.status === 'RESOLVED_WITH_CONFLICT' || r.status === 'SOURCE_CONFLICT' || r.status === 'MANUAL_OVERRIDE_REQUIRED').length;
+    const nBlock = (av2.blockers || []).length;
+    source_validation = {
+      status: st.source_status,
+      detail: nBlock > 0
+        ? `${nBlock} source blocker(s) — see SOURCE ATTESTATION section`
+        : nConf > 0
+          ? `${nConf} field(s) carry cross-source conflicts; operative values selected by authority hierarchy — see SOURCE ATTESTATION section`
+          : 'all filing-relevant values resolved without conflict'
+    };
+    rule_validation = {
+      status: st.rule_status,
+      detail: st.rule_status === 'PASS' ? 'regulatory rule checks pass'
+            : st.rule_status === 'FAIL' ? 'one or more regulatory rules do not pass — see Engineering Conclusion'
+            : st.rule_status === 'REVIEW' ? 'regulatory findings require engineer review'
+            : 'rule evaluation not attached'
+    };
+    evidence_validation = {
+      status: st.evidence_status,
+      detail: st.evidence_status === 'MEASURED'
+        ? 'field measurement evidence attached'
+        : 'no field measurement evidence attached (advisory unless measurement evidence is required for this filing)'
+    };
+    components.push({
+      name:     'Source validation (attestation framework v2)',
+      category: 'source',
+      status:   st.source_status === 'RESOLVED' ? 'PASS'
+              : (st.source_status === 'SOURCE_CONFLICT' || st.source_status === 'UNRESOLVED') ? 'FAIL'
+              : 'WARN',
+      detail:   source_validation.detail
+    });
+
+    // CAP: unresolved source conflicts or source blockers can never
+    // sit under a clean READY / VERIFIED headline.
+    const sourceBlocked = st.source_status === 'SOURCE_CONFLICT'
+                       || st.source_status === 'UNRESOLVED'
+                       || nBlock > 0;
+    const sourceReview  = st.source_status === 'RESOLVED_WITH_CONFLICT'
+                       || st.source_status === 'SOURCE_UNVERIFIED'
+                       || st.source_status === 'OPERATOR_SUPPLIED_ONLY';
+    if (sourceBlocked){
+      filing = { status: 'DO NOT FILE', detail: 'unresolved source conflict or missing primary source — resolve via SOURCE ATTESTATION section (engineer override with reason + reviewer, or corrected fetch) before filing' };
+      if (status === 'VERIFIED') status = 'PARTIAL';
+      confidence = capConfidence(confidence, Confidence.MEDIUM);
+    } else if (sourceReview && filing.status === 'READY'){
+      filing = { status: 'REVIEW', detail: 'source conflicts resolved deterministically by authority hierarchy, but the engineer of record must review the SOURCE ATTESTATION section before filing' };
+      if (status === 'VERIFIED') status = 'PARTIAL';
+      confidence = capConfidence(confidence, Confidence.MEDIUM);
+    }
+  } else {
+    source_validation   = { status: 'NOT_ATTACHED', detail: 'source attestation v2 block not present on this exhibit (legacy exhibit)' };
+    rule_validation     = { status: 'NOT_ATTACHED', detail: 'derived rule status not present (legacy exhibit)' };
+    evidence_validation = { status: 'NOT_ATTACHED', detail: 'derived evidence status not present (legacy exhibit)' };
+  }
+
   return {
     id:      'validation',
     type:    'verdict',
@@ -663,10 +731,16 @@ export function buildValidationVerdictSection(exhibit){
       // The PDF renderer prefers `categories` when present.
       status,
       confidence,
-      // Three orthogonal categories — the new primary surface.
+      // Orthogonal categories — the primary surface.  COMPUTATIONAL,
+      // SOURCE, RULE, EVIDENCE, FILING are the five attestation-v2
+      // dimensions; EXTERNAL is the live-FCC-parity surface that
+      // predates v2 and is kept alongside.
       categories: {
         computational,
         external,
+        source:   source_validation,
+        rule:     rule_validation,
+        evidence: evidence_validation,
         filing
       },
       components,
