@@ -1564,7 +1564,13 @@ export async function runSiteOptimizer(body = {}){
     da_suppression_low_db:              c.am_da_pattern_design_guide?.suppression_low_db ?? null,
     da_suppression_high_db:             c.am_da_pattern_design_guide?.suppression_high_db ?? null,
     da_design_cost_low_usd:             c.am_da_pattern_design_guide?.design_cost_low_usd ?? null,
-    da_design_weeks_low:                c.am_da_pattern_design_guide?.design_weeks_low ?? null
+    da_design_weeks_low:                c.am_da_pattern_design_guide?.design_weeks_low ?? null,
+    gs_quarter_wave_ft:                 c.am_ground_system_design_guide?.quarter_wave_ft ?? null,
+    gs_radials_standard:                c.am_ground_system_design_guide?.radials_standard ?? null,
+    gs_total_wire_ft:                   c.am_ground_system_design_guide?.total_wire_ft ?? null,
+    gs_ground_cost_low_usd:             c.am_ground_system_design_guide?.ground_cost_low_usd ?? null,
+    gs_ground_cost_high_usd:            c.am_ground_system_design_guide?.ground_cost_high_usd ?? null,
+    gs_sigma_mS_m:                      c.am_ground_system_design_guide?.sigma_mS_m ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7407,6 +7413,120 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_ground_system_design_guide: (() => {
+      // AM Ground System Design Guide.
+      //
+      // §73.190 requires a buried radial ground system for AM broadcast stations.
+      // The standard "FCC" ground system for AM:
+      //   - 120 buried copper radials per tower base
+      //   - Minimum radial length: 1/4 wavelength at operating frequency
+      //   - Radials extend uniformly at ~3° spacing (360° / 120 = 3°)
+      //
+      // Fewer radials (down to ~90) may be accepted for constrained sites but
+      // require engineering justification and may degrade efficiency by 5–15%.
+      //
+      // Ground system conductivity (σ) determines antenna efficiency.
+      // The M3 conductivity map (§73.184) governs the expected ground
+      // conductivity at the candidate site; poor ground (σ < 2 mS/m) can
+      // reduce daytime groundwave coverage by 20–35% relative to σ = 8 mS/m.
+      //
+      // For DA stations: each tower in the array requires a full ground system,
+      // so total cost scales with tower count.
+      //
+      // Wire: typically #10 AWG bare copper solid or stranded, buried 6–12 inches.
+      // Bonding: all radials bonded at the tower base; base insulator clearance check.
+      //
+      // Cost estimate basis:
+      //   Labor: $2–4/LF for trenching + burial + backfill (machine trench)
+      //   Wire:  $0.12–0.18/LF for #10 bare copper (market-dependent)
+      //   ~120 radials × (λ/4 length) × (labor + wire) per tower
+
+      const isDA_gs = /^DA/i.test(pattern_mode);
+
+      // Quarter-wave radial length in meters (λ/4)
+      const lambda_gs   = (3e8 / (frequency_khz * 1e3));
+      const qwave_m_gs  = lambda_gs / 4;
+      const qwave_ft_gs = qwave_m_gs * 3.28084;
+
+      // Standard radial count (FCC standard vs. constrained minimum)
+      const radials_standard  = 120;
+      const radials_min       = 90;
+      const radial_spacing_deg = round2(360 / radials_standard);
+
+      // Wire length per radial is λ/4; total wire = radials × length (per tower)
+      const wire_length_per_tower_m  = radials_standard * qwave_m_gs;
+      const wire_length_per_tower_ft = Math.round(wire_length_per_tower_m * 3.28084);
+
+      // DA tower count estimate (1 for NDA)
+      const da_tower_est_gs = isDA_gs ? 3 : 1;   // rough mid-estimate; actual from DA guide
+
+      const total_wire_m  = wire_length_per_tower_m  * da_tower_est_gs;
+      const total_wire_ft = wire_length_per_tower_ft * da_tower_est_gs;
+
+      // Cost per linear foot (labor + wire combined)
+      const cost_low_per_lf  = 2.12 + 0.12;   // $2.12 labor + $0.12 wire
+      const cost_high_per_lf = 4.00 + 0.18;   // $4.00 labor + $0.18 wire
+
+      const ground_cost_low_usd  = Math.round(total_wire_ft * cost_low_per_lf  / 100) * 100;
+      const ground_cost_high_usd = Math.round(total_wire_ft * cost_high_per_lf / 100) * 100;
+
+      // Site-specific conductivity from M3 lookup (already computed in this candidate's context)
+      // sigma_msm is the variable set at candidate eval time (see scoreCandidate head)
+      const sigma_est = typeof sigma_msm === 'number' && sigma_msm > 0 ? sigma_msm : null;
+
+      // Efficiency penalty estimate for poor ground
+      let ground_efficiency_note;
+      if (sigma_est !== null && sigma_est < 2) {
+        ground_efficiency_note = `Poor ground conductivity (σ ≈ ${sigma_est} mS/m). Expect 20–35% reduction in groundwave coverage vs. σ = 8 mS/m standard. Consider radial augmentation (>120 radials) or conductor loading coil.`;
+      } else if (sigma_est !== null && sigma_est < 5) {
+        ground_efficiency_note = `Moderate ground conductivity (σ ≈ ${sigma_est} mS/m). Expect 5–15% reduction vs. σ = 8 mS/m. Standard 120-radial system should be adequate.`;
+      } else if (sigma_est !== null) {
+        ground_efficiency_note = `Good ground conductivity (σ ≈ ${sigma_est} mS/m). Standard 120-radial system is expected to achieve near-ideal efficiency.`;
+      } else {
+        ground_efficiency_note = 'Site conductivity not determined — verify M3 zone before finalizing ground system design.';
+      }
+
+      // Installation timeline
+      const install_weeks_low  = da_tower_est_gs <= 1 ? 1 : 2;
+      const install_weeks_high = da_tower_est_gs <= 1 ? 3 : (da_tower_est_gs <= 3 ? 5 : 8);
+
+      // Radial design items
+      const design_items = [
+        { item: '120 buried radials per tower, uniform 3° spacing', ref: '§73.190', required: true },
+        { item: `Radial length ≥ λ/4 (${Math.round(qwave_ft_gs)} ft at ${frequency_khz} kHz)`, ref: '§73.190', required: true },
+        { item: '#10 AWG bare copper wire, buried 6–12 inches minimum', ref: '§73.190', required: true },
+        { item: 'All radials bonded at tower base with low-resistance clamp', ref: '§73.190', required: true },
+        { item: 'Ground conductivity (M3 zone) verified per §73.184', ref: '§73.184; §73.190', required: true },
+        { item: isDA_gs ? 'Separate full ground system per tower in DA array' : null, ref: '§73.190', required: true },
+        { item: 'Base insulator clearance ≥ 3 ft from any buried conductor', ref: '§73.190; §73.61', required: true },
+        { item: 'Optional: augmented radial count (>120) for low-conductivity sites', ref: '§73.190', required: false },
+        { item: 'RF bonding of guy anchors and buried metalwork per §73.190(c)', ref: '§73.190(c)', required: true }
+      ].filter(d => d.item !== null);
+
+      return {
+        frequency_khz,
+        fcc_class,
+        is_da:                    isDA_gs,
+        sigma_mS_m:               sigma_est,
+        quarter_wave_m:           round2(qwave_m_gs),
+        quarter_wave_ft:          Math.round(qwave_ft_gs),
+        radials_standard,
+        radials_minimum:          radials_min,
+        radial_spacing_deg,
+        wire_length_per_tower_ft,
+        da_tower_estimate:        da_tower_est_gs,
+        total_wire_ft:            Math.round(total_wire_ft),
+        ground_cost_low_usd,
+        ground_cost_high_usd,
+        install_weeks_low,
+        install_weeks_high,
+        ground_efficiency_note,
+        design_items,
+        reference: '47 CFR §73.190 (ground system); §73.184 (groundwave conductivity map); §73.61 (base current monitors); §73.190(c) (bonding)',
+        note: `Standard AM ground system: ${radials_standard} radials × ${Math.round(qwave_ft_gs)} ft = ${wire_length_per_tower_ft.toLocaleString()} LF per tower. DA: ${da_tower_est_gs} tower estimate × = ${Math.round(total_wire_ft).toLocaleString()} LF total. Installed cost: $${ground_cost_low_usd.toLocaleString()}–$${ground_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

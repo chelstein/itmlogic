@@ -2356,6 +2356,74 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Ground System Design Guide */}
+        {candidate.am_ground_system_design_guide && (() => {
+          const gs = candidate.am_ground_system_design_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const fmtFt  = (n) => n != null ? `${Number(n).toLocaleString()} ft` : '—';
+          const sigmaColor = gs.sigma_mS_m == null ? '#6b7280'
+            : gs.sigma_mS_m < 2 ? '#dc2626'
+            : gs.sigma_mS_m < 5 ? '#d97706'
+            : '#16a34a';
+          return (
+            <div style={{ background: '#0a120a', border: '1px solid #14532d', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#4ade80', marginBottom: 10 }}>
+                §73.190 Ground System Design — {gs.frequency_khz} kHz
+              </div>
+              {/* Key metrics row */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>λ/4 radial length</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtFt(gs.quarter_wave_ft)}</div>
+                </div>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Radials</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{gs.radials_standard} standard</div>
+                </div>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Total wire</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtFt(gs.total_wire_ft)}</div>
+                </div>
+                <div style={{ background: '#052e16', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Install cost</div>
+                  <div style={{ color: '#bbf7d0', fontWeight: 600 }}>{fmtUsd(gs.ground_cost_low_usd)} – {fmtUsd(gs.ground_cost_high_usd)}</div>
+                </div>
+              </div>
+              {/* Conductivity badge */}
+              {gs.sigma_mS_m != null && (
+                <div style={{ background: sigmaColor + '22', border: `1px solid ${sigmaColor}44`, borderRadius: 4, padding: '5px 10px', fontSize: 11, marginBottom: 8, color: sigmaColor }}>
+                  σ = {gs.sigma_mS_m} mS/m — {gs.ground_efficiency_note}
+                </div>
+              )}
+              {gs.sigma_mS_m == null && gs.ground_efficiency_note && (
+                <div style={{ background: '#1f1f1f', border: '1px solid #374151', borderRadius: 4, padding: '5px 10px', fontSize: 11, marginBottom: 8, color: '#9ca3af', fontStyle: 'italic' }}>
+                  {gs.ground_efficiency_note}
+                </div>
+              )}
+              {/* Design items checklist */}
+              {gs.design_items && gs.design_items.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#15803d', fontWeight: 600, marginBottom: 4 }}>§73.190 Design Requirements</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {gs.design_items.map((d, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #14532d' }}>
+                          <td style={{ padding: '3px 4px', color: d.required ? '#86efac' : '#6b7280', width: 16 }}>
+                            {d.required ? '✓' : '○'}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{d.item}</td>
+                          <td style={{ padding: '3px 4px', color: '#4ade80', textAlign: 'right', whiteSpace: 'nowrap' }}>{d.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {gs.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{gs.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM DA Pattern Design Guide */}
         {candidate.am_da_pattern_design_guide && (() => {
           const da = candidate.am_da_pattern_design_guide;

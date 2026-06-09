@@ -4089,3 +4089,13 @@ test('am_da_pattern_design_guide present across colocation candidates (NDA = not
     assert.ok(typeof da.reason === 'string', 'reason must be a string');
   }
 });
+
+test('am_ground_system_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const gs = c.am_ground_system_design_guide;
+    assert.ok(gs !== undefined && gs !== null, `candidate missing am_ground_system_design_guide`);
+    assert.strictEqual(gs.radials_standard, 120, 'radials_standard must be 120');
+    assert.ok(gs.ground_cost_low_usd > 0, 'ground_cost_low_usd must be positive');
+  }
+});

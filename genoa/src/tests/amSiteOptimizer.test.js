@@ -16400,3 +16400,48 @@ test('#91 candidate_comparison_table has da_* columns', async () => {
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.da_applicable, true, 'da_applicable must be true for DA station');
 });
+
+// ---- Feature #92: am_ground_system_design_guide ----
+
+test('#92 KAZM: am_ground_system_design_guide present with expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gs = out.candidates[0].am_ground_system_design_guide;
+  assert.ok(gs != null, 'am_ground_system_design_guide must be present');
+  assert.strictEqual(gs.radials_standard, 120, 'radials_standard must be 120');
+  assert.ok(gs.quarter_wave_ft > 0, 'quarter_wave_ft must be positive');
+  assert.ok(gs.total_wire_ft > 0, 'total_wire_ft must be positive');
+});
+
+test('#92 KAZM 780 kHz: quarter-wave ≈ 296 ft (λ/4 at 780 kHz)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gs = out.candidates[0].am_ground_system_design_guide;
+  // λ = 3e8 / 780e3 = 384.6 m; λ/4 = 96.15 m = 315.5 ft (rounded: ~315–316)
+  assert.ok(gs.quarter_wave_ft >= 300 && gs.quarter_wave_ft <= 330,
+    `quarter_wave_ft should be ~315 for 780 kHz, got ${gs.quarter_wave_ft}`);
+});
+
+test('#92 ground cost positive and ordered low < high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gs = out.candidates[0].am_ground_system_design_guide;
+  assert.ok(gs.ground_cost_low_usd > 0, 'ground_cost_low_usd must be positive');
+  assert.ok(gs.ground_cost_high_usd >= gs.ground_cost_low_usd, 'high must be >= low');
+});
+
+test('#92 design_items array has ≥ 5 required items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gs = out.candidates[0].am_ground_system_design_guide;
+  const requiredItems = gs.design_items.filter(d => d.required === true);
+  assert.ok(requiredItems.length >= 5, `expected ≥ 5 required design items, got ${requiredItems.length}`);
+});
+
+test('#92 candidate_comparison_table has gs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gs_quarter_wave_ft'    in row, 'gs_quarter_wave_ft missing');
+    assert.ok('gs_radials_standard'   in row, 'gs_radials_standard missing');
+    assert.ok('gs_total_wire_ft'      in row, 'gs_total_wire_ft missing');
+    assert.ok('gs_ground_cost_low_usd' in row, 'gs_ground_cost_low_usd missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.gs_quarter_wave_ft > 0, 'gs_quarter_wave_ft must be positive');
+});
