@@ -214,7 +214,7 @@ function DeltaRow({ label, candidateVal, baselineVal, higherIsBetter, fmt }){
 // from the chip row when status_category already carries the key signal.
 const ADMIN_LABELS = new Set(['SCREENING ONLY', 'ENGINEER REVIEW REQUIRED']);
 
-export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw }){
+export default function CandidateDetailDrawer({ candidate, baseline, onClose, onPromoteToStudio, callsign, frequency_khz, tpo_kw, fcc_class, pattern_mode }){
   if (!candidate) return null;
   const e = candidate.explanation || {};
   const isInfra = candidate.source === 'INFRASTRUCTURE';
@@ -260,6 +260,12 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             {candidate.status_category && (
               <StatusChip status={candidate.status_category} dense />
             )}
+            {candidate.candidate_type && (
+              <span className="font-mono text-[9px] uppercase tracking-rack border rounded-sm px-1.5 py-0.5"
+                style={{ color: candidate.candidate_type === 'grid' ? '#7ec8e3' : '#b8a4e3', background: 'rgba(126,200,227,0.08)', borderColor: 'rgba(126,200,227,0.35)' }}>
+                {candidate.candidate_type.replace(/_/g, ' ')}
+              </span>
+            )}
             {supplementalLabels.map(s => (
               <StatusChip key={s} label={s} dense />
             ))}
@@ -268,12 +274,39 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
         <div className="flex flex-col gap-1.5 shrink-0">
           {onPromoteToStudio && candidate.status_category !== 'NON_COMPLIANT' && (
             <button
-              onClick={() => onPromoteToStudio({
-                lat: candidate.lat, lon: candidate.lon,
-                callsign, frequency_khz, tpo_kw,
-                rank: candidate.rank,
-                status_category: candidate.status_category
-              })}
+              onClick={() => {
+                const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
+                const gnd = candidate.am_ground_radial_system_design_guide;
+                const imp = candidate.am_antenna_system_impedance_and_base_current_guide;
+                const gw  = candidate.am_propagation_groundwave_field_strength_estimate_guide;
+                const env = candidate.am_site_environmental_impact_and_permitting_guide;
+                onPromoteToStudio({
+                  lat: candidate.lat, lon: candidate.lon,
+                  callsign, frequency_khz, tpo_kw,
+                  fcc_class: fcc_class ?? candidate.fcc_class,
+                  pattern_mode: pattern_mode ?? candidate.pattern_mode,
+                  rank: candidate.rank,
+                  status_category: candidate.status_category,
+                  // Auto-fill values derived from engine guides
+                  autofill: {
+                    tower_overall_height_agl_m:  ltg?.tower_height_m   ?? null,
+                    tower_overall_height_agl_ft: ltg?.tower_height_ft  ?? null,
+                    asr_required:                ltg?.asr_required     ?? null,
+                    tower_lighting_type:         ltg?.lighting_type    ?? null,
+                    tower_painting_standard:     ltg?.asr_required     ? 'AC 70/7460-1L Chapter 3' : null,
+                    faa_notification_required:   ltg?.faa_notification_required ?? null,
+                    n_radials_recommended:       gnd?.n_radials_full   ?? null,
+                    radial_length_ft:            gnd?.quarter_wave_ft  ?? null,
+                    ground_conductivity_msm:     gw?.conductivity_msm  ?? null,
+                    base_current_a:              imp?.base_current_a   ?? null,
+                    ct_rating_a:                 imp?.ct_rating_a      ?? null,
+                    r_base_ohm:                  imp?.r_base_ohm       ?? null,
+                    estimated_erp_kw:            candidate.antenna_system_summary?.estimated_erp_kw ?? null,
+                    nepa_trigger:                env?.nepa_trigger     ?? null,
+                    asr_required_by_env:         env?.section_106_required ?? null,
+                  }
+                });
+              }}
               className="font-mono text-[11px] uppercase tracking-rack border rounded-sm px-2 py-1 transition-colors"
               style={{ color: '#63d471', borderColor: 'rgba(99,212,113,0.45)', background: 'rgba(99,212,113,0.08)' }}
               title="Load this candidate into the Contour Studio for full-physics analysis"
@@ -292,6 +325,46 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
       </header>
 
       <section className="px-4 py-4 space-y-5">
+        {/* FCC Filing Auto-Fill Preview */}
+        {(() => {
+          const ltg = candidate.am_tower_lighting_and_painting_compliance_guide;
+          const gnd = candidate.am_ground_radial_system_design_guide;
+          const imp = candidate.am_antenna_system_impedance_and_base_current_guide;
+          const gw  = candidate.am_propagation_groundwave_field_strength_estimate_guide;
+          if (!ltg && !gnd && !imp) return null;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmtN = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fields = [
+            { label: 'Tower height AGL', value: ltg ? `${fmtF(ltg.tower_height_m)} m (${fmtF(ltg.tower_height_ft, 0)} ft)` : '—', auto: !!ltg },
+            { label: 'ASR required (§17.7)', value: ltg ? (ltg.asr_required ? 'YES' : 'No') : '—', auto: !!ltg, warn: ltg?.asr_required },
+            { label: 'Tower lighting', value: ltg?.lighting_type?.replace(/_/g, ' ') ?? '—', auto: !!ltg },
+            { label: 'Tower painting', value: ltg?.asr_required ? 'AC 70/7460-1L Ch. 3' : 'Not required', auto: !!ltg },
+            { label: 'Radials recommended', value: gnd ? `${gnd.n_radials_full} × ${fmtF(gnd.quarter_wave_ft, 0)} ft` : '—', auto: !!gnd },
+            { label: 'Base current (RMS)', value: imp ? `${fmtF(imp.base_current_a, 2)} A` : '—', auto: !!imp },
+            { label: 'CT rating required', value: imp ? `${imp.ct_rating_a} A` : '—', auto: !!imp },
+            { label: 'Ground conductivity', value: gw ? `${fmtF(gw.conductivity_msm, 1)} mS/m` : '—', auto: !!gw },
+          ].filter(f => f.auto);
+          return (
+            <div style={{ background: 'rgba(99,212,113,0.05)', border: '1px solid rgba(99,212,113,0.25)', borderRadius: 6, padding: '10px 14px' }}>
+              <div style={{ fontWeight: 700, fontSize: 11, color: '#63d471', marginBottom: 8, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+                Auto-Fill → Filing Form
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11 }}>
+                {fields.map(f => (
+                  <div key={f.label} style={{ display: 'flex', gap: 4, alignItems: 'baseline' }}>
+                    <span style={{ color: '#63d471', fontSize: 9, fontWeight: 700, flexShrink: 0 }}>AUTO</span>
+                    <span style={{ color: '#a89c84' }}>{f.label}:</span>
+                    <span style={{ color: f.warn ? '#ffb347' : '#e2d9c5', fontWeight: 600 }}>{f.value}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#63d47199' }}>
+                Fields tagged AUTO pre-fill from engine data on Promote. Verify before filing; edits persist in localStorage per facility.
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Go / No-Go viability banner */}
         {candidate.site_viability_summary && (() => {
           const svs = candidate.site_viability_summary;
@@ -426,6 +499,63 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
             </div>
           );
         })()}
+
+        {/* Blockers — compliance/regulatory flags */}
+        {Array.isArray(candidate.blockers) && candidate.blockers.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1" style={{ color: '#ff7a7a' }}>Compliance blockers</div>
+            <div className="space-y-1">
+              {candidate.blockers.map((b, i) => (
+                <div key={i} className="border rounded-sm px-2.5 py-1.5 font-mono text-[10px]"
+                  style={{ borderColor: 'rgba(255,90,90,0.5)', background: 'rgba(255,90,90,0.06)', color: '#ff9090' }}>
+                  <span className="font-semibold mr-1.5 text-[9px] uppercase tracking-rack text-red-400">{b.code}</span>
+                  {b.message}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Score breakdown detail — transparent explainer per goal */}
+        {Array.isArray(e.score_breakdown_detail) && e.score_breakdown_detail.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1.5">Score breakdown</div>
+            <div className="space-y-1">
+              {e.score_breakdown_detail.map((row) => {
+                if (!row.enabled) return null;
+                const pct = row.max_points > 0 ? (row.points / row.max_points) * 100 : 0;
+                const barColor = pct >= 80 ? '#63d471' : pct >= 50 ? '#ffb347' : '#ff7a7a';
+                return (
+                  <div key={row.key} className="border border-rule/60 rounded-sm px-2 py-1.5">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <span className="font-mono text-[10px] text-cream">{row.label}</span>
+                      <span className="font-mono text-[10px] shrink-0" style={{ color: barColor }}>
+                        {row.points.toFixed(1)} / {row.max_points.toFixed(1)}
+                      </span>
+                    </div>
+                    <div className="relative h-[3px] bg-rule/50 rounded-full mb-1">
+                      <div className="absolute top-0 left-0 h-full rounded-full transition-all"
+                        style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
+                    </div>
+                    {row.reason && (
+                      <div className="font-mono text-[9px] text-textDim leading-snug">{row.reason}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Required next studies */}
+        {Array.isArray(candidate.required_next_studies) && candidate.required_next_studies.length > 0 && (
+          <div>
+            <div className="rack-eyebrow mb-1">Required next studies</div>
+            <ul className="font-mono text-[10px] text-textDim list-disc list-inside space-y-0.5">
+              {candidate.required_next_studies.map((s, i) => <li key={i}>{s}</li>)}
+            </ul>
+          </div>
+        )}
 
         {/* Why it ranked */}
         <div>
@@ -2222,6 +2352,4310 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
                 ))}
               </div>
               <div className="font-mono text-[8px] text-textDim leading-snug">{pp.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Structural Load Analysis Guide */}
+        {candidate.am_tower_structural_load_analysis_guide && (() => {
+          const g = candidate.am_tower_structural_load_analysis_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f8fafc', border: '1px solid #94a3b8', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', marginBottom: 8 }}>
+                Tower Structural Load Analysis (TIA-222-H / ASCE 7-22)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#334155' }}>
+                <div><b>Tower height (λ/4):</b> {fmtF(g.tower_height_ft, 0)} ft ({fmtF(g.tower_height_m, 0)} m)</div>
+                <div><b>Design wind speed:</b> {g.wind_speed_mph} mph (Exp C)</div>
+                <div><b>K_z (TIA-222-H):</b> {fmtF(g.k_z, 2)}</div>
+                <div><b>Velocity pressure q_z:</b> {fmtF(g.velocity_pressure_psf, 1)} psf</div>
+                <div><b>Total wind load:</b> {fmt(Math.round(g.total_wind_load_lbf))} lbf</div>
+                <div><b>Base moment:</b> {fmt(Math.round(g.base_moment_ft_kip))} ft-kip</div>
+                <div><b>Steel weight:</b> ~{fmt(g.steel_weight_lbs)} lbs ({fmtF(g.steel_weight_tons, 1)} tons)</div>
+                <div><b>Tower type:</b> {g.is_guyed ? `Guyed (${g.n_guy_levels} levels, ${g.n_guy_anchors} anchors)` : 'Self-supporting'}</div>
+                <div><b>Foundation depth:</b> ~{fmtF(g.foundation_depth_ft, 0)} ft</div>
+                <div><b>PE study (TIA-222-H stamped):</b> ${fmt(g.pe_study_low_usd)}–${fmt(g.pe_study_high_usd)}</div>
+                <div><b>Fabrication + erection:</b> ${fmt(g.fabrication_low_usd)}–${fmt(g.fabrication_high_usd)}</div>
+                <div><b>Foundation:</b> ${fmt(g.foundation_low_usd)}–${fmt(g.foundation_high_usd)}</div>
+                {g.n_guy_anchors > 0 && (
+                  <div><b>Guy anchors ({g.n_guy_anchors}):</b> ${fmt(g.guy_anchor_low_usd)}–${fmt(g.guy_anchor_high_usd)}</div>
+                )}
+                <div style={{ gridColumn: '1/-1' }}><b>Total structural:</b> ${fmt(g.total_structural_low_usd)}–${fmt(g.total_structural_high_usd)}</div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#64748b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM RF Exposure MPE Evaluation Guide */}
+        {candidate.am_rf_exposure_mpe_evaluation_guide && (() => {
+          const g = candidate.am_rf_exposure_mpe_evaluation_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const evalColor = g.eval_required ? '#ef4444' : '#22c55e';
+          return (
+            <div style={{ background: '#fff1f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#991b1b', marginBottom: 8 }}>
+                RF Exposure / MPE Evaluation (§1.1310 / OET Bulletin 65)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#7f1d1d' }}>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>Evaluation:</b>
+                  <span style={{ color: evalColor, fontWeight: 700 }}>{g.eval_required ? 'REQUIRED (TPO > 1 kW)' : 'Categorically excluded'}</span>
+                </div>
+                <div><b>Base current:</b> {fmtF(g.i_base_a, 2)} A</div>
+                <div><b>GP limit (§1.1310):</b> {g.e_limit_gp_vm} V/m</div>
+                <div><b>OC limit:</b> {g.e_limit_oc_vm} V/m</div>
+                <div><b>GP exclusion radius:</b> {fmtF(g.r_gp_exclusion_m, 2)} m ({fmtF(g.r_gp_exclusion_ft, 1)} ft)</div>
+                <div><b>OC exclusion radius:</b> {fmtF(g.r_oc_exclusion_m, 2)} m ({fmtF(g.r_oc_exclusion_ft, 1)} ft)</div>
+                {g.fence_needed && (<>
+                  <div><b>Fence perimeter:</b> {fmtF(g.perimeter_ft, 0)} ft</div>
+                  <div><b>Fence cost:</b> ${fmt(g.fence_cost_low_usd)}–${fmt(g.fence_cost_high_usd)}</div>
+                </>)}
+                <div><b>Study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
+              </div>
+              {g.field_table && (
+                <div style={{ marginTop: 8, fontSize: 11 }}>
+                  <div style={{ color: '#991b1b', fontWeight: 600, marginBottom: 4 }}>E-field at reference distances:</div>
+                  <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {g.field_table.map(row => (
+                      <span key={row.r_m} style={{ color: row.exceeds_gp ? '#dc2626' : '#15803d', fontFamily: 'monospace', fontSize: 10 }}>
+                        {row.r_m}m: {fmtF(row.e_vm, 0)} V/m {row.exceeds_gp ? '⚠' : '✓'}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b91c1c' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Transmission Line and Coaxial Feed Guide */}
+        {candidate.am_transmission_line_and_coaxial_feed_guide && (() => {
+          const g = candidate.am_transmission_line_and_coaxial_feed_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const recColor = g.recommended_cable?.includes('1-5/8') ? '#f59e0b' : '#22c55e';
+          return (
+            <div style={{ background: '#1e1b4b', border: '1px solid #4338ca', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#a5b4fc', marginBottom: 8 }}>
+                Transmission Line / Coaxial Feed (§73.68)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#c7d2fe' }}>
+                <div><b>Frequency:</b> {g.frequency_khz} kHz ({fmtF(g.f_mhz, 3)} MHz)</div>
+                <div><b>Reference run:</b> {g.typical_line_ft} ft</div>
+                <div><b>7/8" α:</b> {fmtF(g.alpha_78_db_per100ft, 3)} dB/100ft → {fmtF(g.loss_78_db, 3)} dB loss</div>
+                <div><b>7/8" η:</b> {fmtF(g.efficiency_78_pct, 2)}% (V_peak {fmtF(g.v_peak_78_v, 0)} V)</div>
+                <div><b>1-5/8" α:</b> {fmtF(g.alpha_158_db_per100ft, 3)} dB/100ft → {fmtF(g.loss_158_db, 3)} dB loss</div>
+                <div><b>1-5/8" η:</b> {fmtF(g.efficiency_158_pct, 2)}% (V_peak {fmtF(g.v_peak_158_v, 0)} V)</div>
+                <div><b>7/8" installed (100 ft):</b> ${fmt(g.total_78_low_usd)}–${fmt(g.total_78_high_usd)}</div>
+                <div><b>1-5/8" installed (100 ft):</b> ${fmt(g.total_158_low_usd)}–${fmt(g.total_158_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <b>Recommended:</b>
+                  <span style={{ color: recColor, fontWeight: 700 }}>{g.recommended_cable}</span>
+                  <span style={{ fontSize: 10, color: '#818cf8' }}>for {g.frequency_khz} kHz / {tpo_kw} kW TPO</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#6366f1' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Daytime / Nighttime Power Reduction Guide */}
+        {candidate.am_daytime_nighttime_power_reduction_guide && (() => {
+          const g = candidate.am_daytime_nighttime_power_reduction_guide;
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const nightColor = g.is_clear_channel ? '#dc2626' : '#d97706';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#94a3b8', marginBottom: 8 }}>
+                Daytime / Nighttime Power Reduction (§73.99)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#cbd5e1' }}>
+                <div><b>Channel class:</b> <span style={{ color: g.is_clear_channel ? '#f87171' : '#86efac' }}>{g.is_clear_channel ? 'CLEAR — dominant protection' : 'Regional / Local'}</span></div>
+                <div><b>Daytime TPO:</b> {g.daytime_tpo_kw} kW</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>Night power:</b>
+                  <span style={{ color: nightColor, fontWeight: 700 }}>{g.night_power_kw > 0 ? `${g.night_power_kw} kW` : 'SILENT'}</span>
+                </div>
+                <div><b>Reduction:</b> {g.power_reduction_pct}%</div>
+                {g.critical_hours_kw != null && (
+                  <div><b>Critical hours (§73.99b):</b> {g.critical_hours_kw} kW</div>
+                )}
+                <div><b>Summer sunset / sunrise:</b> {g.summer_sunset_utc} / {g.summer_sunrise_utc}</div>
+                <div><b>Summer day length:</b> {fmtF(g.summer_day_length_h, 1)} h</div>
+                <div><b>Winter sunset / sunrise:</b> {g.winter_sunset_utc} / {g.winter_sunrise_utc}</div>
+                <div><b>Winter day length:</b> {fmtF(g.winter_day_length_h, 1)} h</div>
+                <div><b>Automation cost:</b> ${g.automation_cost_low.toLocaleString()}–${g.automation_cost_high.toLocaleString()}</div>
+                <div><b>Power relay cost:</b> ${g.power_relay_cost_low.toLocaleString()}–${g.power_relay_cost_high.toLocaleString()}</div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#64748b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Ground Radial System Design Guide */}
+        {candidate.am_ground_radial_system_design_guide && (() => {
+          const g = candidate.am_ground_radial_system_design_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const effColor = g.efficiency_full_pct >= 75 ? '#15803d' : g.efficiency_full_pct >= 60 ? '#d97706' : '#dc2626';
+          return (
+            <div style={{ background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5b21b6', marginBottom: 8 }}>
+                Ground Radial System Design (§73.68 / §73.190)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#3b0764' }}>
+                <div><b>λ/4 radial length:</b> {fmtF(g.quarter_wave_ft, 1)} ft ({fmtF(g.quarter_wave_m, 1)} m)</div>
+                <div><b>Recommended radials:</b> {g.n_radials_full} (full) / {g.n_radials_economy} (economy)</div>
+                <div><b>R_loss — 120 radials:</b> {fmtF(g.r_loss_full_ohm)} Ω</div>
+                <div><b>R_loss — 60 radials:</b> {fmtF(g.r_loss_economy_ohm)} Ω</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>Efficiency (120-radial):</b>
+                  <span style={{ color: effColor, fontWeight: 600 }}>{fmtF(g.efficiency_full_pct, 1)}%</span>
+                </div>
+                <div><b>Efficiency (60-radial):</b> {fmtF(g.efficiency_economy_pct, 1)}%</div>
+                <div><b>Base current (full):</b> {fmtF(g.base_current_full_a)} A</div>
+                <div><b>Base current (economy):</b> {fmtF(g.base_current_economy_a)} A</div>
+                <div><b>Min site radius:</b> {fmtF(g.min_site_radius_ft, 0)} ft ({fmtF(g.min_site_radius_m, 0)} m)</div>
+                <div><b>Total radial footage:</b> {fmt(g.total_radial_ft)} ft</div>
+                <div><b>Full system installed:</b> ${fmt(g.total_radial_system_low_usd)}–${fmt(g.total_radial_system_high_usd)}</div>
+                <div><b>Economy (60-radial):</b> ${fmt(g.total_radial_eco_low_usd)}–${fmt(g.total_radial_eco_high_usd)}</div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#6d28d9' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Lighting and Painting Compliance Guide */}
+        {candidate.am_tower_lighting_and_painting_compliance_guide && (() => {
+          const g = candidate.am_tower_lighting_and_painting_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const asrColor = g.asr_required ? '#dc2626' : '#15803d';
+          return (
+            <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>
+                Tower Lighting &amp; Painting Compliance (§17.7 / FAA AC 70/7460-1L)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>Tower height (λ/4):</b> {fmtF(g.tower_height_ft)} ft / {fmtF(g.tower_height_m)} m</div>
+                <div><b>ASR threshold:</b> {g.asr_threshold_ft} ft AGL</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>ASR required (§17.7):</b>
+                  <span style={{ color: asrColor, fontWeight: 600 }}>{g.asr_required ? 'YES' : 'No'}</span>
+                </div>
+                <div><b>Lighting type:</b> {g.lighting_type?.replace(/_/g, ' ')}</div>
+                <div><b>FAA 30-day notice (§17.49):</b> {g.faa_notification_required ? 'REQUIRED' : 'N/A'}</div>
+                <div><b>Paint bands:</b> {g.n_paint_bands ?? '—'}</div>
+                <div><b>Capital (lighting + painting):</b> ${fmt(g.total_lighting_low_usd)}–${fmt(g.total_lighting_high_usd)}</div>
+                <div><b>Annual maintenance:</b> ${fmt(g.annual_maintenance_low)}–${fmt(g.annual_maintenance_high)}/yr</div>
+              </div>
+              {g.faa_notification_note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#92400e' }}>{g.faa_notification_note}</div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b45309' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Propagation Groundwave Field Strength Estimate Guide */}
+        {candidate.am_propagation_groundwave_field_strength_estimate_guide && (() => {
+          const g = candidate.am_propagation_groundwave_field_strength_estimate_guide;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const compColor = g.col_field_compliant ? '#15803d' : '#dc2626';
+          return (
+            <div style={{ background: '#fff7f0', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 8 }}>
+                Groundwave Field Strength Estimate (§73.183 / §73.184 M3 Curves)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>σ (conductivity):</b> {fmtF(g.conductivity_msm)} mS/m</div>
+                <div><b>Power scale factor:</b> ×{fmtF(g.power_scale)}</div>
+                <div><b>0.5 mV/m daytime contour:</b> ~{fmtF(g.contour_05mvm_radius_km)} km</div>
+                <div><b>0.1 mV/m nighttime contour:</b> ~{fmtF(g.contour_01mvm_radius_km)} km</div>
+                <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                  <b>COL field ({fmtF(g.field_at_col_dist_km)} km):</b>
+                  <span style={{ color: compColor, fontWeight: 600 }}>{fmtF(g.field_at_col_dist_mvm, 2)} mV/m</span>
+                </div>
+                <div><b>§73.24(b) min (2 mV/m):</b> <span style={{ color: compColor }}>{g.col_field_compliant ? '✓ MET' : '✗ FAILS'}</span></div>
+                <div style={{ gridColumn: '1/-1' }}><b>Formal §73.183 study cost:</b> ${fmt(g.study_cost_low_usd)}–${fmt(g.study_cost_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1', fontSize: 10, color: '#b45309' }}>Screening estimate ±30%. Formal M3 study required for FCC filing.</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna System Impedance and Base Current Guide */}
+        {candidate.am_antenna_system_impedance_and_base_current_guide && (() => {
+          const g = candidate.am_antenna_system_impedance_and_base_current_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#fdf4ff', border: '1px solid #d8b4fe', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#7e22ce', marginBottom: 8 }}>
+                Antenna Impedance &amp; Base Current (§73.68 / §73.1215)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#4a044e' }}>
+                <div><b>R_rad (λ/4 theoretical):</b> {g.r_rad} Ω</div>
+                <div><b>Ground + radial loss:</b> {g.r_loss} Ω</div>
+                <div><b>R_base total:</b> {g.r_base_ohm} Ω</div>
+                <div><b>Base current (RMS):</b> {fmtF(g.base_current_a)} A</div>
+                <div><b>Peak (100% mod):</b> {fmtF(g.base_current_peak_a)} A</div>
+                <div><b>CT rating required:</b> {g.ct_rating_a} A</div>
+                {g.da_current_tolerance_pct != null && (
+                  <div><b>DA tolerance (§73.150(b)):</b> ±{g.da_current_tolerance_pct}%</div>
+                )}
+                <div><b>CT cost:</b> ${fmt(g.ct_cost_low)}–${fmt(g.ct_cost_high)}</div>
+                <div><b>Matching network:</b> ${fmt(g.matching_net_low)}–${fmt(g.matching_net_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total base system:</b> ${fmt(g.total_base_system_low_usd)}–${fmt(g.total_base_system_high_usd)}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Site Access and Utility Infrastructure Guide */}
+        {candidate.am_site_access_and_utility_infrastructure_guide && (() => {
+          const g = candidate.am_site_access_and_utility_infrastructure_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f0f9ff', border: '1px solid #7dd3fc', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0369a1', marginBottom: 8 }}>
+                Site Access &amp; Utility Infrastructure (Generator / Road / Power)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#0c4a6e' }}>
+                <div><b>Total Site Load:</b> {fmtF(g.total_load_kw)} kW</div>
+                <div><b>Generator Size (NFPA 110):</b> {g.generator_kw} kW</div>
+                <div><b>Generator Cost:</b> ${fmt(g.generator_cost_low)}–${fmt(g.generator_cost_high)}</div>
+                <div><b>ATS Cost:</b> ${fmt(g.ats_cost_low)}–${fmt(g.ats_cost_high)}</div>
+                <div><b>Road Access Type:</b> {g.road_access_type?.replace(/_/g, ' ')}</div>
+                <div><b>Road Cost:</b> ${fmt(g.road_cost_low)}–${fmt(g.road_cost_high)}</div>
+                <div><b>Electric Extension ({fmtF(g.power_extension_miles)} mi):</b> ${fmt(g.elec_cost_low)}–${fmt(g.elec_cost_high)}</div>
+                <div><b>Broadband + EAS:</b> ${fmt(g.broadband_install_low + g.eas_equip_low)}–${fmt(g.broadband_install_high + g.eas_equip_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total one-time infrastructure:</b> ${fmt(g.total_infra_low_usd)}–${fmt(g.total_infra_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Annual recurring:</b> ${fmt(g.annual_recurring_low_usd)}–${fmt(g.annual_recurring_high_usd)}/yr</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Site Environmental Impact and Permitting Guide */}
+        {candidate.am_site_environmental_impact_and_permitting_guide && (() => {
+          const g = candidate.am_site_environmental_impact_and_permitting_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const nepaColor = g.nepa_trigger === 'UNLIKELY' ? '#15803d' : g.nepa_trigger === 'POSSIBLE' ? '#d97706' : '#dc2626';
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#166534', marginBottom: 8 }}>
+                Environmental Impact &amp; Permitting (NEPA / NHPA / Zoning)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#14532d' }}>
+                <div><b>Tower Height (λ/4):</b> {fmtF(g.tower_height_ft)} ft / {fmtF(g.tower_height_m)} m</div>
+                <div><b>&gt;450 ft trigger (§1.1307(b)):</b> {g.height_exceeds_450ft ? 'YES — EA required' : 'No'}</div>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <b>NEPA trigger:</b>
+                  <span style={{ color: nepaColor, fontWeight: 600 }}>{g.nepa_trigger}</span>
+                </div>
+                <div><b>§106 (NHPA) review:</b> {g.section_106_required ? 'REQUIRED' : 'NPA exclusion likely'}</div>
+                <div><b>Wetlands screen:</b> {g.wetlands_screen?.replace(/_/g, ' ')}</div>
+                <div><b>CUP required:</b> {g.cup_required ? 'Yes' : 'No'}</div>
+                <div><b>CUP cost:</b> ${fmt(g.cup_filing_fee_low)}–${fmt(g.cup_filing_fee_high)} (filing) + ${fmt(g.cup_consultant_low)}–${fmt(g.cup_consultant_high)} (consultant)</div>
+                <div><b>EA cost:</b> ${fmt(g.ea_cost_low)}–${fmt(g.ea_cost_high)}</div>
+                <div><b>§106 cost:</b> ${fmt(g.s106_cost_low)}–${fmt(g.s106_cost_high)}</div>
+                <div><b>Wetlands cost:</b> ${fmt(g.wetlands_cost_low)}–${fmt(g.wetlands_cost_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total permitting:</b> ${fmt(g.total_permitting_low_usd)}–${fmt(g.total_permitting_high_usd)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Timeline:</b> {g.timeline_days_low}–{g.timeline_days_high} days</div>
+              </div>
+              {g.nepa_trigger_note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#166534' }}><b>NEPA:</b> {g.nepa_trigger_note}</div>
+              )}
+              {g.section_106_note && (
+                <div style={{ marginTop: 4, fontSize: 11, color: '#166534' }}><b>§106:</b> {g.section_106_note}</div>
+              )}
+              {g.wetlands_note && (
+                <div style={{ marginTop: 4, fontSize: 11, color: '#166534' }}><b>Wetlands:</b> {g.wetlands_note}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Power Efficiency and Operating Cost Guide */}
+        {candidate.am_transmitter_power_efficiency_and_operating_cost_guide && (() => {
+          const g = candidate.am_transmitter_power_efficiency_and_operating_cost_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c2410c', marginBottom: 8 }}>
+                Transmitter Power Efficiency &amp; Annual Operating Cost
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#7c2d12' }}>
+                <div><b>TX Type:</b> {g.tx_type?.replace(/_/g, ' ')}</div>
+                <div><b>Plate Efficiency:</b> {g.plate_efficiency_pct}%</div>
+                <div><b>Overall Efficiency:</b> {g.overall_efficiency_pct}%</div>
+                <div><b>AC Input (at TPO):</b> {fmtF(g.ac_input_kw)} kW</div>
+                <div><b>Avg Power (w/modulation):</b> {fmtF(g.avg_power_kw)} kW</div>
+                <div><b>Modulation Factor:</b> ×{g.modulation_avg_factor} (10% uplift)</div>
+                <div><b>Operating Hours:</b> {g.operating_hrs_per_day} hrs/day × 365 = {fmt(g.operating_hrs_per_year)} hrs/yr</div>
+                <div><b>AZ Electric Rate:</b> ${g.electricity_rate_usd_kwh}/kWh</div>
+                <div><b>Annual TX Electricity:</b> ${fmt(Math.round(g.annual_electric_usd))}/yr</div>
+                <div><b>Full Site Load:</b> {fmtF(g.total_site_load_kw)} kW → ${fmt(Math.round(g.annual_total_electric_usd))}/yr</div>
+                <div><b>Waste Heat:</b> {fmtF(g.waste_heat_kw)} kW → {g.cooling_required_type?.replace(/_/g, ' ')}</div>
+                <div><b>At 50% Power ({fmtF(g.power_50pct_kw)} kW):</b> ${fmt(Math.round(g.annual_50pct_usd))}/yr</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Nighttime NIF Service Contour Analysis Guide */}
+        {candidate.am_nighttime_nif_service_contour_analysis_guide && (() => {
+          const g = candidate.am_nighttime_nif_service_contour_analysis_guide;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const compliantColor = g.kkob_interference_compliant ? '#15803d' : '#dc2626';
+          return (
+            <div style={{ background: '#1e1b2e', border: `1px solid ${compliantColor}`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#a78bfa', marginBottom: 8 }}>
+                Nighttime NIF Service Contour (§73.182)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#d4d4d8' }}>
+                <div><b style={{ color: '#a1a1aa' }}>Distance to KKOB:</b> {fmtF(g.dist_to_kkob_km)} km</div>
+                <div>
+                  <b style={{ color: '#a1a1aa' }}>Skywave at KKOB:</b>{' '}
+                  <span style={{ color: compliantColor, fontWeight: 700 }}>{fmtF(g.sky_uVm, 1)} µV/m</span>
+                  {' '}(limit: {g.protection_threshold_uVm} µV/m — {g.kkob_interference_compliant ? 'COMPLIANT' : 'EXCEEDS'})
+                </div>
+                <div><b style={{ color: '#a1a1aa' }}>0.1 mV/m Contour:</b> ≈{g.nighttime_0p1_km} km radius</div>
+                <div><b style={{ color: '#a1a1aa' }}>Conductivity (σ):</b> ≈{g.sigma_proxy_mSm} mS/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Est. NIF Area:</b> {g.nif_fraction_pct_low}–{g.nif_fraction_pct_high}% of nighttime contour</div>
+                <div><b style={{ color: '#a1a1aa' }}>Clear Channel:</b> 780 kHz — KKOB dominant (50 kW)</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${compliantColor}40`, marginTop: 4, paddingTop: 6, color: '#a1a1aa' }}>
+                  <b>NIF Study Cost:</b> ${fmt(g.nif_study_low_usd)}–${fmt(g.nif_study_high_usd)} (§73.182 M3 skywave analysis required at filing)
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Remote Control and Unattended Operation Guide */}
+        {candidate.am_remote_control_and_unattended_operation_guide && (() => {
+          const g = candidate.am_remote_control_and_unattended_operation_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#854d0e', marginBottom: 8 }}>
+                Remote Control &amp; Unattended Operation (§73.1300 / §73.1400)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#713f12' }}>
+                <div><b>Remote Recommended:</b> {g.remote_required ? 'Yes' : 'Optional (site near city)'}</div>
+                <div><b>Operator Response:</b> Within {g.operator_response_time_hrs} hrs (§73.1300)</div>
+                <div><b>RC Accuracy Required:</b> ±{g.rc_accuracy_pct}% (§73.1400(b))</div>
+                <div><b>Must Control Power:</b> {g.rc_must_control_power ? 'Yes' : 'No'}</div>
+                <div><b>Must Monitor Antenna:</b> {g.rc_must_monitor_antenna ? 'Yes' : 'No'}</div>
+                <div><b>Must Monitor Modulation:</b> {g.rc_must_monitor_modulation ? 'Yes' : 'No'}</div>
+                <div><b>DA Antenna Monitor:</b> {g.rc_da_antenna_monitor ? 'Required (DA station)' : 'Not required (NDA)'}</div>
+                <div><b>Log Frequency:</b> {g.log_min_frequency} {g.da_log_frequency ? `/ DA: ${g.da_log_frequency}` : ''}</div>
+                <div><b>Preferred Connection:</b> {g.preferred_connection?.replace(/_/g, ' ')}</div>
+                <div><b>POTS Risk:</b> {g.pots_legacy_risk ? 'High (POTS unreliable in rural AZ)' : 'Low'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #fde047', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>RC System:</b> ${fmt(g.rc_system_low_usd)}–${fmt(g.rc_system_high_usd)}</span>
+                  <span><b>Install:</b> ${fmt(g.install_low_usd)}–${fmt(g.install_high_usd)}</span>
+                  <span><b>Internet/yr:</b> ${fmt(g.annual_internet_low_usd)}–${fmt(g.annual_internet_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM NRSC Emission Mask and Bandwidth Compliance Guide */}
+        {candidate.am_nrsc_emission_mask_and_bandwidth_compliance_guide && (() => {
+          const g = candidate.am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#334155', marginBottom: 8 }}>
+                NRSC-2-B Emission Mask &amp; Bandwidth (§73.44)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#475569' }}>
+                <div><b>Carrier:</b> {g.carrier_khz} kHz | Occupied BW: ±{g.audio_bw_khz} kHz ({g.occupied_bw_khz} kHz total)</div>
+                <div><b>Channel Spacing:</b> {g.channel_spacing_khz} kHz (US AM)</div>
+                <div><b>Harmonic Suppression:</b> ≥{g.harmonic_suppression_required_dBc} dBc (§73.44(e))</div>
+                <div><b>Max Harmonic Power:</b> {g.harmonic_max_mW} mW ({fmtF(g.harmonic_max_w, 3)} W)</div>
+                <div><b>2nd Harmonic:</b> {g.harmonic_2nd_khz} kHz {g.harmonic_2nd_in_am_band ? '⚠ within AM band' : '(outside AM band)'}</div>
+                <div><b>3rd Harmonic:</b> {g.harmonic_3rd_khz} kHz {g.harmonic_3rd_in_am_band ? '⚠ within AM band' : '(outside AM band)'}</div>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <b>NRSC-2-B Mask:</b>{' '}
+                  {g.nrsc2b_mask?.map(p => `±${p.offset_khz} kHz: −${p.attenuation_dBc} dBc`).join(' | ')}
+                </div>
+                <div><b>Type Acceptance:</b> {g.transmitter_type_acceptance_required ? 'Required §73.1660(a)' : 'N/A'}</div>
+                <div><b>NRSC-2-B Compliant:</b> {g.nrsc2b_compliance_assumed ? 'Yes (modern TX assumed)' : 'Verify required'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #cbd5e1', marginTop: 4, paddingTop: 6 }}>
+                  <b>Verification Cost:</b> ${fmt(g.verification_low_usd)}–${fmt(g.verification_high_usd)} (spectrum analyzer measurement)
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM FM Translator and Signal Booster Filing Guide */}
+        {candidate.am_fm_translator_and_signal_booster_filing_guide && (() => {
+          const g = candidate.am_fm_translator_and_signal_booster_filing_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#6d28d9', marginBottom: 8 }}>
+                FM Translator Filing Opportunity (§74.1201 / AM Revitalization)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#4c1d95' }}>
+                <div><b>Eligible:</b> {g.translator_eligible ? 'Yes — §74.1201(g)' : 'No'}</div>
+                <div><b>Max ERP:</b> {g.translator_max_erp_w} W ({g.translator_max_erp_kw} kW) per §74.1235(a)</div>
+                <div><b>Coverage Radius:</b> ~{fmtF(g.translator_coverage_km)} km {g.elevated_site_likely ? '(elevated site benefit)' : '(flat terrain)'}</div>
+                <div><b>Elevated Site:</b> {g.elevated_site_likely ? 'Yes — broader coverage' : 'No'}</div>
+                <div><b>Audience Uplift:</b> {g.audience_reach_uplift_pct_low}–{g.audience_reach_uplift_pct_high}% with translator</div>
+                <div><b>On Relocation:</b> {g.translator_modification_form}</div>
+                <div><b>FCC Fee:</b> ${fmt(g.fcc_fee_usd)}</div>
+                <div><b>AM Contour:</b> within {g.am_primary_contour_mv_m} mV/m daytime (§74.1237)</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #c4b5fd', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>Equipment:</b> ${fmt(g.equipment_low_usd)}–${fmt(g.equipment_high_usd)}</span>
+                  <span><b>Engineering:</b> ${fmt(g.engineering_low_usd)}–${fmt(g.engineering_high_usd)}</span>
+                  <span><b>Total:</b> ${fmt(g.total_translator_low_usd)}–${fmt(g.total_translator_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Noise Floor and RF Interference Environment Guide */}
+        {candidate.am_noise_floor_and_rf_interference_environment_guide && (() => {
+          const g = candidate.am_noise_floor_and_rf_interference_environment_guide;
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const riskColor = g.noise_risk_level === 'HIGH' ? '#dc2626'
+                          : g.noise_risk_level === 'ELEVATED' ? '#d97706'
+                          : '#16a34a';
+          return (
+            <div style={{ background: '#1e1b2e', border: `1px solid ${riskColor}`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: riskColor, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+                Noise Floor &amp; RF Interference Environment
+                <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, background: riskColor, color: '#fff' }}>
+                  {g.noise_risk_level}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#d4d4d8' }}>
+                <div><b style={{ color: '#a1a1aa' }}>Atmospheric Noise (ITU-R P.372-16):</b> {fmtF(g.fa_atmospheric_dBuVm, 1)} dBµV/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Man-Made Noise ({g.noise_zone}):</b> {fmtF(g.fa_manmade_dBuVm, 1)} dBµV/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Combined Noise Floor (Ft):</b> {fmtF(g.ft_dBuVm)} dBµV/m</div>
+                <div><b style={{ color: '#a1a1aa' }}>Day Field Strength:</b> {fmtF(g.fs_day_dBuVm)} dBµV/m (0.5 mV/m)</div>
+                <div>
+                  <b style={{ color: '#a1a1aa' }}>Daytime SNR:</b>{' '}
+                  <span style={{ color: g.snr_day_compliant ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                    {fmtF(g.snr_day_dB)} dB
+                  </span>
+                  {' '}(min {g.snr_threshold_dB} dB §73.37)
+                </div>
+                <div>
+                  <b style={{ color: '#a1a1aa' }}>Nighttime SNR:</b>{' '}
+                  <span style={{ color: g.snr_night_compliant ? '#4ade80' : '#f87171', fontWeight: 700 }}>
+                    {fmtF(g.snr_night_dB)} dB
+                  </span>
+                  {' '}(0.1 mV/m contour)
+                </div>
+                <div><b style={{ color: '#a1a1aa' }}>Hi-Fi Threshold (25 dB):</b> {g.snr_day_hifi ? 'Met' : 'Not met'}</div>
+                <div><b style={{ color: '#a1a1aa' }}>Clear Channel (780 kHz):</b> {g.is_clear_channel_freq ? 'Yes — KKOB dominant' : 'No'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: `1px solid ${riskColor}40`, marginTop: 4, paddingTop: 6, display: 'flex', gap: 18, color: '#a1a1aa' }}>
+                  <span><b>Site Survey:</b> ${fmt(g.survey_cost_low_usd)}–${fmt(g.survey_cost_high_usd)}</span>
+                  <span><b>Total (incl. remediation):</b> ${fmt(g.total_noise_low_usd)}–${fmt(g.total_noise_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Public Inspection File and Online Compliance Guide */}
+        {candidate.am_public_inspection_file_and_online_compliance_guide && (() => {
+          const g = candidate.am_public_inspection_file_and_online_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#b45309', marginBottom: 8 }}>
+                Public Inspection File &amp; Online OPIF Compliance
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>OPIF Required:</b> {g.opif_mandatory ? `Yes — all AMs since ${g.opif_transition_deadline}` : 'No'}</div>
+                <div><b>Political File Upload:</b> Within {g.political_file_upload_days} business day (§73.1943)</div>
+                <div><b>Political File Retention:</b> {g.political_file_retention_years} years</div>
+                <div><b>Letters Retention:</b> {g.letters_retention_years} years</div>
+                <div><b>Issues/Programs List:</b> Within {g.issues_programs_list_filing_days} days of quarter end</div>
+                <div><b>Quarter Deadlines:</b> {g.quarter_deadlines?.join(', ')}</div>
+                <div><b>Ownership Report:</b> {g.ownership_report_form} every {g.ownership_report_cycle_years} yrs</div>
+                <div><b>EEO Report:</b> {g.eeo_report_required ? `${g.eeo_report_form} at renewal` : 'Exempt'}</div>
+                <div><b>Contour Map Required:</b> {g.contour_map_required ? `Yes — ${g.contour_map_contour_mv_m} mV/m daytime` : 'No'}</div>
+                <div><b>Children's Report:</b> {g.childrens_programming_report_required ? 'Required' : 'Exempt (AM)'}</div>
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #fde68a', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>Setup/Audit:</b> ${fmt(g.setup_audit_low_usd)}–${fmt(g.setup_audit_high_usd)}</span>
+                  <span><b>Annual Labor:</b> ${fmt(g.annual_labor_low_usd)}–${fmt(g.annual_labor_high_usd)}/yr</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Modulation Monitoring and Audio Processing Guide */}
+        {candidate.am_modulation_monitoring_and_audio_processing_guide && (() => {
+          const g = candidate.am_modulation_monitoring_and_audio_processing_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d', marginBottom: 8 }}>
+                Modulation Monitoring &amp; Audio Processing
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#166534' }}>
+                <div><b>Monitor Required:</b> {g.monitor_required ? 'Yes — §73.1570(a)' : 'No'}</div>
+                <div><b>Monitor Type:</b> {g.monitor_type?.replace(/_/g, ' ')}</div>
+                <div><b>Positive Peak Limit:</b> {g.max_positive_peak_pct}% (§73.1570(b))</div>
+                <div><b>Negative Peak Limit:</b> {g.max_negative_peak_pct}% (§73.1570(b))</div>
+                <div><b>Power Tolerance:</b> ±{g.power_tolerance_pct}% (§73.1560(a))</div>
+                <div><b>TPO Range:</b> {fmtF(g.tpo_min_kw)}–{fmtF(g.tpo_max_kw)} kW</div>
+                <div><b>Audio BW (NRSC-1-A):</b> ±{g.audio_bandwidth_khz} kHz</div>
+                <div><b>AGC Compression:</b> {g.agc_compression_ratio}:1</div>
+                <div><b>Clipper Threshold:</b> {g.clipper_threshold_pct}%</div>
+                <div><b>Overmod Reporting:</b> &gt;{g.overmodulation_reporting_threshold_sec}s (§73.1570(d))</div>
+                {g.da_base_current_monitoring_required && (
+                  <>
+                    <div><b>DA Current Monitor:</b> Required — §73.51(b)</div>
+                    <div><b>Ratio Tolerance:</b> ±{g.da_ratio_tolerance_pct}% / ±{g.da_phase_tolerance_deg}°</div>
+                  </>
+                )}
+                <div style={{ gridColumn: '1 / -1', borderTop: '1px solid #bbf7d0', marginTop: 4, paddingTop: 6, display: 'flex', gap: 18 }}>
+                  <span><b>Monitor:</b> ${fmt(g.monitor_low_usd)}–${fmt(g.monitor_high_usd)}</span>
+                  <span><b>Processor:</b> ${fmt(g.processor_low_usd)}–${fmt(g.processor_high_usd)}</span>
+                  <span><b>Total Audio:</b> ${fmt(g.total_audio_low_usd)}–${fmt(g.total_audio_high_usd)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Site Lease and Property Rights Guide */}
+        {candidate.am_transmitter_site_lease_and_property_rights_guide && (() => {
+          const g = candidate.am_transmitter_site_lease_and_property_rights_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="prl-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf7f2', borderRadius: 8, border: '2px solid #9a3412' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Site Lease &amp; Property Rights — ASTM E1527 / §73.49</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
+                <span style={{ color: '#9a3412' }}>Radial reach:</span><span>{fmtF(g.radial_length_m, 1)} m (λ/4)</span>
+                <span style={{ color: '#9a3412' }}>Min. site area:</span><span style={{ fontWeight: 700 }}>{fmtF(g.site_area_required_acres, 1)} acres</span>
+                <span style={{ color: '#9a3412' }}>Lease tier:</span><span style={{ textTransform: 'capitalize' }}>{g.lease_tier}</span>
+                <span style={{ color: '#9a3412' }}>Annual lease:</span><span>${fmt(g.lease_annual_low_usd)} – ${fmt(g.lease_annual_high_usd)}/yr</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#7c2d12', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#9a3412' }}>Phase I ESA:</span><span>${fmt(g.phase1_esa_low_usd)} – ${fmt(g.phase1_esa_high_usd)}</span>
+                <span style={{ color: '#9a3412' }}>ALTA survey:</span><span>${fmt(g.survey_low_usd)} – ${fmt(g.survey_high_usd)}</span>
+                <span style={{ color: '#9a3412' }}>Title search:</span><span>${fmt(g.title_low_usd)} – ${fmt(g.title_high_usd)}</span>
+                <span style={{ color: '#9a3412' }}>Lease legal:</span><span>${fmt(g.legal_low_usd)} – ${fmt(g.legal_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fed7aa', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#9a3412', fontWeight: 600 }}>One-time acquisition:</span>
+                <span style={{ color: '#7c2d12', fontWeight: 700 }}>${fmt(g.total_acquisition_low_usd)} – ${fmt(g.total_acquisition_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#c2410c' }}>Ref: 47 CFR §73.49, §73.1125; ASTM E1527-21; ALTA/NSPS Survey</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Operating Log and Technical Records Compliance Guide */}
+        {candidate.am_operating_log_and_technical_records_compliance_guide && (() => {
+          const g = candidate.am_operating_log_and_technical_records_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="log-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Operating Log &amp; Technical Records — §73.1820 / §73.3527</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#0c4a6e', marginBottom: 8 }}>
+                <span style={{ color: '#0369a1' }}>Log retention:</span><span>≥{g.log_retention_years} years (§73.1840)</span>
+                <span style={{ color: '#0369a1' }}>Recommended:</span><span>{g.log_retention_recommended_years} years</span>
+                <span style={{ color: '#0369a1' }}>EAS log (separate):</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§11.35)</span>
+                <span style={{ color: '#0369a1' }}>Online public file:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§73.3527)</span>
+                <span style={{ color: '#0369a1' }}>Quarterly issues list:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§73.3526)</span>
+                <span style={{ color: '#0369a1' }}>Night sched. log:</span>
+                <span style={{ fontWeight: 700, color: g.nighttime_schedule_logging ? '#b45309' : '#6b7280' }}>
+                  {g.nighttime_schedule_logging ? 'YES (clear ch. / DA)' : 'NO'}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: '#0c4a6e', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#0369a1' }}>Log software:</span><span>${fmt(g.log_software_low_usd)} – ${fmt(g.log_software_high_usd)}</span>
+                <span style={{ color: '#0369a1' }}>Training:</span><span>${fmt(g.training_low_usd)} – ${fmt(g.training_high_usd)}</span>
+                <span style={{ color: '#0369a1' }}>Annual maintenance:</span><span>${fmt(g.maintenance_low_usd)} – ${fmt(g.maintenance_high_usd)}</span>
+                <span style={{ color: '#0369a1' }}>Public file setup:</span><span>${fmt(g.public_file_low_usd)} – ${fmt(g.public_file_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#0369a1', fontWeight: 600 }}>Total first-year:</span>
+                <span style={{ color: '#0c4a6e', fontWeight: 700 }}>${fmt(g.total_setup_low_usd)} – ${fmt(g.total_setup_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#0284c7' }}>Ref: 47 CFR §73.1820, §73.1840, §73.3526(e)(11), §73.3527, §73.1690</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Contour Overlap and Co-Channel Interference Guide */}
+        {candidate.am_contour_overlap_and_co_channel_interference_guide && (() => {
+          const g = candidate.am_contour_overlap_and_co_channel_interference_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const riskColor = { LOW: '#15803d', MEDIUM: '#b45309', HIGH: '#b91c1c' }[g.overlap_risk_level] || '#6b7280';
+          return (
+            <div key="cca-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: `2px solid ${riskColor}` }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Co-Channel &amp; Adjacent Interference — §73.37 / §73.182</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#881337', marginBottom: 8 }}>
+                <span style={{ color: '#be123c' }}>Channel:</span><span>{g.frequency_khz} kHz</span>
+                <span style={{ color: '#be123c' }}>Adjacent ch:</span><span>{g.adjacent_ch_low_khz} / {g.adjacent_ch_high_khz} kHz</span>
+                <span style={{ color: '#be123c' }}>D/U protection:</span><span>≥{g.protection_db_required} dB (§73.182(c))</span>
+                <span style={{ color: '#be123c' }}>Reach estimate:</span><span>{g.reach_estimate_km} km</span>
+                <span style={{ color: '#be123c' }}>Overlap risk:</span>
+                <span style={{ fontWeight: 700, color: riskColor }}>{g.overlap_risk_level}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#881337', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#be123c' }}>Screen tool:</span><span>${fmt(g.screen_tool_low_usd)} – ${fmt(g.screen_tool_high_usd)}</span>
+                {g.full_study_low_usd > 0 && <><span style={{ color: '#be123c' }}>Full D/U study:</span><span>${fmt(g.full_study_low_usd)} – ${fmt(g.full_study_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fecdd3', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#be123c', fontWeight: 600 }}>Total study:</span>
+                <span style={{ color: '#881337', fontWeight: 700 }}>${fmt(g.total_study_low_usd)} – ${fmt(g.total_study_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#e11d48' }}>Ref: 47 CFR §73.37, §73.182(c)–(d), §73.184</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Station Power Supply and Electrical Infrastructure Guide */}
+        {candidate.am_station_power_supply_and_electrical_infrastructure_guide && (() => {
+          const g = candidate.am_station_power_supply_and_electrical_infrastructure_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="pse-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #ca8a04' }}>
+              <div style={{ fontWeight: 700, color: '#713f12', marginBottom: 6, fontSize: 13 }}>Power Supply &amp; Electrical Infrastructure — NEC / §73.1215</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#713f12', marginBottom: 8 }}>
+                <span style={{ color: '#ca8a04' }}>TX efficiency:</span><span>{g.tx_efficiency_pct}%</span>
+                <span style={{ color: '#ca8a04' }}>AC input:</span><span>{fmtF(g.ac_input_kw, 2)} kW</span>
+                <span style={{ color: '#ca8a04' }}>Site load (×1.3):</span><span>{fmtF(g.site_load_kw, 1)} kW</span>
+                <span style={{ color: '#ca8a04' }}>Service:</span><span style={{ fontWeight: 600 }}>{g.service_phase}</span>
+                <span style={{ color: '#ca8a04' }}>Generator req:</span><span>{fmtF(g.generator_kw_required, 1)} kW → {g.generator_tier}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#713f12', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#ca8a04' }}>Service upgrade:</span><span>${fmt(g.service_upgrade_low_usd)} – ${fmt(g.service_upgrade_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Generator:</span><span>${fmt(g.generator_low_usd)} – ${fmt(g.generator_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>ATS:</span><span>${fmt(g.ats_low_usd)} – ${fmt(g.ats_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>SPD (NEC 230.67):</span><span>${fmt(g.spd_low_usd)} – ${fmt(g.spd_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Permit/inspection:</span><span>${fmt(g.permit_low_usd)} – ${fmt(g.permit_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fde68a', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#ca8a04', fontWeight: 600 }}>Total electrical:</span>
+                <span style={{ color: '#713f12', fontWeight: 700 }}>${fmt(g.total_electrical_low_usd)} – ${fmt(g.total_electrical_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b45309' }}>Ref: §73.1215, §11.35; NEC Art. 702, NEC 230.67, NEC 250</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Transmission Line and ATU Engineering Guide */}
+        {candidate.am_transmission_line_and_atu_engineering_guide && (() => {
+          const g = candidate.am_transmission_line_and_atu_engineering_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="atu-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #0ea5e9' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Transmission Line &amp; ATU Engineering — §73.1215</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#0c4a6e', marginBottom: 8 }}>
+                <span style={{ color: '#0ea5e9' }}>ATU type:</span><span style={{ fontWeight: 600 }}>{g.atu_type}</span>
+                <span style={{ color: '#0ea5e9' }}>VSWR target:</span><span>≤ {g.vswr_target}:1</span>
+                <span style={{ color: '#0ea5e9' }}>Line type:</span><span>{g.line_type}</span>
+                <span style={{ color: '#0ea5e9' }}>Line run:</span><span>{g.line_run_m} m</span>
+                <span style={{ color: '#0ea5e9' }}>Line loss:</span><span>{fmtF(g.line_loss_db, 2)} dB</span>
+                <span style={{ color: '#0ea5e9' }}>ATU design:</span>
+                <span style={{ fontWeight: 700, color: '#0284c7' }}>REQUIRED (PE)</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#0c4a6e', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#0ea5e9' }}>ATU fabrication:</span><span>${fmt(g.atu_low_usd)} – ${fmt(g.atu_high_usd)}</span>
+                <span style={{ color: '#0ea5e9' }}>Transmission line:</span><span>${fmt(g.line_low_usd)} – ${fmt(g.line_high_usd)}</span>
+                <span style={{ color: '#0ea5e9' }}>Impedance measure:</span><span>${fmt(g.impedance_measure_low_usd)} – ${fmt(g.impedance_measure_high_usd)}</span>
+                <span style={{ color: '#0ea5e9' }}>ATU design (PE):</span><span>${fmt(g.atu_design_low_usd)} – ${fmt(g.atu_design_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#0ea5e9', fontWeight: 600 }}>Total ATU + line:</span>
+                <span style={{ color: '#0c4a6e', fontWeight: 700 }}>${fmt(g.total_atu_low_usd)} – ${fmt(g.total_atu_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#38bdf8' }}>Ref: 47 CFR §73.1215, §73.1690; IEEE Std 100-1992</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Directional Antenna Phase and Ratio Verification Guide */}
+        {candidate.am_directional_antenna_phase_and_ratio_verification_guide && (() => {
+          const g = candidate.am_directional_antenna_phase_and_ratio_verification_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="dav-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: `2px solid ${g.is_da_station ? '#4338ca' : '#6b7280'}` }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>DA Phase &amp; Ratio Verification — §73.68 / §73.154</div>
+              {!g.is_da_station ? (
+                <div style={{ fontSize: 12, color: '#4b5563', padding: '6px 0' }}>
+                  NDA station — no DA phase/ratio monitoring required. DA-specific compliance cost: <strong>$0</strong>.
+                </div>
+              ) : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#1e1b4b', marginBottom: 8 }}>
+                    <span style={{ color: '#4338ca' }}>Pattern mode:</span><span style={{ fontWeight: 700 }}>{g.pattern_mode}</span>
+                    <span style={{ color: '#4338ca' }}>Phase tolerance:</span><span>±{g.phase_tolerance_deg}° (§73.68(a))</span>
+                    <span style={{ color: '#4338ca' }}>Ratio tolerance:</span><span>±{g.ratio_tolerance_pct}% (§73.61(b))</span>
+                    <span style={{ color: '#4338ca' }}>Proof radials:</span><span>{g.proof_radials} (§73.154(a))</span>
+                    <span style={{ color: '#4338ca' }}>Emergency NDA:</span><span>≤{g.emergency_nda_days} days (§73.68(c))</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: '#1e1b4b', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                    <span style={{ color: '#4338ca' }}>Phase/ratio monitor:</span><span>${fmt(g.monitor_low_usd)} – ${fmt(g.monitor_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>Monitor calibration:</span><span>${fmt(g.calibration_low_usd)} – ${fmt(g.calibration_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>Proof of performance:</span><span>${fmt(g.proof_low_usd)} – ${fmt(g.proof_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>Pattern design:</span><span>${fmt(g.design_low_usd)} – ${fmt(g.design_high_usd)}</span>
+                    <span style={{ color: '#4338ca' }}>FCC DA amendment:</span><span>${fmt(g.amendment_low_usd)} – ${fmt(g.amendment_high_usd)}</span>
+                  </div>
+                  <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #c7d2fe', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span style={{ color: '#4338ca', fontWeight: 600 }}>Total DA compliance:</span>
+                    <span style={{ color: '#1e1b4b', fontWeight: 700 }}>${fmt(g.total_da_low_usd)} – ${fmt(g.total_da_high_usd)}</span>
+                  </div>
+                </>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#6366f1' }}>Ref: 47 CFR §73.55, §73.61(b), §73.68, §73.154(a), §73.316(b)</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna Insulator and Base Voltage Protection Guide */}
+        {candidate.am_antenna_insulator_and_base_voltage_protection_guide && (() => {
+          const g = candidate.am_antenna_insulator_and_base_voltage_protection_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="bip-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Base Insulator &amp; Voltage Protection — §73.1215 / NFPA 780</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#7c2d12', marginBottom: 8 }}>
+                <span style={{ color: '#ea580c' }}>V_base RMS:</span><span>{fmtF(g.v_base_rms_vrms, 1)} V RMS</span>
+                <span style={{ color: '#ea580c' }}>V_peak:</span><span style={{ fontWeight: 700 }}>{fmtF(g.v_peak_kv, 2)} kV peak</span>
+                <span style={{ color: '#ea580c' }}>Insulator rating:</span><span>≥ {g.insulator_rating_kv_min} kV BIL (ANSI)</span>
+                <span style={{ color: '#ea580c' }}>Safety margin:</span><span>{fmtF(g.insulator_margin_ratio, 1)}× above V_peak</span>
+                <span style={{ color: '#ea580c' }}>Tower elements:</span><span>{g.n_tower_elements} ({g.n_tower_elements > 1 ? 'DA' : 'NDA'})</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#7c2d12', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#ea580c' }}>Annual inspection:</span><span>${fmt(g.inspect_low_usd)} – ${fmt(g.inspect_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>Insulator replacement:</span><span>${fmt(g.replace_low_usd)} – ${fmt(g.replace_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>RF choke (DC bond):</span><span>${fmt(g.choke_low_usd)} – ${fmt(g.choke_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>Spark gap:</span><span>${fmt(g.spark_low_usd)} – ${fmt(g.spark_high_usd)}</span>
+                <span style={{ color: '#ea580c' }}>MOV arrestor:</span><span>${fmt(g.mov_low_usd)} – ${fmt(g.mov_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fed7aa', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#ea580c', fontWeight: 600 }}>Total protection:</span>
+                <span style={{ color: '#7c2d12', fontWeight: 700 }}>${fmt(g.total_protection_low_usd)} – ${fmt(g.total_protection_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#c2410c' }}>Ref: 47 CFR §73.1215, §73.49; ANSI/IEEE Std 1313.1; NFPA 780</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Skywave Nighttime Service and Interference Guide */}
+        {candidate.am_skywave_nighttime_service_and_interference_guide && (() => {
+          const g = candidate.am_skywave_nighttime_service_and_interference_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="sky-guide" style={{ marginBottom: 16, padding: 12, background: '#1c0f1f', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#e879f9', marginBottom: 6, fontSize: 13 }}>Skywave Nighttime Service &amp; Interference — §73.182</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#f0abfc', marginBottom: 8 }}>
+                <span style={{ color: '#c026d3' }}>Clear channel:</span>
+                <span style={{ fontWeight: 700, color: g.is_clear_channel ? '#f0abfc' : '#6b7280' }}>
+                  {g.is_clear_channel ? 'YES' : 'NO'}
+                </span>
+                <span style={{ color: '#c026d3' }}>Dominant station:</span><span>{g.dominant_station}</span>
+                <span style={{ color: '#c026d3' }}>Night sign-off risk:</span>
+                <span style={{ fontWeight: 700, color: g.night_signoff_risk ? '#f87171' : '#4ade80' }}>
+                  {g.night_signoff_risk ? '⚠ YES — §73.182(m)' : 'NO'}
+                </span>
+                <span style={{ color: '#c026d3' }}>D/U study required:</span>
+                <span style={{ fontWeight: 700, color: g.du_study_required ? '#fbbf24' : '#4ade80' }}>
+                  {g.du_study_required ? 'YES — ITU-R P.1147' : 'NO'}
+                </span>
+                <span style={{ color: '#c026d3' }}>Skip zone est:</span><span>~{fmt(g.skip_zone_est_km)} km</span>
+                <span style={{ color: '#c026d3' }}>1st hop max:</span><span>~{fmt(g.skywave_first_hop_max_km)} km</span>
+              </div>
+              {g.night_signoff_risk && (
+                <div style={{ fontSize: 11, color: '#fca5a5', background: '#3b0a0a', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Class D secondary on clear channel — nighttime D/U study required. If inadequate, station must suspend nighttime ops per §73.182(m).
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#f0abfc', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#c026d3' }}>Skywave study:</span><span>${fmt(g.study_low_usd)} – ${fmt(g.study_high_usd)}</span>
+                <span style={{ color: '#c026d3' }}>FCC counsel:</span><span>${fmt(g.counsel_low_usd)} – ${fmt(g.counsel_high_usd)}</span>
+                <span style={{ color: '#c026d3' }}>STA (interim):</span><span>${fmt(g.sta_low_usd)} – ${fmt(g.sta_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #4a1d5e', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#c026d3', fontWeight: 600 }}>Total skywave compliance:</span>
+                <span style={{ color: '#e879f9', fontWeight: 700 }}>${fmt(g.total_compliance_low_usd)} – ${fmt(g.total_compliance_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#a855f7' }}>Ref: 47 CFR §73.182, §73.25, §73.27; ITU-R P.1147</div>
+            </div>
+          );
+        })()}
+
+        {/* AM License Renewal and Regulatory History Guide */}
+        {candidate.am_license_renewal_and_regulatory_history_guide && (() => {
+          const g = candidate.am_license_renewal_and_regulatory_history_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="rlh-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>License Renewal &amp; Regulatory Compliance — §73.3539 / §73.1125</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#14532d', marginBottom: 8 }}>
+                <span style={{ color: '#15803d' }}>Renewal cycle:</span><span>{g.renewal_cycle_years} years (§73.3539)</span>
+                <span style={{ color: '#15803d' }}>Renewal fee:</span><span>${fmt(g.form_renewal_fee_usd)} (FCC fee)</span>
+                <span style={{ color: '#15803d' }}>CoL distance:</span><span>{fmtF(g.distance_to_col_km, 1)} km of {fmtF(g.main_studio_max_distance_km, 1)} km limit</span>
+                <span style={{ color: '#15803d' }}>Main studio rule:</span>
+                <span style={{ fontWeight: 700, color: g.main_studio_compliant ? '#15803d' : '#b91c1c' }}>
+                  {g.main_studio_compliant ? '✓ COMPLIANT' : '✗ WAIVER NEEDED'}
+                </span>
+              </div>
+              {g.main_studio_waiver_needed && (
+                <div style={{ fontSize: 11, color: '#dc2626', background: '#fef2f2', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Candidate exceeds 25-mile (40.23 km) limit from CoL per §73.1125 — main studio waiver required.
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#14532d', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#15803d' }}>Renewal prep:</span><span>${fmt(g.renewal_prep_low_usd)} – ${fmt(g.renewal_prep_high_usd)}</span>
+                <span style={{ color: '#15803d' }}>Tech amendment:</span><span>${fmt(g.tech_amendment_low_usd)} – ${fmt(g.tech_amendment_high_usd)}</span>
+                <span style={{ color: '#15803d' }}>§1.65 notification:</span><span>${fmt(g.material_change_low_usd)} – ${fmt(g.material_change_high_usd)}</span>
+                {g.main_studio_waiver_needed && <><span style={{ color: '#15803d' }}>Waiver petition:</span><span>${fmt(g.waiver_low_usd)} – ${fmt(g.waiver_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bbf7d0', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#15803d', fontWeight: 600 }}>Total regulatory:</span>
+                <span style={{ color: '#14532d', fontWeight: 700 }}>${fmt(g.total_renewal_low_usd)} – ${fmt(g.total_renewal_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#16a34a' }}>Ref: 47 CFR §73.3539, §73.3527, §73.1125, §1.65, §73.3538</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Auxiliary Backup Transmitter Compliance Guide */}
+        {candidate.am_auxiliary_backup_transmitter_compliance_guide && (() => {
+          const g = candidate.am_auxiliary_backup_transmitter_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div key="bxt-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #7e22ce' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Auxiliary / Backup Transmitter — §73.1675 / §73.1560</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#3b0764', marginBottom: 8 }}>
+                <span style={{ color: '#7e22ce' }}>Backup TPO:</span><span>{fmtF(g.backup_tpo_kw, 1)} kW (≤ authorized)</span>
+                <span style={{ color: '#7e22ce' }}>Power tolerance:</span><span>±{g.power_tolerance_pct}% (§73.1560)</span>
+                <span style={{ color: '#7e22ce' }}>Authorized range:</span><span>{fmtF(g.tpo_authorized_low_kw, 1)}–{fmtF(g.tpo_authorized_high_kw, 1)} kW</span>
+                <span style={{ color: '#7e22ce' }}>DA station:</span><span>{g.is_da_station ? 'YES — pattern required' : 'NDA'}</span>
+                <span style={{ color: '#7e22ce' }}>Sep. antenna:</span>
+                <span style={{ fontWeight: 700, color: g.separate_antenna_needed ? '#b91c1c' : '#15803d' }}>
+                  {g.separate_antenna_needed ? 'NEEDED (>5 km)' : 'NOT NEEDED'}
+                </span>
+              </div>
+              {g.separate_antenna_needed && (
+                <div style={{ fontSize: 11, color: '#7e22ce', background: '#fae8ff', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Candidate &gt;5 km from current site — separate backup antenna needed (new CP + ASR required).
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#3b0764', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#7e22ce' }}>Backup TX:</span><span>${fmt(g.backup_tx_low_usd)} – ${fmt(g.backup_tx_high_usd)}</span>
+                <span style={{ color: '#7e22ce' }}>Transfer switch:</span><span>${fmt(g.ats_low_usd)} – ${fmt(g.ats_high_usd)}</span>
+                <span style={{ color: '#7e22ce' }}>Feedline:</span><span>${fmt(g.feedline_low_usd)} – ${fmt(g.feedline_high_usd)}</span>
+                <span style={{ color: '#7e22ce' }}>FCC exhibit:</span><span>${fmt(g.fcc_exhibit_low_usd)} – ${fmt(g.fcc_exhibit_high_usd)}</span>
+                {g.is_da_station && <><span style={{ color: '#7e22ce' }}>DA verification:</span><span>${fmt(g.da_verify_low_usd)} – ${fmt(g.da_verify_high_usd)}</span></>}
+                {g.separate_antenna_needed && <><span style={{ color: '#7e22ce' }}>Sep. antenna:</span><span>${fmt(g.separate_antenna_low_usd)} – ${fmt(g.separate_antenna_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #e9d5ff', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#7e22ce', fontWeight: 600 }}>Total backup system:</span>
+                <span style={{ color: '#3b0764', fontWeight: 700 }}>${fmt(g.total_backup_low_usd)} – ${fmt(g.total_backup_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#a855f7' }}>Ref: 47 CFR §73.1675, §73.1560, §73.1350(e)</div>
+            </div>
+          );
+        })()}
+
+        {/* AM EAS Equipment Readiness Guide */}
+        {candidate.am_eas_equipment_readiness_guide && (() => {
+          const g = candidate.am_eas_equipment_readiness_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="eas-guide" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', borderRadius: 8, border: '2px solid #1d4ed8' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>EAS Equipment Readiness — 47 CFR Part 11 / IPAWS</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#1e3a8a', marginBottom: 8 }}>
+                <span style={{ color: '#1d4ed8' }}>Encoder/decoder:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§11.11)</span>
+                <span style={{ color: '#1d4ed8' }}>CAP/IPAWS:</span>
+                <span style={{ fontWeight: 700, color: '#15803d' }}>REQUIRED (§11.56)</span>
+                <span style={{ color: '#1d4ed8' }}>Weekly test (RWT):</span><span>Every week §11.61</span>
+                <span style={{ color: '#1d4ed8' }}>Monthly test (RMT):</span><span>≥{g.eas_monthly_test_min_sec} s §11.61</span>
+                <span style={{ color: '#1d4ed8' }}>STL verification:</span>
+                <span style={{ fontWeight: 700, color: g.eas_stl_path_verification_needed ? '#b45309' : '#6b7280' }}>
+                  {g.eas_stl_path_verification_needed ? 'NEEDED' : 'NO'}
+                </span>
+                <span style={{ color: '#1d4ed8' }}>Backup power:</span>
+                <span>{g.backup_power_required ? 'Required (§11.35)' : 'Not required'}</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#1e3a8a', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#1d4ed8' }}>Encoder/decoder:</span><span>${fmt(g.encoder_decoder_low_usd)} – ${fmt(g.encoder_decoder_high_usd)}</span>
+                <span style={{ color: '#1d4ed8' }}>CAP interface:</span><span>${fmt(g.cap_interface_low_usd)} – ${fmt(g.cap_interface_high_usd)}</span>
+                <span style={{ color: '#1d4ed8' }}>Install + program:</span><span>${fmt(g.install_program_low_usd)} – ${fmt(g.install_program_high_usd)}</span>
+                <span style={{ color: '#1d4ed8' }}>STL reverification:</span><span>${fmt(g.stl_reverification_low_usd)} – ${fmt(g.stl_reverification_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #bfdbfe', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#1d4ed8', fontWeight: 600 }}>Total EAS (new site):</span>
+                <span style={{ color: '#1e3a8a', fontWeight: 700 }}>${fmt(g.total_eas_low_usd)} – ${fmt(g.total_eas_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#3b82f6' }}>Ref: 47 CFR §11.11, §11.35, §11.56, §11.61; FEMA IPAWS enrollment</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Structural Load and Wind Survival Guide */}
+        {candidate.am_tower_structural_load_and_wind_survival_guide && (() => {
+          const g = candidate.am_tower_structural_load_and_wind_survival_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=1) => n != null ? Number(n).toFixed(d) : '—';
+          const tierColor = g.compliance_tier === 'FULL_SE_ANALYSIS' ? '#b91c1c' : g.compliance_tier === 'STANDARD_ANALYSIS' ? '#b45309' : '#15803d';
+          return (
+            <div key="tsw-guide" style={{ marginBottom: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, border: '2px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Tower Structural Load &amp; Wind Survival — TIA-222-H / ASCE 7-22</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#1e293b', marginBottom: 8 }}>
+                <span style={{ color: '#475569' }}>Tower height:</span><span>{fmtF(g.tower_height_m, 1)} m ({g.tower_height_m != null ? (g.tower_height_m * 3.281).toFixed(0) : '—'} ft)</span>
+                <span style={{ color: '#475569' }}>Design wind:</span><span>{g.wind_design_mph} mph (90 mph 3-s gust)</span>
+                <span style={{ color: '#475569' }}>Wind force:</span><span>{fmtF(g.wind_force_kn, 1)} kN</span>
+                <span style={{ color: '#475569' }}>Base moment:</span><span>{fmtF(g.base_moment_knm, 0)} kN·m</span>
+                <span style={{ color: '#475569' }}>Fdn capacity req:</span><span>{fmtF(g.foundation_capacity_req_knm, 0)} kN·m (1.5× SF)</span>
+                <span style={{ color: '#475569' }}>Compliance tier:</span>
+                <span style={{ fontWeight: 700, color: tierColor }}>{g.compliance_tier?.replace(/_/g, ' ')}</span>
+              </div>
+              {g.compliance_tier === 'FULL_SE_ANALYSIS' && (
+                <div style={{ fontSize: 11, color: '#7c3aed', background: '#f5f3ff', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Tower height &gt;60 m requires full SE-stamped TIA-222-H analysis + FAA lighting inspection (§17.50).
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#1e293b', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#475569' }}>Struct review:</span><span>${fmt(g.struct_review_low_usd)} – ${fmt(g.struct_review_high_usd)}</span>
+                <span style={{ color: '#475569' }}>Foundation insp:</span><span>${fmt(g.foundation_low_usd)} – ${fmt(g.foundation_high_usd)}</span>
+                {g.faa_lighting_low_usd > 0 && <><span style={{ color: '#475569' }}>FAA lighting:</span><span>${fmt(g.faa_lighting_low_usd)} – ${fmt(g.faa_lighting_high_usd)}</span></>}
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#475569', fontWeight: 600 }}>Total structural:</span>
+                <span style={{ color: '#1e293b', fontWeight: 700 }}>${fmt(g.total_structural_low_usd)} – ${fmt(g.total_structural_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#64748b' }}>Ref: EIA/TIA-222-H, ASCE 7-22, 47 CFR §17.50</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Broadcast Tower Grounding and Cathodic Protection Guide */}
+        {candidate.am_broadcast_tower_grounding_and_cathodic_protection_guide && (() => {
+          const g = candidate.am_broadcast_tower_grounding_and_cathodic_protection_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="gcp-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf6ee', borderRadius: 8, border: '2px solid #92400e' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Tower Grounding &amp; Cathodic Protection — §73.190 / NFPA 780</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 12, color: '#451a03', marginBottom: 8 }}>
+                <span style={{ color: '#92400e' }}>Radials (std):</span><span>{fmt(g.n_radials_standard)}</span>
+                <span style={{ color: '#92400e' }}>Radial length:</span><span>{g.radial_length_m != null ? `${Number(g.radial_length_m).toFixed(1)} m` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Total copper:</span><span>{g.total_copper_wire_m != null ? `${fmt(g.total_copper_wire_m)} m` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Ground R:</span><span>{g.r_ground_std_ohm != null ? `${Number(g.r_ground_std_ohm).toFixed(1)} Ω` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Soil resistivity:</span><span>{g.soil_resistivity_ohm_m != null ? `${fmt(g.soil_resistivity_ohm_m)} Ω·m` : '—'}</span>
+                <span style={{ color: '#92400e' }}>CP recommended:</span>
+                <span style={{ fontWeight: 700, color: g.cp_recommended ? '#b91c1c' : '#15803d' }}>{g.cp_recommended ? 'YES' : 'NO'}</span>
+              </div>
+              {g.cp_recommended && (
+                <div style={{ fontSize: 11, color: '#92400e', background: '#fff7ed', borderRadius: 4, padding: '4px 6px', marginBottom: 6 }}>
+                  Soil resistivity &lt; 300 Ω·m — cathodic protection anode bed recommended per IEEE Std 80-2013 §12.
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: '#451a03', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px' }}>
+                <span style={{ color: '#92400e' }}>Ground system:</span><span>${fmt(g.ground_radials_low_usd)} – ${fmt(g.ground_radials_high_usd)}</span>
+                <span style={{ color: '#92400e' }}>CP anode bed:</span><span>{g.cp_recommended ? `$${fmt(g.cp_anode_bed_low_usd)} – $${fmt(g.cp_anode_bed_high_usd)}` : '—'}</span>
+                <span style={{ color: '#92400e' }}>Bonding / lightning:</span><span>${fmt(g.bonding_lightning_low_usd)} – ${fmt(g.bonding_lightning_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, paddingTop: 6, borderTop: '1px solid #fcd9a0', display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: '#92400e', fontWeight: 600 }}>Total ground system:</span>
+                <span style={{ color: '#78350f', fontWeight: 700 }}>${fmt(g.total_ground_low_usd)} – ${fmt(g.total_ground_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#a16207' }}>Ref: 47 CFR §73.190, §73.1820, NFPA 780, IEEE Std 80-2013</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna Base Current and Impedance Monitoring Guide */}
+        {candidate.am_antenna_base_current_and_impedance_monitoring_guide && (() => {
+          const g = candidate.am_antenna_base_current_and_impedance_monitoring_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="bcim-guide" style={{ marginBottom: 16, padding: 12, background: '#fef9f0', borderRadius: 8, border: '2px solid #b45309' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Base Current &amp; Impedance Monitoring — §73.61 / §73.68</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>λ/4 tower height:</span><span>{g.standard_height_m != null ? `${g.standard_height_m} m (${g.elec_deg}°)` : '—'}</span>
+                <span>R_rad (λ/4):</span><span>{g.r_rad_est_ohm != null ? `${g.r_rad_est_ohm} Ω` : '—'}</span>
+                <span>Authorized I_base:</span><span style={{ fontWeight: 700 }}>{g.i_base_authorized_a != null ? `${g.i_base_authorized_a} A` : '—'}</span>
+                <span>§73.61 ±2% range:</span><span>{g.i_base_authorized_range_a ?? '—'}</span>
+                <span>Meter type:</span><span>{g.meter_type ?? '—'}</span>
+                <span>Calibration interval:</span><span>{g.calibration_interval_months != null ? `${g.calibration_interval_months} months` : '—'}</span>
+                <span>Monitoring towers:</span><span>{g.n_monitoring_towers ?? '—'}</span>
+                {g.phase_monitor_cost_usd != null && <><span>Phase/ratio monitor:</span><span>${fmt(g.phase_monitor_cost_usd)}</span></>}
+                <span>Telemetry (SCADA):</span><span>${fmt(g.remote_telemetry_cost_usd)}</span>
+                <span>Total equip. capex:</span><span style={{ fontWeight: 700 }}>${fmt(g.total_monitoring_equip_low_usd)}–${fmt(g.total_monitoring_equip_high_usd)}</span>
+                <span>Annual calibration:</span><span>${fmt(g.calibration_cost_per_yr_usd)}/yr</span>
+                <span>ATU retune trigger:</span><span style={{ fontSize: 10 }}>{g.atu_retune_trigger ?? '—'}</span>
+                {g.field_meas_required_after_change && <><span>§73.68 field proof:</span><span style={{ color: '#b45309', fontWeight: 700 }}>Required after ATU change (${fmt(g.field_meas_cost_usd)})</span></>}
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#92400e', fontStyle: 'italic' }}>{g.note}</div>}
+              <div style={{ marginTop: 4, fontSize: 10, color: '#d97706' }}>Ref: {g.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Base RF Safety and Detuning Guide */}
+        {candidate.am_tower_base_rf_safety_and_detuning_guide && (() => {
+          const g = candidate.am_tower_base_rf_safety_and_detuning_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="tbrf-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Tower Base RF Safety &amp; Detuning — §73.49 / OET Bul. 65</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Base voltage (high est.):</span><span>{g.v_base_high_vrms != null ? `${g.v_base_high_vrms} V RMS` : '—'}</span>
+                <span>R_base range:</span><span>{g.r_base_est_ohm_low != null ? `${g.r_base_est_ohm_low}–${g.r_base_est_ohm_high} Ω` : '—'}</span>
+                <span>GP exclusion radius:</span><span>{g.rf_exclusion_radius_gp_m != null ? `${g.rf_exclusion_radius_gp_m} m` : '—'}</span>
+                <span>Occ. exclusion radius:</span><span>{g.rf_exclusion_radius_occ_m != null ? `${g.rf_exclusion_radius_occ_m} m` : '—'}</span>
+                <span>§73.49 fence required:</span><span style={{ color: '#15803d', fontWeight: 700 }}>{g.fence_required_by_regulation ? 'YES' : 'NO'}</span>
+                <span>Fence perimeter:</span><span>{g.fence_perimeter_ft != null ? `${g.fence_perimeter_ft} ft` : '—'}</span>
+                <span>Fence height:</span><span>{g.fence_height_m != null ? `${g.fence_height_m} m (8 ft min.)` : '—'}</span>
+                <span>Directional array:</span><span>{g.is_directional ? 'YES — detuning shack required' : 'No'}</span>
+                {g.is_directional && <><span>Detuning shack:</span><span>${fmt(g.detuning_shack_cost_low_usd)}–${fmt(g.detuning_shack_cost_high_usd)}</span></>}
+                <span>Base monitors (×{g.n_towers ?? 1}):</span><span>${fmt(g.base_monitor_total_usd)}</span>
+                <span>Total RF safety capex:</span><span style={{ fontWeight: 700 }}>${fmt(g.total_rf_safety_low_usd)}–${fmt(g.total_rf_safety_high_usd)}</span>
+                <span>Annual maintenance:</span><span>${fmt(g.annual_maint_low_usd)}–${fmt(g.annual_maint_high_usd)}/yr</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#166534', fontStyle: 'italic' }}>{g.note}</div>}
+              <div style={{ marginTop: 4, fontSize: 10, color: '#4ade80' }}>Ref: {g.reference}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Digital Broadcasting (IBOC/HD Radio) Guide */}
+        {candidate.am_digital_broadcasting_iboc_guide && (() => {
+          const g = candidate.am_digital_broadcasting_iboc_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="iboc-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf2f8', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#701a75', marginBottom: 6, fontSize: 13 }}>HD Radio (IBOC) Digital Broadcasting — NRSC-5-D</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#86198f' }}>
+                <span>IBOC mode:</span><span>{g.iboc_mode ?? '—'}</span>
+                <span>Analog carrier:</span><span>{g.analog_carrier_kw != null ? `${g.analog_carrier_kw} kW` : '—'}</span>
+                <span>Digital sidebands (–10 dBc):</span><span>{g.digital_sideband_kw != null ? `${g.digital_sideband_kw} kW ea.` : '—'}</span>
+                <span>IBOC bandwidth:</span><span>{g.iboc_bandwidth_khz != null ? `±${g.iboc_bandwidth_khz/2} kHz (${g.iboc_bandwidth_khz} kHz total)` : '—'}</span>
+                <span>Analog bandwidth (NRSC-2-B):</span><span>{g.analog_bandwidth_khz != null ? `≤ ${g.analog_bandwidth_khz} kHz` : '—'}</span>
+                <span>Adj. ch. degradation:</span><span style={{ color: '#dc2626' }}>{g.adjacent_channel_degradation_db != null ? `~${g.adjacent_channel_degradation_db} dB at ±10 kHz` : '—'}</span>
+                <span>IBOC benefit:</span><span style={{ fontWeight: 600, color: g.iboc_benefit_rating?.includes('HIGH') ? '#16a34a' : '#ca8a04' }}>{g.iboc_benefit_rating ?? '—'}</span>
+                <span>HD exciter + combiner:</span><span>{g.total_iboc_capex_low_usd != null ? `$${fmt(g.total_iboc_capex_low_usd)} – $${fmt(g.total_iboc_capex_high_usd)}` : '—'}</span>
+                <span>Annual license fee:</span><span>{g.annual_license_fee_usd != null ? `$${fmt(g.annual_license_fee_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c026d3', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Daytime vs Nighttime Coverage Differential Guide */}
+        {candidate.am_daytime_vs_nighttime_coverage_differential_guide && (() => {
+          const g = candidate.am_daytime_vs_nighttime_coverage_differential_guide;
+          const isSecondary = g.nighttime_restriction?.includes('SECONDARY');
+          return (
+            <div key="dnc-guide" style={{ marginBottom: 16, padding: 12, background: '#1e1b4b', borderRadius: 8, border: '2px solid #6366f1' }}>
+              <div style={{ fontWeight: 700, color: '#e0e7ff', marginBottom: 6, fontSize: 13 }}>Daytime vs. Nighttime Coverage Differential</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#c7d2fe' }}>
+                <span>ERP:</span><span>{g.erp_kw != null ? `${g.erp_kw} kW` : '—'}</span>
+                <span>Clear channel (780 kHz):</span><span style={{ color: g.is_clear_channel ? '#fbbf24' : '#94a3b8' }}>{g.is_clear_channel ? 'YES — dominant station protection' : 'No'}</span>
+                <span>Daytime 0.5 mV/m radius:</span><span>{g.daytime_05mvpm_radius_km != null ? `~${g.daytime_05mvpm_radius_km} km` : '—'}</span>
+                <span>Daytime 0.2 mV/m radius:</span><span>{g.daytime_02mvpm_radius_km != null ? `~${g.daytime_02mvpm_radius_km} km` : '—'}</span>
+                <span>Daytime coverage area:</span><span>{g.daytime_coverage_area_km2 != null ? `~${Number(g.daytime_coverage_area_km2).toLocaleString()} km²` : '—'}</span>
+                <span>Nighttime skywave reach:</span><span>{g.nighttime_skywave_radius_km != null ? `~${g.nighttime_skywave_radius_km} km` : '—'}</span>
+                <span>Nighttime interference zone:</span><span>{g.nighttime_interference_zone_km != null ? `${g.nighttime_interference_zone_km} km` : '—'}</span>
+                <span>Nighttime restriction:</span><span style={{ color: isSecondary ? '#f87171' : '#86efac', fontWeight: 600, fontSize: 11 }}>{g.nighttime_restriction ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#a5b4fc', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna Tower Lighting and Marking Guide */}
+        {candidate.am_antenna_tower_lighting_and_marking_guide && (() => {
+          const g = candidate.am_antenna_tower_lighting_and_marking_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="ltg-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Tower Lighting &amp; Marking (§17.21 / FAA AC 70/7460-1M)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Lighting required:</span><span style={{ fontWeight: 600, color: g.lighting_required ? '#dc2626' : '#16a34a' }}>{g.lighting_required === true ? 'YES (> 200 ft AGL)' : 'No (≤ 200 ft AGL)'}</span>
+                <span>Lighting category:</span><span style={{ fontSize: 11 }}>{g.lighting_category ?? '—'}</span>
+                <span>Paint bands:</span><span>{g.paint_bands ?? '—'} alternating (aviation orange/white)</span>
+                <span>Tower surface area:</span><span>{g.tower_surface_area_sqft != null ? `${fmt(Math.round(g.tower_surface_area_sqft))} sq ft` : '—'}</span>
+                <span>LED lighting system:</span><span>{g.led_system_cost_low_usd != null ? `$${fmt(g.led_system_cost_low_usd)} – $${fmt(g.led_system_cost_high_usd)}` : '—'}</span>
+                <span>Tower painting:</span><span>{g.painting_cost_low_usd != null ? `$${fmt(Math.round(g.painting_cost_low_usd))} – $${fmt(Math.round(g.painting_cost_high_usd))}` : '—'}</span>
+                <span>Annual maintenance:</span><span>{g.annual_lighting_maintenance_low_usd != null ? `$${fmt(g.annual_lighting_maintenance_low_usd)} – $${fmt(g.annual_lighting_maintenance_high_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0284c7', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Construction Contractor and PM Guide */}
+        {candidate.am_construction_contractor_and_pm_guide && (() => {
+          const g = candidate.am_construction_contractor_and_pm_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="pm-guide" style={{ marginBottom: 16, padding: 12, background: '#fff9f0', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Construction &amp; Project Management</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Phase 1 (site prep):</span><span>{g.phase1_weeks_low != null ? `${g.phase1_weeks_low}–${g.phase1_weeks_high} wks` : '—'}</span>
+                <span>Phase 2 (foundation):</span><span>{g.phase2_weeks_low != null ? `${g.phase2_weeks_low}–${g.phase2_weeks_high} wks` : '—'}</span>
+                <span>Phase 3 (tower erection):</span><span>{g.phase3_weeks_low != null ? `${g.phase3_weeks_low}–${g.phase3_weeks_high} wks` : '—'}</span>
+                <span>Phase 4 (TL/antenna):</span><span>{g.phase4_weeks_low != null ? `${g.phase4_weeks_low}–${g.phase4_weeks_high} wks` : '—'}</span>
+                <span>Phase 5 (TX/proof):</span><span>{g.phase5_weeks_low != null ? `${g.phase5_weeks_low}–${g.phase5_weeks_high} wks` : '—'}</span>
+                <span>Total timeline:</span><span style={{ fontWeight: 600 }}>{g.total_construction_weeks_low != null ? `${g.total_construction_weeks_low}–${g.total_construction_weeks_high} weeks` : '—'}</span>
+                <span>Tower crew (NATE):</span><span>{g.tower_erection_days_low != null ? `${g.tower_erection_days_low}–${g.tower_erection_days_high} days × $${fmt(g.tower_crew_day_rate_low_usd)}/day` : '—'}</span>
+                <span>Tower erection cost:</span><span>{g.tower_erection_cost_low_usd != null ? `$${fmt(g.tower_erection_cost_low_usd)} – $${fmt(g.tower_erection_cost_high_usd)}` : '—'}</span>
+                <span>GC markup:</span><span>{g.gc_markup_pct_low != null ? `${g.gc_markup_pct_low}–${g.gc_markup_pct_high}%` : '—'}</span>
+                <span>PM cost:</span><span>{g.pm_cost_pct_low != null ? `${g.pm_cost_pct_low}–${g.pm_cost_pct_high}% of project` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Station Financial Feasibility Guide */}
+        {candidate.am_station_financial_feasibility_guide && (() => {
+          const g = candidate.am_station_financial_feasibility_guide;
+          const fmt = (n) => n != null ? Number(Math.round(n)).toLocaleString() : '—';
+          const isViable = g.feasibility_flag === 'POTENTIALLY_VIABLE';
+          return (
+            <div key="fin-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: `2px solid ${isViable ? '#16a34a' : '#dc2626'}` }}>
+              <div style={{ fontWeight: 700, color: isViable ? '#14532d' : '#7f1d1d', marginBottom: 6, fontSize: 13 }}>Financial Feasibility Analysis</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: isViable ? '#166534' : '#991b1b' }}>
+                <span>Est. capex range:</span><span>${fmt(g.capex_low_usd)} – ${fmt(g.capex_high_usd)}</span>
+                <span>Revenue uplift/yr:</span><span>${fmt(g.annual_revenue_uplift_low_usd)} – ${fmt(g.annual_revenue_uplift_high_usd)}</span>
+                <span>Payback period:</span><span>{g.payback_years_low != null ? `${g.payback_years_low}–${g.payback_years_high} yrs` : '—'}</span>
+                <span>Discount rate:</span><span>{g.discount_rate_low != null ? `${(g.discount_rate_low*100).toFixed(0)}–${(g.discount_rate_high*100).toFixed(0)}%` : '—'}</span>
+                <span>10-yr NPV (optimistic):</span><span style={{ color: g.npv_optimistic_10yr > 0 ? '#16a34a' : '#dc2626', fontWeight: 600 }}>{g.npv_optimistic_10yr != null ? `$${fmt(g.npv_optimistic_10yr)}` : '—'}</span>
+                <span>10-yr NPV (pessimistic):</span><span style={{ color: '#dc2626' }}>{g.npv_pessimistic_10yr != null ? `$${fmt(g.npv_pessimistic_10yr)}` : '—'}</span>
+                <span>Feasibility:</span><span style={{ fontWeight: 700, color: isViable ? '#16a34a' : '#dc2626' }}>{g.feasibility_flag ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: isViable ? '#15803d' : '#b91c1c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Frequency Monitoring and Technical Compliance Guide */}
+        {candidate.am_frequency_monitoring_and_technical_compliance_guide && (() => {
+          const g = candidate.am_frequency_monitoring_and_technical_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="fmtc-guide" style={{ marginBottom: 16, padding: 12, background: '#faf5ff', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#4c1d95', marginBottom: 6, fontSize: 13 }}>Frequency Monitoring &amp; Technical Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#5b21b6' }}>
+                <span>Carrier frequency:</span><span>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
+                <span>Freq. tolerance (§73.1560):</span><span>±{g.freq_tolerance_hz ?? '—'} Hz</span>
+                <span>Mod. limit neg/pos (§73.1570):</span><span>{g.mod_negative_peak_pct != null ? `${g.mod_negative_peak_pct}% / ${g.mod_positive_peak_pct}%` : '—'}</span>
+                <span>Audio BW (NRSC-2-B):</span><span>{g.audio_bandwidth_khz != null ? `≤ ${g.audio_bandwidth_khz} kHz` : '—'}</span>
+                <span>Frequency monitor:</span><span>{g.frequency_monitor_low_usd != null ? `$${fmt(g.frequency_monitor_low_usd)} – $${fmt(g.frequency_monitor_high_usd)}` : '—'}</span>
+                <span>Modulation monitor:</span><span>{g.mod_monitor_low_usd != null ? `$${fmt(g.mod_monitor_low_usd)} – $${fmt(g.mod_monitor_high_usd)}` : '—'}</span>
+                <span>NRSC-2-B filter:</span><span>{g.nrsc_filter_low_usd != null ? `$${fmt(g.nrsc_filter_low_usd)} – $${fmt(g.nrsc_filter_high_usd)}` : '—'}</span>
+                <span>Total monitoring equip:</span><span style={{ fontWeight: 600 }}>{g.total_monitoring_equip_low_usd != null ? `$${fmt(g.total_monitoring_equip_low_usd)} – $${fmt(g.total_monitoring_equip_high_usd)}` : '—'}</span>
+                <span>Annual compliance:</span><span>{g.annual_fcc_compliance_low_usd != null ? `$${fmt(g.annual_fcc_compliance_low_usd)} – $${fmt(g.annual_fcc_compliance_high_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#6d28d9', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Broadcast Facility Security Guide */}
+        {candidate.am_broadcast_facility_security_guide && (() => {
+          const g = candidate.am_broadcast_facility_security_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="sec-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Broadcast Facility Security (§73.49)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft` : '—'}</span>
+                <span>Fence height (§73.49 min):</span><span>{g.fence_height_ft != null ? `${g.fence_height_ft} ft` : '—'}</span>
+                <span>Guy anchor radius:</span><span>{g.guy_radius_ft_low != null ? `${g.guy_radius_ft_low}–${g.guy_radius_ft_high} ft` : '—'}</span>
+                <span>Fence perimeter (est.):</span><span>{g.fence_perimeter_ft != null ? `${fmt(g.fence_perimeter_ft)} ft` : '—'}</span>
+                <span>Fence cost:</span><span>{g.fence_cost_low_usd != null ? `$${fmt(Math.round(g.fence_cost_low_usd))} – $${fmt(Math.round(g.fence_cost_high_usd))}` : '—'}</span>
+                <span>Gate &amp; access control:</span><span>{g.gate_and_access_low_usd != null ? `$${fmt(g.gate_and_access_low_usd)} – $${fmt(g.gate_and_access_high_usd)}` : '—'}</span>
+                <span>Security capex total:</span><span style={{ fontWeight: 600 }}>{g.total_security_capex_low_usd != null ? `$${fmt(Math.round(g.total_security_capex_low_usd))} – $${fmt(Math.round(g.total_security_capex_high_usd))}` : '—'}</span>
+                <span>Monitoring (annual):</span><span>{g.monitoring_annual_low_usd != null ? `$${fmt(g.monitoring_annual_low_usd)} – $${fmt(g.monitoring_annual_high_usd)}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Structural Analysis Guide */}
+        {candidate.am_tower_structural_analysis_guide && (() => {
+          const g = candidate.am_tower_structural_analysis_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="str-guide" style={{ marginBottom: 16, padding: 12, background: '#fff8f1', borderRadius: 8, border: '2px solid #f97316' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Tower Structural Analysis</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Design standard:</span><span>{g.design_standard ?? '—'}</span>
+                <span>Load standard:</span><span>{g.load_standard ?? '—'}</span>
+                <span>Design wind speed:</span><span>{g.design_wind_speed_mph_low != null ? `${g.design_wind_speed_mph_low}–${g.design_wind_speed_mph_high} mph (3-sec gust)` : '—'}</span>
+                <span>Ice radial load:</span><span>{g.ice_radial_in != null ? `${g.ice_radial_in}" (arid SW)` : '—'}</span>
+                <span>Guy levels:</span><span>{g.guy_levels ?? '—'}</span>
+                <span>Guy wire pretension:</span><span>{g.guy_wire_pretension_pct_low != null ? `${g.guy_wire_pretension_pct_low}–${g.guy_wire_pretension_pct_high}% RBS` : '—'}</span>
+                <span>Structural analysis:</span><span>{g.structural_analysis_low_usd != null ? `$${fmt(g.structural_analysis_low_usd)} – $${fmt(g.structural_analysis_high_usd)}` : '—'}</span>
+                <span>PE stamp:</span><span>{g.pe_stamp_low_usd != null ? `$${fmt(g.pe_stamp_low_usd)} – $${fmt(g.pe_stamp_high_usd)}` : '—'}</span>
+                <span>Total structural cost:</span><span style={{ fontWeight: 600, color: '#dc2626' }}>{g.total_structural_low_usd != null ? `$${fmt(g.total_structural_low_usd)} – $${fmt(g.total_structural_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Insurance and Liability Guide */}
+        {candidate.am_insurance_and_liability_guide && (() => {
+          const g = candidate.am_insurance_and_liability_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="ins-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdfa', borderRadius: 8, border: '2px solid #0d9488' }}>
+              <div style={{ fontWeight: 700, color: '#134e4a', marginBottom: 6, fontSize: 13 }}>Insurance &amp; Liability</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0f766e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Tower replacement value:</span><span>{g.tower_replacement_value_low_usd != null ? `$${fmt(g.tower_replacement_value_low_usd)} – $${fmt(g.tower_replacement_value_high_usd)}` : '—'}</span>
+                <span>Equipment value:</span><span>{g.equipment_value_low_usd != null ? `$${fmt(g.equipment_value_low_usd)} – $${fmt(g.equipment_value_high_usd)}` : '—'}</span>
+                <span>Total insured value:</span><span style={{ fontWeight: 600 }}>{g.total_insured_value_low_usd != null ? `$${fmt(g.total_insured_value_low_usd)} – $${fmt(g.total_insured_value_high_usd)}` : '—'}</span>
+                <span>Property premium/yr:</span><span>{g.annual_property_premium_low_usd != null ? `$${fmt(Math.round(g.annual_property_premium_low_usd))} – $${fmt(Math.round(g.annual_property_premium_high_usd))}` : '—'}</span>
+                <span>GL premium/yr:</span><span>{g.annual_gl_premium_low_usd != null ? `$${fmt(g.annual_gl_premium_low_usd)} – $${fmt(g.annual_gl_premium_high_usd)}` : '—'}</span>
+                <span>Total annual insurance:</span><span style={{ color: '#dc2626', fontWeight: 600 }}>{g.total_annual_insurance_low_usd != null ? `$${fmt(Math.round(g.total_annual_insurance_low_usd))} – $${fmt(Math.round(g.total_annual_insurance_high_usd))}/yr` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0f766e', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmission Line and Phasor Guide */}
+        {candidate.am_transmission_line_and_phasor_guide && (() => {
+          const g = candidate.am_transmission_line_and_phasor_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="tl-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: '2px solid #e11d48' }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Transmission Line &amp; Phasor System</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9f1239' }}>
+                <span>Pattern mode:</span><span>{g.pattern_mode ?? '—'} {g.is_directional ? '(DA — phasor required)' : '(NDA)'}</span>
+                <span>Wavelength (λ):</span><span>{g.lambda_m != null ? `${g.lambda_m} m` : '—'}</span>
+                <span>Rec. TL type:</span><span>{g.tl_type_recommended ?? '—'}</span>
+                <span>VF (open wire / hardline):</span><span>{g.vf_open_wire != null ? `${g.vf_open_wire} / ${g.vf_hardline}` : '—'}</span>
+                <span>TL run estimate:</span><span>{g.tl_run_ft_typical_low != null ? `${g.tl_run_ft_typical_low}–${g.tl_run_ft_typical_high} ft` : '—'}</span>
+                <span>TL cost:</span><span>{g.tl_cost_low_usd != null ? `$${fmt(g.tl_cost_low_usd)} – $${fmt(g.tl_cost_high_usd)}` : '—'}</span>
+                {g.is_directional && <><span>Phasor cost:</span><span style={{ color: '#dc2626' }}>{g.phasor_cost_low_usd != null ? `$${fmt(g.phasor_cost_low_usd)} – $${fmt(g.phasor_cost_high_usd)}` : '—'}</span></>}
+                <span>Base tuning unit:</span><span>{g.base_tuning_low_usd != null ? `$${fmt(g.base_tuning_low_usd)} – $${fmt(g.base_tuning_high_usd)}` : '—'}</span>
+                <span>Total TL system:</span><span style={{ fontWeight: 600 }}>{g.total_tl_system_low_usd != null ? `$${fmt(g.total_tl_system_low_usd)} – $${fmt(g.total_tl_system_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#be123c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Zoning and Land Use Approval Guide */}
+        {candidate.am_zoning_and_land_use_approval_guide && (() => {
+          const g = candidate.am_zoning_and_land_use_approval_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="zon-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #9333ea' }}>
+              <div style={{ fontWeight: 700, color: '#581c87', marginBottom: 6, fontSize: 13 }}>Zoning &amp; Land Use Approval</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7e22ce' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Setback (typical 1×h):</span><span>{g.setback_ft_typical != null ? `${fmt(g.setback_ft_typical)} ft (${g.setback_m_typical} m)` : '—'}</span>
+                <span>Setback (strict 1.5×h):</span><span>{g.setback_ft_strict != null ? `${fmt(g.setback_ft_strict)} ft` : '—'}</span>
+                <span>Min. parcel size:</span><span style={{ color: '#dc2626' }}>{g.min_parcel_acres != null ? `~${g.min_parcel_acres} acres` : '—'}</span>
+                <span>CUP/SUP application:</span><span>{g.cup_application_low_usd != null ? `$${fmt(g.cup_application_low_usd)} – $${fmt(g.cup_application_high_usd)}` : '—'}</span>
+                <span>Zoning legal fees:</span><span>{g.zoning_attorney_low_usd != null ? `$${fmt(g.zoning_attorney_low_usd)} – $${fmt(g.zoning_attorney_high_usd)}` : '—'}</span>
+                <span>Total zoning cost:</span><span style={{ fontWeight: 600 }}>{g.total_zoning_low_usd != null ? `$${fmt(g.total_zoning_low_usd)} – $${fmt(g.total_zoning_high_usd)}` : '—'}</span>
+                <span>Timeline:</span><span>{g.zoning_timeline_weeks_low != null ? `${g.zoning_timeline_weeks_low}–${g.zoning_timeline_weeks_high} weeks` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#a21caf', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Environmental and NEPA Compliance Guide */}
+        {candidate.am_environmental_and_nepa_compliance_guide && (() => {
+          const g = candidate.am_environmental_and_nepa_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const isCE = g.nepa_category === 'CATEGORICAL_EXCLUSION';
+          return (
+            <div key="nepa-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #ca8a04' }}>
+              <div style={{ fontWeight: 700, color: '#713f12', marginBottom: 6, fontSize: 13 }}>Environmental &amp; NEPA Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>NEPA category:</span><span style={{ fontWeight: 600, color: isCE ? '#16a34a' : '#dc2626' }}>{g.nepa_category ?? '—'}</span>
+                <span>Phase I ESA:</span><span>{g.phase1_esa_low_usd != null ? `$${fmt(g.phase1_esa_low_usd)} – $${fmt(g.phase1_esa_high_usd)}` : '—'}</span>
+                <span>Section 106 review:</span><span>{g.section106_review_low_usd != null ? `$${fmt(g.section106_review_low_usd)} – $${fmt(g.section106_review_high_usd)}` : '—'}</span>
+                {!isCE && <><span>Full EA cost:</span><span style={{ color: '#dc2626' }}>{g.full_ea_low_usd != null ? `$${fmt(g.full_ea_low_usd)} – $${fmt(g.full_ea_high_usd)}` : '—'}</span></>}
+                <span>Total env. compliance:</span><span style={{ fontWeight: 600 }}>{g.total_env_cost_low_usd != null ? `$${fmt(g.total_env_cost_low_usd)} – $${fmt(g.total_env_cost_high_usd)}` : '—'}</span>
+                <span>NEPA timeline:</span><span>{g.nepa_timeline_weeks_low != null ? `${g.nepa_timeline_weeks_low}–${g.nepa_timeline_weeks_high} weeks` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#a16207', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM FAA Aeronautical Study and Airspace Guide */}
+        {candidate.am_faa_aeronautical_study_and_airspace_guide && (() => {
+          const g = candidate.am_faa_aeronautical_study_and_airspace_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="faa-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>FAA Aeronautical Study &amp; Airspace</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>FAA Form 7460-1:</span><span style={{ fontWeight: 600, color: g.notice_required ? '#dc2626' : '#16a34a' }}>{g.notice_required === true ? 'REQUIRED (> 200 ft AGL)' : g.notice_required === false ? 'Not required (≤ 200 ft)' : '—'}</span>
+                <span>Obstruction lighting:</span><span>{g.lighting_type ?? '—'}</span>
+                <span>Airport study radius:</span><span>{g.airport_proximity_study_radius_nm != null ? `${g.airport_proximity_study_radius_nm} nm` : '—'}</span>
+                <span>Study timeline:</span><span>{g.faa_study_duration_weeks_low != null ? `${g.faa_study_duration_weeks_low}–${g.faa_study_duration_weeks_high} weeks` : '—'}</span>
+                <span>Study cost:</span><span>{g.faa_study_cost_low_usd != null ? `$${fmt(g.faa_study_cost_low_usd)} – $${fmt(g.faa_study_cost_high_usd)}` : '—'}</span>
+                <span>Lighting install:</span><span>{g.obstruction_lighting_install_low_usd != null ? `$${fmt(g.obstruction_lighting_install_low_usd)} – $${fmt(g.obstruction_lighting_install_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#15803d', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM RF Exposure and OET-65 Compliance Guide */}
+        {candidate.am_rf_exposure_and_oet65_compliance_guide && (() => {
+          const g = candidate.am_rf_exposure_and_oet65_compliance_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="rf65-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>RF Exposure &amp; OET-65 Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>ERP:</span><span>{g.erp_kw != null ? `${g.erp_kw} kW` : '—'}</span>
+                <span>MPE limit (general public):</span><span>{g.mpe_general_mv_per_m != null ? `${g.mpe_general_mv_per_m} mV/m (${g.mpe_general_uW_per_cm2} µW/cm²)` : '—'}</span>
+                <span>Exclusion zone (general):</span><span style={{ color: '#dc2626' }}>{g.exclusion_radius_m_general != null ? `${fmt(g.exclusion_radius_m_general)} m (${g.exclusion_radius_km_general} km)` : '—'}</span>
+                <span>Exclusion zone (controlled):</span><span>{g.exclusion_radius_m_controlled != null ? `${fmt(g.exclusion_radius_m_controlled)} m (${g.exclusion_radius_km_controlled} km)` : '—'}</span>
+                <span>§1.1310 evaluation:</span><span style={{ fontWeight: 600, color: g.evaluation_required ? '#dc2626' : '#16a34a' }}>{g.evaluation_required === true ? 'REQUIRED' : g.evaluation_required === false ? 'Not required' : '—'}</span>
+                <span>Evaluation cost:</span><span>{g.evaluation_cost_low_usd != null ? `$${fmt(g.evaluation_cost_low_usd)} – $${fmt(g.evaluation_cost_high_usd)}` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Foundation and Civil Engineering Guide */}
+        {candidate.am_tower_foundation_and_civil_engineering_guide && (() => {
+          const g = candidate.am_tower_foundation_and_civil_engineering_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div key="tfciv-guide" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', borderRadius: 8, border: '2px solid #2563eb' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>Tower Foundation &amp; Civil Engineering</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#1e40af' }}>
+                <span>Tower class/height:</span><span>{g.fcc_class_used ?? '—'} — {g.tower_height_ft != null ? `${g.tower_height_ft} ft (${g.tower_height_m} m)` : '—'}</span>
+                <span>Base pier depth:</span><span>{g.base_pier_depth_ft_low != null ? `${g.base_pier_depth_ft_low}–${g.base_pier_depth_ft_high} ft` : '—'}</span>
+                <span>Concrete (base pier):</span><span>{g.concrete_cuyd_low != null ? `${g.concrete_cuyd_low}–${g.concrete_cuyd_high} cu yd` : '—'}</span>
+                <span>Guy anchors:</span><span>{g.guy_anchor_count ?? '—'} × {g.guy_anchor_cuyd_each_low != null ? `${g.guy_anchor_cuyd_each_low}–${g.guy_anchor_cuyd_each_high} cu yd` : '—'}</span>
+                <span>Geotech study:</span><span>{g.geo_study_low_usd != null ? `$${fmt(g.geo_study_low_usd)} – $${fmt(g.geo_study_high_usd)}` : '—'}</span>
+                <span>Civil/foundation total:</span><span style={{ color: '#dc2626' }}>{g.civil_foundation_low_usd != null ? `$${fmt(g.civil_foundation_low_usd)} – $${fmt(g.civil_foundation_high_usd)}` : '—'}</span>
+                <span>Design standard:</span><span>{g.design_standard ?? '—'}</span>
+                <span>Concrete standard:</span><span>{g.concrete_standard ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#1d4ed8', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Terrain and Propagation Assessment Guide */}
+        {candidate.am_terrain_and_propagation_assessment_guide && (() => {
+          const g = candidate.am_terrain_and_propagation_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ter-guide" style={{ marginBottom: 16, padding: 12, background: '#fafafa', borderRadius: 8, border: '2px solid #737373' }}>
+              <div style={{ fontWeight: 700, color: '#1c1917', marginBottom: 6, fontSize: 13 }}>Terrain &amp; Propagation Assessment</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#44403c' }}>
+                <span>Candidate location:</span><span>{g.candidate_lat != null ? `${g.candidate_lat}°N, ${Math.abs(g.candidate_lon)}°W` : '—'}</span>
+                <span>Est. elevation:</span><span>{g.elevation_proxy_m != null ? `~${g.elevation_proxy_m.toFixed(0)} m` : '—'}</span>
+                <span>FCC M3 zone:</span><span>{g.fcc_m3_zone ?? '—'}</span>
+                <span>Conductivity (σ):</span><span>{g.conductivity_ms_per_m_low != null ? `${g.conductivity_ms_per_m_low}–${g.conductivity_ms_per_m_high} mS/m` : '—'}</span>
+                <span>Conductivity penalty:</span><span style={{ color: '#dc2626' }}>{g.conductivity_penalty_db_low != null ? `${g.conductivity_penalty_db_low}–${g.conductivity_penalty_db_high} dB vs ideal ground` : '—'}</span>
+                <span>Engineering study:</span><span>{fmt(g.terrain_study_low_usd)} – {fmt(g.terrain_study_high_usd)}</span>
+              </div>
+              {g.study_tools && g.study_tools.length > 0 && (
+                <div style={{ marginTop: 6, fontSize: 11, color: '#57534e' }}>
+                  Tools: {g.study_tools.join('; ')}
+                </div>
+              )}
+              {g.note && <div style={{ marginTop: 4, fontSize: 11, color: '#78716c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Annual Operating Cost Breakdown Guide */}
+        {candidate.am_annual_operating_cost_breakdown_guide && (() => {
+          const g = candidate.am_annual_operating_cost_breakdown_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="aoc-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Annual Operating Cost Breakdown</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Grid draw:</span><span>{g.electricity_draw_kw != null ? `${g.electricity_draw_kw} kW` : '—'} ({g.kwh_per_year != null ? `${g.kwh_per_year.toLocaleString()} kWh/yr` : '—'})</span>
+                <span>Electricity:</span><span>{fmt(g.electricity_low_usd)} – {fmt(g.electricity_high_usd)}/yr</span>
+                <span>Diesel fuel:</span><span>{fmt(g.diesel_low_usd)} – {fmt(g.diesel_high_usd)}/yr ({g.diesel_gal_per_year != null ? `${g.diesel_gal_per_year} gal` : '—'})</span>
+                <span>Land lease:</span><span>{fmt(g.land_lease_low_usd)} – {fmt(g.land_lease_high_usd)}/yr</span>
+                <span>Tower inspection:</span><span>{fmt(g.tower_inspection_low_usd)} – {fmt(g.tower_inspection_high_usd)}/yr</span>
+                <span>FCC annual fee:</span><span>{fmt(g.fcc_annual_fee_low_usd)} – {fmt(g.fcc_annual_fee_high_usd)}/yr</span>
+                <span>Maintenance:</span><span>{fmt(g.maintenance_low_usd)} – {fmt(g.maintenance_high_usd)}/yr</span>
+                <span>Security:</span><span>{fmt(g.security_low_usd)} – {fmt(g.security_high_usd)}/yr</span>
+                <span style={{ fontWeight: 600 }}>Total annual:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}/yr</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#15803d', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Modulation and Audio Processing Guide */}
+        {candidate.am_modulation_and_audio_processing_guide && (() => {
+          const g = candidate.am_modulation_and_audio_processing_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="map-guide" style={{ marginBottom: 16, padding: 12, background: '#fef9f0', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Modulation &amp; Audio Processing</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Pos. modulation limit:</span><span>{g.pos_mod_limit_pct != null ? `${g.pos_mod_limit_pct}%` : '—'} (§73.1570)</span>
+                <span>Neg. modulation limit:</span><span>{g.neg_mod_limit_pct != null ? `${g.neg_mod_limit_pct}%` : '—'}</span>
+                <span>Audio bandwidth:</span><span>{g.audio_bandwidth_hz != null ? `${g.audio_bandwidth_hz/1000} kHz` : '—'}</span>
+                <span>Min SNR:</span><span>{g.min_snr_db != null ? `${g.min_snr_db} dB` : '—'}</span>
+                <span>HD Radio digital:</span><span>{g.iboc_digital_power_dbc != null ? `${g.iboc_digital_power_dbc} dBc` : '—'} = {g.iboc_digital_kw != null ? `${g.iboc_digital_kw} kW` : '—'}</span>
+                <span>Audio processor:</span><span>{fmt(g.audio_processor_low_usd)} – {fmt(g.audio_processor_high_usd)}</span>
+                <span>Modulation monitor:</span><span>{fmt(g.mod_monitor_low_usd)} – {fmt(g.mod_monitor_high_usd)}</span>
+                <span>HD Radio upgrade:</span><span>{fmt(g.iboc_upgrade_low_usd)} – {fmt(g.iboc_upgrade_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Basic total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_basic_low_usd)} – {fmt(g.total_basic_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Frequency Allocation Class and Channel Guide */}
+        {candidate.am_frequency_allocation_class_and_channel_guide && (() => {
+          const g = candidate.am_frequency_allocation_class_and_channel_guide;
+          const chColor = g.channel_type === 'clear' ? '#1d4ed8' : g.channel_type === 'regional' ? '#15803d' : '#92400e';
+          return (
+            <div key="fac-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: `2px solid ${chColor}` }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Frequency Allocation &amp; Station Class</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>Frequency:</span><span style={{ fontWeight: 600 }}>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
+                <span>Channel type:</span><span style={{ fontWeight: 600, color: chColor, textTransform: 'capitalize' }}>{g.channel_type}</span>
+                <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.class_coverage ?? '—'})</span>
+                <span>Max power (day):</span><span>{g.class_max_day_kw != null ? `${g.class_max_day_kw} kW` : '—'}</span>
+                <span>Max power (night):</span><span>{g.class_max_night_kw != null ? (g.class_max_night_kw === 0 ? 'Secondary only' : `${g.class_max_night_kw} kW`) : '—'}</span>
+                <span>Current TPO:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'} ({g.tpo_pct_of_max != null ? `${g.tpo_pct_of_max}% of max` : '—'})</span>
+                <span>Upgrade headroom:</span><span>{g.upgrade_potential_kw != null ? (g.upgrade_potential_kw > 0 ? `${g.upgrade_potential_kw} kW available` : 'None') : '—'}</span>
+                <span>Protection:</span><span style={{ fontSize: 11 }}>{g.class_protection ?? '—'}</span>
+                <span>Nighttime ops:</span><span style={{ fontSize: 11 }}>{g.class_nighttime ?? '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#475569', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM TPO and Antenna Efficiency Guide */}
+        {candidate.am_tpo_and_antenna_efficiency_guide && (() => {
+          const g = candidate.am_tpo_and_antenna_efficiency_guide;
+          return (
+            <div key="tae-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 8, border: '2px solid #4338ca' }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>TPO &amp; Antenna Efficiency</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
+                <span>TPO:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'}</span>
+                <span>Radiation resistance (Rr):</span><span>{g.radiation_resistance_ohms != null ? `${g.radiation_resistance_ohms} Ω` : '—'}</span>
+                <span>120-radial ground (Rg=2Ω):</span>
+                <span style={{ color: '#15803d' }}>η={g.eta_excellent != null ? `${(g.eta_excellent*100).toFixed(1)}%` : '—'} → ERP {g.erp_excellent_kw != null ? `${g.erp_excellent_kw} kW` : '—'}</span>
+                <span>60-radial ground (Rg=8Ω):</span>
+                <span style={{ color: '#d97706' }}>η={g.eta_good != null ? `${(g.eta_good*100).toFixed(1)}%` : '—'} → ERP {g.erp_good_kw != null ? `${g.erp_good_kw} kW` : '—'}</span>
+                <span>Poor ground (Rg=18Ω):</span>
+                <span style={{ color: '#dc2626' }}>η={g.eta_poor != null ? `${(g.eta_poor*100).toFixed(1)}%` : '—'} → ERP {g.erp_poor_kw != null ? `${g.erp_poor_kw} kW` : '—'}</span>
+                <span>Base current (excellent):</span><span>{g.base_current_excellent_a != null ? `${g.base_current_excellent_a} A` : '—'}</span>
+                <span>Ground loss (excellent):</span><span>{g.p_loss_excellent_w != null ? `${g.p_loss_excellent_w} W` : '—'}</span>
+                <span>Ground loss (poor):</span><span>{g.p_loss_poor_w != null ? `${g.p_loss_poor_w} W` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4338ca', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Ground System Radial Design Guide */}
+        {candidate.am_ground_system_radial_design_guide && (() => {
+          const g = candidate.am_ground_system_radial_design_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="grd-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfdf5', borderRadius: 8, border: '2px solid #059669' }}>
+              <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>Ground Radial System Design (§73.190)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#065f46' }}>
+                <span>Wavelength (λ):</span><span>{g.wavelength_m != null ? `${g.wavelength_m} m` : '—'}</span>
+                <span>Radial length (λ/4):</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? `${g.radial_length_m} m` : '—'})` : '—'}</span>
+                <span>Radials (ideal / min):</span><span>{g.num_radials_ideal} / {g.num_radials_min}</span>
+                <span>Total wire length:</span><span>{g.total_radial_length_mi != null ? `${g.total_radial_length_mi} mi (${g.total_radial_length_ft != null ? `${g.total_radial_length_ft.toLocaleString()} ft` : '—'})` : '—'}</span>
+                <span>Copper wire:</span><span>{fmt(g.copper_low_usd)} – {fmt(g.copper_high_usd)}</span>
+                <span>Burial / trenching:</span><span>{fmt(g.burial_low_usd)} – {fmt(g.burial_high_usd)}</span>
+                <span>Ground bus ring:</span><span>{fmt(g.bus_ring_low_usd)} – {fmt(g.bus_ring_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#047857', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Painting and Marking Guide */}
+        {candidate.am_tower_painting_and_marking_guide && (() => {
+          const g = candidate.am_tower_painting_and_marking_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="tpm-guide" style={{ marginBottom: 16, padding: 12, background: '#fff3cd', borderRadius: 8, border: '2px solid #f59e0b' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; FAA Marking (§17.21–§17.25)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>FAA painting required:</span>
+                <span style={{ fontWeight: 600, color: g.requires_painting ? '#d97706' : '#15803d' }}>{g.requires_painting ? 'Yes (>200 ft)' : 'No (≤200 ft)'}</span>
+                {g.requires_painting && (<>
+                  <span>Paint bands:</span><span>{g.num_bands} alternating orange/white ({g.band_height_ft != null ? `${g.band_height_ft.toFixed(0)} ft/band` : '—'})</span>
+                  <span>Initial paint cost:</span><span>{fmt(g.paint_low_usd)} – {fmt(g.paint_high_usd)}</span>
+                  <span>Repaint cycle:</span><span>Every {g.repaint_cycle_years} years ({fmt(g.annual_repaint_low_usd)} – {fmt(g.annual_repaint_high_usd)}/yr)</span>
+                </>)}
+                <span>Annual inspection:</span><span>{fmt(g.lighting_inspection_low_usd)} – {fmt(g.lighting_inspection_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total initial:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_initial_low_usd)} – {fmt(g.total_initial_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Interference Protection Contour Guide */}
+        {candidate.am_interference_protection_contour_guide && (() => {
+          const g = candidate.am_interference_protection_contour_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ipc-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Interference Protection Contour (§73.207)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear channel' : g.is_local_channel ? 'Local channel' : 'Regional channel'}</span>
+                <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.is_class_cd ? 'secondary / no protection' : 'has interference protection'})</span>
+                <span>D/U co-channel:</span><span>{g.du_cochannel_db != null ? `${g.du_cochannel_db} dB` : '—'}</span>
+                <span>D/U adjacent (±10 kHz):</span><span>{g.du_adjacent_channel_db != null ? `${g.du_adjacent_channel_db} dB` : '—'}</span>
+                {g.is_class_cd && g.is_clear_channel && (
+                  <><span>Skywave protect. zone:</span><span>{g.skywave_protection_km_low}–{g.skywave_protection_km_high} km</span></>
+                )}
+                <span>Engineering study:</span><span>{fmt(g.study_low_usd)} – {fmt(g.study_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Decommission and Site Remediation Guide */}
+        {candidate.am_transmitter_decommission_and_site_remediation_guide && (() => {
+          const g = candidate.am_transmitter_decommission_and_site_remediation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="dcom-guide" style={{ marginBottom: 16, padding: 12, background: '#fef2f2', borderRadius: 8, border: '2px solid #dc2626' }}>
+              <div style={{ fontWeight: 700, color: '#7f1d1d', marginBottom: 6, fontSize: 13 }}>Old Site Decommission &amp; Remediation</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#991b1b' }}>
+                <span>Tower type:</span><span>{g.isDA ? `DA (${g.num_towers} towers)` : 'NDA (1 tower)'} — {g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Tower demolition:</span><span>{fmt(g.total_demo_low_usd)} – {fmt(g.total_demo_high_usd)}</span>
+                <span>Building removal:</span><span>{fmt(g.building_removal_low_usd)} – {fmt(g.building_removal_high_usd)}</span>
+                <span>Ground system removal:</span><span>{fmt(g.ground_removal_low_usd)} – {fmt(g.ground_removal_high_usd)}</span>
+                <span>Env. assessment:</span><span>{fmt(g.env_assessment_low_usd)} – {fmt(g.env_assessment_high_usd)}</span>
+                <span>Soil remediation:</span><span>{g.remediation_high_usd > 0 ? `${fmt(g.remediation_low_usd)} – ${fmt(g.remediation_high_usd)} (if needed)` : 'Not anticipated'}</span>
+                <span>FCC modification:</span><span>{fmt(g.fcc_mod_low_usd)} – {fmt(g.fcc_mod_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b91c1c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Community Impact and Coverage Shift Guide */}
+        {candidate.am_community_impact_and_coverage_shift_guide && (() => {
+          const g = candidate.am_community_impact_and_coverage_shift_guide;
+          const statusColor = g.col_proximity_status?.startsWith('excellent') ? '#16a34a'
+            : g.col_proximity_status?.startsWith('acceptable') ? '#d97706' : '#dc2626';
+          return (
+            <div key="cis-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4f8', borderRadius: 8, border: '2px solid #64748b' }}>
+              <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 6, fontSize: 13 }}>Community of License Coverage Shift</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>CoL centroid:</span><span>{g.col_lat != null ? `${g.col_lat}°N, ${g.col_lon}°W` : '—'}</span>
+                <span>Candidate → CoL:</span><span>{g.dist_candidate_to_col_km != null ? `${g.dist_candidate_to_col_km} km` : '—'}</span>
+                <span>Current → CoL:</span><span>{g.dist_current_to_col_km != null ? `${g.dist_current_to_col_km} km` : '—'}</span>
+                <span>Distance delta:</span>
+                <span style={{ color: g.col_proximity_improves ? '#16a34a' : '#dc2626', fontWeight: 600 }}>
+                  {g.col_dist_delta_km != null ? `${g.col_dist_delta_km > 0 ? '+' : ''}${g.col_dist_delta_km} km` : '—'}
+                  {g.col_proximity_improves ? ' ✓ closer' : g.col_dist_delta_km === 0 ? ' (no change)' : ' ⚠ farther'}
+                </span>
+                <span style={{ fontWeight: 600 }}>Proximity status:</span>
+                <span style={{ fontWeight: 600, color: statusColor }}>{g.col_proximity_status ?? '—'}</span>
+                <span>Bearing to CoL:</span><span>{g.bearing_to_col_deg != null ? `${g.bearing_to_col_deg}°` : '—'}</span>
+                <span>Aligned to CoL:</span><span>{g.bearing_aligned_to_col ? 'Yes' : 'No'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#475569', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Total Project Cost Summary Guide */}
+        {candidate.am_total_project_cost_summary_guide && (() => {
+          const g = candidate.am_total_project_cost_summary_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const li = g.line_items_low ?? {};
+          const liH = g.line_items_high ?? {};
+          const liKeys = Object.keys(li);
+          return (
+            <div key="tpc-guide" style={{ marginBottom: 16, padding: 12, background: '#0f172a', borderRadius: 8, border: '2px solid #38bdf8' }}>
+              <div style={{ fontWeight: 700, color: '#f0f9ff', marginBottom: 6, fontSize: 13 }}>Total Project Cost Summary</div>
+              <div style={{ fontSize: 12, color: '#bae6fd', marginBottom: 6 }}>
+                {liKeys.map(k => (
+                  <div key={k} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <span style={{ color: '#93c5fd' }}>{k.replace(/_/g, ' ')}:</span>
+                    <span>{fmt(li[k])} – {fmt(liH[k])}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ borderTop: '1px solid #1e3a5f', paddingTop: 6, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12 }}>
+                <span style={{ color: '#bae6fd', fontWeight: 600 }}>Grand total:</span>
+                <span style={{ color: '#e0f2fe', fontWeight: 600 }}>{fmt(g.grand_total_low_usd)} – {fmt(g.grand_total_high_usd)}</span>
+                <span style={{ color: '#bae6fd' }}>+ {g.contingency_pct}% contingency:</span>
+                <span style={{ color: '#e0f2fe' }}>{fmt(g.contingency_low_usd)} – {fmt(g.contingency_high_usd)}</span>
+                <span style={{ color: '#7dd3fc', fontWeight: 700, fontSize: 13 }}>TOTAL (w/ contingency):</span>
+                <span style={{ color: '#38bdf8', fontWeight: 700, fontSize: 13 }}>{fmt(g.total_with_contingency_low_usd)} – {fmt(g.total_with_contingency_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7dd3fc', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Real Estate and Land Acquisition Guide */}
+        {candidate.am_real_estate_and_land_acquisition_guide && (() => {
+          const g = candidate.am_real_estate_and_land_acquisition_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="re-guide" style={{ marginBottom: 16, padding: 12, background: '#fffbeb', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Real Estate &amp; Land Acquisition</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Site type:</span><span>{g.isDA ? 'DA (multi-tower array)' : 'NDA (single tower)'}</span>
+                <span>Min. acreage:</span><span>{g.min_acres != null ? `${g.min_acres} acres` : '—'}</span>
+                <span>Ground radial:</span><span>{g.radial_ft != null ? `${g.radial_ft.toFixed(0)} ft (${g.radial_m != null ? `${g.radial_m} m` : '—'})` : '—'}</span>
+                <span>Land purchase:</span><span>{fmt(g.purchase_low_usd)} – {fmt(g.purchase_high_usd)}</span>
+                <span>Closing costs:</span><span>{fmt(g.closing_low_usd)} – {fmt(g.closing_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total purchase:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_purchase_low_usd)} – {fmt(g.total_purchase_high_usd)}</span>
+                <span>Lease (monthly):</span><span>{fmt(g.lease_low_per_month)} – {fmt(g.lease_high_per_month)}/mo</span>
+                <span>Lease (20-year):</span><span>{fmt(g.lease_20yr_low_usd)} – {fmt(g.lease_20yr_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Nighttime Skywave Interference Guide */}
+        {candidate.am_nighttime_skywave_interference_guide && (() => {
+          const g = candidate.am_nighttime_skywave_interference_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="sky-guide" style={{ marginBottom: 16, padding: 12, background: '#1e1b4b', borderRadius: 8, border: '2px solid #6366f1' }}>
+              <div style={{ fontWeight: 700, color: '#e0e7ff', marginBottom: 6, fontSize: 13 }}>Nighttime Skywave Interference</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#c7d2fe' }}>
+                <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear channel' : g.is_local_channel ? 'Local channel' : 'Regional channel'}</span>
+                <span>Station class:</span><span>Class {g.fcc_class ?? '—'} ({g.is_class_cd ? 'secondary at night' : 'has nighttime protection'})</span>
+                <span>Skywave reach:</span><span>{g.skywave_reach_km_low != null ? `${g.skywave_reach_km_low}–${g.skywave_reach_km_high} km` : '—'}</span>
+                <span>Engineering study:</span><span>{fmt(g.skywave_study_low_usd)} – {fmt(g.skywave_study_high_usd)}</span>
+                {g.da_night_system_low_usd > 0 && (<><span>Night DA system:</span><span>{fmt(g.da_night_system_low_usd)} – {fmt(g.da_night_system_high_usd)}</span></>)}
+                <span style={{ fontWeight: 600 }}>Total study cost:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_study_low_usd)} – {fmt(g.total_study_high_usd)}</span>
+              </div>
+              {g.nighttime_power_note && <div style={{ marginTop: 6, fontSize: 11, color: '#a5b4fc', fontStyle: 'italic' }}>{g.nighttime_power_note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Signal Contour and Coverage Area Guide */}
+        {candidate.am_signal_contour_and_coverage_area_guide && (() => {
+          const g = candidate.am_signal_contour_and_coverage_area_guide;
+          return (
+            <div key="cov-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#581c87', marginBottom: 6, fontSize: 13 }}>Signal Contour &amp; Coverage (Planning Est.)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#6b21a8' }}>
+                <span>Radiated power:</span><span>{g.radiated_kw != null ? `${g.radiated_kw} kW` : '—'} ({g.isDA ? 'DA' : 'NDA'}, {g.ground_efficiency != null ? `${(g.ground_efficiency*100).toFixed(0)}% eff.` : '—'})</span>
+                <span>5 mV/m radius:</span><span>{g.r_5mvm_km != null ? `${g.r_5mvm_km} km (${g.r_5mvm_mi} mi)` : '—'}</span>
+                <span>0.5 mV/m radius:</span><span>{g.r_05mvm_km != null ? `${g.r_05mvm_km} km (${g.r_05mvm_mi} mi)` : '—'}</span>
+                <span>0.025 mV/m radius:</span><span>{g.r_0025mvm_km != null ? `${g.r_0025mvm_km} km` : '—'}</span>
+                <span>5 mV/m area:</span><span>{g.area_5mvm_km2 != null ? `${Number(g.area_5mvm_km2).toLocaleString()} km²` : '—'}</span>
+                <span>0.5 mV/m area:</span><span>{g.area_05mvm_km2 != null ? `${Number(g.area_05mvm_km2).toLocaleString()} km²` : '—'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7e22ce', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM FCC Construction Permit and License Guide */}
+        {candidate.am_fcc_construction_permit_and_license_guide && (() => {
+          const g = candidate.am_fcc_construction_permit_and_license_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="cp-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>FCC Construction Permit &amp; License</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
+                <span>Antenna type:</span><span>{g.isDA ? `DA (${g.pattern_mode})` : 'NDA'}</span>
+                <span>FCC filing fee:</span><span>{fmt(g.fcc_filing_fee_usd)}</span>
+                <span>Engineering:</span><span>{fmt(g.engineering_low_usd)} – {fmt(g.engineering_high_usd)}</span>
+                <span>FCC attorney:</span><span>{fmt(g.attorney_low_usd)} – {fmt(g.attorney_high_usd)}</span>
+                <span>NEPA review:</span><span>{fmt(g.nepa_low_usd)} – {fmt(g.nepa_high_usd)}</span>
+                <span>§106 review:</span><span>{fmt(g.section106_low_usd)} – {fmt(g.section106_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total (non-recurring):</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_nonrecurring_low_usd)} – {fmt(g.total_nonrecurring_high_usd)}</span>
+                <span>Annual reg. fee:</span><span>{fmt(g.annual_reg_fee_low_usd)} – {fmt(g.annual_reg_fee_high_usd)}/yr</span>
+                <span>FCC review time:</span><span>{g.cp_review_months_low}–{g.cp_review_months_high} months</span>
+                <span>CP build window:</span><span>{g.construction_period_years} years</span>
+                <span>Proof → license:</span><span>{g.proof_to_license_months_low}–{g.proof_to_license_months_high} months</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0369a1', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Building and Studio Link Guide */}
+        {candidate.am_transmitter_building_and_studio_link_guide && (() => {
+          const g = candidate.am_transmitter_building_and_studio_link_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const stlLabel = g.stl_type === 'licensed_950mhz_microwave' ? '950 MHz microwave (Part 74)' : 'Leased circuit / fiber';
+          return (
+            <div key="bld-guide" style={{ marginBottom: 16, padding: 12, background: '#fff8f1', borderRadius: 8, border: '2px solid #c2410c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Transmitter Building &amp; STL</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Equipment shelter:</span><span>{fmt(g.building_low_usd)} – {fmt(g.building_high_usd)}</span>
+                <span>HVAC:</span><span>{fmt(g.hvac_low_usd)} – {fmt(g.hvac_high_usd)}</span>
+                <span>Security/alarm:</span><span>{fmt(g.security_low_usd)} – {fmt(g.security_high_usd)}</span>
+                <span>STL type:</span><span>{stlLabel}</span>
+                <span>STL system:</span><span>{fmt(g.stl_low_usd)} – {fmt(g.stl_high_usd)}{g.stl_license_fee_usd ? ` + $${g.stl_license_fee_usd} license` : ''}</span>
+                <span>Audio codecs:</span><span>{fmt(g.codec_low_usd)} – {fmt(g.codec_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Utility Power and Backup Systems Guide */}
+        {candidate.am_utility_power_and_backup_systems_guide && (() => {
+          const g = candidate.am_utility_power_and_backup_systems_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="pwr-guide" style={{ marginBottom: 16, padding: 12, background: '#faf5ff', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Utility Power &amp; Backup Systems</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#4c1d95' }}>
+                <span>Power extension:</span><span>{g.power_ext_mi != null ? `${g.power_ext_mi.toFixed(2)} mi` : '—'} ({fmt(g.power_ext_low_usd)} – {fmt(g.power_ext_high_usd)})</span>
+                <span>Service panel:</span><span>{fmt(g.service_panel_low_usd)} – {fmt(g.service_panel_high_usd)}</span>
+                <span>Generator ({g.gen_kw != null ? `${g.gen_kw} kW` : '—'}):</span><span>{fmt(g.generator_low_usd)} – {fmt(g.generator_high_usd)}</span>
+                <span>Transfer switch:</span><span>{fmt(g.ats_low_usd)} – {fmt(g.ats_high_usd)}</span>
+                <span>UPS (control):</span><span>{fmt(g.ups_low_usd)} – {fmt(g.ups_high_usd)}</span>
+                <span>Fuel tank:</span><span>{fmt(g.fuel_tank_low_usd)} – {fmt(g.fuel_tank_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#6d28d9', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Site Access and Road Construction Guide */}
+        {candidate.am_site_access_and_road_construction_guide && (() => {
+          const g = candidate.am_site_access_and_road_construction_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="acc-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Site Access &amp; Road Construction</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Relocation distance:</span><span>{g.distance_mi != null ? `${g.distance_mi.toFixed(1)} mi (${g.distance_km != null ? `${g.distance_km.toFixed(1)} km` : '—'})` : '—'}</span>
+                <span>Est. road length:</span><span>{g.road_length_mi != null ? `${g.road_length_mi.toFixed(2)} mi (${g.road_length_ft != null ? `${g.road_length_ft.toFixed(0)} ft` : '—'})` : '—'}</span>
+                <span>Road construction:</span><span>{fmt(g.road_low_usd)} – {fmt(g.road_high_usd)}</span>
+                <span>Culverts/drainage:</span><span>{fmt(g.culvert_low_usd)} – {fmt(g.culvert_high_usd)}</span>
+                <span>Site clearing:</span><span>{fmt(g.clearing_low_usd)} – {fmt(g.clearing_high_usd)}</span>
+                <span>Gate &amp; fencing:</span><span>{fmt(g.gate_fence_low_usd)} – {fmt(g.gate_fence_high_usd)}</span>
+                <span>Grading/leveling:</span><span>{fmt(g.grading_low_usd)} – {fmt(g.grading_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#15803d', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM FCC ASR Tower Registration Guide */}
+        {candidate.am_fcc_asr_tower_registration_guide && (() => {
+          const g = candidate.am_fcc_asr_tower_registration_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="asr-guide" style={{ marginBottom: 16, padding: 12, background: '#fef3c7', borderRadius: 8, border: `2px solid ${g.requires_asr ? '#d97706' : '#6b7280'}` }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>FCC ASR Tower Registration</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft (${g.tower_height_m != null ? `${g.tower_height_m.toFixed(1)} m` : '—'})` : '—'}</span>
+                <span>ASR threshold:</span><span>{g.asr_threshold_ft != null ? `${g.asr_threshold_ft} ft AGL` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>Requires ASR:</span>
+                <span style={{ fontWeight: 600, color: g.requires_asr ? '#b91c1c' : '#15803d' }}>{g.requires_asr ? 'YES — file before construction' : 'No (≤200 ft)'}</span>
+                <span>FAA Form 7460-1:</span><span>{g.requires_faa_notice ? 'Required' : 'Not required'}</span>
+                <span>Lighting type:</span><span>{g.lighting_type ?? '—'}</span>
+                <span>ASR fee:</span><span>{fmt(g.asr_fee_usd)}</span>
+                <span>Structural study:</span><span>{fmt(g.structural_study_low_usd)} – {fmt(g.structural_study_high_usd)}</span>
+                <span>NEPA / §106 review:</span><span>{fmt(g.environmental_review_low_usd)} – {fmt(g.environmental_review_high_usd)}</span>
+                <span>Legal counsel:</span><span>{fmt(g.legal_counsel_low_usd)} – {fmt(g.legal_counsel_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Grounding and Lightning Protection Guide */}
+        {candidate.am_grounding_and_lightning_protection_guide && (() => {
+          const g = candidate.am_grounding_and_lightning_protection_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ltp-guide" style={{ marginBottom: 16, padding: 12, background: '#e2e8f0', borderRadius: 8, border: '2px solid #4a5568' }}>
+              <div style={{ fontWeight: 700, color: '#1a202c', marginBottom: 6, fontSize: 13 }}>Grounding &amp; Lightning Protection</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#2d3748' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Ground ring:</span><span>{g.ground_ring_ft != null ? `${g.ground_ring_ft.toFixed(0)} ft` : '—'} ({fmt(g.ground_ring_low_usd)} – {fmt(g.ground_ring_high_usd)})</span>
+                <span>Ground rods:</span><span>{g.num_ground_rods ?? '—'} ({fmt(g.ground_rod_low_usd)} – {fmt(g.ground_rod_high_usd)})</span>
+                <span>Building bonding:</span><span>{fmt(g.building_low_usd)} – {fmt(g.building_high_usd)}</span>
+                <span>TVSS / SPDs:</span><span>{fmt(g.tvss_low_usd)} – {fmt(g.tvss_high_usd)}</span>
+                <span>Inspection:</span><span>{fmt(g.inspection_low_usd)} – {fmt(g.inspection_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4a5568', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmission Loss Budget Guide */}
+        {candidate.am_transmission_loss_budget_guide && (() => {
+          const g = candidate.am_transmission_loss_budget_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const coaxLabel = {
+            '7_8_inch':   '7/8"',
+            '1_5_8_inch': '1-5/8"',
+            '3_inch':     '3"',
+          }[g.coax_diameter] ?? g.coax_diameter ?? '—';
+          return (
+            <div key="txl-guide" style={{ marginBottom: 16, padding: 12, background: '#d1fae5', borderRadius: 8, border: '2px solid #065f46' }}>
+              <div style={{ fontWeight: 700, color: '#022c22', marginBottom: 6, fontSize: 13 }}>Transmission Line Loss Budget</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#064e3b' }}>
+                <span>Coax size:</span><span>{coaxLabel} ({g.coax_run_ft != null ? `${g.coax_run_ft.toFixed(0)} ft` : '—'})</span>
+                <span>Coax loss:</span><span>{g.coax_loss_db != null ? `${g.coax_loss_db} dB` : '—'}</span>
+                <span>ATU loss:</span><span>{g.atu_loss_db != null ? `${g.atu_loss_db} dB` : '—'}</span>
+                <span>Connectors:</span><span>{g.connector_loss_db != null ? `${g.connector_loss_db} dB` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>Total loss:</span>
+                <span style={{ fontWeight: 600 }}>{g.total_loss_db != null ? `${g.total_loss_db} dB` : '—'}</span>
+                <span>Power at antenna:</span><span>{g.power_at_antenna_kw != null ? `${g.power_at_antenna_kw} kW` : '—'} ({g.power_fraction_at_antenna != null ? `${(g.power_fraction_at_antenna*100).toFixed(1)}%` : '—'})</span>
+                <span>Coax system:</span><span>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#047857', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Guy Wire and Anchor System Guide */}
+        {candidate.am_tower_guy_wire_and_anchor_system_guide && (() => {
+          const g = candidate.am_tower_guy_wire_and_anchor_system_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="gwy-guide" style={{ marginBottom: 16, padding: 12, background: '#fef8ee', borderRadius: 8, border: '2px solid #c05621' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Guy Wire &amp; Anchor System</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Guy levels:</span><span>{g.num_guy_levels ?? '—'}</span>
+                <span>Total anchors:</span><span>{g.num_total_anchors ?? '—'}</span>
+                <span>Guy wire:</span><span>{fmt(g.guy_wire_low_usd)} – {fmt(g.guy_wire_high_usd)}</span>
+                <span>Anchors:</span><span>{fmt(g.anchor_low_usd)} – {fmt(g.anchor_high_usd)}</span>
+                <span>RF insulators:</span><span>{fmt(g.insulator_low_usd)} – {fmt(g.insulator_high_usd)}</span>
+                <span>Install labor:</span><span>{fmt(g.install_low_usd)} – {fmt(g.install_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#d97706', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Financial Feasibility and ROI Guide */}
+        {candidate.am_financial_feasibility_and_roi_guide && (() => {
+          const g = candidate.am_financial_feasibility_and_roi_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="fin-guide" style={{ marginBottom: 16, padding: 12, background: '#f5f5f5', borderRadius: 8, border: '2px solid #525252' }}>
+              <div style={{ fontWeight: 700, color: '#171717', marginBottom: 6, fontSize: 13 }}>Financial Feasibility &amp; ROI</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#262626' }}>
+                <span>Tower:</span><span>{fmt(g.tower_cap_low)} – {fmt(g.tower_cap_high)}</span>
+                <span>Ground system:</span><span>{fmt(g.gnd_low)} – {fmt(g.gnd_high)}</span>
+                <span>Transmitter:</span><span>{fmt(g.tx_low)} – {fmt(g.tx_high)}</span>
+                <span>Soft costs:</span><span>{fmt(g.soft_costs_low)} – {fmt(g.soft_costs_high)}</span>
+                <span>Site prep:</span><span>{fmt(g.site_prep_low)} – {fmt(g.site_prep_high)}</span>
+                <span style={{ fontWeight: 700, borderTop: '1px solid #d4d4d4', paddingTop: 4 }}>Total capital:</span>
+                <span style={{ fontWeight: 700, borderTop: '1px solid #d4d4d4', paddingTop: 4 }}>{fmt(g.total_capital_low)} – {fmt(g.total_capital_high)}</span>
+                <span>Payback (est.):</span><span>{g.simple_payback_years_low ?? '—'}–{g.simple_payback_years_high ?? '—'} yrs</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#737373', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Broadcast Proof of Performance Guide */}
+        {candidate.am_broadcast_proof_of_performance_guide && (() => {
+          const g = candidate.am_broadcast_proof_of_performance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const proofLabel = {
+            nda_reference_check:     'NDA Reference Check',
+            full_directional_proof:  'Full Directional Proof',
+          }[g.proof_type] ?? g.proof_type ?? '—';
+          return (
+            <div key="pop-guide" style={{ marginBottom: 16, padding: 12, background: '#fffbeb', borderRadius: 8, border: '2px solid #92400e' }}>
+              <div style={{ fontWeight: 700, color: '#451a03', marginBottom: 6, fontSize: 13 }}>Proof of Performance (§73.153-154)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#78350f' }}>
+                <span>Proof type:</span><span>{proofLabel}</span>
+                <span>Measured radials:</span><span>{g.num_measured_radials ?? '—'}</span>
+                {g.is_da && <><span>Meas. points:</span><span>{g.num_measurement_points ?? '—'}</span></>}
+                <span>Engineer:</span><span>{fmt(g.engineer_low_usd)} – {fmt(g.engineer_high_usd)}</span>
+                <span>Equipment:</span><span>{fmt(g.equipment_low_usd)} – {fmt(g.equipment_high_usd)}</span>
+                <span>Travel:</span><span>{fmt(g.travel_low_usd)} – {fmt(g.travel_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#b45309', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Nighttime Operation and Skywave Classification Guide */}
+        {candidate.am_nighttime_operation_and_skywave_classification_guide && (() => {
+          const g = candidate.am_nighttime_operation_and_skywave_classification_guide;
+          const statusLabel = {
+            secondary_limited_time: 'Secondary — Limited Time',
+            secondary_standard:     'Secondary — Standard',
+            dominant_unlimited:     'Dominant — Unlimited',
+          }[g.nighttime_status] ?? g.nighttime_status ?? '—';
+          return (
+            <div key="sky-guide" style={{ marginBottom: 16, padding: 12, background: '#e8edf5', borderRadius: 8, border: '2px solid #1e3a8a' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>Nighttime &amp; Skywave Classification</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#1e40af' }}>
+                <span>Channel type:</span><span>{g.is_clear_channel ? 'Clear Channel' : 'Regional/Local'}</span>
+                <span>Station class:</span><span>{g.fcc_class} ({g.is_secondary ? 'Secondary' : 'Dominant'})</span>
+                <span>Night status:</span><span>{statusLabel}</span>
+                <span>Day power:</span><span>{g.daytime_power_kw != null ? `${g.daytime_power_kw} kW` : '—'}</span>
+                <span>Night power max:</span><span>{g.nighttime_power_kw_max != null ? `${g.nighttime_power_kw_max} kW` : '—'}</span>
+                <span>Night fraction:</span><span>{g.nighttime_power_fraction != null ? `${(g.nighttime_power_fraction * 100).toFixed(0)}%` : '—'}</span>
+                <span style={{ fontWeight: 600 }}>Effective power:</span>
+                <span style={{ fontWeight: 600 }}>{g.effective_power_fraction != null ? `${(g.effective_power_fraction * 100).toFixed(0)}%` : '—'} of TPO</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#3b82f6', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Operating Cost and Annual Expense Guide */}
+        {candidate.am_operating_cost_and_annual_expense_guide && (() => {
+          const g = candidate.am_operating_cost_and_annual_expense_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="opc-guide" style={{ marginBottom: 16, padding: 12, background: '#e0f2fe', borderRadius: 8, border: '2px solid #0369a1' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Annual Operating Costs</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#075985' }}>
+                <span>Power input:</span><span>{g.annual_power_kw_input != null ? `${g.annual_power_kw_input} kW` : '—'} ({g.tpo_kw} kW TPO)</span>
+                <span>Annual kWh:</span><span>{g.annual_kwh != null ? g.annual_kwh.toLocaleString() : '—'}</span>
+                <span>Power cost:</span><span>{fmt(g.annual_power_cost_low)} – {fmt(g.annual_power_cost_high)}/yr</span>
+                <span>Tower maint:</span><span>{fmt(g.annual_tower_maint_low)} – {fmt(g.annual_tower_maint_high)}/yr</span>
+                <span>Monitoring:</span><span>{fmt(g.annual_monitoring_low)} – {fmt(g.annual_monitoring_high)}/yr</span>
+                <span>Engineering:</span><span>{fmt(g.annual_engineering_low)} – {fmt(g.annual_engineering_high)}/yr</span>
+                <span style={{ fontWeight: 600 }}>Annual total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_total_low)} – {fmt(g.annual_total_high)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0284c7', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Colocation Sharing and Tower Lease Guide */}
+        {candidate.am_colocation_sharing_and_tower_lease_guide && (() => {
+          const g = candidate.am_colocation_sharing_and_tower_lease_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="cot-guide" style={{ marginBottom: 16, padding: 12, background: '#dcfce7', borderRadius: 8, border: '2px solid #15803d' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Colocation vs Standalone Tower</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft` : '—'}</span>
+                <span>Standalone tower:</span><span>{fmt(g.standalone_tower_low_usd)} – {fmt(g.standalone_tower_high_usd)}</span>
+                <span>Structural analysis:</span><span>{fmt(g.structural_analysis_low_usd)} – {fmt(g.structural_analysis_high_usd)}</span>
+                <span>Co-location monthly:</span><span>${g.colocation_monthly_low ?? '—'} – ${g.colocation_monthly_high ?? '—'}/mo</span>
+                <span>Co-location annual:</span><span>{fmt(g.colocation_annual_low)} – {fmt(g.colocation_annual_high)}</span>
+                <span style={{ fontWeight: 600 }}>10-yr lease total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.colocation_10yr_low)} – {fmt(g.colocation_10yr_high)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#16a34a', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Zoning and Land Use Permit Guide */}
+        {candidate.am_zoning_and_land_use_permit_guide && (() => {
+          const g = candidate.am_zoning_and_land_use_permit_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const tierLabel = { small: 'Small Market', medium: 'Medium Market', large: 'Large Market' }[g.market_tier] ?? g.market_tier ?? '—';
+          return (
+            <div key="zon-guide" style={{ marginBottom: 16, padding: 12, background: '#fafaf9', borderRadius: 8, border: '2px solid #57534e' }}>
+              <div style={{ fontWeight: 700, color: '#1c1917', marginBottom: 6, fontSize: 13 }}>Zoning &amp; Land Use Permit</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#292524' }}>
+                <span>Market:</span><span>{tierLabel}</span>
+                <span>Reach est.:</span><span>{g.reach_scale_km != null ? `${g.reach_scale_km.toFixed(0)} km` : '—'}</span>
+                <span>Timeline:</span><span>{g.typical_weeks_min ?? '—'}–{g.typical_weeks_max ?? '—'} weeks</span>
+                <span>Permit fee:</span><span>{fmt(g.permit_low_usd)} – {fmt(g.permit_high_usd)}</span>
+                <span>Legal:</span><span>{fmt(g.legal_low_usd)} – {fmt(g.legal_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#78716c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Soil Conductivity and Ground Loss Assessment Guide */}
+        {candidate.am_soil_conductivity_and_ground_loss_assessment_guide && (() => {
+          const g = candidate.am_soil_conductivity_and_ground_loss_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const tierLabel = {
+            arid_low: 'Arid / Low (≈2 mS/m)',
+            average:  'Average US (≈5 mS/m)',
+          }[g.conductivity_tier] ?? g.conductivity_tier ?? '—';
+          return (
+            <div key="gsc-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#4a044e', marginBottom: 6, fontSize: 13 }}>Soil Conductivity &amp; Ground Loss</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#701a75' }}>
+                <span>Tier:</span><span>{tierLabel}</span>
+                <span>σ estimate:</span><span>{g.sigma_est_ms_m != null ? `${g.sigma_est_ms_m} mS/m` : '—'}</span>
+                <span>Soil treatment:</span><span>{g.soil_treatment_needed ? 'Recommended' : 'Not needed'}</span>
+                <span>Resistivity test:</span><span>{fmt(g.resistivity_test_low_usd)} – {fmt(g.resistivity_test_high_usd)}</span>
+                {g.soil_treatment_needed && <>
+                  <span>Soil treatment:</span><span>{fmt(g.soil_treatment_low_usd)} – {fmt(g.soil_treatment_high_usd)}</span>
+                </>}
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#86198f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Lighting and Aviation Compliance Guide */}
+        {candidate.am_tower_lighting_and_aviation_compliance_guide && (() => {
+          const g = candidate.am_tower_lighting_and_aviation_compliance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const lightLabel = {
+            none_required:                  'None Required',
+            medium_intensity_white_or_red:  'Medium Intensity (White/Red)',
+            high_intensity_white_dual_red:  'High Intensity (White + Dual Red)',
+          }[g.lighting_type] ?? g.lighting_type ?? '—';
+          return (
+            <div key="lit-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: '2px solid #6366f1' }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>Tower Lighting &amp; Aviation Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#312e81' }}>
+                <span>Tower height:</span><span>{g.tower_height_ft != null ? `${g.tower_height_ft.toFixed(0)} ft (${g.tower_height_m != null ? g.tower_height_m.toFixed(1) : '—'} m)` : '—'}</span>
+                <span>FAA notice:</span><span>{g.needs_faa_notice ? 'Required' : 'Not required'}</span>
+                <span>ASR registration:</span><span>{g.needs_asr ? `Yes ($${g.asr_fee_usd ?? '—'})` : 'No'}</span>
+                <span>Lighting:</span><span>{lightLabel}</span>
+                <span>Lighting cost:</span><span>{fmt(g.lighting_cost_low_usd)} – {fmt(g.lighting_cost_high_usd)}</span>
+                <span>FAA filing:</span><span>{fmt(g.faa_notice_cost_low_usd)} – {fmt(g.faa_notice_cost_high_usd)}</span>
+                <span>Annual maint:</span><span>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total install:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_install_low_usd)} – {fmt(g.total_install_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4338ca', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Environmental Impact Assessment Guide */}
+        {candidate.am_environmental_impact_assessment_guide && (() => {
+          const g = candidate.am_environmental_impact_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const typeLabel = {
+            categorical_exclusion:    'Categorical Exclusion (CE)',
+            environmental_assessment: 'Environmental Assessment (EA)',
+          }[g.assessment_type] ?? g.assessment_type ?? '—';
+          return (
+            <div key="env-guide" style={{ marginBottom: 16, padding: 12, background: '#f7fee7', borderRadius: 8, border: '2px solid #65a30d' }}>
+              <div style={{ fontWeight: 700, color: '#365314', marginBottom: 6, fontSize: 13 }}>Environmental &amp; NEPA Review</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3f6212' }}>
+                <span>Assessment:</span><span>{typeLabel}</span>
+                <span>Env review:</span><span>{fmt(g.env_review_low_usd)} – {fmt(g.env_review_high_usd)}</span>
+                <span>Section 106:</span><span>{fmt(g.section_106_low_usd)} – {fmt(g.section_106_high_usd)}</span>
+                <span>Bio survey:</span><span>{fmt(g.bio_survey_low_usd)} – {fmt(g.bio_survey_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4d7c0f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna Array and Phasor Guide */}
+        {candidate.am_antenna_array_and_phasor_guide && (() => {
+          const g = candidate.am_antenna_array_and_phasor_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const arrayLabel = {
+            single_tower_nda: 'Single Tower (NDA)',
+            two_tower_da:     '2-Tower Directional',
+            three_tower_da:   '3-Tower Directional',
+          }[g.array_type] ?? g.array_type ?? '—';
+          return (
+            <div key="ant-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: '2px solid #e11d48' }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Antenna Array &amp; Phasor System</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9f1239' }}>
+                <span>Array type:</span><span>{arrayLabel}</span>
+                <span>Towers:</span><span>{g.tower_count ?? '—'}</span>
+                <span>Phasor needed:</span><span>{g.phasor_needed ? 'Yes' : 'No'}</span>
+                {g.phasor_needed && <>
+                  <span>Phasor cabinet:</span><span>{fmt(g.phasor_cost_low_usd)} – {fmt(g.phasor_cost_high_usd)}</span>
+                  <span>Extra foundations:</span><span>{fmt(g.tower_foundation_low_usd)} – {fmt(g.tower_foundation_high_usd)}</span>
+                </>}
+                <span>ATU:</span><span>{fmt(g.atu_low_usd)} – {fmt(g.atu_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#be123c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM RF Radiation Safety and Compliance Guide */}
+        {candidate.am_rf_radiation_safety_and_compliance_guide && (() => {
+          const g = candidate.am_rf_radiation_safety_and_compliance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const evalLabel = {
+            desktop_calculation_required:       'Desktop Calculation',
+            computational_evaluation_required:  'Computational Evaluation',
+            field_measurement_required:         'Field Measurement',
+          }[g.evaluation_type] ?? g.evaluation_type ?? '—';
+          return (
+            <div key="rfr-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>RF Radiation Safety &amp; MPE Compliance</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span>Power:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'}</span>
+                <span>E-field limit:</span><span>{g.e_limit_vm != null ? `${g.e_limit_vm} V/m` : '—'} (uncontrolled)</span>
+                <span>MPE limit:</span><span>{g.mpe_limit_mw_cm2 != null ? `${g.mpe_limit_mw_cm2} mW/cm²` : '—'}</span>
+                <span>Exclusion zone:</span><span>{g.exclusion_zone_m != null ? `≈ ${g.exclusion_zone_m} m` : '—'}</span>
+                <span>Evaluation:</span><span>{evalLabel}</span>
+                <span>Evaluation cost:</span><span>{fmt(g.evaluation_cost_low_usd)} – {fmt(g.evaluation_cost_high_usd)}</span>
+                <span>Signage:</span><span>{fmt(g.signage_low_usd)} – {fmt(g.signage_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_compliance_low_usd)} – {fmt(g.total_compliance_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#c2410c', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Ground System Installation and Maintenance Guide */}
+        {candidate.am_ground_system_installation_and_maintenance_guide && (() => {
+          const g = candidate.am_ground_system_installation_and_maintenance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="gnd-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Ground System (Radials)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span>Frequency:</span><span>{g.frequency_khz != null ? `${g.frequency_khz} kHz` : '—'}</span>
+                <span>λ/4 radial:</span><span>{g.radial_length_ft != null ? `${g.radial_length_ft.toFixed(0)} ft (${g.radial_length_m != null ? g.radial_length_m.toFixed(1) : '—'} m)` : '—'}</span>
+                <span>Radials:</span><span>{g.recommended_radials ?? '—'} {g.is_da ? '(DA enhanced)' : '(standard)'}</span>
+                <span>Total wire:</span><span>{g.total_ft_standard != null ? `${Math.round(g.total_ft_standard).toLocaleString()} ft` : '—'}</span>
+                <span>Wire:</span><span>{fmt(g.wire_low_usd)} – {fmt(g.wire_high_usd)}</span>
+                <span>Labor:</span><span>{fmt(g.labor_low_usd)} – {fmt(g.labor_high_usd)}</span>
+                <span>Hardware:</span><span>{fmt(g.hardware_low_usd)} – {fmt(g.hardware_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_low_usd)} – {fmt(g.total_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#4ade80', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Procurement and Upgrade Guide */}
+        {candidate.am_transmitter_procurement_and_upgrade_guide && (() => {
+          const g = candidate.am_transmitter_procurement_and_upgrade_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const txLabel = {
+            solid_state_low_power:    'Solid-State Low Power',
+            solid_state_medium_power: 'Solid-State Medium Power',
+            solid_state_high_power:   'Solid-State High Power',
+          }[g.tx_type] ?? g.tx_type ?? '—';
+          return (
+            <div key="txp-guide" style={{ marginBottom: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, border: '2px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Transmitter Procurement &amp; Upgrade</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span>Type:</span><span>{txLabel}</span>
+                <span>Power:</span><span>{g.tpo_kw != null ? `${g.tpo_kw} kW` : '—'} Class {g.fcc_class ?? '—'}</span>
+                <span>Transmitter:</span><span>{fmt(g.tx_cost_low_usd)} – {fmt(g.tx_cost_high_usd)}</span>
+                <span>Exciter:</span><span>{fmt(g.exciter_low_usd)} – {fmt(g.exciter_high_usd)}</span>
+                <span>Install:</span><span>{fmt(g.install_low_usd)} – {fmt(g.install_high_usd)}</span>
+                <span>Shipping:</span><span>{fmt(g.shipping_low_usd)} – {fmt(g.shipping_high_usd)}</span>
+                <span style={{ fontWeight: 600 }}>Total:</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.total_tx_low_usd)} – {fmt(g.total_tx_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#64748b', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Site Grading and Drainage Guide */}
+        {candidate.am_site_grading_and_drainage_guide && (() => {
+          const g = candidate.am_site_grading_and_drainage_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="grd-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfdf5', borderRadius: 8, border: '2px solid #059669' }}>
+              <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>Site Grading &amp; Drainage</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#065f46' }}>
+                <span style={{ color: '#059669' }}>Terrain Class:</span><span style={{ fontWeight: 600 }}>{g.terrain_class} @ {g.dist_km} km</span>
+                <span style={{ color: '#059669' }}>Grading:</span><span>{fmt(g.grading_low_usd)} – {fmt(g.grading_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Clearing &amp; Grubbing:</span><span>{fmt(g.clearing_low_usd)} – {fmt(g.clearing_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Storm Drainage:</span><span>{fmt(g.drainage_low_usd)} – {fmt(g.drainage_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Erosion Control:</span><span>{fmt(g.erosion_control_low_usd)} – {fmt(g.erosion_control_high_usd)}</span>
+                <span style={{ color: '#059669' }}>Total Site Prep:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_site_prep_low_usd)} – {fmt(g.total_site_prep_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#047857' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Insurance and Bonding Guide */}
+        {candidate.am_insurance_and_bonding_guide && (() => {
+          const g = candidate.am_insurance_and_bonding_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ins-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #b45309' }}>
+              <div style={{ fontWeight: 700, color: '#451a03', marginBottom: 6, fontSize: 13 }}>Insurance &amp; Bonding</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span style={{ color: '#b45309' }}>Tower Ins. (annual):</span><span>{fmt(g.annual_tower_ins_low_usd)} – {fmt(g.annual_tower_ins_high_usd)}/yr</span>
+                <span style={{ color: '#b45309' }}>E&amp;O Ins. (annual):</span><span>{fmt(g.annual_eo_ins_low_usd)} – {fmt(g.annual_eo_ins_high_usd)}/yr</span>
+                <span style={{ color: '#b45309' }}>Total Annual Ins.:</span><span style={{ fontWeight: 600 }}>{fmt(g.annual_total_ins_low_usd)} – {fmt(g.annual_total_ins_high_usd)}/yr</span>
+                <span style={{ color: '#b45309' }}>Surety Bond ({(g.surety_bond_pct * 100).toFixed(0)}%):</span><span>{fmt(g.surety_bond_low_usd)} – {fmt(g.surety_bond_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Workers' Comp (construction):</span><span>{fmt(g.wc_during_construction_low_usd)} – {fmt(g.wc_during_construction_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Tower Height:</span><span>{g.tower_height_ft} ft Class {g.fcc_class}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#78350f' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Studio-Transmitter Link Guide */}
+        {candidate.am_studio_transmitter_link_guide && (() => {
+          const g = candidate.am_studio_transmitter_link_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="stl-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 8, border: '2px solid #4f46e5' }}>
+              <div style={{ fontWeight: 700, color: '#1e1b4b', marginBottom: 6, fontSize: 13 }}>Studio-Transmitter Link (STL) (47 CFR Part 74)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
+                <span style={{ color: '#4f46e5' }}>STL Type:</span><span style={{ fontWeight: 600 }}>{g.stl_type} @ {g.dist_km} km{g.stl_fcc_license_required ? ' (FCC license req.)' : ''}</span>
+                <span style={{ color: '#4f46e5' }}>IP Codec (×2):</span><span>{fmt(g.ip_codec_total_low_usd)} – {fmt(g.ip_codec_total_high_usd)}</span>
+                {g.stl_type === 'microwave_950mhz' && <><span style={{ color: '#4f46e5' }}>Microwave HW:</span><span>{fmt(g.microwave_hw_low_usd)} – {fmt(g.microwave_hw_high_usd)}</span></>}
+                <span style={{ color: '#4f46e5' }}>Internet/Cell:</span><span>{fmt(g.monthly_internet_low_usd)}–{fmt(g.monthly_internet_high_usd)}/mo ({fmt(g.annual_internet_low_usd)}–{fmt(g.annual_internet_high_usd)}/yr)</span>
+                <span style={{ color: '#4f46e5' }}>Audio Processing:</span><span>{fmt(g.audio_proc_low_usd)} – {fmt(g.audio_proc_high_usd)}</span>
+                <span style={{ color: '#4f46e5' }}>Total Setup:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_stl_setup_low_usd)} – {fmt(g.total_stl_setup_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#312e81' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Construction Project Schedule and Management Guide */}
+        {candidate.am_construction_project_schedule_and_management_guide && (() => {
+          const g = candidate.am_construction_project_schedule_and_management_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="sch-guide" style={{ marginBottom: 16, padding: 12, background: '#faf5ff', borderRadius: 8, border: '2px solid #9333ea' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Construction Project Schedule &amp; Management</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7e22ce' }}>
+                <span style={{ color: '#9333ea' }}>Channel / Mode:</span><span style={{ fontWeight: 600 }}>{g.is_clear ? 'Clear channel' : 'Non-clear'} {g.is_da ? 'DA' : 'NDA'} Class {g.fcc_class}</span>
+                <span style={{ color: '#9333ea' }}>Pre-FCC (search+ESA+app):</span><span>{g.pre_fcc_months_low}–{g.pre_fcc_months_high} months</span>
+                <span style={{ color: '#9333ea' }}>FCC Processing:</span><span>{g.fcc_processing_months_low}–{g.fcc_processing_months_high} months{g.is_clear ? ' (clear channel)' : ''}</span>
+                <span style={{ color: '#9333ea' }}>Construction:</span><span>{g.post_fcc_months_low}–{g.post_fcc_months_high} months ({g.construction_weeks_low}–{g.construction_weeks_high} wks)</span>
+                <span style={{ color: '#9333ea' }}>Total Timeline:</span><span style={{ fontWeight: 600 }}>{g.total_months_low}–{g.total_months_high} months</span>
+                <span style={{ color: '#9333ea' }}>PM Overhead ({(g.pm_pct * 100).toFixed(0)}%):</span><span>{fmt(g.pm_cost_low_usd)} – {fmt(g.pm_cost_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#6b21a8' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Utility Power Service and Metering Guide */}
+        {candidate.am_utility_power_service_and_metering_guide && (() => {
+          const g = candidate.am_utility_power_service_and_metering_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="pwr-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf2f8', borderRadius: 8, border: '2px solid #be185d' }}>
+              <div style={{ fontWeight: 700, color: '#831843', marginBottom: 6, fontSize: 13 }}>Utility Power Service &amp; Metering (NEC Art. 230)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9d174d' }}>
+                <span style={{ color: '#be185d' }}>Load / Service:</span><span style={{ fontWeight: 600 }}>{g.total_load_kw} kW — {g.service_type} ({g.service_size_amps}A)</span>
+                <span style={{ color: '#be185d' }}>Service Entrance:</span><span>{fmt(g.service_entrance_low_usd)} – {fmt(g.service_entrance_high_usd)}</span>
+                <span style={{ color: '#be185d' }}>Line Extension:</span><span>{g.line_ext_miles} mi — {fmt(g.line_ext_low_usd)} – {fmt(g.line_ext_high_usd)}</span>
+                <span style={{ color: '#be185d' }}>Total Setup:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_utility_setup_low_usd)} – {fmt(g.total_utility_setup_high_usd)}</span>
+                <span style={{ color: '#be185d' }}>Monthly Power:</span><span>{fmt(g.monthly_power_cost_usd)}/mo at ${g.power_rate_per_kwh}/kWh</span>
+                <span style={{ color: '#be185d' }}>Annual Power:</span><span>{fmt(g.annual_power_cost_usd)}/yr</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#881337' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Transmission Line and Antenna Tuning Unit Guide */}
+        {candidate.am_transmission_line_and_antenna_tuning_unit_guide && (() => {
+          const g = candidate.am_transmission_line_and_antenna_tuning_unit_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="atu-guide" style={{ marginBottom: 16, padding: 12, background: '#fef9c3', borderRadius: 8, border: '2px solid #ca8a04' }}>
+              <div style={{ fontWeight: 700, color: '#713f12', marginBottom: 6, fontSize: 13 }}>Transmission Line &amp; Antenna Tuning Unit (§73.51 / §73.54)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#92400e' }}>
+                <span style={{ color: '#ca8a04' }}>Configuration:</span><span style={{ fontWeight: 600 }}>{g.is_da ? 'DA' : 'NDA'} — {g.n_towers} tower{g.n_towers > 1 ? 's' : ''}</span>
+                <span style={{ color: '#ca8a04' }}>Est. Rbase:</span><span>{g.r_base_est_ohm} Ω (Rrad={g.r_radiation_est_ohm} Ω + Rg={g.r_ground_est_ohm} Ω)</span>
+                <span style={{ color: '#ca8a04' }}>ATU:</span><span>{fmt(g.atu_cost_low_usd)} – {fmt(g.atu_cost_high_usd)}</span>
+                {g.is_da && <><span style={{ color: '#ca8a04' }}>Phasor:</span><span>{fmt(g.phasor_low_usd)} – {fmt(g.phasor_high_usd)}</span></>}
+                <span style={{ color: '#ca8a04' }}>Base Current Meter:</span><span>{fmt(g.base_current_meter_low_usd)} – {fmt(g.base_current_meter_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Tx Line:</span><span>{fmt(g.tx_line_low_usd)} – {fmt(g.tx_line_high_usd)}</span>
+                <span style={{ color: '#ca8a04' }}>Total ATU System:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_atu_system_low_usd)} – {fmt(g.total_atu_system_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#78350f' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Base Insulator and RF Isolation Guide */}
+        {candidate.am_tower_base_insulator_and_rf_isolation_guide && (() => {
+          const g = candidate.am_tower_base_insulator_and_rf_isolation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="rfi-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf6ec', borderRadius: 8, border: '2px solid #c2410c' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Tower Base Insulator &amp; RF Isolation (§73.49 / §73.1213)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9a3412' }}>
+                <span style={{ color: '#c2410c' }}>Tower / Wavelength:</span><span>{g.tower_height_ft} ft (λ={g.wavelength_m} m at {g.frequency_khz} kHz)</span>
+                <span style={{ color: '#c2410c' }}>Base Insulator:</span><span style={{ fontWeight: 600 }}>{g.base_insulator_type} — {fmt(g.base_insulator_low_usd)} – {fmt(g.base_insulator_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Lightning Gap:</span><span>{fmt(g.lightning_gap_low_usd)} – {fmt(g.lightning_gap_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Guy RF Chokes ({g.n_guy_levels} levels):</span><span>{fmt(g.rf_choke_total_low_usd)} – {fmt(g.rf_choke_total_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Lighting Isolation:</span><span>{fmt(g.lighting_isolation_low_usd)} – {fmt(g.lighting_isolation_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Total RF Isolation:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_rf_isolation_low_usd)} – {fmt(g.total_rf_isolation_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#7c2d12' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Emergency Alert System Equipment Guide */}
+        {candidate.am_emergency_alert_system_equipment_guide && (() => {
+          const g = candidate.am_emergency_alert_system_equipment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="eas-guide" style={{ marginBottom: 16, padding: 12, background: '#fef2f2', borderRadius: 8, border: '2px solid #dc2626' }}>
+              <div style={{ fontWeight: 700, color: '#7f1d1d', marginBottom: 6, fontSize: 13 }}>Emergency Alert System (EAS) Equipment (47 CFR Part 11)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#b91c1c' }}>
+                <span style={{ color: '#dc2626' }}>CAP Compatible:</span><span style={{ fontWeight: 600, color: g.cap_compatible ? '#16a34a' : '#dc2626' }}>{g.cap_compatible ? 'Yes (required)' : 'No — upgrade needed'}</span>
+                <span style={{ color: '#dc2626' }}>Encoder/Decoder:</span><span>{fmt(g.eas_encoder_decoder_low_usd)} – {fmt(g.eas_encoder_decoder_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Audio Routing:</span><span>{fmt(g.audio_routing_low_usd)} – {fmt(g.audio_routing_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Installation:</span><span>{fmt(g.installation_low_usd)} – {fmt(g.installation_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Annual Monitoring:</span><span>{fmt(g.annual_monitoring_low_usd)} – {fmt(g.annual_monitoring_high_usd)}/yr (IPAWS/CAP)</span>
+                <span style={{ color: '#dc2626' }}>Total Equipment:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_eas_equipment_low_usd)} – {fmt(g.total_eas_equipment_high_usd)}</span>
+                <span style={{ color: '#dc2626' }}>Required Sources:</span><span>{g.n_required_sources} (LP-1 + LP-2); logs retained {g.log_retention_years} years</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#991b1b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Auxiliary Transmitter and Backup Power Guide */}
+        {candidate.am_auxiliary_transmitter_and_backup_power_guide && (() => {
+          const g = candidate.am_auxiliary_transmitter_and_backup_power_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="bkp-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfeff', borderRadius: 8, border: '2px solid #0891b2' }}>
+              <div style={{ fontWeight: 700, color: '#164e63', marginBottom: 6, fontSize: 13 }}>Auxiliary Transmitter &amp; Backup Power (§73.1660)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0e7490' }}>
+                <span style={{ color: '#0891b2' }}>Power Budget:</span><span>{g.tx_dc_kw} kW tx + {g.building_load_kw} kW bldg = {g.total_load_kw} kW total</span>
+                <span style={{ color: '#0891b2' }}>Generator:</span><span style={{ fontWeight: 600 }}>{g.generator_kw} kW — {fmt(g.generator_cost_low_usd)} – {fmt(g.generator_cost_high_usd)}</span>
+                <span style={{ color: '#0891b2' }}>Auto Transfer Switch:</span><span>{fmt(g.ats_low_usd)} – {fmt(g.ats_high_usd)}</span>
+                <span style={{ color: '#0891b2' }}>UPS (10-min bridge):</span><span>{fmt(g.ups_low_usd)} – {fmt(g.ups_high_usd)}</span>
+                <span style={{ color: '#0891b2' }}>Annual Maintenance:</span><span>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}/yr</span>
+                <span style={{ color: '#0891b2' }}>Total Backup System:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_backup_low_usd)} – {fmt(g.total_backup_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#155e75' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Modulation Monitor and Station Logging Guide */}
+        {candidate.am_modulation_monitor_and_station_logging_guide && (() => {
+          const g = candidate.am_modulation_monitor_and_station_logging_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="mon-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f9ff', borderRadius: 8, border: '2px solid #0284c7' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Modulation Monitor &amp; Station Logging (§73.1215 / §73.1820)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0369a1' }}>
+                <span style={{ color: '#0284c7' }}>Monitor Type:</span><span style={{ fontWeight: 600 }}>{g.monitor_type} (Class {g.fcc_class})</span>
+                <span style={{ color: '#0284c7' }}>Monitor Cost:</span><span>{fmt(g.monitor_cost_low_usd)} – {fmt(g.monitor_cost_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Remote Control:</span><span>{fmt(g.remote_control_low_usd)} – {fmt(g.remote_control_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Internet Monitoring:</span><span>{fmt(g.internet_monitoring_low_usd)} – {fmt(g.internet_monitoring_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Annual Calibration:</span><span>{fmt(g.annual_calibration_low_usd)} – {fmt(g.annual_calibration_high_usd)}/yr</span>
+                <span style={{ color: '#0284c7' }}>Total Monitoring:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_monitoring_low_usd)} – {fmt(g.total_monitoring_high_usd)}</span>
+                <span style={{ color: '#0284c7' }}>Log Schedule:</span><span>every {g.log_interval_min} min ({g.readings_per_day} readings/day)</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#075985' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Building and Equipment Shelter Guide */}
+        {candidate.am_transmitter_building_and_equipment_shelter_guide && (() => {
+          const g = candidate.am_transmitter_building_and_equipment_shelter_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="shlt-guide" style={{ marginBottom: 16, padding: 12, background: '#f5f3ff', borderRadius: 8, border: '2px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#3b0764', marginBottom: 6, fontSize: 13 }}>Transmitter Building &amp; Equipment Shelter</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#6d28d9' }}>
+                <span style={{ color: '#7c3aed' }}>Building Type:</span><span style={{ fontWeight: 600 }}>{g.bldg_type} — {g.bldg_sqft} sq-ft</span>
+                <span style={{ color: '#7c3aed' }}>Construction:</span><span>{fmt(g.bldg_construction_low_usd)} – {fmt(g.bldg_construction_high_usd)} ({fmt(g.bldg_cost_per_sqft_low)}–{fmt(g.bldg_cost_per_sqft_high)}/sq-ft)</span>
+                <span style={{ color: '#7c3aed' }}>HVAC ({g.hvac_tons}-ton):</span><span>{fmt(g.hvac_low_usd)} – {fmt(g.hvac_high_usd)}</span>
+                <span style={{ color: '#7c3aed' }}>Electrical Service:</span><span>{fmt(g.electrical_service_low_usd)} – {fmt(g.electrical_service_high_usd)}</span>
+                <span style={{ color: '#7c3aed' }}>Generator Pad:</span><span>{fmt(g.generator_pad_low_usd)} – {fmt(g.generator_pad_high_usd)}</span>
+                <span style={{ color: '#7c3aed' }}>Total Shelter:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_shelter_low_usd)} – {fmt(g.total_shelter_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#4c1d95' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Site Lease and Land Acquisition Guide */}
+        {candidate.am_site_lease_and_land_acquisition_guide && (() => {
+          const g = candidate.am_site_lease_and_land_acquisition_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="lnd-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdfa', borderRadius: 8, border: '2px solid #0d9488' }}>
+              <div style={{ fontWeight: 700, color: '#134e4a', marginBottom: 6, fontSize: 13 }}>Site Lease &amp; Land Acquisition (§73.1125)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#0f766e' }}>
+                <span style={{ color: '#0d9488' }}>Land Class:</span><span style={{ fontWeight: 600 }}>{g.land_class} — {g.site_acres} acres @ {g.dist_km} km</span>
+                <span style={{ color: '#0d9488' }}>Purchase (total):</span><span>{fmt(g.purchase_total_low_usd)} – {fmt(g.purchase_total_high_usd)}</span>
+                <span style={{ color: '#0d9488' }}>Annual Lease:</span><span>{fmt(g.annual_lease_total_low_usd)} – {fmt(g.annual_lease_total_high_usd)}/yr</span>
+                <span style={{ color: '#0d9488' }}>20-yr Lease Total:</span><span>{fmt(g.lease_20yr_low_usd)} – {fmt(g.lease_20yr_high_usd)}</span>
+                <span style={{ color: '#0d9488' }}>Due Diligence:</span><span>{fmt(g.total_due_diligence_low_usd)} – {fmt(g.total_due_diligence_high_usd)} (survey, title, zoning)</span>
+                <span style={{ color: '#0d9488' }}>Preferred Option:</span><span style={{ fontWeight: 600, color: g.preferred_option === 'lease' ? '#0d9488' : '#92400e' }}>{g.preferred_option}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#134e4a' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Carrier Frequency Accuracy and Reference Guide */}
+        {candidate.am_carrier_frequency_accuracy_and_reference_guide && (() => {
+          const g = candidate.am_carrier_frequency_accuracy_and_reference_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const fmtHz = (n) => n != null ? (n < 1 ? `${n} Hz` : `${n} Hz`) : '—';
+          return (
+            <div key="cfa-guide" style={{ marginBottom: 16, padding: 12, background: '#eff6ff', borderRadius: 8, border: '2px solid #2563eb' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 6, fontSize: 13 }}>Carrier Frequency Accuracy &amp; Reference (§73.1545)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#1d4ed8' }}>
+                <span style={{ color: '#2563eb' }}>Frequency:</span><span>{g.frequency_khz} kHz (±{g.required_accuracy_hz} Hz / {g.required_accuracy_ppm} ppm max)</span>
+                <span style={{ color: '#2563eb' }}>Recommended Ref:</span><span style={{ fontWeight: 600 }}>{g.recommended_reference}</span>
+                <span style={{ color: '#2563eb' }}>GPSDO Error:</span><span>{fmtHz(g.gpsdo_error_hz)} ({g.gpsdo_accuracy_ppb} ppb) — {fmt(g.gpsdo_cost_low_usd)}–{fmt(g.gpsdo_cost_high_usd)}</span>
+                <span style={{ color: '#2563eb' }}>Rubidium Error:</span><span>{fmtHz(g.rubidium_error_hz)} ({g.rubidium_accuracy_ppb} ppb) — {fmt(g.rubidium_cost_low_usd)}–{fmt(g.rubidium_cost_high_usd)}</span>
+                <span style={{ color: '#2563eb' }}>OCXO Error:</span><span>{fmtHz(g.ocxo_error_hz)} ({g.ocxo_accuracy_ppb.toLocaleString()} ppb) — {fmt(g.ocxo_cost_low_usd)}–{fmt(g.ocxo_cost_high_usd)}</span>
+                <span style={{ color: '#2563eb' }}>Annual Calibration:</span><span>{fmt(g.annual_calibration_low_usd)} – {fmt(g.annual_calibration_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#1e40af' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Decommissioning and Site Remediation Guide */}
+        {candidate.am_tower_decommissioning_and_site_remediation_guide && (() => {
+          const g = candidate.am_tower_decommissioning_and_site_remediation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="demo-guide" style={{ marginBottom: 16, padding: 12, background: '#f4f4f5', borderRadius: 8, border: '2px solid #52525b' }}>
+              <div style={{ fontWeight: 700, color: '#18181b', marginBottom: 6, fontSize: 13 }}>Site Decommissioning &amp; Remediation (Current Tower)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3f3f46' }}>
+                <span style={{ color: '#71717a' }}>Tower Height:</span><span>{g.tower_demo_ft} ft ≈ {g.tower_steel_tons_est} tons steel</span>
+                <span style={{ color: '#71717a' }}>Tower Demolition:</span><span>{fmt(g.tower_demo_cost_low_usd)} – {fmt(g.tower_demo_cost_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Steel Salvage:</span><span>{fmt(g.salvage_low_usd)} – {fmt(g.salvage_high_usd)} (credit)</span>
+                <span style={{ color: '#71717a' }}>Building Demo:</span><span>{fmt(g.building_demo_low_usd)} – {fmt(g.building_demo_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Site Restoration:</span><span>{fmt(g.site_restoration_low_usd)} – {fmt(g.site_restoration_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Total (gross):</span><span>{fmt(g.total_demo_cost_low_usd)} – {fmt(g.total_demo_cost_high_usd)}</span>
+                <span style={{ color: '#71717a' }}>Net (after salvage):</span><span>{fmt(g.net_demo_cost_low_usd)} – {fmt(g.net_demo_cost_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#52525b' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Ground System Resistance and Maintenance Guide */}
+        {candidate.am_ground_system_resistance_and_maintenance_guide && (() => {
+          const g = candidate.am_ground_system_resistance_and_maintenance_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="grm-guide" style={{ marginBottom: 16, padding: 12, background: '#f7fee7', borderRadius: 8, border: '2px solid #65a30d' }}>
+              <div style={{ fontWeight: 700, color: '#365314', marginBottom: 6, fontSize: 13 }}>Ground System Resistance &amp; Maintenance (§73.190)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3f6212' }}>
+                <span style={{ color: '#65a30d' }}>Soil Conductivity:</span><span>{g.sigma_msm} mS/m → Rg≈{g.rg_est_ohm} Ω</span>
+                <span style={{ color: '#65a30d' }}>Resistance Status:</span><span style={{ fontWeight: 600, color: g.rg_acceptable ? '#16a34a' : '#dc2626' }}>{g.rg_acceptable ? `Acceptable (< ${g.rg_target_ohm} Ω)` : `Exceeds ${g.rg_target_ohm} Ω target`}</span>
+                <span style={{ color: '#65a30d' }}>Annual Check:</span><span>{fmt(g.annual_resistance_check_low_usd)} – {fmt(g.annual_resistance_check_high_usd)}</span>
+                <span style={{ color: '#65a30d' }}>Radial Repair:</span><span>{g.n_radials_annual_replace_low}–{g.n_radials_annual_replace_high} /yr × {fmt(g.radial_repair_cost_per_radial_usd)}</span>
+                <span style={{ color: '#65a30d' }}>5-yr Inspection:</span><span>{fmt(g.comprehensive_inspection_low_usd)} – {fmt(g.comprehensive_inspection_high_usd)} ({fmt(g.comprehensive_amortized_annual_usd)}/yr amortized)</span>
+                <span style={{ color: '#65a30d' }}>Annual Reserve:</span><span>{fmt(g.total_annual_ground_maint_low_usd)} – {fmt(g.total_annual_ground_maint_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#365314' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Commissioning and Acceptance Testing Guide */}
+        {candidate.am_commissioning_and_acceptance_testing_guide && (() => {
+          const g = candidate.am_commissioning_and_acceptance_testing_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="com-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf4ff', borderRadius: 8, border: '2px solid #a21caf' }}>
+              <div style={{ fontWeight: 700, color: '#701a75', marginBottom: 6, fontSize: 13 }}>Commissioning &amp; Acceptance Testing (§73.44 / §73.61 / OET-65)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7e22ce' }}>
+                <span style={{ color: '#a21caf' }}>Station:</span><span>{g.tpo_kw} kW {g.is_da ? 'DA' : 'NDA'} Class {g.fcc_class} at {g.pattern_mode}</span>
+                <span style={{ color: '#a21caf' }}>FAT (factory):</span><span>{fmt(g.fat_cost_low_usd)} – {fmt(g.fat_cost_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>SAT (site):</span><span>{fmt(g.sat_cost_low_usd)} – {fmt(g.sat_cost_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>Harmonic Test:</span><span>{fmt(g.harmonic_test_low_usd)} – {fmt(g.harmonic_test_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>MPE Survey:</span><span>{fmt(g.mpe_survey_low_usd)} – {fmt(g.mpe_survey_high_usd)} {g.mpe_evaluation_required ? '(required)' : '(optional)'}</span>
+                <span style={{ color: '#a21caf' }}>Total:</span><span>{fmt(g.total_commissioning_low_usd)} – {fmt(g.total_commissioning_high_usd)}</span>
+                <span style={{ color: '#a21caf' }}>Timeline:</span><span>{g.commissioning_weeks_low}–{g.commissioning_weeks_high} weeks</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#701a75' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Broadcast Tower Structural Inspection Guide */}
+        {candidate.am_broadcast_tower_structural_inspection_guide && (() => {
+          const g = candidate.am_broadcast_tower_structural_inspection_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="insp-guide" style={{ marginBottom: 16, padding: 12, background: '#fff1f2', borderRadius: 8, border: '2px solid #e11d48' }}>
+              <div style={{ fontWeight: 700, color: '#881337', marginBottom: 6, fontSize: 13 }}>Tower Structural Inspection (TIA-222-H §8)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#9f1239' }}>
+                <span style={{ color: '#e11d48' }}>Tower Height:</span><span>{g.tower_insp_ft} ft — {g.n_guy_levels} guy levels</span>
+                <span style={{ color: '#e11d48' }}>Annual Visual:</span><span>{fmt(g.annual_inspection_low_usd)} – {fmt(g.annual_inspection_high_usd)}</span>
+                <span style={{ color: '#e11d48' }}>3-yr Detailed:</span><span>{fmt(g.detailed_inspection_low_usd)} – {fmt(g.detailed_inspection_high_usd)} ({fmt(g.detailed_amortized_annual_usd)}/yr)</span>
+                <span style={{ color: '#e11d48' }}>Guy Tension Check:</span><span>{fmt(g.guy_tension_check_low_usd)} – {fmt(g.guy_tension_check_high_usd)}</span>
+                <span style={{ color: '#e11d48' }}>Annual Reserve:</span><span>{fmt(g.total_annual_inspection_low_usd)} – {fmt(g.total_annual_inspection_high_usd)}</span>
+                <span style={{ color: '#e11d48' }}>Design Life:</span><span>{g.design_life_years} years</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#881337' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Annual Regulatory Compliance and Fee Guide */}
+        {candidate.am_annual_regulatory_compliance_and_fee_guide && (() => {
+          const g = candidate.am_annual_regulatory_compliance_and_fee_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="reg-guide" style={{ marginBottom: 16, padding: 12, background: '#eef2ff', borderRadius: 8, border: '2px solid #4338ca' }}>
+              <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 6, fontSize: 13 }}>Annual Regulatory Compliance &amp; FCC Fees</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#3730a3' }}>
+                <span style={{ color: '#4338ca' }}>Annual FCC Fee:</span><span>{fmt(g.annual_fcc_fee_usd)} (Class {g.fcc_class})</span>
+                <span style={{ color: '#4338ca' }}>License Renewal:</span><span>{fmt(g.renewal_fee_usd)} / {g.license_renewal_cycle_years} yr ({fmt(g.renewal_amortized_annual_usd)}/yr amortized)</span>
+                <span style={{ color: '#4338ca' }}>EAS Testing:</span><span>{fmt(g.eas_testing_annual_low_usd)} – {fmt(g.eas_testing_annual_high_usd)}/yr</span>
+                <span style={{ color: '#4338ca' }}>Compliance Counsel:</span><span>{fmt(g.compliance_consultant_annual_low_usd)} – {fmt(g.compliance_consultant_annual_high_usd)}/yr</span>
+                <span style={{ color: '#4338ca' }}>Total Annual:</span><span>{fmt(g.total_annual_compliance_low_usd)} – {fmt(g.total_annual_compliance_high_usd)}</span>
+                <span style={{ color: '#4338ca' }}>10-yr PV (3%):</span><span>{fmt(g.pv_10yr_low_usd)} – {fmt(g.pv_10yr_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#312e81' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Concrete Foundation and Anchor Design Guide */}
+        {candidate.am_concrete_foundation_and_anchor_design_guide && (() => {
+          const g = candidate.am_concrete_foundation_and_anchor_design_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="fnd-guide" style={{ marginBottom: 16, padding: 12, background: '#fafaf9', borderRadius: 8, border: '2px solid #78716c' }}>
+              <div style={{ fontWeight: 700, color: '#292524', marginBottom: 6, fontSize: 13 }}>Concrete Foundation &amp; Anchor Design (TIA-222-H / ACI 318)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#44403c' }}>
+                <span style={{ color: '#78716c' }}>Tower Height:</span><span>{g.tower_fnd_ft} ft ({g.tower_fnd_m} m)</span>
+                <span style={{ color: '#78716c' }}>Base Pier:</span><span>{g.base_pier_diameter_ft} ft dia × {g.base_pier_depth_ft} ft deep ({g.base_pier_cy} CY)</span>
+                <span style={{ color: '#78716c' }}>Guy Anchors:</span><span>{g.n_anchors} × {g.anchor_dim_ft} ft × {g.anchor_dim_ft} ft × {g.anchor_depth_ft} ft ({g.anchor_cy_each} CY each)</span>
+                <span style={{ color: '#78716c' }}>Total Concrete:</span><span>{g.total_concrete_cy} CY</span>
+                <span style={{ color: '#78716c' }}>Foundation Cost:</span><span>{fmt(g.foundation_cost_low_usd)} – {fmt(g.foundation_cost_high_usd)}</span>
+                <span style={{ color: '#78716c' }}>Total System:</span><span>{fmt(g.total_foundation_low_usd)} – {fmt(g.total_foundation_high_usd)}</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#57534e' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Painting and Aviation Marking Guide */}
+        {candidate.am_tower_painting_and_aviation_marking_guide && (() => {
+          const g = candidate.am_tower_painting_and_aviation_marking_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="pnt-guide" style={{ marginBottom: 16, padding: 12, background: '#fff7ed', borderRadius: 8, border: '2px solid #ea580c' }}>
+              <div style={{ fontWeight: 700, color: '#9a3412', marginBottom: 6, fontSize: 13 }}>Tower Painting &amp; Aviation Marking (47 CFR §17.50)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#7c2d12' }}>
+                <span style={{ color: '#c2410c' }}>Tower Height:</span><span>{g.tower_pnt_ft} ft ({g.tower_pnt_m} m)</span>
+                <span style={{ color: '#c2410c' }}>Aviation Marking:</span><span style={{ fontWeight: 600, color: g.requires_aviation_marking ? '#dc2626' : '#16a34a' }}>{g.requires_aviation_marking ? 'Required (>200 ft)' : 'Not Required'}</span>
+                <span style={{ color: '#c2410c' }}>Initial Paint Cost:</span><span>{fmt(g.initial_paint_cost_low_usd)} – {fmt(g.initial_paint_cost_high_usd)}</span>
+                <span style={{ color: '#c2410c' }}>Paint Cycle:</span><span>{g.paint_cycle_years_low}–{g.paint_cycle_years_high} years</span>
+                <span style={{ color: '#c2410c' }}>Annual Reserve:</span><span>{fmt(g.annual_paint_reserve_usd)}/yr</span>
+                <span style={{ color: '#c2410c' }}>20-yr Lifecycle:</span><span>{fmt(g.life_20yr_paint_low_usd)} – {fmt(g.life_20yr_paint_high_usd)}</span>
+                {g.requires_aviation_marking && <><span style={{ color: '#c2410c' }}>Lighting Alt:</span><span>{fmt(g.lighting_only_initial_low_usd)} – {fmt(g.lighting_only_initial_high_usd)} (strobe/beacon)</span></>}
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#9a3412' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Noise Floor and RF Environment Analysis Guide */}
+        {candidate.am_noise_floor_and_rf_environment_analysis_guide && (() => {
+          const g = candidate.am_noise_floor_and_rf_environment_analysis_guide;
+          const riskColor = g.interference_risk === 'low' ? '#16a34a' : g.interference_risk === 'medium' ? '#d97706' : '#dc2626';
+          return (
+            <div key="nf-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #334155' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Noise Floor &amp; RF Environment (ITU-R P.372)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#334155' }}>
+                <span style={{ color: '#64748b' }}>Atmospheric Fa:</span><span>{g.fa_atmospheric_db} dB ({g.frequency_khz} kHz)</span>
+                <span style={{ color: '#64748b' }}>Man-Made Fa:</span><span>{g.fa_man_made_db} dB ({g.land_use_noise_class})</span>
+                <span style={{ color: '#64748b' }}>Noise Floor:</span><span>≈{g.noise_floor_db_uvm} dBμV/m ({g.bw_khz} kHz BW)</span>
+                <span style={{ color: '#64748b' }}>Interference Risk:</span><span style={{ fontWeight: 600, color: riskColor }}>{g.interference_risk.toUpperCase()}</span>
+                <span style={{ color: '#64748b' }}>Noise Score:</span><span>{g.noise_score}/100 (higher = quieter)</span>
+                <span style={{ color: '#64748b' }}>Reduction vs Urban:</span><span>−{g.noise_reduction_vs_urban_db} dB man-made noise</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#475569' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Phase I Environmental Site Assessment Guide */}
+        {candidate.am_phase_i_environmental_site_assessment_guide && (() => {
+          const g = candidate.am_phase_i_environmental_site_assessment_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="esa-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdf4', borderRadius: 8, border: '2px solid #16a34a' }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 6, fontSize: 13 }}>Phase I Environmental Site Assessment (ASTM E1527-21)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#166534' }}>
+                <span style={{ color: '#16a34a' }}>Site Area:</span><span>{g.site_acres} acres (Class {g.fcc_class})</span>
+                <span style={{ color: '#16a34a' }}>Phase I Cost:</span><span>{fmt(g.phase1_cost_low_usd)} – {fmt(g.phase1_cost_high_usd)}</span>
+                <span style={{ color: '#16a34a' }}>Phase I Timeline:</span><span>{g.phase1_weeks} weeks</span>
+                <span style={{ color: '#16a34a' }}>REC Probability:</span><span>{g.rec_probability_pct}% (rural AM site)</span>
+                <span style={{ color: '#16a34a' }}>Phase II (if RECs):</span><span>{fmt(g.phase2_cost_low_usd)} – {fmt(g.phase2_cost_high_usd)}</span>
+                <span style={{ color: '#16a34a' }}>Total High:</span><span>{fmt(g.total_esa_high_usd)} (incl. vapor intrusion)</span>
+                <span style={{ color: '#16a34a' }}>Phase II Timeline:</span><span>+{g.phase2_weeks_low}–{g.phase2_weeks_high} weeks if triggered</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#14532d' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM FCC Application Engineering Report Guide */}
+        {candidate.am_fcc_application_engineering_report_guide && (() => {
+          const g = candidate.am_fcc_application_engineering_report_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="fca-guide" style={{ marginBottom: 16, padding: 12, background: '#fefce8', borderRadius: 8, border: '2px solid #d97706' }}>
+              <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 6, fontSize: 13 }}>FCC Form 301-AM Application &amp; Engineering</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#78350f' }}>
+                <span style={{ color: '#b45309' }}>Channel Type:</span><span>{g.is_clear_channel ? 'Clear Channel' : 'Regional/Local'} — {g.frequency_khz} kHz</span>
+                <span style={{ color: '#b45309' }}>Antenna Pattern:</span><span>{g.is_da ? 'Directional (DA)' : 'Non-Directional (NDA)'}</span>
+                <span style={{ color: '#b45309' }}>FCC Filing Fee:</span><span>{fmt(g.fcc_filing_fee_usd)} (Form 301-AM)</span>
+                <span style={{ color: '#b45309' }}>Stations to Study:</span><span>~{g.n_stations_to_study} within {g.study_radius_km} km</span>
+                <span style={{ color: '#b45309' }}>Engineering Cost:</span><span>{fmt(g.eng_cost_low_usd)} – {fmt(g.eng_cost_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Total App Cost:</span><span>{fmt(g.total_application_low_usd)} – {fmt(g.total_application_high_usd)}</span>
+                <span style={{ color: '#b45309' }}>Processing Time:</span><span>{g.processing_months_low}–{g.processing_months_high} months</span>
+              </div>
+              <div className="font-mono text-[8px] leading-snug" style={{ marginTop: 6, color: '#92400e' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* AM Site Access Road and Security Guide */}
+        {candidate.am_site_access_road_and_security_guide && (() => {
+          const g = candidate.am_site_access_road_and_security_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="sec-guide" style={{ marginBottom: 16, padding: 12, background: '#f9fafb', borderRadius: 8, border: '1px solid #6b7280' }}>
+              <div style={{ fontWeight: 700, color: '#1f2937', marginBottom: 6, fontSize: 13 }}>Site Access Road &amp; Security</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Perimeter Fence:</span><span>{g.fence_perim_ft} ft — {fmt(g.fence_cost_low_usd)} – {fmt(g.fence_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Entry Gate:</span><span>{fmt(g.gate_cost_low_usd)} – {fmt(g.gate_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Access Road:</span><span>{g.road_length_ft} ft — {fmt(g.road_cost_low_usd)} – {fmt(g.road_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Security Cameras ({g.camera_count}x):</span><span>{fmt(g.camera_cost_low_usd)} – {fmt(g.camera_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Alarm System:</span><span>{fmt(g.alarm_cost_low_usd)} – {fmt(g.alarm_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>RF Signs ({g.n_rf_signs}x) + Clearing:</span><span>{fmt(g.rf_signs_cost_usd + g.vegetation_clearing_low_usd)} – {fmt(g.rf_signs_cost_usd + g.vegetation_clearing_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_security_low_usd)} – {fmt(g.total_security_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual Monitoring:</span><span>{fmt(g.annual_security_maint_usd)}/yr</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#374151', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Geotechnical and Soil Investigation Guide */}
+        {candidate.am_geotechnical_and_soil_investigation_guide && (() => {
+          const g = candidate.am_geotechnical_and_soil_investigation_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="gt-guide" style={{ marginBottom: 16, padding: 12, background: '#fdf8f0', borderRadius: 8, border: '1px solid #b45309' }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 6, fontSize: 13 }}>Geotechnical &amp; Soil Investigation</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>USCS Soil Class:</span><span style={{ fontWeight: 600 }}>{g.uscs_class}</span>
+                <span style={{ color: '#6b7280' }}>Bearing Capacity:</span><span>{g.bearing_capacity_psf_low.toLocaleString()}–{g.bearing_capacity_psf_high.toLocaleString()} psf</span>
+                <span style={{ color: '#6b7280' }}>Frost Depth:</span><span>{g.frost_depth_in} in.</span>
+                <span style={{ color: '#6b7280' }}>Foundation Type:</span><span>{g.foundation_type}</span>
+                <span style={{ color: '#6b7280' }}>Foundation Depth:</span><span>{g.foundation_depth_ft_low}–{g.foundation_depth_ft_high} ft</span>
+                <span style={{ color: '#6b7280' }}>Boring Program:</span><span>{g.n_borings} borings × {g.boring_depth_ft} ft (SPT)</span>
+                <span style={{ color: '#6b7280' }}>Borings Cost:</span><span>{fmt(g.borings_cost_low_usd)} – {fmt(g.borings_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Lab + Report:</span><span>{fmt(g.lab_analysis_cost_usd + g.geotech_report_cost_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Geotech:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_geotech_low_usd)} – {fmt(g.total_geotech_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 4, fontSize: 11, color: '#92400e' }}>{g.soil_description}</div>
+              {g.note && <div style={{ marginTop: 4, fontSize: 11, color: '#78350f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM RF System Monitoring and Telemetry Guide */}
+        {candidate.am_rf_system_monitoring_and_telemetry_guide && (() => {
+          const g = candidate.am_rf_system_monitoring_and_telemetry_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="tel-guide" style={{ marginBottom: 16, padding: 12, background: '#f0f4ff', borderRadius: 8, border: '1px solid #1d4ed8' }}>
+              <div style={{ fontWeight: 700, color: '#1e3a5f', marginBottom: 6, fontSize: 13 }}>RF System Monitoring &amp; Telemetry</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Tower Elements:</span><span>{g.n_elements} ({g.n_base_meters} base current meter{g.n_base_meters > 1 ? 's' : ''})</span>
+                <span style={{ color: '#6b7280' }}>Remote Control:</span><span>{g.fcc_remote_control_allowed ? '✓ Permitted (§73.1400)' : 'Not permitted'}</span>
+                <span style={{ color: '#6b7280' }}>Base Current Meters:</span><span>{fmt(g.base_meters_total_low_usd)} – {fmt(g.base_meters_total_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Remote Controller:</span><span>{fmt(g.remote_ctrl_cost_low_usd)} – {fmt(g.remote_ctrl_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Connectivity Install:</span><span>{fmt(g.connectivity_install_low_usd)} – {fmt(g.connectivity_install_high_usd)}</span>
+                {g.scada_low_usd > 0 && <><span style={{ color: '#6b7280' }}>SCADA System:</span><span>{fmt(g.scada_low_usd)} – {fmt(g.scada_high_usd)}</span></>}
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_telemetry_low_usd)} – {fmt(g.total_telemetry_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual Connectivity:</span><span>{fmt(g.annual_connectivity_usd)}/yr</span>
+                <span style={{ color: '#6b7280' }}>FCC Log Interval:</span><span>{g.log_interval_min} min ({g.annual_log_entries.toLocaleString()} entries/yr)</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#1e3a5f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Coverage Improvement vs Current Site Guide */}
+        {candidate.am_coverage_improvement_vs_current_site_guide && (() => {
+          const g = candidate.am_coverage_improvement_vs_current_site_guide;
+          const verdictColor = g.verdict.includes('GAIN') ? '#15803d' : g.verdict.includes('LOSS') ? '#dc2626' : '#374151';
+          return (
+            <div key="ci-guide" style={{ marginBottom: 16, padding: 12, background: '#f8fafc', borderRadius: 8, border: '2px solid #0ea5e9' }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 6, fontSize: 13 }}>Coverage Improvement vs Current Site</div>
+              <div style={{ marginBottom: 6, padding: '4px 8px', background: '#e0f2fe', borderRadius: 4, fontSize: 13, fontWeight: 700, color: verdictColor }}>{g.verdict.replace(/_/g, ' ')}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Current Site Radius:</span><span>{g.d_current_km} km (σ={g.sigma_current} mS/m)</span>
+                <span style={{ color: '#6b7280' }}>Candidate Radius:</span><span style={{ fontWeight: 600, color: verdictColor }}>{g.d_candidate_km} km (σ={g.sigma_candidate} mS/m)</span>
+                <span style={{ color: '#6b7280' }}>Coverage Change:</span><span style={{ color: verdictColor, fontWeight: 600 }}>{g.coverage_radius_delta_pct >= 0 ? '+' : ''}{g.coverage_radius_delta_pct}% ({g.coverage_delta_km2 >= 0 ? '+' : ''}{g.coverage_delta_km2} km²)</span>
+                <span style={{ color: '#6b7280' }}>Displacement:</span><span>{g.displacement_km} km at {g.bearing_deg_ci}°</span>
+                <span style={{ color: '#6b7280' }}>COL Coverage:</span><span>{g.col_field_improvement}</span>
+                <span style={{ color: '#6b7280' }}>COL in Current:</span><span>{g.col_in_current_contour ? '✓ Yes' : '✗ No'}</span>
+                <span style={{ color: '#6b7280' }}>COL in Candidate:</span><span>{g.col_in_candidate_contour ? '✓ Yes' : '✗ No'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0c4a6e', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Lightning Protection and Surge Suppression Guide */}
+        {candidate.am_lightning_protection_and_surge_suppression_guide && (() => {
+          const g = candidate.am_lightning_protection_and_surge_suppression_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="lp-guide" style={{ marginBottom: 16, padding: 12, background: '#fef6ee', borderRadius: 8, border: '1px solid #f97316' }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 6, fontSize: 13 }}>Lightning Protection &amp; Surge Suppression</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Flash Density (N_g):</span><span>{g.N_g} flashes/km²/yr{g.is_monsoon ? ' (SW monsoon × 1.5 → ' + g.N_g_adj + ')' : ''}</span>
+                <span style={{ color: '#6b7280' }}>Tower Height:</span><span>{g.tower_h_ft_lp} ft → A_e = {g.A_e_km2} km²</span>
+                <span style={{ color: '#6b7280' }}>Expected Strikes:</span><span style={{ fontWeight: 600, color: g.N_s > 1 ? '#dc2626' : '#374151' }}>{g.N_s}/yr — LPS {g.lps_required ? '✓ Required' : 'Optional'}</span>
+                <span style={{ color: '#6b7280' }}>Base Arrestor:</span><span>{fmt(g.base_arrestor_cost_low_usd)} – {fmt(g.base_arrestor_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>AC SPD:</span><span>{fmt(g.ac_spd_cost_low_usd)} – {fmt(g.ac_spd_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>RF/Control SPDs:</span><span>{fmt(g.rf_spd_cost_low_usd)} – {fmt(g.rf_spd_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Structural LPS:</span><span>{fmt(g.structural_lps_cost_low_usd)} – {fmt(g.structural_lps_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_lp_cost_low_usd)} – {fmt(g.total_lp_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual PM:</span><span>{fmt(g.annual_lp_maint_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#7c2d12', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Soil Conductivity and Groundwave Coverage Guide */}
+        {candidate.am_soil_conductivity_and_groundwave_coverage_guide && (() => {
+          const g = candidate.am_soil_conductivity_and_groundwave_coverage_guide;
+          return (
+            <div key="sc-guide" style={{ marginBottom: 16, padding: 12, background: '#f1f5f9', borderRadius: 8, border: '1px solid #475569' }}>
+              <div style={{ fontWeight: 700, color: '#1e293b', marginBottom: 6, fontSize: 13 }}>Soil Conductivity &amp; Groundwave Coverage</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>FCC M3 Zone:</span><span style={{ fontWeight: 600 }}>Zone {g.m3_zone} — σ = {g.sigma_ms} mS/m</span>
+                <span style={{ color: '#6b7280' }}>Conductivity:</span><span>{g.conductivity_label}</span>
+                <span style={{ color: '#6b7280' }}>Frequency Scale:</span><span>{g.freq_scale}× (√1000/{Math.round(1000/g.freq_scale/g.freq_scale)} kHz)</span>
+                <span style={{ color: '#6b7280' }}>0.5 mV/m Radius:</span><span style={{ fontWeight: 600 }}>{g.d_05_mvm_km} km</span>
+                <span style={{ color: '#6b7280' }}>Coverage Area:</span><span>{g.coverage_area_km2.toLocaleString()} km²</span>
+                <span style={{ color: '#6b7280' }}>vs US Avg (σ=5):</span><span style={{ color: g.coverage_delta_pct >= 0 ? '#15803d' : '#dc2626', fontWeight: 600 }}>{g.coverage_delta_pct >= 0 ? '+' : ''}{g.coverage_delta_pct}% ({g.d_ref_avg_km} km avg)</span>
+                <span style={{ color: '#6b7280', gridColumn: '1/-1' }}>{g.ground_advisory}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#334155', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Electrical Service and Power Infrastructure Guide */}
+        {candidate.am_electrical_service_and_power_infrastructure_guide && (() => {
+          const g = candidate.am_electrical_service_and_power_infrastructure_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="es-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfeff', borderRadius: 8, border: '1px solid #06b6d4' }}>
+              <div style={{ fontWeight: 700, color: '#0e4f5f', marginBottom: 6, fontSize: 13 }}>Electrical Service &amp; Power Infrastructure</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Facility Load:</span><span>{g.total_load_kw_es} kW ({g.tx_draw_kw_es} kW TX)</span>
+                <span style={{ color: '#6b7280' }}>NEC 125% Demand:</span><span>{g.demand_kw} kW</span>
+                <span style={{ color: '#6b7280' }}>Service:</span><span style={{ fontWeight: 600 }}>{g.service_phase}, {g.service_amps}A</span>
+                <span style={{ color: '#6b7280' }}>Transformer:</span><span>{g.transformer_kva} kVA ({fmt(g.transformer_cost_low_usd)} – {fmt(g.transformer_cost_high_usd)})</span>
+                <span style={{ color: '#6b7280' }}>Service Entrance:</span><span>{fmt(g.service_entrance_low_usd)} – {fmt(g.service_entrance_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Voltage Regulator:</span><span>{fmt(g.voltage_regulator_low_usd)} – {fmt(g.voltage_regulator_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Line Extension (~{g.est_line_ext_ft} ft):</span><span>{fmt(g.line_ext_cost_low_usd)} – {fmt(g.line_ext_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Utility Cost:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_utility_low_usd)} – {fmt(g.total_utility_high_usd)}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0e4f5f', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM NEPA and Environmental Permitting Guide */}
+        {candidate.am_nepa_and_environmental_permitting_guide && (() => {
+          const g = candidate.am_nepa_and_environmental_permitting_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="env-guide" style={{ marginBottom: 16, padding: 12, background: '#ecfdf5', borderRadius: 8, border: '1px solid #059669' }}>
+              <div style={{ fontWeight: 700, color: '#064e3b', marginBottom: 6, fontSize: 13 }}>NEPA &amp; Environmental Permitting</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Tower Height:</span><span>{g.tower_height_ft_env} ft</span>
+                <span style={{ color: '#6b7280' }}>NEPA Level:</span><span style={{ fontWeight: 600 }}>{g.nepa_level}</span>
+                <span style={{ color: '#6b7280' }}>Section 106 (NHPA):</span><span>{g.triggers_section_106 ? '✓ Required (>200 ft ASR)' : 'Not required'}</span>
+                <span style={{ color: '#6b7280' }}>Full EA Required:</span><span>{g.triggers_ea ? '✓ Yes (>450 ft)' : 'No'}</span>
+                <span style={{ color: '#6b7280' }}>SHPO Review:</span><span>{g.shpo_review_weeks_low}–{g.shpo_review_weeks_high} weeks</span>
+                <span style={{ color: '#6b7280' }}>Tribal Consultation:</span><span>{g.tribal_consult_weeks_low}–{g.tribal_consult_weeks_high} weeks</span>
+                <span style={{ color: '#6b7280' }}>Phase I ESA:</span><span>{fmt(g.phase1_esa_cost_low_usd)} – {fmt(g.phase1_esa_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Wetland Delineation:</span><span>{fmt(g.wetland_delineation_cost_low_usd)} – {fmt(g.wetland_delineation_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Section 106 Survey:</span><span>{fmt(g.section_106_survey_low_usd)} – {fmt(g.section_106_survey_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>ESA §7 Consultation:</span><span>{fmt(g.esa_consult_cost_low_usd)} – {fmt(g.esa_consult_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Env. Cost:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_env_cost_low_usd)} – {fmt(g.total_env_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Timeline:</span><span>{g.env_review_weeks_low}–{g.env_review_weeks_high} weeks</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#064e3b', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Tower Structural and Wind Loading Guide */}
+        {candidate.am_tower_structural_and_wind_loading_guide && (() => {
+          const g = candidate.am_tower_structural_and_wind_loading_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="tw-guide" style={{ marginBottom: 16, padding: 12, background: '#f5f3ff', borderRadius: 8, border: '1px solid #7c3aed' }}>
+              <div style={{ fontWeight: 700, color: '#5b21b6', marginBottom: 6, fontSize: 13 }}>Tower Structural &amp; Wind Loading</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Wavelength:</span><span>λ = {g.lambda_m} m &nbsp;|&nbsp; λ/4 = {g.quarter_wave_ft} ft</span>
+                <span style={{ color: '#6b7280' }}>Tower Height:</span><span style={{ fontWeight: 600 }}>{g.tower_height_ft} ft ({Math.round(g.height_fraction * 100)}% λ, Class D optimized)</span>
+                <span style={{ color: '#6b7280' }}>TIA-222-H Class:</span><span>{g.tia_class} / Exposure {g.exposure_cat}</span>
+                <span style={{ color: '#6b7280' }}>Wind Zone:</span><span>{g.wind_zone} ({g.design_wind_speed_mph} mph)</span>
+                <span style={{ color: '#6b7280' }}>Ice Zone:</span><span>{g.ice_zone}</span>
+                <span style={{ color: '#6b7280' }}>Preferred Type:</span><span>{g.preferred_type}</span>
+                <span style={{ color: '#6b7280' }}>Guyed Tower:</span><span>{fmt(g.guyed_low_usd)} – {fmt(g.guyed_high_usd)} (steel + erection)</span>
+                <span style={{ color: '#6b7280' }}>Foundation:</span><span>{fmt(g.foundation_low_usd)} – {fmt(g.foundation_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Guy Anchors ({g.guy_anchor_count} tiers):</span><span>{fmt(g.guy_anchor_low_usd)} – {fmt(g.guy_anchor_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Guyed:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_guyed_low_usd)} – {fmt(g.total_guyed_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Self-Supporting:</span><span>{fmt(g.selfsupport_low_usd)} – {fmt(g.selfsupport_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>FAA Marking:</span><span>{g.faa_marking_required ? '✓ Required (>200 ft AGL)' : 'Not required'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#5b21b6', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Emergency Power and Backup Systems Guide */}
+        {candidate.am_emergency_power_and_backup_systems_guide && (() => {
+          const g = candidate.am_emergency_power_and_backup_systems_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ep-guide" style={{ marginBottom: 16, padding: 12, background: '#f0fdfa', borderRadius: 8, border: '1px solid #2dd4bf' }}>
+              <div style={{ fontWeight: 700, color: '#0f766e', marginBottom: 6, fontSize: 13 }}>Emergency Power &amp; Backup Systems</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px', fontSize: 12, color: '#374151' }}>
+                <span style={{ color: '#6b7280' }}>Facility Load:</span><span>{g.total_load_kw} kW total ({g.tx_draw_kw_ep} kW TX + {g.hvac_draw_kw_ep} kW HVAC)</span>
+                <span style={{ color: '#6b7280' }}>Generator Size:</span><span style={{ fontWeight: 600 }}>{g.generator_size_kw} kW diesel (25% margin)</span>
+                <span style={{ color: '#6b7280' }}>Transfer Switch:</span><span>{g.ats_type}</span>
+                <span style={{ color: '#6b7280' }}>Fuel Burn:</span><span>{g.fuel_burn_gph} gal/hr</span>
+                <span style={{ color: '#6b7280' }}>72-hr Fuel:</span><span>{g.fuel_for_72h_gal} gal — NFPA 110 {g.nfpa_level}</span>
+                <span style={{ color: '#6b7280' }}>30-day Reserve:</span><span>{g.fuel_for_30d_gal.toLocaleString()} gal</span>
+                <span style={{ color: '#6b7280' }}>Generator Install:</span><span>{fmt(g.gen_install_low_usd)} – {fmt(g.gen_install_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Fuel Tank:</span><span>{fmt(g.fuel_tank_low_usd)} – {fmt(g.fuel_tank_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>ATS Cost:</span><span>{fmt(g.ats_cost_low_usd)} – {fmt(g.ats_cost_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Total Capital:</span><span style={{ fontWeight: 600 }}>{fmt(g.total_backup_low_usd)} – {fmt(g.total_backup_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>Annual PM:</span><span>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}</span>
+                <span style={{ color: '#6b7280' }}>EAS Continuity:</span><span>{g.eas_continuity_required ? '✓ Required (47 CFR §11.35)' : 'Not required'}</span>
+              </div>
+              {g.note && <div style={{ marginTop: 6, fontSize: 11, color: '#0f766e', fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* AM Annual Operating Cost Analysis Guide */}
+        {candidate.am_annual_operating_cost_analysis_guide && (() => {
+          const g = candidate.am_annual_operating_cost_analysis_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #22c55e', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 8, fontSize: 13 }}>
+                Annual Operating Cost Analysis (OPEX)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#166534' }}>
+                <span>Tx draw</span>
+                <span style={{ fontWeight: 600 }}>{g.tx_draw_kw} kW ({g.daily_hrs_day}h day / {g.daily_hrs_night}h night @ {g.night_draw_kw} kW)</span>
+                <span>Annual electricity</span>
+                <span style={{ fontWeight: 600 }}>{g.annual_kwh_total.toLocaleString()} kWh → {fmt(g.elec_cost_low_usd)} – {fmt(g.elec_cost_high_usd)}</span>
+                <span>Equipment maintenance</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.equip_maint_low_usd)} – {fmt(g.equip_maint_high_usd)}/yr</span>
+                <span>FCC regulatory fee</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.fcc_annual_fee_usd)}/yr</span>
+                <span>Insurance premium</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.insurance_low_usd)} – {fmt(g.insurance_high_usd)}/yr</span>
+                <span>STL operating cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.stl_annual_low_usd)} – {fmt(g.stl_annual_high_usd)}/yr</span>
+                <span>Tower/ground inspection</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.tower_inspection_usd_low)} – {fmt(g.tower_inspection_usd_high)}/yr</span>
+                <span>Tower lighting maint.</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.lighting_maint_low_usd)} – {fmt(g.lighting_maint_high_usd)}/yr</span>
+                <span>Property tax/lease</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.property_cost_low_usd)} – {fmt(g.property_cost_high_usd)}/yr</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>Total annual OPEX</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>{fmt(g.total_annual_low_usd)} – {fmt(g.total_annual_high_usd)}/yr</span>
+                <span>10-yr NPV (5%)</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.opex_10yr_pv_low_usd)} – {fmt(g.opex_10yr_pv_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#14532d', borderTop: '1px solid #bbf7d0', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna Electrical Design & Efficiency Guide */}
+        {candidate.am_antenna_electrical_design_and_efficiency_guide && (() => {
+          const g = candidate.am_antenna_electrical_design_and_efficiency_guide;
+          const effColor = (pct) => pct >= 95 ? '#166534' : pct >= 88 ? '#92400e' : '#991b1b';
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fb923c', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#7c2d12', marginBottom: 8, fontSize: 13 }}>
+                Antenna Electrical Design &amp; Efficiency
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#9a3412' }}>
+                <span>Wavelength</span>
+                <span style={{ fontWeight: 600 }}>{g.lambda_m}m @ {Math.round(300000/g.lambda_m)} kHz</span>
+                <span>Physical height</span>
+                <span style={{ fontWeight: 600 }}>{g.physical_height_m}m ({Math.round(g.physical_height_m * 3.281)}ft)</span>
+                <span>Electrical height</span>
+                <span style={{ fontWeight: 600 }}>{g.electrical_height_deg}° (λ/4 resonant)</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA)' : ' (NDA)'}</span>
+                <span>Radial count</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} buried (λ/4 each)</span>
+                <span>Radiation resistance</span>
+                <span style={{ fontWeight: 600 }}>{g.radiation_resistance_ohm}Ω</span>
+                <span>Ground loss (R_g)</span>
+                <span style={{ fontWeight: 600 }}>{g.ground_loss_ohm_low}–{g.ground_loss_ohm_high}Ω</span>
+                <span>Antenna efficiency</span>
+                <span style={{ fontWeight: 700, color: effColor(g.efficiency_pct_low) }}>{g.efficiency_pct_low}–{g.efficiency_pct_high}%</span>
+                <span>ATU insertion loss</span>
+                <span style={{ fontWeight: 600 }}>{g.atu_loss_pct_low}–{g.atu_loss_pct_high}%</span>
+                <span>System efficiency</span>
+                <span style={{ fontWeight: 700, color: effColor(g.total_efficiency_pct_low) }}>{g.total_efficiency_pct_low}–{g.total_efficiency_pct_high}%</span>
+                <span>Effective ERP</span>
+                <span style={{ fontWeight: 700, color: '#7c2d12' }}>{g.effective_erp_kw_low}–{g.effective_erp_kw_high} kW (from {g.effective_erp_kw_high > 0 ? Math.round(g.effective_erp_kw_high / g.total_efficiency_pct_high * 100) : '?'} kW TPO)</span>
+                <span>VSWR 2:1 bandwidth</span>
+                <span style={{ fontWeight: 600 }}>{g.vswr_bw_khz_low}–{g.vswr_bw_khz_high} kHz</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#7c2d12', borderTop: '1px solid #fed7aa', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Studio-to-Transmitter Link Guide */}
+        {candidate.am_studio_to_transmitter_link_guide && (() => {
+          const g = candidate.am_studio_to_transmitter_link_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const techLabel = { IP_INTERNET: 'IP / Internet', LICENSED_950MHZ: '950 MHz Licensed STL', DIGITAL_MICROWAVE: 'Digital Microwave' };
+          const techColor = { IP_INTERNET: '#166534', LICENSED_950MHZ: '#92400e', DIGITAL_MICROWAVE: '#1e40af' };
+          return (
+            <div style={{ background: '#fdf4ff', border: '1px solid #a855f7', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#581c87', marginBottom: 8, fontSize: 13 }}>
+                Studio-to-Transmitter Link (FCC Part 74 / §74.550)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#6b21a8' }}>
+                <span>STL distance</span>
+                <span style={{ fontWeight: 600 }}>{g.stl_distance_km}km ({g.stl_distance_mi}mi)</span>
+                <span>Technology</span>
+                <span style={{ fontWeight: 700, color: techColor[g.stl_technology] ?? '#6b21a8' }}>{techLabel[g.stl_technology] ?? g.stl_technology}</span>
+                <span>FCC Part 74 license</span>
+                <span style={{ fontWeight: 600, color: g.fcc_part_74_license_required ? '#b45309' : '#166534' }}>
+                  {g.fcc_part_74_license_required ? `Required — ${fmt(g.fcc_license_fee_usd)}` : 'Not required'}
+                </span>
+                <span>Audio latency</span>
+                <span style={{ fontWeight: 600 }}>{g.stl_latency_ms}ms</span>
+                <span>Backup technology</span>
+                <span style={{ fontWeight: 600 }}>{g.backup_technology ? techLabel[g.backup_technology] ?? g.backup_technology : 'Dual-path IP recommended'}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #e9d5ff', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#6b21a8' }}>
+                <span>STL equipment</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.stl_equip_low_usd)} – {fmt(g.stl_equip_high_usd)}</span>
+                <span>Backup STL equipment</span>
+                <span style={{ fontWeight: 600 }}>{g.backup_equip_low_usd > 0 ? `${fmt(g.backup_equip_low_usd)} – ${fmt(g.backup_equip_high_usd)}` : 'N/A'}</span>
+                <span style={{ fontWeight: 700, color: '#581c87' }}>Total STL (one-time)</span>
+                <span style={{ fontWeight: 700, color: '#581c87' }}>{fmt(g.total_stl_cost_low_usd)} – {fmt(g.total_stl_cost_high_usd)}</span>
+                <span>Annual operating cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.stl_annual_low_usd)} – {fmt(g.stl_annual_high_usd)}/yr</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#581c87', borderTop: '1px solid #e9d5ff', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Daytime Interference & Protection Guide */}
+        {candidate.am_daytime_interference_and_protection_guide && (() => {
+          const g = candidate.am_daytime_interference_and_protection_guide;
+          const riskColor = { LOW: '#166534', MEDIUM: '#92400e', HIGH: '#991b1b' };
+          const ctColor = { CLEAR_CHANNEL: '#1e40af', REGIONAL_CHANNEL: '#6d28d9', LOCAL_CHANNEL: '#0e7490' };
+          return (
+            <div style={{ background: '#eff6ff', border: '1px solid #60a5fa', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#1e3a8a', marginBottom: 8, fontSize: 13 }}>
+                Daytime Interference &amp; Protection (§73.182)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#1e40af' }}>
+                <span>Channel type</span>
+                <span style={{ fontWeight: 700, color: ctColor[g.channel_type] ?? '#1e40af' }}>{g.channel_type.replace(/_/g, ' ')}</span>
+                <span>Station status</span>
+                <span style={{ fontWeight: 600, color: g.is_secondary ? '#991b1b' : '#166534' }}>
+                  {g.is_secondary ? 'SECONDARY (§73.21)' : 'PRIMARY'}
+                </span>
+                {g.night_power_limit_kw != null && <>
+                  <span>Night power limit</span>
+                  <span style={{ fontWeight: 600, color: '#991b1b' }}>{g.night_power_limit_kw} kW (§73.21)</span>
+                </>}
+                <span>Co-channel risk</span>
+                <span style={{ fontWeight: 700, color: riskColor[g.co_channel_risk] ?? '#1e40af' }}>{g.co_channel_risk}</span>
+                <span>Co-channel D/U (daytime)</span>
+                <span style={{ fontWeight: 600 }}>{g.co_channel_D_U_daytime_db} dB</span>
+                <span>1st adjacent D/U</span>
+                <span style={{ fontWeight: 600 }}>{g.first_adjacent_protection_db} dB (±10 kHz)</span>
+                <span>2nd adjacent D/U</span>
+                <span style={{ fontWeight: 600 }}>{g.second_adjacent_protection_db} dB (±20 kHz)</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #bfdbfe', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#1e40af' }}>
+                <span>0.5 mV/m service radius</span>
+                <span style={{ fontWeight: 600 }}>{g.service_radius_05_mvpm_km} km (primary)</span>
+                <span>0.15 mV/m service radius</span>
+                <span style={{ fontWeight: 600 }}>{g.service_radius_015_mvpm_km} km (secondary)</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#1e3a8a', borderTop: '1px solid #bfdbfe', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Local Zoning & Land Use Compatibility Guide */}
+        {candidate.am_local_zoning_and_land_use_compatibility_guide && (() => {
+          const g = candidate.am_local_zoning_and_land_use_compatibility_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const riskColor = { LOW: '#166534', MEDIUM: '#92400e', HIGH: '#991b1b' };
+          const znColor = { URBAN_COMMERCIAL: '#991b1b', SUBURBAN_RESIDENTIAL: '#92400e', MIXED_INDUSTRIAL: '#1e40af', AGRICULTURAL_RURAL: '#166534' };
+          return (
+            <div style={{ background: '#f0fdf4', border: '1px solid #4ade80', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#14532d', marginBottom: 8, fontSize: 13 }}>
+                Local Zoning &amp; Land Use Compatibility
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#166534' }}>
+                <span>Zoning class</span>
+                <span style={{ fontWeight: 700, color: znColor[g.zoning_class] ?? '#166534' }}>{g.zoning_class.replace(/_/g, ' ')} ({g.dist_from_col_km}km from COL)</span>
+                <span>Tower height</span>
+                <span style={{ fontWeight: 600 }}>{g.tower_height_ft}ft ({g.tower_height_m}m)</span>
+                <span>Zoning height limit</span>
+                <span style={{ fontWeight: 600 }}>{g.zoning_height_limit_ft}ft</span>
+                <span>Height variance</span>
+                <span style={{ fontWeight: 600, color: g.height_variance_required ? '#991b1b' : '#166534' }}>
+                  {g.height_variance_required ? 'Required' : 'Not required'}
+                </span>
+                <span>CUP probability</span>
+                <span style={{ fontWeight: 600 }}>{Math.round(g.cup_probability * 100)}%</span>
+                <span>Setback from residential</span>
+                <span style={{ fontWeight: 600 }}>{g.setback_required_ft}ft min</span>
+                <span>Min. lot width</span>
+                <span style={{ fontWeight: 600 }}>{g.min_lot_width_ft}ft</span>
+                <span>SHPO review</span>
+                <span style={{ fontWeight: 600, color: g.shpo_review_required ? '#b45309' : '#166534' }}>
+                  {g.shpo_review_required ? `Required (${g.shpo_review_weeks_low}–${g.shpo_review_weeks_high} weeks)` : 'Not triggered'}
+                </span>
+                <span>Opposition risk</span>
+                <span style={{ fontWeight: 700, color: riskColor[g.opposition_risk] ?? '#166534' }}>{g.opposition_risk}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #bbf7d0', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#166534' }}>
+                <span>CUP application</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.cup_cost_low_usd)} – {fmt(g.cup_cost_high_usd)}</span>
+                <span>Height variance</span>
+                <span style={{ fontWeight: 600 }}>{g.variance_cost_low_usd > 0 ? `${fmt(g.variance_cost_low_usd)} – ${fmt(g.variance_cost_high_usd)}` : 'N/A'}</span>
+                <span>Legal fees (opposition)</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.legal_fees_low_usd)} – {fmt(g.legal_fees_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>Total zoning costs</span>
+                <span style={{ fontWeight: 700, color: '#14532d' }}>{fmt(g.total_zoning_cost_low_usd)} – {fmt(g.total_zoning_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#14532d', borderTop: '1px solid #bbf7d0', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter Building & Utilities Guide */}
+        {candidate.am_transmitter_building_and_utilities_guide && (() => {
+          const g = candidate.am_transmitter_building_and_utilities_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#fdf6e3', border: '1px solid #d97706', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#78350f', marginBottom: 8, fontSize: 13 }}>
+                Transmitter Building &amp; Utilities
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#92400e' }}>
+                <span>Building footprint</span>
+                <span style={{ fontWeight: 600 }}>{g.bld_sqft_low}–{g.bld_sqft_high} sq ft</span>
+                <span>Building construction</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.building_cost_low_usd)} – {fmt(g.building_cost_high_usd)}</span>
+                <span>Electrical service</span>
+                <span style={{ fontWeight: 600 }}>{g.electrical_service_amps}A / {g.electrical_service_volts}V</span>
+                <span>Utility extension</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.utility_extension_cost_low_usd)} – {fmt(g.utility_extension_cost_high_usd)}</span>
+                <span>HVAC</span>
+                <span style={{ fontWeight: 600 }}>{g.hvac_tons}-ton ({fmt(g.hvac_cost_low_usd)} – {fmt(g.hvac_cost_high_usd)}; service {fmt(g.hvac_annual_service_usd)}/yr)</span>
+                <span>Emergency generator</span>
+                <span style={{ fontWeight: 600 }}>{g.generator_kw} kW ({fmt(g.generator_cost_low_usd)} – {fmt(g.generator_cost_high_usd)})</span>
+                <span>Fuel storage</span>
+                <span style={{ fontWeight: 600 }}>{g.fuel_tank_gal} gal ({fmt(g.fuel_tank_cost_usd)})</span>
+                <span>Building permit</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.building_permit_cost_low_usd)} – {fmt(g.building_permit_cost_high_usd)}</span>
+                <span>Site prep/grading</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.site_prep_cost_low_usd)} – {fmt(g.site_prep_cost_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#78350f' }}>Total infrastructure</span>
+                <span style={{ fontWeight: 700, color: '#78350f' }}>{fmt(g.total_infrastructure_low_usd)} – {fmt(g.total_infrastructure_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#78350f', borderTop: '1px solid #fde68a', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Transmitter & Equipment Selection Guide */}
+        {candidate.am_transmitter_and_equipment_selection_guide && (() => {
+          const g = candidate.am_transmitter_and_equipment_selection_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const pcLabel = { LOW: 'Low (≤1 kW)', MEDIUM: 'Medium (1–10 kW)', HIGH: 'High (10–50 kW)', VERY_HIGH: 'Very High (>50 kW)' };
+          return (
+            <div style={{ background: '#fff5f5', border: '1px solid #fc8181', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#7f1d1d', marginBottom: 8, fontSize: 13 }}>
+                Transmitter &amp; Equipment Selection (§73.61 / §73.1400)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#991b1b' }}>
+                <span>Power class</span>
+                <span style={{ fontWeight: 600 }}>{pcLabel[g.power_class_tx] ?? g.power_class_tx}</span>
+                <span>Nominal transmitter</span>
+                <span style={{ fontWeight: 600 }}>{g.nominal_tx_kw} kW AM (TPO: {g.total_equipment_low_usd > 0 ? `${g.nominal_tx_kw}` : '—'} kW)</span>
+                <span>Backup transmitter</span>
+                <span style={{ fontWeight: 600 }}>{g.backup_tx_kw} kW (recommended)</span>
+                <span>Base current meters</span>
+                <span style={{ fontWeight: 600 }}>{g.n_base_current_meters} (§73.61)</span>
+                <span>DA phasing cabinet</span>
+                <span style={{ fontWeight: 600 }}>{g.phasing_cabinet_cost_low_usd > 0 ? `${fmt(g.phasing_cabinet_cost_low_usd)} – ${fmt(g.phasing_cabinet_cost_high_usd)}` : 'Not required (NDA)'}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #fecaca', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#991b1b' }}>
+                <span>Main transmitter</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.main_tx_cost_low_usd)} – {fmt(g.main_tx_cost_high_usd)}</span>
+                <span>Backup transmitter</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.backup_tx_cost_low_usd)} – {fmt(g.backup_tx_cost_high_usd)}</span>
+                <span>Remote control</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.remote_control_cost_low_usd)} – {fmt(g.remote_control_cost_high_usd)} (§73.1400)</span>
+                <span>Current meters</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.meter_cost_low_usd)} – {fmt(g.meter_cost_high_usd)}</span>
+                <span>Dummy load</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.dummy_load_cost_low_usd)} – {fmt(g.dummy_load_cost_high_usd)}</span>
+                <span>RF feedline</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.feedline_cost_low_usd)} – {fmt(g.feedline_cost_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#7f1d1d' }}>Total equipment</span>
+                <span style={{ fontWeight: 700, color: '#7f1d1d' }}>{fmt(g.total_equipment_low_usd)} – {fmt(g.total_equipment_high_usd)}</span>
+                <span>Annual maintenance</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_maint_low_usd)} – {fmt(g.annual_maint_high_usd)}/yr</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#7f1d1d', borderTop: '1px solid #fecaca', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Construction Permit & Buildout Timeline Guide */}
+        {candidate.am_construction_permit_and_buildout_timeline_guide && (() => {
+          const g = candidate.am_construction_permit_and_buildout_timeline_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const riskColor = { LOW: '#166534', MEDIUM: '#92400e', HIGH: '#991b1b' };
+          return (
+            <div style={{ background: '#eef2ff', border: '1px solid #818cf8', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#312e81', marginBottom: 8, fontSize: 13 }}>
+                Construction Permit &amp; Buildout Timeline (§73.67)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3730a3' }}>
+                <span>Filing type</span>
+                <span style={{ fontWeight: 600 }}>{g.filing_type} — {g.fcc_form}</span>
+                <span>CP processing</span>
+                <span style={{ fontWeight: 600 }}>{g.cp_processing_months_low}–{g.cp_processing_months_high} months</span>
+                <span>CP validity</span>
+                <span style={{ fontWeight: 600 }}>{g.cp_validity_years} years from grant (§73.67)</span>
+                <span>CP expiration risk</span>
+                <span style={{ fontWeight: 700, color: riskColor[g.cp_expiration_risk] ?? '#3730a3' }}>{g.cp_expiration_risk}</span>
+                <span>FCC filing fee</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.fcc_filing_fee_usd)}</span>
+                <span>Engineering cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.engineering_cost_low_usd)} – {fmt(g.engineering_cost_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #c7d2fe', paddingTop: 8, fontSize: 12, color: '#3730a3' }}>
+                <div style={{ fontWeight: 600, marginBottom: 4 }}>Post-grant milestones:</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 12px' }}>
+                  <span>Tower construction</span><span style={{ fontWeight: 600 }}>{g.tower_const_months_low}–{g.tower_const_months_high} mo</span>
+                  <span>Ground system install</span><span style={{ fontWeight: 600 }}>{g.ground_install_months_low}–{g.ground_install_months_high} mo</span>
+                  <span>Equipment commissioning</span><span style={{ fontWeight: 600 }}>{g.equip_months_low}–{g.equip_months_high} mo</span>
+                  <span>Proof of performance</span><span style={{ fontWeight: 600 }}>{g.proof_months_low}–{g.proof_months_high} mo</span>
+                  <span>License to cover (Form 302-AM)</span><span style={{ fontWeight: 600 }}>{g.license_months_low}–{g.license_months_high} mo</span>
+                </div>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #c7d2fe', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3730a3' }}>
+                <span>Post-CP construction total</span>
+                <span style={{ fontWeight: 600 }}>{g.post_cp_months_low}–{g.post_cp_months_high} months</span>
+                <span>Construction margin in CP window</span>
+                <span style={{ fontWeight: 600 }}>{g.construction_margin_months_low}–{g.construction_margin_months_high} months</span>
+                <span style={{ fontWeight: 700, color: '#312e81' }}>Total decision-to-on-air</span>
+                <span style={{ fontWeight: 700, color: '#312e81' }}>{g.total_months_low}–{g.total_months_high} months</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#312e81', borderTop: '1px solid #c7d2fe', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Site Acquisition & Real Property Guide */}
+        {candidate.am_site_acquisition_and_real_property_guide && (() => {
+          const g = candidate.am_site_acquisition_and_real_property_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const classColor = { RURAL: '#166534', SUBURBAN: '#92400e', URBAN: '#991b1b' };
+          return (
+            <div style={{ background: '#f7fee7', border: '1px solid #a3e635', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#365314', marginBottom: 8, fontSize: 13 }}>
+                Site Acquisition &amp; Real Property
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3f6212' }}>
+                <span>Site class</span>
+                <span style={{ fontWeight: 700, color: classColor[g.site_class] ?? '#3f6212' }}>{g.site_class} ({g.dist_from_col_km}km from COL)</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
+                <span>Min. site area</span>
+                <span style={{ fontWeight: 600 }}>{g.min_site_acres_low}–{g.min_site_acres_high} acres</span>
+                <span>Land purchase</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.purchase_cost_low_usd)} – {fmt(g.purchase_cost_high_usd)}</span>
+                <span>Transaction costs</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.transaction_costs_low_usd)} – {fmt(g.transaction_costs_high_usd)}</span>
+                <span>Title &amp; closing</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.title_and_closing_low_usd)} – {fmt(g.title_and_closing_high_usd)}</span>
+                <span style={{ fontWeight: 700, color: '#365314' }}>Total purchase</span>
+                <span style={{ fontWeight: 700, color: '#365314' }}>{fmt(g.total_purchase_low_usd)} – {fmt(g.total_purchase_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #d9f99d', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#3f6212' }}>
+                <span>Annual lease</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_lease_low_usd)} – {fmt(g.annual_lease_high_usd)}/yr</span>
+                <span>20-yr lease PV (5%)</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.lease_20yr_pv_low_usd)} – {fmt(g.lease_20yr_pv_high_usd)}</span>
+                <span>Phase I ESA</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.env_assessment_cost_low_usd)} – {fmt(g.env_assessment_cost_high_usd)}</span>
+                <span>Zoning / CUP</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.zoning_permit_cost_low_usd)} – {fmt(g.zoning_permit_cost_high_usd)}</span>
+                <span>Survey</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.survey_cost_low_usd)} – {fmt(g.survey_cost_high_usd)}</span>
+                <span>Access road</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.access_road_cost_low_usd)} – {fmt(g.access_road_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#365314', borderTop: '1px solid #d9f99d', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Antenna Tower Lighting & FAA Guide */}
+        {candidate.am_antenna_tower_lighting_and_faa_guide && (() => {
+          const g = candidate.am_antenna_tower_lighting_and_faa_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const ltgLabel = { NONE: 'None', LOW_INTENSITY_RED: 'Low intensity red', MEDIUM_INTENSITY_RED_WHITE: 'Medium intensity red/white', HIGH_INTENSITY_WHITE_STROBE: 'High intensity white strobe' };
+          return (
+            <div style={{ background: '#f0f9ff', border: '1px solid #38bdf8', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#0c4a6e', marginBottom: 8, fontSize: 13 }}>
+                Tower Lighting &amp; FAA Registration (14 CFR Part 77 / §17.7)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#075985' }}>
+                <span>Est. tower height</span>
+                <span style={{ fontWeight: 600 }}>{g.std_tower_height_ft}ft ({g.std_tower_height_m}m) at {Math.round(1000 * g.lambda_m / 300)}kHz</span>
+                <span>FAA Form 7460-1</span>
+                <span style={{ fontWeight: 600, color: g.faa_notification_required ? '#b45309' : '#166534' }}>
+                  {g.faa_notification_required ? 'Required' : 'Not required'}
+                </span>
+                <span>FCC ASR registration</span>
+                <span style={{ fontWeight: 600, color: g.asr_required ? '#b45309' : '#166534' }}>
+                  {g.asr_required ? 'Required (§17.7)' : 'Not required'}
+                </span>
+                <span>NOTAM coordination</span>
+                <span style={{ fontWeight: 600 }}>{g.notam_required ? 'Required during construction' : 'Not required'}</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
+                <span>Lighting type</span>
+                <span style={{ fontWeight: 600 }}>{ltgLabel[g.lighting_type] ?? g.lighting_type}</span>
+                <span>Light levels</span>
+                <span style={{ fontWeight: 600 }}>{g.n_light_levels > 0 ? g.n_light_levels : 'None'}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #bae6fd', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#075985' }}>
+                <span>FAA filing cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.faa_filing_cost_low_usd)} – {fmt(g.faa_filing_cost_high_usd)}</span>
+                <span>ASR filing cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.asr_filing_cost_low_usd)} – {fmt(g.asr_filing_cost_high_usd)}</span>
+                <span>Lighting install</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.lighting_install_cost_low_usd)} – {fmt(g.lighting_install_cost_high_usd)}</span>
+                <span>Annual maintenance</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.annual_maintenance_cost_low_usd)} – {fmt(g.annual_maintenance_cost_high_usd)}/yr</span>
+                <span style={{ fontWeight: 700, color: '#0c4a6e' }}>Total initial cost</span>
+                <span style={{ fontWeight: 700, color: '#0c4a6e' }}>{fmt(g.total_initial_cost_low_usd)} – {fmt(g.total_initial_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#0c4a6e', borderTop: '1px solid #bae6fd', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Grounding System & RF Safety Guide */}
+        {candidate.am_grounding_system_and_rf_safety_guide && (() => {
+          const g = candidate.am_grounding_system_and_rf_safety_guide;
+          const fmt = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#fffbeb', border: '1px solid #fbbf24', borderRadius: 8, padding: '14px 16px', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, color: '#92400e', marginBottom: 8, fontSize: 13 }}>
+                Ground System &amp; RF Safety (§73.54 / OET-65)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#78350f' }}>
+                <span>Radials</span>
+                <span style={{ fontWeight: 600 }}>{g.n_radials} × {g.radial_length_m}m (λ/4 = {g.radial_length_m}m)</span>
+                <span>Tower elements</span>
+                <span style={{ fontWeight: 600 }}>{g.n_tower_elements}{g.n_tower_elements > 1 ? ' (DA array)' : ' (NDA)'}</span>
+                <span>Wire gauge</span>
+                <span style={{ fontWeight: 600 }}>#{g.wire_gauge_awg} AWG bare copper</span>
+                <span>Total copper</span>
+                <span style={{ fontWeight: 600 }}>{g.total_radial_length_m.toLocaleString()}m buried</span>
+                <span>Radial install cost</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.radial_install_cost_low_usd)} – {fmt(g.radial_install_cost_high_usd)}</span>
+                <span>ATU / bonding</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.atu_cost_low_usd)} – {fmt(g.atu_cost_high_usd)}</span>
+                <span>Ground system total</span>
+                <span style={{ fontWeight: 600 }}>{fmt(g.ground_system_total_low_usd)} – {fmt(g.ground_system_total_high_usd)}</span>
+              </div>
+              <div style={{ marginTop: 8, borderTop: '1px solid #fde68a', paddingTop: 8, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, color: '#78350f' }}>
+                <span>MPE eval required</span>
+                <span style={{ fontWeight: 600 }}>{g.mpe_evaluation_required ? 'Yes (§1.1307)' : 'No'}</span>
+                <span>Uncontrolled MPE</span>
+                <span style={{ fontWeight: 600 }}>{g.mpe_uncontrolled_mw_cm2} mW/cm²</span>
+                <span>Exclusion zone</span>
+                <span style={{ fontWeight: 600 }}>{g.exclusion_zone_m}m (uncontrolled) / {g.controlled_zone_m}m (controlled)</span>
+                <span>RF fence</span>
+                <span style={{ fontWeight: 600, color: g.rf_fence_required ? '#b45309' : '#166534' }}>
+                  {g.rf_fence_required ? `Required — ${Math.round(g.fence_perimeter_ft)} linear ft` : 'Not required'}
+                </span>
+                {g.rf_fence_required && <>
+                  <span>Fence cost</span>
+                  <span style={{ fontWeight: 600 }}>{fmt(g.fence_cost_low_usd)} – {fmt(g.fence_cost_high_usd)}</span>
+                </>}
+                <span style={{ fontWeight: 700, color: '#92400e' }}>Total (ground + fence)</span>
+                <span style={{ fontWeight: 700, color: '#92400e' }}>{fmt(g.total_cost_low_usd)} – {fmt(g.total_cost_high_usd)}</span>
+              </div>
+              {g.note && (
+                <div style={{ marginTop: 8, fontSize: 11, color: '#92400e', borderTop: '1px solid #fde68a', paddingTop: 6 }}>
+                  {g.note}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Station Insurance & Bonding Guide */}
+        {candidate.am_station_insurance_and_bonding_guide && (() => {
+          const g = candidate.am_station_insurance_and_bonding_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff1f2', borderRadius: 8, border: '1px solid #fda4af' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#9f1239', marginBottom: 8 }}>
+                Station Insurance & Surety Bonding
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Annual Insurance Premium:</span> <strong>${g.annual_premium_low_usd?.toLocaleString()}–${g.annual_premium_high_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#64748b' }}>Tower Replacement Value:</span> <strong>${g.tower_replacement_value_low_usd?.toLocaleString()}–${g.tower_replacement_value_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Required Coverage Categories:</span> <strong>{g.n_required_categories}</strong></div>
+                <div><span style={{ color: '#64748b' }}>BI Coverage Max:</span> <strong>{g.bi_max_coverage_months} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>BI Waiting Period:</span> <strong>{g.bi_waiting_period_hours}h</strong></div>
+                <div><span style={{ color: '#64748b' }}>BI Monthly Coverage:</span> <strong>${g.bi_monthly_coverage_usd?.toLocaleString()}/mo</strong></div>
+                <div><span style={{ color: '#64748b' }}>Performance Bond:</span> <strong>${g.performance_bond_amount_usd?.toLocaleString()} ({g.performance_bond_pct}%)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Bond Annual Premium:</span> <strong>${g.bond_annual_premium_usd?.toLocaleString()}/yr</strong></div>
+              </div>
+              {g.insurance_categories?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#9f1239', marginBottom: 4 }}>Coverage Requirements</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {g.insurance_categories.filter(c => c.required).map((c, i) => (
+                      <span key={i} style={{ background: '#fecdd3', color: '#881337', borderRadius: 3, padding: '1px 6px', fontSize: 10 }}>
+                        {c.type}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* FCC Proof of Performance Measurement Guide */}
+        {candidate.fcc_proof_of_performance_measurement_guide && (() => {
+          const g = candidate.fcc_proof_of_performance_measurement_guide;
+          const proofColor = {
+            FULL_PROOF: '#7c3aed', SHORT_PROOF: '#0c4a6e', ABBREVIATED: '#15803d', NONE: '#374151'
+          }[g.proof_type] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #a78bfa' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5b21b6', marginBottom: 8 }}>
+                FCC Proof of Performance — Field Measurement Guide
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Proof Type:</span> <strong style={{ color: proofColor }}>{g.proof_type?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Radials Required:</span> <strong>{g.n_radials_required}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Pts Per Radial:</span> <strong>{g.n_measurement_points_per_radial}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Measurement Pts:</span> <strong>{g.total_measurement_points}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Measurement Days:</span> <strong>{g.n_measurement_days}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Timeline:</span> <strong>{g.proof_weeks_low}–{g.proof_weeks_high} weeks</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Proof Cost:</span> <strong>${g.total_proof_cost_low_usd?.toLocaleString()}–${g.total_proof_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>DA Monitor Required:</span> <strong style={{ color: g.da_monitor_required ? '#b91c1c' : '#15803d' }}>{g.da_monitor_required ? `YES ($${g.da_monitor_cost_low_usd?.toLocaleString()}–$${g.da_monitor_cost_high_usd?.toLocaleString()})` : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Critical Hours:</span> <strong style={{ color: g.critical_hours_required ? '#92400e' : '#15803d' }}>{g.critical_hours_required ? 'Required' : 'Not required'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>FCC Review Time:</span> <strong>{g.fcc_review_days_low}–{g.fcc_review_days_high} days</strong></div>
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Translator & Booster Strategy Guide */}
+        {candidate.am_translator_and_booster_strategy_guide && (() => {
+          const g = candidate.am_translator_and_booster_strategy_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#ecfdf5', borderRadius: 8, border: '1px solid #6ee7b7' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#065f46', marginBottom: 8 }}>
+                FM Translator & AM Booster Strategy
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>FM Translator Eligible:</span> <strong style={{ color: '#065f46' }}>{g.fm_translator_eligible ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Revitalization:</span> <strong style={{ color: '#065f46' }}>{g.am_revitalization_eligible ? 'Eligible' : 'N/A'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Recommended ERP:</span> <strong>{g.recommended_translator_erp_w}W ({g.recommended_translator_coverage_km} km)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Translator Cost:</span> <strong>${g.translator_total_cost_low_usd?.toLocaleString()}–${g.translator_total_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Annual OpEx:</span> <strong>${g.translator_annual_opex_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#64748b' }}>Max Distance from AM:</span> <strong>{g.translator_max_distance_from_am_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Operable During Silence:</span> <strong style={{ color: '#065f46' }}>{g.translator_operable_during_silence ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Audience Multiplier:</span> <strong>×{g.translator_audience_multiplier}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Booster (new):</span> <strong style={{ color: '#b91c1c' }}>{g.am_booster_new_license_available ? 'Available' : 'NOT AVAILABLE'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Booster (grandfathered):</span> <strong>{g.am_booster_existing_grandfathered ? 'Yes' : 'No'}</strong></div>
+              </div>
+              {g.translator_power_tiers?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#065f46', marginBottom: 4 }}>Translator Power Tiers</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {g.translator_power_tiers.map((t, i) => (
+                      <span key={i} style={{ background: '#a7f3d0', color: '#064e3b', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                        {t.power_w}W ERP · {t.coverage_radius_km} km
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Digital HD Radio Upgrade Pathway Guide */}
+        {candidate.am_digital_hd_radio_upgrade_pathway_guide && (() => {
+          const g = candidate.am_digital_hd_radio_upgrade_pathway_guide;
+          const riskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#15803d' }[g.adjacent_ch_interference_risk] ?? '#374151';
+          const applicableModes = g.applicable_hd_modes?.filter(m => m.applicable) ?? [];
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fdf2f8', borderRadius: 8, border: '1px solid #f0abfc' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#86198f', marginBottom: 8 }}>
+                AM Digital — HD Radio® Upgrade Pathway
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Applicable Modes:</span> <strong>{applicableModes.map(m => m.mode).join(', ') || 'MA1'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Sideband Level:</span> <strong>{g.hd_sideband_dbhd_increased} dBc</strong></div>
+                <div><span style={{ color: '#64748b' }}>Total Upgrade Cost:</span> <strong>${g.total_hd_upgrade_cost_low_usd?.toLocaleString()}–${g.total_hd_upgrade_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>HD Coverage:</span> <strong>{Math.round((g.hd_coverage_fraction ?? 0.6) * 100)}% of analog</strong></div>
+                <div><span style={{ color: '#64748b' }}>Multicast Channels:</span> <strong>HD2–HD{g.hd_multicast_channels + 1}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Authorization Time:</span> <strong>{g.hd_authorization_timeline_months_low}–{g.hd_authorization_timeline_months_high} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>Adj. Ch. Interf. Risk:</span> <strong style={{ color: riskColor }}>{g.adjacent_ch_interference_risk}</strong></div>
+                <div><span style={{ color: '#64748b' }}>National AM HD Adoption:</span> <strong>{g.national_hd_am_adoption_pct}%</strong></div>
+              </div>
+              {applicableModes.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#86198f', marginBottom: 4 }}>HD Modes</div>
+                  {applicableModes.map((m, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#fae8ff', borderRadius: 3, padding: '3px 7px', marginBottom: 2 }}>
+                      <strong>{m.mode} — {m.name}</strong>: {m.description} · Coverage {Math.round(m.coverage_fraction_analog * 100)}% of analog
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Automation & Emergency Alert System Guide */}
+        {candidate.am_automation_and_emergency_alert_system_guide && (() => {
+          const g = candidate.am_automation_and_emergency_alert_system_guide;
+          const autoColor = {
+            FULL: '#15803d', SEMI: '#0c4a6e', MANUAL: '#92400e'
+          }[g.recommended_automation] ?? '#374151';
+          const tierBadgeColor = {
+            'Enterprise': '#7c3aed', 'Professional': '#0c4a6e', 'Entry-level': '#15803d'
+          }[g.recommended_eas_tier] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #7dd3fc' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0369a1', marginBottom: 8 }}>
+                Automation & Emergency Alert System (EAS)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>EAS Tier:</span> <strong style={{ color: tierBadgeColor }}>{g.recommended_eas_tier}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Automation:</span> <strong style={{ color: autoColor }}>{g.recommended_automation}</strong></div>
+                <div><span style={{ color: '#64748b' }}>EAS Setup Cost:</span> <strong>${g.eas_setup_cost_low_usd?.toLocaleString()}–${g.eas_setup_cost_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Monthly Op Cost:</span> <strong>${g.monthly_operating_cost_usd}/mo</strong></div>
+                <div><span style={{ color: '#64748b' }}>IPAWS Required:</span> <strong style={{ color: '#0369a1' }}>{g.ipaws_monitoring_required ? 'Yes' : 'No'} (${g.ipaws_monthly_cost_usd}/mo)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Part 11 Items:</span> <strong>{g.n_part11_required_items} required</strong></div>
+                <div><span style={{ color: '#64748b' }}>STL Backup Paths:</span> <strong>{g.n_stl_backup_paths}</strong></div>
+                <div><span style={{ color: '#64748b' }}>EAS Test Types:</span> <strong>{g.n_eas_tests}</strong></div>
+              </div>
+              {g.eas_tests?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0369a1', marginBottom: 4 }}>EAS Tests</div>
+                  {g.eas_tests.map((t, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#e0f2fe', borderRadius: 3, padding: '3px 7px', marginBottom: 2 }}>
+                      <strong>{t.type}</strong>: {t.frequency}{t.penalty_per_miss_usd > 0 ? ` · Max fine $${t.penalty_per_miss_usd.toLocaleString()}` : ''}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Broadcast Market Competitive Landscape Guide */}
+        {candidate.broadcast_market_competitive_landscape_guide && (() => {
+          const g = candidate.broadcast_market_competitive_landscape_guide;
+          const tierColor = {
+            MAJOR: '#0c4a6e', MEDIUM: '#1e40af', SMALL: '#374151', RURAL: '#15803d'
+          }[g.market_tier] ?? '#374151';
+          const tierBg = {
+            MAJOR: '#e0f2fe', MEDIUM: '#dbeafe', SMALL: '#f3f4f6', RURAL: '#dcfce7'
+          }[g.market_tier] ?? '#f3f4f6';
+          const dispRiskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#15803d' }[g.market_displacement_risk] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff7ed', borderRadius: 8, border: '1px solid #fed7aa' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c2410c', marginBottom: 8 }}>
+                Broadcast Market — Competitive Landscape
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Market Tier:</span> <strong style={{ color: tierColor }}>{g.market_tier}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Reach Scale:</span> <strong>{g.reach_scale_km?.toFixed(0)} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM Stations in Market:</span> <strong>{g.estimated_am_stations_in_market}</strong></div>
+                <div><span style={{ color: '#64748b' }}>FM Stations in Market:</span> <strong>{g.estimated_fm_stations_in_market}</strong></div>
+                <div><span style={{ color: '#64748b' }}>FM Translators:</span> <strong>{g.estimated_translators_in_market}</strong></div>
+                <div><span style={{ color: '#64748b' }}>AM National Share:</span> <strong>{g.am_market_share_pct}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Audience Δ vs Current:</span> <strong style={{ color: g.audience_potential_change_pct >= 0 ? '#15803d' : '#b91c1c' }}>{g.audience_potential_change_pct >= 0 ? '+' : ''}{g.audience_potential_change_pct}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Displacement Risk:</span> <strong style={{ color: dispRiskColor }}>{g.market_displacement_risk}</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: tierBg, color: tierColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.market_tier} MARKET
+                </span>
+                <span style={{ background: '#fef9c3', color: '#92400e', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  FM Translator Advantage: {g.fm_translator_advantage}
+                </span>
+              </div>
+              {g.format_segments?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#c2410c', marginBottom: 4 }}>AM Format Segments</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                    {g.format_segments.map((f, i) => (
+                      <span key={i} style={{ background: '#fed7aa', color: '#7c2d12', borderRadius: 3, padding: '1px 6px', fontSize: 10 }}>
+                        {f.format} {f.am_station_pct}% · {f.growth_trend?.replace(/_/g, ' ')}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Tower Structural Wind & Ice Load Design Guide */}
+        {candidate.tower_structural_wind_and_ice_load_design_guide && (() => {
+          const g = candidate.tower_structural_wind_and_ice_load_design_guide;
+          const iceColor = {
+            HEAVY_ICE: '#b91c1c', MODERATE_ICE: '#92400e', LIGHT_ICE: '#15803d'
+          }[g.ice_zone] ?? '#374151';
+          const windRisk = g.design_wind_speed_mph >= 130 ? 'HIGH' : g.design_wind_speed_mph >= 105 ? 'MODERATE' : 'LOW';
+          const windColor = windRisk === 'HIGH' ? '#b91c1c' : windRisk === 'MODERATE' ? '#92400e' : '#15803d';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #94a3b8' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#1e293b', marginBottom: 8 }}>
+                Tower Structural — Wind & Ice Load Design
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Tower Height:</span> <strong>{g.tower_height_m}m / {g.tower_height_ft}ft</strong></div>
+                <div><span style={{ color: '#64748b' }}>Wind Zone:</span> <strong style={{ color: windColor }}>{g.wind_zone?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Design Wind Speed:</span> <strong style={{ color: windColor }}>{g.design_wind_speed_mph} mph ({g.design_wind_speed_ms} m/s)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Wind Pressure:</span> <strong>{g.wind_pressure_psf} psf ({g.wind_pressure_pa} Pa)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Ice Load Zone:</span> <strong style={{ color: iceColor }}>{g.ice_zone?.replace(/_/g, ' ')} ({g.ice_radial_in}")</strong></div>
+                <div><span style={{ color: '#64748b' }}>TIA Risk Category:</span> <strong>{g.tia_risk_category}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Tower Weight:</span> <strong>{g.tower_weight_lb_low?.toLocaleString()}–{g.tower_weight_lb_high?.toLocaleString()} lb</strong></div>
+                <div><span style={{ color: '#64748b' }}>Guy Levels:</span> <strong>{g.n_guy_levels}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Guy Anchor Radius:</span> <strong>{g.guy_anchor_radius_m_low}–{g.guy_anchor_radius_m_high}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>Foundation Depth:</span> <strong>{g.foundation_depth_m}m dia {g.foundation_diameter_m}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>Base Insulator:</span> <strong>{g.base_insulator_kv} kV</strong></div>
+                <div><span style={{ color: '#64748b' }}>Design Standard:</span> <strong style={{ fontSize: 10 }}>{g.design_standard}</strong></div>
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Night Skywave Coverage & Interference Risk Guide */}
+        {candidate.am_night_skywave_coverage_and_interference_risk_guide && (() => {
+          const g = candidate.am_night_skywave_coverage_and_interference_risk_guide;
+          const riskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#15803d' }[g.dominant_class_a_risk] ?? '#374151';
+          const opColor = {
+            FULL_POWER_24H: '#15803d', DA_N_REQUIRED: '#0c4a6e', REDUCED_POWER_OR_SILENT: '#92400e'
+          }[g.night_operation_type] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#1e1b4b', borderRadius: 8, border: '1px solid #4338ca' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#a5b4fc', marginBottom: 8 }}>
+                Night Skywave — Coverage & Interference Risk
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10, color: '#e0e7ff' }}>
+                <div><span style={{ color: '#94a3b8' }}>Latitude Zone:</span> <strong>{g.lat_zone?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>E-Layer Height:</span> <strong>{g.e_layer_height_km} km</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Skip Distance:</span> <strong>{g.skip_distance_km} km</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Skip Zone:</span> <strong>{g.skip_zone_low_km}–{g.skip_zone_high_km} km</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Operation:</span> <strong style={{ color: opColor === '#15803d' ? '#4ade80' : opColor === '#92400e' ? '#fb923c' : '#93c5fd' }}>{g.night_operation_type?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>DA-N Required:</span> <strong style={{ color: g.da_n_required ? '#f87171' : '#4ade80' }}>{g.da_n_required ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Reduce Power:</span> <strong style={{ color: g.requires_night_power_reduction ? '#fb923c' : '#4ade80' }}>{g.requires_night_power_reduction ? 'Required' : 'No'}</strong></div>
+                <div><span style={{ color: '#94a3b8' }}>Night Noise Penalty:</span> <strong>{g.night_noise_penalty_db} dB</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: '#312e81', color: '#a5b4fc', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.night_protection_class?.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: g.dominant_class_a_risk === 'HIGH' ? '#7f1d1d' : g.dominant_class_a_risk === 'MODERATE' ? '#78350f' : '#14532d', color: '#fecaca', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  Class A Risk: {g.dominant_class_a_risk}
+                </span>
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* RF Propagation Terrain Roughness Guide */}
+        {candidate.rf_propagation_terrain_roughness_guide && (() => {
+          const g = candidate.rf_propagation_terrain_roughness_guide;
+          const classColor = {
+            VERY_SMOOTH: '#15803d', SMOOTH: '#166534', MODERATE: '#0c4a6e',
+            ROUGH: '#92400e', VERY_ROUGH: '#7c2d12'
+          }[g.terrain_class] ?? '#374151';
+          const classBg = {
+            VERY_SMOOTH: '#dcfce7', SMOOTH: '#d1fae5', MODERATE: '#e0f2fe',
+            ROUGH: '#fef3c7', VERY_ROUGH: '#fee2e2'
+          }[g.terrain_class] ?? '#f3f4f6';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fdf4ff', borderRadius: 8, border: '1px solid #e879f9' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#7e22ce', marginBottom: 8 }}>
+                RF Propagation — Terrain Roughness Analysis
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Wavelength:</span> <strong>{g.lambda_m}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>σ Terrain:</span> <strong>{g.sigma_msm_val}m</strong></div>
+                <div><span style={{ color: '#64748b' }}>Δh Interdecile:</span> <strong>{g.delta_h_m}m (ref {g.delta_h_ref_m}m)</strong></div>
+                <div><span style={{ color: '#64748b' }}>Terrain Factor:</span> <strong>{g.terrain_correction_factor}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Base Range:</span> <strong>{g.base_groundwave_range_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Est. R(50,50) Range:</span> <strong>{g.estimated_range_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Effective COL Range:</span> <strong>{g.effective_range_col_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>COL Bearing:</span> <strong>{g.bearing_to_col_deg !== null ? `${g.bearing_to_col_deg}°` : 'N/A'}</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: classBg, color: classColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.terrain_class?.replace(/_/g, ' ')}
+                </span>
+                {g.da_favored_bearing !== null && (
+                  <span style={{ background: g.da_favored_bearing ? '#dcfce7' : '#fee2e2', color: g.da_favored_bearing ? '#15803d' : '#b91c1c', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                    DA COL BEARING: {g.da_favored_bearing ? 'FAVORED' : 'UNFAVORED'}
+                  </span>
+                )}
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* FCC License History & Compliance Record Guide */}
+        {candidate.fcc_license_history_and_compliance_record_guide && (() => {
+          const g = candidate.fcc_license_history_and_compliance_record_guide;
+          const priorityColor = {
+            EXPEDITED_ELIGIBLE: '#14532d', PRIORITY_RURAL: '#1e40af', NORMAL: '#374151'
+          }[g.processing_priority] ?? '#374151';
+          const priorityBg = {
+            EXPEDITED_ELIGIBLE: '#dcfce7', PRIORITY_RURAL: '#dbeafe', NORMAL: '#f3f4f6'
+          }[g.processing_priority] ?? '#f3f4f6';
+          const compRiskColor = { HIGH: '#b91c1c', MODERATE: '#92400e', LOW: '#14532d' }[g.comparative_proceeding_risk] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fefce8', borderRadius: 8, border: '1px solid #fde047' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#854d0e', marginBottom: 8 }}>
+                FCC License History & Compliance Profile
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Processing Priority:</span> <strong style={{ color: priorityColor }}>{g.processing_priority?.replace(/_/g, ' ')}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Processing Time:</span> <strong>{g.processing_months_low}–{g.processing_months_high} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>Comparative Risk:</span> <strong style={{ color: compRiskColor }}>{g.comparative_proceeding_risk}</strong></div>
+                <div><span style={{ color: '#64748b' }}>STA Eligible:</span> <strong style={{ color: g.sta_eligible ? '#15803d' : '#b91c1c' }}>{g.sta_eligible ? `Yes (${g.sta_duration_days} days)` : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>CP Expiry Term:</span> <strong>{g.cp_years_to_expiry} years</strong></div>
+                <div><span style={{ color: '#64748b' }}>Foreign Ownership Limit:</span> <strong>20–25%</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: priorityBg, color: priorityColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.processing_priority?.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: '#fef9c3', color: compRiskColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  Comparative: {g.comparative_proceeding_risk}
+                </span>
+              </div>
+              {g.key_filing_deadlines?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#854d0e', marginBottom: 4 }}>Key Filing Deadlines</div>
+                  {g.key_filing_deadlines.map((d, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#fef9c3', borderRadius: 4, padding: '3px 8px', marginBottom: 2 }}>
+                      <strong>{d.item}</strong> ({d.form}): {d.deadline}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Environmental Permitting & NEPA Compliance Guide */}
+        {candidate.environmental_permitting_and_nepa_compliance_guide && (() => {
+          const g = candidate.environmental_permitting_and_nepa_compliance_guide;
+          const tierColor = {
+            CATEGORICAL_EXCLUSION: '#14532d', ENVIRONMENTAL_ASSESSMENT: '#92400e',
+            ENVIRONMENTAL_IMPACT_STATEMENT: '#7f1d1d'
+          }[g.nepa_tier] ?? '#374151';
+          const tierBg = {
+            CATEGORICAL_EXCLUSION: '#dcfce7', ENVIRONMENTAL_ASSESSMENT: '#fef3c7',
+            ENVIRONMENTAL_IMPACT_STATEMENT: '#fee2e2'
+          }[g.nepa_tier] ?? '#f3f4f6';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d', marginBottom: 8 }}>
+                Environmental Permitting & NEPA Compliance
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Tower Height:</span> <strong>{g.tower_height_m}m / {g.tower_height_ft}ft</strong></div>
+                <div><span style={{ color: '#64748b' }}>Array Towers:</span> <strong>{g.n_towers_in_array}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Exceeds 61m AGL:</span> <strong style={{ color: g.exceeds_61m_agl ? '#b91c1c' : '#15803d' }}>{g.exceeds_61m_agl ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>§1.1307 Triggers:</span> <strong>{g.n_section_1307_triggers}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Section 106 Required:</span> <strong style={{ color: g.section_106_nhpa_required ? '#b91c1c' : '#15803d' }}>{g.section_106_nhpa_required ? 'YES' : 'No'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>RF MPE Assessment:</span> <strong>{g.rf_mpe_assessment_required ? 'Required' : 'CE applies'}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Permitting Timeline:</span> <strong>{g.total_permitting_timeline_days_low}–{g.total_permitting_timeline_days_high} days</strong></div>
+                <div><span style={{ color: '#64748b' }}>Army Corps NWP-57:</span> <strong>{g.army_corps_nwp57_applicable ? 'Applicable' : 'N/A'}</strong></div>
+              </div>
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ background: tierBg, color: tierColor, borderRadius: 4, padding: '2px 10px', fontSize: 11, fontWeight: 600 }}>
+                  {g.nepa_tier_label ?? g.nepa_tier?.replace(/_/g, ' ')}
+                </span>
+              </div>
+              {g.section_1307_triggers?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#15803d', marginBottom: 4 }}>§1.1307 Triggers</div>
+                  {g.section_1307_triggers.map((t, i) => (
+                    <div key={i} style={{ fontSize: 11, background: '#dcfce7', borderRadius: 4, padding: '4px 8px', marginBottom: 3 }}>
+                      <strong>{t.code}</strong>: {t.issue} — <em>{t.action}</em>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Community of License Population Change Trend Guide */}
+        {candidate.community_of_license_population_change_trend_guide && (() => {
+          const g = candidate.community_of_license_population_change_trend_guide;
+          const tierColor = {
+            RAPID_GROWTH: '#14532d', GROWING: '#166534', STABLE: '#0c4a6e',
+            DECLINING: '#7c2d12', RAPID_DECLINE: '#450a0a'
+          }[g.growth_tier] ?? '#374151';
+          const tierBg = {
+            RAPID_GROWTH: '#dcfce7', GROWING: '#d1fae5', STABLE: '#e0f2fe',
+            DECLINING: '#fee2e2', RAPID_DECLINE: '#fecaca'
+          }[g.growth_tier] ?? '#f3f4f6';
+          const riskColor = { HIGH: '#991b1b', MODERATE: '#92400e', LOW: '#14532d' }[g.sect_307b_preference_risk] ?? '#374151';
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#ecfeff', borderRadius: 8, border: '1px solid #67e8f9' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0e7490', marginBottom: 8 }}>
+                COL Population Change & §307(b) Risk
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Coverage Radius:</span> <strong>{g.coverage_radius_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Dist to COL Centroid:</span> <strong>{g.col_dist_from_candidate_km} km</strong></div>
+                <div><span style={{ color: '#64748b' }}>Pop Served Fraction:</span> <strong>{(g.pop_served_fraction * 100).toFixed(0)}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Est. COL Pop (now):</span> <strong>{g.col_pop_estimate_now?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Est. COL Pop (10yr):</span> <strong>{g.col_pop_estimate_10yr?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>10yr Change:</span> <strong>{g.col_pop_change_10yr >= 0 ? '+' : ''}{g.col_pop_change_10yr?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Growth Rate:</span> <strong>{g.estimated_col_growth_pct_per_yr}%/yr</strong></div>
+                <div><span style={{ color: '#64748b' }}>National Baseline:</span> <strong>{g.national_baseline_growth_pct_per_yr}%/yr</strong></div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+                <span style={{ background: tierBg, color: tierColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  {g.growth_tier?.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: '#fef3c7', color: riskColor, borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                  §307(b): {g.sect_307b_preference_risk} RISK
+                </span>
+                {g.tuck_rule_protected && (
+                  <span style={{ background: '#dbeafe', color: '#1e3a8a', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 600 }}>
+                    TUCK RULE PROTECTED (IHB)
+                  </span>
+                )}
+              </div>
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b' }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Silent Period Revenue Impact & Audience Retention Guide */}
+        {candidate.silent_period_revenue_impact_and_audience_retention_guide && (() => {
+          const g = candidate.silent_period_revenue_impact_and_audience_retention_guide;
+          const typicalScenario = g.silence_scenarios?.find(s => s.months === 6);
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0fdfa', borderRadius: 8, border: '1px solid #5eead4' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0f766e', marginBottom: 8 }}>
+                Silent Period — Revenue & Audience Impact
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#64748b' }}>Monthly Gross:</span> <strong>${g.monthly_gross_revenue_low_usd?.toLocaleString()}–${g.monthly_gross_revenue_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Monthly Net:</span> <strong>${g.monthly_net_revenue_low_usd?.toLocaleString()}–${g.monthly_net_revenue_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#64748b' }}>Agency/Rep Commission:</span> <strong>{g.agency_rep_commission_pct}%</strong></div>
+                <div><span style={{ color: '#64748b' }}>Monthly Audience Attrition:</span> <strong>{g.monthly_audience_attrition_pct}%/mo</strong></div>
+                <div><span style={{ color: '#64748b' }}>FCC Silence Limit:</span> <strong>{g.fcc_silence_limit_months} months</strong></div>
+                <div><span style={{ color: '#64748b' }}>1-Month Acceleration Value:</span> <strong>${g.acceleration_1mo_value_usd?.toLocaleString()}</strong></div>
+              </div>
+              {typicalScenario && (
+                <div style={{ background: '#ccfbf1', borderRadius: 6, padding: '8px 10px', fontSize: 12, marginBottom: 10 }}>
+                  <strong>Typical 6-Month Scenario:</strong> Revenue loss ${g.typical_6mo_revenue_loss_low_usd?.toLocaleString()}–${g.typical_6mo_revenue_loss_high_usd?.toLocaleString()} net · Audience retained {g.typical_6mo_audience_retained_pct}% · Recovery ~{g.typical_6mo_recovery_months} months
+                </div>
+              )}
+              {g.silence_scenarios?.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0f766e', marginBottom: 4 }}>Silence Scenarios</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#99f6e4', color: '#134e4a' }}>
+                        <th style={{ padding: '3px 6px', textAlign: 'left' }}>Scenario</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Prob</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Audience Ret.</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Net Rev Loss</th>
+                        <th style={{ padding: '3px 6px', textAlign: 'right' }}>Recovery</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.silence_scenarios.map((s, i) => (
+                        <tr key={i} style={{ background: i % 2 === 0 ? '#f0fdfa' : '#ccfbf1' }}>
+                          <td style={{ padding: '3px 6px' }}>{s.label}</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{Math.round(s.probability * 100)}%</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{s.audience_retained_pct}%</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>${s.revenue_loss_net_low_usd?.toLocaleString()}–${s.revenue_loss_net_high_usd?.toLocaleString()}</td>
+                          <td style={{ padding: '3px 6px', textAlign: 'right' }}>{s.recovery_months_est} mo</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {g.non_broadcast_streams?.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#0f766e', marginBottom: 4 }}>Non-Broadcast Revenue During Silence</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {g.non_broadcast_streams.map((s, i) => (
+                      <span key={i} style={{ background: '#99f6e4', color: '#134e4a', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                        {s.source}: ${s.monthly_low?.toLocaleString()}–${s.monthly_high?.toLocaleString()}/mo
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {g.reference && (
+                <div style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>{g.reference}</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* FCC Form 301 Exhibit Checklist Guide */}
+        {candidate.fcc_form_301_exhibit_checklist_guide && (() => {
+          const g = candidate.fcc_form_301_exhibit_checklist_guide;
+          const topDeficiency = g.deficiency_triggers?.[0];
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f5f3ff', borderRadius: 8, border: '1px solid #c4b5fd' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#4c1d95', marginBottom: 8 }}>
+                FCC Form 301-AM Exhibit Checklist — Construction Permit Application
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Pattern mode:</span> <strong>{g.pattern_mode} ({g.is_directional ? 'Directional' : 'Non-Directional'})</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total exhibits:</span> <strong>{g.n_exhibits_total}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Required exhibits:</span> <strong style={{ color: '#7c3aed' }}>{g.n_exhibits_required}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>DA-specific exhibits:</span> <strong>{g.n_exhibits_da_specific} {g.is_directional ? '(required)' : '(not needed — NDA)'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ASR required:</span> <strong style={{ color: g.asr_required ? '#dc2626' : '#16a34a' }}>{g.asr_required ? `Yes — tower ${g.tower_height_ft} ft (§17.7)` : 'No'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Filing fee:</span> <strong>${g.filing_fee_usd?.toLocaleString()} (Form 301)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Filing system:</span> <strong>{g.filing_system}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Deficiency risks:</span> <strong>{g.n_deficiency_risks} identified</strong></div>
+              </div>
+              {topDeficiency && (
+                <div style={{ marginBottom: 8, padding: '8px 10px', background: '#ede9fe', borderRadius: 6, border: '1px solid #c4b5fd' }}>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#4c1d95', marginBottom: 3 }}>Top Deficiency Risk #{topDeficiency.rank}: {topDeficiency.issue}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>{topDeficiency.cfr} — {topDeficiency.how_to_avoid}</div>
+                </div>
+              )}
+              {g.required_exhibits && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#4c1d95', marginBottom: 4 }}>Required Exhibits ({g.n_exhibits_required})</div>
+                  <table style={{ width: '100%', fontSize: 10, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#ddd6fe' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>ID</th>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Exhibit</th>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>CFR</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.required_exhibits.map((e, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #c4b5fd' }}>
+                          <td style={{ padding: '2px 6px', fontWeight: 700, color: '#4c1d95', whiteSpace: 'nowrap' }}>{e.id}</td>
+                          <td style={{ padding: '2px 6px' }}>{e.title}</td>
+                          <td style={{ padding: '2px 6px', color: '#6b7280', whiteSpace: 'nowrap' }}>{e.cfr}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#4c1d95' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Electrical Power Consumption Guide */}
+        {candidate.electrical_power_consumption_guide && (() => {
+          const g = candidate.electrical_power_consumption_guide;
+          const ss   = g.transmitter_models?.find(m => m.type === 'SOLID_STATE');
+          const tube = g.transmitter_models?.find(m => m.type === 'TUBE');
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff1f2', borderRadius: 8, border: '1px solid #fda4af' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#9f1239', marginBottom: 8 }}>
+                Electrical Power Consumption — Transmitter Efficiency &amp; Electricity Cost
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>TPO / frequency:</span> <strong>{g.tpo_kw} kW @ {g.frequency_khz} kHz</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Electricity rate:</span> <strong>${g.electricity_rate_low_usd_per_kwh}–${g.electricity_rate_high_usd_per_kwh}/kWh</strong></div>
+                <div><span style={{ color: '#6b7280' }}>SS annual cost:</span> <strong style={{ color: '#15803d' }}>${ss?.annual_cost_low_usd?.toLocaleString()}–${ss?.annual_cost_high_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tube annual cost:</span> <strong style={{ color: '#b45309' }}>${tube?.annual_cost_low_usd?.toLocaleString()}–${tube?.annual_cost_high_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Annual savings (SS vs tube):</span> <strong style={{ color: '#15803d' }}>${g.annual_savings_vs_tube_usd?.toLocaleString()}/yr</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Upgrade payback:</span> <strong>{g.upgrade_payback_years} yr on ${g.solid_state_tx_upgrade_cost_usd?.toLocaleString()} tx</strong></div>
+              </div>
+              {g.transmitter_models && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#9f1239', marginBottom: 4 }}>Transmitter Technology Comparison</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fecdd3' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Type</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Eff %</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Input kW</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Annual Cost</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.transmitter_models.map((m, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #fda4af', background: m.type === 'SOLID_STATE' ? '#fff1f2' : 'transparent' }}>
+                          <td style={{ padding: '3px 6px', fontWeight: m.type === 'SOLID_STATE' ? 700 : 400 }}>{m.label}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.efficiency_low_pct}–{m.efficiency_high_pct}%</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>{m.input_power_low_kw}–{m.input_power_high_kw}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${m.annual_cost_low_usd?.toLocaleString()}–${m.annual_cost_high_usd?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#9f1239' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Antenna Base Impedance & ATU Design Guide */}
+        {candidate.antenna_base_impedance_and_atu_design_guide && (() => {
+          const g = candidate.antenna_base_impedance_and_atu_design_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fafaf0', borderRadius: 8, border: '1px solid #d4c84a' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5c4a00', marginBottom: 8 }}>
+                Antenna Base Impedance &amp; ATU Design — §73.190 / §73.62
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Frequency:</span> <strong>{g.frequency_khz} kHz (λ = {g.lambda_m} m)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tower height (λ/4):</span> <strong>{g.lambda_quarter_m} m</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Rr (radiation Ω):</span> <strong>{g.rr_ohm} Ω</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Rg (ground loss):</span> <strong>{g.rg_low_ohm}–{g.rg_high_ohm} Ω</strong></div>
+                <div><span style={{ color: '#6b7280' }}>R_base (total):</span> <strong>{g.r_base_low_ohm}–{g.r_base_high_ohm} Ω (typ {g.r_base_typ_ohm} Ω)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Feedline:</span> <strong>{g.feedline_impedance_ohm} Ω coax</strong></div>
+                <div><span style={{ color: '#6b7280' }}>ATU type:</span> <strong>{g.atu_network_type}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Networks:</span> <strong>{g.n_atu_networks}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>L (shunt):</span> <strong>{g.l_shunt_uh} μH (X = {g.xl_shunt_ohm} Ω)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>C (series):</span> <strong>{g.c_series_pf?.toLocaleString()} pF (X = {g.xc_series_ohm} Ω)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Network Q:</span> <strong>{g.q_network}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>-3 dB BW:</span> <strong style={{ color: g.bw_adequate ? '#15803d' : '#dc2626' }}>{g.bw_3db_khz} kHz {g.bw_adequate ? '✓' : '⚠'}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Antenna efficiency:</span> <strong>{g.antenna_efficiency_low_pct}–{g.antenna_efficiency_high_pct}% (typ {g.antenna_efficiency_typ_pct}%)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Base current ({g.tpo_kw} kW):</span> <strong>{g.base_current_low_a}–{g.base_current_high_a} A (typ {g.base_current_typ_a} A)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Detuning zone:</span> <strong>≤ {g.detuning_radius_m} m from tower (§73.190)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Guy wire detuning:</span> <strong style={{ color: g.guy_wire_detuning_required ? '#b45309' : '#6b7280' }}>{g.guy_wire_detuning_required ? 'Required' : 'Not required'}</strong></div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: 10, color: '#5c4a00' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Station Total Project Cost Pro Forma Guide */}
+        {candidate.station_total_project_cost_pro_forma_guide && (() => {
+          const g = candidate.station_total_project_cost_pro_forma_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#f0f9ff', borderRadius: 8, border: '1px solid #7dd3fc' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0c4a6e', marginBottom: 8 }}>
+                Station Relocation Pro Forma — Total Project Cost
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Total (low):</span> <strong>${g.total_project_low_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Total (high):</span> <strong>${g.total_project_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Typical estimate:</span> <strong style={{ color: '#0369a1' }}>${g.total_project_typ_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Contingency:</span> <strong>{g.contingency_pct}%</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Timeline:</span> <strong>{g.total_timeline_months_low}–{g.total_timeline_months_high} months</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Tower height (λ/4):</span> <strong>{g.tower_height_m} m / {g.tower_height_ft} ft</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Radial system:</span> <strong>{g.n_radials} × {g.radial_length_m} m</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Cost categories:</span> <strong>{g.n_cost_categories}</strong></div>
+              </div>
+              {g.cost_categories && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#0c4a6e', marginBottom: 4 }}>Cost Breakdown by Category</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#bae6fd' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Category</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Low</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>High</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.cost_categories.map((cat, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #7dd3fc' }}>
+                          <td style={{ padding: '3px 6px' }}>{cat.category}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${cat.low_usd?.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px' }}>${cat.high_usd?.toLocaleString()}</td>
+                        </tr>
+                      ))}
+                      <tr style={{ borderTop: '2px solid #0369a1', fontWeight: 700, background: '#e0f2fe' }}>
+                        <td style={{ padding: '3px 6px' }}>Subtotal (pre-contingency)</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.subtotal_low_usd?.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.subtotal_high_usd?.toLocaleString()}</td>
+                      </tr>
+                      <tr style={{ borderTop: '1px solid #0369a1', fontWeight: 700, color: '#0c4a6e', background: '#bae6fd' }}>
+                        <td style={{ padding: '3px 6px' }}>Total ({g.contingency_pct}% contingency)</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.total_project_low_usd?.toLocaleString()}</td>
+                        <td style={{ textAlign: 'right', padding: '3px 6px' }}>${g.total_project_high_usd?.toLocaleString()}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#0c4a6e' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
+        {/* Transmitter Power Upgrade Pathway Guide */}
+        {candidate.transmitter_power_upgrade_pathway_guide && (() => {
+          const g = candidate.transmitter_power_upgrade_pathway_guide;
+          return (
+            <div style={{ marginBottom: 18, padding: '14px 16px', background: '#fff7ed', borderRadius: 8, border: '1px solid #fdba74' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#9a3412', marginBottom: 8 }}>
+                Transmitter Power Upgrade Pathway — §73.21 / Form 301
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px', fontSize: 12, marginBottom: 10 }}>
+                <div><span style={{ color: '#6b7280' }}>Current TPO:</span> <strong>{g.current_tpo_kw} kW ({g.pattern_mode})</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Day ceiling (§73.21):</span> <strong>{g.day_max_tpo_kw} kW</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Day headroom:</span> <strong style={{ color: g.day_headroom_kw > 0 ? '#15803d' : '#6b7280' }}>{g.day_headroom_kw} kW</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Night ceiling:</span> <strong>{g.night_max_tpo_kw} kW{g.night_upgrade_requires_da_n ? ' (DA-N req.)' : ''}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Upgraded TPO:</span> <strong>{g.upgraded_tpo_kw} kW</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Coverage gain:</span> <strong style={{ color: '#15803d' }}>+{g.coverage_gain_pct}% radius (√ERP)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>CP filing fee:</span> <strong>${g.form301_fee_usd?.toLocaleString()} (Form 301)</strong></div>
+                <div><span style={{ color: '#6b7280' }}>FCC processing:</span> <strong>{g.cp_processing_months_low}–{g.cp_processing_months_high} months</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Project cost range:</span> <strong>${g.total_project_low_usd?.toLocaleString()}–${g.total_project_high_usd?.toLocaleString()}</strong></div>
+                <div><span style={{ color: '#6b7280' }}>Can upgrade day:</span> <strong style={{ color: g.can_upgrade_day_power ? '#15803d' : '#dc2626' }}>{g.can_upgrade_day_power ? 'Yes' : 'No — at ceiling'}</strong></div>
+              </div>
+              {g.upgrade_steps && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: 11, color: '#9a3412', marginBottom: 4 }}>Power Upgrade Steps</div>
+                  <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: '#fed7aa' }}>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>#</th>
+                        <th style={{ textAlign: 'left', padding: '3px 6px' }}>Action</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Cost</th>
+                        <th style={{ textAlign: 'right', padding: '3px 6px' }}>Timeline</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {g.upgrade_steps.map((s, i) => (
+                        <tr key={i} style={{ borderTop: '1px solid #fdba74' }}>
+                          <td style={{ padding: '3px 6px', color: '#9a3412', fontWeight: 700 }}>{s.step}</td>
+                          <td style={{ padding: '3px 6px' }}>{s.action}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px', whiteSpace: 'nowrap' }}>{s.cost_range_usd}</td>
+                          <td style={{ textAlign: 'right', padding: '3px 6px', whiteSpace: 'nowrap' }}>{s.timeline}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <div style={{ marginTop: 8, fontSize: 10, color: '#9a3412' }}>{g.note}</div>
             </div>
           );
         })()}

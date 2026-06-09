@@ -100,7 +100,7 @@ export default function MapPage({ authed, onNavigate, onLogout }){
       />
 
       {/* RF study console — control panel */}
-      <div className="absolute top-3 left-4 z-30 w-64 rounded border border-rule bg-black/80 backdrop-blur-sm px-3 py-2.5 font-mono text-[11px]">
+      <div className="absolute top-3 left-4 z-30 w-64 rounded border border-rule bg-black/80 backdrop-blur-sm px-3 py-2.5 font-mono text-[11px] overflow-y-auto" style={{ maxHeight: 'calc(100vh - 1.5rem)' }}>
         <div className="flex items-center">
           <span className="text-cream tracking-rack uppercase text-[10px]">Genoa · RF Console</span>
           <span className="ml-auto text-textDim/70 text-[8px]">{activeCount} active</span>

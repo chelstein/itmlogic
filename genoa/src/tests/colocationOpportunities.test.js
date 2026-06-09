@@ -2054,3 +2054,1950 @@ test('colocation GRID candidates have population_demographics_overlay', async ()
     assert.strictEqual(c.population_demographics_overlay.n_contours, 3, `rank ${c.rank} must have 3 contours`);
   }
 });
+
+test('colocation GRID candidates have transmitter_power_upgrade_pathway_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.transmitter_power_upgrade_pathway_guide;
+    assert.ok(g != null, `rank ${c.rank} missing transmitter_power_upgrade_pathway_guide`);
+    assert.strictEqual(g.can_upgrade_day_power, true, `rank ${c.rank} can_upgrade_day_power must be true (5 kW → 10 kW headroom)`);
+    assert.strictEqual(g.coverage_gain_pct, 41, `rank ${c.rank} coverage_gain_pct must be 41`);
+  }
+});
+
+test('colocation GRID candidates have station_total_project_cost_pro_forma_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.station_total_project_cost_pro_forma_guide;
+    assert.ok(g != null, `rank ${c.rank} missing station_total_project_cost_pro_forma_guide`);
+    assert.strictEqual(g.n_cost_categories, 9, `rank ${c.rank} must have 9 cost categories`);
+    assert.ok(g.total_project_low_usd > 200000, `rank ${c.rank} total_low must be > $200k`);
+  }
+});
+
+test('colocation GRID candidates have antenna_base_impedance_and_atu_design_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.antenna_base_impedance_and_atu_design_guide;
+    assert.ok(g != null, `rank ${c.rank} missing antenna_base_impedance_and_atu_design_guide`);
+    assert.strictEqual(g.rr_ohm, 36.6, `rank ${c.rank} Rr must be 36.6 Ω`);
+    assert.ok(g.bw_adequate, `rank ${c.rank} bw_adequate must be true`);
+  }
+});
+
+test('colocation GRID candidates have electrical_power_consumption_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.electrical_power_consumption_guide;
+    assert.ok(g != null, `rank ${c.rank} missing electrical_power_consumption_guide`);
+    assert.strictEqual(g.n_transmitter_models, 3, `rank ${c.rank} must have 3 transmitter models`);
+    assert.ok(g.annual_savings_vs_tube_usd > 0, `rank ${c.rank} annual savings must be positive`);
+  }
+});
+
+test('colocation GRID candidates have fcc_form_301_exhibit_checklist_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.fcc_form_301_exhibit_checklist_guide;
+    assert.ok(g != null, `rank ${c.rank} missing fcc_form_301_exhibit_checklist_guide`);
+    assert.strictEqual(g.n_exhibits_da_specific, 0, `rank ${c.rank} NDA must have 0 DA exhibits`);
+    assert.strictEqual(g.filing_fee_usd, 4200, `rank ${c.rank} filing fee must be $4,200`);
+  }
+});
+
+test('silent_period_revenue_impact_and_audience_retention_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.silent_period_revenue_impact_and_audience_retention_guide;
+    assert.ok(g != null, `rank ${c.rank} missing silent_period guide`);
+    assert.ok(g.typical_6mo_revenue_loss_low_usd > 0, `rank ${c.rank}: 6mo revenue loss must be positive`);
+    assert.ok(g.silence_scenarios.length === 4, `rank ${c.rank}: must have 4 silence scenarios`);
+  }
+});
+
+test('community_of_license_population_change_trend_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['RAPID_GROWTH', 'GROWING', 'STABLE', 'DECLINING', 'RAPID_DECLINE'];
+  for (const c of out.candidates) {
+    const g = c.community_of_license_population_change_trend_guide;
+    assert.ok(g != null, `rank ${c.rank} missing community_of_license_population_change_trend_guide`);
+    assert.ok(valid_tiers.includes(g.growth_tier), `rank ${c.rank}: growth_tier '${g.growth_tier}' invalid`);
+    assert.ok(g.col_pop_estimate_now >= 0, `rank ${c.rank}: col_pop_estimate_now must be >= 0`);
+  }
+});
+
+test('environmental_permitting_and_nepa_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['CATEGORICAL_EXCLUSION', 'ENVIRONMENTAL_ASSESSMENT', 'ENVIRONMENTAL_IMPACT_STATEMENT'];
+  for (const c of out.candidates) {
+    const g = c.environmental_permitting_and_nepa_compliance_guide;
+    assert.ok(g != null, `rank ${c.rank} missing environmental_permitting_and_nepa_compliance_guide`);
+    assert.ok(valid_tiers.includes(g.nepa_tier), `rank ${c.rank}: nepa_tier '${g.nepa_tier}' invalid`);
+    assert.ok(g.total_permitting_timeline_days_low > 0, `rank ${c.rank}: timeline must be positive`);
+  }
+});
+
+test('fcc_license_history_and_compliance_record_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_priorities = ['EXPEDITED_ELIGIBLE', 'NORMAL', 'PRIORITY_RURAL'];
+  for (const c of out.candidates) {
+    const g = c.fcc_license_history_and_compliance_record_guide;
+    assert.ok(g != null, `rank ${c.rank} missing fcc_license_history_and_compliance_record_guide`);
+    assert.ok(valid_priorities.includes(g.processing_priority), `rank ${c.rank}: processing_priority '${g.processing_priority}' invalid`);
+    assert.ok(g.processing_months_low > 0, `rank ${c.rank}: processing_months_low must be > 0`);
+  }
+});
+
+test('rf_propagation_terrain_roughness_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_classes = ['VERY_SMOOTH', 'SMOOTH', 'MODERATE', 'ROUGH', 'VERY_ROUGH'];
+  for (const c of out.candidates) {
+    const g = c.rf_propagation_terrain_roughness_guide;
+    assert.ok(g != null, `rank ${c.rank} missing rf_propagation_terrain_roughness_guide`);
+    assert.ok(valid_classes.includes(g.terrain_class), `rank ${c.rank}: terrain_class '${g.terrain_class}' invalid`);
+    assert.ok(g.estimated_range_km > 0, `rank ${c.rank}: estimated_range_km must be > 0`);
+  }
+});
+
+test('am_night_skywave_coverage_and_interference_risk_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_ops = ['FULL_POWER_24H', 'DA_N_REQUIRED', 'REDUCED_POWER_OR_SILENT'];
+  for (const c of out.candidates) {
+    const g = c.am_night_skywave_coverage_and_interference_risk_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_night_skywave_coverage_and_interference_risk_guide`);
+    assert.ok(valid_ops.includes(g.night_operation_type), `rank ${c.rank}: night_operation_type '${g.night_operation_type}' invalid`);
+    assert.ok(g.skip_distance_km > 0, `rank ${c.rank}: skip_distance_km must be > 0`);
+  }
+});
+
+test('tower_structural_wind_and_ice_load_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_zones = ['SOUTHWEST_DESERT', 'MOUNTAIN_WEST', 'PACIFIC_COAST', 'NORTHEAST', 'CENTRAL_PLAINS', 'GULF_COAST'];
+  for (const c of out.candidates) {
+    const g = c.tower_structural_wind_and_ice_load_design_guide;
+    assert.ok(g != null, `rank ${c.rank} missing tower_structural_wind_and_ice_load_design_guide`);
+    assert.ok(valid_zones.includes(g.wind_zone), `rank ${c.rank}: wind_zone '${g.wind_zone}' invalid`);
+    assert.ok(g.design_wind_speed_mph > 0, `rank ${c.rank}: design_wind_speed_mph must be > 0`);
+  }
+});
+
+test('broadcast_market_competitive_landscape_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['MAJOR', 'MEDIUM', 'SMALL', 'RURAL'];
+  for (const c of out.candidates) {
+    const g = c.broadcast_market_competitive_landscape_guide;
+    assert.ok(g != null, `rank ${c.rank} missing broadcast_market_competitive_landscape_guide`);
+    assert.ok(valid_tiers.includes(g.market_tier), `rank ${c.rank}: market_tier '${g.market_tier}' invalid`);
+    assert.ok(g.n_format_segments >= 5, `rank ${c.rank}: must have at least 5 format segments`);
+  }
+});
+
+test('am_automation_and_emergency_alert_system_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_tiers = ['Entry-level', 'Professional', 'Enterprise'];
+  for (const c of out.candidates) {
+    const g = c.am_automation_and_emergency_alert_system_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_automation_and_emergency_alert_system_guide`);
+    assert.ok(valid_tiers.includes(g.recommended_eas_tier), `rank ${c.rank}: eas_tier '${g.recommended_eas_tier}' invalid`);
+    assert.ok(g.eas_setup_cost_low_usd > 0, `rank ${c.rank}: EAS setup cost must be positive`);
+  }
+});
+
+test('am_digital_hd_radio_upgrade_pathway_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_digital_hd_radio_upgrade_pathway_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_digital_hd_radio_upgrade_pathway_guide`);
+    assert.ok(g.n_applicable_hd_modes >= 1, `rank ${c.rank}: must have at least 1 applicable HD mode`);
+    assert.ok(g.total_hd_upgrade_cost_low_usd > 0, `rank ${c.rank}: HD upgrade cost must be positive`);
+  }
+});
+
+test('am_translator_and_booster_strategy_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_translator_and_booster_strategy_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_translator_and_booster_strategy_guide`);
+    assert.ok(g.fm_translator_eligible, `rank ${c.rank}: must be FM translator eligible`);
+    assert.ok(g.recommended_translator_erp_w > 0, `rank ${c.rank}: recommended ERP must be > 0`);
+  }
+});
+
+test('fcc_proof_of_performance_measurement_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  const valid_proof_types = ['FULL_PROOF', 'SHORT_PROOF', 'ABBREVIATED', 'NONE'];
+  for (const c of out.candidates) {
+    const g = c.fcc_proof_of_performance_measurement_guide;
+    assert.ok(g != null, `rank ${c.rank} missing fcc_proof_of_performance_measurement_guide`);
+    assert.ok(valid_proof_types.includes(g.proof_type), `rank ${c.rank}: proof_type '${g.proof_type}' invalid`);
+    assert.ok(g.total_measurement_points > 0, `rank ${c.rank}: total measurement points must be > 0`);
+  }
+});
+
+test('am_station_insurance_and_bonding_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_station_insurance_and_bonding_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_station_insurance_and_bonding_guide`);
+    assert.ok(g.annual_premium_low_usd > 0, `rank ${c.rank}: annual premium must be > 0`);
+    assert.ok(g.n_required_categories >= 5, `rank ${c.rank}: must have >= 5 required coverage categories`);
+  }
+});
+
+test('am_grounding_system_and_rf_safety_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_grounding_system_and_rf_safety_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_grounding_system_and_rf_safety_guide`);
+    assert.ok(g.n_radials >= 60, `rank ${c.rank}: n_radials must be >= 60`);
+    assert.ok(g.total_cost_low_usd > 0, `rank ${c.rank}: total_cost_low_usd must be positive`);
+    assert.ok(g.exclusion_zone_m > 0, `rank ${c.rank}: exclusion_zone_m must be positive`);
+  }
+});
+
+test('am_antenna_tower_lighting_and_faa_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_tower_lighting_and_faa_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_antenna_tower_lighting_and_faa_guide`);
+    assert.ok(typeof g.lighting_type === 'string', `rank ${c.rank}: lighting_type must be a string`);
+    assert.ok(g.std_tower_height_ft > 0, `rank ${c.rank}: std_tower_height_ft must be positive`);
+    assert.ok(g.total_initial_cost_low_usd >= 0, `rank ${c.rank}: total_initial_cost_low_usd must be non-negative`);
+  }
+});
+
+test('am_site_acquisition_and_real_property_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_site_acquisition_and_real_property_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_site_acquisition_and_real_property_guide`);
+    assert.ok(['RURAL', 'SUBURBAN', 'URBAN'].includes(g.site_class), `rank ${c.rank}: invalid site_class`);
+    assert.ok(g.total_purchase_low_usd > 0, `rank ${c.rank}: total_purchase_low_usd must be positive`);
+    assert.ok(g.annual_lease_low_usd > 0, `rank ${c.rank}: annual_lease_low_usd must be positive`);
+  }
+});
+
+test('am_construction_permit_and_buildout_timeline_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_construction_permit_and_buildout_timeline_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_construction_permit_and_buildout_timeline_guide`);
+    assert.ok(g.total_months_low > 0, `rank ${c.rank}: total_months_low must be positive`);
+    assert.ok(['LOW', 'MEDIUM', 'HIGH'].includes(g.cp_expiration_risk), `rank ${c.rank}: invalid cp_expiration_risk`);
+    assert.ok(g.fcc_filing_fee_usd > 0, `rank ${c.rank}: fcc_filing_fee_usd must be positive`);
+  }
+});
+
+test('am_transmitter_and_equipment_selection_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_and_equipment_selection_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_transmitter_and_equipment_selection_guide`);
+    assert.ok(['LOW','MEDIUM','HIGH','VERY_HIGH'].includes(g.power_class_tx), `rank ${c.rank}: invalid power_class_tx`);
+    assert.ok(g.total_equipment_low_usd > 0, `rank ${c.rank}: total_equipment_low_usd must be positive`);
+    assert.ok(g.backup_tx_kw >= 1, `rank ${c.rank}: backup_tx_kw must be at least 1`);
+  }
+});
+
+test('am_transmitter_building_and_utilities_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_building_and_utilities_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_transmitter_building_and_utilities_guide`);
+    assert.ok(g.bld_sqft_low > 0, `rank ${c.rank}: bld_sqft_low must be positive`);
+    assert.ok(g.generator_kw > 0, `rank ${c.rank}: generator_kw must be positive`);
+    assert.ok(g.total_infrastructure_low_usd > 0, `rank ${c.rank}: total_infrastructure_low_usd must be positive`);
+  }
+});
+
+test('am_local_zoning_and_land_use_compatibility_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_local_zoning_and_land_use_compatibility_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_local_zoning_and_land_use_compatibility_guide`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_zoning_cost_low_usd >= 0, `rank ${c.rank}: total_zoning_cost_low_usd must be non-negative`);
+  }
+});
+
+test('am_daytime_interference_and_protection_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_daytime_interference_and_protection_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_daytime_interference_and_protection_guide`);
+    assert.ok(['CLEAR_CHANNEL','REGIONAL_CHANNEL','LOCAL_CHANNEL'].includes(g.channel_type), `rank ${c.rank}: invalid channel_type`);
+    assert.ok(g.service_radius_05_mvpm_km > 0, `rank ${c.rank}: service_radius must be positive`);
+  }
+});
+
+test('am_studio_to_transmitter_link_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_studio_to_transmitter_link_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_studio_to_transmitter_link_guide`);
+    assert.ok(['IP_INTERNET','LICENSED_950MHZ','DIGITAL_MICROWAVE'].includes(g.stl_technology), `rank ${c.rank}: invalid stl_technology`);
+    assert.ok(g.total_stl_cost_low_usd >= 0, `rank ${c.rank}: total_stl_cost_low_usd must be non-negative`);
+    assert.ok(g.stl_latency_ms > 0, `rank ${c.rank}: stl_latency_ms must be positive`);
+  }
+});
+
+test('am_antenna_electrical_design_and_efficiency_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_electrical_design_and_efficiency_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_antenna_electrical_design_and_efficiency_guide`);
+    assert.ok(g.efficiency_pct_low > 0 && g.efficiency_pct_low < 100, `rank ${c.rank}: efficiency_pct_low must be 0-100`);
+    assert.ok(g.effective_erp_kw_low > 0, `rank ${c.rank}: effective_erp_kw_low must be positive`);
+    assert.ok(g.radiation_resistance_ohm === 36.5, `rank ${c.rank}: radiation_resistance should be 36.5Ω`);
+  }
+});
+
+test('am_annual_operating_cost_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_annual_operating_cost_analysis_guide;
+    assert.ok(g != null, `rank ${c.rank} missing am_annual_operating_cost_analysis_guide`);
+    assert.ok(g.total_annual_low_usd > 0, `rank ${c.rank}: total_annual_low_usd must be positive`);
+    assert.ok(g.annual_kwh_total > 0, `rank ${c.rank}: annual_kwh_total must be positive`);
+    assert.ok(g.opex_10yr_pv_low_usd > g.total_annual_low_usd, `rank ${c.rank}: 10yr NPV must exceed 1 year`);
+  }
+});
+
+test('am_emergency_power_and_backup_systems_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_emergency_power_and_backup_systems_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_emergency_power_and_backup_systems_guide missing`);
+    assert.ok(g.generator_size_kw >= 10, `rank ${c.rank}: generator_size_kw should be ≥10 kW`);
+    assert.ok(g.total_backup_low_usd > 0, `rank ${c.rank}: total_backup_low_usd must be positive`);
+    assert.ok(g.fuel_for_72h_gal > 0, `rank ${c.rank}: fuel_for_72h_gal must be positive`);
+  }
+});
+
+test('am_tower_structural_and_wind_loading_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_and_wind_loading_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_structural_and_wind_loading_guide missing`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_guyed_low_usd > 0, `rank ${c.rank}: total_guyed_low_usd must be positive`);
+    assert.ok(typeof g.tia_class === 'string', `rank ${c.rank}: tia_class should be a string`);
+  }
+});
+
+test('am_nepa_and_environmental_permitting_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nepa_and_environmental_permitting_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nepa_and_environmental_permitting_guide missing`);
+    assert.ok(typeof g.nepa_level === 'string', `rank ${c.rank}: nepa_level should be a string`);
+    assert.ok(g.total_env_cost_low_usd > 0, `rank ${c.rank}: total_env_cost_low_usd must be positive`);
+    assert.ok(g.env_review_weeks_low > 0, `rank ${c.rank}: env_review_weeks_low must be positive`);
+  }
+});
+
+test('am_electrical_service_and_power_infrastructure_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_electrical_service_and_power_infrastructure_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_electrical_service_and_power_infrastructure_guide missing`);
+    assert.ok(g.service_amps > 0, `rank ${c.rank}: service_amps must be positive`);
+    assert.ok(g.transformer_kva > 0, `rank ${c.rank}: transformer_kva must be positive`);
+    assert.ok(g.total_utility_low_usd > 0, `rank ${c.rank}: total_utility_low_usd must be positive`);
+  }
+});
+
+test('am_soil_conductivity_and_groundwave_coverage_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_soil_conductivity_and_groundwave_coverage_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_soil_conductivity_and_groundwave_coverage_guide missing`);
+    assert.ok(g.sigma_ms > 0, `rank ${c.rank}: sigma_ms must be positive`);
+    assert.ok(g.d_05_mvm_km > 0, `rank ${c.rank}: d_05_mvm_km must be positive`);
+    assert.ok(g.coverage_area_km2 > 0, `rank ${c.rank}: coverage_area_km2 must be positive`);
+  }
+});
+
+test('am_lightning_protection_and_surge_suppression_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_lightning_protection_and_surge_suppression_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_lightning_protection_and_surge_suppression_guide missing`);
+    assert.ok(g.N_g > 0, `rank ${c.rank}: N_g must be positive`);
+    assert.ok(g.total_lp_cost_low_usd > 0, `rank ${c.rank}: total_lp_cost_low_usd must be positive`);
+    assert.ok(g.N_s > 0, `rank ${c.rank}: N_s must be positive`);
+  }
+});
+
+test('am_coverage_improvement_vs_current_site_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_coverage_improvement_vs_current_site_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_coverage_improvement_vs_current_site_guide missing`);
+    assert.ok(typeof g.verdict === 'string', `rank ${c.rank}: verdict should be a string`);
+    assert.ok(g.d_candidate_km > 0, `rank ${c.rank}: d_candidate_km must be positive`);
+    assert.ok(['SIGNIFICANT_COVERAGE_GAIN','MARGINAL_COVERAGE_GAIN','EQUIVALENT_COVERAGE','MARGINAL_COVERAGE_LOSS','SIGNIFICANT_COVERAGE_LOSS'].includes(g.verdict), `rank ${c.rank}: verdict should be a valid classification`);
+  }
+});
+
+test('am_rf_system_monitoring_and_telemetry_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_rf_system_monitoring_and_telemetry_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_rf_system_monitoring_and_telemetry_guide missing`);
+    assert.ok(g.n_base_meters >= 1, `rank ${c.rank}: n_base_meters must be at least 1`);
+    assert.ok(g.total_telemetry_low_usd > 0, `rank ${c.rank}: total_telemetry_low_usd must be positive`);
+    assert.ok(g.annual_log_entries > 0, `rank ${c.rank}: annual_log_entries must be positive`);
+  }
+});
+
+test('am_geotechnical_and_soil_investigation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_geotechnical_and_soil_investigation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_geotechnical_and_soil_investigation_guide missing`);
+    assert.ok(g.bearing_capacity_psf_low > 0, `rank ${c.rank}: bearing_capacity_psf_low must be positive`);
+    assert.ok(g.total_geotech_low_usd > 0, `rank ${c.rank}: total_geotech_low_usd must be positive`);
+    assert.ok(typeof g.foundation_type === 'string', `rank ${c.rank}: foundation_type should be a string`);
+  }
+});
+
+test('am_transmitter_procurement_and_upgrade_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_procurement_and_upgrade_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_procurement_and_upgrade_guide missing`);
+    assert.ok(g.tx_cost_low_usd > 0, `rank ${c.rank}: tx_cost_low_usd must be positive`);
+    assert.ok(g.total_tx_high_usd >= g.total_tx_low_usd, `rank ${c.rank}: high cost must be >= low`);
+    assert.ok(['solid_state_low_power','solid_state_medium_power','solid_state_high_power'].includes(g.tx_type), `rank ${c.rank}: tx_type must be valid`);
+  }
+});
+
+test('am_site_grading_and_drainage_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_grading_and_drainage_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_grading_and_drainage_guide missing`);
+    assert.ok(g.total_site_prep_low_usd > 0, `rank ${c.rank}: total_site_prep_low_usd must be positive`);
+    assert.ok(['existing_or_improved','semi_rural','rural_undeveloped'].includes(g.terrain_class), `rank ${c.rank}: terrain_class must be valid`);
+  }
+});
+
+test('am_insurance_and_bonding_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_insurance_and_bonding_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_insurance_and_bonding_guide missing`);
+    assert.ok(g.annual_total_ins_low_usd > 0, `rank ${c.rank}: annual_total_ins_low_usd must be positive`);
+    assert.ok(g.surety_bond_low_usd > 0, `rank ${c.rank}: surety_bond_low_usd must be positive`);
+    assert.ok(g.annual_total_ins_high_usd >= g.annual_total_ins_low_usd, `rank ${c.rank}: high must be >= low`);
+  }
+});
+
+test('am_studio_transmitter_link_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_studio_transmitter_link_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_studio_transmitter_link_guide missing`);
+    assert.ok(g.total_stl_setup_low_usd > 0, `rank ${c.rank}: total_stl_setup_low_usd must be positive`);
+    assert.ok(g.total_stl_setup_high_usd >= g.total_stl_setup_low_usd, `rank ${c.rank}: high cost must be >= low`);
+    assert.ok(['ip_audio_internet','microwave_950mhz'].includes(g.stl_type), `rank ${c.rank}: stl_type must be valid`);
+  }
+});
+
+test('am_construction_project_schedule_and_management_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_construction_project_schedule_and_management_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_construction_project_schedule_and_management_guide missing`);
+    assert.ok(g.total_months_low > 0, `rank ${c.rank}: total_months_low must be positive`);
+    assert.ok(g.total_months_high >= g.total_months_low, `rank ${c.rank}: high must be >= low`);
+    assert.strictEqual(g.is_clear, true, `rank ${c.rank}: KAZM 780 kHz is_clear should be true`);
+  }
+});
+
+test('am_utility_power_service_and_metering_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_utility_power_service_and_metering_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_utility_power_service_and_metering_guide missing`);
+    assert.ok(g.monthly_power_cost_usd > 0, `rank ${c.rank}: monthly_power_cost_usd must be positive`);
+    assert.ok(g.total_utility_setup_low_usd >= 0, `rank ${c.rank}: total_utility_setup_low_usd must be non-negative`);
+    assert.ok(['single_phase_240V','three_phase_208V'].includes(g.service_type), `rank ${c.rank}: service_type must be valid`);
+  }
+});
+
+test('am_transmission_line_and_antenna_tuning_unit_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_antenna_tuning_unit_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmission_line_and_antenna_tuning_unit_guide missing`);
+    assert.ok(g.r_base_est_ohm > 0, `rank ${c.rank}: r_base_est_ohm must be positive`);
+    assert.ok(g.total_atu_system_low_usd > 0, `rank ${c.rank}: total_atu_system_low_usd must be positive`);
+    assert.ok(g.total_atu_system_high_usd >= g.total_atu_system_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
+test('am_tower_base_insulator_and_rf_isolation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_base_insulator_and_rf_isolation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_base_insulator_and_rf_isolation_guide missing`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_rf_isolation_low_usd > 0, `rank ${c.rank}: total_rf_isolation_low_usd must be positive`);
+    assert.ok(g.total_rf_isolation_high_usd >= g.total_rf_isolation_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
+test('am_emergency_alert_system_equipment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_emergency_alert_system_equipment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_emergency_alert_system_equipment_guide missing`);
+    assert.strictEqual(g.cap_compatible, true, `rank ${c.rank}: cap_compatible should be true`);
+    assert.ok(g.total_eas_equipment_low_usd > 0, `rank ${c.rank}: total_eas_equipment_low_usd must be positive`);
+    assert.strictEqual(g.n_required_sources, 2, `rank ${c.rank}: n_required_sources should be 2`);
+  }
+});
+
+test('am_auxiliary_transmitter_and_backup_power_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_auxiliary_transmitter_and_backup_power_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_auxiliary_transmitter_and_backup_power_guide missing`);
+    assert.ok(g.generator_kw > 0, `rank ${c.rank}: generator_kw must be positive`);
+    assert.ok(g.total_backup_low_usd > 0, `rank ${c.rank}: total_backup_low_usd must be positive`);
+    assert.ok(g.total_backup_high_usd >= g.total_backup_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
+test('am_modulation_monitor_and_station_logging_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_modulation_monitor_and_station_logging_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_monitor_and_station_logging_guide missing`);
+    assert.ok(g.monitor_cost_low_usd > 0, `rank ${c.rank}: monitor_cost_low_usd must be positive`);
+    assert.ok(g.total_monitoring_low_usd > 0, `rank ${c.rank}: total_monitoring_low_usd must be positive`);
+    assert.strictEqual(g.log_interval_min, 30, `rank ${c.rank}: log_interval_min should be 30`);
+  }
+});
+
+test('am_transmitter_building_and_equipment_shelter_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_building_and_equipment_shelter_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_building_and_equipment_shelter_guide missing`);
+    assert.ok(g.bldg_sqft > 0, `rank ${c.rank}: bldg_sqft must be positive`);
+    assert.ok(g.total_shelter_low_usd > 0, `rank ${c.rank}: total_shelter_low_usd must be positive`);
+    assert.ok(g.total_shelter_high_usd >= g.total_shelter_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
+test('am_site_lease_and_land_acquisition_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_lease_and_land_acquisition_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_lease_and_land_acquisition_guide missing`);
+    assert.ok(g.site_acres > 0, `rank ${c.rank}: site_acres must be positive`);
+    assert.ok(g.purchase_total_low_usd > 0, `rank ${c.rank}: purchase_total_low_usd must be positive`);
+    assert.ok(['suburban','rural_edge','rural'].includes(g.land_class), `rank ${c.rank}: land_class must be suburban/rural_edge/rural`);
+  }
+});
+
+test('am_carrier_frequency_accuracy_and_reference_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_carrier_frequency_accuracy_and_reference_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_carrier_frequency_accuracy_and_reference_guide missing`);
+    assert.ok(g.required_accuracy_hz > 0, `rank ${c.rank}: required_accuracy_hz must be positive`);
+    assert.ok(g.gpsdo_cost_low_usd > 0, `rank ${c.rank}: gpsdo_cost_low_usd must be positive`);
+    assert.strictEqual(g.recommended_reference, 'GPSDO', `rank ${c.rank}: recommended_reference should be GPSDO`);
+  }
+});
+
+test('am_tower_decommissioning_and_site_remediation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_decommissioning_and_site_remediation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_decommissioning_and_site_remediation_guide missing`);
+    assert.ok(g.tower_demo_ft > 0, `rank ${c.rank}: tower_demo_ft must be positive`);
+    assert.ok(g.total_demo_cost_low_usd > 0, `rank ${c.rank}: total_demo_cost_low_usd must be positive`);
+    assert.ok(g.net_demo_cost_high_usd >= 0, `rank ${c.rank}: net_demo_cost_high_usd must be non-negative`);
+  }
+});
+
+test('am_ground_system_resistance_and_maintenance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_resistance_and_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_resistance_and_maintenance_guide missing`);
+    assert.ok(g.rg_est_ohm > 0, `rank ${c.rank}: rg_est_ohm must be positive`);
+    assert.ok(typeof g.rg_acceptable === 'boolean', `rank ${c.rank}: rg_acceptable must be a boolean`);
+    assert.ok(g.total_annual_ground_maint_high_usd >= g.total_annual_ground_maint_low_usd, `rank ${c.rank}: high cost >= low`);
+  }
+});
+
+test('am_commissioning_and_acceptance_testing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_commissioning_and_acceptance_testing_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_commissioning_and_acceptance_testing_guide missing`);
+    assert.ok(g.total_commissioning_low_usd > 0, `rank ${c.rank}: total_commissioning_low_usd must be positive`);
+    assert.ok(g.mpe_evaluation_required === true, `rank ${c.rank}: MPE evaluation required for all AM stations`);
+    assert.ok(g.total_commissioning_high_usd >= g.total_commissioning_low_usd, `rank ${c.rank}: high cost >= low`);
+  }
+});
+
+test('am_broadcast_tower_structural_inspection_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_tower_structural_inspection_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_broadcast_tower_structural_inspection_guide missing`);
+    assert.ok(g.tower_insp_ft > 0, `rank ${c.rank}: tower_insp_ft must be positive`);
+    assert.ok(g.n_guy_levels >= 2, `rank ${c.rank}: n_guy_levels must be at least 2`);
+    assert.ok(g.total_annual_inspection_high_usd >= g.total_annual_inspection_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
+test('am_annual_regulatory_compliance_and_fee_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_annual_regulatory_compliance_and_fee_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_regulatory_compliance_and_fee_guide missing`);
+    assert.ok(g.annual_fcc_fee_usd > 0, `rank ${c.rank}: annual_fcc_fee_usd must be positive`);
+    assert.ok(g.total_annual_compliance_low_usd > 0, `rank ${c.rank}: total_annual_compliance_low_usd must be positive`);
+    assert.ok(g.license_renewal_cycle_years === 8, `rank ${c.rank}: license renewal cycle must be 8 years`);
+  }
+});
+
+test('am_concrete_foundation_and_anchor_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_concrete_foundation_and_anchor_design_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_concrete_foundation_and_anchor_design_guide missing`);
+    assert.ok(g.tower_fnd_ft > 0, `rank ${c.rank}: tower_fnd_ft must be positive`);
+    assert.ok(g.total_concrete_cy > 0, `rank ${c.rank}: total_concrete_cy must be positive`);
+    assert.ok(g.total_foundation_high_usd >= g.total_foundation_low_usd, `rank ${c.rank}: high cost must be >= low`);
+  }
+});
+
+test('am_tower_painting_and_aviation_marking_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_painting_and_aviation_marking_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_painting_and_aviation_marking_guide missing`);
+    assert.ok(g.tower_pnt_ft > 0, `rank ${c.rank}: tower_pnt_ft must be positive`);
+    assert.ok(g.initial_paint_cost_low_usd > 0, `rank ${c.rank}: initial_paint_cost_low_usd must be positive`);
+    assert.ok(g.life_20yr_paint_high_usd >= g.life_20yr_paint_low_usd, `rank ${c.rank}: high lifecycle cost must be >= low`);
+  }
+});
+
+test('am_noise_floor_and_rf_environment_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_noise_floor_and_rf_environment_analysis_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_noise_floor_and_rf_environment_analysis_guide missing`);
+    assert.ok(g.fa_atmospheric_db > 0, `rank ${c.rank}: fa_atmospheric_db must be positive`);
+    assert.ok(g.noise_score >= 0 && g.noise_score <= 100, `rank ${c.rank}: noise_score must be 0-100`);
+    assert.ok(['low','medium','high'].includes(g.interference_risk), `rank ${c.rank}: interference_risk must be low/medium/high`);
+  }
+});
+
+test('am_phase_i_environmental_site_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_phase_i_environmental_site_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_phase_i_environmental_site_assessment_guide missing`);
+    assert.ok(g.site_acres > 0, `rank ${c.rank}: site_acres must be positive`);
+    assert.ok(g.phase1_cost_low_usd > 0, `rank ${c.rank}: phase1_cost_low_usd must be positive`);
+    assert.ok(g.total_esa_high_usd >= g.total_esa_low_usd, `rank ${c.rank}: high ESA cost must be >= low`);
+  }
+});
+
+test('am_fcc_application_engineering_report_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_application_engineering_report_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_application_engineering_report_guide missing`);
+    assert.ok(g.fcc_filing_fee_usd > 0, `rank ${c.rank}: fcc_filing_fee_usd must be positive`);
+    assert.ok(g.n_stations_to_study > 0, `rank ${c.rank}: n_stations_to_study must be positive`);
+    assert.ok(g.total_application_low_usd > 0, `rank ${c.rank}: total_application_low_usd must be positive`);
+  }
+});
+
+test('am_site_access_road_and_security_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_access_road_and_security_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_access_road_and_security_guide missing`);
+    assert.ok(g.fence_perim_ft > 0, `rank ${c.rank}: fence_perim_ft must be positive`);
+    assert.ok(g.total_security_low_usd > 0, `rank ${c.rank}: total_security_low_usd must be positive`);
+    assert.ok(g.annual_security_maint_usd > 0, `rank ${c.rank}: annual_security_maint_usd must be positive`);
+  }
+});
+
+test('am_ground_system_installation_and_maintenance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_installation_and_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_installation_and_maintenance_guide missing`);
+    assert.ok(g.radial_length_ft > 0, `rank ${c.rank}: radial_length_ft must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok([120, 160].includes(g.recommended_radials), `rank ${c.rank}: recommended_radials must be 120 or 160`);
+  }
+});
+
+test('am_rf_radiation_safety_and_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_rf_radiation_safety_and_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_rf_radiation_safety_and_compliance_guide missing`);
+    assert.ok(g.exclusion_zone_m >= 0, `rank ${c.rank}: exclusion_zone_m must be non-negative`);
+    assert.ok(g.total_compliance_high_usd >= g.total_compliance_low_usd, `rank ${c.rank}: high must be >= low`);
+    assert.ok(['desktop_calculation_required','computational_evaluation_required','field_measurement_required'].includes(g.evaluation_type),
+      `rank ${c.rank}: unexpected evaluation_type: ${g.evaluation_type}`);
+  }
+});
+
+test('am_antenna_array_and_phasor_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_antenna_array_and_phasor_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_antenna_array_and_phasor_guide missing`);
+    assert.ok(g.tower_count >= 1, `rank ${c.rank}: tower_count must be >= 1`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['single_tower_nda','two_tower_da','three_tower_da'].includes(g.array_type),
+      `rank ${c.rank}: unexpected array_type: ${g.array_type}`);
+  }
+});
+
+test('am_environmental_impact_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_environmental_impact_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_environmental_impact_assessment_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['categorical_exclusion','environmental_assessment'].includes(g.assessment_type),
+      `rank ${c.rank}: unexpected assessment_type: ${g.assessment_type}`);
+  }
+});
+
+test('am_tower_lighting_and_aviation_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_lighting_and_aviation_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_lighting_and_aviation_compliance_guide missing`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+    assert.ok(g.total_install_high_usd >= g.total_install_low_usd, `rank ${c.rank}: high must be >= low`);
+    assert.ok(['none_required','medium_intensity_white_or_red','high_intensity_white_dual_red'].includes(g.lighting_type),
+      `rank ${c.rank}: unexpected lighting_type: ${g.lighting_type}`);
+  }
+});
+
+test('am_soil_conductivity_and_ground_loss_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_soil_conductivity_and_ground_loss_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_soil_conductivity_and_ground_loss_assessment_guide missing`);
+    assert.ok(g.sigma_est_ms_m > 0, `rank ${c.rank}: sigma_est_ms_m must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['arid_low','average'].includes(g.conductivity_tier),
+      `rank ${c.rank}: unexpected conductivity_tier: ${g.conductivity_tier}`);
+  }
+});
+
+test('am_zoning_and_land_use_permit_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_zoning_and_land_use_permit_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_zoning_and_land_use_permit_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['small','medium','large'].includes(g.market_tier),
+      `rank ${c.rank}: unexpected market_tier: ${g.market_tier}`);
+  }
+});
+
+test('am_colocation_sharing_and_tower_lease_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_colocation_sharing_and_tower_lease_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_colocation_sharing_and_tower_lease_guide missing`);
+    assert.ok(g.standalone_tower_low_usd > 0, `rank ${c.rank}: standalone_tower_low_usd must be positive`);
+    assert.ok(g.colocation_10yr_high >= g.colocation_10yr_low, `rank ${c.rank}: 10yr high must be >= low`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+  }
+});
+
+test('am_operating_cost_and_annual_expense_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_operating_cost_and_annual_expense_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_operating_cost_and_annual_expense_guide missing`);
+    assert.ok(g.annual_total_low > 0, `rank ${c.rank}: annual_total_low must be positive`);
+    assert.ok(g.annual_total_high >= g.annual_total_low, `rank ${c.rank}: high must be >= low`);
+    assert.ok(g.annual_power_kw_input > 0, `rank ${c.rank}: annual_power_kw_input must be positive`);
+  }
+});
+
+test('am_nighttime_operation_and_skywave_classification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nighttime_operation_and_skywave_classification_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nighttime_operation_and_skywave_classification_guide missing`);
+    assert.ok(g.effective_power_fraction > 0 && g.effective_power_fraction <= 1,
+      `rank ${c.rank}: effective_power_fraction must be in (0,1]`);
+    assert.ok(['secondary_limited_time','secondary_standard','dominant_unlimited'].includes(g.nighttime_status),
+      `rank ${c.rank}: unexpected nighttime_status: ${g.nighttime_status}`);
+  }
+});
+
+test('am_broadcast_proof_of_performance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_proof_of_performance_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_broadcast_proof_of_performance_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(['nda_reference_check','full_directional_proof'].includes(g.proof_type),
+      `rank ${c.rank}: unexpected proof_type: ${g.proof_type}`);
+  }
+});
+
+test('am_financial_feasibility_and_roi_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_financial_feasibility_and_roi_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_financial_feasibility_and_roi_guide missing`);
+    assert.ok(g.total_capital_low > 0, `rank ${c.rank}: total_capital_low must be positive`);
+    assert.ok(g.total_capital_high >= g.total_capital_low, `rank ${c.rank}: total_capital_high must be >= low`);
+    assert.ok(g.simple_payback_years_low > 0, `rank ${c.rank}: payback_years_low must be positive`);
+  }
+});
+
+test('am_tower_guy_wire_and_anchor_system_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_guy_wire_and_anchor_system_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_guy_wire_and_anchor_system_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.num_total_anchors >= 9, `rank ${c.rank}: num_total_anchors must be >= 9`);
+    assert.ok([3,4].includes(g.num_guy_levels), `rank ${c.rank}: num_guy_levels should be 3 or 4`);
+  }
+});
+
+test('am_transmission_loss_budget_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmission_loss_budget_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmission_loss_budget_guide missing`);
+    assert.ok(g.total_loss_db > 0, `rank ${c.rank}: total_loss_db must be positive`);
+    assert.ok(g.power_fraction_at_antenna > 0.9, `rank ${c.rank}: power_fraction_at_antenna must be > 0.9`);
+    assert.ok(['7_8_inch','1_5_8_inch','3_inch'].includes(g.coax_diameter),
+      `rank ${c.rank}: unexpected coax_diameter: ${g.coax_diameter}`);
+  }
+});
+
+test('am_grounding_and_lightning_protection_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_grounding_and_lightning_protection_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_grounding_and_lightning_protection_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.total_high_usd >= g.total_low_usd, `rank ${c.rank}: total_high must be >= total_low`);
+    assert.ok(g.num_ground_rods > 0, `rank ${c.rank}: num_ground_rods must be positive`);
+  }
+});
+
+test('am_fcc_asr_tower_registration_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_asr_tower_registration_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_asr_tower_registration_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(typeof g.requires_asr === 'boolean', `rank ${c.rank}: requires_asr must be boolean`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+  }
+});
+
+test('am_site_access_and_road_construction_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_access_and_road_construction_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_site_access_and_road_construction_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.road_length_mi >= 0.25, `rank ${c.rank}: road_length_mi must be >= 0.25 (minimum)`);
+    assert.ok(g.road_length_mi <= 2.0, `rank ${c.rank}: road_length_mi must be <= 2.0 (maximum)`);
+  }
+});
+
+test('am_utility_power_and_backup_systems_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_utility_power_and_backup_systems_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_utility_power_and_backup_systems_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.gen_kw > 0, `rank ${c.rank}: gen_kw must be positive`);
+    assert.ok(g.power_ext_mi >= 0.1, `rank ${c.rank}: power_ext_mi must be >= 0.1 (minimum)`);
+  }
+});
+
+test('am_transmitter_building_and_studio_link_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_building_and_studio_link_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_building_and_studio_link_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(['licensed_950mhz_microwave','leased_circuit_or_fiber'].includes(g.stl_type),
+      `rank ${c.rank}: unexpected stl_type: ${g.stl_type}`);
+  }
+});
+
+test('am_fcc_construction_permit_and_license_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_construction_permit_and_license_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_fcc_construction_permit_and_license_guide missing`);
+    assert.ok(g.total_nonrecurring_low_usd > 0, `rank ${c.rank}: total_nonrecurring_low_usd must be positive`);
+    assert.ok(typeof g.isDA === 'boolean', `rank ${c.rank}: isDA must be boolean`);
+    assert.ok(Array.isArray(g.filing_forms), `rank ${c.rank}: filing_forms must be array`);
+  }
+});
+
+test('am_signal_contour_and_coverage_area_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_signal_contour_and_coverage_area_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_signal_contour_and_coverage_area_guide missing`);
+    assert.ok(g.r_5mvm_km > 0, `rank ${c.rank}: r_5mvm_km must be positive`);
+    assert.ok(g.r_05mvm_km > g.r_5mvm_km, `rank ${c.rank}: r_05mvm_km must be > r_5mvm_km`);
+    assert.ok(g.area_5mvm_km2 > 0, `rank ${c.rank}: area_5mvm_km2 must be positive`);
+  }
+});
+
+test('am_nighttime_skywave_interference_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nighttime_skywave_interference_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_nighttime_skywave_interference_guide missing`);
+    assert.ok(g.total_study_low_usd > 0, `rank ${c.rank}: total_study_low_usd must be positive`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', `rank ${c.rank}: is_clear_channel must be boolean`);
+    assert.ok(typeof g.nighttime_power_note === 'string', `rank ${c.rank}: nighttime_power_note must be string`);
+  }
+});
+
+test('am_real_estate_and_land_acquisition_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_real_estate_and_land_acquisition_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_real_estate_and_land_acquisition_guide missing`);
+    assert.ok(g.total_purchase_low_usd > 0, `rank ${c.rank}: total_purchase_low_usd must be positive`);
+    assert.ok(g.min_acres >= 2, `rank ${c.rank}: min_acres must be >= 2`);
+    assert.ok(g.radial_ft > 0, `rank ${c.rank}: radial_ft must be positive`);
+  }
+});
+
+test('am_total_project_cost_summary_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_total_project_cost_summary_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_total_project_cost_summary_guide missing`);
+    assert.ok(g.grand_total_low_usd > 0, `rank ${c.rank}: grand_total_low_usd must be positive`);
+    assert.ok(g.total_with_contingency_low_usd > g.grand_total_low_usd, `rank ${c.rank}: contingency must increase total`);
+    assert.ok(typeof g.line_items_low === 'object', `rank ${c.rank}: line_items_low must be object`);
+  }
+});
+
+test('am_community_impact_and_coverage_shift_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_community_impact_and_coverage_shift_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_community_impact_and_coverage_shift_guide missing`);
+    assert.ok(typeof g.col_proximity_status === 'string', `rank ${c.rank}: col_proximity_status must be string`);
+    assert.ok(['excellent (<15 km)','acceptable (15–30 km)','needs_waiver_review (>30 km)'].includes(g.col_proximity_status),
+      `rank ${c.rank}: unexpected col_proximity_status: ${g.col_proximity_status}`);
+  }
+});
+
+test('am_transmitter_decommission_and_site_remediation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_decommission_and_site_remediation_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_transmitter_decommission_and_site_remediation_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.num_towers >= 1, `rank ${c.rank}: num_towers must be >= 1`);
+    assert.ok(g.tower_height_ft > 0, `rank ${c.rank}: tower_height_ft must be positive`);
+  }
+});
+
+test('am_interference_protection_contour_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_interference_protection_contour_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_interference_protection_contour_guide missing`);
+    assert.ok(g.du_cochannel_db > 0, `rank ${c.rank}: du_cochannel_db must be positive`);
+    assert.ok(g.study_low_usd > 0, `rank ${c.rank}: study_low_usd must be positive`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', `rank ${c.rank}: is_clear_channel must be boolean`);
+  }
+});
+
+test('am_tower_painting_and_marking_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_painting_and_marking_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tower_painting_and_marking_guide missing`);
+    assert.ok(typeof g.requires_painting === 'boolean', `rank ${c.rank}: requires_painting must be boolean`);
+    assert.ok(g.total_initial_low_usd > 0, `rank ${c.rank}: total_initial_low_usd must be positive`);
+    if (g.requires_painting) {
+      assert.ok(g.num_bands > 0, `rank ${c.rank}: num_bands must be > 0 when painting required`);
+    }
+  }
+});
+
+test('am_ground_system_radial_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_radial_design_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_ground_system_radial_design_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.num_radials_ideal === 120, `rank ${c.rank}: num_radials_ideal should be 120`);
+    assert.ok(g.radial_length_ft > 0, `rank ${c.rank}: radial_length_ft must be positive`);
+  }
+});
+
+test('am_tpo_and_antenna_efficiency_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tpo_and_antenna_efficiency_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_tpo_and_antenna_efficiency_guide missing`);
+    assert.ok(g.eta_excellent > 0.9, `rank ${c.rank}: eta_excellent must be > 0.9`);
+    assert.ok(g.erp_excellent_kw > 0, `rank ${c.rank}: erp_excellent_kw must be positive`);
+    assert.ok(g.erp_excellent_kw <= g.tpo_kw, `rank ${c.rank}: erp must be <= tpo (losses exist)`);
+  }
+});
+
+test('am_frequency_allocation_class_and_channel_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_frequency_allocation_class_and_channel_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_frequency_allocation_class_and_channel_guide missing`);
+    assert.ok(['clear','local','regional'].includes(g.channel_type), `rank ${c.rank}: unexpected channel_type: ${g.channel_type}`);
+    assert.ok(g.class_max_day_kw > 0, `rank ${c.rank}: class_max_day_kw must be positive`);
+  }
+});
+
+test('am_modulation_and_audio_processing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_modulation_and_audio_processing_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_modulation_and_audio_processing_guide missing`);
+    assert.ok(g.pos_mod_limit_pct === 125, `rank ${c.rank}: pos_mod_limit_pct should always be 125%`);
+    assert.ok(g.iboc_digital_kw >= 0, `rank ${c.rank}: iboc_digital_kw must be >= 0`);
+    assert.ok(g.total_basic_low_usd > 0, `rank ${c.rank}: total_basic_low_usd must be positive`);
+  }
+});
+
+test('am_annual_operating_cost_breakdown_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_annual_operating_cost_breakdown_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_annual_operating_cost_breakdown_guide missing`);
+    assert.ok(g.total_low_usd > 0, `rank ${c.rank}: total_low_usd must be positive`);
+    assert.ok(g.kwh_per_year > 0, `rank ${c.rank}: kwh_per_year must be positive`);
+    assert.ok(g.electricity_draw_kw >= 3, `rank ${c.rank}: electricity_draw_kw must be >= 3 (3× TPO min 1 kW)`);
+  }
+});
+
+test('am_terrain_and_propagation_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_terrain_and_propagation_assessment_guide;
+    assert.ok(g !== undefined && g !== null, `rank ${c.rank}: am_terrain_and_propagation_assessment_guide missing`);
+    assert.ok(g.conductivity_ms_per_m_low > 0, `rank ${c.rank}: conductivity_ms_per_m_low must be positive`);
+    assert.ok(Array.isArray(g.study_tools), `rank ${c.rank}: study_tools must be array`);
+    assert.ok(g.terrain_study_low_usd > 0, `rank ${c.rank}: terrain_study_low_usd must be positive`);
+  }
+});
+
+test('am_tower_foundation_and_civil_engineering_guide colocation: all colocation candidates have valid tower foundation data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_foundation_and_civil_engineering_guide;
+    assert.ok(g, `candidate missing am_tower_foundation_and_civil_engineering_guide`);
+    assert.ok(g.tower_height_m > 0, `tower_height_m must be positive`);
+    assert.ok(g.civil_foundation_low_usd > 0, `civil_foundation_low_usd must be positive`);
+    assert.ok(g.guy_anchor_count === 3, `guy_anchor_count should be 3 for guyed AM monopole`);
+  }
+});
+
+test('am_rf_exposure_and_oet65_compliance_guide colocation: all colocation candidates have valid RF exposure data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_rf_exposure_and_oet65_compliance_guide;
+    assert.ok(g, `candidate missing am_rf_exposure_and_oet65_compliance_guide`);
+    assert.ok(g.exclusion_radius_m_general > 0, `exclusion_radius_m_general must be positive`);
+    assert.ok(typeof g.evaluation_required === 'boolean', `evaluation_required must be boolean`);
+    assert.ok(g.mpe_general_mv_per_m === 614, `mpe_general_mv_per_m must be 614 mV/m (FCC limit)`);
+  }
+});
+
+test('am_faa_aeronautical_study_and_airspace_guide colocation: all colocation candidates have valid FAA data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_faa_aeronautical_study_and_airspace_guide;
+    assert.ok(g, `candidate missing am_faa_aeronautical_study_and_airspace_guide`);
+    assert.ok(g.tower_height_ft > 0, `tower_height_ft must be positive`);
+    assert.ok(typeof g.notice_required === 'boolean', `notice_required must be boolean`);
+    assert.ok(g.faa_study_cost_low_usd > 0, `faa_study_cost_low_usd must be positive`);
+  }
+});
+
+test('am_environmental_and_nepa_compliance_guide colocation: all colocation candidates have valid NEPA data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_environmental_and_nepa_compliance_guide;
+    assert.ok(g, `candidate missing am_environmental_and_nepa_compliance_guide`);
+    assert.ok(g.total_env_cost_low_usd > 0, `total_env_cost_low_usd must be positive`);
+    assert.ok(['CATEGORICAL_EXCLUSION','EA_REQUIRED'].includes(g.nepa_category), `nepa_category must be valid`);
+    assert.ok(g.phase1_esa_low_usd > 0, `phase1_esa_low_usd must be positive`);
+  }
+});
+
+test('am_zoning_and_land_use_approval_guide colocation: all colocation candidates have valid zoning data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_zoning_and_land_use_approval_guide;
+    assert.ok(g, `candidate missing am_zoning_and_land_use_approval_guide`);
+    assert.ok(g.setback_ft_typical > 0, `setback_ft_typical must be positive`);
+    assert.ok(g.min_parcel_acres > 0, `min_parcel_acres must be positive`);
+    assert.ok(g.total_zoning_low_usd > 0, `total_zoning_low_usd must be positive`);
+  }
+});
+
+test('am_transmission_line_and_phasor_guide colocation: all colocation candidates have valid TL data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_phasor_guide;
+    assert.ok(g, `candidate missing am_transmission_line_and_phasor_guide`);
+    assert.ok(g.lambda_m > 0, `lambda_m must be positive`);
+    assert.ok(g.total_tl_system_low_usd > 0, `total_tl_system_low_usd must be positive`);
+    assert.ok(typeof g.is_directional === 'boolean', `is_directional must be boolean`);
+  }
+});
+
+test('am_insurance_and_liability_guide colocation: all colocation candidates have valid insurance data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_insurance_and_liability_guide;
+    assert.ok(g, `candidate missing am_insurance_and_liability_guide`);
+    assert.ok(g.total_annual_insurance_low_usd > 0, `total_annual_insurance_low_usd must be positive`);
+    assert.ok(g.tower_replacement_value_low_usd > 0, `tower_replacement_value_low_usd must be positive`);
+    assert.ok(g.annual_gl_premium_low_usd > 0, `annual_gl_premium_low_usd must be positive`);
+  }
+});
+
+test('am_tower_structural_analysis_guide colocation: all colocation candidates have valid structural data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_analysis_guide;
+    assert.ok(g, `candidate missing am_tower_structural_analysis_guide`);
+    assert.ok(g.tower_height_ft > 0, `tower_height_ft must be positive`);
+    assert.ok(g.guy_levels >= 1, `guy_levels must be at least 1`);
+    assert.ok(g.total_structural_low_usd > 0, `total_structural_low_usd must be positive`);
+  }
+});
+
+test('am_broadcast_facility_security_guide colocation: all colocation candidates have valid security data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_facility_security_guide;
+    assert.ok(g, `candidate missing am_broadcast_facility_security_guide`);
+    assert.strictEqual(g.fence_height_ft, 8, `fence_height_ft must be 8 per §73.49`);
+    assert.ok(g.total_security_capex_low_usd > 0, `total_security_capex_low_usd must be positive`);
+    assert.ok(g.fence_perimeter_ft > 0, `fence_perimeter_ft must be positive`);
+  }
+});
+
+test('am_frequency_monitoring_and_technical_compliance_guide colocation: all candidates have valid monitoring data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_frequency_monitoring_and_technical_compliance_guide;
+    assert.ok(g, `candidate missing am_frequency_monitoring_and_technical_compliance_guide`);
+    assert.strictEqual(g.freq_tolerance_hz, 20, `freq_tolerance_hz must be 20 Hz`);
+    assert.ok(g.total_monitoring_equip_low_usd > 0, `total_monitoring_equip_low_usd must be positive`);
+    assert.strictEqual(g.audio_bandwidth_khz, 10, `audio_bandwidth_khz must be 10 kHz (NRSC-2-B)`);
+  }
+});
+
+test('am_station_financial_feasibility_guide colocation: all candidates have valid financial data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_station_financial_feasibility_guide;
+    assert.ok(g, `candidate missing am_station_financial_feasibility_guide`);
+    assert.ok(Number.isFinite(g.npv_optimistic_10yr), `npv_optimistic_10yr must be finite`);
+    assert.ok(g.capex_low_usd > 0, `capex_low_usd must be positive`);
+    assert.ok(['POTENTIALLY_VIABLE','FINANCIALLY_CHALLENGED'].includes(g.feasibility_flag), `feasibility_flag must be valid`);
+  }
+});
+
+test('am_construction_contractor_and_pm_guide colocation: all candidates have valid PM data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_construction_contractor_and_pm_guide;
+    assert.ok(g, `candidate missing am_construction_contractor_and_pm_guide`);
+    assert.ok(g.total_construction_weeks_low > 0, `total_construction_weeks_low must be positive`);
+    assert.ok(g.tower_erection_cost_low_usd > 0, `tower_erection_cost_low_usd must be positive`);
+    assert.ok(g.gc_markup_pct_low > 0 && g.gc_markup_pct_low < 100, `gc_markup_pct_low must be 0-100`);
+  }
+});
+
+test('am_antenna_tower_lighting_and_marking_guide colocation: all candidates have valid lighting data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_tower_lighting_and_marking_guide;
+    assert.ok(g, `candidate missing am_antenna_tower_lighting_and_marking_guide`);
+    assert.ok(g.tower_height_ft > 0, `tower_height_ft must be positive`);
+    assert.ok(typeof g.lighting_required === 'boolean', `lighting_required must be boolean`);
+    assert.ok(g.painting_cost_low_usd >= 0, `painting_cost_low_usd must be non-negative`);
+  }
+});
+
+test('am_daytime_vs_nighttime_coverage_differential_guide colocation: all candidates have valid day/night data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_daytime_vs_nighttime_coverage_differential_guide;
+    assert.ok(g, `candidate missing am_daytime_vs_nighttime_coverage_differential_guide`);
+    assert.ok(g.daytime_05mvpm_radius_km > 0, `daytime_05mvpm_radius_km must be positive`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', `is_clear_channel must be boolean`);
+    assert.ok(g.nighttime_restriction != null, `nighttime_restriction must not be null`);
+  }
+});
+
+test('am_digital_broadcasting_iboc_guide colocation: all candidates have valid IBOC data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_digital_broadcasting_iboc_guide;
+    assert.ok(g, `candidate missing am_digital_broadcasting_iboc_guide`);
+    assert.ok(g.digital_sideband_kw > 0, `digital_sideband_kw must be positive`);
+    assert.ok(g.total_iboc_capex_low_usd > 0, `total_iboc_capex_low_usd must be positive`);
+    assert.ok(g.iboc_bandwidth_khz === 30, `iboc_bandwidth_khz must be 30 kHz (hybrid AM IBOC)`);
+  }
+});
+
+test('colocation candidates include am_tower_base_rf_safety_and_detuning_guide with §73.49 fence', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_base_rf_safety_and_detuning_guide;
+    assert.ok(g, `candidate missing am_tower_base_rf_safety_and_detuning_guide`);
+    assert.strictEqual(g.fence_required_by_regulation, true, '§73.49 fence required on all AM towers');
+    assert.ok(g.v_base_high_vrms > 0, `v_base_high_vrms must be positive`);
+    assert.ok(g.total_rf_safety_low_usd > 0, `total_rf_safety_low_usd must be positive`);
+  }
+});
+
+test('colocation candidates include am_antenna_base_current_and_impedance_monitoring_guide with §73.61 tolerance', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_base_current_and_impedance_monitoring_guide;
+    assert.ok(g, `candidate missing am_antenna_base_current_and_impedance_monitoring_guide`);
+    assert.strictEqual(g.i_base_tolerance_pct, 2, '§73.61 requires ±2% base current tolerance');
+    assert.ok(g.total_monitoring_equip_low_usd > 0, `total_monitoring_equip_low_usd must be positive`);
+    assert.ok(g.calibration_interval_months === 12, `calibration_interval_months must be 12`);
+  }
+});
+
+test('colocation candidates include am_broadcast_tower_grounding_and_cathodic_protection_guide', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_tower_grounding_and_cathodic_protection_guide;
+    assert.ok(g, `candidate missing am_broadcast_tower_grounding_and_cathodic_protection_guide`);
+    assert.strictEqual(g.n_radials_standard, 120, 'standard ground system = 120 radials');
+    assert.ok(g.total_ground_low_usd > 0, `total_ground_low_usd must be positive`);
+    assert.ok(g.cp_recommended != null, `cp_recommended must be defined`);
+  }
+});
+
+test('colocation candidates include am_tower_structural_load_and_wind_survival_guide with TIA-222-H wind data', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_load_and_wind_survival_guide;
+    assert.ok(g, `candidate missing am_tower_structural_load_and_wind_survival_guide`);
+    assert.strictEqual(g.wind_design_mph, 90, 'design wind speed must be 90 mph per ASCE 7-22 Risk Cat II');
+    assert.ok(g.wind_force_kn > 0, `wind_force_kn must be positive`);
+    assert.ok(g.total_structural_low_usd > 0, `total_structural_low_usd must be positive`);
+  }
+});
+
+test('colocation candidates include am_eas_equipment_readiness_guide with §11.56 CAP/IPAWS required', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_eas_equipment_readiness_guide;
+    assert.ok(g, `candidate missing am_eas_equipment_readiness_guide`);
+    assert.strictEqual(g.eas_cap_ipaws_required, true, '§11.56 CAP/IPAWS required for all AM stations since 2012');
+    assert.strictEqual(g.eas_monthly_test_min_sec, 120, '§11.61 RMT ≥ 120 s');
+    assert.ok(g.total_eas_low_usd > 0, `total_eas_low_usd must be positive`);
+  }
+});
+
+test('colocation candidates include am_auxiliary_backup_transmitter_compliance_guide with §73.1560 power tolerance', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_auxiliary_backup_transmitter_compliance_guide;
+    assert.ok(g, `candidate missing am_auxiliary_backup_transmitter_compliance_guide`);
+    assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 AM power tolerance ±10%');
+    assert.strictEqual(g.backup_tpo_kw, 5, 'backup_tpo_kw must equal authorized tpo_kw');
+    assert.ok(g.total_backup_low_usd > 0, `total_backup_low_usd must be positive`);
+  }
+});
+
+test('colocation candidates include am_license_renewal_and_regulatory_history_guide with §73.1125 main studio check', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_license_renewal_and_regulatory_history_guide;
+    assert.ok(g, `candidate missing am_license_renewal_and_regulatory_history_guide`);
+    assert.strictEqual(g.renewal_cycle_years, 8, '§73.3539 renewal cycle = 8 years');
+    assert.ok(Math.abs(g.main_studio_max_distance_km - 40.23) < 0.01, '§73.1125 limit = 40.23 km');
+    assert.ok(g.total_renewal_low_usd > 0, `total_renewal_low_usd must be positive`);
+  }
+});
+
+test('colocation candidates include am_skywave_nighttime_service_and_interference_guide with §73.182 D/U obligation', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_skywave_nighttime_service_and_interference_guide;
+    assert.ok(g, `candidate missing am_skywave_nighttime_service_and_interference_guide`);
+    assert.strictEqual(g.is_clear_channel, true, '780 kHz is a clear channel');
+    assert.strictEqual(g.night_signoff_risk, true, 'Class D on 780 kHz has nighttime sign-off risk');
+    assert.ok(g.dominant_station.includes('KKOB'), 'dominant on 780 kHz is KKOB');
+  }
+});
+
+test('colocation candidates include am_antenna_insulator_and_base_voltage_protection_guide with V_peak check', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_antenna_insulator_and_base_voltage_protection_guide;
+    assert.ok(g, `candidate missing am_antenna_insulator_and_base_voltage_protection_guide`);
+    assert.ok(g.v_peak_kv > 0, 'v_peak_kv must be positive');
+    assert.ok(g.insulator_rating_kv_min >= 15, 'insulator_rating_kv_min must be ≥ 15 kV BIL');
+    assert.ok(g.insulator_margin_ratio > 1, 'insulator must be rated above V_peak');
+  }
+});
+
+test('colocation candidates include am_directional_antenna_phase_and_ratio_verification_guide (NDA = zero DA cost)', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_directional_antenna_phase_and_ratio_verification_guide;
+    assert.ok(g, `candidate missing am_directional_antenna_phase_and_ratio_verification_guide`);
+    assert.strictEqual(g.is_da_station, false, 'KAZM NDA should not be DA');
+    assert.strictEqual(g.total_da_low_usd, 0, 'NDA station DA compliance cost must be 0');
+    assert.strictEqual(g.phase_tolerance_deg, 3, '§73.68(a) phase tolerance = ±3°');
+  }
+});
+
+test('colocation candidates include am_transmission_line_and_atu_engineering_guide with VSWR target', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_atu_engineering_guide;
+    assert.ok(g, `candidate missing am_transmission_line_and_atu_engineering_guide`);
+    assert.strictEqual(g.atu_design_required, true, 'ATU design required at every new site');
+    assert.strictEqual(g.vswr_target, 1.3, 'VSWR target must be 1.3:1');
+    assert.ok(g.total_atu_low_usd > 0, 'total_atu_low_usd must be positive');
+  }
+});
+
+test('colocation candidates include am_station_power_supply_and_electrical_infrastructure_guide with NEC 702.5 sizing', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_station_power_supply_and_electrical_infrastructure_guide;
+    assert.ok(g, `candidate missing am_station_power_supply_and_electrical_infrastructure_guide`);
+    assert.ok(g.ac_input_kw > 0, 'ac_input_kw must be positive');
+    assert.ok(g.generator_kw_required >= g.site_load_kw * 1.25 - 0.1, 'generator must be ≥ 125% of site load (NEC 702.5)');
+    assert.ok(g.total_electrical_low_usd > 0, 'total_electrical_low_usd must be positive');
+  }
+});
+
+test('colocation candidates include am_contour_overlap_and_co_channel_interference_guide with §73.182 D/U check', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_contour_overlap_and_co_channel_interference_guide;
+    assert.ok(g, `candidate missing am_contour_overlap_and_co_channel_interference_guide`);
+    assert.strictEqual(g.protection_db_required, 20, '§73.182(c) D/U requirement = 20 dB');
+    assert.strictEqual(g.adjacent_ch_low_khz, 770, 'adjacent lower channel is 770 kHz');
+    assert.strictEqual(g.adjacent_ch_high_khz, 790, 'adjacent upper channel is 790 kHz');
+  }
+});
+
+test('colocation candidates include am_operating_log_and_technical_records_compliance_guide with §73.1840 retention', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_operating_log_and_technical_records_compliance_guide;
+    assert.ok(g, `candidate missing am_operating_log_and_technical_records_compliance_guide`);
+    assert.strictEqual(g.log_retention_years, 2, '§73.1840 retention = 2 years');
+    assert.strictEqual(g.log_public_file_required, true, 'online public file required per §73.3527');
+    assert.ok(g.total_setup_low_usd > 0, 'total_setup_low_usd must be positive');
+  }
+});
+
+test('colocation candidates include am_transmitter_site_lease_and_property_rights_guide with site area calculation', async () => {
+  const out = await runColocationOpportunities({
+    callsign: 'KAZM', frequency_khz: 780, current_site: { lat: 34.8606, lon: -111.8206 },
+    search_radius_km: 30, grid_spacing_km: 15, tpo_kw: 5, pattern_mode: 'NDA',
+    fcc_class: 'D', search_mode: 'GRID', candidate_limit: 3,
+    optimization_goals: { maximize_col_coverage: true }
+  });
+  assert.equal(out.available, true);
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_site_lease_and_property_rights_guide;
+    assert.ok(g, `candidate missing am_transmitter_site_lease_and_property_rights_guide`);
+    assert.ok(g.site_area_required_acres > 5, 'site area must be > 5 acres for 780 kHz');
+    assert.ok(g.lease_annual_low_usd > 0, 'lease_annual_low_usd must be positive');
+    assert.ok(g.total_acquisition_low_usd > 0, 'total_acquisition must be positive');
+  }
+});
+
+test('am_modulation_monitoring_and_audio_processing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_modulation_monitoring_and_audio_processing_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_modulation_monitoring_and_audio_processing_guide`);
+    assert.strictEqual(g.max_positive_peak_pct, 125, 'positive peak limit must be 125% per §73.1570(b)');
+    assert.strictEqual(g.max_negative_peak_pct, 100, 'negative peak limit must be 100% per §73.1570(b)');
+    assert.ok(g.total_audio_low_usd > 0, 'total_audio_low_usd must be positive');
+  }
+});
+
+test('am_public_inspection_file_and_online_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_public_inspection_file_and_online_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_public_inspection_file_and_online_compliance_guide`);
+    assert.strictEqual(g.opif_mandatory, true, 'OPIF mandatory for all AM stations since 2020');
+    assert.strictEqual(g.political_file_upload_days, 1, 'political file upload within 1 business day');
+    assert.ok(g.total_setup_low_usd > 0, 'total_setup_low_usd must be positive');
+  }
+});
+
+test('am_noise_floor_and_rf_interference_environment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_noise_floor_and_rf_interference_environment_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_noise_floor_and_rf_interference_environment_guide`);
+    assert.strictEqual(g.fa_atmospheric_dBuVm, 53.0, 'ITU-R P.372-16 zone B atmospheric noise must be 53 dBµV/m');
+    assert.ok(g.ft_dBuVm >= g.fa_atmospheric_dBuVm, 'combined noise Ft must be >= atmospheric alone');
+    assert.ok(['LOW', 'ELEVATED', 'HIGH'].includes(g.noise_risk_level), 'noise_risk_level must be LOW/ELEVATED/HIGH');
+  }
+});
+
+test('am_fm_translator_and_signal_booster_filing_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fm_translator_and_signal_booster_filing_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_fm_translator_and_signal_booster_filing_guide`);
+    assert.strictEqual(g.translator_eligible, true, 'all AM stations eligible for FM translator per §74.1201(g)');
+    assert.strictEqual(g.translator_max_erp_w, 250, 'FM translator max ERP is 250 W per §74.1235(a)');
+    assert.ok(g.total_translator_low_usd > 0, 'total_translator_low_usd must be positive');
+  }
+});
+
+test('am_nrsc_emission_mask_and_bandwidth_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nrsc_emission_mask_and_bandwidth_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_nrsc_emission_mask_and_bandwidth_compliance_guide`);
+    assert.strictEqual(g.occupied_bw_khz, 20, 'AM occupied bandwidth must be 20 kHz (±10 kHz NRSC-1-A audio)');
+    assert.strictEqual(g.harmonic_suppression_required_dBc, 40, '§73.44(e) requires 40 dBc harmonic suppression');
+    assert.ok(Array.isArray(g.nrsc2b_mask) && g.nrsc2b_mask.length >= 3, 'nrsc2b_mask must have mask points');
+  }
+});
+
+test('am_remote_control_and_unattended_operation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_remote_control_and_unattended_operation_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_remote_control_and_unattended_operation_guide`);
+    assert.strictEqual(g.operator_response_time_hrs, 2, '§73.1300 operator response time must be 2 hours');
+    assert.strictEqual(g.rc_accuracy_pct, 2.0, '§73.1400 remote control accuracy must be ±2%');
+    assert.ok(g.total_rc_low_usd > 0, 'total_rc_low_usd must be positive');
+  }
+});
+
+test('am_nighttime_nif_service_contour_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_nighttime_nif_service_contour_analysis_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_nighttime_nif_service_contour_analysis_guide`);
+    assert.strictEqual(g.protection_threshold_uVm, 50, 'Class D clear channel protection threshold must be 50 µV/m');
+    assert.ok(g.dist_to_kkob_km > 0, 'dist_to_kkob_km must be positive');
+    assert.ok(g.total_nif_low_usd >= 2000, 'NIF study cost must be ≥$2,000');
+  }
+});
+
+test('am_transmitter_power_efficiency_and_operating_cost_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_power_efficiency_and_operating_cost_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_transmitter_power_efficiency_and_operating_cost_guide`);
+    assert.strictEqual(g.overall_efficiency_pct, 72, 'solid-state AM transmitter overall efficiency must be 72%');
+    assert.ok(g.ac_input_kw > 0, 'ac_input_kw must be positive');
+    assert.ok(g.annual_electric_usd > 0, 'annual_electric_usd must be positive');
+  }
+});
+
+test('am_site_environmental_impact_and_permitting_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_environmental_impact_and_permitting_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_site_environmental_impact_and_permitting_guide`);
+    assert.ok(typeof g.nepa_trigger === 'string', 'nepa_trigger must be a string');
+    assert.strictEqual(g.cup_required, true, 'cup_required must be true for colocation candidate');
+    assert.ok(g.total_permitting_low_usd > 0, 'total_permitting_low_usd must be positive');
+  }
+});
+
+test('am_site_access_and_utility_infrastructure_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_access_and_utility_infrastructure_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_site_access_and_utility_infrastructure_guide`);
+    assert.ok(g.generator_kw > 0, 'generator_kw must be positive');
+    assert.ok(typeof g.road_access_type === 'string', 'road_access_type must be a string');
+    assert.ok(g.total_infra_low_usd > 0, 'total_infra_low_usd must be positive');
+  }
+});
+
+test('am_antenna_system_impedance_and_base_current_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_antenna_system_impedance_and_base_current_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_antenna_system_impedance_and_base_current_guide`);
+    assert.ok(g.base_current_a > 0, 'base_current_a must be positive');
+    assert.ok(g.ct_rating_a >= g.base_current_peak_a, 'CT must cover peak base current');
+    assert.strictEqual(g.r_rad, 36.5, 'r_rad must be 36.5 Ω for λ/4 monopole');
+  }
+});
+
+test('am_propagation_groundwave_field_strength_estimate_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_propagation_groundwave_field_strength_estimate_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_propagation_groundwave_field_strength_estimate_guide`);
+    assert.ok(g.contour_05mvm_radius_km > 0, 'contour_05mvm_radius_km must be positive');
+    assert.ok(g.contour_01mvm_radius_km > g.contour_05mvm_radius_km, '0.1 mV/m must be farther than 0.5 mV/m');
+    assert.ok(g.study_cost_low_usd > 0, 'study_cost_low_usd must be positive');
+  }
+});
+
+test('am_tower_lighting_and_painting_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_lighting_and_painting_compliance_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_tower_lighting_and_painting_compliance_guide`);
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+    assert.ok(g.total_lighting_low_usd > 0, 'total_lighting_low_usd must be positive');
+  }
+});
+
+test('am_ground_radial_system_design_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_radial_system_design_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_ground_radial_system_design_guide`);
+    assert.ok(g.quarter_wave_ft > 0, 'quarter_wave_ft must be positive');
+    assert.ok(g.efficiency_full_pct > 50, 'efficiency_full_pct must be > 50%');
+    assert.ok(g.total_radial_system_low_usd > 0, 'total_radial_system_low_usd must be positive');
+  }
+});
+
+test('am_daytime_nighttime_power_reduction_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_daytime_nighttime_power_reduction_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_daytime_nighttime_power_reduction_guide`);
+    assert.ok(typeof g.is_clear_channel === 'boolean', 'is_clear_channel must be boolean');
+    assert.ok(g.summer_day_length_h > 0, 'summer_day_length_h must be positive');
+    assert.ok(g.summer_day_length_h > g.winter_day_length_h, 'summer must be longer than winter');
+  }
+});
+
+test('am_transmission_line_and_coaxial_feed_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_and_coaxial_feed_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_transmission_line_and_coaxial_feed_guide`);
+    assert.ok(g.alpha_78_db_per100ft > 0, 'alpha_78_db_per100ft must be positive');
+    assert.ok(g.efficiency_78_pct > 90, 'efficiency_78_pct must be > 90% at AM frequencies');
+    assert.ok(typeof g.recommended_cable === 'string', 'recommended_cable must be a string');
+  }
+});
+
+test('am_rf_exposure_mpe_evaluation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_rf_exposure_mpe_evaluation_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_rf_exposure_mpe_evaluation_guide`);
+    assert.ok(typeof g.eval_required === 'boolean', 'eval_required must be boolean');
+    assert.ok(g.r_gp_exclusion_m > 0, 'r_gp_exclusion_m must be positive');
+    assert.strictEqual(g.e_limit_gp_vm, 614, 'GP limit must be 614 V/m');
+  }
+});
+
+test('am_tower_structural_load_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tower_structural_load_analysis_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_tower_structural_load_analysis_guide`);
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.ok(g.total_wind_load_lbf > 0, 'total_wind_load_lbf must be positive');
+    assert.ok(g.total_structural_low_usd > 0, 'total_structural_low_usd must be positive');
+  }
+});

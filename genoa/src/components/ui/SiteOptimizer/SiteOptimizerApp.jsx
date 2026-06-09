@@ -530,6 +530,8 @@ export default function SiteOptimizerApp({ onSwitchToContourStudio, onLogout, on
         callsign={inputs.callsign}
         frequency_khz={inputs.frequency_khz}
         tpo_kw={inputs.tpo_kw}
+        fcc_class={inputs.fcc_class}
+        pattern_mode={inputs.pattern_mode}
       />
     </>
   );
@@ -1716,6 +1718,137 @@ const DEMO_RESULT = {
         ],
         reference: '47 CFR §73.3520; §73.3533; §73.3534; 47 CFR §1.47; FCC Media Bureau AM processing data',
         note: 'Timeline estimates are based on FCC processing history and regulatory requirements as of 2024. Actual timelines vary significantly. All phase estimates are calendar weeks.'
+      },
+      fcc_form_301_exhibit_checklist_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
+        is_directional: false, is_clear_channel: true, tower_height_ft: 315, asr_required: true,
+        n_exhibits_total: 24, n_exhibits_required: 22, n_exhibits_da_specific: 0,
+        filing_fee_usd: 4200, filing_system: 'FCC LMS (Licensing Management System)',
+        n_deficiency_risks: 5,
+        deficiency_triggers: [
+          { rank: 1, issue: 'Missing nighttime skywave analysis', cfr: '§73.182', how_to_avoid: 'Run §73.182 skywave NIF contour analysis before filing; include FCC SKYWAVE tool output as exhibit' },
+          { rank: 2, issue: 'Incomplete NEPA checklist (§1.1306)', cfr: '§1.1306', how_to_avoid: 'Complete all 13 NEPA categories; consult environmental attorney if any "yes" — EA may be required' },
+          { rank: 3, issue: 'ASR number missing for tower ≥ 200 ft', cfr: '§17.4; §17.7', how_to_avoid: 'Register ASR in FCC ASR system before filing Form 301' },
+          { rank: 4, issue: 'Site coordinates not in NAD83', cfr: '§73.1020(c)', how_to_avoid: 'Convert all GPS coordinates to NAD83 using NGS NADCON5 tool' },
+          { rank: 5, issue: 'RF exposure (MPE) exhibit missing', cfr: '§1.1310; OET-65', how_to_avoid: 'Calculate MPE per OET Bulletin 65; include calculation exhibit' }
+        ],
+        required_exhibits: [
+          { id: 'A1', section: 'A', title: 'FCC Form 301 main application (fully completed)', required: true, cfr: '§73.3533; §73.3536' },
+          { id: 'A2', section: 'A', title: 'Legal name and entity documentation', required: true, cfr: '§73.1020; §73.3533' },
+          { id: 'A3', section: 'A', title: 'Ownership disclosure (FCC Form 323)', required: true, cfr: '§73.3615' },
+          { id: 'A4', section: 'A', title: 'CORES entity registration', required: true, cfr: '§1.8001' },
+          { id: 'B1', section: 'B', title: 'Site coordinates — FCC datum (NAD83)', required: true, cfr: '§73.1020(c)' },
+          { id: 'B2', section: 'B', title: 'Proposed ERP and TPO (kW)', required: true, cfr: '§73.21; §73.51' },
+          { id: 'B3', section: 'B', title: 'Antenna height data (AMSL and AGL)', required: true, cfr: '§73.1020(b)' },
+          { id: 'B4', section: 'B', title: 'Ground system design description', required: true, cfr: '§73.190' },
+          { id: 'B5', section: 'B', title: 'Soil conductivity (M3 value or measured)', required: true, cfr: '§73.184; §73.150' },
+          { id: 'B6', section: 'B', title: 'Proposed operating schedule (day/night/critical hours)', required: true, cfr: '§73.99; §73.1740' },
+          { id: 'C1', section: 'C', title: 'Co-channel groundwave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24' },
+          { id: 'C2', section: 'C', title: 'Adjacent channel interference check (±10 kHz)', required: true, cfr: '§73.187; §73.188' },
+          { id: 'C3', section: 'C', title: 'Blanket interference analysis (§73.24(g))', required: true, cfr: '§73.24(g)' },
+          { id: 'C4', section: 'C', title: 'Nighttime skywave interference analysis (§73.182)', required: true, cfr: '§73.182; §73.24(g)' },
+          { id: 'D1', section: 'D', title: 'NEPA Environmental Checklist (§1.1307)', required: true, cfr: '§1.1306; §1.1307' },
+          { id: 'D2', section: 'D', title: 'RF Exposure (MPE) evaluation — OET Bulletin 65', required: true, cfr: '§1.1310; OET Bulletin 65' },
+          { id: 'D4', section: 'D', title: 'NHPA §106 / cultural resources desktop survey', required: true, cfr: 'NHPA §106; §1.1307(a)(4)' },
+          { id: 'E1', section: 'E', title: 'ASR registration number', required: true, cfr: '47 CFR §17.4; §17.7' },
+          { id: 'E2', section: 'E', title: 'FAA aeronautical study (Form 7460-1)', required: true, cfr: '14 CFR §77; §17.23' },
+          { id: 'F1', section: 'F', title: 'Engineer certification', required: true, cfr: '§73.1870; §73.3536(a)(2)' },
+          { id: 'F2', section: 'F', title: 'Applicant signature and certification', required: true, cfr: '§73.3533(a)(7)' },
+          { id: 'F3', section: 'F', title: 'Filing fee payment', required: true, cfr: '§1.1102' }
+        ],
+        reference: '47 CFR §73.1; §73.21; §73.24; §73.150; §73.182; §73.190; §1.1102; §1.1306; §1.1310; §17.4; FCC Form 301 Instructions (2024); OET Bulletin 65',
+        note: 'FCC Form 301-AM NDA application for 780 kHz Class D: 22 required exhibits across 6 sections. Top deficiency risk: Missing nighttime skywave analysis. ASR registration required (tower ≈ 315 ft). Filing fee: $4,200.'
+      },
+      electrical_power_consumption_guide: {
+        frequency_khz: 780, tpo_kw: 5, hours_per_year: 8760,
+        electricity_rate_low_usd_per_kwh: 0.10, electricity_rate_high_usd_per_kwh: 0.16,
+        auxiliary_load_kw: 1.0, n_transmitter_models: 3,
+        transmitter_models: [
+          { type: 'TUBE',        label: 'Vacuum tube (legacy)',  example_models: 'Harris MW-5, RCA BTA-5R',     efficiency_low_pct: 50, efficiency_high_pct: 55, input_power_low_kw: 9.09,  input_power_high_kw: 10.0,  hvac_load_est_kw: 3.64, total_facility_low_kw: 11.09, total_facility_high_kw: 14.99, annual_kwh_low: 97147, annual_kwh_high: 131312, annual_cost_low_usd: 9715, annual_cost_high_usd: 21010 },
+          { type: 'HYBRID',      label: 'Hybrid solid-state',   example_models: 'Harris DX-5, early Nautel NA', efficiency_low_pct: 58, efficiency_high_pct: 62, input_power_low_kw: 8.06,  input_power_high_kw: 8.62,  hvac_load_est_kw: 1.54, total_facility_low_kw: 9.29,  total_facility_high_kw: 10.35, annual_kwh_low: 81381, annual_kwh_high: 90666, annual_cost_low_usd: 8138, annual_cost_high_usd: 14507 },
+          { type: 'SOLID_STATE', label: 'Modern solid-state',   example_models: 'Nautel NX5, GatesAir FAX-5',  efficiency_low_pct: 65, efficiency_high_pct: 72, input_power_low_kw: 6.94,  input_power_high_kw: 7.69,  hvac_load_est_kw: 0.46, total_facility_low_kw: 8.31,  total_facility_high_kw: 9.25, annual_kwh_low: 72797, annual_kwh_high: 81030, annual_cost_low_usd: 7280, annual_cost_high_usd: 12965 }
+        ],
+        recommended_type: 'SOLID_STATE',
+        solid_state_annual_cost_low_usd: 7280, solid_state_annual_cost_high_usd: 12965,
+        annual_savings_vs_tube_usd: 6337, solid_state_tx_upgrade_cost_usd: 18000, upgrade_payback_years: 2.8,
+        power_factor_uncorrected: 0.78, apparent_power_kva: 10.65,
+        reference: '47 CFR §73.1590; DOE EIA Commercial Electricity Rates (2024); Nautel NX5 spec; GatesAir FAX-5 spec; ITU-R BS.2101',
+        note: '780 kHz 5 kW facility (modern solid-state): total load ~8.31–9.25 kW; estimated annual electricity $7,280–$12,965 at 2024 commercial rates. Tube-to-solid-state upgrade saves ~$6,337/yr; payback ≈ 2.8 yr on a $18,000 transmitter.'
+      },
+      antenna_base_impedance_and_atu_design_guide: {
+        frequency_khz: 780, f_hz: 780000, lambda_m: 384.6, lambda_quarter_m: 96, tpo_kw: 5, pattern_mode: 'NDA',
+        feedline_impedance_ohm: 50, rr_ohm: 36.6, rg_low_ohm: 2.0, rg_high_ohm: 5.0, rcond_ohm: 0.4,
+        r_base_low_ohm: 39.0, r_base_high_ohm: 42.0, r_base_typ_ohm: 40.5,
+        q_network: 0.484, xl_shunt_ohm: 103.3, xc_series_ohm: 19.6,
+        l_shunt_uh: 21.06, c_series_pf: 10402,
+        bw_3db_khz: 1610.5, bw_adequate: true,
+        antenna_efficiency_low_pct: 87.1, antenna_efficiency_high_pct: 93.8, antenna_efficiency_typ_pct: 90.4,
+        base_current_low_a: 10.91, base_current_high_a: 11.34, base_current_typ_a: 11.12,
+        detuning_radius_m: 96, guy_wire_detuning_required: true,
+        n_atu_networks: 'one (NDA — single tower)', is_directional: false,
+        atu_network_type: 'L-network (shunt inductor / series capacitor)',
+        reference: '47 CFR §73.190 (ground system/detuning); §73.62 (base current monitoring); §73.154 (proof); ITU-R BS.346-1; IEEE Std 100',
+        note: '780 kHz λ/4 monopole (96 m): base impedance ~39–42 Ω (Rr=36.6 Ω + Rg=2–5 Ω). ATU: L-network; shunt L ≈ 21.06 μH, series C ≈ 10,402 pF; -3 dB BW ≈ 1610 kHz. Efficiency ≈ 90.4%. Base current at 5 kW: ≈ 11.12 A. Guy wire detuning coils required within 96 m (§73.190).'
+      },
+      station_total_project_cost_pro_forma_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA', tpo_kw: 5,
+        tower_height_m: 96, tower_height_ft: 315, n_radials: 120, radial_length_m: 96,
+        n_cost_categories: 9,
+        cost_categories: [
+          { category: 'FCC Regulatory Fees',            low_usd: 5295,   high_usd: 5955,   notes: 'Form 301 CP ($4,200) + Form 302-AM ($435) + annual fee ($660)' },
+          { category: 'Professional Services',           low_usd: 30000,  high_usd: 60000,  notes: 'Broadcast attorney + engineer; NDA simplifies attorney scope' },
+          { category: 'Site Acquisition (excl. land)',   low_usd: 8500,   high_usd: 31000,  notes: 'Title search, survey, Phase I ESA, NEPA §1.1307, local permits' },
+          { category: 'Tower Construction',              low_usd: 107100, high_usd: 252000, notes: 'λ/4 guyed monopole 96 m (315 ft); foundation, base insulator, guys, ASR' },
+          { category: 'Ground Radial System',            low_usd: 21888,  high_usd: 61488,  notes: '120 radials × 96 m; AWG-10 copper wire + burial/bonding labor; §73.190' },
+          { category: 'Transmitter & ATU Equipment',     low_usd: 25000,  high_usd: 68000,  notes: '5 kW transmitter + ATU + hardline + base current monitoring' },
+          { category: 'Transmitter Building',            low_usd: 83000,  high_usd: 235000, notes: '1000 sq ft + HVAC + 200A electrical + 50 kW generator + security' },
+          { category: 'STL System',                      low_usd: 11000,  high_usd: 33000,  notes: 'Microwave or IP studio-transmitter link; equipment + installation' },
+          { category: 'Proof of Performance',            low_usd: 8000,   high_usd: 20000,  notes: '8-radial NDA field intensity traversal (§73.154(b)) + report + FCC exhibit' }
+        ],
+        subtotal_low_usd: 299783, subtotal_high_usd: 766443,
+        contingency_pct: 15, contingency_low_usd: 44967, contingency_high_usd: 114967,
+        total_project_low_usd: 344750, total_project_high_usd: 881410, total_project_typ_usd: 613080,
+        total_timeline_months_low: 18, total_timeline_months_high: 30,
+        timeline_milestones: [
+          { milestone: 'Engineering study + Form 301 filed',      month_start: 0,  month_end: 2,  parallel: false },
+          { milestone: 'FCC CP processing',                        month_start: 2,  month_end: 20, parallel: false },
+          { milestone: 'Site acquisition + permitting',            month_start: 1,  month_end: 12, parallel: true  },
+          { milestone: 'Tower construction + radial installation', month_start: 12, month_end: 18, parallel: false },
+          { milestone: 'Equipment install + ATU commissioning',    month_start: 18, month_end: 21, parallel: false },
+          { milestone: 'Proof of performance + Form 302-AM',       month_start: 21, month_end: 24, parallel: false }
+        ],
+        n_financing_options: 4,
+        financing_options: [
+          { source: 'SBA 7(a) loan', max_usd: 5000000, term_years: 10, notes: 'Equipment and working capital; 7-8% rate typical (2024)' },
+          { source: 'SBA 504 loan', max_usd: 5500000, term_years: 20, notes: 'Real estate and tower construction; lower fixed rate' },
+          { source: 'CoBank / Farm Credit', max_usd: null, term_years: null, notes: 'Broadcast-specialized lender; familiar with FCC license collateral' },
+          { source: 'Seller financing', max_usd: null, term_years: null, notes: 'If acquiring existing AM facility; negotiate CP contingency clause' }
+        ],
+        reference: '47 CFR §73.21; §73.154; §73.182; §73.190; §1.1102; §1.1307; NHPA §106; SBA 7(a)/504 program guidelines',
+        note: 'Complete relocation budget for 780 kHz Class D (NDA) 5 kW: estimated $344,750–$881,410 (typical $613,080), including 15% contingency. Excludes land purchase price. Timeline: 18–30 months from CP filing to new license. All figures are 2024 screening-grade estimates.'
+      },
+      transmitter_power_upgrade_pathway_guide: {
+        frequency_khz: 780, fcc_class: 'D', pattern_mode: 'NDA',
+        current_tpo_kw: 5, day_max_tpo_kw: 10, night_max_tpo_kw: 1,
+        day_headroom_kw: 5, can_upgrade_day_power: true, upgraded_tpo_kw: 10,
+        coverage_radius_factor: 1.414, coverage_gain_pct: 41,
+        is_directional: false, night_upgrade_requires_da_n: true,
+        form301_fee_usd: 4200, form302_fee_usd: 435,
+        transmitter_cost_low_usd: 15000, transmitter_cost_high_usd: 45000,
+        installation_cost_usd: 7500,
+        engineering_cost_low_usd: 4000, engineering_cost_high_usd: 8000,
+        total_project_low_usd: 31135, total_project_high_usd: 65135,
+        cp_processing_months_low: 6, cp_processing_months_high: 18,
+        n_upgrade_steps: 5,
+        upgrade_steps: [
+          { step: 1, action: 'Interference analysis', form: null, cost_range_usd: '$4,000–$8,000', timeline: '2–4 weeks', notes: '§73.182 co-channel/adjacent-channel analysis; NDA — no pattern proof needed' },
+          { step: 2, action: 'File FCC Form 301 (CP application)', form: 'Form 301', cost_range_usd: '$4,200', timeline: '1–2 weeks', notes: 'Major facility change; engineering exhibit, interference study, environmental checklist (§1.1307)' },
+          { step: 3, action: 'FCC processing / CP grant', form: null, cost_range_usd: 'included', timeline: '6–18 months', notes: 'CP grants construction authority; build must commence within 3 years (§73.1620)' },
+          { step: 4, action: 'Procure and install transmitter', form: null, cost_range_usd: '$22,500–$52,500', timeline: '4–12 weeks', notes: '10 kW AM transmitter + electrical service upgrade + bonding + commissioning' },
+          { step: 5, action: 'File FCC Form 302-AM (license to cover)', form: 'Form 302-AM', cost_range_usd: '$435', timeline: '2–8 weeks', notes: 'NDA 8-radial proof data required (§73.154(b))' }
+        ],
+        reference: '47 CFR §73.21 (power limitations); §73.182 (nighttime interference); §73.154 (proof of performance); §73.1620 (CP construction period); §1.1102 (filing fees); FCC Form 301; FCC Form 302-AM',
+        note: '780 kHz Class D (NDA) — current 5 kW TPO. Daytime upgrade to 10 kW available (§73.21 Class D ceiling) — groundwave coverage radius grows ~41% (√ERP scaling). Nighttime ceiling: 1 kW (Class D secondary; DA-N antenna + §73.182 skywave analysis required for night upgrade).'
       },
       am_coverage_optimization_by_tower_height_guide: {
         frequency_khz: 780, wavelength_m: 384.6,

@@ -32,7 +32,7 @@ export default function FeatureDetail({ selection, onClose }){
   const raw   = selection.properties || {};
 
   return (
-    <div className="absolute top-3 right-3 z-40 w-72 rounded border border-rule bg-black/85 backdrop-blur-sm font-mono text-[11px] text-cream">
+    <div className="absolute top-14 right-3 z-30 w-72 rounded border border-rule bg-black/85 backdrop-blur-sm font-mono text-[11px] text-cream">
       <div className="flex items-start gap-2 px-3 py-2 border-b border-rule">
         <div className="min-w-0">
           <div className="truncate text-cream text-[12px]">{selection.title || 'Feature'}</div>
