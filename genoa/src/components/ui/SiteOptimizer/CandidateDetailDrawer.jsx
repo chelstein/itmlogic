@@ -2356,6 +2356,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Relocation Master Timeline Guide */}
+        {candidate.am_relocation_master_timeline_guide && (() => {
+          const mt = candidate.am_relocation_master_timeline_guide;
+          const phaseColor = (p) => p.parallel ? '#6366f1' : '#0ea5e9';
+          return (
+            <div style={{ background: '#09090b', border: '1px solid #3f3f46', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#fafafa', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Relocation Master Timeline</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#a1a1aa', background: '#18181b', borderRadius: 3, padding: '2px 6px', border: '1px solid #3f3f46' }}>8 PHASES</span>
+              </div>
+
+              {/* Total timeline banner */}
+              <div style={{ background: '#18181b', borderRadius: 6, padding: '8px 12px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #3f3f46' }}>
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#71717a', marginBottom: 2 }}>TOTAL PROJECT TIMELINE</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 700, color: '#f4f4f5' }}>
+                    {Math.round(mt.total_months_low)}–{Math.round(mt.total_months_high)} months
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#71717a', marginTop: 1 }}>({mt.total_weeks_low}–{mt.total_weeks_high} wks)</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#71717a' }}>Critical parallel path</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#a78bfa', fontWeight: 600 }}>Phase {mt.parallel_critical_phase}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#71717a' }}>{mt.parallel_critical_name}</div>
+                </div>
+              </div>
+
+              {/* Phase Gantt table */}
+              <div style={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #27272a' }}>
+                {(mt.phases || []).map((phase, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '18px 1fr auto', gap: 6, padding: '5px 8px', background: i % 2 === 0 ? '#09090b' : '#0f0f11', borderBottom: '1px solid #18181b', alignItems: 'start' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 9, color: phaseColor(phase), fontWeight: 700, paddingTop: 1 }}>{phase.phase}</div>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#e4e4e7', display: 'flex', gap: 6, alignItems: 'center' }}>
+                        {phase.name}
+                        {phase.parallel && <span style={{ fontFamily: 'monospace', fontSize: 7, color: '#6366f1', background: '#1e1b4b', borderRadius: 2, padding: '1px 4px' }}>PARALLEL</span>}
+                      </div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#52525b', marginTop: 1, lineHeight: 1.4 }}>{phase.description}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 7, color: '#3f3f46', marginTop: 1 }}>↳ {phase.milestone}</div>
+                    </div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#a1a1aa', textAlign: 'right', whiteSpace: 'nowrap' }}>{phase.weeks_low}–{phase.weeks_high} wks</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Interference Budget and NIF Guide */}
         {candidate.am_interference_budget_and_nif_guide && (() => {
           const ib = candidate.am_interference_budget_and_nif_guide;

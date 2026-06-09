@@ -16301,3 +16301,49 @@ test('candidate_comparison_table interference budget columns present for KAZM', 
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.ib_nif_cost_low_usd > 0, 'ib_nif_cost_low_usd must be positive');
 });
+
+// ── Feature #90: am_relocation_master_timeline_guide ─────────────────────────
+test('KAZM 780 kHz: am_relocation_master_timeline_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_relocation_master_timeline_guide != null, 'master timeline guide missing');
+  }
+});
+
+test('KAZM master timeline: 8 phases, total_months_high > total_months_low > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const mt = out.candidates[0].am_relocation_master_timeline_guide;
+  assert.strictEqual(mt.n_phases, 8,                                  'must have 8 phases');
+  assert.ok(mt.total_months_low  > 0,                                 'total_months_low must be positive');
+  assert.ok(mt.total_months_high > mt.total_months_low,               'total_months_high must exceed low');
+});
+
+test('KAZM clear-channel: FCC processing phase (6) is 52–156 weeks', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const mt = out.candidates[0].am_relocation_master_timeline_guide;
+  const phase6 = mt.phases.find(p => p.phase === 6);
+  assert.ok(phase6 != null, 'phase 6 (FCC processing) must exist');
+  assert.strictEqual(phase6.weeks_low,  52,  'clear channel FCC processing weeks_low must be 52');
+  assert.strictEqual(phase6.weeks_high, 156, 'clear channel FCC processing weeks_high must be 156');
+});
+
+test('KAZM master timeline: total_weeks is parallel_critical + sequential', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const mt = out.candidates[0].am_relocation_master_timeline_guide;
+  const expected_low  = mt.parallel_path_weeks_low  + mt.sequential_weeks_low;
+  const expected_high = mt.parallel_path_weeks_high + mt.sequential_weeks_high;
+  assert.strictEqual(mt.total_weeks_low,  expected_low,  'total_weeks_low must be parallel + sequential');
+  assert.strictEqual(mt.total_weeks_high, expected_high, 'total_weeks_high must be parallel + sequential');
+});
+
+test('candidate_comparison_table master timeline columns present for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mt_total_weeks_low'   in row, 'mt_total_weeks_low missing');
+    assert.ok('mt_total_months_low'  in row, 'mt_total_months_low missing');
+    assert.ok('mt_total_months_high' in row, 'mt_total_months_high missing');
+    assert.ok('mt_critical_phase'    in row, 'mt_critical_phase missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.mt_total_weeks_low > 0, 'mt_total_weeks_low must be positive');
+});

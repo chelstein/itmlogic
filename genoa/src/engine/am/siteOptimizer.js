@@ -1535,6 +1535,10 @@ export async function runSiteOptimizer(body = {}){
     fcc_total_soft_cost_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.total_soft_cost_low ?? null,
     fcc_processing_days_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.fcc_processing_days_low ?? null,
     fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null,
+    mt_total_weeks_low:                 c.am_relocation_master_timeline_guide?.total_weeks_low ?? null,
+    mt_total_months_low:                c.am_relocation_master_timeline_guide?.total_months_low ?? null,
+    mt_total_months_high:               c.am_relocation_master_timeline_guide?.total_months_high ?? null,
+    mt_critical_phase:                  c.am_relocation_master_timeline_guide?.parallel_critical_phase ?? null,
     ib_nif_complexity:                  c.am_interference_budget_and_nif_guide?.nif_study_complexity ?? null,
     ib_nif_ok_screen:                   c.am_interference_budget_and_nif_guide?.nif_screening_ok ?? null,
     ib_co_ch_du_margin_db:              c.am_interference_budget_and_nif_guide?.co_channel_du_margin_db ?? null,
@@ -7395,6 +7399,155 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_relocation_master_timeline_guide: (() => {
+      // AM station relocation master project timeline guide.
+      //
+      // Aggregates phase durations from all engineering and regulatory disciplines
+      // into a Gantt-style schedule with parallel-path critical path analysis.
+      //
+      // Regulatory milestones:
+      //   Phase 1 — Site selection + due diligence (§73.3549(a) site control)
+      //   Phase 2 — Engineering (NIF study, DA design if applicable)
+      //   Phase 3 — Environmental (NEPA/NHPA, TCNS tribal, Phase I ESA)
+      //   Phase 4 — FAA coordination (Form 7460-1 if ASR required)
+      //   Phase 5 — FCC application filing (Form 301-AM CP)
+      //   Phase 6 — FCC processing (§73.3548 petitions to deny, grant)
+      //   Phase 7 — Construction (tower, ground system, building)
+      //   Phase 8 — Proof of performance + license to cover (Form 302-AM)
+      //
+      // Critical path: the longest chain of sequential dependencies.
+      // Phases 1–4 can proceed in parallel; Phase 5 requires all prior phases.
+      // Phases 6–8 are strictly sequential after Phase 5.
+
+      const is_da_mt    = /^DA/i.test(pattern_mode);
+      const chanCls_mt  = frequencyChannelClass(frequency_khz);
+      const isClear_mt  = chanCls_mt === 'clear_channel';
+      const isUrban_mt  = (pt.land_use_classification?.density_per_km2 ?? 200) > 500;
+      const eaLikely_mt = isUrban_mt; // proxy — matches NEPA guide
+
+      const lambda_mt   = round2(300000 / frequency_khz);
+      const h_frac_mt   = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_m_mt      = round2(h_frac_mt * lambda_mt);
+      const h_ft_mt     = Math.round(h_m_mt * 3.28084);
+      const asrReq_mt   = h_m_mt > 60.96;
+
+      // ── Phase durations (weeks) ──
+      const phases = [
+        {
+          phase:       1,
+          name:        'Site selection + due diligence',
+          description: 'Candidate site walkover, Phase I ESA, lease/option negotiation, zoning pre-application',
+          weeks_low:   isUrban_mt ? 12 : 8,
+          weeks_high:  isUrban_mt ? 26 : 18,
+          parallel:    true,
+          milestone:   '§73.3549(a) site control letter'
+        },
+        {
+          phase:       2,
+          name:        'Engineering + NIF study',
+          description: `${isClear_mt ? 'Full §73.182 NIF study' : 'Standard NIF study'}, antenna design${is_da_mt ? ', DA pattern engineering' : ''}, tower load analysis`,
+          weeks_low:   isClear_mt ? 8  : is_da_mt ? 6 : 4,
+          weeks_high:  isClear_mt ? 20 : is_da_mt ? 16 : 10,
+          parallel:    true,
+          milestone:   'NIF study report + Form 301-AM exhibits'
+        },
+        {
+          phase:       3,
+          name:        'Environmental + tribal review',
+          description: `TCNS tribal notification (§1.1306); ${eaLikely_mt ? 'Environmental Assessment (§1.1311)' : 'Categorical exclusion screening'}; NHPA §106 (SHPO consultation if urban)`,
+          weeks_low:   eaLikely_mt ? 22 : 4,
+          weeks_high:  eaLikely_mt ? 52 : 12,
+          parallel:    true,
+          milestone:   eaLikely_mt ? 'FONSI / EA clearance' : 'CE certification'
+        },
+        {
+          phase:       4,
+          name:        asrReq_mt ? 'FAA Form 7460-1 coordination' : 'FAA pre-coordination (optional)',
+          description: asrReq_mt
+            ? `Tower ${h_ft_mt} ft > 200 ft — ASR registration (§17.7) + FAA obstruction study required before CP filing`
+            : `Tower ${h_ft_mt} ft ≤ 200 ft — FAA pre-coordination recommended but ASR not required`,
+          weeks_low:   asrReq_mt ? 4  : 1,
+          weeks_high:  asrReq_mt ? 12 : 4,
+          parallel:    true,
+          milestone:   asrReq_mt ? 'FAA "no hazard" determination + ASR registration' : 'FAA airspace check completed'
+        },
+        {
+          phase:       5,
+          name:        'FCC application filing (Form 301-AM)',
+          description: 'Assemble and submit CP application: engineering exhibits, NIF study, site control letter, NEPA cert, ASR number, Form 301-AM fee ($1,015)',
+          weeks_low:   2,
+          weeks_high:  4,
+          parallel:    false,
+          milestone:   'FCC public notice issued'
+        },
+        {
+          phase:       6,
+          name:        'FCC processing + grant',
+          description: `FCC Broadcast Branch review; 30-day petition-to-deny window (§73.3548); potential hearing if contested. ${isClear_mt ? 'Clear channel applications receive heightened IB scrutiny.' : ''}`,
+          weeks_low:   isClear_mt ? 52 : 26,
+          weeks_high:  isClear_mt ? 156 : 78,
+          parallel:    false,
+          milestone:   'CP granted (§73.3561); 3-year construction window begins'
+        },
+        {
+          phase:       7,
+          name:        'Construction',
+          description: 'Tower erection, foundation, ground radial system, transmission line, transmitter building, equipment installation',
+          weeks_low:   16,
+          weeks_high:  36,
+          parallel:    false,
+          milestone:   'Construction complete; ready for proof of performance'
+        },
+        {
+          phase:       8,
+          name:        'Proof of performance + license (Form 302-AM)',
+          description: `${is_da_mt ? '72-radial DA field intensity traversal (§73.154(a))' : '8-radial NDA inverse-distance traversal (§73.154(b))'}; prepare proof report; file Form 302-AM within 6 months of license grant`,
+          weeks_low:   is_da_mt ? 12 : 4,
+          weeks_high:  is_da_mt ? 28 : 12,
+          parallel:    false,
+          milestone:   'License to Cover granted'
+        }
+      ];
+
+      // ── Critical path ──
+      // Phases 1-4 are parallel; critical is the longest.
+      const parallelMaxLow  = Math.max(...phases.filter(p => p.parallel).map(p => p.weeks_low));
+      const parallelMaxHigh = Math.max(...phases.filter(p => p.parallel).map(p => p.weeks_high));
+      const sequentialLow   = phases.filter(p => !p.parallel).reduce((s, p) => s + p.weeks_low,  0);
+      const sequentialHigh  = phases.filter(p => !p.parallel).reduce((s, p) => s + p.weeks_high, 0);
+      const total_weeks_low  = parallelMaxLow  + sequentialLow;
+      const total_weeks_high = parallelMaxHigh + sequentialHigh;
+      const total_months_low  = round2(total_weeks_low  / 4.33);
+      const total_months_high = round2(total_weeks_high / 4.33);
+
+      // Identify critical parallel path
+      const criticalParallelPhase = phases.filter(p => p.parallel).sort((a, b) => b.weeks_high - a.weeks_high)[0];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        pattern_mode,
+        phases,
+        n_phases:                  phases.length,
+        parallel_critical_phase:   criticalParallelPhase.phase,
+        parallel_critical_name:    criticalParallelPhase.name,
+        parallel_path_weeks_low:   parallelMaxLow,
+        parallel_path_weeks_high:  parallelMaxHigh,
+        sequential_weeks_low:      sequentialLow,
+        sequential_weeks_high:     sequentialHigh,
+        total_weeks_low,
+        total_weeks_high,
+        total_months_low,
+        total_months_high,
+        is_da:                     is_da_mt,
+        is_clear_channel:          isClear_mt,
+        ea_likely:                 eaLikely_mt,
+        asr_required:              asrReq_mt,
+        reference: '47 CFR §73.3549(a) (site control); §73.3548 (petitions to deny); §73.3561 (CP grant, 3-year window); §73.3598 (CP extension); §73.154 (proof of performance); §1.1306 (NEPA); §17.7 (ASR); FCC Form 301-AM and 302-AM instructions',
+        note: `Total relocation timeline: ${Math.round(total_months_low)}–${Math.round(total_months_high)} months (${total_weeks_low}–${total_weeks_high} weeks). Critical parallel path: Phase ${criticalParallelPhase.phase} (${criticalParallelPhase.name}). ${isClear_mt ? 'Clear channel — expect 36–48+ months.' : ''}`
       };
     })(),
 

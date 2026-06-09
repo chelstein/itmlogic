@@ -4067,3 +4067,14 @@ test('am_interference_budget_and_nif_guide present across colocation candidates'
     assert.ok(ib.min_sep_co_channel_km > 0, 'min_sep_co_channel_km must be positive');
   }
 });
+
+test('am_relocation_master_timeline_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const mt = c.am_relocation_master_timeline_guide;
+    assert.ok(mt !== undefined && mt !== null, `candidate missing am_relocation_master_timeline_guide`);
+    assert.strictEqual(mt.n_phases, 8, 'must have 8 phases');
+    assert.ok(mt.total_months_high > mt.total_months_low, 'high must exceed low');
+    assert.ok(mt.parallel_path_weeks_high > 0, 'parallel path must be positive');
+  }
+});
