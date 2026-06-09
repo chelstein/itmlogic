@@ -2356,6 +2356,95 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM DA Pattern Design Guide */}
+        {candidate.am_da_pattern_design_guide && (() => {
+          const da = candidate.am_da_pattern_design_guide;
+          if (!da.applicable) {
+            return (
+              <div style={{ background: '#0c0c14', border: '1px solid #312e81', borderRadius: 8, padding: '12px 16px', marginBottom: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#818cf8', marginBottom: 6 }}>AM DA Pattern Design — Not Required</div>
+                <div style={{ fontSize: 11, color: '#a5b4fc' }}>{da.reason}</div>
+                {da.conversion_trigger && (
+                  <div style={{ fontSize: 11, color: '#6b7280', marginTop: 6, fontStyle: 'italic' }}>{da.conversion_trigger}</div>
+                )}
+              </div>
+            );
+          }
+          const complexColor = { HIGH: '#dc2626', MODERATE: '#d97706', LOW: '#16a34a' }[da.da_complexity] ?? '#6b7280';
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#0c0c14', border: '1px solid #312e81', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#818cf8', marginBottom: 10 }}>
+                §73.316 DA Pattern Design — {da.pattern_mode}
+              </div>
+              {/* Summary chips */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: complexColor + '22', color: complexColor, borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {da.da_complexity} complexity
+                </span>
+                <span style={{ background: '#1e1b4b', color: '#a5b4fc', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {da.tower_count_low}–{da.tower_count_high} towers
+                </span>
+                <span style={{ background: '#1e1b4b', color: '#c4b5fd', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {da.suppression_low_db}–{da.suppression_high_db} dB suppression
+                </span>
+                {da.is_da2 && (
+                  <span style={{ background: '#2e1065', color: '#e879f9', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>DA-2 (day+night)</span>
+                )}
+                <span style={{ background: '#1e1b4b', color: '#94a3b8', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {da.hrp_azimuths} azimuth HRP table
+                </span>
+              </div>
+              {/* Cost + timeline row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: '#0a0a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Design cost</div>
+                  <div style={{ color: '#e0e7ff', fontWeight: 600 }}>{fmtUsd(da.design_cost_low_usd)} – {fmtUsd(da.design_cost_high_usd)}</div>
+                </div>
+                <div style={{ background: '#0a0a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Design timeline</div>
+                  <div style={{ color: '#e0e7ff', fontWeight: 600 }}>{da.design_weeks_low}–{da.design_weeks_high} weeks</div>
+                </div>
+                <div style={{ background: '#0a0a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                  <div style={{ color: '#6b7280' }}>Construction premium</div>
+                  <div style={{ color: '#e0e7ff', fontWeight: 600 }}>{da.construction_premium_pct_low}–{da.construction_premium_pct_high}%</div>
+                </div>
+              </div>
+              {/* Form 301-AM DA exhibits */}
+              {da.form_301_da_exhibits && da.form_301_da_exhibits.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>Form 301-AM DA Exhibits Required</div>
+                  {da.form_301_da_exhibits.map((ex, i) => (
+                    <div key={i} style={{ fontSize: 10, color: '#a5b4fc', paddingLeft: 8, borderLeft: '2px solid #4338ca', marginBottom: 2 }}>
+                      {ex}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Compliance checklist */}
+              {da.compliance_checklist && da.compliance_checklist.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>§73.316 Compliance Checklist</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {da.compliance_checklist.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #1e1b4b' }}>
+                          <td style={{ padding: '3px 4px', color: row.required ? '#86efac' : '#6b7280', width: 16 }}>
+                            {row.required ? '✓' : '○'}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{row.item}</td>
+                          <td style={{ padding: '3px 4px', color: '#6366f1', textAlign: 'right', whiteSpace: 'nowrap' }}>{row.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {da.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{da.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Relocation Master Timeline Guide */}
         {candidate.am_relocation_master_timeline_guide && (() => {
           const mt = candidate.am_relocation_master_timeline_guide;

@@ -16347,3 +16347,56 @@ test('candidate_comparison_table master timeline columns present for KAZM', asyn
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.mt_total_weeks_low > 0, 'mt_total_weeks_low must be positive');
 });
+
+// ---- Feature #91: am_da_pattern_design_guide ----
+
+const KAZM_DA = {
+  ...KAZM,
+  pattern_mode: 'DA-N',
+  fcc_class:    'B',
+  frequency_khz: 1000,   // clear channel (WNWS dominant)
+};
+
+test('#91 DA-N station: am_da_pattern_design_guide is applicable=true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_DA, candidate_limit: 1 });
+  const da = out.candidates[0].am_da_pattern_design_guide;
+  assert.ok(da != null, 'am_da_pattern_design_guide must be present');
+  assert.strictEqual(da.applicable, true, 'DA station must have applicable=true');
+  assert.strictEqual(da.pattern_mode, 'DA-N', 'pattern_mode must pass through');
+});
+
+test('#91 DA-N clear channel: complexity is HIGH and suppression ≥ 25 dB', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_DA, candidate_limit: 1 });
+  const da = out.candidates[0].am_da_pattern_design_guide;
+  assert.strictEqual(da.da_complexity, 'HIGH', 'clear channel DA must be HIGH complexity');
+  assert.ok(da.suppression_low_db >= 25, `suppression_low_db must be ≥ 25, got ${da.suppression_low_db}`);
+});
+
+test('#91 NDA station: am_da_pattern_design_guide applicable=false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const da = out.candidates[0].am_da_pattern_design_guide;
+  assert.ok(da != null, 'am_da_pattern_design_guide must be present');
+  assert.strictEqual(da.applicable, false, 'NDA station must have applicable=false');
+  assert.ok(typeof da.reason === 'string' && da.reason.length > 0, 'reason must be a non-empty string');
+});
+
+test('#91 DA-2 station: is_da2=true, pattern_count=2, suppression_high boosted', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_DA, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const da = out.candidates[0].am_da_pattern_design_guide;
+  assert.strictEqual(da.is_da2, true, 'DA-2 must set is_da2=true');
+  assert.strictEqual(da.pattern_count, 2, 'DA-2 must have pattern_count=2');
+  assert.ok(da.suppression_high_db >= 30, `DA-2 suppression_high_db must be ≥ 30, got ${da.suppression_high_db}`);
+});
+
+test('#91 candidate_comparison_table has da_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_DA, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('da_applicable'         in row, 'da_applicable missing');
+    assert.ok('da_complexity'         in row, 'da_complexity missing');
+    assert.ok('da_tower_count_low'    in row, 'da_tower_count_low missing');
+    assert.ok('da_suppression_low_db' in row, 'da_suppression_low_db missing');
+    assert.ok('da_design_cost_low_usd' in row, 'da_design_cost_low_usd missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.da_applicable, true, 'da_applicable must be true for DA station');
+});

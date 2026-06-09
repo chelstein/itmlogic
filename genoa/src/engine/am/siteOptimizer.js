@@ -1556,7 +1556,15 @@ export async function runSiteOptimizer(body = {}){
     pf_grand_total_midpoint_usd:        c.am_station_relocation_total_project_cost_proforma?.grand_total_midpoint_usd ?? null,
     pf_tower_height_ft:                 c.am_station_relocation_total_project_cost_proforma?.tower_height_ft ?? null,
     pf_subtotal_low_usd:                c.am_station_relocation_total_project_cost_proforma?.subtotal_low_usd ?? null,
-    pf_contingency_low_usd:             c.am_station_relocation_total_project_cost_proforma?.contingency_low_usd ?? null
+    pf_contingency_low_usd:             c.am_station_relocation_total_project_cost_proforma?.contingency_low_usd ?? null,
+    da_applicable:                      c.am_da_pattern_design_guide?.applicable ?? null,
+    da_complexity:                      c.am_da_pattern_design_guide?.da_complexity ?? null,
+    da_tower_count_low:                 c.am_da_pattern_design_guide?.tower_count_low ?? null,
+    da_tower_count_high:                c.am_da_pattern_design_guide?.tower_count_high ?? null,
+    da_suppression_low_db:              c.am_da_pattern_design_guide?.suppression_low_db ?? null,
+    da_suppression_high_db:             c.am_da_pattern_design_guide?.suppression_high_db ?? null,
+    da_design_cost_low_usd:             c.am_da_pattern_design_guide?.design_cost_low_usd ?? null,
+    da_design_weeks_low:                c.am_da_pattern_design_guide?.design_weeks_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7399,6 +7407,166 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_da_pattern_design_guide: (() => {
+      // AM Directional Antenna Pattern Design Guide.
+      //
+      // When a relocating AM station uses a directional antenna (DA-D, DA-N, or DA-2)
+      // the FCC requires a full pattern design with tabulated radiation field values
+      // at specific azimuths, submitted with FCC Form 301-AM (new CP application).
+      //
+      // Key rules:
+      //   §73.316 — DA pattern design requirements, tabulation of field values,
+      //             suppression requirement (dominant station protection)
+      //   §73.207 — minimum mileage separations (D/U ratios govern protection)
+      //   §73.215 — interference standards; D/U protection determines required suppression
+      //   §73.154 — proof of performance after construction (Form 302-AM)
+      //   §1.1310 — RF exposure (MPE) evaluation (DA increases near-field complexity)
+      //
+      // Suppression ratio: §73.316 itself does not specify a fixed minimum suppression
+      // ratio.  Suppression is whatever is needed to maintain D/U protection margins
+      // under §73.207/§73.215 toward each protected station.  In practice, Class A
+      // clear-channel dominants typically require 30–50 dB of nighttime suppression
+      // in the protection azimuth; Class B regional require 20–40 dB; Class C local
+      // may need 10–25 dB depending on co-channel or first-adjacent scenario.
+      //
+      // Horizontal radiation pattern (HRP): §73.316(b) requires a table of relative
+      // field values at every 10° azimuth (36 values, 0°–350°) for each pattern
+      // (day/night/critical hours if separately defined).  This table is filed as
+      // an exhibit to Form 301-AM.  Additional spot azimuths (bearing to each
+      // protected station) must also be provided.
+      //
+      // Tower array sizing:  Small 2–3 tower arrays handle moderate suppression needs;
+      // 4–6 tower arrays handle deep suppression (>30 dB) or complex multi-station
+      // environments; >6 towers are rare and require individual justification.
+
+      const isDA_da = /^DA/i.test(pattern_mode);
+
+      if (!isDA_da) {
+        return {
+          applicable: false,
+          reason: `Station operates NDA (${pattern_mode}) — DA pattern design not required for relocation unless site change necessitates conversion to DA.`,
+          conversion_trigger: `Conversion from NDA to DA may be required if the new site cannot achieve co-channel or adjacent-channel D/U protection using NDA groundwave pattern.`,
+          reference: '47 CFR §73.316; §73.207; §73.215'
+        };
+      }
+
+      // Determine DA complexity from class and channel type
+      const isClearCh_da  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocalCh_da  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isRegionalCh_da = !isClearCh_da && !isLocalCh_da;
+
+      // Suppression depth estimates (dB) by class and channel type
+      // Based on §73.207 D/U protection ratios and typical interference environments
+      let supp_low_db, supp_high_db, da_complexity, tower_count_low, tower_count_high;
+
+      if (isClearCh_da && fcc_class === 'A') {
+        supp_low_db    = 30;
+        supp_high_db   = 50;
+        da_complexity  = 'HIGH';
+        tower_count_low  = 3;
+        tower_count_high = 6;
+      } else if (isClearCh_da) {
+        supp_low_db    = 25;
+        supp_high_db   = 45;
+        da_complexity  = 'HIGH';
+        tower_count_low  = 3;
+        tower_count_high = 5;
+      } else if (isRegionalCh_da) {
+        supp_low_db    = 20;
+        supp_high_db   = 40;
+        da_complexity  = 'MODERATE';
+        tower_count_low  = 2;
+        tower_count_high = 4;
+      } else {
+        // local channel DA — unusual but possible
+        supp_low_db    = 10;
+        supp_high_db   = 25;
+        da_complexity  = 'LOW';
+        tower_count_low  = 2;
+        tower_count_high = 3;
+      }
+
+      // DA-2 (separate day and night patterns) is more complex than DA-D or DA-N alone
+      const isDAN_only = /^DA-N$/i.test(pattern_mode);
+      const isDA2      = /^DA-2$/i.test(pattern_mode);
+      const patternCount = isDA2 ? 2 : 1;
+
+      if (isDA2) {
+        supp_high_db += 5;         // DA-2 night pattern often needs deeper suppression
+        tower_count_high = Math.min(tower_count_high + 1, 8);
+      }
+
+      // §73.316(b): HRP table — 36 azimuth values at 10° increments, plus protection spot azimuths
+      const hrp_azimuths      = 36;       // 0°, 10°, ..., 350°
+      const spot_azimuths_min = 2;        // at minimum, 1 spot per protected station + verification points
+      const spot_azimuths_typical = isClearCh_da ? 6 : isRegionalCh_da ? 4 : 2;
+
+      // Pattern design engineering cost (consultant fee, not included in AM filing fee)
+      // Includes modeling, optimization, proof prediction, HRP table, FCC exhibits
+      const design_cost_low_usd  = isDA2 ? 8000 : (da_complexity === 'HIGH' ? 6000 : (da_complexity === 'MODERATE' ? 4000 : 2500));
+      const design_cost_high_usd = isDA2 ? 20000 : (da_complexity === 'HIGH' ? 14000 : (da_complexity === 'MODERATE' ? 9000 : 5000));
+
+      // Design timeline
+      const design_weeks_low  = da_complexity === 'HIGH' ? 6  : (da_complexity === 'MODERATE' ? 4 : 2);
+      const design_weeks_high = da_complexity === 'HIGH' ? 16 : (da_complexity === 'MODERATE' ? 10 : 6);
+
+      // Construction complexity relative to NDA
+      const construction_premium_pct_low  = tower_count_low  === 2 ? 30 : (tower_count_low  <= 3 ? 60  : 100);
+      const construction_premium_pct_high = tower_count_high === 2 ? 60 : (tower_count_high <= 3 ? 120 : 200);
+
+      // FCC Form 301-AM filing requirements for DA
+      const form_301_da_exhibits = [
+        'Horizontal radiation pattern table (36 azimuths, 10° increment) — §73.316(b)',
+        'Vertical radiation pattern (spot radials, 10° increments per §73.150)',
+        'Tabulation of field values at each protected-station bearing',
+        'Tower spacing and phasing array parameters (spacing in degrees at operating freq)',
+        'Antenna system description (number of towers, phasing/coupling network)',
+        isDA2 ? 'Separate day and night pattern tables with transition timing' : null,
+        'Computer-modeled proof prediction (MoM or NEC for multi-tower arrays)',
+        'Ground system design (per §73.190 — minimum 120 buried radials per tower)',
+        'Common point impedance and power calculations'
+      ].filter(Boolean);
+
+      // Key §73.316 compliance checklist
+      const compliance_checklist = [
+        { item: 'HRP table at 36 azimuths (0°–350°, 10° increment)', required: true, ref: '§73.316(b)' },
+        { item: 'Spot values at each protected-station bearing', required: true, ref: '§73.316(b)' },
+        { item: 'D/U protection margin ≥ required threshold at each protected station', required: true, ref: '§73.207; §73.215' },
+        { item: 'Proof-of-performance field measurement plan (72-radial FI traversal)', required: true, ref: '§73.154(a)' },
+        { item: 'FCC Form 302-AM proof within 6 months of CP grant', required: true, ref: '§73.154' },
+        { item: 'Base current ratio monitors at each tower base', required: true, ref: '§73.61; §73.68' },
+        { item: 'Common point ammeter and sample loop calibration', required: true, ref: '§73.61' },
+        { item: 'Emergency NDA operation capability (automatic direction-finder failure)', required: true, ref: '§73.69' },
+        { item: 'RF exposure (MPE) evaluation — near-field more complex for multi-tower DA', required: tpo_kw >= 5, ref: '§1.1310; OET Bulletin 65' }
+      ];
+
+      return {
+        applicable:             true,
+        pattern_mode,
+        is_da2:                 isDA2,
+        is_da_n_only:           isDAN_only,
+        pattern_count:          patternCount,
+        channel_class:          isClearCh_da ? 'CLEAR' : (isRegionalCh_da ? 'REGIONAL' : 'LOCAL'),
+        da_complexity,
+        tower_count_low,
+        tower_count_high,
+        suppression_low_db:     supp_low_db,
+        suppression_high_db:    supp_high_db,
+        hrp_azimuths,
+        spot_azimuths_typical,
+        form_301_da_exhibits,
+        compliance_checklist,
+        design_cost_low_usd,
+        design_cost_high_usd,
+        design_weeks_low,
+        design_weeks_high,
+        construction_premium_pct_low,
+        construction_premium_pct_high,
+        reference: '47 CFR §73.316 (DA requirements); §73.207 (mileage separations); §73.215 (interference standards); §73.154 (proof of performance); §73.61 (base current monitors); §73.68 (monitor points); §73.69 (emergency NDA); §73.190 (ground system); §1.1310 (MPE)',
+        note: `Class ${fcc_class} ${pattern_mode} on ${frequency_khz} kHz (${isClearCh_da ? 'clear' : isRegionalCh_da ? 'regional' : 'local'} channel) — estimated ${tower_count_low}–${tower_count_high} tower array, ${supp_low_db}–${supp_high_db} dB suppression depth. Pattern design: ${design_weeks_low}–${design_weeks_high} weeks, $${design_cost_low_usd.toLocaleString()}–$${design_cost_high_usd.toLocaleString()}.`
       };
     })(),
 

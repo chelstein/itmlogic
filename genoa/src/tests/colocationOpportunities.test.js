@@ -4078,3 +4078,14 @@ test('am_relocation_master_timeline_guide present across colocation candidates',
     assert.ok(mt.parallel_path_weeks_high > 0, 'parallel path must be positive');
   }
 });
+
+test('am_da_pattern_design_guide present across colocation candidates (NDA = not applicable)', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const da = c.am_da_pattern_design_guide;
+    assert.ok(da !== undefined && da !== null, `candidate missing am_da_pattern_design_guide`);
+    // baseBody uses NDA, so all candidates must have applicable=false
+    assert.strictEqual(da.applicable, false, `NDA colocation candidate must have applicable=false`);
+    assert.ok(typeof da.reason === 'string', 'reason must be a string');
+  }
+});
