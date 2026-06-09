@@ -16534,3 +16534,45 @@ test('#94 candidate_comparison_table has cp_* columns', async () => {
   const r0 = out.candidate_comparison_table[0];
   assert.strictEqual(r0.cp_term_years, 3, 'cp_term_years must be 3');
 });
+
+// ---- Feature #95: am_skywave_nighttime_guide ----
+
+test('#95 KAZM 780 kHz (clear, Class D): night limit 1 kW, PSA eligible', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const sw = out.candidates[0].am_skywave_nighttime_guide;
+  assert.ok(sw != null, 'am_skywave_nighttime_guide must be present');
+  assert.strictEqual(sw.is_clear_channel, true, '780 kHz must be clear channel');
+  assert.strictEqual(sw.night_power_limit_kw, 1, 'Class D clear channel night limit must be 1 kW');
+  assert.strictEqual(sw.psa_eligible, true, 'Class D clear channel must be PSA eligible');
+});
+
+test('#95 KAZM: dominant_station string contains KKOB', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const sw = out.candidates[0].am_skywave_nighttime_guide;
+  assert.ok(sw.dominant_station?.includes('KKOB'), `dominant_station should include KKOB, got: ${sw.dominant_station}`);
+});
+
+test('#95 regional channel: night limit 5 kW, no PSA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1500, fcc_class: 'B', candidate_limit: 1 });
+  const sw = out.candidates[0].am_skywave_nighttime_guide;
+  assert.strictEqual(sw.is_regional_channel, true, '1500 kHz must be regional');
+  assert.strictEqual(sw.night_power_limit_kw, 5, 'Class B regional night limit must be 5 kW');
+  assert.strictEqual(sw.psa_eligible, false, 'regional channel must not be PSA eligible');
+});
+
+test('#95 local channel: no night constraint, night limit = tpo_kw', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1230, fcc_class: 'C', tpo_kw: 0.25, candidate_limit: 1 });
+  const sw = out.candidates[0].am_skywave_nighttime_guide;
+  assert.strictEqual(sw.is_local_channel, true, '1230 kHz must be local channel');
+  assert.strictEqual(sw.night_study_required, false, 'local channel must not require night study');
+});
+
+test('#95 candidate_comparison_table has sw_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sw_night_limit_kw'       in row, 'sw_night_limit_kw missing');
+    assert.ok('sw_night_op_type'        in row, 'sw_night_op_type missing');
+    assert.ok('sw_night_study_required' in row, 'sw_night_study_required missing');
+    assert.ok('sw_psa_eligible'         in row, 'sw_psa_eligible missing');
+  }
+});

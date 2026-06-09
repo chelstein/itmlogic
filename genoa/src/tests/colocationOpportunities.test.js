@@ -4119,3 +4119,13 @@ test('am_cp_validity_and_tolling_guide present across colocation candidates', as
     assert.ok(Array.isArray(cp.milestones) && cp.milestones.length >= 4, 'milestones must have ≥ 4 entries');
   }
 });
+
+test('am_skywave_nighttime_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const sw = c.am_skywave_nighttime_guide;
+    assert.ok(sw !== undefined && sw !== null, 'candidate missing am_skywave_nighttime_guide');
+    assert.ok(typeof sw.night_operation_type === 'string', 'night_operation_type must be string');
+    assert.ok(sw.night_power_limit_kw > 0, 'night_power_limit_kw must be positive');
+  }
+});

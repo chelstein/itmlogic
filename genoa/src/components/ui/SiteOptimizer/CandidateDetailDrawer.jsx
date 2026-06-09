@@ -2356,6 +2356,75 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Skywave Nighttime Guide */}
+        {candidate.am_skywave_nighttime_guide && (() => {
+          const sw = candidate.am_skywave_nighttime_guide;
+          const fmtUsd = (n) => n != null && n > 0 ? `$${Number(n).toLocaleString()}` : null;
+          const opColor = {
+            FULL_POWER: '#16a34a',
+            REGIONAL_NIGHT: '#0ea5e9',
+            LOCAL_UNPROTECTED: '#6b7280',
+            LIMITED_1KW_OR_DAN: '#dc2626',
+            LIMITED_2_5KW_OR_DAN: '#d97706'
+          }[sw.night_operation_type] ?? '#6b7280';
+          return (
+            <div style={{ background: '#080d18', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#93c5fd', marginBottom: 10 }}>
+                §73.182 Skywave / Nighttime — {sw.frequency_khz} kHz Class {sw.fcc_class}
+              </div>
+              {/* Operation type badge + power */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: opColor + '22', color: opColor, borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {sw.night_operation_type.replace(/_/g, ' ')}
+                </span>
+                <span style={{ background: '#0c1a2e', color: '#bfdbfe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  Night limit: {sw.night_power_limit_kw} kW
+                </span>
+                {sw.is_clear_channel && (
+                  <span style={{ background: '#1e3a5f', color: '#60a5fa', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                    CLEAR CHANNEL
+                  </span>
+                )}
+                {sw.psa_eligible && (
+                  <span style={{ background: '#1e3a5f', color: '#93c5fd', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                    PSA Eligible
+                  </span>
+                )}
+              </div>
+              {/* Dominant station */}
+              {sw.dominant_station && (
+                <div style={{ background: '#0c1a2e', border: '1px solid #1e3a5f', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#93c5fd', marginBottom: 8 }}>
+                  <span style={{ color: '#6b7280' }}>Dominant station: </span>{sw.dominant_station}
+                </div>
+              )}
+              {/* Nighttime constraint */}
+              <div style={{ background: '#0c1a2e', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#bfdbfe', marginBottom: 8 }}>
+                {sw.nighttime_constraint}
+              </div>
+              {/* Study cost/timeline if required */}
+              {sw.night_study_required && (
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 11, flex: 1 }}>
+                    <div style={{ color: '#6b7280' }}>Nighttime study cost</div>
+                    <div style={{ color: '#bfdbfe', fontWeight: 600 }}>{fmtUsd(sw.night_study_cost_low_usd) ?? '—'} – {fmtUsd(sw.night_study_cost_high_usd) ?? '—'}</div>
+                  </div>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 11, flex: 1 }}>
+                    <div style={{ color: '#6b7280' }}>Study timeline</div>
+                    <div style={{ color: '#bfdbfe', fontWeight: 600 }}>{sw.night_study_weeks_low}–{sw.night_study_weeks_high} weeks</div>
+                  </div>
+                </div>
+              )}
+              {/* PSA note */}
+              {sw.psa_note && (
+                <div style={{ background: '#0c1a2e', border: '1px solid #1d4ed8', borderRadius: 4, padding: '5px 10px', fontSize: 10, color: '#93c5fd', fontStyle: 'italic' }}>
+                  {sw.psa_note}
+                </div>
+              )}
+              {sw.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{sw.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM CP Validity and Tolling Guide */}
         {candidate.am_cp_validity_and_tolling_guide && (() => {
           const cp = candidate.am_cp_validity_and_tolling_guide;

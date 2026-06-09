@@ -1580,7 +1580,12 @@ export async function runSiteOptimizer(body = {}){
     cp_term_years:                      c.am_cp_validity_and_tolling_guide?.cp_term_years ?? null,
     cp_ltc_deadline_months:             c.am_cp_validity_and_tolling_guide?.ltc_deadline_months ?? null,
     cp_complexity_risk:                 c.am_cp_validity_and_tolling_guide?.complexity_risk ?? null,
-    cp_extension_days:                  c.am_cp_validity_and_tolling_guide?.extension_days ?? null
+    cp_extension_days:                  c.am_cp_validity_and_tolling_guide?.extension_days ?? null,
+    sw_night_limit_kw:                  c.am_skywave_nighttime_guide?.night_power_limit_kw ?? null,
+    sw_night_op_type:                   c.am_skywave_nighttime_guide?.night_operation_type ?? null,
+    sw_night_study_required:            c.am_skywave_nighttime_guide?.night_study_required ?? null,
+    sw_dominant_station:                c.am_skywave_nighttime_guide?.dominant_station ?? null,
+    sw_psa_eligible:                    c.am_skywave_nighttime_guide?.psa_eligible ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7423,6 +7428,147 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_skywave_nighttime_guide: (() => {
+      // AM Skywave Protection and Nighttime Operating Guide.
+      //
+      // At night, AM groundwave attenuates rapidly but ionospheric skywave
+      // propagation carries signals thousands of miles.  The FCC §73.182
+      // system governs protection of Class A (dominant) clear-channel stations
+      // from skywave interference by Class B, C, and D co-channel stations.
+      //
+      // Key rules:
+      //   §73.182 — Nighttime interference; skywave signal contours
+      //   §73.183 — Class A dominant station nighttime protection (50 µV/m)
+      //   §73.25–27 — Channel classification (clear/regional/local)
+      //   §73.21 — Class A stations may operate up to 50 kW nights on clear channels
+      //   §73.22 — Class B/D stations severely restricted at night on clear channels
+      //             (typically 1–2.5 kW max nighttime, or DA-N required)
+      //
+      // Class D stations on clear channels at night:
+      //   §73.22(b): Class D on clear channel → either:
+      //   Option 1: Operate at ≤ 1 kW at night (no interference to dominant)
+      //   Option 2: Operate DA-N with pattern that protects dominant at 0.1 mV/m contour
+      //   Option 3: "Sunset to sunrise" (sign on after local sunset, off before local sunrise)
+      //             —allows pre-sunrise authorization (PSA) via §73.99 and post-sunset
+      //             authorization (PSA) up to a defined limit
+      //
+      // Class B regional channel:
+      //   §73.21(b): 5 kW max nights; DA-N often required to protect co-channel stations
+      //
+      // The nighttime situation is frequently the binding constraint on AM site selection:
+      // if a candidate site at night cannot achieve the required D/U margin toward the
+      // dominant station (50 µV/m protected field), the site may be unusable at night
+      // regardless of its daytime merits.
+
+      const isClearCh_sw = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocalCh_sw = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isRegionalCh_sw = !isClearCh_sw && !isLocalCh_sw;
+      const isDA_sw = /^DA/i.test(pattern_mode);
+      const isDAN_sw  = /^DA-N$/i.test(pattern_mode) || /^DA-2$/i.test(pattern_mode);
+
+      // Nighttime power limit by class and channel
+      let night_power_limit_kw, night_operation_type, nighttime_constraint;
+
+      if (fcc_class === 'A') {
+        night_power_limit_kw = Math.min(tpo_kw, 50);
+        night_operation_type = 'FULL_POWER';
+        nighttime_constraint = 'Class A dominant — may operate full power nights; provides §73.183 50 µV/m protection to others';
+      } else if (isClearCh_sw && fcc_class === 'D') {
+        night_power_limit_kw = Math.min(tpo_kw, 1.0);
+        night_operation_type = 'LIMITED_1KW_OR_DAN';
+        nighttime_constraint = 'Class D on clear channel — §73.22(b): max 1 kW nights OR DA-N pattern required; may need Sunset-to-Sunrise authorization';
+      } else if (isClearCh_sw && fcc_class === 'B') {
+        night_power_limit_kw = Math.min(tpo_kw, 2.5);
+        night_operation_type = 'LIMITED_2_5KW_OR_DAN';
+        nighttime_constraint = 'Class B on clear channel — §73.21(b): max 2.5 kW nights; DA-N typically required to protect Class A dominant';
+      } else if (isRegionalCh_sw) {
+        night_power_limit_kw = Math.min(tpo_kw, 5);
+        night_operation_type = 'REGIONAL_NIGHT';
+        nighttime_constraint = 'Class B regional — §73.21(b): max 5 kW nights; DA-N may be required to protect co-channel regional stations';
+      } else {
+        // Local channel
+        night_power_limit_kw = Math.min(tpo_kw, tpo_kw);
+        night_operation_type = 'LOCAL_UNPROTECTED';
+        nighttime_constraint = 'Local channel station — §73.27: no nighttime skywave protection limits (local channels operate without dominance protection)';
+      }
+
+      // Dominant station lookup for clear channels (780 kHz = KKOB, Albuquerque NM, 50 kW)
+      // This is a simplified lookup — in production this would be the FCC AM database query
+      const clearChannelDominants = {
+        640: 'KFI Los Angeles CA (50 kW)',
+        650: 'WSM Nashville TN (50 kW)',
+        660: 'WNBC/WFAN New York NY (50 kW)',
+        670: 'KLUP/KNBR San Francisco CA (50 kW)',
+        700: 'WLW Cincinnati OH (50 kW)',
+        710: 'WOR New York NY (50 kW)',
+        720: 'WGN Chicago IL (50 kW)',
+        750: 'WSB Atlanta GA (50 kW)',
+        760: 'WJR Detroit MI (50 kW)',
+        770: 'KKOB Albuquerque NM (50 kW)',
+        780: 'KKOB Albuquerque NM (50 kW)',
+        820: 'WBAP Fort Worth TX (50 kW)',
+        830: 'WCCO Minneapolis MN (50 kW)',
+        840: 'WHAS Louisville KY (50 kW)',
+        870: 'WWL New Orleans LA (50 kW)',
+        880: 'WCBS New York NY (50 kW)',
+        890: 'WLS Chicago IL (50 kW)',
+        940: 'WINZ Miami FL (50 kW)',
+        990: 'WNTP Philadelphia PA (50 kW)',
+        1000: 'WNWS/KOMO Seattle WA (50 kW)',
+        1020: 'KDKA Pittsburgh PA (50 kW)',
+        1030: 'WBZ Boston MA (50 kW)',
+        1040: 'WHO Des Moines IA (50 kW)',
+        1060: 'KYW Philadelphia PA (50 kW)',
+        1070: 'KNX Los Angeles CA (50 kW)',
+        1100: 'WTAM Cleveland OH (50 kW)',
+        1120: 'KMOX St. Louis MO (50 kW)',
+        1160: 'KSL Salt Lake City UT (50 kW)',
+        1180: 'WHAM Rochester NY (50 kW)',
+        1200: 'WOAI San Antonio TX (50 kW)',
+        1210: 'WPHT Philadelphia PA (50 kW)'
+      };
+
+      const dominant_station = isClearCh_sw ? (clearChannelDominants[frequency_khz] ?? `Clear-channel dominant on ${frequency_khz} kHz`) : null;
+
+      // Skywave 50% contour distance estimate (simplified)
+      // At night, the 50% skywave signal from a 50 kW Class A dominant reaches ~1500–2500 km
+      // At the candidate site in AZ (~500 km from Albuquerque for KKOB/780 kHz),
+      // the dominant's skywave signal is likely above threshold → protection required
+      const night_study_required = isClearCh_sw && fcc_class !== 'A';
+      const night_study_weeks_low  = night_study_required ? 4  : 0;
+      const night_study_weeks_high = night_study_required ? 12 : 0;
+      const night_study_cost_low_usd  = night_study_required ? 2500  : 0;
+      const night_study_cost_high_usd = night_study_required ? 8000  : 0;
+
+      // Sunset/sunrise authorization (PSA) for Class D clear-channel stations
+      const psa_eligible = isClearCh_sw && fcc_class === 'D';
+      const psa_note = psa_eligible
+        ? 'Pre-Sunrise Authorization (PSA) under §73.99: may operate up to 500 W (0.5 kW) before local sunrise if no interference to dominant. Requires FCC approval; submit separately from CP.'
+        : null;
+
+      return {
+        frequency_khz,
+        fcc_class,
+        is_clear_channel:         isClearCh_sw,
+        is_regional_channel:      isRegionalCh_sw,
+        is_local_channel:         isLocalCh_sw,
+        is_da_night:              isDAN_sw,
+        dominant_station,
+        night_power_limit_kw,
+        night_operation_type,
+        nighttime_constraint,
+        night_study_required,
+        night_study_weeks_low,
+        night_study_weeks_high,
+        night_study_cost_low_usd,
+        night_study_cost_high_usd,
+        psa_eligible,
+        psa_note,
+        reference: '47 CFR §73.182 (nighttime skywave); §73.183 (Class A protection); §73.21–27 (class power limits); §73.22(b) (Class D clear channel nights); §73.99 (PSA); §73.182 skywave interference analysis methodology',
+        note: `Class ${fcc_class} on ${frequency_khz} kHz (${isClearCh_sw ? 'clear' : isRegionalCh_sw ? 'regional' : 'local'} channel). Night limit: ${night_power_limit_kw} kW (${night_operation_type}). ${nighttime_constraint}`
       };
     })(),
 
