@@ -1530,7 +1530,11 @@ export async function runSiteOptimizer(body = {}){
     bld_hvac_tons_specified:            c.am_transmitter_building_and_hvac_guide?.hvac_tons_specified ?? null,
     bld_total_heat_kw:                  c.am_transmitter_building_and_hvac_guide?.total_heat_kw ?? null,
     bld_building_sqft_low:              c.am_transmitter_building_and_hvac_guide?.building_sqft_low ?? null,
-    bld_total_building_low_usd:         c.am_transmitter_building_and_hvac_guide?.total_building_low_usd ?? null
+    bld_total_building_low_usd:         c.am_transmitter_building_and_hvac_guide?.total_building_low_usd ?? null,
+    fcc_total_fcc_fees:                 c.am_fcc_application_filing_cost_and_timeline_guide?.total_fcc_fees ?? null,
+    fcc_total_soft_cost_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.total_soft_cost_low ?? null,
+    fcc_processing_days_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.fcc_processing_days_low ?? null,
+    fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7373,6 +7377,118 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_fcc_application_filing_cost_and_timeline_guide: (() => {
+      // AM station relocation FCC application filing cost and timeline guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.3500: Applications required — Construction Permit (CP) via
+      //     FCC Form 301-AM (modification CP), License to Cover via Form 302-AM.
+      //   §73.3533: Major modification: change in community of license, class, or
+      //     significant change in facilities requires a major amendment petition.
+      //   §73.3548: Petitions to deny — third parties have 30 days after public
+      //     notice to file.  Contested applications take 12–24+ months.
+      //   §73.3561: FCC grant of CP — licensee has 3 years to complete construction.
+      //   §73.3598: Construction permit expiration; extensions possible for cause.
+      //   47 CFR §1.1102 / FCC FY 2024 Fee Schedule (DA 23-864):
+      //     AM station application fees (FY2024):
+      //       Form 301-AM (major modification CP): $1,015
+      //       Form 302-AM (license to cover CP): $1,015
+      //       Form 303-S (renewal of license, not applicable to relocation)
+      //     Note: FCC fee schedule updates annually in October.
+      //     Actual FY2024 fee: $1,015 per filing per FCC DA 23-864 (Sep 2023).
+      //   §73.3522: Non-substantial (minor) modification — faster processing
+      //     (30–60 days) vs. major modification (6–18 months).
+      //   §73.3580: Public notice requirement — 30-day petition window triggered
+      //     on acceptance of a major modification application.
+      //
+      // Filing sequence for AM station relocation:
+      //   1. Environmental (NEPA) review / NHPA §106 (if triggered) — pre-filing
+      //   2. Form 301-AM — Major Modification CP (new site coordinates, power,
+      //      antenna pattern, tower height)
+      //   3. 30-day public notice / petition window
+      //   4. FCC grant of CP (target: 6–18 months for uncontested)
+      //   5. Construction (up to 3 years from CP grant)
+      //   6. Proof-of-performance measurements (§73.154)
+      //   7. Form 302-AM — License to Cover CP
+      //   8. FCC grant of license (30–90 days if complete)
+      //
+      // Attorney / consulting engineer fees (2023 market rates):
+      //   Communications attorney: $400–$700/hr  (5–15 hrs for uncontested reloc.)
+      //   FCC consulting engineer (Forms 301/302 preparation): $3,000–$8,000
+      //   NEPA/§106 consultant (if triggered): $5,000–$20,000 (separate)
+
+      const isDA = /^DA/i.test(pattern_mode);
+
+      // FCC filing fees (FY2024)
+      const fee_301_am  = 1015;   // Form 301-AM
+      const fee_302_am  = 1015;   // Form 302-AM
+      const total_fcc_fees = fee_301_am + fee_302_am;
+
+      // Attorney cost
+      const atty_low  = Math.round(5  * 400);   // 5 hrs × $400/hr
+      const atty_high = Math.round(15 * 700);   // 15 hrs × $700/hr
+
+      // Engineering preparation
+      const eng_low  = isDA ? 5000 : 3000;
+      const eng_high = isDA ? 12000 : 8000;
+
+      // Timeline (days) — uncontested major modification
+      const nepa_days_low  = 30;   // §1.1307 categorical exclusion
+      const nepa_days_high = 90;   // if EA required, pre-filing
+      const fcc_processing_low  = 180;   // 6 months (uncontested, no petition)
+      const fcc_processing_high = 540;   // 18 months (minor opposition / staff backlog)
+      const construction_days   = 1095;  // 3 years from CP grant per §73.3561
+      const proof_days_low      = 60;    // proof-of-performance field work
+      const proof_days_high     = 120;
+      const license_grant_days_low  = 30;
+      const license_grant_days_high = 90;
+
+      const total_timeline_low  = nepa_days_low  + fcc_processing_low  + proof_days_low  + license_grant_days_low;
+      const total_timeline_high = nepa_days_high + fcc_processing_high + proof_days_high + license_grant_days_high;
+
+      // Total soft cost (excluding construction)
+      const total_soft_low  = total_fcc_fees + atty_low  + eng_low;
+      const total_soft_high = total_fcc_fees + atty_high + eng_high;
+
+      return {
+        fcc_class,
+        pattern_mode,
+        is_directional:          isDA,
+        fee_form_301_am:         fee_301_am,
+        fee_form_302_am:         fee_302_am,
+        total_fcc_fees,
+        attorney_cost_low:       atty_low,
+        attorney_cost_high:      atty_high,
+        engineering_prep_low:    eng_low,
+        engineering_prep_high:   eng_high,
+        total_soft_cost_low:     total_soft_low,
+        total_soft_cost_high:    total_soft_high,
+        nepa_prefiling_days_low:  nepa_days_low,
+        nepa_prefiling_days_high: nepa_days_high,
+        fcc_processing_days_low:  fcc_processing_low,
+        fcc_processing_days_high: fcc_processing_high,
+        construction_days_allowed: construction_days,
+        proof_days_low,
+        proof_days_high,
+        license_grant_days_low,
+        license_grant_days_high,
+        total_timeline_days_low:  total_timeline_low,
+        total_timeline_days_high: total_timeline_high,
+        filing_sequence: [
+          'NEPA/§106 pre-filing review (if triggered)',
+          'FCC Form 301-AM — Major Modification CP',
+          '30-day public notice / petition window (§73.3580)',
+          'FCC grant of CP (§73.3561)',
+          'Construction (≤ 3 years)',
+          'Proof-of-performance measurements (§73.154)',
+          'FCC Form 302-AM — License to Cover CP',
+          'FCC grant of license'
+        ],
+        reference: '47 CFR §73.3500 (applications); §73.3533 (major mod); §73.3548 (petitions to deny); §73.3561 (CP grant); §73.3580 (public notice); §73.3598 (CP expiration); FCC FY2024 Fee Schedule DA 23-864 ($1,015 per Form 301-AM / 302-AM)',
+        note: `${isDA ? 'DA' : 'NDA'} ${fcc_class} station. FCC fees: $${total_fcc_fees.toLocaleString()}. Soft costs (atty + eng): $${total_soft_low.toLocaleString()}–$${total_soft_high.toLocaleString()}. Timeline: ${total_timeline_low}–${total_timeline_high} days (excl. construction).`
       };
     })(),
 

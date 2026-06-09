@@ -2356,6 +2356,40 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM FCC Application Filing Cost and Timeline Guide */}
+        {candidate.am_fcc_application_filing_cost_and_timeline_guide && (() => {
+          const g = candidate.am_fcc_application_filing_cost_and_timeline_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          return (
+            <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#713f12', marginBottom: 8 }}>
+                FCC Application Filing Cost &amp; Timeline (§73.3500 / FY2024)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#78350f' }}>
+                <div><b>Form 301-AM (CP):</b> ${fmt(g.fee_form_301_am)}</div>
+                <div><b>Form 302-AM (License):</b> ${fmt(g.fee_form_302_am)}</div>
+                <div><b>Total FCC fees:</b> ${fmt(g.total_fcc_fees)}</div>
+                <div><b>Station type:</b> {g.is_directional ? `DA (${g.pattern_mode})` : 'NDA'} Class {g.fcc_class}</div>
+                <div><b>Attorney (5–15 hrs):</b> ${fmt(g.attorney_cost_low)}–${fmt(g.attorney_cost_high)}</div>
+                <div><b>Engineering prep:</b> ${fmt(g.engineering_prep_low)}–${fmt(g.engineering_prep_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total soft cost:</b> ${fmt(g.total_soft_cost_low)}–${fmt(g.total_soft_cost_high)}</div>
+                <div><b>FCC processing:</b> {g.fcc_processing_days_low}–{g.fcc_processing_days_high} days</div>
+                <div><b>Total timeline (excl. construction):</b> {g.total_timeline_days_low}–{g.total_timeline_days_high} days</div>
+                <div><b>CP construction window:</b> {g.construction_days_allowed} days (§73.3561)</div>
+              </div>
+              {g.filing_sequence && (
+                <div style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: '#92400e', marginBottom: 4 }}>Filing sequence:</div>
+                  <ol style={{ margin: 0, paddingLeft: 16, fontSize: 10, color: '#78350f', lineHeight: 1.6 }}>
+                    {g.filing_sequence.map((step, i) => <li key={i}>{step}</li>)}
+                  </ol>
+                </div>
+              )}
+              <div style={{ marginTop: 6, fontSize: 10, color: '#b45309' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Transmitter Building and HVAC Guide */}
         {candidate.am_transmitter_building_and_hvac_guide && (() => {
           const g = candidate.am_transmitter_building_and_hvac_guide;

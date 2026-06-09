@@ -16083,3 +16083,49 @@ test('candidate_comparison_table bld columns present and valid for KAZM', async 
   assert.ok(r0.bld_hvac_tons_specified >= 0.5, 'bld_hvac_tons_specified must be >= 0.5');
   assert.ok(r0.bld_total_building_low_usd > 0, 'bld_total_building_low_usd must be positive');
 });
+
+// ── Feature #85: am_fcc_application_filing_cost_and_timeline_guide ────────────
+test('KAZM 780 kHz: am_fcc_application_filing_cost_and_timeline_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_fcc_application_filing_cost_and_timeline_guide, 'fcc filing guide missing');
+  }
+});
+
+test('KAZM NDA: FCC fees are $2,030 and NDA flag is false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
+  assert.strictEqual(g.fee_form_301_am, 1015, 'Form 301-AM fee must be $1,015 (FY2024)');
+  assert.strictEqual(g.fee_form_302_am, 1015, 'Form 302-AM fee must be $1,015 (FY2024)');
+  assert.strictEqual(g.total_fcc_fees, 2030, 'total_fcc_fees must be $2,030');
+  assert.strictEqual(g.is_directional, false, 'NDA pattern must flag is_directional false');
+});
+
+test('KAZM: timeline is 300–840 days (excl. construction) and filing sequence has 8 steps', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
+  assert.strictEqual(g.total_timeline_days_low, 300, 'total_timeline_days_low must be 300');
+  assert.strictEqual(g.total_timeline_days_high, 840, 'total_timeline_days_high must be 840');
+  assert.strictEqual(g.filing_sequence.length, 8, 'filing_sequence must have 8 steps');
+  assert.strictEqual(g.construction_days_allowed, 1095, 'CP window must be 3 years = 1095 days');
+});
+
+test('KAZM: soft cost low > FCC fees alone and high >= low', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_filing_cost_and_timeline_guide;
+  assert.ok(g.total_soft_cost_low > g.total_fcc_fees, 'soft cost low must exceed FCC fees alone');
+  assert.ok(g.total_soft_cost_high >= g.total_soft_cost_low, 'high must be >= low');
+});
+
+test('candidate_comparison_table fcc columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fcc_total_fcc_fees'          in row, 'fcc_total_fcc_fees missing');
+    assert.ok('fcc_total_soft_cost_low'     in row, 'fcc_total_soft_cost_low missing');
+    assert.ok('fcc_processing_days_low'     in row, 'fcc_processing_days_low missing');
+    assert.ok('fcc_total_timeline_days_low' in row, 'fcc_total_timeline_days_low missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.fcc_total_fcc_fees, 2030, 'fcc_total_fcc_fees must be $2,030');
+  assert.strictEqual(r0.fcc_processing_days_low, 180, 'fcc_processing_days_low must be 180');
+});
