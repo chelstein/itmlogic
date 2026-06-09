@@ -12,9 +12,18 @@
 //   { "type": "vector", "url": "pmtiles://https://<host>/basemap" }
 //
 // Mounted PUBLIC (before the /api auth gate); returns 503 until configured.
+//
+// Why we buffer range responses instead of streaming:
+//   Node fetch() transparently decompresses bodies with Content-Encoding:
+//   gzip/br.  If the storage backend attaches Content-Encoding to binary
+//   objects (some S3-compatible backends do), the forwarded Content-Length
+//   reflects the compressed size while the body bytes are decompressed —
+//   protomaps rejects this as "content-length exceeding request".
+//   Buffering the ArrayBuffer lets us recompute the true byte length and
+//   set an accurate Content-Length, which PMTiles requires for range reads.
+//   PMTiles range slices are 4 KB – 256 KB, so buffering is safe.
 
 import express from 'express';
-import { Readable } from 'node:stream';
 
 const router = express.Router();
 const BASEMAP_URL = process.env.BASEMAP_URL || '';
@@ -36,22 +45,25 @@ router.get('/*', async (req, res) => {
       headers: range ? { Range: range } : undefined,
       signal:  ac.signal
     });
+    clearTimeout(timer);
+
+    // Buffer the body so we can compute the true byte length.
+    // This avoids content-length mismatches when the upstream uses
+    // Content-Encoding (fetch decompresses transparently; the original
+    // Content-Length would then be wrong for the protomaps client).
+    const body = await upstream.arrayBuffer();
+    const buf  = Buffer.from(body);
+
     res.status(upstream.status);
-    for (const h of ['content-type', 'content-length', 'content-range', 'accept-ranges', 'etag', 'last-modified']){
+    // Forward metadata headers but NOT content-length — we set it below
+    // from the actual buffer size so it is always accurate.
+    for (const h of ['content-type', 'content-range', 'accept-ranges', 'etag', 'last-modified']){
       const v = upstream.headers.get(h);
       if (v) res.setHeader(h, v);
     }
+    res.setHeader('content-length', buf.byteLength);
     res.setHeader('cache-control', upstream.headers.get('cache-control') || 'public, max-age=86400');
-    if (!upstream.body){
-      res.end();
-      return;
-    }
-    // Stream the upstream body straight through — never buffer the whole
-    // archive.  A no-Range request would otherwise pull the entire
-    // multi-hundred-MB PMTiles file into memory and exceed the gateway
-    // timeout (the 504 we were seeing); buffering also serialized every
-    // range read through a full arrayBuffer().
-    Readable.fromWeb(upstream.body).pipe(res).on('error', () => { try { res.destroy(); } catch { /* noop */ } });
+    res.send(buf);
   } catch (err) {
     clearTimeout(timer);
     if (!res.headersSent){
@@ -65,3 +77,4 @@ router.get('/*', async (req, res) => {
 });
 
 export default router;
+
