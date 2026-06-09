@@ -2356,6 +2356,72 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Station Relocation Total Project Cost Pro Forma */}
+        {candidate.am_station_relocation_total_project_cost_proforma && (() => {
+          const pf = candidate.am_station_relocation_total_project_cost_proforma;
+          const fmt = (n) => n != null ? '$' + Number(n).toLocaleString() : '—';
+          const fmtK = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '—';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#f8fafc', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Total Project Cost Pro Forma</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b', background: '#1e293b', borderRadius: 3, padding: '2px 6px' }}>SCREENING-GRADE</span>
+              </div>
+
+              {/* Grand total banner */}
+              <div style={{ background: '#1e293b', borderRadius: 6, padding: '10px 14px', marginBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginBottom: 2 }}>GRAND TOTAL (incl. contingency)</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 16, fontWeight: 700, color: '#f1f5f9' }}>
+                    {fmtK(pf.grand_total_low_usd)} – {fmtK(pf.grand_total_high_usd)}
+                  </div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', marginTop: 2 }}>midpoint {fmtK(pf.grand_total_midpoint_usd)}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>Class {pf.fcc_class} · {pf.frequency_khz} kHz</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>{pf.tpo_kw} kW · {pf.is_da ? 'DA' : 'NDA'}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b' }}>{pf.tower_height_ft} ft {pf.is_guyed ? 'guyed' : 'self-support'}</div>
+                </div>
+              </div>
+
+              {/* Line items table */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#64748b', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Line Items</div>
+              <div style={{ borderRadius: 4, overflow: 'hidden', border: '1px solid #1e293b', marginBottom: 8 }}>
+                {(pf.line_items || []).map((item, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '5px 8px', background: i % 2 === 0 ? '#0f172a' : '#141d2e', borderBottom: '1px solid #1e293b' }}>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#cbd5e1' }}>{item.category}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#475569', marginTop: 1 }}>{item.notes}</div>
+                    </div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtK(item.low)}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'right', whiteSpace: 'nowrap' }}>–{fmtK(item.high)}</div>
+                  </div>
+                ))}
+                {/* Subtotal row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '5px 8px', background: '#1e293b', borderTop: '1px solid #334155' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', fontWeight: 700 }}>Subtotal</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', textAlign: 'right' }}>{fmtK(pf.subtotal_low_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'right' }}>–{fmtK(pf.subtotal_high_usd)}</div>
+                </div>
+                {/* Contingency row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '5px 8px', background: '#1e293b' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8' }}>Contingency ({pf.contingency_pct_low}–{pf.contingency_pct_high}%)</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#94a3b8', textAlign: 'right' }}>{fmtK(pf.contingency_low_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'right' }}>–{fmtK(pf.contingency_high_usd)}</div>
+                </div>
+                {/* Grand total row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 4, padding: '6px 8px', background: '#0f172a', borderTop: '2px solid #334155' }}>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#f1f5f9', fontWeight: 700 }}>GRAND TOTAL</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#38bdf8', textAlign: 'right', fontWeight: 700 }}>{fmtK(pf.grand_total_low_usd)}</div>
+                  <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#0ea5e9', textAlign: 'right', fontWeight: 700 }}>–{fmtK(pf.grand_total_high_usd)}</div>
+                </div>
+              </div>
+
+              <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#475569', lineHeight: 1.5 }}>{pf.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM FCC Application Filing Cost and Timeline Guide */}
         {candidate.am_fcc_application_filing_cost_and_timeline_guide && (() => {
           const g = candidate.am_fcc_application_filing_cost_and_timeline_guide;

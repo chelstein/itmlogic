@@ -4023,3 +4023,14 @@ test('am_fcc_application_filing_cost_and_timeline_guide present across colocatio
     assert.ok(g.total_timeline_days_low > 0, 'total_timeline_days_low must be positive');
   }
 });
+
+test('am_station_relocation_total_project_cost_proforma present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const pf = c.am_station_relocation_total_project_cost_proforma;
+    assert.ok(pf !== undefined && pf !== null, `candidate missing am_station_relocation_total_project_cost_proforma`);
+    assert.ok(pf.grand_total_low_usd > 0, 'grand_total_low_usd must be positive');
+    assert.ok(pf.grand_total_high_usd > pf.grand_total_low_usd, 'high must exceed low');
+    assert.strictEqual(pf.line_items.length, 11, 'must have 11 line items');
+  }
+});

@@ -16129,3 +16129,50 @@ test('candidate_comparison_table fcc columns present and valid for KAZM', async 
   assert.strictEqual(r0.fcc_total_fcc_fees, 2030, 'fcc_total_fcc_fees must be $2,030');
   assert.strictEqual(r0.fcc_processing_days_low, 180, 'fcc_processing_days_low must be 180');
 });
+
+// ── Feature #86: am_station_relocation_total_project_cost_proforma ────────────
+test('KAZM 780 kHz: am_station_relocation_total_project_cost_proforma present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_station_relocation_total_project_cost_proforma != null, 'proforma guide missing');
+  }
+});
+
+test('KAZM NDA proforma: grand_total_high > grand_total_low > 0 and 11 line items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const pf = out.candidates[0].am_station_relocation_total_project_cost_proforma;
+  assert.ok(pf.grand_total_low_usd  > 0,                                    'grand_total_low must be positive');
+  assert.ok(pf.grand_total_high_usd > pf.grand_total_low_usd,               'high must exceed low');
+  assert.strictEqual(pf.line_items.length, 11,                               'must have 11 line items');
+  assert.strictEqual(pf.is_da, false,                                        'KAZM NDA must flag is_da false');
+});
+
+test('KAZM NDA proforma: midpoint is average of low and high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const pf = out.candidates[0].am_station_relocation_total_project_cost_proforma;
+  const expected_mid = Math.round((pf.grand_total_low_usd + pf.grand_total_high_usd) / 2);
+  assert.strictEqual(pf.grand_total_midpoint_usd, expected_mid, 'midpoint must be average of low and high');
+});
+
+test('KAZM NDA proforma: DA variant has higher soft costs than NDA', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const ndaPf  = ndaOut.candidates[0].am_station_relocation_total_project_cost_proforma;
+  const daPf   = daOut.candidates[0].am_station_relocation_total_project_cost_proforma;
+  assert.ok(daPf.grand_total_low_usd > ndaPf.grand_total_low_usd, 'DA proforma must exceed NDA (higher soft costs + pop)');
+});
+
+test('candidate_comparison_table proforma columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pf_grand_total_low_usd'      in row, 'pf_grand_total_low_usd missing');
+    assert.ok('pf_grand_total_high_usd'     in row, 'pf_grand_total_high_usd missing');
+    assert.ok('pf_grand_total_midpoint_usd' in row, 'pf_grand_total_midpoint_usd missing');
+    assert.ok('pf_tower_height_ft'          in row, 'pf_tower_height_ft missing');
+    assert.ok('pf_subtotal_low_usd'         in row, 'pf_subtotal_low_usd missing');
+    assert.ok('pf_contingency_low_usd'      in row, 'pf_contingency_low_usd missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.pf_grand_total_low_usd > 0,                          'pf_grand_total_low_usd must be positive');
+  assert.ok(r0.pf_grand_total_high_usd > r0.pf_grand_total_low_usd, 'high must exceed low in comparison table');
+});

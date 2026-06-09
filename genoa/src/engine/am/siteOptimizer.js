@@ -1534,7 +1534,13 @@ export async function runSiteOptimizer(body = {}){
     fcc_total_fcc_fees:                 c.am_fcc_application_filing_cost_and_timeline_guide?.total_fcc_fees ?? null,
     fcc_total_soft_cost_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.total_soft_cost_low ?? null,
     fcc_processing_days_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.fcc_processing_days_low ?? null,
-    fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null
+    fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null,
+    pf_grand_total_low_usd:             c.am_station_relocation_total_project_cost_proforma?.grand_total_low_usd ?? null,
+    pf_grand_total_high_usd:            c.am_station_relocation_total_project_cost_proforma?.grand_total_high_usd ?? null,
+    pf_grand_total_midpoint_usd:        c.am_station_relocation_total_project_cost_proforma?.grand_total_midpoint_usd ?? null,
+    pf_tower_height_ft:                 c.am_station_relocation_total_project_cost_proforma?.tower_height_ft ?? null,
+    pf_subtotal_low_usd:                c.am_station_relocation_total_project_cost_proforma?.subtotal_low_usd ?? null,
+    pf_contingency_low_usd:             c.am_station_relocation_total_project_cost_proforma?.contingency_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7377,6 +7383,153 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_station_relocation_total_project_cost_proforma: (() => {
+      // AM station relocation total project cost pro forma.
+      //
+      // Aggregates screening-grade cost estimates across all engineering disciplines:
+      //   tower structure, foundation, ground radials, transmission line, transmitter,
+      //   transmitter building + HVAC, tower lighting/painting (ASR), RF/MPE fencing,
+      //   FCC filing fees, soft costs (engineering + legal + NIF), and proof of
+      //   performance.  Includes 15 % (low) / 25 % (high) contingency.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.3500 — CP (Form 301-AM) + license to cover (Form 302-AM)
+      //   §73.3533 — major modification petition
+      //   §17.7 — ASR registration (tower ≥ 60.96 m / 200 ft AGL)
+      //   §1.1307 / OET Bulletin 65 — MPE categorical exclusion threshold (> 1 kW)
+      //   FCC FY2024 fee schedule (47 CFR §1.1102) — $1,015 Form 301-AM; $385 Form 854
+      //
+      // Engineering cost model: ARBE (2023) + FCC ULS filing data; adjusted for
+      //   current steel / copper / labor indices (ENR CCI Q4 2024).
+
+      // ── Tower height (same formula as antenna_height_optimization guide) ──
+      const lambda_pf       = round2(300000 / frequency_khz);        // m
+      const h_frac_pf       = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_m_pf          = round2(h_frac_pf * lambda_pf);
+      const h_ft_pf         = Math.round(h_m_pf * 3.28084);
+      const is_guyed_pf     = h_ft_pf < 400;
+
+      // ── 1. Tower steel + erection ──
+      const lbs_per_ft_pf   = is_guyed_pf ? 110 : 200;
+      const steel_tons_pf   = round2((lbs_per_ft_pf * h_ft_pf) / 2000);
+      const tower_low_pf    = Math.round(steel_tons_pf * 1800);  // $1,800/ton installed (guyed)
+      const tower_high_pf   = Math.round(steel_tons_pf * 2800);
+
+      // ── 2. Foundation (caisson / drilled pier) ──
+      const fnd_low_pf      = Math.round(h_ft_pf * 200);          // $200/ft tower height (proxy)
+      const fnd_high_pf     = Math.round(h_ft_pf * 350);
+
+      // ── 3. Ground radial system (120-radial full system) ──
+      const n_rad_pf        = 120;
+      const rad_len_ft_pf   = Math.round(lambda_pf * 3.28084);    // 1λ radials
+      const total_wire_pf   = n_rad_pf * rad_len_ft_pf;
+      const gnd_low_pf      = Math.round(total_wire_pf * 0.53);   // $0.53/ft wire + burial labor
+      const gnd_high_pf     = Math.round(total_wire_pf * 0.85);
+
+      // ── 4. Transmission line ──
+      const feedrun_m_pf    = h_m_pf + 30;                         // tower height + shack run
+      const feedrun_ft_pf   = Math.round(feedrun_m_pf * 3.28084);
+      const cable_id_pf     = tpo_kw <= 5 ? '7/8"' : '1-5/8"';
+      const cable_cpm_pf    = tpo_kw <= 5 ? 12 : 22;               // $/ft installed
+      const txl_low_pf      = Math.round(feedrun_ft_pf * cable_cpm_pf * 0.85);
+      const txl_high_pf     = Math.round(feedrun_ft_pf * cable_cpm_pf * 1.30);
+
+      // ── 5. Transmitter (solid-state AM) ──
+      const xmtr_cpm_pf     = tpo_kw <= 1 ? 8000 : tpo_kw <= 5 ? 5000 : 3500; // $/kW
+      const xmtr_low_pf     = Math.round(tpo_kw * xmtr_cpm_pf * 0.90);
+      const xmtr_high_pf    = Math.round(tpo_kw * xmtr_cpm_pf * 1.50);
+
+      // ── 6. Transmitter building + HVAC ──
+      const pa_eff_pf       = 0.875;
+      const heat_kw_pf      = round2(tpo_kw * (1 - pa_eff_pf));
+      const hvac_tons_pf    = Math.ceil((heat_kw_pf * 3412) / 12000);
+      const sqft_low_pf     = Math.max(400, Math.round(tpo_kw * 30 + 300));
+      const sqft_high_pf    = sqft_low_pf + 200;
+      const bldg_low_pf     = Math.round(sqft_low_pf * 95  + hvac_tons_pf * 2800);
+      const bldg_high_pf    = Math.round(sqft_high_pf * 150 + hvac_tons_pf * 4200);
+
+      // ── 7. Tower lighting + painting (§17.7 ASR > 200 ft / 60.96 m) ──
+      const asr_req_pf      = h_m_pf > 60.96;
+      const ltg_low_pf      = asr_req_pf ? Math.round(h_ft_pf * 18 + 8500)  : 0;
+      const ltg_high_pf     = asr_req_pf ? Math.round(h_ft_pf * 30 + 15000) : 0;
+
+      // ── 8. RF/MPE safety fence (same formula as mpe_evaluation_guide) ──
+      const r_base_mpe_pf   = round2(36.5 + 400 / Math.pow(120, 0.8));
+      const i_base_pf       = round2(Math.sqrt((tpo_kw * 1000) / r_base_mpe_pf));
+      const r_gp_pf         = round2(60 * i_base_pf / 614);        // GP 614 V/m limit
+      const perim_ft_pf     = round2(2 * Math.PI * r_gp_pf * 3.28084);
+      const fence_needed_pf = (r_gp_pf * 3.28084) > 10;
+      const mpe_low_pf      = fence_needed_pf ? Math.round(perim_ft_pf * 25 + 1500) : 1500;
+      const mpe_high_pf     = fence_needed_pf ? Math.round(perim_ft_pf * 60 + 5000) : 5000;
+
+      // ── 9. FCC filing fees ──
+      const is_da_pf        = /^DA/i.test(pattern_mode);
+      const fcc_fee_cp_pf   = 1015;   // Form 301-AM (FY2024 §1.1102)
+      const fcc_fee_asr_pf  = asr_req_pf ? 385 : 0;  // Form 854
+      const fcc_fees_pf     = fcc_fee_cp_pf + fcc_fee_asr_pf;
+
+      // ── 10. Soft costs (engineering + legal + NIF study) ──
+      const eng_low_pf      = is_da_pf ? 35000 : 18000;
+      const eng_high_pf     = is_da_pf ? 75000 : 45000;
+      const legal_low_pf    = 8000;
+      const legal_high_pf   = 22000;
+      const nif_low_pf      = is_da_pf ? 12000 : 6000;
+      const nif_high_pf     = is_da_pf ? 28000 : 15000;
+      const soft_low_pf     = eng_low_pf  + legal_low_pf  + nif_low_pf;
+      const soft_high_pf    = eng_high_pf + legal_high_pf + nif_high_pf;
+
+      // ── 11. Proof of performance (field measurements + Form 302-AM) ──
+      const pop_low_pf      = is_da_pf ? 13500 : 6000;
+      const pop_high_pf     = is_da_pf ? 32000 : 13000;
+
+      // ── Line-item table ──
+      const line_items_pf = [
+        { category: 'Tower steel + erection',          low: tower_low_pf,  high: tower_high_pf,  notes: `${h_ft_pf} ft ${is_guyed_pf ? 'guyed' : 'self-support'}; ${steel_tons_pf} tons steel` },
+        { category: 'Foundation (caisson/drilled pier)', low: fnd_low_pf,  high: fnd_high_pf,    notes: is_guyed_pf ? 'Anchored caisson + guy anchors' : 'Drilled concrete pier' },
+        { category: 'Ground radial system',             low: gnd_low_pf,   high: gnd_high_pf,    notes: `${n_rad_pf} radials × ${rad_len_ft_pf} ft; #10 Cu wire` },
+        { category: 'Transmission line',                low: txl_low_pf,   high: txl_high_pf,    notes: `${cable_id_pf} hardline, ${feedrun_ft_pf} ft run` },
+        { category: 'Transmitter (solid-state AM)',     low: xmtr_low_pf,  high: xmtr_high_pf,   notes: `${tpo_kw} kW authorized` },
+        { category: 'Transmitter building + HVAC',      low: bldg_low_pf,  high: bldg_high_pf,   notes: `${sqft_low_pf}–${sqft_high_pf} sqft; ${hvac_tons_pf}-ton HVAC` },
+        { category: 'Tower lighting + painting',        low: ltg_low_pf,   high: ltg_high_pf,    notes: asr_req_pf ? `FAA marking required (${h_ft_pf} ft > 200 ft threshold)` : `No ASR required (${h_ft_pf} ft ≤ 200 ft)` },
+        { category: 'RF/MPE safety fence + study',      low: mpe_low_pf,   high: mpe_high_pf,    notes: `GP exclusion r≈${r_gp_pf} m; ${fence_needed_pf ? `${Math.round(perim_ft_pf)} ft perimeter` : 'fence may not be required'}` },
+        { category: 'FCC filing fees',                  low: fcc_fees_pf,  high: fcc_fees_pf,    notes: `Form 301-AM $1,015${asr_req_pf ? ' + Form 854 $385' : ''}` },
+        { category: 'Soft costs (engineering + legal + NIF)', low: soft_low_pf, high: soft_high_pf, notes: `${is_da_pf ? 'DA' : 'NDA'} pathway; includes FCC counsel` },
+        { category: 'Proof of performance (Form 302-AM)', low: pop_low_pf, high: pop_high_pf,    notes: `${is_da_pf ? '72-radial DA field survey' : '8-radial NDA inverse-distance traversal'}` }
+      ];
+
+      const subtotal_low_pf  = line_items_pf.reduce((s, l) => s + l.low,  0);
+      const subtotal_high_pf = line_items_pf.reduce((s, l) => s + l.high, 0);
+      const cont_low_pf      = Math.round(subtotal_low_pf  * 0.15);
+      const cont_high_pf     = Math.round(subtotal_high_pf * 0.25);
+      const total_low_pf     = subtotal_low_pf  + cont_low_pf;
+      const total_high_pf    = subtotal_high_pf + cont_high_pf;
+      const midpoint_pf      = Math.round((total_low_pf + total_high_pf) / 2);
+
+      return {
+        fcc_class,
+        frequency_khz,
+        pattern_mode,
+        tower_height_ft:              h_ft_pf,
+        tower_height_m:               h_m_pf,
+        tpo_kw,
+        is_guyed:                     is_guyed_pf,
+        asr_required:                 asr_req_pf,
+        is_da:                        is_da_pf,
+        line_items:                   line_items_pf,
+        subtotal_low_usd:             subtotal_low_pf,
+        subtotal_high_usd:            subtotal_high_pf,
+        contingency_pct_low:          15,
+        contingency_pct_high:         25,
+        contingency_low_usd:          cont_low_pf,
+        contingency_high_usd:         cont_high_pf,
+        grand_total_low_usd:          total_low_pf,
+        grand_total_high_usd:         total_high_pf,
+        grand_total_midpoint_usd:     midpoint_pf,
+        reference: '47 CFR §73.3500; §73.3533; §73.3561; §17.7; §1.1307; §1.1310; OET Bulletin 65 Ed. 97-01; FCC FY2024 fee schedule (§1.1102); ARBE cost model (2023); ENR CCI Q4 2024',
+        note: `SCREENING-GRADE pro forma. Total project cost estimate: $${(total_low_pf/1000).toFixed(0)}K–$${(total_high_pf/1000).toFixed(0)}K (midpoint ~$${(midpoint_pf/1000).toFixed(0)}K) including 15–25% contingency. Class ${fcc_class} ${frequency_khz} kHz, ${tpo_kw} kW ${is_da_pf ? 'DA' : 'NDA'}, ${h_ft_pf} ft tower. Engage a licensed broadcast engineer and FCC counsel before committing capital.`
       };
     })(),
 
