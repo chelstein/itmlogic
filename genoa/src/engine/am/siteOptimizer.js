@@ -24869,17 +24869,7 @@ async function scoreCandidate(pt, ctx, warnings){
       const isDA_ah = /^DA/i.test(pattern_mode);
 
       // FCC §73.150(b): proof of performance electrical height verification
-      const proofMethod = {
-        method: 'FCC §73.154 antenna proof of performance',
-        required_measurements: [
-          'Base current ratio (measured vs. authorized)',
-          'Operating power (calculated from base current and resistance)',
-          isDA_ah ? 'Phase and amplitude at each tower (DA monitoring points)' : 'Non-directional field strength at 1 km',
-          'Vertical radiation pattern (spot radials at 10° increments per §73.150)'
-        ],
-        filing_form: 'FCC Form 302-AM (after CP; within 6 months of license grant)',
-        tolerance: '±5% base current; ±3° phase (if DA)'
-      };
+      const proofMethod = `FCC §73.154 antenna proof of performance — ${isDA_ah ? 'DA: ±3° phase, ±5% base current; phase/amplitude at each tower' : 'NDA: ±5% base current; field strength at 1 km'} — Form 302-AM within 6 months of CP grant`;
 
       return {
         fcc_class,
