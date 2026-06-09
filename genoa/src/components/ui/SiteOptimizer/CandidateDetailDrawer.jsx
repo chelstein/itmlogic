@@ -9787,7 +9787,15 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
               </div>
               {a.proof_of_performance && (
                 <div style={{ background: '#0c1a1a', borderRadius: 4, padding: '6px 8px', fontSize: 11, marginBottom: 6 }}>
-                  <span style={{ color: '#9ca3af' }}>Proof method:</span> <span style={{ color: '#d1d5db' }}>{a.proof_of_performance}</span>
+                  <span style={{ color: '#9ca3af' }}>Proof method:</span>{' '}
+                  <span style={{ color: '#d1d5db' }}>
+                    {typeof a.proof_of_performance === 'string'
+                      ? a.proof_of_performance
+                      : a.proof_of_performance.method}
+                  </span>
+                  {typeof a.proof_of_performance === 'object' && a.proof_of_performance.tolerance && (
+                    <span style={{ color: '#6b7280', marginLeft: 8 }}>tolerance: {a.proof_of_performance.tolerance}</span>
+                  )}
                 </div>
               )}
               {a.note && <div style={{ color: '#6b7280', fontSize: 10, fontStyle: 'italic', marginBottom: 4 }}>{a.note}</div>}
