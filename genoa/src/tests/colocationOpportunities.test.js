@@ -4001,3 +4001,14 @@ test('am_tower_structural_load_analysis_guide present across colocation candidat
     assert.ok(g.total_structural_low_usd > 0, 'total_structural_low_usd must be positive');
   }
 });
+
+test('am_transmitter_building_and_hvac_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_building_and_hvac_guide;
+    assert.ok(g !== undefined && g !== null, `candidate missing am_transmitter_building_and_hvac_guide`);
+    assert.ok(g.hvac_tons_specified >= 0.5, 'hvac_tons_specified must be >= 0.5 ton');
+    assert.ok(g.total_heat_kw > 0, 'total_heat_kw must be positive');
+    assert.ok(g.total_building_low_usd > 0, 'total_building_low_usd must be positive');
+  }
+});

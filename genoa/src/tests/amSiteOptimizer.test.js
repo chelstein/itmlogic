@@ -16034,3 +16034,52 @@ test('candidate_comparison_table str columns present and valid for KAZM', async 
   assert.strictEqual(r0.str_is_guyed, true, 'str_is_guyed must be true for 315 ft tower');
   assert.ok(r0.str_total_structural_low_usd > 20000, 'structural cost must be > $20K');
 });
+
+// ── Feature #84: am_transmitter_building_and_hvac_guide ──────────────────────
+test('KAZM 780 kHz: am_transmitter_building_and_hvac_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_transmitter_building_and_hvac_guide, 'hvac guide missing on candidate');
+  }
+});
+
+test('KAZM 5 kW: solid-state heat dissipation and HVAC tonnage physically reasonable', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_hvac_guide;
+  assert.strictEqual(g.tpo_kw, 5, 'tpo_kw must equal input (5 kW)');
+  assert.ok(g.p_heat_solid_state_kw > 0 && g.p_heat_solid_state_kw < 5,
+    `p_heat_solid_state_kw should be < TPO, got ${g.p_heat_solid_state_kw}`);
+  assert.ok(g.p_heat_tube_kw > g.p_heat_solid_state_kw,
+    'tube heat must exceed solid-state heat (lower efficiency)');
+  assert.ok(g.hvac_tons_specified >= 0.5, 'at least 0.5-ton HVAC specified');
+  assert.ok(g.hvac_tons_specified >= g.hvac_tons_required, 'specified must be >= required');
+});
+
+test('KAZM 5 kW: eta_solid_state_pct is 87.5%', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_hvac_guide;
+  assert.strictEqual(g.eta_solid_state_pct, 87.5, 'solid-state efficiency must be 87.5%');
+  assert.ok(g.eta_tube_pct < g.eta_solid_state_pct, 'tube efficiency must be less than solid-state');
+});
+
+test('KAZM 5 kW: building cost and total ordered correctly', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_building_and_hvac_guide;
+  assert.ok(g.total_building_low_usd > 0, 'total_building_low_usd must be > 0');
+  assert.ok(g.total_building_high_usd >= g.total_building_low_usd, 'high >= low');
+  assert.ok(g.building_sqft_low >= 400, '5 kW building must be >= 400 sqft');
+  assert.ok(g.building_sqft_high <= 600, '5 kW building must be <= 600 sqft');
+});
+
+test('candidate_comparison_table bld columns present and valid for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bld_hvac_tons_specified'    in row, 'bld_hvac_tons_specified missing');
+    assert.ok('bld_total_heat_kw'          in row, 'bld_total_heat_kw missing');
+    assert.ok('bld_building_sqft_low'      in row, 'bld_building_sqft_low missing');
+    assert.ok('bld_total_building_low_usd' in row, 'bld_total_building_low_usd missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.bld_hvac_tons_specified >= 0.5, 'bld_hvac_tons_specified must be >= 0.5');
+  assert.ok(r0.bld_total_building_low_usd > 0, 'bld_total_building_low_usd must be positive');
+});

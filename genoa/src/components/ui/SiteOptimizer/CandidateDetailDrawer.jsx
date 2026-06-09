@@ -2356,6 +2356,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Building and HVAC Guide */}
+        {candidate.am_transmitter_building_and_hvac_guide && (() => {
+          const g = candidate.am_transmitter_building_and_hvac_guide;
+          const fmt = (n) => n != null ? Number(n).toLocaleString() : '—';
+          const fmtF = (n, d=2) => n != null ? Number(n).toFixed(d) : '—';
+          return (
+            <div style={{ background: '#ecfdf5', border: '1px solid #6ee7b7', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#065f46', marginBottom: 8 }}>
+                Transmitter Building &amp; HVAC (NFPA 70 / NFPA 110)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 18px', fontSize: 12, color: '#064e3b' }}>
+                <div><b>TPO:</b> {g.tpo_kw} kW</div>
+                <div><b>Solid-state efficiency:</b> {g.eta_solid_state_pct}%</div>
+                <div><b>Heat dissipated (SS):</b> {fmtF(g.p_heat_solid_state_kw)} kW</div>
+                <div><b>Aux heat (lighting/ctrl):</b> {g.aux_heat_kw} kW</div>
+                <div><b>Total heat load:</b> {fmtF(g.total_heat_kw)} kW</div>
+                <div><b>HVAC required:</b> {fmtF(g.hvac_tons_required, 2)} ton → <b>{g.hvac_tons_specified} ton specified</b></div>
+                <div><b>Building size:</b> {g.building_sqft_low}–{g.building_sqft_high} sq ft</div>
+                <div><b>HVAC cost:</b> ${fmt(g.hvac_cost_low)}–${fmt(g.hvac_cost_high)}</div>
+                <div><b>Building shell:</b> ${fmt(g.building_cost_low)}–${fmt(g.building_cost_high)}</div>
+                <div><b>Security + panel:</b> ${fmt(g.security_cost_low + g.panel_cost_low)}–${fmt(g.security_cost_high + g.panel_cost_high)}</div>
+                <div style={{ gridColumn: '1/-1' }}><b>Total building:</b> ${fmt(g.total_building_low_usd)}–${fmt(g.total_building_high_usd)}</div>
+              </div>
+              <div style={{ marginTop: 6, fontSize: 10, color: '#047857' }}>{g.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Structural Load Analysis Guide */}
         {candidate.am_tower_structural_load_analysis_guide && (() => {
           const g = candidate.am_tower_structural_load_analysis_guide;

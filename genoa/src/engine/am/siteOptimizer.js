@@ -1526,7 +1526,11 @@ export async function runSiteOptimizer(body = {}){
     str_tower_height_ft:                c.am_tower_structural_load_analysis_guide?.tower_height_ft ?? null,
     str_is_guyed:                       c.am_tower_structural_load_analysis_guide?.is_guyed ?? null,
     str_total_wind_load_lbf:            c.am_tower_structural_load_analysis_guide?.total_wind_load_lbf ?? null,
-    str_total_structural_low_usd:       c.am_tower_structural_load_analysis_guide?.total_structural_low_usd ?? null
+    str_total_structural_low_usd:       c.am_tower_structural_load_analysis_guide?.total_structural_low_usd ?? null,
+    bld_hvac_tons_specified:            c.am_transmitter_building_and_hvac_guide?.hvac_tons_specified ?? null,
+    bld_total_heat_kw:                  c.am_transmitter_building_and_hvac_guide?.total_heat_kw ?? null,
+    bld_building_sqft_low:              c.am_transmitter_building_and_hvac_guide?.building_sqft_low ?? null,
+    bld_total_building_low_usd:         c.am_transmitter_building_and_hvac_guide?.total_building_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7369,6 +7373,103 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_transmitter_building_and_hvac_guide: (() => {
+      // AM transmitter building and HVAC / thermal management guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.49: AM antenna towers must be enclosed with locked fence if
+      //     accessible to the public.  By extension the transmitter building must
+      //     comply with local building codes and be secure.
+      //   §73.1350(c): Transmitter must be capable of reducing power or shutting
+      //     down from the operating position; building must provide safe access.
+      //   NFPA 70 (NEC): All electrical work must comply with the National Electrical
+      //     Code, including panel sizing, grounding, and wiring methods.
+      //   NFPA 110: Emergency generator (if installed) must meet NFPA 110 Level 1
+      //     or Level 2 depending on station classification.
+      //
+      // Thermal model:
+      //   Solid-state AM transmitters (2010+): efficiency η ≈ 85–90%
+      //     Heat dissipated P_heat = P_out × (1/η − 1)
+      //     At η=87.5% average: P_heat ≈ P_out × 0.143
+      //   Tube transmitters (legacy): η ≈ 60–70%
+      //     P_heat_tube ≈ P_out × (1/0.65 − 1) = P_out × 0.538
+      //   Total building heat load = P_heat + auxiliary (lighting, chargers, computers)
+      //     Auxiliary ≈ 1.5 kW (small building)
+      //   HVAC tonnage: 1 ton = 3.517 kW of cooling
+      //     Tons required = total_heat_kw / 3.517 × 1.25 safety factor
+      //   Building size: transmitter + control room + EAS + bathroom
+      //     Small (≤ 5 kW): ~400–600 sq ft; Medium (5–50 kW): ~600–1000 sq ft
+      //
+      // Cost model (2023, stick-built or pre-engineered metal building):
+      //   Building shell: $80–$150 / sq ft installed (incl. slab, electrical rough-in)
+      //   HVAC (mini-split or split system): $3,000–$8,000 / ton installed
+      //   Security: camera, keypad, alarm: $2,000–$6,000
+      //   Utility panel (200A minimum): $3,000–$8,000
+
+      const p_kw           = tpo_kw;
+      const eta_solid_state = 0.875;   // 87.5% average solid-state AM efficiency
+      const eta_tube        = 0.65;    // 65% legacy tube transmitter
+
+      // Heat dissipation
+      const p_heat_ss_kw    = round2(p_kw * (1 / eta_solid_state - 1));
+      const p_heat_tube_kw  = round2(p_kw * (1 / eta_tube - 1));
+      const aux_kw          = 1.5;
+      const total_heat_ss_kw   = round2(p_heat_ss_kw   + aux_kw);
+      const total_heat_tube_kw = round2(p_heat_tube_kw + aux_kw);
+
+      // HVAC sizing (1.25 safety factor)
+      const tons_ss   = round2(total_heat_ss_kw   / 3.517 * 1.25);
+      const tons_tube = round2(total_heat_tube_kw / 3.517 * 1.25);
+      const tons_required = tons_ss;  // assume solid-state (modern standard)
+
+      // Recommended HVAC unit size (round up to next half-ton)
+      const tons_specified = round2(Math.ceil(tons_required * 2) / 2);
+
+      // Building size
+      const sqft_low  = p_kw <= 5 ? 400 : p_kw <= 25 ? 600 : 800;
+      const sqft_high = p_kw <= 5 ? 600 : p_kw <= 25 ? 1000 : 1400;
+
+      // Costs
+      const building_low  = Math.round(sqft_low  * 80);
+      const building_high = Math.round(sqft_high * 150);
+      const hvac_low      = Math.round(tons_specified * 3000);
+      const hvac_high     = Math.round(tons_specified * 8000);
+      const security_low  = 2000;
+      const security_high = 6000;
+      const panel_low     = 3000;
+      const panel_high    = 8000;
+
+      const total_low  = building_low  + hvac_low  + security_low  + panel_low;
+      const total_high = building_high + hvac_high + security_high + panel_high;
+
+      return {
+        tpo_kw:                  p_kw,
+        eta_solid_state_pct:     round2(eta_solid_state * 100),
+        eta_tube_pct:            round2(eta_tube * 100),
+        p_heat_solid_state_kw:   p_heat_ss_kw,
+        p_heat_tube_kw,
+        aux_heat_kw:             aux_kw,
+        total_heat_kw:           total_heat_ss_kw,
+        total_heat_tube_kw,
+        hvac_tons_required:      tons_required,
+        hvac_tons_specified:     tons_specified,
+        building_sqft_low:       sqft_low,
+        building_sqft_high:      sqft_high,
+        building_cost_low:       building_low,
+        building_cost_high:      building_high,
+        hvac_cost_low:           hvac_low,
+        hvac_cost_high:          hvac_high,
+        security_cost_low:       security_low,
+        security_cost_high:      security_high,
+        panel_cost_low:          panel_low,
+        panel_cost_high:         panel_high,
+        total_building_low_usd:  total_low,
+        total_building_high_usd: total_high,
+        reference: '47 CFR §73.49 (tower/building security); §73.1350(c) (transmitter control); NFPA 70 (NEC electrical); NFPA 110 (emergency power); ASHRAE fundamentals (HVAC sizing)',
+        note: `TPO ${p_kw} kW solid-state: P_heat=${p_heat_ss_kw} kW + ${aux_kw} kW aux = ${total_heat_ss_kw} kW total → ${tons_specified} ton HVAC. Building ${sqft_low}–${sqft_high} sq ft. Total: $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),
 
