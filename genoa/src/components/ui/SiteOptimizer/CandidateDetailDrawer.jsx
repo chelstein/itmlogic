@@ -2356,6 +2356,82 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM RF Exposure (MPE) Evaluation Guide */}
+        {candidate.am_rf_exposure_mpe_guide && (() => {
+          const mpe = candidate.am_rf_exposure_mpe_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const evalColor = { CE: '#16a34a', ANALYTIC_NDA: '#0ea5e9', ANALYTIC_FULL: '#d97706', SITE_STUDY: '#dc2626' }[mpe.eval_type] ?? '#6b7280';
+          const statusColor = (s) => ({ REQUIRED: '#fbbf24', INFO: '#60a5fa', CE: '#4ade80' }[s] ?? '#9ca3af');
+          return (
+            <div style={{ background: '#0a0f14', border: '1px solid #1e3a5f', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#38bdf8', marginBottom: 10 }}>
+                §1.1310 RF Exposure (MPE) — {mpe.frequency_khz} kHz @ {mpe.erp_kw} kW
+              </div>
+              {/* Required / CE badge */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: (mpe.mpe_required ? '#dc2626' : '#16a34a') + '33', color: mpe.mpe_required ? '#fca5a5' : '#86efac', borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {mpe.mpe_required ? 'MPE EVALUATION REQUIRED' : 'CATEGORICALLY EXCLUDED (CE)'}
+                </span>
+                <span style={{ background: evalColor + '22', color: evalColor, borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {mpe.eval_type}
+                </span>
+              </div>
+              {/* Metric grid */}
+              {mpe.mpe_required && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 10 }}>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: '#6b7280' }}>Uncontrolled distance</div>
+                    <div style={{ color: '#bae6fd', fontWeight: 600 }}>{mpe.safe_distance_unctrl_m} m ({mpe.safe_distance_unctrl_ft} ft)</div>
+                  </div>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: '#6b7280' }}>Reactive near-field</div>
+                    <div style={{ color: '#bae6fd', fontWeight: 600 }}>{mpe.near_field_m} m ({mpe.near_field_ft} ft)</div>
+                  </div>
+                  <div style={{ background: '#061020', borderRadius: 4, padding: '6px 8px', fontSize: 11 }}>
+                    <div style={{ color: '#6b7280' }}>Eval cost</div>
+                    <div style={{ color: '#bae6fd', fontWeight: 600 }}>{fmtUsd(mpe.eval_cost_low_usd)} – {fmtUsd(mpe.eval_cost_high_usd)}</div>
+                  </div>
+                </div>
+              )}
+              {/* MPE limits row */}
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 10, flex: 1 }}>
+                  <span style={{ color: '#6b7280' }}>Controlled limit: </span>
+                  <span style={{ color: '#7dd3fc' }}>{mpe.e_limit_controlled_vm} V/m</span>
+                </div>
+                <div style={{ background: '#061020', borderRadius: 4, padding: '5px 8px', fontSize: 10, flex: 1 }}>
+                  <span style={{ color: '#6b7280' }}>Uncontrolled limit: </span>
+                  <span style={{ color: '#7dd3fc' }}>{mpe.e_limit_uncontrolled_vm} V/m</span>
+                </div>
+              </div>
+              {/* Fencing note */}
+              {mpe.fencing_note && (
+                <div style={{ background: mpe.fencing_required ? '#431407' : '#052e16', border: `1px solid ${mpe.fencing_required ? '#9a3412' : '#166534'}`, borderRadius: 4, padding: '5px 10px', fontSize: 11, marginBottom: 8, color: mpe.fencing_required ? '#fed7aa' : '#bbf7d0' }}>
+                  {mpe.fencing_note}
+                </div>
+              )}
+              {/* Checklist */}
+              {mpe.checklist && mpe.checklist.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#0284c7', fontWeight: 600, marginBottom: 4 }}>MPE Compliance Checklist</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {mpe.checklist.map((row, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #1e3a5f' }}>
+                          <td style={{ padding: '3px 4px', color: statusColor(row.status), width: 56, fontWeight: 600 }}>{row.status}</td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{row.item}</td>
+                          <td style={{ padding: '3px 4px', color: '#38bdf8', textAlign: 'right', whiteSpace: 'nowrap' }}>{row.ref}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {mpe.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{mpe.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM Ground System Design Guide */}
         {candidate.am_ground_system_design_guide && (() => {
           const gs = candidate.am_ground_system_design_guide;

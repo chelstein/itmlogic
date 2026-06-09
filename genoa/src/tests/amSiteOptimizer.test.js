@@ -16445,3 +16445,49 @@ test('#92 candidate_comparison_table has gs_* columns', async () => {
   const r0 = out.candidate_comparison_table[0];
   assert.ok(r0.gs_quarter_wave_ft > 0, 'gs_quarter_wave_ft must be positive');
 });
+
+// ---- Feature #93: am_rf_exposure_mpe_guide ----
+
+test('#93 KAZM 5 kW: am_rf_exposure_mpe_guide mpe_required=true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
+  assert.ok(mpe != null, 'am_rf_exposure_mpe_guide must be present');
+  assert.strictEqual(mpe.mpe_required, true, '5 kW must require MPE evaluation');
+  assert.ok(mpe.safe_distance_unctrl_m > 0, 'safe_distance_unctrl_m must be positive');
+});
+
+test('#93 KAZM < 5 kW: mpe_required=false, eval_type=CE', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 4, candidate_limit: 1 });
+  const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
+  assert.strictEqual(mpe.mpe_required, false, '4 kW must be CE');
+  assert.strictEqual(mpe.eval_type, 'CE', 'eval_type must be CE for < 5 kW');
+});
+
+test('#93 MPE limits follow OET Bulletin 65 formula at 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
+  // Controlled: 1842 / 0.780 = 2361.5 V/m
+  assert.ok(Math.abs(mpe.e_limit_controlled_vm - 1842 / 0.780) < 5,
+    `e_limit_controlled_vm should be ~2362, got ${mpe.e_limit_controlled_vm}`);
+  // Uncontrolled = controlled / sqrt(2)
+  assert.ok(Math.abs(mpe.e_limit_uncontrolled_vm - mpe.e_limit_controlled_vm / Math.SQRT2) < 5,
+    'e_limit_uncontrolled_vm should be controlled / sqrt(2)');
+});
+
+test('#93 near-field radius ≈ λ/(2π) at 780 kHz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const mpe = out.candidates[0].am_rf_exposure_mpe_guide;
+  const expected = (3e8 / (780e3)) / (2 * Math.PI);  // ~61.2 m
+  assert.ok(Math.abs(mpe.near_field_m - expected) < 2,
+    `near_field_m should be ~${expected.toFixed(1)}, got ${mpe.near_field_m}`);
+});
+
+test('#93 candidate_comparison_table has mpe_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mpe_required'           in row, 'mpe_required missing');
+    assert.ok('mpe_eval_type'          in row, 'mpe_eval_type missing');
+    assert.ok('mpe_safe_dist_unctrl_m' in row, 'mpe_safe_dist_unctrl_m missing');
+    assert.ok('mpe_near_field_m'       in row, 'mpe_near_field_m missing');
+  }
+});

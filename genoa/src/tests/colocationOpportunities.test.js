@@ -4099,3 +4099,13 @@ test('am_ground_system_design_guide present across colocation candidates', async
     assert.ok(gs.ground_cost_low_usd > 0, 'ground_cost_low_usd must be positive');
   }
 });
+
+test('am_rf_exposure_mpe_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ tpo_kw: 5, candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const mpe = c.am_rf_exposure_mpe_guide;
+    assert.ok(mpe !== undefined && mpe !== null, 'candidate missing am_rf_exposure_mpe_guide');
+    assert.ok(typeof mpe.mpe_required === 'boolean', 'mpe_required must be boolean');
+    assert.ok(mpe.e_limit_controlled_vm > 0, 'e_limit_controlled_vm must be positive');
+  }
+});

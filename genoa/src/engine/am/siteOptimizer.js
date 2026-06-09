@@ -1570,7 +1570,13 @@ export async function runSiteOptimizer(body = {}){
     gs_total_wire_ft:                   c.am_ground_system_design_guide?.total_wire_ft ?? null,
     gs_ground_cost_low_usd:             c.am_ground_system_design_guide?.ground_cost_low_usd ?? null,
     gs_ground_cost_high_usd:            c.am_ground_system_design_guide?.ground_cost_high_usd ?? null,
-    gs_sigma_mS_m:                      c.am_ground_system_design_guide?.sigma_mS_m ?? null
+    gs_sigma_mS_m:                      c.am_ground_system_design_guide?.sigma_mS_m ?? null,
+    mpe_required:                       c.am_rf_exposure_mpe_guide?.mpe_required ?? null,
+    mpe_eval_type:                      c.am_rf_exposure_mpe_guide?.eval_type ?? null,
+    mpe_safe_dist_unctrl_m:             c.am_rf_exposure_mpe_guide?.safe_distance_unctrl_m ?? null,
+    mpe_fencing_required:               c.am_rf_exposure_mpe_guide?.fencing_required ?? null,
+    mpe_eval_cost_low_usd:              c.am_rf_exposure_mpe_guide?.eval_cost_low_usd ?? null,
+    mpe_near_field_m:                   c.am_rf_exposure_mpe_guide?.near_field_m ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7413,6 +7419,132 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_rf_exposure_mpe_guide: (() => {
+      // AM RF Exposure (MPE) Evaluation Guide.
+      //
+      // §1.1310 requires a Maximum Permissible Exposure (MPE) evaluation for
+      // any AM broadcast station with ERP ≥ 5 kW (daytime TPO is used as ERP
+      // for AM; AM antennas typically have near-unity gain relative to isotropic).
+      //
+      // OET Bulletin 65 (1997 ed.) provides the methodology:
+      //   - Controlled (occupational) MPE limit: 614 V/m (630–3000 kHz)
+      //   - Uncontrolled (general population) MPE limit: 614 / sqrt(2) = 274 V/m
+      //     (frequency-dependent formula for 0.3–3 MHz: 1842/f(MHz) V/m)
+      //   - Near-field evaluation radius: the reactive near-field extends to ~λ/2π
+      //   - Far-field safe distance (fenced zone): d = (sqrt(30 × P_kw × G) / E_limit) × 1000 m
+      //     simplified for AM (G ≈ 1.64 isotropic): d_unc_m = sqrt(49200 × P_kw) / 274
+      //
+      // FCC rule: ERP ≥ 5 kW daytime → formal RF exposure evaluation and
+      // submittal with FCC Form 301-AM as an engineering exhibit.
+      // Stations < 5 kW are categorically excluded (CE) under §1.1306.
+      //
+      // Key outputs:
+      //   - Whether MPE evaluation is required (ERP ≥ 5 kW threshold)
+      //   - Estimated controlled and uncontrolled fenced distances
+      //   - Evaluation type: near-field prediction, far-field analytic, full site study
+      //   - Consultant cost and timeline estimates
+
+      const freq_mhz     = frequency_khz / 1000;        // e.g., 0.780 MHz for 780 kHz
+      const erp_kw       = tpo_kw;                      // AM ERP ≈ TPO (near-unity gain)
+
+      // §1.1306 categorical exclusion threshold: 5 kW ERP for general population
+      const mpe_required = erp_kw >= 5;
+
+      // OET Bulletin 65 MPE limits for 300 kHz – 3 MHz
+      // Controlled (occupational): 1842/f(MHz) V/m → at 0.3–3 MHz typically 614–6140 V/m
+      // Uncontrolled (general pop): same formula ÷ sqrt(2) for this band
+      const e_limit_ctrl_vm   = round2(1842 / freq_mhz);
+      const e_limit_unctrl_vm = round2(e_limit_ctrl_vm / Math.SQRT2);
+
+      // Safe-distance calculation (OET Bulletin 65 far-field formula):
+      //   d (m) = sqrt(30 × P_eff_W × G_isotropic) / E_limit
+      //   G_isotropic for AM monopole ≈ 1.5 (half-wave dipole equivalent)
+      const G_iso      = 1.5;
+      const P_eff_W    = erp_kw * 1000;
+      const d_ctrl_m   = mpe_required ? round2(Math.sqrt(30 * P_eff_W * G_iso) / e_limit_ctrl_vm) : null;
+      const d_unctrl_m = mpe_required ? round2(Math.sqrt(30 * P_eff_W * G_iso) / e_limit_unctrl_vm) : null;
+
+      const d_ctrl_ft   = d_ctrl_m   ? Math.round(d_ctrl_m   * 3.28084) : null;
+      const d_unctrl_ft = d_unctrl_m ? Math.round(d_unctrl_m * 3.28084) : null;
+
+      // Reactive near-field boundary: λ / (2π)
+      const lambda_m_mpe  = 3e8 / (frequency_khz * 1e3);   // full wavelength in meters
+      const near_field_m  = round2(lambda_m_mpe / (2 * Math.PI));
+      const near_field_ft = Math.round(near_field_m * 3.28084);
+
+      // Evaluation type
+      let eval_type, eval_weeks_low, eval_weeks_high, eval_cost_low_usd, eval_cost_high_usd;
+      const isDA_mpe = /^DA/i.test(pattern_mode);
+
+      if (!mpe_required) {
+        eval_type = 'CE';   // Categorically Excluded
+        eval_weeks_low = 0; eval_weeks_high = 0;
+        eval_cost_low_usd = 0; eval_cost_high_usd = 500;  // documentation only
+      } else if (erp_kw < 20 && !isDA_mpe) {
+        eval_type = 'ANALYTIC_NDA';
+        eval_weeks_low = 1; eval_weeks_high = 3;
+        eval_cost_low_usd = 500; eval_cost_high_usd = 2000;
+      } else if (erp_kw < 50 || !isDA_mpe) {
+        eval_type = 'ANALYTIC_FULL';
+        eval_weeks_low = 2; eval_weeks_high = 6;
+        eval_cost_low_usd = 1500; eval_cost_high_usd = 5000;
+      } else {
+        eval_type = 'SITE_STUDY';  // Large ERP or complex DA — requires field measurements
+        eval_weeks_low = 4; eval_weeks_high = 12;
+        eval_cost_low_usd = 4000; eval_cost_high_usd = 15000;
+      }
+
+      // Fencing requirement: uncontrolled boundary must be fenced or signed
+      const fencing_required = mpe_required && d_unctrl_m != null && d_unctrl_m > 0;
+      const fencing_note = fencing_required
+        ? `Uncontrolled boundary (${d_unctrl_m} m / ${d_unctrl_ft} ft) must be fenced or posted with RF warning signs per OET Bulletin 65.`
+        : 'No fencing required — station is categorically excluded from MPE evaluation.';
+
+      // Form 301-AM exhibit: required when mpe_required
+      const form_exhibit_required = mpe_required;
+
+      // Key checklist
+      const checklist = [
+        { item: `ERP threshold check (≥ 5 kW → evaluation required)`, status: mpe_required ? 'REQUIRED' : 'CE', ref: '§1.1306; §1.1310' },
+        { item: `Controlled MPE limit: ${e_limit_ctrl_vm} V/m (at ${frequency_khz} kHz)`, status: 'INFO', ref: 'OET Bulletin 65' },
+        { item: `Uncontrolled MPE limit: ${e_limit_unctrl_vm} V/m (at ${frequency_khz} kHz)`, status: 'INFO', ref: 'OET Bulletin 65' },
+        { item: mpe_required ? `Uncontrolled safe distance: ${d_unctrl_m} m (${d_unctrl_ft} ft)` : 'CE — no safe distance calc required', status: mpe_required ? 'REQUIRED' : 'CE', ref: 'OET Bulletin 65' },
+        { item: `Near-field boundary: ${near_field_m} m (${near_field_ft} ft) — reactive near-field`, status: 'INFO', ref: 'OET Bulletin 65 §4' },
+        { item: `Evaluation type: ${eval_type} (${eval_weeks_low}–${eval_weeks_high} weeks)`, status: mpe_required ? 'REQUIRED' : 'CE', ref: '§1.1310; OET Bulletin 65' },
+        { item: form_exhibit_required ? 'RF exposure exhibit required in Form 301-AM filing' : 'No RF exhibit required (CE)', status: form_exhibit_required ? 'REQUIRED' : 'CE', ref: '§1.1310; FCC Form 301-AM instructions' },
+        { item: fencing_required ? `Fencing/signage required at ${d_unctrl_m} m radius` : 'No fencing required', status: fencing_required ? 'REQUIRED' : 'CE', ref: 'OET Bulletin 65' }
+      ];
+
+      return {
+        frequency_khz,
+        frequency_mhz:          freq_mhz,
+        fcc_class,
+        erp_kw,
+        mpe_required,
+        eval_type,
+        e_limit_controlled_vm:  e_limit_ctrl_vm,
+        e_limit_uncontrolled_vm: e_limit_unctrl_vm,
+        safe_distance_ctrl_m:   d_ctrl_m,
+        safe_distance_ctrl_ft:  d_ctrl_ft,
+        safe_distance_unctrl_m: d_unctrl_m,
+        safe_distance_unctrl_ft: d_unctrl_ft,
+        near_field_m,
+        near_field_ft,
+        fencing_required,
+        fencing_note,
+        form_exhibit_required,
+        eval_weeks_low,
+        eval_weeks_high,
+        eval_cost_low_usd,
+        eval_cost_high_usd,
+        checklist,
+        reference: '47 CFR §1.1310 (MPE); §1.1306 (categorical exclusion); OET Bulletin 65 (1997, ed. 97-01); FCC Form 301-AM instructions',
+        note: mpe_required
+          ? `Class ${fcc_class} @ ${erp_kw} kW — MPE evaluation required. Uncontrolled boundary: ${d_unctrl_m} m. Eval type: ${eval_type}. Cost: $${eval_cost_low_usd.toLocaleString()}–$${eval_cost_high_usd.toLocaleString()}.`
+          : `Class ${fcc_class} @ ${erp_kw} kW — Categorically Excluded (< 5 kW ERP threshold). No formal MPE evaluation required.`
       };
     })(),
 
