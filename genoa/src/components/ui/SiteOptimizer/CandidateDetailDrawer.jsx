@@ -2356,6 +2356,69 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM CP Validity and Tolling Guide */}
+        {candidate.am_cp_validity_and_tolling_guide && (() => {
+          const cp = candidate.am_cp_validity_and_tolling_guide;
+          const riskColor = { HIGH: '#dc2626', MODERATE: '#d97706', LOW: '#16a34a' }[cp.complexity_risk] ?? '#6b7280';
+          const activeToggles = cp.tolling_triggers?.filter(t => t.applies) ?? [];
+          return (
+            <div style={{ background: '#0f0a1a', border: '1px solid #4c1d95', borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c084fc', marginBottom: 10 }}>
+                §73.3598 CP Validity & Tolling — Class {cp.fcc_class}
+              </div>
+              {/* Risk badge + key terms */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
+                <span style={{ background: riskColor + '22', color: riskColor, borderRadius: 4, padding: '2px 7px', fontSize: 11, fontWeight: 600 }}>
+                  {cp.complexity_risk} timeline risk
+                </span>
+                <span style={{ background: '#2e1065', color: '#ddd6fe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {cp.cp_term_years}-year CP term
+                </span>
+                <span style={{ background: '#2e1065', color: '#ddd6fe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  {cp.extension_days}-day extension available
+                </span>
+                <span style={{ background: '#2e1065', color: '#ddd6fe', borderRadius: 4, padding: '2px 7px', fontSize: 11 }}>
+                  LtC due month {cp.ltc_deadline_months}
+                </span>
+              </div>
+              {/* Risk rationale */}
+              <div style={{ background: '#1a0d2e', borderRadius: 4, padding: '6px 10px', fontSize: 11, color: '#c4b5fd', marginBottom: 10 }}>
+                {cp.risk_rationale}
+              </div>
+              {/* Milestones */}
+              {cp.milestones && cp.milestones.length > 0 && (
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>CP Lifecycle Milestones</div>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+                    <tbody>
+                      {cp.milestones.map((m, i) => (
+                        <tr key={i} style={{ borderBottom: '1px solid #2e1065' }}>
+                          <td style={{ padding: '3px 4px', color: '#a78bfa', fontWeight: 600, whiteSpace: 'nowrap', width: 64 }}>
+                            {m.month != null ? `Mo ${m.month}` : `Mo ${m.month_low}–${m.month_high}`}
+                          </td>
+                          <td style={{ padding: '3px 4px', color: '#d1d5db' }}>{m.event}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {/* Tolling triggers that apply */}
+              {activeToggles.length > 0 && (
+                <div>
+                  <div style={{ fontSize: 11, color: '#7c3aed', fontWeight: 600, marginBottom: 4 }}>Applicable Tolling Triggers</div>
+                  {activeToggles.map((t, i) => (
+                    <div key={i} style={{ fontSize: 10, color: '#ddd6fe', paddingLeft: 8, borderLeft: '2px solid #6d28d9', marginBottom: 2 }}>
+                      {t.trigger} <span style={{ color: '#7c3aed' }}>{t.ref}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {cp.note && <div style={{ marginTop: 8, fontSize: 10, color: '#6b7280', fontStyle: 'italic' }}>{cp.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* AM RF Exposure (MPE) Evaluation Guide */}
         {candidate.am_rf_exposure_mpe_guide && (() => {
           const mpe = candidate.am_rf_exposure_mpe_guide;

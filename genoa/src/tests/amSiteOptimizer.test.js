@@ -16491,3 +16491,46 @@ test('#93 candidate_comparison_table has mpe_* columns', async () => {
     assert.ok('mpe_near_field_m'       in row, 'mpe_near_field_m missing');
   }
 });
+
+// ---- Feature #94: am_cp_validity_and_tolling_guide ----
+
+test('#94 KAZM: am_cp_validity_and_tolling_guide present with correct term', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cp = out.candidates[0].am_cp_validity_and_tolling_guide;
+  assert.ok(cp != null, 'am_cp_validity_and_tolling_guide must be present');
+  assert.strictEqual(cp.cp_term_years, 3, '§73.3598(a) CP term must be 3 years');
+  assert.strictEqual(cp.ltc_deadline_months, 24, 'LtC deadline must be 24 months');
+  assert.strictEqual(cp.extension_days, 180, '§73.3598(e) extension must be 180 days');
+});
+
+test('#94 DA station: complexity_risk is HIGH', async () => {
+  const out = await runSiteOptimizer({ ...KAZM_DA, candidate_limit: 1 });
+  const cp = out.candidates[0].am_cp_validity_and_tolling_guide;
+  assert.strictEqual(cp.complexity_risk, 'HIGH', 'DA station must have HIGH CP risk');
+});
+
+test('#94 clear-channel NDA: complexity_risk is MODERATE', async () => {
+  // Clear channel, NDA → MODERATE risk
+  const clearNDA = { ...KAZM, pattern_mode: 'NDA', frequency_khz: 780 };
+  const out = await runSiteOptimizer({ ...clearNDA, candidate_limit: 1 });
+  const cp = out.candidates[0].am_cp_validity_and_tolling_guide;
+  assert.strictEqual(cp.complexity_risk, 'MODERATE', 'clear-channel NDA must be MODERATE');
+});
+
+test('#94 milestones array has ≥ 4 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cp = out.candidates[0].am_cp_validity_and_tolling_guide;
+  assert.ok(cp.milestones.length >= 4, `expected ≥ 4 milestones, got ${cp.milestones.length}`);
+});
+
+test('#94 candidate_comparison_table has cp_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cp_term_years'          in row, 'cp_term_years missing');
+    assert.ok('cp_ltc_deadline_months' in row, 'cp_ltc_deadline_months missing');
+    assert.ok('cp_complexity_risk'     in row, 'cp_complexity_risk missing');
+    assert.ok('cp_extension_days'      in row, 'cp_extension_days missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.strictEqual(r0.cp_term_years, 3, 'cp_term_years must be 3');
+});

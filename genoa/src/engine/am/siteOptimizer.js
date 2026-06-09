@@ -1576,7 +1576,11 @@ export async function runSiteOptimizer(body = {}){
     mpe_safe_dist_unctrl_m:             c.am_rf_exposure_mpe_guide?.safe_distance_unctrl_m ?? null,
     mpe_fencing_required:               c.am_rf_exposure_mpe_guide?.fencing_required ?? null,
     mpe_eval_cost_low_usd:              c.am_rf_exposure_mpe_guide?.eval_cost_low_usd ?? null,
-    mpe_near_field_m:                   c.am_rf_exposure_mpe_guide?.near_field_m ?? null
+    mpe_near_field_m:                   c.am_rf_exposure_mpe_guide?.near_field_m ?? null,
+    cp_term_years:                      c.am_cp_validity_and_tolling_guide?.cp_term_years ?? null,
+    cp_ltc_deadline_months:             c.am_cp_validity_and_tolling_guide?.ltc_deadline_months ?? null,
+    cp_complexity_risk:                 c.am_cp_validity_and_tolling_guide?.complexity_risk ?? null,
+    cp_extension_days:                  c.am_cp_validity_and_tolling_guide?.extension_days ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -7419,6 +7423,133 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_cp_validity_and_tolling_guide: (() => {
+      // AM Construction Permit Validity and Tolling Guide.
+      //
+      // Once granted, an FCC Construction Permit (CP) must be acted upon within
+      // a statutory period or it expires automatically.  §73.3598 governs the
+      // initial term and tolling (pausing) of CP expiration:
+      //
+      //   §73.3598(a): Standard CP term for AM stations = 3 years from grant date.
+      //   §73.3598(b): Tolling — the 3-year clock is paused if:
+      //     1. Environmental challenge (NEPA EA/EIS) is filed and pending
+      //     2. FCC Review/Reconsideration/Appeal of the CP itself is pending
+      //     3. Construction is substantially started but suspended due to:
+      //        a. International coordination required (US/MX, US/CA treaty)
+      //        b. Litigation enjoining construction
+      //     4. Other documented force-majeure events (COVID tolling precedent)
+      //   §73.3598(e): FCC may grant one 180-day extension if "good cause" shown.
+      //     Good cause examples: environmental challenges still pending, financing
+      //     not yet secured, tower manufacturer lead times, permitting delays.
+      //   §73.3598(f): License to Cover — FCC Form 302-AM must be filed within
+      //     2 years of CP grant or before expiration, whichever is sooner.
+      //
+      // Construction "substantially started" = major construction contracts signed
+      // or major foundation work underway (FCC Media Bureau interpretation).
+      //
+      // Danger window: if CP expires without construction complete and no
+      // timely extension request, the authorization is VOID; a new Form 301-AM
+      // CP application is required (re-competes in an AM window if applicable).
+      //
+      // For AM: there is no "long-form" vs. "short-form" distinction — all
+      // full-service AM CPs require Form 301-AM; minor modifications use
+      // Form 301-AM (minor) and have the same 3-year clock unless expedited.
+
+      // CP standard term (statutory)
+      const cp_term_years    = 3;
+      const cp_term_months   = cp_term_years * 12;
+      const cp_term_days     = cp_term_years * 365;
+
+      // Extension: one-time 180-day extension on showing of good cause
+      const extension_days   = 180;
+      const extension_months = Math.round(extension_days / 30);
+
+      // Tolling scenarios — which apply to this station type
+      const isDA_cp = /^DA/i.test(pattern_mode);
+      const isClear_cp = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const needsTreaty_cp = false;   // treaty coordination is a tolling trigger if applicable
+
+      const tolling_triggers = [
+        {
+          trigger: 'Environmental challenge (NEPA EA/EIS) filed with FCC',
+          applies:  true,   // could happen for any site
+          ref: '§73.3598(b)(1)'
+        },
+        {
+          trigger: 'FCC Petition for Reconsideration/Appeal of CP grant pending',
+          applies:  true,
+          ref: '§73.3598(b)(2)'
+        },
+        {
+          trigger: 'International coordination required (US/MX or US/CA treaty)',
+          applies:  isClear_cp,  // clear-channel stations are the most common treaty cases
+          ref: '§73.3598(b)(3)(i)'
+        },
+        {
+          trigger: 'Litigation enjoining construction',
+          applies:  true,
+          ref: '§73.3598(b)(3)(ii)'
+        },
+        {
+          trigger: 'Force-majeure / extraordinary circumstances (e.g., COVID precedent)',
+          applies:  true,
+          ref: '§73.3598(b); COVID tolling orders'
+        }
+      ];
+
+      // Good-cause extension reasons
+      const good_cause_examples = [
+        'Environmental review still pending at time of extension request',
+        'Tower manufacturer or steel lead times exceed original schedule',
+        'Local zoning permits not yet issued despite good-faith effort',
+        'Financing secured but closing delayed beyond original schedule',
+        'International coordination in progress but unresolved'
+      ];
+
+      // Form 302-AM "License to Cover" filing deadline
+      // Must be filed within 2 years of CP grant OR before CP expiration, whichever sooner.
+      // For a standard 3-year CP, the 2-year deadline is the binding constraint.
+      const ltc_deadline_months = 24;  // 2 years from CP grant = 24 months
+
+      // Key milestones in CP lifecycle
+      const milestones = [
+        { event: 'CP granted by FCC', month: 0, note: '3-year clock starts on grant date' },
+        { event: 'Substantial construction started (contracts signed, major work begun)', month_low: 6, month_high: 18, note: 'Must begin before expiration; establishes good-faith record' },
+        { event: 'Construction complete; antenna on-air for testing', month_low: 12, month_high: 30, note: 'Proof of performance field measurements begin' },
+        { event: 'Form 302-AM (License to Cover) must be filed', month: ltc_deadline_months, note: `§73.3598(f): 2-year deadline or before expiration; contains proof-of-performance results` },
+        { event: 'CP expiration (if 180-day extension granted)', month: cp_term_months + extension_months, note: `Extended CP expires ${cp_term_months + extension_months} months from grant` },
+        { event: 'CP expiration (standard term, no extension)', month: cp_term_months, note: `${cp_term_years}-year standard term per §73.3598(a)` }
+      ];
+
+      // Timeline risk assessment
+      const complexity_risk = isDA_cp ? 'HIGH' : isClear_cp ? 'MODERATE' : 'LOW';
+      const risk_rationale  = isDA_cp
+        ? 'DA pattern design, multi-tower construction, and 72-radial proof-of-performance add 6–12 months to construction timeline. Extension likely needed if treaty coordination or environmental review triggered.'
+        : isClear_cp
+          ? 'Clear-channel station may trigger international coordination; FCC processing can be 1–3 years. CP tolling for treaty coordination is common for Class A clear-channel stations.'
+          : 'Standard regional/local channel CP. 3-year term is generally sufficient if environmental and permitting issues resolved early.';
+
+      return {
+        fcc_class,
+        frequency_khz,
+        is_da:                    isDA_cp,
+        is_clear_channel:         isClear_cp,
+        cp_term_years,
+        cp_term_months,
+        cp_term_days,
+        extension_days,
+        extension_months,
+        ltc_deadline_months,
+        tolling_triggers,
+        good_cause_examples,
+        milestones,
+        complexity_risk,
+        risk_rationale,
+        reference: '47 CFR §73.3598 (CP term, tolling, extension); §73.3598(a) (3-year term); §73.3598(b) (tolling); §73.3598(e) (180-day extension); §73.3598(f) (license to cover); FCC Form 302-AM instructions',
+        note: `Class ${fcc_class} CP: ${cp_term_years}-year standard term. LtC (Form 302-AM) due by month ${ltc_deadline_months}. Timeline risk: ${complexity_risk}. ${risk_rationale}`
       };
     })(),
 

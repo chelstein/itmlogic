@@ -4109,3 +4109,13 @@ test('am_rf_exposure_mpe_guide present across colocation candidates', async () =
     assert.ok(mpe.e_limit_controlled_vm > 0, 'e_limit_controlled_vm must be positive');
   }
 });
+
+test('am_cp_validity_and_tolling_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cp = c.am_cp_validity_and_tolling_guide;
+    assert.ok(cp !== undefined && cp !== null, 'candidate missing am_cp_validity_and_tolling_guide');
+    assert.strictEqual(cp.cp_term_years, 3, 'cp_term_years must be 3');
+    assert.ok(Array.isArray(cp.milestones) && cp.milestones.length >= 4, 'milestones must have ≥ 4 entries');
+  }
+});
