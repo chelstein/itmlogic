@@ -4034,3 +4034,14 @@ test('am_station_relocation_total_project_cost_proforma present across colocatio
     assert.strictEqual(pf.line_items.length, 11, 'must have 11 line items');
   }
 });
+
+test('am_site_access_and_land_use_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const lu = c.am_site_access_and_land_use_guide;
+    assert.ok(lu !== undefined && lu !== null, `candidate missing am_site_access_and_land_use_guide`);
+    assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(lu.zone_risk_tier), `zone_risk_tier invalid: ${lu.zone_risk_tier}`);
+    assert.strictEqual(lu.due_diligence_items.length, 7, 'must have 7 due-diligence items');
+    assert.ok(lu.site_control_weeks_low > 0, 'site_control_weeks_low must be positive');
+  }
+});

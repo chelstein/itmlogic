@@ -16176,3 +16176,43 @@ test('candidate_comparison_table proforma columns present and valid for KAZM', a
   assert.ok(r0.pf_grand_total_low_usd > 0,                          'pf_grand_total_low_usd must be positive');
   assert.ok(r0.pf_grand_total_high_usd > r0.pf_grand_total_low_usd, 'high must exceed low in comparison table');
 });
+
+// ── Feature #87: am_site_access_and_land_use_guide ────────────────────────────
+test('KAZM 780 kHz: am_site_access_and_land_use_guide present on all candidates', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    assert.ok(c.am_site_access_and_land_use_guide != null, 'site access guide missing');
+  }
+});
+
+test('KAZM NDA site-access guide: zone_risk_tier is LOW/MODERATE/HIGH and 7 due-diligence items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lu = out.candidates[0].am_site_access_and_land_use_guide;
+  assert.ok(['LOW', 'MODERATE', 'HIGH'].includes(lu.zone_risk_tier), `zone_risk_tier must be LOW/MODERATE/HIGH, got ${lu.zone_risk_tier}`);
+  assert.strictEqual(lu.due_diligence_items.length, 7, 'must have 7 due-diligence items');
+});
+
+test('KAZM site-access: lease_10yr_low = lease_low_per_month_usd * 120', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lu = out.candidates[0].am_site_access_and_land_use_guide;
+  assert.strictEqual(lu.lease_10yr_low_usd, lu.lease_low_per_month_usd * 120, '10-year lease must be monthly × 120');
+});
+
+test('KAZM site-access: site_control_weeks_high > site_control_weeks_low > 0', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lu = out.candidates[0].am_site_access_and_land_use_guide;
+  assert.ok(lu.site_control_weeks_low  > 0,                            'site_control_weeks_low must be positive');
+  assert.ok(lu.site_control_weeks_high > lu.site_control_weeks_low,    'high must exceed low');
+});
+
+test('candidate_comparison_table site-access land-use columns present for KAZM', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lu_zone_risk_tier'         in row, 'lu_zone_risk_tier missing');
+    assert.ok('lu_lease_low_per_month_usd' in row, 'lu_lease_low_per_month_usd missing');
+    assert.ok('lu_site_control_weeks_low' in row, 'lu_site_control_weeks_low missing');
+    assert.ok('lu_faa_study_trigger'      in row, 'lu_faa_study_trigger missing');
+  }
+  const r0 = out.candidate_comparison_table[0];
+  assert.ok(r0.lu_lease_low_per_month_usd > 0, 'lease must be positive');
+});

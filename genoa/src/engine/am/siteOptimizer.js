@@ -1535,6 +1535,10 @@ export async function runSiteOptimizer(body = {}){
     fcc_total_soft_cost_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.total_soft_cost_low ?? null,
     fcc_processing_days_low:            c.am_fcc_application_filing_cost_and_timeline_guide?.fcc_processing_days_low ?? null,
     fcc_total_timeline_days_low:        c.am_fcc_application_filing_cost_and_timeline_guide?.total_timeline_days_low ?? null,
+    lu_zone_risk_tier:                  c.am_site_access_and_land_use_guide?.zone_risk_tier ?? null,
+    lu_lease_low_per_month_usd:         c.am_site_access_and_land_use_guide?.lease_low_per_month_usd ?? null,
+    lu_site_control_weeks_low:          c.am_site_access_and_land_use_guide?.site_control_weeks_low ?? null,
+    lu_faa_study_trigger:               c.am_site_access_and_land_use_guide?.faa_study_trigger ?? null,
     pf_grand_total_low_usd:             c.am_station_relocation_total_project_cost_proforma?.grand_total_low_usd ?? null,
     pf_grand_total_high_usd:            c.am_station_relocation_total_project_cost_proforma?.grand_total_high_usd ?? null,
     pf_grand_total_midpoint_usd:        c.am_station_relocation_total_project_cost_proforma?.grand_total_midpoint_usd ?? null,
@@ -7383,6 +7387,118 @@ async function scoreCandidate(pt, ctx, warnings){
         filing_form:                'FCC Form 302-AM (license to cover)',
         reference: '47 CFR §73.154 (proof of performance); §73.155 (adjustment tolerances); §73.61 (base current monitoring); §73.190 (ground system); §1.1310 (MPE); OET Bulletin 65 (MPE evaluation); FCC Form 302-AM instructions',
         note: `Proof-of-performance requirements are based on ${isDA_pp ? `directional antenna (${pattern_mode}) §73.154(a) — 72-radial FI traversal` : `non-directional (NDA) §73.154(b) — 8-radial inverse-distance traversal`}. All measurements must be made by or under the supervision of a licensed broadcast engineer using calibrated instrumentation. Submit complete proof report as an exhibit to FCC Form 302-AM. Allow ${proof_weeks_low}–${proof_weeks_high} weeks for field measurements, data reduction, and report preparation.`
+      };
+    })(),
+
+    am_site_access_and_land_use_guide: (() => {
+      // AM tower site access, land use, and zoning guide.
+      //
+      // Regulatory framework:
+      //   47 CFR §73.1350(a): The licensee is responsible for maintaining a site
+      //     with sufficient access to operate and maintain the antenna system.
+      //   §73.1690(c): Relocation of transmitter or antenna requires prior Commission
+      //     authorization (CP) — the FCC filing process starts with site control.
+      //   §73.3549(a): Applications for major facilities modification must include
+      //     a statement that the applicant has "reasonable assurance of site
+      //     availability" — binding option or lease letter required with Form 301-AM.
+      //   47 CFR Part 1, Subpart B / NEPA §1.1307: Environmental assessment
+      //     triggers include historic properties (NHPA §106), wetlands, floodplains,
+      //     and sites within tribal lands — zoning class drives this risk.
+      //
+      // Land use classification model:
+      //   Based on FCC CDBS/LMS cross-referenced land_use_classification field from
+      //   the propagation engine.  Density / class drives lease cost and zoning risk.
+      //
+      //   INDUSTRIAL / AG-RURAL — lowest zoning risk; AM towers typically allowed
+      //     by right or with administrative permit.  Lease: $500–$1,500/mo.
+      //   SUBURBAN / LIGHT COMMERCIAL — moderate zoning risk; conditional use permit
+      //     often required; neighborhood opposition common.  Lease: $1,200–$3,500/mo.
+      //   URBAN / HIGH DENSITY — highest zoning risk; special exception or variance;
+      //     substantial NIMBY and historic district exposure. Lease $3,000–$8,000/mo.
+      //
+      // Site control timeline (before CP filing):
+      //   Site identification + access inspection:   2–4 weeks
+      //   Environmental Phase I ESA:                 3–6 weeks
+      //   Lease/option negotiation:                  4–12 weeks
+      //   Zoning hearing (if required):              8–26 weeks
+      //   Total pre-filing site control:             17–48 weeks
+
+      const density = pt.land_use_classification?.density_per_km2 ?? 200; // default: suburban
+      const lu_class = pt.land_use_classification?.class ?? 'suburban';
+
+      // ── Zone risk tier ──
+      const isRural    = density < 50  || /rural|industrial|agricultural/i.test(lu_class);
+      const isUrban    = density > 500 || /urban|downtown|commercial.*high/i.test(lu_class);
+      const isSuburban = !isRural && !isUrban;
+
+      const zone_risk_tier = isRural ? 'LOW' : isUrban ? 'HIGH' : 'MODERATE';
+      const zone_risk_desc = {
+        LOW:      'Industrial/agricultural/rural zoning — AM tower typically by right or administrative permit. Lowest NIMBY exposure.',
+        MODERATE: 'Suburban/light commercial zoning — conditional use permit typically required. Moderate neighborhood opposition risk.',
+        HIGH:     'Urban/high-density/historic area — special exception or variance required. Highest NIMBY, NHP, and environmental risk.'
+      }[zone_risk_tier];
+
+      // ── Lease cost range ($/month) ──
+      const lease_low_mo  = isRural ? 500  : isUrban ? 3000 : 1200;
+      const lease_high_mo = isRural ? 1500 : isUrban ? 8000 : 3500;
+      const lease_10yr_low  = lease_low_mo  * 120;
+      const lease_10yr_high = lease_high_mo * 120;
+
+      // ── Site control timeline ──
+      const zoning_weeks_low  = isRural ? 0  : isUrban ? 12 : 4;
+      const zoning_weeks_high = isRural ? 6  : isUrban ? 26 : 14;
+      const site_control_weeks_low  = 9  + zoning_weeks_low;   // phase I ESA + lease
+      const site_control_weeks_high = 22 + zoning_weeks_high;
+
+      // ── Environmental triggers (§1.1307) ──
+      const is_da_lu = /^DA/i.test(pattern_mode);
+      const lambda_lu = round2(300000 / frequency_khz);
+      const h_frac_lu = ['A', 'B'].includes(fcc_class) ? 0.625 : 0.25;
+      const h_m_lu    = round2(h_frac_lu * lambda_lu);
+      const h_ft_lu   = Math.round(h_m_lu * 3.28084);
+
+      // Tower > 450 ft (137 m) triggers additional §1.1307(a)(5) FAA study
+      const faa_study_trigger = h_m_lu > 137;
+
+      // Urban sites carry higher historic property (NHPA §106) risk
+      const nhpa_risk = isUrban ? 'HIGH' : isSuburban ? 'MODERATE' : 'LOW';
+
+      // Floodplain / wetland exposure (screening-grade: proxy via density)
+      const floodplain_risk = isRural ? 'MODERATE' : isUrban ? 'LOW' : 'LOW';
+
+      // ── Site due-diligence checklist ──
+      const due_diligence_items = [
+        { item: 'Site identification and access inspection',        weeks_low: 2, weeks_high: 4,  notes: 'Tower candidate walkover; evaluate guyed vs self-support access road requirements' },
+        { item: 'Phase I ESA (ASTM E1527-21)',                     weeks_low: 3, weeks_high: 6,  notes: 'Required by FCC §1.1307(a) NEPA checklist for new tower sites' },
+        { item: 'FAA Form 7460-1 (pre-coordination)',              weeks_low: 4, weeks_high: 12, notes: h_m_lu > 60.96 ? `Required — ${h_ft_lu} ft tower > 200 ft §17.7 ASR threshold` : `May not be required — ${h_ft_lu} ft tower ≤ 200 ft; verify airspace` },
+        { item: 'NHPA §106 historic property review',              weeks_low: 3, weeks_high: 16, notes: nhpa_risk === 'HIGH' ? 'Urban site — SHPO consultation likely required; allow 16 weeks worst case' : 'Standard desktop review usually sufficient' },
+        { item: 'Lease/option agreement (site control letter)',     weeks_low: 4, weeks_high: 12, notes: 'FCC requires "reasonable assurance of site availability" with Form 301-AM (§73.3549(a))' },
+        { item: 'Zoning permit / conditional use hearing',          weeks_low: zoning_weeks_low, weeks_high: zoning_weeks_high, notes: zone_risk_desc },
+        { item: 'Title/survey and access road easement',           weeks_low: 2, weeks_high: 6,  notes: 'Required before construction permit can be exercised' }
+      ];
+
+      return {
+        fcc_class,
+        frequency_khz,
+        pattern_mode,
+        land_use_density_per_km2:     round2(density),
+        land_use_class:               lu_class,
+        zone_risk_tier,
+        zone_risk_description:        zone_risk_desc,
+        nhpa_106_risk:                nhpa_risk,
+        floodplain_risk,
+        faa_study_trigger,
+        tower_height_ft:              h_ft_lu,
+        tower_height_m:               h_m_lu,
+        lease_low_per_month_usd:      lease_low_mo,
+        lease_high_per_month_usd:     lease_high_mo,
+        lease_10yr_low_usd:           lease_10yr_low,
+        lease_10yr_high_usd:          lease_10yr_high,
+        site_control_weeks_low,
+        site_control_weeks_high,
+        due_diligence_items,
+        reference: '47 CFR §73.1350(a); §73.1690(c); §73.3549(a); 47 CFR Part 1 §1.1306–§1.1307 (NEPA); NHPA §106 (16 USC §470f); ASTM E1527-21 (Phase I ESA); FCC Form 7460-1 (FAA coordination)',
+        note: `SCREENING-GRADE land-use and site-access assessment. Zone risk: ${zone_risk_tier}. Estimated lease: $${lease_low_mo.toLocaleString()}–$${lease_high_mo.toLocaleString()}/mo ($${(lease_10yr_low/1000).toFixed(0)}K–$${(lease_10yr_high/1000).toFixed(0)}K over 10 years). Site control before CP filing: ${site_control_weeks_low}–${site_control_weeks_high} weeks.`
       };
     })(),
 

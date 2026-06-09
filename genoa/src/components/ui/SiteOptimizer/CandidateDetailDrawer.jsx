@@ -2356,6 +2356,59 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Access and Land Use Guide */}
+        {candidate.am_site_access_and_land_use_guide && (() => {
+          const lu = candidate.am_site_access_and_land_use_guide;
+          const riskColor = lu.zone_risk_tier === 'HIGH' ? '#ef4444' : lu.zone_risk_tier === 'MODERATE' ? '#f59e0b' : '#22c55e';
+          const riskBg    = lu.zone_risk_tier === 'HIGH' ? '#450a0a' : lu.zone_risk_tier === 'MODERATE' ? '#451a03' : '#052e16';
+          const fmtK = (n) => n != null ? '$' + Math.round(n / 1000) + 'K' : '—';
+          return (
+            <div style={{ background: '#0c0a09', border: `1px solid ${riskColor}40`, borderRadius: 8, padding: '14px 18px', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 700, color: '#fafaf9', letterSpacing: '0.08em', textTransform: 'uppercase' }}>Site Access & Land Use</span>
+                <span style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: 700, color: riskColor, background: riskBg, border: `1px solid ${riskColor}60`, borderRadius: 3, padding: '2px 6px' }}>{lu.zone_risk_tier} ZONE RISK</span>
+                {lu.faa_study_trigger && <span style={{ fontFamily: 'monospace', fontSize: 9, color: '#fbbf24', background: '#451a03', border: '1px solid #fbbf2440', borderRadius: 3, padding: '2px 6px' }}>FAA STUDY REQUIRED</span>}
+              </div>
+
+              {/* Key metrics grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+                {[
+                  { label: 'Lease (est.)',   value: `$${lu.lease_low_per_month_usd?.toLocaleString()}–$${lu.lease_high_per_month_usd?.toLocaleString()}/mo` },
+                  { label: 'Site control',   value: `${lu.site_control_weeks_low}–${lu.site_control_weeks_high} wks` },
+                  { label: '10-yr lease',    value: fmtK(lu.lease_10yr_low_usd) + '–' + fmtK(lu.lease_10yr_high_usd) },
+                  { label: 'NHPA §106',      value: lu.nhpa_106_risk },
+                  { label: 'Floodplain',     value: lu.floodplain_risk },
+                  { label: 'LU class',       value: (lu.land_use_class ?? '—').replace(/_/g, ' ').toLowerCase() }
+                ].map(m => (
+                  <div key={m.label} style={{ background: '#1c1917', borderRadius: 4, padding: '6px 8px', border: '1px solid #292524' }}>
+                    <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#e7e5e4', fontWeight: 600 }}>{m.value}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#78716c', marginTop: 1 }}>{m.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Zone risk description */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: riskColor, background: riskBg, borderRadius: 4, padding: '6px 8px', marginBottom: 8, lineHeight: 1.5 }}>
+                {lu.zone_risk_description}
+              </div>
+
+              {/* Due diligence checklist */}
+              <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#78716c', marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.07em' }}>Pre-filing due diligence</div>
+              <div style={{ space: 0 }}>
+                {(lu.due_diligence_items || []).map((item, i) => (
+                  <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, padding: '4px 6px', background: i % 2 === 0 ? '#1c1917' : '#0c0a09', borderBottom: '1px solid #1c1917', borderRadius: i === 0 ? '4px 4px 0 0' : i === (lu.due_diligence_items.length - 1) ? '0 0 4px 4px' : 0 }}>
+                    <div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#e7e5e4' }}>{item.item}</div>
+                      <div style={{ fontFamily: 'monospace', fontSize: 8, color: '#57534e', marginTop: 1 }}>{item.notes}</div>
+                    </div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 9, color: '#a8a29e', textAlign: 'right', whiteSpace: 'nowrap' }}>{item.weeks_low}–{item.weeks_high} wks</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Station Relocation Total Project Cost Pro Forma */}
         {candidate.am_station_relocation_total_project_cost_proforma && (() => {
           const pf = candidate.am_station_relocation_total_project_cost_proforma;
