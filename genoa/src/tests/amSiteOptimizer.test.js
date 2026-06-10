@@ -18817,3 +18817,4 @@ test('#141 candidate_comparison_table has gnd_* columns', async () => {
     assert.ok('gnd_proof_required'       in row, 'gnd_proof_required missing');
   }
 });
+

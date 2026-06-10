@@ -4622,3 +4622,4 @@ test('am_ground_system_and_radial_field_installation_guide present across coloca
     assert.ok(g.cost_estimates.total_system_low_usd > 0, 'total_system_low_usd must be positive');
   }
 });
+
