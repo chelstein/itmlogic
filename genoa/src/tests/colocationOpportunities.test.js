@@ -4600,3 +4600,14 @@ test('am_site_accessibility_and_ada_compliance_guide present across colocation c
     assert.ok(g.n_accessibility_features >= 0, 'n_accessibility_features must be non-negative');
   }
 });
+
+test('am_faa_tower_lighting_and_obstruction_marking_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_faa_tower_lighting_and_obstruction_marking_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_faa_tower_lighting_and_obstruction_marking_guide');
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+    assert.ok(Array.isArray(g.checklist), 'checklist must be array');
+  }
+});

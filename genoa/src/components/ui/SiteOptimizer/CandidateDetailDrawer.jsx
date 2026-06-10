@@ -11650,6 +11650,51 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FAA Tower Lighting & Obstruction Marking */}
+        {candidate.am_faa_tower_lighting_and_obstruction_marking_guide && (() => {
+          const g = candidate.am_faa_tower_lighting_and_obstruction_marking_guide;
+          const LIGHT_COLOR = g.lighting_type === 'HIGH_INTENSITY_WHITE_DAY_RED_NIGHT' ? '#dc2626' : g.lighting_type === 'MEDIUM_INTENSITY_RED' ? '#ea580c' : '#ca8a04';
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c2410c', marginBottom: 6 }}>
+                FAA Tower Lighting & Obstruction Marking
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ background: LIGHT_COLOR, color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                  {g.lighting_type?.replace(/_/g, ' ')}
+                </span>
+                {g.asr_required && (
+                  <span style={{ background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+                    ASR Required
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 11, marginBottom: 6 }}>
+                <div><span style={{ color: '#6b7280' }}>Est. Tower Height:</span> <b>{g.tower_height_ft} ft AGL ({g.tower_height_m} m)</b></div>
+                <div><span style={{ color: '#6b7280' }}>Towers:</span> <b>{g.n_towers}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Form 7460-1:</span> <b>{g.requires_form_7460_1 ? 'Required' : 'Not required'}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Form 854 (ASR):</span> <b>{g.requires_form_854 ? 'Required' : 'Not required'}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Install Cost:</span> <b>${(g.cost_estimates?.lighting_install_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.lighting_install_high_usd ?? 0).toLocaleString()}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Annual Maint.:</span> <b>${(g.cost_estimates?.annual_maintenance_usd ?? 0).toLocaleString()}</b></div>
+              </div>
+              {Array.isArray(g.checklist) && g.checklist.length > 0 && (
+                <details style={{ marginBottom: 5 }}>
+                  <summary style={{ color: '#c2410c', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                    Compliance Checklist ({g.n_checklist_items} items)
+                  </summary>
+                  <ul style={{ margin: '4px 0 0', padding: '0 0 0 16px' }}>
+                    {g.checklist.map((item, i) => (
+                      <li key={i} style={{ fontSize: 10, color: '#374151', marginBottom: 1 }}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
