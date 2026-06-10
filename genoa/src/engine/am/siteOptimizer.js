@@ -1760,7 +1760,11 @@ export async function runSiteOptimizer(body = {}){
     nfl_ambient_floor_dbuv:             c.am_noise_floor_and_interference_environment_survey_guide?.ambient_noise_floor_dbuv ?? null,
     nfl_snr_at_contour_db:              c.am_noise_floor_and_interference_environment_survey_guide?.snr_at_05mvm_contour_db ?? null,
     nfl_adequate_snr:                   c.am_noise_floor_and_interference_environment_survey_guide?.adequate_snr ?? null,
-    nfl_total_low_usd:                  c.am_noise_floor_and_interference_environment_survey_guide?.cost_estimates?.total_low_usd ?? null
+    nfl_total_low_usd:                  c.am_noise_floor_and_interference_environment_survey_guide?.cost_estimates?.total_low_usd ?? null,
+    opf_n_triggered_on_relocation:      c.am_online_public_file_compliance_guide?.n_triggered_on_relocation ?? null,
+    opf_n_opif_categories:              c.am_online_public_file_compliance_guide?.n_opif_categories ?? null,
+    opf_update_deadline_days:           c.am_online_public_file_compliance_guide?.opif_update_deadline_days ?? null,
+    opf_total_low_usd:                  c.am_online_public_file_compliance_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31788,6 +31792,57 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.182(a); ITU-R P.372; OET Bulletin 65; FCC Part 15',
         note: `Noise environment: ${noise_environment}. Ambient floor: ${ambient_noise_floor_dbuv} dBμV/m. SNR at 0.5 mV/m contour: ${SNR_AT_CONTOUR_DB} dB — ${adequate_snr ? 'ADEQUATE' : 'MARGINAL — mitigation may be required'}. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_online_public_file_compliance_guide: (() => {
+      // §73.3526 requires AM stations to maintain an online public inspection file (OPIF)
+      // in the FCC's cloud-based system. Relocation triggers mandatory OPIF updates:
+      // new construction permits, environmental filings, and antenna/tower notifications.
+      const isDA = /^DA/i.test(pattern_mode ?? '');
+
+      // Required OPIF document categories per §73.3526(e)
+      const opif_categories = [
+        { category: 'License and Applications',         trigger_on_relocation: true,  description: 'CP filing, license to cover, any pending apps' },
+        { category: 'Contour Maps',                     trigger_on_relocation: true,  description: 'Updated 2/0.5 mV/m groundwave contours' },
+        { category: 'Ownership Reports (Form 323)',     trigger_on_relocation: false, description: 'Biennial filing; no change unless ownership changes' },
+        { category: 'EEO Program (if applicable)',      trigger_on_relocation: false, description: 'Annual EEO public file report' },
+        { category: 'NEPA/Environmental Docs',          trigger_on_relocation: true,  description: 'EA, FONSI, or negative declaration for new site' },
+        { category: 'FAA Coordination (Form 7460-1)',   trigger_on_relocation: true,  description: 'ASR/FAA correspondence for new tower' },
+        { category: 'RF Exposure Statement',            trigger_on_relocation: true,  description: 'OET-65 MPE study for new site' },
+      ];
+      if (isDA) opif_categories.push({ category: 'DA Proof of Performance', trigger_on_relocation: true, description: 'Directional antenna proof per §73.154' });
+
+      const n_triggered    = opif_categories.filter(c => c.trigger_on_relocation).length;
+      const n_total        = opif_categories.length;
+
+      // Compliance timeline: OPIF must be updated within 30 days of CP grant per §73.3526(b)
+      const OPIF_UPDATE_DEADLINE_DAYS = 30;
+
+      // FCC OPIF portal compliance costs (admin/legal)
+      const ADMIN_LOW  = 500;
+      const ADMIN_HIGH = 1500;
+      const LEGAL_LOW  = isDA ? 800 : 400;
+      const LEGAL_HIGH = isDA ? 2000 : 1000;
+      const total_low_usd  = round2(ADMIN_LOW  + LEGAL_LOW);
+      const total_high_usd = round2(ADMIN_HIGH + LEGAL_HIGH);
+
+      return {
+        n_opif_categories:               n_total,
+        n_triggered_on_relocation:       n_triggered,
+        opif_update_deadline_days:       OPIF_UPDATE_DEADLINE_DAYS,
+        opif_categories,
+        fcc_opif_portal:                 'https://publicfiles.fcc.gov',
+        cost_estimates: {
+          admin_low_usd:   ADMIN_LOW,
+          admin_high_usd:  ADMIN_HIGH,
+          legal_low_usd:   LEGAL_LOW,
+          legal_high_usd:  LEGAL_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.3526; §73.3527; FCC Media Bureau OPIF FAQ',
+        note: `OPIF update required within ${OPIF_UPDATE_DEADLINE_DAYS} days of CP grant. ${n_triggered} of ${n_total} document categories triggered by relocation${isDA ? ' (DA proof required)' : ''}. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 

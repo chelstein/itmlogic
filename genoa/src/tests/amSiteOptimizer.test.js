@@ -18313,3 +18313,48 @@ test('#130 candidate_comparison_table has nfl_* columns', async () => {
     assert.ok('nfl_total_low_usd'      in row, 'nfl_total_low_usd missing');
   }
 });
+
+// ---- Feature #131: am_online_public_file_compliance_guide ----
+test('#131 KAZM: OPIF compliance guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_online_public_file_compliance_guide;
+  assert.ok(g, 'am_online_public_file_compliance_guide missing');
+  assert.ok(g.n_opif_categories >= 7, 'must have ≥7 OPIF categories');
+  assert.ok(g.n_triggered_on_relocation >= 5, 'relocation triggers ≥5 OPIF document categories');
+  assert.strictEqual(g.opif_update_deadline_days, 30, 'OPIF update deadline is 30 days post-CP');
+});
+
+test('#131 all triggered categories have trigger_on_relocation=true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_online_public_file_compliance_guide;
+  const triggered = g.opif_categories.filter(c => c.trigger_on_relocation);
+  assert.ok(triggered.length >= 5, 'at least 5 categories must be triggered');
+  for (const cat of triggered) {
+    assert.ok(cat.category && cat.description, 'each category must have category and description');
+  }
+});
+
+test('#131 DA station triggers additional OPIF proof category', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_online_public_file_compliance_guide;
+  const gDA  = daOut.candidates[0].am_online_public_file_compliance_guide;
+  assert.ok(gDA.n_opif_categories > gNDA.n_opif_categories, 'DA must add DA proof category vs NDA');
+});
+
+test('#131 OPIF portal URL is present', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_online_public_file_compliance_guide;
+  assert.ok(typeof g.fcc_opif_portal === 'string' && g.fcc_opif_portal.length > 0, 'fcc_opif_portal URL must be present');
+  assert.ok(g.cost_estimates.total_low_usd > 0, 'compliance cost must be positive');
+});
+
+test('#131 candidate_comparison_table has opf_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('opf_n_triggered_on_relocation' in row, 'opf_n_triggered_on_relocation missing');
+    assert.ok('opf_n_opif_categories'          in row, 'opf_n_opif_categories missing');
+    assert.ok('opf_update_deadline_days'        in row, 'opf_update_deadline_days missing');
+    assert.ok('opf_total_low_usd'              in row, 'opf_total_low_usd missing');
+  }
+});

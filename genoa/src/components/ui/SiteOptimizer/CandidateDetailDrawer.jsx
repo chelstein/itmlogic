@@ -11239,6 +11239,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Online Public File Compliance Guide */}
+        {candidate.am_online_public_file_compliance_guide && (() => {
+          const g = candidate.am_online_public_file_compliance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Online Public File Compliance (§73.3526)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TRIGGERED DOCS</span>
+                  <div style={{ color: '#f59e0b', fontSize: 13, fontWeight: 700 }}>{g.n_triggered_on_relocation}</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>of {g.n_opif_categories} categories</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>UPDATE DEADLINE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.opif_update_deadline_days} days post-CP</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.opif_categories || []).filter(c => c.trigger_on_relocation).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Documents Triggered by Relocation</div>
+                  {g.opif_categories.filter(c => c.trigger_on_relocation).map((cat, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{cat.category}</span>
+                      <span style={{ color: '#64748b', fontSize: 9, maxWidth: '55%', textAlign: 'right' }}>{cat.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
