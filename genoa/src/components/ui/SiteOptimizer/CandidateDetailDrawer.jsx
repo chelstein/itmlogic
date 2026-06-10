@@ -2356,6 +2356,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Proof of Performance Guide */}
+        {candidate.am_proof_of_performance_guide && (() => {
+          const pop = candidate.am_proof_of_performance_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const reqColor = pop.proof_required ? '#f87171' : '#4ade80';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#fbbf24' }}>📐</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Proof of Performance (§73.151)</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: reqColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {pop.proof_required ? 'DA PROOF REQUIRED' : 'NDA — NO PROOF'}
+                </div>
+              </div>
+              {pop.proof_required ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                  <span>Radials: <b style={{ color: '#e2e8f0' }}>{pop.n_radials_required} ({pop.radial_step_deg}° step)</b></span>
+                  <span>Total measurements: <b style={{ color: '#e2e8f0' }}>{pop.total_measurement_points}</b></span>
+                  <span>Towers (typical): <b style={{ color: '#e2e8f0' }}>{pop.typical_tower_count}</b></span>
+                  <span>Cost estimate: <b style={{ color: '#e2e8f0' }}>{fmtUsd(pop.proof_cost_usd?.total_low)}–{fmtUsd(pop.proof_cost_usd?.total_high)}</b></span>
+                  <span>Filing: <b style={{ color: '#e2e8f0' }}>Form 302-AM</b></span>
+                  <span>Deadline: <b style={{ color: '#facc15' }}>90 days from first op.</b></span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 8 }}>No periodic proof required for NDA stations (§73.152).</div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Environmental & RF Hazard Assessment Guide */}
         {candidate.am_environmental_and_rf_hazard_assessment_guide && (() => {
           const env = candidate.am_environmental_and_rf_hazard_assessment_guide;

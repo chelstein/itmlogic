@@ -16920,3 +16920,57 @@ test('#102 candidate_comparison_table has env_* columns', async () => {
     assert.ok('env_n_required'       in row, 'env_n_required missing');
   }
 });
+
+// ---- Feature #103: am_proof_of_performance_guide ----
+
+test('#103 KAZM NDA: proof not required, no measurement points', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const pop = out.candidates[0].am_proof_of_performance_guide;
+  assert.ok(pop, 'am_proof_of_performance_guide must be present');
+  assert.strictEqual(pop.proof_required, false, 'NDA station must not require proof');
+  assert.strictEqual(pop.n_radials_required, 0, 'NDA: n_radials_required must be 0');
+  assert.strictEqual(pop.total_measurement_points, 0, 'NDA: total_measurement_points must be 0');
+});
+
+test('#103 DA-N station: proof required, has radials and cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const pop = out.candidates[0].am_proof_of_performance_guide;
+  assert.ok(pop.proof_required, 'DA-N station must require proof');
+  assert.ok(pop.n_radials_required > 0, 'DA-N must have radials');
+  assert.ok(pop.total_measurement_points > 0, 'DA-N must have measurement points');
+  assert.ok(pop.proof_cost_usd?.total_low > 0, 'DA-N proof must have cost estimate');
+  assert.ok(pop.form_302_schedule?.deadline_days === 90, 'Form 302-AM deadline must be 90 days');
+});
+
+test('#103 4-tower array uses 5° radial step', async () => {
+  // Simulate a station where typical_towers ≥ 4 → radial_step_deg = 5
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const pop = out.candidates[0].am_proof_of_performance_guide;
+  if (pop.typical_tower_count >= 4) {
+    assert.strictEqual(pop.radial_step_deg, 5, '4+ tower array must use 5° step');
+    assert.strictEqual(pop.n_radials_required, 72, '5° step = 72 radials');
+  } else {
+    assert.strictEqual(pop.radial_step_deg, 10, '2-tower DA uses 10° step');
+    assert.strictEqual(pop.n_radials_required, 36, '10° step = 36 radials');
+  }
+});
+
+test('#103 is_da_n and is_da_d flags match pattern_mode', async () => {
+  const outN = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outD = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  assert.ok( outN.candidates[0].am_proof_of_performance_guide.is_da_n, 'DA-N must set is_da_n');
+  assert.ok(!outN.candidates[0].am_proof_of_performance_guide.is_da_d, 'DA-N must NOT set is_da_d');
+  assert.ok( outD.candidates[0].am_proof_of_performance_guide.is_da_d, 'DA-D must set is_da_d');
+  assert.ok(!outD.candidates[0].am_proof_of_performance_guide.is_da_n, 'DA-D must NOT set is_da_n');
+});
+
+test('#103 candidate_comparison_table has pop_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pop_proof_required' in row, 'pop_proof_required missing');
+    assert.ok('pop_n_radials'       in row, 'pop_n_radials missing');
+    assert.ok('pop_total_points'    in row, 'pop_total_points missing');
+    assert.ok('pop_cost_low_usd'    in row, 'pop_cost_low_usd missing');
+    assert.ok('pop_radial_step_deg' in row, 'pop_radial_step_deg missing');
+  }
+});

@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    pop_proof_required:                 c.am_proof_of_performance_guide?.proof_required ?? null,
+    pop_n_radials:                      c.am_proof_of_performance_guide?.n_radials_required ?? null,
+    pop_total_points:                   c.am_proof_of_performance_guide?.total_measurement_points ?? null,
+    pop_cost_low_usd:                   c.am_proof_of_performance_guide?.proof_cost_usd?.total_low ?? null,
+    pop_radial_step_deg:                c.am_proof_of_performance_guide?.radial_step_deg ?? null,
     env_nepa_disposition:               c.am_environmental_and_rf_hazard_assessment_guide?.nepa_disposition ?? null,
     env_rf_eval_required:               c.am_environmental_and_rf_hazard_assessment_guide?.rf_eval_required ?? null,
     env_rf_safe_dist_m:                 c.am_environmental_and_rf_hazard_assessment_guide?.rf_safe_dist_m ?? null,
@@ -27388,6 +27393,125 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_proof_of_performance_guide: (() => {
+      // Proof of performance (field measurement) guide for AM stations.
+      //
+      // 47 CFR §73.151 requires AM licensees to conduct field-strength
+      // measurements and file a formal proof of performance whenever:
+      //   (a) The station first begins operation (new CP or initial license)
+      //   (b) A DA antenna system is installed, modified, or replaced
+      //   (c) The Commission orders a proof
+      //   (d) An antenna array fails to conform to licensed parameters
+      //
+      // Non-directional (NDA) stations must file proof only on initial
+      // license grant or when ordered by FCC.
+      //
+      // DA proof requirements (§73.151):
+      //   - Radial measurements at 5°, 10°, 15° increments (FCC specifies per application)
+      //   - Minimum 3 measurement points per radial (typically 2 km, 5 km, 10 km or to
+      //     the licensed contour distance)
+      //   - Measurements on all authorized radials per the license DA parameters
+      //   - Filed via Form 302-AM or as part of a CP or modification application
+      //
+      // NDA proof requirements (§73.152):
+      //   - Spot checks if FCC questions the antenna efficiency
+      //   - No periodic proof required for NDA stations
+      //
+      // Field measurement methodology:
+      //   - Calibrated field strength meter (or equivalent SDR with calibration)
+      //   - GPS coordinates for each measurement point logged
+      //   - Measurement taken ≥ 100 ft from overhead wires, buildings, fences
+      //   - No rain/wet ground conditions (increases ground conductivity)
+      //   - Multiple readings averaged per point (typically 3–5 sweeps)
+      //
+      // References:
+      //   47 CFR §73.151 (DA proof)
+      //   47 CFR §73.152 (NDA no proof required)
+      //   47 CFR §73.154 (proof filing — not required for NDA unless ordered)
+      //   FCC Form 302-AM Instructions
+
+      const isDA       = /^DA/i.test(pattern_mode);
+      const isDAN      = /^DA-N/i.test(pattern_mode);
+      const isDAD      = /^DA-D/i.test(pattern_mode);
+      const isDAND     = /^DA(?:-N|-D|-2)?/i.test(pattern_mode);  // any DA variant
+      const isSynthesized = /^DA-2/i.test(pattern_mode);
+
+      // Number of towers in a typical DA array
+      // DA-N (nighttime) or DA-D (daytime) typically 2–4 towers
+      // DA-2 (day and night) typically 3–6 towers
+      const TYPICAL_TOWER_COUNTS = {
+        NDA:  1,
+        'DA-N': 2,
+        'DA-D': 2,
+        'DA-2': 3
+      };
+      const typical_towers = TYPICAL_TOWER_COUNTS[pattern_mode] ?? (isDA ? 2 : 1);
+
+      // Proof requirement
+      const proofRequired      = isDA;
+      const proofType          = isDA ? 'DA_PROOF' : 'NDA_NO_PROOF';
+
+      // Radial step for field measurements (per §73.151 for typical DA)
+      // FCC usually specifies 5° increments for 4-tower arrays and 10° for 2-tower
+      const radial_step_deg    = typical_towers >= 4 ? 5 : 10;
+      const n_radials          = Math.round(360 / radial_step_deg);
+
+      // Minimum measurement points per radial (2 km, 5 km, and ≥ contour)
+      const MIN_POINTS_PER_RADIAL = 3;
+      const total_measurement_points = proofRequired ? n_radials * MIN_POINTS_PER_RADIAL : 0;
+
+      // Cost estimate for a DA proof (field crew + engineer review + filing)
+      const PROOF_COST_USD = proofRequired ? {
+        field_crew_low:   800 * n_radials,
+        field_crew_high:  1400 * n_radials,
+        engineer_review:  2500,
+        filing_fee_usd:   0,   // no FCC fee for proof filing
+        total_low:        round2(800 * n_radials + 2500),
+        total_high:       round2(1400 * n_radials + 2500),
+        note:             `${n_radials} radials × field crew cost + engineer review. No FCC filing fee.`
+      } : null;
+
+      // Form 302-AM filing schedule
+      const FORM302_SCHEDULE = proofRequired ? {
+        filing_trigger:   'After DA antenna system installed/modified at new site',
+        deadline_days:    90,   // 90 days from first operation under new parameters
+        form:             'FCC Form 302-AM',
+        cfr:              '§73.154',
+        note:             'Proof must be filed within 90 days of commencing operation. Extension available on showing good cause.'
+      } : null;
+
+      // Equipment requirements
+      const EQUIPMENT = [
+        { item: 'Calibrated field strength meter (or SDR with cal certificate)', required: true },
+        { item: 'GPS receiver (sub-meter accuracy preferred)', required: true },
+        { item: 'Base camp communication (cellular or radio)', required: true },
+        { item: 'Licensed surveyor (for property-line or right-of-way crossings)', required: false },
+        { item: 'Drone (aerial measurements in inaccessible terrain)', required: false }
+      ];
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        is_da_station:              isDA,
+        is_da_n:                    isDAN,
+        is_da_d:                    isDAD,
+        typical_tower_count:        typical_towers,
+        proof_required:             proofRequired,
+        proof_type:                 proofType,
+        radial_step_deg:            radial_step_deg,
+        n_radials_required:         proofRequired ? n_radials : 0,
+        min_points_per_radial:      MIN_POINTS_PER_RADIAL,
+        total_measurement_points:   total_measurement_points,
+        proof_cost_usd:             PROOF_COST_USD,
+        form_302_schedule:          FORM302_SCHEDULE,
+        equipment:                  EQUIPMENT,
+        n_equipment_required:       EQUIPMENT.filter(e => e.required).length,
+        reference: '47 CFR §73.151; §73.152; §73.154; FCC Form 302-AM Instructions',
+        note: proofRequired
+          ? `DA proof required: ${n_radials} radials at ${radial_step_deg}° step, ${MIN_POINTS_PER_RADIAL} points/radial (${total_measurement_points} total measurements). File Form 302-AM within 90 days of first operation.`
+          : `Non-directional station — no periodic proof of performance required per §73.152 (unless ordered by FCC).`
       };
     })(),
 
