@@ -10138,6 +10138,79 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* TIA-222-H Tower Structural Certification Guide */}
+        {candidate.am_tia222_tower_structural_certification_guide && (() => {
+          const g = candidate.am_tia222_tower_structural_certification_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const asrColor = g.asr_triggered_qw ? '#ef4444' : '#4ade80';
+          const iceColor = g.ice_thickness_in === 0 ? '#4ade80' : g.ice_thickness_in === 0.5 ? '#fbbf24' : '#ef4444';
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                TIA-222-H Structural Certification (ANSI/TIA-222-H / ASCE 7-16)
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>λ/4 Height</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{g.tower_height_ft} ft</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>{g.tower_height_m} m</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>5/8λ Height</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{g.five_eighth_height_ft} ft</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>{g.five_eighth_height_m} m</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>ASR Required (λ/4)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: asrColor }}>{g.asr_triggered_qw ? 'YES (>200 ft)' : 'No (<200 ft)'}</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Struct. Category</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>SC {g.structural_category}</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>TIA-222-H</div>
+                </div>
+              </div>
+              {/* Wind & Ice */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>SITE STRUCTURAL LOADING</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Design Wind Speed</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>{g.wind_speed_mph} mph (ultimate)</span>
+                  <span style={{ color: '#94a3b8' }}>Wind Zone</span>
+                  <span style={{ color: '#e2e8f0', fontSize: 10 }}>{g.wind_zone?.split(' (')[0]}</span>
+                  <span style={{ color: '#94a3b8' }}>Ice Thickness</span>
+                  <span style={{ color: iceColor, fontWeight: 700 }}>{g.ice_thickness_in} in radial</span>
+                  <span style={{ color: '#94a3b8' }}>Ice Zone</span>
+                  <span style={{ color: '#e2e8f0', fontSize: 10 }}>{g.ice_zone?.split(' (')[0]}</span>
+                </div>
+              </div>
+              {/* Tower Type */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '7px 11px', marginBottom: 8, fontSize: 11 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 3 }}>TOWER TYPE</div>
+                <div style={{ color: '#e2e8f0', fontWeight: 700 }}>{g.tower_type_label}</div>
+                <div style={{ color: '#64748b', fontSize: 10, marginTop: 2 }}>{g.n_towers} tower(s); SC {g.structural_category} — standard broadcast importance</div>
+              </div>
+              {/* Cost Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>PE Analysis (low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(g.pe_analysis_cost_per_tower_usd?.low)}/tower</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Total PE (all towers, low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>{fmtUsd(g.total_pe_analysis_low_usd)}</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Upgrade Cost (low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(g.upgrade_cost_per_tower_usd?.low)}/tower</div>
+                </div>
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Interference Distance & Service Area Overlap Guide */}
         {candidate.am_interference_distance_and_service_area_overlap_guide && (() => {
           const g = candidate.am_interference_distance_and_service_area_overlap_guide;

@@ -4315,3 +4315,14 @@ test('am_interference_distance_and_service_area_overlap_guide present across col
     assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'valid risk level required');
   }
 });
+
+test('am_tia222_tower_structural_certification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_tia222_tower_structural_certification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_tia222_tower_structural_certification_guide');
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.strictEqual(g.structural_category, 'II', 'structural category must be II');
+    assert.ok(g.total_pe_analysis_low_usd > 0, 'PE analysis cost must be positive');
+  }
+});

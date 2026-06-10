@@ -17521,3 +17521,55 @@ test('#113 candidate_comparison_table has ids_* columns', async () => {
     assert.ok('ids_du_co_ch_db'      in row, 'ids_du_co_ch_db missing');
   }
 });
+
+// ---- Feature #114: am_tia222_tower_structural_certification_guide ----
+
+test('#114 KAZM 780kHz: TIA-222 guide present with correct quarter-wave height', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.ok(g, 'am_tia222_tower_structural_certification_guide must be present');
+  // 780 kHz: λ = 300000/780 ≈ 384.6 m; λ/4 ≈ 96.2 m ≈ 315 ft
+  assert.ok(g.tower_height_ft > 300 && g.tower_height_ft < 340, `780 kHz λ/4 must be ≈315 ft, got ${g.tower_height_ft}`);
+  assert.ok(g.tower_height_m  >  90 && g.tower_height_m  < 105, `780 kHz λ/4 must be ≈96 m, got ${g.tower_height_m}`);
+  assert.strictEqual(g.structural_category, 'II', 'AM broadcast must be Structural Category II');
+  assert.ok([110, 115, 120, 130].includes(g.wind_speed_mph), 'wind speed must be a standard ASCE 7 value');
+  assert.ok([0, 0.5, 1.0].includes(g.ice_thickness_in), 'ice thickness must be 0, 0.5, or 1.0 in');
+});
+
+test('#114 540 kHz tower is taller than 1600 kHz tower; both have correct λ/4', async () => {
+  const out540  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const out1600 = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const g540    = out540.candidates[0].am_tia222_tower_structural_certification_guide;
+  const g1600   = out1600.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.ok(g540.tower_height_ft > g1600.tower_height_ft,
+    `540 kHz tower (${g540.tower_height_ft} ft) must be taller than 1600 kHz (${g1600.tower_height_ft} ft)`);
+  // 540 kHz: λ/4 ≈ 138.9 m ≈ 456 ft
+  assert.ok(g540.tower_height_ft > 450 && g540.tower_height_ft < 470, `540 kHz λ/4 must be ≈456 ft, got ${g540.tower_height_ft}`);
+});
+
+test('#114 DA-2 station has 3 towers and total PE analysis = 3× per-tower', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g   = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.strictEqual(g.n_towers, 3, 'DA-2 must have 3 towers');
+  assert.ok(Math.abs(g.total_pe_analysis_low_usd - g.pe_analysis_cost_per_tower_usd.low * 3) <= 1,
+    'total_pe_analysis_low must equal 3× per-tower cost');
+});
+
+test('#114 NDA station has 1 tower and ASR not triggered for high-frequency station', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g   = out.candidates[0].am_tia222_tower_structural_certification_guide;
+  assert.strictEqual(g.n_towers, 1, 'NDA must have 1 tower');
+  // 1600 kHz: λ/4 ≈ 46.9 m ≈ 154 ft < 200 ft ASR threshold
+  assert.strictEqual(g.asr_triggered_qw, false, '1600 kHz λ/4 must NOT trigger ASR (< 200 ft)');
+});
+
+test('#114 candidate_comparison_table has tia_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tia_tower_height_ft'  in row, 'tia_tower_height_ft missing');
+    assert.ok('tia_wind_speed_mph'   in row, 'tia_wind_speed_mph missing');
+    assert.ok('tia_ice_thickness_in' in row, 'tia_ice_thickness_in missing');
+    assert.ok('tia_asr_triggered_qw' in row, 'tia_asr_triggered_qw missing');
+    assert.ok('tia_total_pe_low_usd' in row, 'tia_total_pe_low_usd missing');
+  }
+});

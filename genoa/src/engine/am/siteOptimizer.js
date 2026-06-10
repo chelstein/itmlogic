@@ -1675,7 +1675,12 @@ export async function runSiteOptimizer(body = {}){
     ids_d_01_km:                        c.am_interference_distance_and_service_area_overlap_guide?.service_contours?.d_01_mvm_km ?? null,
     ids_risk_level:                     c.am_interference_distance_and_service_area_overlap_guide?.interference_risk_level ?? null,
     ids_co_ch_min_sep_km:               c.am_interference_distance_and_service_area_overlap_guide?.min_separation_km?.co_km ?? null,
-    ids_du_co_ch_db:                    c.am_interference_distance_and_service_area_overlap_guide?.du_requirements?.co_channel_groundwave_db ?? null
+    ids_du_co_ch_db:                    c.am_interference_distance_and_service_area_overlap_guide?.du_requirements?.co_channel_groundwave_db ?? null,
+    tia_tower_height_ft:                c.am_tia222_tower_structural_certification_guide?.tower_height_ft ?? null,
+    tia_wind_speed_mph:                 c.am_tia222_tower_structural_certification_guide?.wind_speed_mph ?? null,
+    tia_ice_thickness_in:               c.am_tia222_tower_structural_certification_guide?.ice_thickness_in ?? null,
+    tia_asr_triggered_qw:               c.am_tia222_tower_structural_certification_guide?.asr_triggered_qw ?? null,
+    tia_total_pe_low_usd:               c.am_tia222_tower_structural_certification_guide?.total_pe_analysis_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -29765,6 +29770,130 @@ async function scoreCandidate(pt, ctx, warnings){
         skywave_obligation,
         reference: '47 CFR §73.37; §73.182 Table 1; §73.187; ITU-R P.368-10',
         note: `${fcc_class} at ${frequency_khz} kHz (${chanClass.replace('_', ' ')}). Primary 0.5 mV/m contour: ${d_05_mvm_km} km (${area_05_km2} km²). Co-channel min sep (vs Class ${CLS}): ${my_sep.co_km} km. D/U co-channel: ≥${DU_REQUIRED.co_channel_groundwave_db} dB at service boundary. Interference risk: ${interference_risk_level}.`
+      };
+    })(),
+
+    am_tia222_tower_structural_certification_guide: (() => {
+      // TIA-222-H structural certification guide for AM broadcast towers.
+      //
+      // ANSI/TIA-222-H (2017, with 2022 addendum) — Structural Standards for
+      // Antenna Supporting Structures and Antennas.
+      //   - Replaces TIA-222-G (2005); many jurisdictions now require -H compliance.
+      //   - Defines four Structural Categories (I–IV) based on facility importance.
+      //   - AM broadcast towers typically fall in Category II (standard importance).
+      //   - Key structural requirements:
+      //       Wind Speed: Design must meet ASCE 7-16 ultimate design wind speed maps.
+      //       Ice Loading: Ice zone maps determine radial ice thickness (0, 0.5, 1.0 in).
+      //       Gravity Loads: Self-weight of tower sections + appurtenances.
+      //       Dead + Live + Wind combinations per ASCE 7 load combination rules.
+      //
+      // Tower structural analysis is required:
+      //   (a) For all new towers (initial construction permit)
+      //   (b) When antenna loading is increased (added array elements, new phasor)
+      //   (c) When the tower is modified in height or guy configuration
+      //   (d) Before any colocation of additional antennas
+      //
+      // Tower types for AM:
+      //   - Guyed vertical: most common; economical above 150 ft; TIA-222-H §6.4
+      //   - Self-supporting lattice: used at co-located sites; TIA-222-H §6.3
+      //   - Monopole: rare for AM due to base insulator requirement; TIA-222-H §6.5
+      //
+      // Cost ranges for structural analysis and certification:
+      //   - PE structural analysis (new tower): $3,500–$8,000
+      //   - TIA-222-H compliance upgrade (existing tower): $5,000–$20,000
+      //   - Full tower replacement (if non-compliant): see am_tower_structural guides
+      //
+      // References:
+      //   ANSI/TIA-222-H (2017); ASCE 7-16; 47 CFR §73.1 (general technical rules)
+      //   FCC Form 854 (ASR); 47 CFR §17.7 (ASR height threshold)
+
+      // Quarter-wave tower height at this frequency (typical AM tower)
+      const lambda_m      = Number.isFinite(frequency_khz) ? round2(300000 / frequency_khz) : null;
+      const qw_m          = lambda_m ? round2(lambda_m / 4) : null;
+      const qw_ft         = qw_m    ? Math.round(qw_m * 3.28084) : null;
+      const five_eighth_m = lambda_m ? round2(lambda_m * 5 / 8) : null;
+      const five_eighth_ft = five_eighth_m ? Math.round(five_eighth_m * 3.28084) : null;
+
+      // Structural Category (SC) — AM broadcast always SC II
+      const structural_category = 'II';
+      const sc_description = 'Standard Importance — AM broadcast towers (TIA-222-H Table 2-1)';
+
+      // Wind zone estimation by latitude band
+      // ASCE 7-16 Figure 26.5-1C defines ultimate design wind speeds (V_ult).
+      // For CONUS, approximate by lat:
+      //   Coastal south (lat < 30): ~130 mph (Cat 4 hurricane exposure)
+      //   Southeast (30–34):        ~120 mph
+      //   Midwest/Plains (34–42):   ~115 mph (some tornado exposure)
+      //   Northeast/West (42+):     ~110 mph
+      const lat = pt.lat ?? 37;
+      const wind_speed_mph = lat < 30 ? 130 : lat < 34 ? 120 : lat < 42 ? 115 : 110;
+      const wind_zone_label = lat < 30 ? 'Coastal High Wind (ASCE 7-16 Fig 26.5-1C Zone V)'
+        : lat < 34 ? 'Southeast (Hurricane Risk — ASCE 7-16)'
+        : lat < 42 ? 'Interior (Tornado/Convective — ASCE 7-16)'
+        : 'Northern Interior (ASCE 7-16)';
+
+      // Ice zone estimation (radial ice thickness)
+      // ASCE 7-16 Figure 10-2B (freezing rain) by latitude:
+      //   South of 35°N: 0 in (no design ice)
+      //   35–42°N:       0.5 in (moderate ice)
+      //   North of 42°N: 1.0 in (heavy ice) – Great Lakes / Northeast
+      const ice_thickness_in = lat < 35 ? 0 : lat < 42 ? 0.5 : 1.0;
+      const ice_zone_label = ice_thickness_in === 0 ? 'No Ice Zone (south of 35°N)'
+        : ice_thickness_in === 0.5 ? 'Moderate Ice (0.5 in radial — ASCE 7-16)'
+        : 'Heavy Ice (1.0 in radial — ASCE 7-16 Great Lakes/Northeast)';
+
+      // Number of DA towers affects structural analysis cost
+      const isDA = /^DA/i.test(pattern_mode);
+      const isDA2 = /^DA-2/i.test(pattern_mode);
+      const n_towers = isDA2 ? 3 : isDA ? 2 : 1;
+
+      // Structural analysis cost (per tower)
+      const pe_analysis_cost_per_tower_usd = { low: 3500, high: 8000 };
+      const total_pe_analysis_low  = round2(pe_analysis_cost_per_tower_usd.low  * n_towers);
+      const total_pe_analysis_high = round2(pe_analysis_cost_per_tower_usd.high * n_towers);
+
+      // Compliance upgrade cost (if existing tower doesn't meet TIA-222-H)
+      const upgrade_cost_usd = { low: 5000, high: 20000 };  // per tower
+
+      // ASR height check — does quarter-wave tower trigger ASR?
+      const ASR_HEIGHT_THRESHOLD_M = 61;   // 200 ft / §17.7
+      const asr_height_trigger = qw_m ? qw_m > ASR_HEIGHT_THRESHOLD_M : null;
+      const five_eighth_asr_trigger = five_eighth_m ? five_eighth_m > ASR_HEIGHT_THRESHOLD_M : null;
+
+      // Tower type recommendation
+      const tower_type = n_towers > 1 ? 'guyed_vertical_array'
+        : qw_ft > 600 ? 'guyed_vertical_tall'
+        : 'guyed_vertical_standard';
+      const tower_type_label = {
+        guyed_vertical_array:    'Guyed Vertical Array (DA — multiple towers)',
+        guyed_vertical_tall:     'Guyed Vertical (tall — >600 ft; class-specific wind/ice)',
+        guyed_vertical_standard: 'Guyed Vertical (standard — <600 ft)'
+      }[tower_type];
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, pattern_mode,
+        is_da_station:            isDA,
+        n_towers,
+        structural_category,
+        sc_description,
+        tower_height_ft:          qw_ft,
+        tower_height_m:           qw_m,
+        five_eighth_height_ft:    five_eighth_ft,
+        five_eighth_height_m:     five_eighth_m,
+        wind_speed_mph,
+        wind_zone:                wind_zone_label,
+        ice_thickness_in,
+        ice_zone:                 ice_zone_label,
+        tower_type,
+        tower_type_label,
+        asr_triggered_qw:         asr_height_trigger,
+        asr_triggered_5_8:        five_eighth_asr_trigger,
+        pe_analysis_cost_per_tower_usd,
+        total_pe_analysis_low_usd:  total_pe_analysis_low,
+        total_pe_analysis_high_usd: total_pe_analysis_high,
+        upgrade_cost_per_tower_usd: upgrade_cost_usd,
+        reference: 'ANSI/TIA-222-H (2017); ASCE 7-16 §26.5, §10; 47 CFR §17.7; FCC Form 854',
+        note: `${frequency_khz} kHz: λ/4 = ${qw_ft} ft (${qw_m} m), 5/8λ = ${five_eighth_ft} ft. ${n_towers} tower(s), Structural Category ${structural_category}. Wind: ${wind_speed_mph} mph. Ice: ${ice_thickness_in} in. ASR (λ/4): ${asr_height_trigger ? 'REQUIRED (>200 ft)' : 'not required (<200 ft)'}.`
       };
     })(),
 
