@@ -4513,3 +4513,14 @@ test('am_online_public_file_compliance_guide present across colocation candidate
     assert.ok(g.cost_estimates?.total_low_usd > 0, 'OPIF compliance cost must be positive');
   }
 });
+
+test('am_modulation_monitor_and_carrier_frequency_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_modulation_monitor_and_carrier_frequency_compliance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_modulation_monitor_and_carrier_frequency_compliance_guide');
+    assert.strictEqual(g.carrier_tolerance_hz, 20, 'carrier tolerance must be ±20 Hz');
+    assert.ok(g.n_calibration_items >= 3, 'must have ≥3 calibration items');
+    assert.ok(g.cost_estimates?.total_low_usd >= 0, 'cost must be non-negative');
+  }
+});

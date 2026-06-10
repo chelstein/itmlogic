@@ -11280,6 +11280,56 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Modulation Monitor & Carrier Frequency Compliance Guide */}
+        {candidate.am_modulation_monitor_and_carrier_frequency_compliance_guide && (() => {
+          const g = candidate.am_modulation_monitor_and_carrier_frequency_compliance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Modulation Monitor &amp; Carrier Frequency Compliance (§73.1215 / §73.1560)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CARRIER TOLERANCE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>±{g.carrier_tolerance_hz} Hz</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>{g.carrier_tolerance_ppm} ppm</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD MONITOR</span>
+                  <div style={{ color: g.modulation_monitor_required ? '#f59e0b' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                    {g.modulation_monitor_required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD LIMITS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10 }}>+{g.modulation_limit_positive_pct}% / −{g.modulation_limit_negative_pct}%</div>
+                </div>
+                {g.n_monitor_points_required > 0 && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontSize: 9 }}>DA MONITOR PTS</span>
+                    <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_monitor_points_required}</div>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.calibration_items || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Calibration Items</div>
+                  {g.calibration_items.map((item, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{item}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

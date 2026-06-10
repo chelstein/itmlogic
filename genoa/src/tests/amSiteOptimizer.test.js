@@ -18358,3 +18358,47 @@ test('#131 candidate_comparison_table has opf_* columns', async () => {
     assert.ok('opf_total_low_usd'              in row, 'opf_total_low_usd missing');
   }
 });
+
+// ---- Feature #132: am_modulation_monitor_and_carrier_frequency_compliance_guide ----
+test('#132 KAZM: modulation monitor guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitor_and_carrier_frequency_compliance_guide;
+  assert.ok(g, 'am_modulation_monitor_and_carrier_frequency_compliance_guide missing');
+  assert.strictEqual(g.carrier_tolerance_hz, 20, 'carrier tolerance must be ±20 Hz per §73.1560');
+  assert.ok(g.carrier_tolerance_ppm > 0, 'carrier_tolerance_ppm must be positive');
+  assert.strictEqual(g.modulation_limit_positive_pct, 125, 'positive mod limit must be 125%');
+});
+
+test('#132 carrier tolerance ppm matches frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_modulation_monitor_and_carrier_frequency_compliance_guide;
+  const expected_ppm = Math.round((20 / (KAZM.frequency_khz * 1000)) * 1e6 * 100) / 100;
+  assert.ok(Math.abs(g.carrier_tolerance_ppm - expected_ppm) < 0.1, `tolerance_ppm ${g.carrier_tolerance_ppm} should be ≈${expected_ppm}`);
+});
+
+test('#132 modulation monitor required above 10 W', async () => {
+  const highPwr = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const g = highPwr.candidates[0].am_modulation_monitor_and_carrier_frequency_compliance_guide;
+  assert.strictEqual(g.modulation_monitor_required, true, '5 kW station requires modulation monitor');
+  assert.ok(g.n_calibration_items >= 3, 'must have ≥3 calibration items');
+});
+
+test('#132 DA adds phase monitor calibration items', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_modulation_monitor_and_carrier_frequency_compliance_guide;
+  const gDA  = daOut.candidates[0].am_modulation_monitor_and_carrier_frequency_compliance_guide;
+  assert.ok(gDA.n_calibration_items > gNDA.n_calibration_items, 'DA must add calibration items vs NDA');
+  assert.ok(gDA.n_monitor_points_required > 0, 'DA must require >0 monitor points');
+});
+
+test('#132 candidate_comparison_table has mmc_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('mmc_carrier_tolerance_hz'  in row, 'mmc_carrier_tolerance_hz missing');
+    assert.ok('mmc_carrier_tolerance_ppm' in row, 'mmc_carrier_tolerance_ppm missing');
+    assert.ok('mmc_monitor_required'      in row, 'mmc_monitor_required missing');
+    assert.ok('mmc_n_calibration_items'   in row, 'mmc_n_calibration_items missing');
+    assert.ok('mmc_total_low_usd'         in row, 'mmc_total_low_usd missing');
+  }
+});

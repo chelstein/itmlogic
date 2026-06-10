@@ -1764,7 +1764,12 @@ export async function runSiteOptimizer(body = {}){
     opf_n_triggered_on_relocation:      c.am_online_public_file_compliance_guide?.n_triggered_on_relocation ?? null,
     opf_n_opif_categories:              c.am_online_public_file_compliance_guide?.n_opif_categories ?? null,
     opf_update_deadline_days:           c.am_online_public_file_compliance_guide?.opif_update_deadline_days ?? null,
-    opf_total_low_usd:                  c.am_online_public_file_compliance_guide?.cost_estimates?.total_low_usd ?? null
+    opf_total_low_usd:                  c.am_online_public_file_compliance_guide?.cost_estimates?.total_low_usd ?? null,
+    mmc_carrier_tolerance_hz:           c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.carrier_tolerance_hz ?? null,
+    mmc_carrier_tolerance_ppm:          c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.carrier_tolerance_ppm ?? null,
+    mmc_monitor_required:               c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.modulation_monitor_required ?? null,
+    mmc_n_calibration_items:            c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.n_calibration_items ?? null,
+    mmc_total_low_usd:                  c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31843,6 +31848,71 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.3526; §73.3527; FCC Media Bureau OPIF FAQ',
         note: `OPIF update required within ${OPIF_UPDATE_DEADLINE_DAYS} days of CP grant. ${n_triggered} of ${n_total} document categories triggered by relocation${isDA ? ' (DA proof required)' : ''}. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_modulation_monitor_and_carrier_frequency_compliance_guide: (() => {
+      // §73.1560: AM carrier frequency must remain within ±20 Hz of authorized frequency.
+      // §73.1215: Requires a modulation monitor at each station operating above 10 watts.
+      // On relocation, all monitoring must be re-established at new site; new transmitter
+      // may require recalibration of modulation monitor per §73.1570.
+      const freq_khz    = frequency_khz ?? 1000;
+      const tpo         = tpo_kw ?? 1;
+      const isDA        = /^DA/i.test(pattern_mode ?? '');
+
+      // Carrier frequency tolerance per §73.1560
+      const CARRIER_TOL_HZ    = 20;
+      const carrier_tol_ppm   = round2((CARRIER_TOL_HZ / (freq_khz * 1000)) * 1e6);
+
+      // Modulation monitor requirement: required above 10 W per §73.1215(a)
+      const modulation_monitor_required = tpo * 1000 > 10;
+
+      // Modulation limits per §73.1570
+      const MOD_MAX_PCT       = 125;   // §73.1570(b) peak positive
+      const MOD_NEG_MAX_PCT   = 100;   // §73.1570(b) peak negative (100% max to avoid splatter)
+
+      // Monitoring point requirement for DA per §73.61
+      const n_monitor_points_required = isDA ? 3 : 0;
+
+      // Equipment calibration after transmitter move
+      const calibration_items = [
+        'Carrier frequency reference (GPS-disciplined or atomic standard)',
+        'Modulation monitor linearity calibration (AM depth, ±0.5% accuracy)',
+        'Automatic modulation control (AMC) limit verification',
+      ];
+      if (isDA) {
+        calibration_items.push('DA phase monitor set-up (§73.68: ±3° phase, ±5% ratio tolerance)');
+        calibration_items.push('Remote monitoring point verification (§73.61)');
+      }
+
+      // Costs
+      const EQUIP_LOW   = modulation_monitor_required ? 2500 : 0;
+      const EQUIP_HIGH  = modulation_monitor_required ? 6000 : 0;
+      const CALIB_LOW   = round2(calibration_items.length * 400);
+      const CALIB_HIGH  = round2(calibration_items.length * 1000);
+      const total_low_usd  = round2(EQUIP_LOW  + CALIB_LOW);
+      const total_high_usd = round2(EQUIP_HIGH + CALIB_HIGH);
+
+      return {
+        carrier_frequency_khz:           freq_khz,
+        carrier_tolerance_hz:            CARRIER_TOL_HZ,
+        carrier_tolerance_ppm:           carrier_tol_ppm,
+        modulation_monitor_required,
+        modulation_limit_positive_pct:   MOD_MAX_PCT,
+        modulation_limit_negative_pct:   MOD_NEG_MAX_PCT,
+        n_monitor_points_required,
+        n_calibration_items:             calibration_items.length,
+        calibration_items,
+        cost_estimates: {
+          equipment_low_usd:   EQUIP_LOW,
+          equipment_high_usd:  EQUIP_HIGH,
+          calibration_low_usd: CALIB_LOW,
+          calibration_high_usd:CALIB_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.1215; §73.1560; §73.1570; §73.68',
+        note: `Carrier tolerance ±${CARRIER_TOL_HZ} Hz (${carrier_tol_ppm} ppm) at ${freq_khz} kHz. Modulation monitor: ${modulation_monitor_required ? 'REQUIRED (>10 W)' : 'NOT REQUIRED (≤10 W)'}. Peak modulation: +${MOD_MAX_PCT}% / −${MOD_NEG_MAX_PCT}%. ${n_monitor_points_required > 0 ? `DA requires ${n_monitor_points_required} monitor points. ` : ''}Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 
