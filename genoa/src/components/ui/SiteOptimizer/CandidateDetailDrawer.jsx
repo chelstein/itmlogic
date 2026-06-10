@@ -11330,6 +11330,45 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Coverage Population & Demographic Analysis Guide */}
+        {candidate.am_coverage_population_and_demographic_analysis_guide && (() => {
+          const g = candidate.am_coverage_population_and_demographic_analysis_guide;
+          const deltaColor = (g.coverage_delta_vs_baseline_pct ?? 0) >= 0 ? '#22c55e' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Coverage Population &amp; Demographic Analysis (§73.182)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>AREA TYPE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.area_classification}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EST SERVED POP</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{(g.est_served_population || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COVERAGE AREA</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{(g.est_coverage_area_km2 || 0).toLocaleString()} km²</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>POP DENSITY</span>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>{g.pop_density_proxy_per_km2} /km²</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COVERAGE DELTA</span>
+                  <div style={{ color: deltaColor, fontSize: 11, fontWeight: 700 }}>
+                    {(g.coverage_delta_vs_baseline_pct ?? 0) >= 0 ? '+' : ''}{g.coverage_delta_vs_baseline_pct}%
+                  </div>
+                </div>
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

@@ -4524,3 +4524,14 @@ test('am_modulation_monitor_and_carrier_frequency_compliance_guide present acros
     assert.ok(g.cost_estimates?.total_low_usd >= 0, 'cost must be non-negative');
   }
 });
+
+test('am_coverage_population_and_demographic_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_coverage_population_and_demographic_analysis_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_coverage_population_and_demographic_analysis_guide');
+    assert.ok(['URBAN','SUBURBAN','RURAL','REMOTE'].includes(g.area_classification), 'area_classification must be valid enum');
+    assert.ok(g.est_served_population >= 0, 'est_served_population must be non-negative');
+    assert.ok(g.est_coverage_area_km2 >= 0, 'est_coverage_area_km2 must be non-negative');
+  }
+});

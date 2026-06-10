@@ -18402,3 +18402,45 @@ test('#132 candidate_comparison_table has mmc_* columns', async () => {
     assert.ok('mmc_total_low_usd'         in row, 'mmc_total_low_usd missing');
   }
 });
+
+// ---- Feature #133: am_coverage_population_and_demographic_analysis_guide ----
+test('#133 KAZM: coverage population guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_coverage_population_and_demographic_analysis_guide;
+  assert.ok(g, 'am_coverage_population_and_demographic_analysis_guide missing');
+  assert.ok(['URBAN','SUBURBAN','RURAL','REMOTE'].includes(g.area_classification), 'area_classification must be valid enum');
+  assert.ok(g.est_served_population >= 0, 'est_served_population must be non-negative');
+  assert.ok(g.est_coverage_area_km2 >= 0, 'est_coverage_area_km2 must be non-negative');
+});
+
+test('#133 est_coverage_area_km2 is computed from coverage_pct', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_coverage_population_and_demographic_analysis_guide;
+  const R = Math.round(50 * (g.coverage_pct / 100) * 100) / 100;
+  const expectedArea = Math.round(Math.PI * R * R * 100) / 100;
+  assert.ok(Math.abs(g.est_coverage_area_km2 - expectedArea) < 10, `area ${g.est_coverage_area_km2} should be ≈${expectedArea}`);
+});
+
+test('#133 est_served_population is density × area', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_coverage_population_and_demographic_analysis_guide;
+  const expected = Math.round(g.est_coverage_area_km2 * g.pop_density_proxy_per_km2 * 100) / 100;
+  assert.ok(Math.abs(g.est_served_population - expected) < 100, `served pop ${g.est_served_population} should be ≈${expected}`);
+});
+
+test('#133 coverage_delta_vs_baseline_pct is coverage_pct - 50', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_coverage_population_and_demographic_analysis_guide;
+  const expected = Math.round((g.coverage_pct - 50) * 100) / 100;
+  assert.ok(Math.abs(g.coverage_delta_vs_baseline_pct - expected) < 0.1, `delta ${g.coverage_delta_vs_baseline_pct} should be ≈${expected}`);
+});
+
+test('#133 candidate_comparison_table has cpd_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cpd_area_classification'   in row, 'cpd_area_classification missing');
+    assert.ok('cpd_est_served_population' in row, 'cpd_est_served_population missing');
+    assert.ok('cpd_est_coverage_area_km2' in row, 'cpd_est_coverage_area_km2 missing');
+    assert.ok('cpd_coverage_delta_pct'    in row, 'cpd_coverage_delta_pct missing');
+  }
+});
