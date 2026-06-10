@@ -1769,7 +1769,11 @@ export async function runSiteOptimizer(body = {}){
     mmc_carrier_tolerance_ppm:          c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.carrier_tolerance_ppm ?? null,
     mmc_monitor_required:               c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.modulation_monitor_required ?? null,
     mmc_n_calibration_items:            c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.n_calibration_items ?? null,
-    mmc_total_low_usd:                  c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.cost_estimates?.total_low_usd ?? null
+    mmc_total_low_usd:                  c.am_modulation_monitor_and_carrier_frequency_compliance_guide?.cost_estimates?.total_low_usd ?? null,
+    cpd_area_classification:            c.am_coverage_population_and_demographic_analysis_guide?.area_classification ?? null,
+    cpd_est_served_population:          c.am_coverage_population_and_demographic_analysis_guide?.est_served_population ?? null,
+    cpd_est_coverage_area_km2:          c.am_coverage_population_and_demographic_analysis_guide?.est_coverage_area_km2 ?? null,
+    cpd_coverage_delta_pct:             c.am_coverage_population_and_demographic_analysis_guide?.coverage_delta_vs_baseline_pct ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31913,6 +31917,69 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.1215; §73.1560; §73.1570; §73.68',
         note: `Carrier tolerance ±${CARRIER_TOL_HZ} Hz (${carrier_tol_ppm} ppm) at ${freq_khz} kHz. Modulation monitor: ${modulation_monitor_required ? 'REQUIRED (>10 W)' : 'NOT REQUIRED (≤10 W)'}. Peak modulation: +${MOD_MAX_PCT}% / −${MOD_NEG_MAX_PCT}%. ${n_monitor_points_required > 0 ? `DA requires ${n_monitor_points_required} monitor points. ` : ''}Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_coverage_population_and_demographic_analysis_guide: (() => {
+      // §73.182 coverage analysis plus FCC public interest test uses served population
+      // as a key metric. This guide synthesizes the coverage_pct score with population
+      // density proxies to characterize the audience demographic for the new site.
+      const lat       = pt.lat ?? 38;
+      const cvg_pct   = coverage_pct ?? 0;
+      const dist_km   = pt.distance_from_current_km ?? 0;
+
+      // Population density proxy (persons/km²) from latitude band
+      // (Rough US census band proxy; actual would use GIS population raster)
+      const POP_DENSITY_URBAN      = 400;   // dense metro
+      const POP_DENSITY_SUBURBAN   = 80;    // suburban ring
+      const POP_DENSITY_RURAL      = 10;    // agricultural/rural
+      const POP_DENSITY_REMOTE     = 2;     // sparsely populated
+
+      const isCoastalCorridor = (lat > 36 && lat < 42) && (pt.lon ?? -95) > -90;
+      const isSunbelt         = lat > 25 && lat < 35;
+      const pop_density_proxy =
+        isCoastalCorridor ? POP_DENSITY_URBAN :
+        isSunbelt         ? POP_DENSITY_SUBURBAN :
+        dist_km < 30      ? POP_DENSITY_SUBURBAN : POP_DENSITY_RURAL;
+
+      const area_classification =
+        pop_density_proxy >= POP_DENSITY_URBAN    ? 'URBAN'    :
+        pop_density_proxy >= POP_DENSITY_SUBURBAN ? 'SUBURBAN' :
+        pop_density_proxy >= POP_DENSITY_RURAL    ? 'RURAL'    : 'REMOTE';
+
+      // Coverage contour area estimate (0.5 mV/m groundwave contour, circular approx)
+      const COVERAGE_RADIUS_KM = round2(50 * (coverage_pct / 100));
+      const coverage_area_km2  = round2(Math.PI * Math.pow(COVERAGE_RADIUS_KM, 2));
+
+      // Estimated served population (persons within coverage area)
+      const est_served_pop = round2(coverage_area_km2 * pop_density_proxy);
+
+      // Coverage improvement vs current site (positive = gain)
+      const coverage_delta_pct = round2(cvg_pct - 50);   // assumes 50% baseline
+
+      // Demographic characterization
+      const audience_profile = {
+        area_classification,
+        pop_density_proxy_per_km2:     pop_density_proxy,
+        est_coverage_radius_km:        COVERAGE_RADIUS_KM,
+        est_coverage_area_km2:         coverage_area_km2,
+        est_served_population:         est_served_pop,
+        coverage_pct,
+        coverage_delta_vs_baseline_pct: coverage_delta_pct,
+      };
+
+      // Population study cost (FCC LMS filing aid + GIS population overlay)
+      const STUDY_LOW  = 800;
+      const STUDY_HIGH = 2500;
+
+      return {
+        ...audience_profile,
+        cost_estimates: {
+          population_study_low_usd:  STUDY_LOW,
+          population_study_high_usd: STUDY_HIGH,
+        },
+        reference: '47 CFR §73.182; FCC Form 301-AM Technical Exhibit; Census Bureau TIGER',
+        note: `Coverage area classification: ${area_classification}. Est. served pop: ${est_served_pop.toLocaleString()} (${pop_density_proxy} /km² × ${coverage_area_km2.toLocaleString()} km²). Coverage ${coverage_delta_pct >= 0 ? '+' : ''}${coverage_delta_pct}% vs baseline. GIS population overlay recommended.`
       };
     })(),
 
