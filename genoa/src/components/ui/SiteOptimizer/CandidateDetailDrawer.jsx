@@ -2356,6 +2356,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Environmental & RF Hazard Assessment Guide */}
+        {candidate.am_environmental_and_rf_hazard_assessment_guide && (() => {
+          const env = candidate.am_environmental_and_rf_hazard_assessment_guide;
+          const nepaColor = env.nepa_disposition === 'EA_REQUIRED' ? '#f87171' : '#4ade80';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#86efac' }}>🌿</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Environmental & RF Hazard Assessment</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: nepaColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {env.nepa_disposition === 'EA_REQUIRED' ? 'EA REQUIRED' : 'CE LIKELY'}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>NEPA: <b style={{ color: nepaColor }}>{env.nepa_disposition?.replace(/_/g,' ')}</b></span>
+                <span>RF eval required: <b style={{ color: env.rf_eval_required ? '#f87171' : '#4ade80' }}>{env.rf_eval_required ? 'YES (≥1 kW)' : 'NO'}</b></span>
+                <span>RF fence dist: <b style={{ color: '#e2e8f0' }}>{env.rf_safe_dist_m != null ? `~${env.rf_safe_dist_m} m` : '—'}</b></span>
+                <span>NHPA §106: <b style={{ color: env.nhpa_likely_required ? '#facc15' : '#4ade80' }}>{env.nhpa_likely_required ? 'VERIFY HEIGHT' : 'CHECK HEIGHT'}</b></span>
+                <span>Checklist items: <b style={{ color: '#e2e8f0' }}>{env.n_env_required} required</b></span>
+                <span>Advisory items: <b style={{ color: '#64748b' }}>{env.n_env_advisory}</b></span>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                {env.note}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Frequency Coordination & Channel Study Guide */}
         {candidate.am_frequency_coordination_and_channel_study_guide && (() => {
           const fcs = candidate.am_frequency_coordination_and_channel_study_guide;
