@@ -17812,3 +17812,55 @@ test('#119 candidate_comparison_table has tta_* columns', async () => {
     assert.ok('tta_n_verification_steps'    in row, 'tta_n_verification_steps missing');
   }
 });
+
+// ---- Feature #120: am_community_coverage_waiver_and_short_spacing_guide ----
+test('#120 KAZM: community coverage waiver guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(['ADEQUATE','MARGINAL','DEFICIENT','UNKNOWN'].includes(g.coverage_status), 'coverage_status must be valid enum');
+  assert.ok(g.co_channel_min_km > 0, 'co_channel_min_km must be positive');
+  assert.ok(g.waiver_cost?.total_low_usd > 0, 'waiver cost must be positive');
+});
+
+test('#120 Class A has larger co-channel minimum than Class D', async () => {
+  const classA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const classD = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const gA = classA.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  const gD = classD.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  assert.ok(gA.co_channel_min_km > gD.co_channel_min_km, `Class A co-channel (${gA.co_channel_min_km} km) must exceed Class D (${gD.co_channel_min_km} km)`);
+});
+
+test('#120 5 mV/m reach is positive and consistent with propagation guide', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_community_coverage_waiver_and_short_spacing_guide;
+  const scm = out.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide;
+  assert.ok(g.r5_mvm_km > 0, '5 mV/m reach must be positive');
+  // Both guides use the same fccAmDistanceKm calculation — should match
+  assert.ok(Math.abs(g.r5_mvm_km - scm.contour_distances_km.d_5mvm_km) < 1,
+    `coverage waiver 5 mV/m (${g.r5_mvm_km} km) must match signal mapping guide (${scm.contour_distances_km.d_5mvm_km} km)`);
+});
+
+test('#120 waiver_likely_needed reflects coverage status', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const c of out.candidates) {
+    const g = c.am_community_coverage_waiver_and_short_spacing_guide;
+    if (g.coverage_status === 'DEFICIENT') {
+      assert.ok(g.waiver_likely_needed === true, 'DEFICIENT coverage must set waiver_likely_needed');
+    }
+    if (g.coverage_status === 'ADEQUATE') {
+      assert.ok(g.waiver_likely_needed === false, 'ADEQUATE coverage must not set waiver_likely_needed');
+    }
+  }
+});
+
+test('#120 candidate_comparison_table has ccw_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ccw_coverage_status'       in row, 'ccw_coverage_status missing');
+    assert.ok('ccw_coverage_pct'          in row, 'ccw_coverage_pct missing');
+    assert.ok('ccw_waiver_likely_needed'  in row, 'ccw_waiver_likely_needed missing');
+    assert.ok('ccw_co_channel_min_km'     in row, 'ccw_co_channel_min_km missing');
+    assert.ok('ccw_waiver_total_low_usd'  in row, 'ccw_waiver_total_low_usd missing');
+  }
+});

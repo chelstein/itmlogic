@@ -10720,6 +10720,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Community Coverage Waiver & Short-Spacing Guide */}
+        {candidate.am_community_coverage_waiver_and_short_spacing_guide && (() => {
+          const g = candidate.am_community_coverage_waiver_and_short_spacing_guide;
+          const wc = g.waiver_cost || {};
+          const ss = g.short_spacing_minimums || {};
+          const statusColor = g.coverage_status === 'ADEQUATE' ? '#22c55e' : g.coverage_status === 'MARGINAL' ? '#f59e0b' : g.coverage_status === 'DEFICIENT' ? '#f87171' : '#64748b';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Community Coverage Waiver &amp; Short-Spacing (§73.24(j) / §73.37)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COL COVERAGE STATUS</span>
+                  <div style={{ color: statusColor, fontSize: 13, fontWeight: 700 }}>{g.coverage_status}</div>
+                </div>
+                {g.coverage_pct_estimated != null && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontSize: 9 }}>EST COVERAGE %</span>
+                    <div style={{ color: statusColor, fontSize: 11, fontWeight: 700 }}>{g.coverage_pct_estimated}%</div>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>5 mV/m REACH</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.r5_mvm_km ?? 'N/A'} km</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>WAIVER NEEDED</span>
+                  <div style={{ color: g.waiver_likely_needed ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.waiver_likely_needed ? 'LIKELY' : 'Unlikely'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>CO-CHANNEL MIN</span><div style={{ color: '#e2e8f0', fontSize: 11 }}>{ss.co_channel_km} km</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>±10 kHz MIN</span><div style={{ color: '#e2e8f0', fontSize: 11 }}>{ss.adj_10khz_km} km</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>±20 kHz MIN</span><div style={{ color: '#e2e8f0', fontSize: 11 }}>{ss.adj_20khz_km} km</div></div>
+                {g.waiver_likely_needed && (
+                  <div><span style={{ color: '#94a3b8', fontSize: 9 }}>WAIVER COST</span><div style={{ color: '#fbbf24', fontSize: 11 }}>${(wc.total_low_usd || 0).toLocaleString()}–${(wc.total_high_usd || 0).toLocaleString()}</div></div>
+                )}
+              </div>
+              {g.da_may_improve && (
+                <div style={{ color: '#fbbf24', fontSize: 9, marginBottom: 4 }}>
+                  DA pattern may improve COL coverage — consider directional antenna to maximize signal toward city.
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
