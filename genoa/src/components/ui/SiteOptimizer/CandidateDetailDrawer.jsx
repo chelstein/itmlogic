@@ -11465,6 +11465,54 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Auxiliary Transmitter & Emergency Operations Guide */}
+        {candidate.am_auxiliary_transmitter_and_emergency_operations_guide && (() => {
+          const g = candidate.am_auxiliary_transmitter_and_emergency_operations_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Auxiliary Transmitter &amp; Emergency Operations (§73.1680 / §73.1250)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MIN AUX POWER</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.aux_min_power_kw} kW</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>({g.aux_min_power_pct}% of licensed)</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>SWITCHOVER</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>≤{g.switchover_max_days} days</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NDA EMERGENCY OP</span>
+                  <div style={{ color: g.aux_nda_allowed ? '#22c55e' : '#475569', fontSize: 10, fontWeight: 700 }}>
+                    {g.aux_nda_allowed ? 'ALLOWED (DA→NDA)' : 'N/A (NDA)'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CHECKLIST ITEMS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_checklist_items}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.emergency_checklist || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Emergency Operations Checklist</div>
+                  {g.emergency_checklist.map((item, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>☐ {item}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

@@ -18529,3 +18529,47 @@ test('#135 candidate_comparison_table has tlm_* columns', async () => {
     assert.ok('tlm_annual_low_usd'             in row, 'tlm_annual_low_usd missing');
   }
 });
+
+// ---- Feature #136: am_auxiliary_transmitter_and_emergency_operations_guide ----
+test('#136 KAZM: auxiliary transmitter guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_transmitter_and_emergency_operations_guide;
+  assert.ok(g, 'am_auxiliary_transmitter_and_emergency_operations_guide missing');
+  assert.ok(g.aux_min_power_kw >= 0, 'aux_min_power_kw must be non-negative');
+  assert.strictEqual(g.aux_min_power_pct, 10, 'auxiliary power must be ≥10% per §73.1680');
+  assert.strictEqual(g.switchover_max_days, 30, 'switchover must be within 30 days per §73.1680');
+});
+
+test('#136 aux_min_power_kw is 10% of TPO', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const g = out.candidates[0].am_auxiliary_transmitter_and_emergency_operations_guide;
+  assert.ok(Math.abs(g.aux_min_power_kw - 0.5) < 0.01, `aux_min_power_kw should be 0.5 kW (10% of 5 kW), got ${g.aux_min_power_kw}`);
+});
+
+test('#136 DA station allows NDA emergency operation', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_auxiliary_transmitter_and_emergency_operations_guide;
+  const gDA  = daOut.candidates[0].am_auxiliary_transmitter_and_emergency_operations_guide;
+  assert.strictEqual(gNDA.aux_nda_allowed, false, 'NDA station: aux_nda_allowed should be false');
+  assert.strictEqual(gDA.aux_nda_allowed, true, 'DA station: aux_nda_allowed should be true');
+});
+
+test('#136 emergency checklist has ≥5 items; DA adds more', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_auxiliary_transmitter_and_emergency_operations_guide;
+  const gDA  = daOut.candidates[0].am_auxiliary_transmitter_and_emergency_operations_guide;
+  assert.ok(gNDA.n_checklist_items >= 5, 'checklist must have ≥5 items');
+  assert.ok(gDA.n_checklist_items > gNDA.n_checklist_items, 'DA must add at least one extra checklist item');
+});
+
+test('#136 candidate_comparison_table has aux_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('aux_min_power_kw'        in row, 'aux_min_power_kw missing');
+    assert.ok('aux_switchover_max_days' in row, 'aux_switchover_max_days missing');
+    assert.ok('aux_n_checklist_items'   in row, 'aux_n_checklist_items missing');
+    assert.ok('aux_total_low_usd'       in row, 'aux_total_low_usd missing');
+  }
+});
