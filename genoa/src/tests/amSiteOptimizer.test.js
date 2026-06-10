@@ -16974,3 +16974,58 @@ test('#103 candidate_comparison_table has pop_* columns', async () => {
     assert.ok('pop_radial_step_deg' in row, 'pop_radial_step_deg missing');
   }
 });
+
+// ---- Feature #104: am_construction_permit_exhibit_requirements_guide ----
+
+test('#104 KAZM NDA: exhibit guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const cpe = out.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpe, 'am_construction_permit_exhibit_requirements_guide must be present');
+  assert.ok(Array.isArray(cpe.exhibits), 'exhibits must be an array');
+  assert.ok(typeof cpe.n_required_exhibits === 'number', 'n_required_exhibits must be numeric');
+  assert.ok(cpe.n_required_exhibits >= 4, 'NDA must require at least 4 base exhibits');
+  assert.ok(typeof cpe.quarter_wave_height_m === 'number', 'quarter_wave_height_m must be numeric');
+  assert.ok(typeof cpe.fcc_filing_fee_usd === 'number', 'fcc_filing_fee_usd must be numeric');
+});
+
+test('#104 DA station adds DA-specific exhibits (HRP table + phasor)', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const cpeDA  = outDA.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  const cpeNDA = outNDA.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpeDA.is_da,  'DA-N must have is_da = true');
+  assert.ok(!cpeNDA.is_da, 'NDA must have is_da = false');
+  assert.ok(cpeDA.n_required_exhibits > cpeNDA.n_required_exhibits, 'DA must require more exhibits than NDA');
+  const hrpExhibit = cpeDA.exhibits.find(e => /horizontal radiation pattern/i.test(e.name));
+  assert.ok(hrpExhibit?.required, 'DA must require Horizontal Radiation Pattern exhibit');
+});
+
+test('#104 high-power station (>5 kW) flags EA required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const cpe = out.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpe.environmental_assessment_required, 'TPO > 5 kW must require Environmental Assessment exhibit');
+  const eaExhibit = cpe.exhibits.find(e => /environmental assessment/i.test(e.name));
+  assert.ok(eaExhibit?.required, 'EA exhibit must be in exhibits list and marked required');
+});
+
+test('#104 Class A station requires NIF exhibit; Class C does not', async () => {
+  const outA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const outC = await runSiteOptimizer({ ...KAZM, fcc_class: 'C', candidate_limit: 1 });
+  const cpeA = outA.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  const cpeC = outC.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpeA.nif_required,  'Class A must require NIF exhibit');
+  assert.ok(!cpeC.nif_required, 'Class C must not require NIF exhibit');
+  const nifExhibitA = cpeA.exhibits.find(e => /nighttime nif/i.test(e.name));
+  assert.ok(nifExhibitA?.required, 'NIF exhibit must be required for Class A');
+});
+
+test('#104 candidate_comparison_table has cpe_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cpe_n_required_exhibits' in row, 'cpe_n_required_exhibits missing');
+    assert.ok('cpe_asr_required'        in row, 'cpe_asr_required missing');
+    assert.ok('cpe_ea_required'         in row, 'cpe_ea_required missing');
+    assert.ok('cpe_nif_required'        in row, 'cpe_nif_required missing');
+    assert.ok('cpe_total_cost_low_usd'  in row, 'cpe_total_cost_low_usd missing');
+  }
+});

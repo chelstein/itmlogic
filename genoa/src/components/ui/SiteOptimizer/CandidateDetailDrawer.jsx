@@ -2356,6 +2356,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Construction Permit Exhibit Requirements Guide */}
+        {candidate.am_construction_permit_exhibit_requirements_guide && (() => {
+          const cpe = candidate.am_construction_permit_exhibit_requirements_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const asrColor = cpe.asr_required ? '#f87171' : '#4ade80';
+          const eaColor  = cpe.environmental_assessment_required ? '#f87171' : '#4ade80';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#818cf8' }}>📋</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Form 301-AM Exhibit Requirements</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#e2e8f0', background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {cpe.n_required_exhibits} EXHIBITS
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>Quarter-wave tower: <b style={{ color: '#e2e8f0' }}>{cpe.quarter_wave_height_m}m</b></span>
+                <span>ASR registration: <b style={{ color: asrColor }}>{cpe.asr_required ? 'REQUIRED' : 'NOT REQUIRED'}</b></span>
+                <span>Env. Assessment: <b style={{ color: eaColor }}>{cpe.environmental_assessment_required ? 'EA REQUIRED (>5 kW)' : 'CE LIKELY'}</b></span>
+                <span>Nighttime NIF: <b style={{ color: cpe.nif_required ? '#facc15' : '#4ade80' }}>{cpe.nif_required ? 'REQUIRED (A/B)' : 'NOT REQUIRED'}</b></span>
+                <span>FCC filing fee: <b style={{ color: '#e2e8f0' }}>{fmtUsd(cpe.fcc_filing_fee_usd)}</b></span>
+                <span>Total est. cost: <b style={{ color: '#e2e8f0' }}>{fmtUsd(cpe.total_filing_cost_low_usd)}–{fmtUsd(cpe.total_filing_cost_high_usd)}</b></span>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                Form 301-AM · {cpe.is_da ? 'DA' : 'NDA'} · Class {cpe.fcc_class} · {cpe.tpo_kw} kW · Ref: {cpe.reference}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Proof of Performance Guide */}
         {candidate.am_proof_of_performance_guide && (() => {
           const pop = candidate.am_proof_of_performance_guide;
