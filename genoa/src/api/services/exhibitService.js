@@ -3526,6 +3526,31 @@ export async function computeExhibit(req){
     }
   }
 
+  // HAAT Consistency Check — cross-consumer invariant enforcement.
+  // Verifies that resolveHaatAuthority(), source attestation, validation
+  // verdict, AI review context, replay token, and PDF renderer all report
+  // IDENTICAL filing_controlling_haat_m.  Any divergence is a BLOCKER.
+  {
+    const { checkHaatConsistency } = await import('../../engine/haat/haatConsistencyCheck.js');
+    const svc = String(exhibit.station_inputs?.service || '').toUpperCase();
+    if (svc !== 'AM') {
+      // AM service does not use HAAT; skip.
+      const consistencyResult = checkHaatConsistency(exhibit, {
+        operative_haat_m:    exhibit.haat_lineage?.operative_m    ?? null,
+        operative_haat_basis: exhibit.haat_lineage?.operative_basis ?? null
+      });
+      exhibit.haat_consistency_check = consistencyResult;
+      if (!consistencyResult.pass) {
+        // Promote blockers to the exhibit's warning list so they surface
+        // in validation verdict and filing readiness.
+        for (const b of consistencyResult.blockers) {
+          exhibit._haat_consistency_blockers = exhibit._haat_consistency_blockers || [];
+          exhibit._haat_consistency_blockers.push(b);
+        }
+      }
+    }
+  }
+
   exhibit.narrative = renderNarrative(exhibit);
 
   // Surface pattern provenance at the exhibit top level for consumers that

@@ -211,10 +211,20 @@ export async function compute({ inputs, evidence = {}, options = {} } = {}){
   // Resolve HAAT authority — distinguishes FCC-authorized, Genoa-computed
   // §73.313, and operator-declared HAAT so they are never conflated.
   // The result is stamped onto exhibit.haat_authority for PDF/attestation use.
+  //
+  // FCC LMS data lives at evidence.fcc_lms.license — never evidence.fcc_licensed
+  // (that path does not exist in any evidence object).  facilityStatus must
+  // also derive from the same LMS record so licensed facilities are not
+  // misclassified as proposed.
+  const _fccLmsLicense   = evidence?.fcc_lms?.license ?? null;
+  const _fccAuthorizedHaatM = _fccLmsLicense?.haat_m
+                           ?? evidence?.facility?.haat_m
+                           ?? null;
+  const _isLicensed = !!_fccLmsLicense || !!(evidence?.fcc_licensed);
   const haatAuthority = resolveHaatAuthority({
     studyIntent:            inputs.study_intent || 'existing_facility_review',
-    facilityStatus:         inputs.facility_status || (evidence?.fcc_licensed ? 'licensed' : 'proposed'),
-    fccAuthorizedHaatM:     evidence?.fcc_licensed?.haat_m ?? evidence?.facility?.haat_m ?? null,
+    facilityStatus:         inputs.facility_status || (_isLicensed ? 'licensed' : 'proposed'),
+    fccAuthorizedHaatM:     _fccAuthorizedHaatM,
     operatorDeclaredHaatM:  inputs.haat_m ?? null,
     computedRadialHaat:     evidence?.terrain_haat_per_radial ?? [],
     rcamslM:                inputs.rcamsl_m ?? inputs.overall_height_amsl_m ?? null,
