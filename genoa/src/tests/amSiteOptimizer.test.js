@@ -17676,3 +17676,50 @@ test('#116 candidate_comparison_table has rdb_* columns', async () => {
     assert.ok('rdb_n_da_certifications'  in row, 'rdb_n_da_certifications missing');
   }
 });
+
+// ---- Feature #117: am_station_sale_and_license_assignment_guide ----
+test('#117 KAZM: station sale guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_station_sale_and_license_assignment_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(g.total_cost_low_usd > 0, 'total_cost_low_usd must be positive');
+  assert.ok(g.total_cost_high_usd > g.total_cost_low_usd, 'high cost must exceed low cost');
+  assert.ok(Array.isArray(g.due_diligence_items) && g.due_diligence_items.length >= 6, 'must have ≥6 due diligence items');
+});
+
+test('#117 streamlined timeline is 60 days; contested is longer', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_station_sale_and_license_assignment_guide;
+  assert.strictEqual(g.timeline_days.streamlined, 60, 'streamlined must be 60 days');
+  assert.ok(g.timeline_days.contested > g.timeline_days.streamlined, 'contested must exceed streamlined');
+  assert.strictEqual(g.timeline_days.petition_window, 30, 'petition window must be 30 days');
+});
+
+test('#117 DA station has higher total cost than NDA (DA exhibit premium)', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_station_sale_and_license_assignment_guide;
+  const gDA2 = da2.candidates[0].am_station_sale_and_license_assignment_guide;
+  assert.ok(gDA2.total_cost_low_usd > gNDA.total_cost_low_usd, 'DA-2 total cost must exceed NDA (exhibit premium)');
+  assert.strictEqual(gNDA.da_exhibit_premium_usd, 0, 'NDA must have zero DA exhibit premium');
+  assert.ok(gDA2.da_exhibit_premium_usd > 0, 'DA-2 must have positive exhibit premium');
+});
+
+test('#117 critical due diligence items include license verification and enforcement check', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_station_sale_and_license_assignment_guide;
+  const criticals = g.due_diligence_items.filter(d => d.priority === 'CRITICAL');
+  assert.ok(criticals.length >= 2, 'must have at least 2 CRITICAL items');
+  assert.ok(criticals.some(d => d.item.toLowerCase().includes('license') || d.item.toLowerCase().includes('lms')), 'license verification must be critical');
+});
+
+test('#117 candidate_comparison_table has sal_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('sal_total_cost_low_usd'  in row, 'sal_total_cost_low_usd missing');
+    assert.ok('sal_total_cost_high_usd' in row, 'sal_total_cost_high_usd missing');
+    assert.ok('sal_streamlined_days'    in row, 'sal_streamlined_days missing');
+    assert.ok('sal_n_critical_items'    in row, 'sal_n_critical_items missing');
+    assert.ok('sal_fcc_form_fee_usd'    in row, 'sal_fcc_form_fee_usd missing');
+  }
+});

@@ -10563,6 +10563,64 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Station Sale & License Assignment Guide */}
+        {candidate.am_station_sale_and_license_assignment_guide && (() => {
+          const g = candidate.am_station_sale_and_license_assignment_guide;
+          const tl = g.timeline_days || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Station Sale &amp; FCC License Assignment (§73.3540 / Form 314/315)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>
+                    ${(g.total_cost_low_usd || 0).toLocaleString()}–${(g.total_cost_high_usd || 0).toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FCC FILING FEE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>${(g.fcc_form_fee_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>STREAMLINED TIMELINE</span>
+                  <div style={{ color: '#22c55e', fontSize: 11, fontWeight: 700 }}>{tl.streamlined} days</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>PETITION WINDOW</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{tl.petition_window} days</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CRITICAL DUE DILIGENCE</span>
+                  <div style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>{g.n_critical_items} items</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>HIGH PRIORITY</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>{g.n_high_items} items</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANTI-TRAFFICKING HOLD</span>
+                  <div style={{ color: '#22c55e', fontSize: 11 }}>{g.anti_trafficking_holding_period}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Due Diligence Checklist</div>
+              {(g.due_diligence_items || []).slice(0, 6).map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: d.priority === 'CRITICAL' ? '#f87171' : d.priority === 'HIGH' ? '#fbbf24' : '#cbd5e1', fontSize: 9 }}>
+                    [{d.priority}] {d.item}
+                  </span>
+                  <span style={{ color: '#64748b', fontSize: 9 }}>{d.rule}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

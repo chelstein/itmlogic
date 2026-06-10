@@ -1690,7 +1690,12 @@ export async function runSiteOptimizer(body = {}){
     rdb_one_time_total_usd:             c.am_fcc_registration_and_database_management_guide?.one_time_registration_costs?.total_usd ?? null,
     rdb_annual_total_low_usd:           c.am_fcc_registration_and_database_management_guide?.annual_maintenance_costs?.total_annual_low_usd ?? null,
     rdb_n_annual_obligations:           c.am_fcc_registration_and_database_management_guide?.n_annual_obligations ?? null,
-    rdb_n_da_certifications:            c.am_fcc_registration_and_database_management_guide?.n_da_certifications ?? null
+    rdb_n_da_certifications:            c.am_fcc_registration_and_database_management_guide?.n_da_certifications ?? null,
+    sal_total_cost_low_usd:             c.am_station_sale_and_license_assignment_guide?.total_cost_low_usd ?? null,
+    sal_total_cost_high_usd:            c.am_station_sale_and_license_assignment_guide?.total_cost_high_usd ?? null,
+    sal_streamlined_days:               c.am_station_sale_and_license_assignment_guide?.timeline_days?.streamlined ?? null,
+    sal_n_critical_items:               c.am_station_sale_and_license_assignment_guide?.n_critical_items ?? null,
+    sal_fcc_form_fee_usd:               c.am_station_sale_and_license_assignment_guide?.fcc_form_fee_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30181,6 +30186,130 @@ async function scoreCandidate(pt, ctx, warnings){
         key_databases: ['CORES/FRN', 'LMS', 'ASR', 'ETRS/EAS', 'OPIF'],
         reference: '47 CFR §1.8001; §17.4; §17.7; §73.2080; §73.3526; §73.3539; §73.3571; §73.3598; §73.3615; §11.61',
         note: `${frequency_khz} kHz (${fcc_class}): ASR ${asr_required ? 'REQUIRED (λ/4 ≈ ' + qw_m + ' m > 61 m)' : 'not required (λ/4 ≈ ' + qw_m + ' m ≤ 61 m)'}. Annual compliance cost ≈ $${total_annual_low_usd.toLocaleString()}. ${n_annual_obligations} annual obligations. ${is_da ? 'DA pattern parameters must be current in LMS.' : 'NDA — no pattern maintenance required.'}`
+      };
+    })(),
+
+    am_station_sale_and_license_assignment_guide: (() => {
+      // Guide #117 — Station Sale & FCC License Assignment
+      //
+      // An AM station sale requires FCC consent before closing.  The license
+      // is not property that can be freely sold — it is assigned or transferred
+      // subject to §310(d) of the Communications Act and FCC Form 314/315.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.3540 — Application for voluntary assignment/transfer.
+      //   Assignee must be legally, technically, and financially qualified.
+      //   Application must be filed and granted before the transaction closes.
+      //
+      // 47 CFR §73.3597 — Processing of assignment/transfer applications.
+      //   Routine applications are processed in ~60 days (Streamlined).
+      //   Complex/contested applications can take 6–18 months.
+      //   FCC will place application on public notice for 30-day petition period.
+      //
+      // 47 CFR §73.3522 — Anti-trafficking rule (repealed 1981 for radio).
+      //   No current anti-trafficking holding period for AM stations.
+      //   However, stations still must have served the public interest during
+      //   the holding period under license renewal standards.
+      //
+      // 47 CFR §73.3555 — Ownership limits (see guide #115).
+      //   Buyer must certify compliance with local ownership caps.
+      //
+      // FCC Form 314 — Assignment of license (asset sale).
+      // FCC Form 315 — Transfer of control (stock/entity-level deal).
+      //   These are distinct forms; choice depends on transaction structure.
+      //
+      // DUE DILIGENCE CHECKLIST (Engineering)
+      // ──────────────────────────────────────
+      //  • Verify license parameters match LMS records (ERP, ant. coord.)
+      //  • Confirm no pending enforcement actions (FCC EDOCS search)
+      //  • Confirm CP validity/expiration if any outstanding CP
+      //  • Review OPIF for completeness (public file violations = liability)
+      //  • Confirm EEO program compliance history
+      //  • Review lease for transmitter site and tower rights
+      //  • Confirm DA proof of performance if applicable
+      //  • Confirm ASR current and annual inspection up to date
+      //  • Check for pending interference complaints (FCC Enforcement Bureau)
+      //
+      // TIMELINE (STREAMLINED APPLICATION)
+      // ────────────────────────────────────
+      //  Day 0:   File Form 314/315 in LMS
+      //  Day ~7:  FCC issues public notice; 30-day petition window opens
+      //  Day ~37: Petition window closes; if no objections → staff review
+      //  Day ~60: Consent granted (streamlined)
+      //  Day 60+: Parties close transaction; file consummation notice
+      //           within 30 days of closing (FCC Form 316).
+      //
+      // COST ESTIMATES
+      //  Filing fee: Form 314/315 FCC fee: $1,020 (FY2024 AM schedule fee)
+      //  Legal (simple assignment): $5,000–$15,000 (buyer + seller counsel)
+      //  Legal (contested/complex): $25,000–$75,000+
+      //  Engineering technical exhibits: $3,000–$8,000
+      //  Environmental/title review: $2,000–$5,000
+
+      const is_da = /^DA/i.test(pattern_mode);
+
+      const FCC_FORM_FEE_USD    = 1020;     // FY2024 FCC Form 314/315 filing fee
+      const LEGAL_LOW_USD       = 5000;     // simple streamlined transaction
+      const LEGAL_HIGH_USD      = 15000;
+      const ENG_EXHIBIT_LOW_USD = 3000;
+      const ENG_EXHIBIT_HIGH_USD= 8000;
+      const ENV_TITLE_LOW_USD   = 2000;
+      const ENV_TITLE_HIGH_USD  = 5000;
+
+      // DA stations require pattern exhibits — add DA engineering premium
+      const DA_EXHIBIT_PREMIUM  = is_da ? 2500 : 0;
+
+      const total_cost_low_usd  = round2(FCC_FORM_FEE_USD + LEGAL_LOW_USD + ENG_EXHIBIT_LOW_USD + ENV_TITLE_LOW_USD + DA_EXHIBIT_PREMIUM);
+      const total_cost_high_usd = round2(FCC_FORM_FEE_USD + LEGAL_HIGH_USD + ENG_EXHIBIT_HIGH_USD + ENV_TITLE_HIGH_USD + DA_EXHIBIT_PREMIUM);
+
+      const TIMELINE_DAYS = {
+        streamlined: 60,
+        contested:   270,  // 9 months typical
+        petition_window: 30,
+        consummation_notice: 30,  // after closing
+      };
+
+      const DUE_DILIGENCE_ITEMS = [
+        { item: 'License/LMS parameter verification',    priority: 'CRITICAL', rule: '47 CFR §73.24' },
+        { item: 'FCC enforcement action search',         priority: 'CRITICAL', rule: 'FCC EDOCS' },
+        { item: 'OPIF completeness audit',               priority: 'HIGH',     rule: '47 CFR §73.3526' },
+        { item: 'CP validity and expiration check',      priority: 'HIGH',     rule: '47 CFR §73.3598' },
+        { item: 'Transmitter site lease review',         priority: 'HIGH',     rule: 'Contract law' },
+        { item: 'ASR status and inspection currency',    priority: 'MEDIUM',   rule: '47 CFR §17.21' },
+        { item: 'EEO program compliance history',        priority: 'MEDIUM',   rule: '47 CFR §73.2080' },
+        { item: 'Ownership cap certification',           priority: 'HIGH',     rule: '47 CFR §73.3555' },
+      ];
+
+      // DA-specific due diligence
+      if (is_da) {
+        DUE_DILIGENCE_ITEMS.push(
+          { item: 'DA proof of performance review',      priority: 'HIGH',     rule: '47 CFR §73.62' },
+          { item: 'Monitor point measurement records',   priority: 'HIGH',     rule: '47 CFR §73.158' }
+        );
+      }
+
+      const n_critical_items = DUE_DILIGENCE_ITEMS.filter(d => d.priority === 'CRITICAL').length;
+      const n_high_items     = DUE_DILIGENCE_ITEMS.filter(d => d.priority === 'HIGH').length;
+
+      return {
+        applicable_forms: is_da
+          ? ['Form 314 (asset sale)', 'Form 315 (transfer of control)']
+          : ['Form 314 (asset sale)', 'Form 315 (transfer of control)'],
+        fcc_form_fee_usd: FCC_FORM_FEE_USD,
+        legal_cost_low_usd:  LEGAL_LOW_USD,
+        legal_cost_high_usd: LEGAL_HIGH_USD,
+        da_exhibit_premium_usd: DA_EXHIBIT_PREMIUM,
+        total_cost_low_usd,
+        total_cost_high_usd,
+        timeline_days: TIMELINE_DAYS,
+        due_diligence_items: DUE_DILIGENCE_ITEMS,
+        n_critical_items,
+        n_high_items,
+        anti_trafficking_holding_period: 'None (repealed 1981 for radio)',
+        streamlined_eligible: true,
+        reference: '47 CFR §73.3540; §73.3597; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
+        note: `${frequency_khz} kHz (${fcc_class}): Assignment cost range $${total_cost_low_usd.toLocaleString()}–$${total_cost_high_usd.toLocaleString()}. Streamlined timeline ~${TIMELINE_DAYS.streamlined} days. ${n_critical_items} critical due-diligence items. ${is_da ? 'DA station: pattern exhibits required.' : 'NDA: standard exhibits.'}`
       };
     })(),
 

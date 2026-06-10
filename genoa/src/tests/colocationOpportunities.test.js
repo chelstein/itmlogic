@@ -4348,3 +4348,14 @@ test('am_fcc_registration_and_database_management_guide present across colocatio
     assert.ok(Array.isArray(g.key_databases) && g.key_databases.length >= 3, 'must have at least 3 key databases');
   }
 });
+
+test('am_station_sale_and_license_assignment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_station_sale_and_license_assignment_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_station_sale_and_license_assignment_guide');
+    assert.ok(g.total_cost_low_usd > 0, 'total_cost_low_usd must be positive');
+    assert.ok(g.timeline_days?.streamlined === 60, 'streamlined timeline must be 60 days');
+    assert.ok(Array.isArray(g.due_diligence_items) && g.due_diligence_items.length >= 6, 'must have ≥6 due diligence items');
+  }
+});
