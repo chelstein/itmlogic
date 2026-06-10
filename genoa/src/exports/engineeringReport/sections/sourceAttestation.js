@@ -50,7 +50,7 @@ const FIELD_LABEL = {
   frequency_mhz:       'Frequency',
   channel:             'Channel',
   erp_kw:              'ERP',
-  haat_m:              'HAAT',
+  haat_m:              'HAAT (filing-controlling)',
   rcamsl_m:            'RCAMSL',
   ground_elevation_m:  'Ground elevation',
   coordinates_lat_lon: 'Coordinates',
@@ -98,13 +98,33 @@ export function buildSourceAttestationSection(exhibit, options){
       });
       const op = (r.candidates || []).find(x => x.operative);
       if (op){
-        conflictNarratives.push(
-          `The operative ${label} for filing calculations is ${fmtValue(op.value, op.unit)} from ` +
-          `${SOURCE_LABEL[op.source_type] || op.source_type}.  The ${SOURCE_LABEL[c.source_type] || c.source_type} value of ` +
-          `${fmtValue(c.value, c.unit)} is retained as advisory engineering evidence and conflicts beyond tolerance ` +
-          `(Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}); it does not control filing ` +
-          `calculations unless reviewed and promoted by the engineer of record.`
-        );
+        const isHaatField = key === 'haat_m';
+        if (isHaatField) {
+          // HAAT conflict narrative must use HAAT-specific framing.
+          // The operative value is the filing-controlling HAAT (basis declared
+          // in the HAAT BASIS AND GOVERNANCE section); the non-operative value
+          // is retained as engineering evidence.  A difference between an
+          // FCC-authorized HAAT and a Genoa-computed §73.313 HAAT is a
+          // basis-selection issue, NOT a math failure — do not label it as one.
+          conflictNarratives.push(
+            `The filing-controlling HAAT used in this exhibit\'s RF calculations is ` +
+            `${fmtValue(op.value, op.unit)} from ${SOURCE_LABEL[op.source_type] || op.source_type}. ` +
+            `The ${SOURCE_LABEL[c.source_type] || c.source_type} HAAT value of ` +
+            `${fmtValue(c.value, c.unit)} is retained as advisory engineering evidence ` +
+            `(difference: Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}). ` +
+            `A difference between the FCC-authorized HAAT and the Genoa-computed §73.313 radial HAAT ` +
+            `is a basis-selection issue, not a math failure; it must be explicitly declared by the ` +
+            `engineer of record. See HAAT BASIS AND GOVERNANCE section for the declared basis.`
+          );
+        } else {
+          conflictNarratives.push(
+            `The operative ${label} for filing calculations is ${fmtValue(op.value, op.unit)} from ` +
+            `${SOURCE_LABEL[op.source_type] || op.source_type}.  The ${SOURCE_LABEL[c.source_type] || c.source_type} value of ` +
+            `${fmtValue(c.value, c.unit)} is retained as advisory engineering evidence and conflicts beyond tolerance ` +
+            `(Δ ${c.conflicts[0]?.delta ?? '—'} vs tolerance ${c.conflicts[0]?.tolerance ?? '—'}); it does not control filing ` +
+            `calculations unless reviewed and promoted by the engineer of record.`
+          );
+        }
       }
     }
   }

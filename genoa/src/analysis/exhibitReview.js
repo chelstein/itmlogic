@@ -74,14 +74,16 @@ export function snapshot(exhibit){
     lines.push(`engineering_conclusion=${exhibit.engineering_conclusion.conclusion}`);
   if (hv.status) lines.push(`haat_validation_status=${hv.status} haat_basis=${hv.basis || '?'}`);
 
-  // Full HAAT lineage context — enables the AI to distinguish operator
-  // input issues from genuine engineering contradictions.
+  // Full HAAT authority context — enables the AI to distinguish operator
+  // input issues from genuine engineering contradictions, and to correctly
+  // identify which of the three distinct HAAT concepts applies.
   const s = hv.stats || {};
   const lineage = exhibit?.haat_lineage || {};
-  const operatorEnteredM  = s.operator_m ?? lineage.operator_entered_m ?? null;
-  const operativeM        = lineage.operative_m ?? (hv.basis === 'terrain_derived' ? s.mean_m : s.operator_m);
-  const operativeBasis    = lineage.operative_basis ?? hv.basis ?? null;
-  const operativeSource   = lineage.operative_source ?? null;
+  const ha = exhibit?.haat_authority || {};
+  const operatorEnteredM  = s.operator_m ?? lineage.operator_entered_m ?? ha.operator_declared_haat_m ?? null;
+  const filingControllingM    = ha.filing_controlling_haat_m ?? lineage.operative_m ?? (hv.basis === 'terrain_derived' ? s.mean_m : s.operator_m);
+  const filingControllingBasis = ha.filing_controlling_haat_basis ?? lineage.operative_basis ?? hv.basis ?? null;
+  const filingControllingSource = ha.filing_controlling_haat_source ?? lineage.operative_source ?? null;
   const aglSuspected      = hv.agl_suspected === true;
   const suspectedInputType = aglSuspected ? 'tower_agl_entered_as_haat' : 'haat_as_entered';
   const haatValidationWarnings = (hv.issues || [])
@@ -89,10 +91,13 @@ export function snapshot(exhibit){
     .map(i => i.code)
     .join(',') || 'none';
 
-  if (operatorEnteredM != null) lines.push(`haat_operator_entered_m=${operatorEnteredM}`);
-  if (operativeM != null)       lines.push(`haat_operative_for_filing_m=${operativeM}`);
-  if (operativeBasis)           lines.push(`haat_operative_basis=${operativeBasis}`);
-  if (operativeSource)          lines.push(`haat_operative_source=${operativeSource}`);
+  if (operatorEnteredM != null)         lines.push(`haat_operator_entered_m=${operatorEnteredM}`);
+  if (ha.authorized_haat_m != null)     lines.push(`haat_fcc_authorized_m=${ha.authorized_haat_m}`);
+  if (ha.computed_average_haat_m != null) lines.push(`haat_computed_73_313_mean_m=${ha.computed_average_haat_m}`);
+  if (filingControllingM != null)       lines.push(`filing_controlling_haat_m=${filingControllingM}`);
+  if (filingControllingBasis)           lines.push(`filing_controlling_haat_basis=${filingControllingBasis}`);
+  if (filingControllingSource)          lines.push(`filing_controlling_haat_source=${filingControllingSource}`);
+  if (ha.haat_conflict_status)          lines.push(`haat_conflict_status=${ha.haat_conflict_status}`);
   lines.push(`haat_input_suspected_type=${suspectedInputType}`);
   lines.push(`haat_validation_warnings=${haatValidationWarnings}`);
 
