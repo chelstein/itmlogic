@@ -1605,7 +1605,12 @@ export async function runSiteOptimizer(body = {}){
     cfr_tolerance_ppm:                  c.am_carrier_frequency_reference_guide?.fcc_tolerance_ppm ?? null,
     cfr_recommended_ref:                c.am_carrier_frequency_reference_guide?.recommended_reference ?? null,
     cfr_gpsdo_cost_low_usd:             c.am_carrier_frequency_reference_guide?.reference_options?.[0]?.cost_low_usd ?? null,
-    cfr_tcxo_marginal:                  c.am_carrier_frequency_reference_guide?.tcxo_marginal ?? null
+    cfr_tcxo_marginal:                  c.am_carrier_frequency_reference_guide?.tcxo_marginal ?? null,
+    cos_opportunity_score:              c.am_colocation_opportunity_score_guide?.colocation_opportunity_score ?? null,
+    cos_opportunity_tier:               c.am_colocation_opportunity_score_guide?.opportunity_tier ?? null,
+    cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
+    cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
+    cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27373,6 +27378,157 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_colocation_opportunity_score_guide: (() => {
+      // Colocation opportunity scoring guide for this candidate site.
+      //
+      // Colocation (sharing an existing tower with another broadcaster) can
+      // dramatically reduce capital cost for an AM relocation — eliminating the
+      // tower, foundation, and much of the ground system cost — but has strict
+      // technical constraints:
+      //
+      //   1. Electrical height: the existing tower must match the AM antenna's
+      //      required electrical height (typically 3/8λ – 5/8λ for full ERP).
+      //   2. Structural load: the AM tower loading (guy tension, base insulator
+      //      clearances, RF isolation) must be compatible with the existing structure.
+      //   3. Pattern: a DA system requires multiple towers at precise spacings/
+      //      orientations; colocation of DA stations is rare and expensive.
+      //   4. Interference: AM towers are base-driven; co-located FM or TV antennas
+      //      may re-radiate and distort the AM pattern.
+      //   5. Ground system: the AM station needs its own buried radial ground system
+      //      regardless of colocation; shared ground is NOT acceptable.
+      //
+      // This guide scores the colocation opportunity for the candidate site using
+      // publicly available proxy metrics (tower height feasibility from tpo_kw,
+      // DA complexity, blanket population for existing tower density, and
+      // candidate grid spacing as a proxy for candidate distance from existing towers).
+      //
+      // References: §73.150; §73.153; §73.190; FCC/NAB co-location engineering guidance
+      //             NAB Engineering Handbook Ch. 5, §5.3 (Tower sharing)
+
+      const isDA_cos   = /^DA/i.test(pattern_mode);
+      const isClear_cos = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // ---- Ideal tower height for this station ----
+      // Optimal AM antenna height: between λ/4 (90° electrical) and 5/8λ (225° electrical)
+      // Practical peak ERP: ~225° (5/8λ) for NDA; pattern needs may force different height for DA
+      const lambda_m_cos = 3e8 / (frequency_khz * 1e3);   // wavelength in meters
+      const opt_height_m = round2(lambda_m_cos * 5 / 8);   // 5/8λ optimal
+      const min_height_m = round2(lambda_m_cos * 1 / 4);   // λ/4 minimum useful
+      const opt_height_ft = round2(opt_height_m * 3.28084);
+      const min_height_ft = round2(min_height_m * 3.28084);
+
+      // ---- Colocation feasibility tier ----
+      // NDA stations are much more likely to find compatible shared towers.
+      // DA stations almost always require dedicated towers at precise spacings.
+      const COL_SCENARIOS = isDA_cos ? [
+        {
+          id:          'DEDICATED_ARRAY',
+          label:       'Dedicated DA tower array (recommended)',
+          feasibility: 'HIGH',
+          cost_pct_greenfield: 100,
+          notes:       'DA stations require precise tower spacing and orientation; colocation on existing towers is rarely geometrically feasible.'
+        },
+        {
+          id:          'PARTIAL_COLOCATION',
+          label:       'Partial colocation (1 tower shared, rest dedicated)',
+          feasibility: 'LOW',
+          cost_pct_greenfield: 80,
+          notes:       'May be possible if existing tower height/orientation matches one element of the array. Requires full EM modeling.'
+        }
+      ] : [
+        {
+          id:          'FULL_COLOCATION',
+          label:       'Full colocation (AM on existing tower)',
+          feasibility: 'MODERATE',
+          cost_pct_greenfield: 35,
+          notes:       `Requires existing tower ${min_height_ft}–${opt_height_ft} ft, base insulator compatible design, and ATU/isolation network. Cost: ~35% of greenfield.`
+        },
+        {
+          id:          'TOWER_MODIFICATION',
+          label:       'Existing tower modification (height extension)',
+          feasibility: 'LOW',
+          cost_pct_greenfield: 60,
+          notes:       'If existing tower is too short, a height extension (add-on section or guy replacement) may be feasible with structural analysis. Cost: ~60% of greenfield.'
+        },
+        {
+          id:          'GREENFIELD',
+          label:       'Dedicated new tower (greenfield)',
+          feasibility: 'HIGH',
+          cost_pct_greenfield: 100,
+          notes:       'Always feasible; highest cost but maximum control over height, location, and ground system.'
+        }
+      ];
+
+      // ---- Proximity heuristic ----
+      // Use blanket_population_pct as a proxy for existing tower density:
+      // high blanket pop → more urban → more existing broadcast towers to co-locate on.
+      // Crude but avoids needing a live tower database at screening stage.
+      const bp_cos = pt.blanket_population_pct ?? 0;
+      const existing_tower_density = bp_cos > 0.15 ? 'HIGH' : bp_cos > 0.05 ? 'MODERATE' : 'LOW';
+      const colocation_search_priority = !isDA_cos && existing_tower_density !== 'LOW' ? 'HIGH' : 'LOW';
+
+      // ---- Cost comparison: colocation vs greenfield ----
+      // Greenfield reference cost for NDA single tower
+      const greenfield_tower_low_usd   = Math.round((100000 + opt_height_ft * 180) / 1000) * 1000;
+      const greenfield_tower_high_usd  = Math.round(greenfield_tower_low_usd * 2.0 / 1000) * 1000;
+      const colocation_base_low_usd    = isDA_cos ? greenfield_tower_low_usd
+        : Math.round((greenfield_tower_low_usd * 0.35) / 1000) * 1000;
+      const colocation_base_high_usd   = isDA_cos ? greenfield_tower_high_usd
+        : Math.round((greenfield_tower_high_usd * 0.45) / 1000) * 1000;
+      // Ground system is always required regardless of colocation
+      const ground_system_usd_low      = Math.round(120 * round2(lambda_m_cos / 4 * 3.28084) * 1.5 / 1000) * 1000;
+      const ground_system_usd_high     = Math.round(ground_system_usd_low * 1.8 / 1000) * 1000;
+
+      // ---- RF interference checklist ----
+      // Co-located non-AM antennas that could distort the AM pattern:
+      const RF_INTERFERENCE_RISKS = [
+        { source: 'FM antenna on shared tower',    risk: 'MODERATE', mitigation: 'RF isolation network + ATU; may require EM simulation of pattern distortion' },
+        { source: 'TV antenna on shared tower',    risk: 'LOW',       mitigation: 'TV frequencies far from AM MF; limited re-radiation concern; verify with field measurement' },
+        { source: 'Two-way or cellular on tower',  risk: 'LOW',       mitigation: 'Band-pass filter on AM feed; verify no intermod products in AM band' },
+        { source: 'Adjacent AM tower (DA element)', risk: 'HIGH',     mitigation: 'Strict phasor coupling analysis required; undriven AM towers must be detuned (§73.153)' }
+      ];
+
+      // ---- Overall opportunity score (0–100) ----
+      let opp_score = 50;  // baseline
+      if (!isDA_cos) opp_score += 25;                    // NDA stations have much better colocation options
+      if (existing_tower_density === 'HIGH') opp_score += 15;
+      else if (existing_tower_density === 'MODERATE') opp_score += 7;
+      if (isClear_cos) opp_score -= 10;                 // clear channel = tall tower need; harder to match
+      const colocation_opportunity_score = Math.min(100, Math.max(0, opp_score));
+
+      const opportunity_tier = colocation_opportunity_score >= 65 ? 'GOOD'
+        : colocation_opportunity_score >= 40 ? 'MODERATE'
+        : 'LOW';
+
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        is_da: isDA_cos, is_clear_channel: isClear_cos,
+        optimal_tower_height_m: opt_height_m,
+        optimal_tower_height_ft: opt_height_ft,
+        minimum_tower_height_m: min_height_m,
+        minimum_tower_height_ft: min_height_ft,
+        colocation_opportunity_score,
+        opportunity_tier,
+        existing_tower_density,
+        colocation_search_priority,
+        scenarios: COL_SCENARIOS,
+        n_scenarios: COL_SCENARIOS.length,
+        cost_comparison: {
+          greenfield_tower_low_usd,
+          greenfield_tower_high_usd,
+          colocation_base_low_usd,
+          colocation_base_high_usd,
+          ground_system_usd_low,   // always required
+          ground_system_usd_high,
+          potential_savings_low_usd: isDA_cos ? 0 : greenfield_tower_low_usd - colocation_base_high_usd
+        },
+        rf_interference_risks: RF_INTERFERENCE_RISKS,
+        n_rf_risks: RF_INTERFERENCE_RISKS.length,
+        reference: '47 CFR §73.150; §73.153; §73.190; NAB Engineering Handbook Ch. 5 §5.3',
+        note: `Colocation opportunity: ${colocation_opportunity_score}/100 (${opportunity_tier}). ${isDA_cos ? 'DA station — dedicated array almost always required.' : `NDA: optimal tower ${opt_height_ft} ft (5/8λ). Colocation saves ~$${((greenfield_tower_low_usd - colocation_base_low_usd)/1000).toFixed(0)}K–$${((greenfield_tower_high_usd - colocation_base_high_usd)/1000).toFixed(0)}K vs greenfield.`}`
       };
     })(),
 

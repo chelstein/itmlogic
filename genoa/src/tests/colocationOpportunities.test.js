@@ -4169,3 +4169,13 @@ test('am_carrier_frequency_reference_guide present across colocation candidates'
     assert.ok(cfr.n_reference_options >= 4, 'must have ≥ 4 reference options');
   }
 });
+
+test('am_colocation_opportunity_score_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cos = c.am_colocation_opportunity_score_guide;
+    assert.ok(cos !== undefined && cos !== null, 'candidate missing am_colocation_opportunity_score_guide');
+    assert.ok(['GOOD','MODERATE','LOW'].includes(cos.opportunity_tier), `unexpected tier: ${cos.opportunity_tier}`);
+    assert.ok(cos.optimal_tower_height_ft > 0, 'optimal_tower_height_ft must be positive');
+  }
+});
