@@ -1610,7 +1610,12 @@ export async function runSiteOptimizer(body = {}){
     cos_opportunity_tier:               c.am_colocation_opportunity_score_guide?.opportunity_tier ?? null,
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
-    cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null
+    cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    fcs_channel_class:                  c.am_frequency_coordination_and_channel_study_guide?.channel_class ?? null,
+    fcs_has_skywave:                    c.am_frequency_coordination_and_channel_study_guide?.has_skywave_obligation ?? null,
+    fcs_coch_radius_km:                 c.am_frequency_coordination_and_channel_study_guide?.co_channel_search_radius_km ?? null,
+    fcs_adj_radius_km:                  c.am_frequency_coordination_and_channel_study_guide?.adj_channel_search_radius_km ?? null,
+    fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27378,6 +27383,117 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_frequency_coordination_and_channel_study_guide: (() => {
+      // Frequency coordination and channel interference study guide.
+      //
+      // Before an AM relocation can be accepted by FCC LMS, the applicant must
+      // demonstrate that the proposed site and antenna configuration do not
+      // create prohibited interference to:
+      //   1. Co-channel Class A (clear-channel) and Class B dominant stations
+      //      per §73.182 skywave (50% RSS sky-wave protection)
+      //   2. Co-channel daytime groundwave per §73.182(a)–(d) D/U ratios
+      //   3. Adjacent-channel (±10 kHz) stations per §73.182(g)/(h) tables
+      //   4. 2nd-adjacent (±20 kHz) stations per §73.182(k)
+      //   5. International stations — US/MX (1986 agreement) and US/CA treaty
+      //
+      // Channel classification determines which rules apply.  Local channels
+      // (Class C, 1230–1490 kHz) have relaxed protection obligations vs.
+      // regional (Class B) and clear (Class A) channels.
+      //
+      // References:
+      //   47 CFR §73.182 (nighttime protection)
+      //   47 CFR §73.37 (daytime prohibited operations)
+      //   47 CFR §73.183/§73.184 (groundwave method)
+      //   FCC Form 301-AM Instructions
+      //   US/Mexico AM Agreement (1986); US/Canada Agreement
+
+      const isClearCh  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocalCh  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isRegional = !isClearCh && !isLocalCh;
+
+      // Channel class label
+      const channelClass = isClearCh ? 'CLEAR (Class A dominant)' : isLocalCh ? 'LOCAL (Class C, ≤250W)' : 'REGIONAL (Class B)';
+
+      // Daytime groundwave D/U requirements (§73.182(a)–(d) simplified)
+      // Co-channel Class A stations require 20 dB D/U at the proposed transmitter site.
+      // These are screening thresholds — exact §73.182 table interpolation required.
+      const CO_CHANNEL_DU_DB = isClearCh ? 26 : isLocalCh ? 6 : 20;  // dB required
+      const ADJ_CHANNEL_DU_DB = 6;   // §73.182(g) ±10 kHz minimum D/U
+      const SEC_ADJ_DU_DB     = 0;   // §73.182(k) ±20 kHz — equal signal acceptable
+
+      // Required groundwave study radius (km) for Form 301 co-channel search
+      // §73.182 table lookup requires searching to the 0.5 mV/m co-channel contour.
+      // As a proxy: 0.5 mV/m ~ 1.5× the 25 mV/m distance for typical erp/HAAT.
+      // Use class-based search radius floor from FCC practice.
+      const CO_CHANNEL_SEARCH_RADIUS_KM = isClearCh ? 1000 : isLocalCh ? 300 : 650;
+      const ADJ_CHANNEL_SEARCH_RADIUS_KM = isClearCh ? 500 : isLocalCh ? 200 : 350;
+
+      // International treaty zone check
+      const MX_TREATY_RADIUS_KM  = 320;
+      const CA_TREATY_RADIUS_KM  = 800;
+
+      // Nighttime skywave obligation for this class
+      const hasSkywave   = fcc_class !== 'C';   // Class C has no skywave protection obligation
+      const hasDaytimeDA = /^DA/i.test(pattern_mode) && erp_kw > 0;
+
+      // Form 301-AM sections triggered by relocation
+      const FORM301_SECTIONS = [
+        { section: 'Section I',  item: 'Station identification and license data', required: true },
+        { section: 'Section II', item: 'Technical operating parameters (ERP, ant pattern, HAAT)', required: true },
+        { section: 'Section III', item: 'Transmitter site coordinates and AMSL', required: true },
+        { section: 'Section IV', item: 'Co-channel and adjacent-channel interference study (§73.182)', required: true },
+        { section: 'Section IV', item: 'International station check (US/MX, US/CA treaties)', required: isClearCh || isRegional },
+        { section: 'Section V',  item: 'Nighttime RSS skywave calculation if Class A, B, or D', required: hasSkywave },
+        { section: 'Section VI', item: 'DA antenna pattern table if directional (§73.316)', required: hasDaytimeDA },
+        { section: 'Section VII', item: 'Environmental notification (NEPA/NHPA) if applicable', required: true }
+      ];
+
+      // Co-channel search methodology overview
+      const STUDY_METHODOLOGY = {
+        groundwave_method: '47 CFR §73.183 / §73.184 FCC gwave conductivity curves',
+        skywave_method:    hasSkywave ? '47 CFR §73.190(c) Wang 1985 Ionospheric method (FCCAM sidecar)' : 'N/A — Class C no skywave obligation',
+        rss_formula:       hasSkywave ? 'RSS = √(∑ Eₙ²) where Eₙ is interfering skywave field; proposed ≤ √(Eprotected² - ∑ Eₙ²)' : 'N/A',
+        du_ratio_method:   '§73.182 Table I (co-channel), Table II (adj-channel); FCC gwave distance',
+        search_tools:      'FCC AM Query (CDBS), LMS AM search, FCCAM sidecar (skywave RSS)'
+      };
+
+      // Estimated study effort (person-hours) based on channel class
+      const STUDY_EFFORT_HRS = isClearCh ? { min: 16, max: 40, note: 'Clear-channel skywave RSS can require querying 100+ stations' }
+                              : isLocalCh ? { min: 4,  max: 12, note: 'Local channels: groundwave-only study; shorter search radius' }
+                              :             { min: 8,  max: 24, note: 'Regional B channels: groundwave + skywave; moderate radius' };
+
+      // Cost estimate
+      const COST_EST_USD = {
+        diy_engineer:    isClearCh ? 4000 : isLocalCh ? 1200 : 2500,
+        consulting_firm: isClearCh ? 12000 : isLocalCh ? 3500 : 7500,
+        note:            'Consulting cost ranges from independent engineer to full filing firm'
+      };
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        channel_class:           channelClass,
+        is_clear_channel:        isClearCh,
+        is_local_channel:        isLocalCh,
+        is_regional_channel:     isRegional,
+        has_skywave_obligation:  hasSkywave,
+        has_da_pattern:          hasDaytimeDA,
+        co_channel_du_required_db:  CO_CHANNEL_DU_DB,
+        adj_channel_du_required_db: ADJ_CHANNEL_DU_DB,
+        sec_adj_du_required_db:     SEC_ADJ_DU_DB,
+        co_channel_search_radius_km:  CO_CHANNEL_SEARCH_RADIUS_KM,
+        adj_channel_search_radius_km: ADJ_CHANNEL_SEARCH_RADIUS_KM,
+        international_treaty_mx_km:  MX_TREATY_RADIUS_KM,
+        international_treaty_ca_km:  CA_TREATY_RADIUS_KM,
+        form_301_sections:        FORM301_SECTIONS,
+        n_form_301_required:      FORM301_SECTIONS.filter(s => s.required).length,
+        study_methodology:        STUDY_METHODOLOGY,
+        study_effort_hrs:         STUDY_EFFORT_HRS,
+        cost_est_usd:             COST_EST_USD,
+        reference: '47 CFR §73.182; §73.37; §73.183; §73.184; §73.190; FCC Form 301-AM; US/Mexico 1986 AM Agreement; US/Canada AM Treaty',
+        note: `${channelClass} channel. Required study radius: co-channel ${CO_CHANNEL_SEARCH_RADIUS_KM} km, adj-channel ${ADJ_CHANNEL_SEARCH_RADIUS_KM} km. ${hasSkywave ? 'Nighttime skywave RSS required.' : 'No nighttime skywave obligation (Class C).'}`
       };
     })(),
 

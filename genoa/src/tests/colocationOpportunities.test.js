@@ -4179,3 +4179,14 @@ test('am_colocation_opportunity_score_guide present across colocation candidates
     assert.ok(cos.optimal_tower_height_ft > 0, 'optimal_tower_height_ft must be positive');
   }
 });
+
+test('am_frequency_coordination_and_channel_study_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const fcs = c.am_frequency_coordination_and_channel_study_guide;
+    assert.ok(fcs !== undefined && fcs !== null, 'candidate missing am_frequency_coordination_and_channel_study_guide');
+    assert.ok(typeof fcs.channel_class === 'string', 'channel_class must be a string');
+    assert.ok(typeof fcs.co_channel_search_radius_km === 'number', 'co_channel_search_radius_km must be numeric');
+    assert.ok(fcs.n_form_301_required > 0, 'n_form_301_required must be positive');
+  }
+});
