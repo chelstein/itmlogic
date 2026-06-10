@@ -1670,7 +1670,12 @@ export async function runSiteOptimizer(body = {}){
     fsm_n_radials:                      c.am_field_strength_measurement_and_contour_verification_guide?.n_radials_required ?? null,
     fsm_total_measurements:             c.am_field_strength_measurement_and_contour_verification_guide?.total_field_measurements ?? null,
     fsm_total_cost_low_usd:             c.am_field_strength_measurement_and_contour_verification_guide?.total_cost_low_usd ?? null,
-    fsm_filing_deadline_days:           c.am_field_strength_measurement_and_contour_verification_guide?.filing_deadline_days ?? null
+    fsm_filing_deadline_days:           c.am_field_strength_measurement_and_contour_verification_guide?.filing_deadline_days ?? null,
+    ids_d_05_km:                        c.am_interference_distance_and_service_area_overlap_guide?.service_contours?.d_05_mvm_km ?? null,
+    ids_d_01_km:                        c.am_interference_distance_and_service_area_overlap_guide?.service_contours?.d_01_mvm_km ?? null,
+    ids_risk_level:                     c.am_interference_distance_and_service_area_overlap_guide?.interference_risk_level ?? null,
+    ids_co_ch_min_sep_km:               c.am_interference_distance_and_service_area_overlap_guide?.min_separation_km?.co_km ?? null,
+    ids_du_co_ch_db:                    c.am_interference_distance_and_service_area_overlap_guide?.du_requirements?.co_channel_groundwave_db ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -29644,6 +29649,122 @@ async function scoreCandidate(pt, ctx, warnings){
         note: isDA
           ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: formal proof required within ${filing_deadline_days} days of initial operation — ${n_radials_required} radials at ${radial_step_deg}° steps, ${MIN_POINTS_PER_RADIAL} points/radial (${total_field_measurements} measurements). File via FCC Form 302-AM.`
           : `NDA station at ${frequency_khz} kHz: formal proof not required (§73.152) unless FCC orders. Recommend ${nda_spot_check_radials} spot-check radials internally to verify COL coverage and document compliance.`
+      };
+    })(),
+
+    am_interference_distance_and_service_area_overlap_guide: (() => {
+      // Interference distance and service area overlap analysis.
+      //
+      // 47 CFR §73.182 — Engineering Standards for AM Broadcast Stations.
+      //   Table 1 specifies the required D/U (desired-to-undesired) signal
+      //   ratios for co-channel and adjacent-channel protection at the
+      //   0.5 mV/m service contour of the proposed station.
+      //   Key D/U values (daytime, co-channel):
+      //     Class A dominant station: D/U ≥ 20 dB at 0.5 mV/m service boundary
+      //     Class B/C/D skywave:      D/U ≥ 6 dB (0.1 mV/m nighttime)
+      //     Ground wave co-channel:   D/U ≥ 3 dB at 0.5 mV/m
+      //   Adjacent channel (±10 kHz): D/U ≥ −6 dB (undesired may exceed desired)
+      //   Adjacent channel (±20 kHz): D/U ≥ −12 dB
+      //
+      // 47 CFR §73.37 — Table of minimum separation distances.
+      //   Specifies the minimum km between co-channel and adjacent-channel
+      //   stations by station class combination.  These are the initial
+      //   screening criteria; actual protection studies use §73.182 methodology.
+      //
+      // 47 CFR §73.187 — Dominance rule (Class A clear-channel stations).
+      //   All other stations on a clear channel must protect the dominant
+      //   Class A station's 0.5 mV/m primary service contour by ≥ 20 dB D/U.
+      //   At night, Class B/D stations must not cause interference within
+      //   the dominant station's 0.1 mV/m 50% skywave service contour.
+      //
+      // Protection contour radii are computed using the FCC's AM groundwave
+      // curves (ITU-R P.368-10 / FCC M3 tables) at the station's soil
+      // conductivity σ and TPO.
+      //
+      // References:
+      //   47 CFR §73.37; §73.182 Table 1; §73.187
+      //   ITU-R P.368-10; FCC M3 conductivity maps
+
+      const chanClass  = frequencyChannelClass(frequency_khz);
+      const isClear    = chanClass === 'clear_channel';
+      const isRegional = chanClass === 'regional';
+      const isLocal    = chanClass === 'local';
+
+      // D/U requirement table (daytime, co-channel, at service boundary)
+      const DU_REQUIRED = {
+        co_channel_dominant_db:     isClear ? 20 : null,
+        co_channel_groundwave_db:   3,
+        adj_10khz_db:              -6,   // negative = undesired may exceed desired
+        adj_20khz_db:              -12,
+        night_skywave_dominant_db:  isClear ? 6 : null,
+        night_skywave_class_b_db:   isRegional ? 6 : null
+      };
+
+      // Service contour protection distances at this site's conductivity and power
+      const _gwDist = (mvm) => {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma_msm, erp_kw: tpo_kw });
+        return round2(r?.distance_km ?? 0);
+      };
+      const d_05_mvm_km = _gwDist(0.5);    // primary service contour
+      const d_025_mvm_km = _gwDist(0.25);  // mid-service
+      const d_01_mvm_km  = _gwDist(0.1);   // nighttime reference
+
+      // Protection contour areas
+      const area_05_km2  = round2(Math.PI * Math.pow(d_05_mvm_km,  2));
+      const area_01_km2  = round2(Math.PI * Math.pow(d_01_mvm_km,  2));
+
+      // Minimum separation distances from §73.37 Table — this station's class
+      const CLS = fcc_class.toUpperCase() in { A:1, B:1, C:1, D:1 } ? fcc_class.toUpperCase() : 'D';
+      const CO_CHANNEL_VS = {
+        A: { co_km: 1037, adj10_km: 805, adj20_km: 402 },
+        B: { co_km:  953, adj10_km: 724, adj20_km: 354 },
+        C: { co_km:  354, adj10_km: 177, adj20_km:  96 },
+        D: { co_km:  953, adj10_km: 724, adj20_km: 354 }
+      };
+      const my_sep = CO_CHANNEL_VS[CLS] ?? CO_CHANNEL_VS['D'];
+
+      // Interference risk assessment for this site relative to its conductivity
+      const sigma_q = sigmaQuality(sigma_msm);
+      const interference_risk_level =
+        sigma_q === 'EXCELLENT' ? 'LOW'
+        : sigma_q === 'GOOD'    ? 'LOW'
+        : sigma_q === 'FAIR'    ? 'MODERATE'
+        : 'HIGH';  // POOR conductivity has shorter groundwave reach, reducing interference
+
+      // Explanation: lower σ → shorter contour → lower D/U risk at distant stations
+      const risk_note = interference_risk_level === 'LOW'
+        ? `High σ (${sigma_msm} mS/m) extends primary contour to ${d_05_mvm_km} km — greater reach into potential co-channel interference zones.`
+        : interference_risk_level === 'MODERATE'
+        ? `Moderate σ (${sigma_msm} mS/m) — ${d_05_mvm_km} km primary contour; moderate D/U risk at neighboring stations.`
+        : `Low σ (${sigma_msm} mS/m) — shorter contour (${d_05_mvm_km} km); lower co-channel D/U risk but reduced COL coverage.`;
+
+      // Skywave obligation note
+      const skywave_obligation = isClear
+        ? `Clear channel (${frequency_khz} kHz): must protect Class A dominant station's 0.1 mV/m skywave contour at D/U ≥ 6 dB at night. Full NIF skywave study required per §73.182.`
+        : isRegional
+        ? `Regional channel (${frequency_khz} kHz): skywave NIF study required. Class B station must not cause harmful interference within protected service contours of co-channel stations.`
+        : `Local channel (${frequency_khz} kHz): no skywave obligation (Class C daytime-only or limited-time). Co-channel separation per §73.37 governs.`;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw, sigma_msm, pattern_mode,
+        channel_class:               chanClass,
+        is_clear_channel:            isClear,
+        is_regional_channel:         isRegional,
+        is_local_channel:            isLocal,
+        du_requirements:             DU_REQUIRED,
+        service_contours: {
+          d_05_mvm_km,
+          d_025_mvm_km,
+          d_01_mvm_km,
+          area_05_km2,
+          area_01_km2
+        },
+        min_separation_km:           my_sep,
+        interference_risk_level,
+        risk_note,
+        skywave_obligation,
+        reference: '47 CFR §73.37; §73.182 Table 1; §73.187; ITU-R P.368-10',
+        note: `${fcc_class} at ${frequency_khz} kHz (${chanClass.replace('_', ' ')}). Primary 0.5 mV/m contour: ${d_05_mvm_km} km (${area_05_km2} km²). Co-channel min sep (vs Class ${CLS}): ${my_sep.co_km} km. D/U co-channel: ≥${DU_REQUIRED.co_channel_groundwave_db} dB at service boundary. Interference risk: ${interference_risk_level}.`
       };
     })(),
 

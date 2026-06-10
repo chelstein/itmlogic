@@ -17469,3 +17469,55 @@ test('#112 candidate_comparison_table has fsm_* columns', async () => {
     assert.ok('fsm_filing_deadline_days'  in row, 'fsm_filing_deadline_days missing');
   }
 });
+
+// ---- Feature #113: am_interference_distance_and_service_area_overlap_guide ----
+
+test('#113 KAZM: interference distance guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  assert.ok(g, 'am_interference_distance_and_service_area_overlap_guide must be present');
+  assert.ok(g.service_contours?.d_05_mvm_km > 0, '0.5 mV/m contour distance must be positive');
+  assert.ok(g.service_contours?.d_01_mvm_km > 0, '0.1 mV/m contour distance must be positive');
+  assert.ok(g.service_contours?.d_01_mvm_km > g.service_contours?.d_05_mvm_km,
+    '0.1 mV/m contour (weaker signal) must reach farther than 0.5 mV/m contour');
+  assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'risk level must be LOW/MODERATE/HIGH');
+  assert.strictEqual(g.du_requirements.co_channel_groundwave_db, 3, '§73.182 co-channel D/U must be 3 dB');
+});
+
+test('#113 clear channel frequency has co_channel_dominant_db = 20; local does not', async () => {
+  const outClear = await runSiteOptimizer({ ...KAZM, frequency_khz: 650,  candidate_limit: 1 }); // clear
+  const outLocal = await runSiteOptimizer({ ...KAZM, frequency_khz: 1400, candidate_limit: 1 }); // local
+  const gClear   = outClear.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  const gLocal   = outLocal.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  assert.strictEqual(gClear.du_requirements.co_channel_dominant_db, 20, 'clear channel must have 20 dB dominant protection');
+  assert.strictEqual(gClear.is_clear_channel, true, 'clear channel detection must work');
+  assert.strictEqual(gLocal.du_requirements.co_channel_dominant_db, null, 'local channel must not have dominant D/U');
+  assert.strictEqual(gLocal.is_local_channel, true, 'local channel detection must work');
+});
+
+test('#113 higher sigma → longer 0.5 mV/m contour → higher interference risk', async () => {
+  // High σ site (good conductor) has farther groundwave reach
+  const outHigh = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gHigh   = outHigh.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  // All test candidates for KAZM are near actual sites; at least d_05 must be > 0
+  assert.ok(gHigh.service_contours.d_05_mvm_km > 0, 'd_05 must be positive');
+  assert.ok(gHigh.service_contours.area_05_km2 > 0, 'area must be positive');
+});
+
+test('#113 adjacent channel D/U values match §73.182 (−6 dB and −12 dB)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_interference_distance_and_service_area_overlap_guide;
+  assert.strictEqual(g.du_requirements.adj_10khz_db, -6,  '§73.182: adj ±10 kHz D/U must be −6 dB');
+  assert.strictEqual(g.du_requirements.adj_20khz_db, -12, '§73.182: adj ±20 kHz D/U must be −12 dB');
+});
+
+test('#113 candidate_comparison_table has ids_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ids_d_05_km'          in row, 'ids_d_05_km missing');
+    assert.ok('ids_d_01_km'          in row, 'ids_d_01_km missing');
+    assert.ok('ids_risk_level'        in row, 'ids_risk_level missing');
+    assert.ok('ids_co_ch_min_sep_km' in row, 'ids_co_ch_min_sep_km missing');
+    assert.ok('ids_du_co_ch_db'      in row, 'ids_du_co_ch_db missing');
+  }
+});

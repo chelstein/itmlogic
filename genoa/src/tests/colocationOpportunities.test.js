@@ -4304,3 +4304,14 @@ test('am_field_strength_measurement_and_contour_verification_guide present acros
     assert.ok(Array.isArray(g.measurement_conditions), 'measurement_conditions must be an array');
   }
 });
+
+test('am_interference_distance_and_service_area_overlap_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_interference_distance_and_service_area_overlap_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_interference_distance_and_service_area_overlap_guide');
+    assert.ok(g.service_contours?.d_05_mvm_km > 0, 'd_05_mvm_km must be positive');
+    assert.strictEqual(g.du_requirements?.adj_10khz_db, -6, 'adj ±10 kHz must be −6 dB');
+    assert.ok(['LOW','MODERATE','HIGH'].includes(g.interference_risk_level), 'valid risk level required');
+  }
+});
