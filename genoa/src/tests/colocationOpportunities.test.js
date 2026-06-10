@@ -4200,3 +4200,13 @@ test('am_environmental_and_rf_hazard_assessment_guide present across colocation 
     assert.ok(Array.isArray(env.env_checklist), 'env_checklist must be an array');
   }
 });
+
+test('am_proof_of_performance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const pop = c.am_proof_of_performance_guide;
+    assert.ok(pop !== undefined && pop !== null, 'candidate missing am_proof_of_performance_guide');
+    assert.ok(typeof pop.proof_required === 'boolean', 'proof_required must be boolean');
+    assert.ok(typeof pop.proof_type === 'string', 'proof_type must be a string');
+  }
+});
