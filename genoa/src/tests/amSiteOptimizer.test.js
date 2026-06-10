@@ -17767,3 +17767,48 @@ test('#118 candidate_comparison_table has scm_* columns', async () => {
     assert.ok('scm_formal_proof_required' in row, 'scm_formal_proof_required missing');
   }
 });
+
+// ---- Feature #119: am_transmitter_type_acceptance_and_fcc_certification_guide ----
+test('#119 KAZM: transmitter type acceptance guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(typeof g.power_category === 'string', 'power_category must be a string');
+  assert.ok(g.authorized_power_range?.min_kw > 0, 'min_kw must be positive');
+  assert.ok(g.authorized_power_range?.max_kw > g.authorized_power_range?.min_kw, 'max_kw must exceed min_kw');
+});
+
+test('#119 power tolerance: max = TPO × 1.05, min = TPO × 0.90', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const g   = out.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  assert.ok(Math.abs(g.authorized_power_range.max_kw - 10 * 1.05) < 0.1, `max power must be ≈ 10.5 kW, got ${g.authorized_power_range.max_kw}`);
+  assert.ok(Math.abs(g.authorized_power_range.min_kw - 10 * 0.90) < 0.1, `min power must be ≈ 9.0 kW, got ${g.authorized_power_range.min_kw}`);
+});
+
+test('#119 high-power station costs more than low-power station', async () => {
+  const low  = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.5, candidate_limit: 1 });
+  const high = await runSiteOptimizer({ ...KAZM, tpo_kw: 50,  candidate_limit: 1 });
+  const gL   = low.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  const gH   = high.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide;
+  assert.ok(gH.cost_estimates.total_equipment_low_usd > gL.cost_estimates.total_equipment_low_usd, 'high-power cost must exceed low-power');
+  assert.strictEqual(gH.power_category, 'CLEAR_CHANNEL', '50 kW must be CLEAR_CHANNEL category');
+  assert.strictEqual(gL.power_category, 'LOW_POWER', '0.5 kW must be LOW_POWER category');
+});
+
+test('#119 DA station has da_element_tolerance_pct; NDA does not', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide.da_element_tolerance_pct, null, 'NDA: no element tolerance');
+  assert.strictEqual(da2.candidates[0].am_transmitter_type_acceptance_and_fcc_certification_guide.da_element_tolerance_pct, 5, 'DA-2: ±5% element tolerance');
+});
+
+test('#119 candidate_comparison_table has tta_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tta_power_category'          in row, 'tta_power_category missing');
+    assert.ok('tta_max_power_kw'            in row, 'tta_max_power_kw missing');
+    assert.ok('tta_min_power_kw'            in row, 'tta_min_power_kw missing');
+    assert.ok('tta_total_equipment_low_usd' in row, 'tta_total_equipment_low_usd missing');
+    assert.ok('tta_n_verification_steps'    in row, 'tta_n_verification_steps missing');
+  }
+});

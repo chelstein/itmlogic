@@ -10673,6 +10673,53 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Type Acceptance & FCC Certification Guide */}
+        {candidate.am_transmitter_type_acceptance_and_fcc_certification_guide && (() => {
+          const g = candidate.am_transmitter_type_acceptance_and_fcc_certification_guide;
+          const costs = g.cost_estimates || {};
+          const pwr = g.authorized_power_range || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Transmitter Type Acceptance &amp; FCC Certification (§73.1660)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>POWER CATEGORY</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>{g.power_category}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>AUTHORIZED RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{pwr.min_kw}–{pwr.max_kw} kW</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOLERANCE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>+{pwr.tolerance_high_pct}% / −{pwr.tolerance_low_pct}%</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EQUIPMENT COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>
+                    ${(costs.total_equipment_low_usd || 0).toLocaleString()}–${(costs.total_equipment_high_usd || 0).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                {g.da_element_tolerance_pct != null && (
+                  <div><span style={{ color: '#94a3b8', fontSize: 9 }}>DA ELEMENT TOL</span><div style={{ color: '#fbbf24', fontSize: 11 }}>±{g.da_element_tolerance_pct}%</div></div>
+                )}
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>IBOC AUTH REQUIRED</span><div style={{ color: '#f59e0b', fontSize: 11 }}>{g.iboc_requires_separate_auth ? 'YES' : 'NO'}</div></div>
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>LEGACY MODELS OK</span><div style={{ color: '#22c55e', fontSize: 11 }}>{g.discontinued_models_ok ? 'YES' : 'NO'}</div></div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Type Acceptance Verification Steps</div>
+              {(g.type_acceptance_steps || []).map((s, i) => (
+                <div key={i} style={{ color: '#cbd5e1', fontSize: 9, padding: '1px 0' }}>{i + 1}. {s}</div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
