@@ -1735,7 +1735,12 @@ export async function runSiteOptimizer(body = {}){
     acp_formal_proof_required:          c.am_antenna_commissioning_and_proof_of_performance_guide?.formal_proof_required ?? null,
     acp_n_monitor_points:               c.am_antenna_commissioning_and_proof_of_performance_guide?.n_monitor_points ?? null,
     acp_total_low_usd:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.cost_estimates?.total_low_usd ?? null,
-    acp_proof_radials:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.proof_radials_required ?? null
+    acp_proof_radials:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.proof_radials_required ?? null,
+    fia_d_05mvm_km:                     c.am_frequency_interference_analysis_and_channel_study_guide?.d_05mvm_km ?? null,
+    fia_min_co_channel_sep_km:          c.am_frequency_interference_analysis_and_channel_study_guide?.min_co_channel_separation_km ?? null,
+    fia_n_study_steps:                  c.am_frequency_interference_analysis_and_channel_study_guide?.n_study_steps ?? null,
+    fia_study_low_usd:                  c.am_frequency_interference_analysis_and_channel_study_guide?.cost_estimates?.channel_study_low_usd ?? null,
+    fia_contour_overlap_prohibited:     c.am_frequency_interference_analysis_and_channel_study_guide?.contour_overlap_prohibited ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31326,6 +31331,119 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.62; §73.67; §73.151; §73.154; §73.158; §73.1560; §73.1660; §73.3598',
         note: `${frequency_khz} kHz (${fcc_class}): ${all_steps.length} commissioning steps. ${is_da ? `DA: formal proof required on ≥8 radials, ${n_monitor_points} monitor point(s). ` : 'NDA: no formal proof required. '}Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
+      };
+    })(),
+
+    am_frequency_interference_analysis_and_channel_study_guide: (() => {
+      // Guide #126 — Frequency Interference Analysis & Channel Study
+      //
+      // Every AM CP application must demonstrate that the proposed station
+      // will not create prohibited interference to existing stations.
+      // The FCC's engineering standards for AM interference are codified in
+      // §73.182 and the channel study rules.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.182 — Engineering standards for AM directional antennas.
+      //   Establishes the D/U (desired-to-undesired) ratios required to avoid
+      //   prohibited interference.  The "desired" signal is the existing station's
+      //   service contour; the "undesired" is the new station's signal at that contour.
+      //
+      // 47 CFR §73.182(a) — Daytime interference.
+      //   Co-channel: Undesired signal must be < 50% of desired (D/U ≥ 2)
+      //     at the existing station's 0.5 mV/m daytime groundwave contour.
+      //   ±10 kHz: D/U ≥ 20 dB at the existing station's 0.5 mV/m contour.
+      //   ±20 kHz: D/U ≥ 6 dB.
+      //
+      // 47 CFR §73.182(b) — Nighttime skywave interference.
+      //   Co-channel (Class A): Undesired skywave must not exceed 50% of
+      //     desired groundwave at the dominant station's 0.5 mV/m contour.
+      //   Class B/D: Skywave interference limits apply from §73.182 tables.
+      //
+      // 47 CFR §73.37 — Short-spacing.
+      //   Minimum mileage separations between stations on the same/adjacent
+      //   channels.  These are distance-based proxies for the D/U ratio.
+      //
+      // 47 CFR §73.182(e) — Overlap of 0.5 mV/m contours.
+      //   The 0.5 mV/m daytime groundwave contours of two stations on the
+      //   same channel may not overlap (contour-to-contour separation required).
+      //
+      // D/U RATIO REFERENCE TABLE
+      // ──────────────────────────
+      //   Channel separation | D/U required | Standard
+      //   Co-channel         | 2:1 (6 dB)   | §73.182(a)(1)
+      //   ±10 kHz            | 20 dB        | §73.182(a)(2)
+      //   ±20 kHz            | 6 dB         | §73.182(a)(3)
+      //   ±30 kHz            | No limit     | (channel too far for AM)
+      //
+      // CHANNEL STUDY STEPS
+      // ────────────────────
+      //   1. Identify all stations within interference distance on co-channel
+      //   2. Identify all ±10 kHz adjacent stations within interference distance
+      //   3. Identify all ±20 kHz stations within interference distance
+      //   4. For each, compute proposed station's undesired signal at that
+      //      station's 0.5 mV/m groundwave contour
+      //   5. Confirm D/U ratio ≥ required value for each case
+      //   6. For nighttime operations: repeat for skywave at night
+      //   7. Prepare interference exhibit for Form 301-AM
+      //
+      // COST ESTIMATES
+      //   Channel study (NDA, no conflicts): $2,000–$5,000
+      //   Channel study (DA, full study):    $5,000–$12,000
+      //   Contested interference resolution: $10,000–$30,000
+
+      const is_da = /^DA/i.test(pattern_mode);
+      const isClassA = fcc_class.toUpperCase() === 'A';
+
+      // D/U ratio requirements
+      const DU_REQUIREMENTS = [
+        { separation: 'Co-channel',   du_ratio_db: 6,   du_ratio_linear: 2,  rule: '§73.182(a)(1)', domain: 'Daytime groundwave' },
+        { separation: '±10 kHz',      du_ratio_db: 20,  du_ratio_linear: 10, rule: '§73.182(a)(2)', domain: 'Daytime groundwave' },
+        { separation: '±20 kHz',      du_ratio_db: 6,   du_ratio_linear: 2,  rule: '§73.182(a)(3)', domain: 'Daytime groundwave' },
+        { separation: 'Co-channel',   du_ratio_db: 6,   du_ratio_linear: 2,  rule: '§73.182(b)',    domain: 'Nighttime skywave (Class A)' },
+      ].filter(d => d.domain === 'Daytime groundwave' || isClassA);
+
+      // Channel study steps
+      const STUDY_STEPS = [
+        'Identify all co-channel stations within interference distance',
+        'Identify all ±10 kHz adjacent stations within interference distance',
+        'Identify all ±20 kHz adjacent stations within interference distance',
+        'Compute proposed station undesired signal at each station\'s 0.5 mV/m contour',
+        'Verify D/U ≥ required value for each co-channel and adjacent case',
+        ...(isClassA ? ['Compute nighttime skywave D/U at dominant 0.5 mV/m contour'] : []),
+        'Prepare interference exhibit for FCC Form 301-AM',
+      ];
+
+      // Interference distance estimates (co-channel groundwave)
+      let d_05mvm_km = null;
+      try {
+        const r = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5, conductivity_msm: 4, erp_kw: tpo_kw });
+        d_05mvm_km = round2(r.distance_km);
+      } catch (_){ /* leave null */ }
+
+      // Co-channel interference distance: new station's 0.5 mV/m must not reach
+      // existing station's 0.5 mV/m contour → separation ≥ 2 × d_05mvm_km
+      const min_co_channel_separation_km = d_05mvm_km != null ? round2(d_05mvm_km * 2) : null;
+
+      // Cost estimates
+      const STUDY_LOW  = is_da ? 5000 : 2000;
+      const STUDY_HIGH = is_da ? 12000 : 5000;
+
+      return {
+        du_requirements: DU_REQUIREMENTS,
+        channel_study_steps: STUDY_STEPS,
+        n_study_steps: STUDY_STEPS.length,
+        d_05mvm_km,
+        min_co_channel_separation_km,
+        contour_overlap_prohibited: true,
+        cost_estimates: {
+          channel_study_low_usd:  STUDY_LOW,
+          channel_study_high_usd: STUDY_HIGH,
+          contested_resolution_low_usd: 10000,
+          contested_resolution_high_usd: 30000,
+        },
+        reference: '47 CFR §73.37; §73.182; §73.182(a); §73.182(b); §73.182(e)',
+        note: `${frequency_khz} kHz (${fcc_class}): 0.5 mV/m reach ≈ ${d_05mvm_km ?? 'N/A'} km. Min co-channel separation ≈ ${min_co_channel_separation_km ?? 'N/A'} km. D/U requirements: co-channel 6 dB, ±10 kHz 20 dB, ±20 kHz 6 dB. Study cost est. $${STUDY_LOW.toLocaleString()}–$${STUDY_HIGH.toLocaleString()}.`
       };
     })(),
 

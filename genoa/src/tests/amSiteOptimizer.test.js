@@ -18089,3 +18089,50 @@ test('#125 candidate_comparison_table has acp_* columns', async () => {
     assert.ok('acp_proof_radials'       in row, 'acp_proof_radials missing');
   }
 });
+
+// ---- Feature #126: am_frequency_interference_analysis_and_channel_study_guide ----
+test('#126 KAZM: channel study guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_frequency_interference_analysis_and_channel_study_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(Array.isArray(g.du_requirements) && g.du_requirements.length >= 3, 'must have ≥3 D/U requirements');
+  assert.ok(g.d_05mvm_km > 0, '0.5 mV/m reach must be positive');
+  assert.strictEqual(g.contour_overlap_prohibited, true, 'contour overlap must be prohibited');
+});
+
+test('#126 ±10 kHz D/U requirement is 20 dB; ±20 kHz is 6 dB', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_frequency_interference_analysis_and_channel_study_guide;
+  const adj10 = g.du_requirements.find(d => d.separation === '±10 kHz');
+  const adj20 = g.du_requirements.find(d => d.separation === '±20 kHz');
+  assert.ok(adj10, '±10 kHz requirement must be present');
+  assert.ok(adj20, '±20 kHz requirement must be present');
+  assert.strictEqual(adj10.du_ratio_db, 20, '±10 kHz must require 20 dB D/U');
+  assert.strictEqual(adj20.du_ratio_db, 6,  '±20 kHz must require 6 dB D/U');
+});
+
+test('#126 min co-channel separation is approximately 2× the 0.5 mV/m reach', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_frequency_interference_analysis_and_channel_study_guide;
+  assert.ok(Math.abs(g.min_co_channel_separation_km - 2 * g.d_05mvm_km) < 1,
+    `min separation (${g.min_co_channel_separation_km}) must be ≈ 2× 0.5 mV/m reach (${g.d_05mvm_km})`);
+});
+
+test('#126 DA channel study costs more than NDA', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_frequency_interference_analysis_and_channel_study_guide;
+  const gDA2 = da2.candidates[0].am_frequency_interference_analysis_and_channel_study_guide;
+  assert.ok(gDA2.cost_estimates.channel_study_low_usd > gNDA.cost_estimates.channel_study_low_usd, 'DA channel study must cost more than NDA');
+});
+
+test('#126 candidate_comparison_table has fia_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fia_d_05mvm_km'               in row, 'fia_d_05mvm_km missing');
+    assert.ok('fia_min_co_channel_sep_km'     in row, 'fia_min_co_channel_sep_km missing');
+    assert.ok('fia_n_study_steps'             in row, 'fia_n_study_steps missing');
+    assert.ok('fia_study_low_usd'             in row, 'fia_study_low_usd missing');
+    assert.ok('fia_contour_overlap_prohibited' in row, 'fia_contour_overlap_prohibited missing');
+  }
+});
