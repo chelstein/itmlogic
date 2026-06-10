@@ -4159,3 +4159,13 @@ test('am_tower_detuning_and_phasor_verification_guide present across colocation 
     assert.ok(dtv.detuning_cap_pf > 0, 'detuning_cap_pf must be positive');
   }
 });
+
+test('am_carrier_frequency_reference_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cfr = c.am_carrier_frequency_reference_guide;
+    assert.ok(cfr !== undefined && cfr !== null, 'candidate missing am_carrier_frequency_reference_guide');
+    assert.strictEqual(cfr.fcc_tolerance_hz, 20, 'tolerance must be ±20 Hz');
+    assert.ok(cfr.n_reference_options >= 4, 'must have ≥ 4 reference options');
+  }
+});

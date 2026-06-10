@@ -2356,6 +2356,62 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Carrier Frequency Reference Guide */}
+        {candidate.am_carrier_frequency_reference_guide && (() => {
+          const cfr = candidate.am_carrier_frequency_reference_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="cfr-guide" style={{ background: '#080e1a', border: '1px solid #1e3a5f', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#38bdf8', fontSize: 13, marginBottom: 6 }}>
+                Carrier Frequency Reference — §73.1540
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div style={{ background: '#0a1624', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>FCC Tolerance</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#e0f2fe' }}>±{cfr.fcc_tolerance_hz} Hz</div>
+                  <div style={{ fontSize: 8, color: '#7ab7d0' }}>±{cfr.fcc_tolerance_ppm} ppm</div>
+                </div>
+                <div style={{ background: '#0a1624', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Recommended Ref</div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#4ade80' }}>GPSDO</div>
+                  <div style={{ fontSize: 8, color: '#7ab7d0' }}>{fmtUsd(cfr.reference_options?.[0]?.cost_low_usd)}–{fmtUsd(cfr.reference_options?.[0]?.cost_high_usd)}</div>
+                </div>
+                <div style={{ background: '#0a1624', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Forfeiture Risk</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>${(cfr.forfeiture_risk?.base_per_day_usd ?? 0).toLocaleString()}/day</div>
+                </div>
+              </div>
+              {cfr.tcxo_marginal && (
+                <div style={{ fontSize: 9, color: '#fbbf24', background: '#1a1200', border: '1px solid #5a4200', borderRadius: 4, padding: '4px 8px', marginBottom: 8 }}>
+                  WARNING: TCXO alone exceeds ±20 Hz tolerance at {cfr.frequency_khz} kHz — GPS discipline required.
+                </div>
+              )}
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Reference Options</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: '#0a1624' }}>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Type</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Accuracy</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Meets Tol.</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#38bdf8' }}>Cost</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(cfr.reference_options ?? []).map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #1a3050', background: r.recommended ? '#0d1e30' : 'transparent' }}>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: r.recommended ? '#38bdf8' : '#ccc', fontWeight: r.recommended ? 700 : 400 }}>{r.label.split(' (')[0]}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>±{r.accuracy_hz} Hz</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: r.meets_fcc_tol ? '#4ade80' : '#ef4444', fontWeight: 600 }}>{r.meets_fcc_tol ? '✓' : '✗'}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>{r.cost_low_usd === 0 ? 'Built-in' : `${fmtUsd(r.cost_low_usd)}–${fmtUsd(r.cost_high_usd)}`}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{cfr.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Detuning and Phasor Verification Guide */}
         {candidate.am_tower_detuning_and_phasor_verification_guide && (() => {
           const dtv = candidate.am_tower_detuning_and_phasor_verification_guide;

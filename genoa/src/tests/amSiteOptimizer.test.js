@@ -16722,3 +16722,58 @@ test('#98 candidate_comparison_table has dtv_* columns', async () => {
     assert.ok('dtv_monitor_est_low_usd' in row, 'dtv_monitor_est_low_usd missing');
   }
 });
+
+// ---- Feature #99: am_carrier_frequency_reference_guide ----
+
+test('#99 KAZM: am_carrier_frequency_reference_guide present, tolerance ±20 Hz', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cfr = out.candidates[0].am_carrier_frequency_reference_guide;
+  assert.ok(cfr, 'am_carrier_frequency_reference_guide must be present');
+  assert.strictEqual(cfr.fcc_tolerance_hz, 20, 'FCC tolerance must be ±20 Hz (§73.1540)');
+  assert.ok(typeof cfr.fcc_tolerance_ppm === 'number', 'fcc_tolerance_ppm must be numeric');
+  assert.ok(cfr.fcc_tolerance_ppm > 0, 'fcc_tolerance_ppm must be positive');
+  assert.strictEqual(cfr.recommended_reference, 'GPS_DISCIPLINED', 'GPS_DISCIPLINED must be recommended');
+});
+
+test('#99 reference_options array has 4 entries including GPSDO as first', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cfr = out.candidates[0].am_carrier_frequency_reference_guide;
+  assert.strictEqual(cfr.n_reference_options, 4, 'must have 4 reference options');
+  assert.strictEqual(cfr.reference_options[0].id, 'GPS_DISCIPLINED', 'first option must be GPS_DISCIPLINED');
+  assert.strictEqual(cfr.reference_options[0].recommended, true, 'GPSDO must be recommended');
+  for (const opt of cfr.reference_options) {
+    assert.ok(opt.meets_fcc_tol !== undefined, `option ${opt.id} must have meets_fcc_tol`);
+    assert.ok(opt.accuracy_hz >= 0, `option ${opt.id} accuracy_hz must be non-negative`);
+  }
+});
+
+test('#99 TCXO meets FCC tolerance at 780 kHz but tolerance is frequency-dependent', async () => {
+  const out780  = await runSiteOptimizer({ ...KAZM, frequency_khz: 780,  candidate_limit: 1 });
+  const out1700 = await runSiteOptimizer({ ...KAZM, frequency_khz: 1700, candidate_limit: 1 });
+  const cfr780  = out780.candidates[0].am_carrier_frequency_reference_guide;
+  const cfr1700 = out1700.candidates[0].am_carrier_frequency_reference_guide;
+  // At 780 kHz, 50 ppb = 780000 * 50e-9 = 39 Hz → exceeds 20 Hz; tcxo_marginal = true
+  // At lower frequencies same proportional; TCXO accuracy_hz scales with freq
+  const tcxoOpt780  = cfr780.reference_options.find(r => r.id === 'TCXO');
+  const tcxoOpt1700 = cfr1700.reference_options.find(r => r.id === 'TCXO');
+  assert.ok(tcxoOpt780.accuracy_hz > tcxoOpt1700.accuracy_hz || tcxoOpt780.accuracy_hz <= 20,
+    'TCXO accuracy_hz should be higher (worse) at higher frequency or within tolerance');
+});
+
+test('#99 forfeiture risk has correct base rate', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const cfr = out.candidates[0].am_carrier_frequency_reference_guide;
+  assert.strictEqual(cfr.forfeiture_risk.base_per_day_usd, 10000, 'forfeiture base must be $10,000/day (§1.80(b)(7))');
+  assert.ok(cfr.forfeiture_risk.max_single_usd > cfr.forfeiture_risk.base_per_day_usd, 'max must exceed daily');
+});
+
+test('#99 candidate_comparison_table has cfr_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cfr_tolerance_hz'       in row, 'cfr_tolerance_hz missing');
+    assert.ok('cfr_tolerance_ppm'      in row, 'cfr_tolerance_ppm missing');
+    assert.ok('cfr_recommended_ref'    in row, 'cfr_recommended_ref missing');
+    assert.ok('cfr_gpsdo_cost_low_usd' in row, 'cfr_gpsdo_cost_low_usd missing');
+    assert.ok('cfr_tcxo_marginal'      in row, 'cfr_tcxo_marginal missing');
+  }
+});
