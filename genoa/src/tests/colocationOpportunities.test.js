@@ -4359,3 +4359,14 @@ test('am_station_sale_and_license_assignment_guide present across colocation can
     assert.ok(Array.isArray(g.due_diligence_items) && g.due_diligence_items.length >= 6, 'must have ≥6 due diligence items');
   }
 });
+
+test('am_signal_coverage_mapping_and_contour_documentation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_signal_coverage_mapping_and_contour_documentation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_signal_coverage_mapping_and_contour_documentation_guide');
+    assert.ok(Array.isArray(g.contours_required) && g.contours_required.length >= 2, 'must have ≥2 contours');
+    assert.ok(g.contour_distances_km?.d_05mvm_km > 0, '0.5 mV/m distance must be positive');
+    assert.ok(typeof g.formal_proof_required === 'boolean', 'formal_proof_required must be boolean');
+  }
+});

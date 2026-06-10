@@ -10621,6 +10621,58 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Signal Coverage Mapping & Contour Documentation Guide */}
+        {candidate.am_signal_coverage_mapping_and_contour_documentation_guide && (() => {
+          const g = candidate.am_signal_coverage_mapping_and_contour_documentation_guide;
+          const costs = g.cost_estimates || {};
+          const dists = g.contour_distances_km || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Signal Coverage Mapping &amp; Contour Documentation (§73.183 / §73.186)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONTOURS REQUIRED</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.n_contours_required}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>DA RADIALS</span>
+                  <div style={{ color: g.n_radials > 0 ? '#f59e0b' : '#64748b', fontSize: 11, fontWeight: 700 }}>
+                    {g.n_radials > 0 ? `${g.n_radials} (every 10°)` : 'N/A (NDA)'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MAP SCALE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.map_scale}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FORMAL PROOF</span>
+                  <div style={{ color: g.formal_proof_required ? '#f87171' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.formal_proof_required ? 'REQUIRED' : 'Not required'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                {dists.d_5mvm_km != null && <div><span style={{ color: '#94a3b8', fontSize: 9 }}>5 mV/m</span><div style={{ color: '#22c55e', fontSize: 11 }}>{dists.d_5mvm_km} km</div></div>}
+                {dists.d_05mvm_km != null && <div><span style={{ color: '#94a3b8', fontSize: 9 }}>0.5 mV/m</span><div style={{ color: '#38bdf8', fontSize: 11 }}>{dists.d_05mvm_km} km</div></div>}
+                {dists.d_01mvm_km != null && <div><span style={{ color: '#94a3b8', fontSize: 9 }}>0.1 mV/m</span><div style={{ color: '#94a3b8', fontSize: 11 }}>{dists.d_01mvm_km} km</div></div>}
+                <div><span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span><div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div></div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Contours Required</div>
+              {(g.contours_required || []).map((c, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: 9, fontWeight: 700 }}>{c.contour}</span>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>{c.purpose}</span>
+                  <span style={{ color: '#38bdf8', fontSize: 9 }}>{c.rule}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

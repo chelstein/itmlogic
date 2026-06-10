@@ -17723,3 +17723,47 @@ test('#117 candidate_comparison_table has sal_* columns', async () => {
     assert.ok('sal_fcc_form_fee_usd'    in row, 'sal_fcc_form_fee_usd missing');
   }
 });
+
+// ---- Feature #118: am_signal_coverage_mapping_and_contour_documentation_guide ----
+test('#118 KAZM: coverage mapping guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(Array.isArray(g.contours_required) && g.contours_required.length >= 2, 'must have ≥2 contours required');
+  assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
+  assert.ok(g.contour_distances_km?.d_05mvm_km > 0, '0.5 mV/m contour distance must be positive');
+});
+
+test('#118 NDA has no radials; DA has 36 radials', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 0, 'NDA: 0 radials');
+  assert.strictEqual(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.n_radials, 36, 'DA-2: 36 radials');
+});
+
+test('#118 DA-2 requires formal proof; NDA does not', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.formal_proof_required, false, 'NDA: no proof');
+  assert.strictEqual(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.formal_proof_required, true,  'DA-2: proof required');
+  assert.ok(da2.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.cost_estimates.total_low_usd >
+            nda.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide.cost_estimates.total_low_usd, 'DA-2 cost > NDA cost');
+});
+
+test('#118 0.5 mV/m contour farther than 5 mV/m contour', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_signal_coverage_mapping_and_contour_documentation_guide;
+  const { d_5mvm_km, d_05mvm_km } = g.contour_distances_km;
+  assert.ok(d_05mvm_km > d_5mvm_km, `0.5 mV/m (${d_05mvm_km} km) must be farther than 5 mV/m (${d_5mvm_km} km)`);
+});
+
+test('#118 candidate_comparison_table has scm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('scm_n_contours_required'   in row, 'scm_n_contours_required missing');
+    assert.ok('scm_n_radials'             in row, 'scm_n_radials missing');
+    assert.ok('scm_d_05mvm_km'            in row, 'scm_d_05mvm_km missing');
+    assert.ok('scm_total_low_usd'         in row, 'scm_total_low_usd missing');
+    assert.ok('scm_formal_proof_required' in row, 'scm_formal_proof_required missing');
+  }
+});
