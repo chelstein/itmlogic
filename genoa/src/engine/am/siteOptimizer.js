@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    cpe_n_required_exhibits:            c.am_construction_permit_exhibit_requirements_guide?.n_required_exhibits ?? null,
+    cpe_asr_required:                   c.am_construction_permit_exhibit_requirements_guide?.asr_required ?? null,
+    cpe_ea_required:                    c.am_construction_permit_exhibit_requirements_guide?.environmental_assessment_required ?? null,
+    cpe_nif_required:                   c.am_construction_permit_exhibit_requirements_guide?.nif_required ?? null,
+    cpe_total_cost_low_usd:             c.am_construction_permit_exhibit_requirements_guide?.total_filing_cost_low_usd ?? null,
     pop_proof_required:                 c.am_proof_of_performance_guide?.proof_required ?? null,
     pop_n_radials:                      c.am_proof_of_performance_guide?.n_radials_required ?? null,
     pop_total_points:                   c.am_proof_of_performance_guide?.total_measurement_points ?? null,
@@ -27393,6 +27398,96 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_construction_permit_exhibit_requirements_guide: (() => {
+      // FCC Form 301-AM construction permit exhibit requirements.
+      //
+      // When relocating an AM station, the applicant must file a construction
+      // permit (CP) application on FCC Form 301-AM.  Required exhibits vary
+      // by station class, operating mode (DA/NDA), transmitter power, estimated
+      // tower height, and triggered environmental categories.
+      //
+      // Mandatory exhibits for ALL AM CP applications (§73.182; §73.24):
+      //   1. §73.182 Engineering Interference Study
+      //   2. NEPA §1.1307 Environmental Checklist
+      //   3. Tower/Site Description (coordinates, height, ground system)
+      //   4. Community Coverage Analysis (§73.24(j) 5 mV/m contour)
+      //
+      // Additional exhibits triggered by station characteristics:
+      //   • TPO ≥ 1 kW:  OET-65 RF radiation hazard analysis required
+      //   • TPO > 5 kW:  Environmental Assessment (EA) per §1.1307(a)(5)
+      //   • DA mode:     Horizontal Radiation Pattern (HRP) table (§73.316),
+      //                  antenna array technical data, phasor description
+      //   • Tower ≥ 60.96m (200 ft): FAA Form 7460-1 / ASR registration (§17.7)
+      //   • Class A/B:   Nighttime NIF analysis (§73.182 skywave tables)
+      //
+      // Tower height estimate: a first-order estimate uses the quarter-wave
+      // height (λ/4) which is the optimum electrical height for a series-excited
+      // AM monopole.  λ/4 (m) = 75,000 / frequency_khz.
+      //
+      // Form 301-AM filing fee: $1,705 (as of 2024 FCC fee schedule, 47 CFR
+      // §1.1104).  Post-grant license fee (Form 302-AM): $190.
+
+      const isDA = /^DA/i.test(pattern_mode);
+
+      // Quarter-wave height estimate
+      const quarter_wave_height_m = round2(75000 / frequency_khz);
+      // ASR registration threshold: 200 feet = 60.96 m (47 CFR §17.7)
+      const asr_required          = quarter_wave_height_m > 60.96;
+
+      const rf_hazard_required    = tpo_kw >= 1.0;
+      const ea_required           = tpo_kw > 5.0;
+      // NIF required for Class A and B (subject to skywave interference)
+      const nif_required          = fcc_class === 'A' || fcc_class === 'B';
+
+      // Build ordered exhibit list
+      const exhibits = [
+        { id: 'E1', name: '§73.182 Engineering Interference Study',         required: true },
+        { id: 'E2', name: 'NEPA §1.1307 Environmental Checklist',           required: true },
+        { id: 'E3', name: 'Tower/Site Description + Ground System Data',    required: true },
+        { id: 'E4', name: '§73.24(j) Community Coverage Analysis',          required: true },
+        { id: 'E5', name: 'OET-65 RF Radiation Hazard Analysis',            required: rf_hazard_required },
+        { id: 'E6', name: 'Horizontal Radiation Pattern Table (§73.316)',   required: isDA },
+        { id: 'E7', name: 'Antenna Array Technical Data / Phasor Desc.',    required: isDA },
+        { id: 'E8', name: 'FAA Form 7460-1 / ASR Registration (§17.7)',     required: asr_required },
+        { id: 'E9', name: 'Environmental Assessment EA (§1.1307(a)(5))',    required: ea_required },
+        { id: 'E10', name: 'Nighttime NIF Analysis (§73.182 skywave)',      required: nif_required },
+      ];
+
+      const n_required_exhibits = exhibits.filter(e => e.required).length;
+
+      // Engineering preparation cost estimate
+      // Base: interference study + coverage + forms
+      const base_cost_low  = 3500;
+      const base_cost_high = 6000;
+      const da_increment   = isDA        ? 4000 : 0;
+      const ea_increment   = ea_required ? 3000 : 0;
+      const nif_increment  = nif_required ? 5000 : 0;
+      const prep_cost_low  = base_cost_low  + Math.round(da_increment * 0.8) + Math.round(ea_increment * 0.75) + Math.round(nif_increment * 0.8);
+      const prep_cost_high = base_cost_high + da_increment + ea_increment + nif_increment + 2000;
+
+      // Filing fee per 47 CFR §1.1104 (2024 schedule)
+      const fcc_filing_fee_usd = 1705;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_da:                        isDA,
+        quarter_wave_height_m,
+        asr_required,
+        rf_hazard_exhibit_required:   rf_hazard_required,
+        environmental_assessment_required: ea_required,
+        nif_required,
+        exhibits,
+        n_required_exhibits,
+        exhibit_prep_cost_usd:        { low: prep_cost_low, high: prep_cost_high },
+        fcc_filing_fee_usd,
+        total_filing_cost_low_usd:    prep_cost_low  + fcc_filing_fee_usd,
+        total_filing_cost_high_usd:   prep_cost_high + fcc_filing_fee_usd,
+        form:                         'FCC Form 301-AM',
+        reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
+        note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
       };
     })(),
 

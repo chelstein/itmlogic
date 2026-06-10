@@ -4210,3 +4210,14 @@ test('am_proof_of_performance_guide present across colocation candidates', async
     assert.ok(typeof pop.proof_type === 'string', 'proof_type must be a string');
   }
 });
+
+test('am_construction_permit_exhibit_requirements_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cpe = c.am_construction_permit_exhibit_requirements_guide;
+    assert.ok(cpe !== undefined && cpe !== null, 'candidate missing am_construction_permit_exhibit_requirements_guide');
+    assert.ok(typeof cpe.n_required_exhibits === 'number', 'n_required_exhibits must be numeric');
+    assert.ok(Array.isArray(cpe.exhibits), 'exhibits must be an array');
+    assert.ok(cpe.n_required_exhibits >= 4, 'must have at least 4 required exhibits');
+  }
+});
