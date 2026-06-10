@@ -95,19 +95,25 @@ export function resolveOperativeHaat({ inputs = {}, evidence = {}, haatValidatio
   }
 
   // 4. FCC-licensed / authorized HAAT.
+  // FCC LMS data is at evidence.fcc_lms.license — evidence.fcc_licensed
+  // does not exist in production evidence objects.
   const fccHaat = (() => {
     const n = Number(
-      evidence?.fcc_licensed?.haat_m
+      evidence?.fcc_lms?.license?.haat_m
+      ?? evidence?.fcc_licensed?.haat_m
       ?? evidence?.facility?.haat_m
       ?? evidence?.fcc_facility?.haat_m
     );
     return Number.isFinite(n) && n > 0 ? n : NaN;
   })();
   if (Number.isFinite(fccHaat)) {
+    const fccSrc = evidence?.fcc_lms?.license?.haat_m != null
+      ? 'evidence.fcc_lms.license.haat_m'
+      : 'evidence.fcc_licensed.haat_m';
     return {
       haat_m:            fccHaat,
       basis:             'fcc_authorized',
-      source:            'evidence.fcc_licensed.haat_m',
+      source:            fccSrc,
       confidence:        'medium',
       operator_entered_m: Number.isFinite(operatorHaat) ? operatorHaat : null,
       warnings

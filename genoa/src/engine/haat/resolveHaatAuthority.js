@@ -112,7 +112,7 @@ export function resolveHaatAuthority({
     // Computed §73.313 HAAT is shown for review, not for filing.
     filingControllingHaatM  = authHaat;
     filingControllingBasis  = 'FCC_AUTHORIZED';
-    filingControllingSource = 'evidence.fcc_licensed.haat_m';
+    filingControllingSource = 'evidence.fcc_lms.license.haat_m';
 
     // Check if computed value differs significantly — REVIEW_REQUIRED, not BLOCKER
     if (computedMean !== null) {

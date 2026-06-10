@@ -265,6 +265,30 @@ export function buildValidationVerdictSection(exhibit){
     });
   }
 
+  // HAAT consistency check — cross-consumer invariant.
+  // Verifies that source attestation, validation, AI review, contour engine,
+  // replay token, and PDF renderer all carry IDENTICAL filing_controlling_haat_m.
+  // category:'haat' keeps it out of validationComponents (math score).
+  const hcc = exhibit?.haat_consistency_check;
+  if (hcc) {
+    const hccDetail = hcc.pass
+      ? `All six HAAT consumers agree on filing_controlling_haat_m = ${exhibit?.haat_authority?.filing_controlling_haat_m ?? '?'} m.`
+      : hcc.blockers.map(b => b.message).join(' | ');
+    components.push({
+      name:     'HAAT consistency check (cross-consumer)',
+      category: 'haat',
+      status:   hcc.pass ? 'PASS' : 'FAIL',
+      detail:   hccDetail
+    });
+  } else if (exhibit?.haat_authority && String(exhibit?.station_inputs?.service || '').toUpperCase() !== 'AM') {
+    components.push({
+      name:     'HAAT consistency check (cross-consumer)',
+      category: 'haat',
+      status:   'SKIP',
+      detail:   'HAAT consistency check not yet run (exhibit built before this check was introduced)'
+    });
+  }
+
   // Engineering confidence (terrain-aware advisory layer).
   //
   // This row is ADVISORY — it does not gate compliance and there is no

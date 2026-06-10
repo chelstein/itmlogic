@@ -267,3 +267,98 @@ test('WJPZ-FM golden exhibit: licensed FM, FCC haat=37m, terrain mean 241.8m →
   assert.ok(Array.isArray(result.computed_radial_haat_m) && result.computed_radial_haat_m.length >= 3,
     'computed_radial_haat_m must be an array with at least 3 values');
 });
+
+// -----------------------------------------------------------------------
+// Test 10: engine/index.js path fix — fcc_lms.license.haat_m surfaces as
+// fccAuthorizedHaatM even when fcc_licensed is absent
+// -----------------------------------------------------------------------
+import { checkHaatConsistency } from '../engine/haat/haatConsistencyCheck.js';
+
+test('checkHaatConsistency PASS when resolver and attestation agree', () => {
+  // Minimal exhibit: resolver says filing_controlling_haat_m = 37,
+  // source_attestation_v2 reports operative haat_m = 37 (FCC_LMS candidate).
+  const exhibit = {
+    station_inputs: { service: 'FM' },
+    haat_authority: {
+      filing_controlling_haat_m:     37,
+      filing_controlling_haat_basis: 'FCC_AUTHORIZED',
+      haat_conflict_status:          'REVIEW_REQUIRED'
+    },
+    haat_lineage: { operative_m: 241.8 },
+    source_attestation_v2: {
+      fields: {
+        haat_m: {
+          candidates: [
+            { value: 241.8, is_operative: false, source_type: 'USGS_DEM' },
+            { value: 37,    is_operative: true,  source_type: 'FCC_LMS'  }
+          ]
+        }
+      }
+    }
+  };
+  const result = checkHaatConsistency(exhibit, { operative_haat_m: 241.8, operative_haat_basis: 'terrain_derived' });
+  assert.ok(result.pass, `Expected PASS, got: ${JSON.stringify(result.blockers)}`);
+  assert.strictEqual(result.status, 'PASS');
+  assert.strictEqual(result.table.length, 6);
+});
+
+test('checkHaatConsistency BLOCKER when attestation operative differs from resolver', () => {
+  // Simulate the original bug: attestation incorrectly shows 241.8m as operative
+  // while resolver correctly returns 37m.
+  const exhibit = {
+    station_inputs: { service: 'FM' },
+    haat_authority: {
+      filing_controlling_haat_m:     37,
+      filing_controlling_haat_basis: 'FCC_AUTHORIZED',
+      haat_conflict_status:          'REVIEW_REQUIRED'
+    },
+    haat_lineage: { operative_m: 241.8 },
+    source_attestation_v2: {
+      fields: {
+        haat_m: {
+          candidates: [
+            { value: 241.8, is_operative: true,  source_type: 'USGS_DEM' }  // WRONG
+          ]
+        }
+      }
+    }
+  };
+  const result = checkHaatConsistency(exhibit, { operative_haat_m: 241.8 });
+  assert.ok(!result.pass, 'Should FAIL when attestation and resolver disagree');
+  assert.strictEqual(result.status, 'BLOCKER');
+  const codes = result.blockers.map(b => b.code);
+  assert.ok(codes.includes('HAAT_CONSISTENCY_SA_VS_RESOLVER'),
+    `Expected HAAT_CONSISTENCY_SA_VS_RESOLVER, got: ${codes}`);
+});
+
+test('checkHaatConsistency BLOCKER when resolver has no filing_controlling_haat_m', () => {
+  const exhibit = {
+    station_inputs: { service: 'FM' },
+    haat_authority: {
+      filing_controlling_haat_m:     null,
+      filing_controlling_haat_basis: null,
+      haat_conflict_status:          'BLOCKER'
+    },
+    source_attestation_v2: { fields: {} }
+  };
+  const result = checkHaatConsistency(exhibit);
+  assert.ok(!result.pass, 'Null resolver value must be a BLOCKER');
+  const codes = result.blockers.map(b => b.code);
+  assert.ok(codes.includes('HAAT_CONSISTENCY_NO_RESOLVER_VALUE'));
+});
+
+test('producer table has all six consumers', () => {
+  const exhibit = {
+    station_inputs: { service: 'FM' },
+    haat_authority: { filing_controlling_haat_m: 100, filing_controlling_haat_basis: 'FCC_AUTHORIZED' },
+    source_attestation_v2: { fields: { haat_m: { candidates: [{ value: 100, is_operative: true }] } } }
+  };
+  const result = checkHaatConsistency(exhibit, { operative_haat_m: 100 });
+  const producers = result.table.map(r => r.producer);
+  assert.ok(producers.includes('contour engine'),     'table must include contour engine');
+  assert.ok(producers.includes('validation verdict'), 'table must include validation verdict');
+  assert.ok(producers.includes('source attestation'), 'table must include source attestation');
+  assert.ok(producers.includes('AI review context'),  'table must include AI review context');
+  assert.ok(producers.includes('replay token'),       'table must include replay token');
+  assert.ok(producers.includes('PDF renderer'),       'table must include PDF renderer');
+});
