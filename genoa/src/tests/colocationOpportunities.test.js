@@ -4282,3 +4282,14 @@ test('am_transmitter_power_monitoring_and_operating_log_guide present across col
     assert.ok(Array.isArray(g.log_entry_triggers) && g.log_entry_triggers.length >= 3, 'must have at least 3 log entry triggers');
   }
 });
+
+test('am_operator_and_chief_operator_qualification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_operator_and_chief_operator_qualification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_operator_and_chief_operator_qualification_guide');
+    assert.strictEqual(g.rp_permit_required, true, 'RP permit always required');
+    assert.ok(g.n_weekly_duties >= 4, 'must have at least 4 weekly chief operator duties');
+    assert.strictEqual(g.unattended_operation.authorized, true, 'unattended operation must be authorized');
+  }
+});

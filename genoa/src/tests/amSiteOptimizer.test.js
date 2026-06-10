@@ -17361,3 +17361,57 @@ test('#110 candidate_comparison_table has pml_* columns', async () => {
     assert.ok('pml_total_monitoring_low_usd' in row, 'pml_total_monitoring_low_usd missing');
   }
 });
+
+// ---- Feature #111: am_operator_and_chief_operator_qualification_guide ----
+
+test('#111 KAZM NDA: chief operator qualification guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  assert.ok(g, 'am_operator_and_chief_operator_qualification_guide must be present');
+  assert.strictEqual(g.rp_permit_required, true, 'RP permit must always be required');
+  assert.strictEqual(g.rp_permit_cost_usd, 0, 'RP permit is free (FCC ULS)');
+  assert.strictEqual(g.chief_operator_designation.required, true, 'chief operator must be required');
+  assert.strictEqual(g.chief_operator_designation.must_be_us_citizen, true, 'must be US citizen');
+  assert.strictEqual(g.unattended_operation.authorized, true, '§73.801 unattended must be authorized');
+  assert.strictEqual(g.log_retention_years, undefined, 'log retention is not a field on this guide (it is on pml guide)');
+});
+
+test('#111 DA station has more weekly duties than NDA (antenna monitor duty added)', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const gDA    = outDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const gNDA   = outNDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  assert.ok(gDA.n_weekly_duties > gNDA.n_weekly_duties,
+    `DA weekly duties (${gDA.n_weekly_duties}) must exceed NDA (${gNDA.n_weekly_duties})`);
+});
+
+test('#111 modification_triggers includes DA pattern change for DA station, not for NDA', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const gDA    = outDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const gNDA   = outNDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const hasDaPattern = t => t.change.toLowerCase().includes('pattern');
+  assert.ok(gDA.modification_triggers.some(hasDaPattern),  'DA guide must include pattern change trigger');
+  assert.ok(!gNDA.modification_triggers.some(hasDaPattern), 'NDA guide must NOT include pattern change trigger');
+});
+
+test('#111 compliance_calendar has at least 4 items; DA has more than NDA', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const gDA    = outDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  const gNDA   = outNDA.candidates[0].am_operator_and_chief_operator_qualification_guide;
+  assert.ok(gNDA.n_calendar_items >= 4, `NDA calendar must have ≥4 items, got ${gNDA.n_calendar_items}`);
+  assert.ok(gDA.n_calendar_items > gNDA.n_calendar_items,
+    `DA calendar (${gDA.n_calendar_items}) must exceed NDA (${gNDA.n_calendar_items})`);
+});
+
+test('#111 candidate_comparison_table has coq_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('coq_rp_permit_required'    in row, 'coq_rp_permit_required missing');
+    assert.ok('coq_n_weekly_duties'       in row, 'coq_n_weekly_duties missing');
+    assert.ok('coq_unattended_authorized' in row, 'coq_unattended_authorized missing');
+    assert.ok('coq_n_mod_triggers'        in row, 'coq_n_mod_triggers missing');
+    assert.ok('coq_n_calendar_items'      in row, 'coq_n_calendar_items missing');
+  }
+});
