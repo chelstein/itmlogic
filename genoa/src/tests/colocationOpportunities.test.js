@@ -4129,3 +4129,13 @@ test('am_skywave_nighttime_guide present across colocation candidates', async ()
     assert.ok(sw.night_power_limit_kw > 0, 'night_power_limit_kw must be positive');
   }
 });
+
+test('am_site_buildout_risk_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const bra = c.am_site_buildout_risk_assessment_guide;
+    assert.ok(bra !== undefined && bra !== null, 'candidate missing am_site_buildout_risk_assessment_guide');
+    assert.ok(['LOW','MODERATE','HIGH','CRITICAL'].includes(bra.buildout_risk_tier), `unexpected risk tier: ${bra.buildout_risk_tier}`);
+    assert.ok(typeof bra.buildout_feasibility_score === 'number', 'buildout_feasibility_score must be numeric');
+  }
+});

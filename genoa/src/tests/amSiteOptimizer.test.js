@@ -16576,3 +16576,54 @@ test('#95 candidate_comparison_table has sw_* columns', async () => {
     assert.ok('sw_psa_eligible'         in row, 'sw_psa_eligible missing');
   }
 });
+
+// ---- Feature #96: am_site_buildout_risk_assessment_guide ----
+
+test('#96 KAZM: am_site_buildout_risk_assessment_guide present with expected shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const bra = out.candidates[0].am_site_buildout_risk_assessment_guide;
+  assert.ok(bra, 'am_site_buildout_risk_assessment_guide must be present');
+  assert.ok(typeof bra.buildout_feasibility_score === 'number', 'buildout_feasibility_score must be numeric');
+  assert.ok(bra.buildout_feasibility_score >= 0 && bra.buildout_feasibility_score <= 100, 'feasibility score must be 0–100');
+  assert.ok(['LOW','MODERATE','HIGH','CRITICAL'].includes(bra.buildout_risk_tier), `unexpected risk tier: ${bra.buildout_risk_tier}`);
+  assert.ok(bra.risk_dimensions?.regulatory, 'regulatory dimension must be present');
+  assert.ok(bra.risk_dimensions?.environmental, 'environmental dimension must be present');
+  assert.ok(bra.risk_dimensions?.acquisition, 'acquisition dimension must be present');
+  assert.ok(bra.risk_dimensions?.construction, 'construction dimension must be present');
+  assert.ok(bra.risk_dimensions?.zoning, 'zoning dimension must be present');
+});
+
+test('#96 DA station has elevated construction risk (≥ 2)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const bra = out.candidates[0].am_site_buildout_risk_assessment_guide;
+  assert.ok(bra.risk_dimensions.construction.score >= 2, `DA station construction risk should be ≥2, got ${bra.risk_dimensions.construction.score}`);
+  assert.strictEqual(bra.is_da, true, 'is_da must be true for DA-N pattern_mode');
+});
+
+test('#96 clear-channel station has regulatory risk ≥ 1', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const bra = out.candidates[0].am_site_buildout_risk_assessment_guide;
+  // KAZM 780 kHz is clear channel → regulatory risk +1 minimum
+  assert.ok(bra.risk_dimensions.regulatory.score >= 1, `clear channel regulatory score should be ≥1, got ${bra.risk_dimensions.regulatory.score}`);
+  assert.strictEqual(bra.is_clear_channel, true, 'is_clear_channel must be true for 780 kHz');
+});
+
+test('#96 capex estimates are positive and ordered low < high', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const bra = out.candidates[0].am_site_buildout_risk_assessment_guide;
+  assert.ok(bra.est_capex_low_usd > 0, 'capex_low_usd must be positive');
+  assert.ok(bra.est_capex_high_usd > bra.est_capex_low_usd, 'capex_high must exceed capex_low');
+  assert.ok(bra.est_buildout_months_low > 0, 'buildout_months_low must be positive');
+  assert.ok(bra.est_buildout_months_high >= bra.est_buildout_months_low, 'buildout_months_high must be >= low');
+});
+
+test('#96 candidate_comparison_table has bra_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('bra_feasibility_score'   in row, 'bra_feasibility_score missing');
+    assert.ok('bra_risk_tier'           in row, 'bra_risk_tier missing');
+    assert.ok('bra_primary_risk_factor' in row, 'bra_primary_risk_factor missing');
+    assert.ok('bra_months_low'          in row, 'bra_months_low missing');
+    assert.ok('bra_capex_low_usd'       in row, 'bra_capex_low_usd missing');
+  }
+});

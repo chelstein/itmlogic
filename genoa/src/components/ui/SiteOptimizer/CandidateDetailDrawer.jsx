@@ -2356,6 +2356,80 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Site Buildout Risk Assessment Guide */}
+        {candidate.am_site_buildout_risk_assessment_guide && (() => {
+          const bra = candidate.am_site_buildout_risk_assessment_guide;
+          const fmtUsd  = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const fmtMos  = (lo, hi) => lo != null ? `${lo}–${hi} mo` : '—';
+          const TIER_COLOR = { LOW: '#2d6a2d', MODERATE: '#7a6500', HIGH: '#8a2200', CRITICAL: '#5a0a0a' };
+          const tierBg = TIER_COLOR[bra.buildout_risk_tier] ?? '#1a1a2e';
+          const scoreColor = bra.buildout_feasibility_score >= 75 ? '#4ade80'
+            : bra.buildout_feasibility_score >= 50 ? '#facc15'
+            : bra.buildout_feasibility_score >= 25 ? '#f97316'
+            : '#ef4444';
+          const SCORE_BADGE = ['NEGLIGIBLE', 'LOW', 'MODERATE', 'HIGH', 'CRITICAL'];
+          const dimRow = (label, score, items) => (
+            <tr key={label} style={{ borderBottom: '1px solid #333' }}>
+              <td style={{ padding: '3px 6px', color: '#aaa', fontSize: 10, whiteSpace: 'nowrap' }}>{label}</td>
+              <td style={{ padding: '3px 6px', fontSize: 10, color: score >= 3 ? '#ef4444' : score >= 2 ? '#f97316' : '#4ade80', fontWeight: 600 }}>
+                {SCORE_BADGE[score] ?? score}
+              </td>
+              <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>
+                {(items ?? []).slice(0, 2).join(' · ')}
+              </td>
+            </tr>
+          );
+          return (
+            <div key="bra-guide" style={{ background: '#0c1008', border: '1px solid #2d4a1e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <div style={{ fontWeight: 700, color: '#86efac', fontSize: 13 }}>
+                  Buildout Risk Assessment
+                </div>
+                <div style={{ background: tierBg, border: `1px solid ${scoreColor}`, borderRadius: 4, padding: '2px 8px', fontSize: 10, fontWeight: 700, color: scoreColor }}>
+                  {bra.buildout_risk_label ?? bra.buildout_risk_tier}
+                </div>
+                <div style={{ marginLeft: 'auto', fontSize: 18, fontWeight: 800, color: scoreColor }}>
+                  {bra.buildout_feasibility_score}/100
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#ccc', marginBottom: 8, fontStyle: 'italic' }}>
+                {bra.risk_summary}
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: '#1a2a10' }}>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#86efac' }}>Dimension</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#86efac' }}>Level</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#86efac' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dimRow('Regulatory', bra.risk_dimensions?.regulatory?.score, bra.risk_dimensions?.regulatory?.items)}
+                  {dimRow('Environmental', bra.risk_dimensions?.environmental?.score, bra.risk_dimensions?.environmental?.items)}
+                  {dimRow('Acquisition', bra.risk_dimensions?.acquisition?.score, bra.risk_dimensions?.acquisition?.items)}
+                  {dimRow('Construction', bra.risk_dimensions?.construction?.score, bra.risk_dimensions?.construction?.items)}
+                  {dimRow('Zoning', bra.risk_dimensions?.zoning?.score, bra.risk_dimensions?.zoning?.items)}
+                </tbody>
+              </table>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Primary Risk</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f97316' }}>{bra.primary_risk_factor ?? '—'}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Timeline</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtMos(bra.est_buildout_months_low, bra.est_buildout_months_high)}</div>
+                </div>
+                <div style={{ background: '#111c0a', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#86efac' }}>Est. CapEx</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(bra.est_capex_low_usd)}–{fmtUsd(bra.est_capex_high_usd)}</div>
+                </div>
+              </div>
+              <div className="font-mono text-[8px] text-textDim leading-snug">{bra.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Skywave Nighttime Guide */}
         {candidate.am_skywave_nighttime_guide && (() => {
           const sw = candidate.am_skywave_nighttime_guide;
