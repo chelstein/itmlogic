@@ -4458,3 +4458,14 @@ test('am_frequency_interference_analysis_and_channel_study_guide present across 
     assert.strictEqual(g.contour_overlap_prohibited, true, 'contour overlap must be prohibited');
   }
 });
+
+test('am_site_hydrology_and_flood_zone_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_hydrology_and_flood_zone_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_site_hydrology_and_flood_zone_guide');
+    assert.ok(['LOW','MODERATE','ELEVATED'].includes(g.flood_risk_level), 'flood_risk_level must be valid enum');
+    assert.strictEqual(g.ea_required_if_in_floodplain, true, 'EA must be required if in floodplain');
+    assert.ok(g.n_mitigation_measures >= 3, 'must have ≥3 mitigation measures');
+  }
+});

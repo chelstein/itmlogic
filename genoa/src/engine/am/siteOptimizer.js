@@ -1740,7 +1740,12 @@ export async function runSiteOptimizer(body = {}){
     fia_min_co_channel_sep_km:          c.am_frequency_interference_analysis_and_channel_study_guide?.min_co_channel_separation_km ?? null,
     fia_n_study_steps:                  c.am_frequency_interference_analysis_and_channel_study_guide?.n_study_steps ?? null,
     fia_study_low_usd:                  c.am_frequency_interference_analysis_and_channel_study_guide?.cost_estimates?.channel_study_low_usd ?? null,
-    fia_contour_overlap_prohibited:     c.am_frequency_interference_analysis_and_channel_study_guide?.contour_overlap_prohibited ?? null
+    fia_contour_overlap_prohibited:     c.am_frequency_interference_analysis_and_channel_study_guide?.contour_overlap_prohibited ?? null,
+    fhz_flood_risk_level:               c.am_site_hydrology_and_flood_zone_guide?.flood_risk_level ?? null,
+    fhz_ea_required_if_in_floodplain:   c.am_site_hydrology_and_flood_zone_guide?.ea_required_if_in_floodplain ?? null,
+    fhz_n_mitigation_measures:          c.am_site_hydrology_and_flood_zone_guide?.n_mitigation_measures ?? null,
+    fhz_total_low_usd:                  c.am_site_hydrology_and_flood_zone_guide?.cost_estimates?.total_low_usd ?? null,
+    fhz_ea_cost_low_usd:                c.am_site_hydrology_and_flood_zone_guide?.cost_estimates?.environmental_assessment_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31444,6 +31449,115 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.37; §73.182; §73.182(a); §73.182(b); §73.182(e)',
         note: `${frequency_khz} kHz (${fcc_class}): 0.5 mV/m reach ≈ ${d_05mvm_km ?? 'N/A'} km. Min co-channel separation ≈ ${min_co_channel_separation_km ?? 'N/A'} km. D/U requirements: co-channel 6 dB, ±10 kHz 20 dB, ±20 kHz 6 dB. Study cost est. $${STUDY_LOW.toLocaleString()}–$${STUDY_HIGH.toLocaleString()}.`
+      };
+    })(),
+
+    am_site_hydrology_and_flood_zone_guide: (() => {
+      // Guide #127 — Site Hydrology & Flood Zone Assessment
+      //
+      // AM tower sites with buried ground radial systems are especially
+      // vulnerable to flood damage.  FEMA flood zone designation affects
+      // site permittability, insurance requirements, and FCC environmental
+      // review obligations.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §1.1307(a)(3) — Floodplains.
+      //   FCC environmental review requires an Environmental Assessment (EA)
+      //   when a proposed facility is located in a 100-year floodplain (FEMA
+      //   Zone AE, AH, A, VE, V).  The applicant must show the action will
+      //   not affect floodplain values.
+      //
+      // 47 CFR §1.1311 — Environmental Assessment contents.
+      //   EA must address hydrology/floodplain impact, including whether the
+      //   tower or ground system would obstruct flood flow, trap debris, or
+      //   increase flood risk to adjacent properties.
+      //
+      // FEMA FLOOD ZONE CATEGORIES
+      // ───────────────────────────
+      //   Zone AE/A: 100-year floodplain (1% annual chance flood).
+      //     Structures require elevation certificate; flood insurance may be
+      //     required by lender.  Ground radials may be subject to scour.
+      //   Zone VE/V: Coastal high-hazard zone with wave action.
+      //     AM towers rarely sited here; significant structural requirements.
+      //   Zone X (shaded): 500-year floodplain (0.2% annual chance).
+      //     No mandatory federal requirements but prudent to note.
+      //   Zone X (unshaded): Minimal flood hazard.
+      //     No special requirements.
+      //
+      // GROUND SYSTEM FLOOD VULNERABILITY
+      // ────────────────────────────────────
+      //   Buried radial systems in floodplains are at risk of:
+      //    • Scour: flood current erodes soil cover, exposes/breaks radials
+      //    • Corrosion acceleration: wet/anaerobic soil speeds copper degradation
+      //    • Displacement: debris flow can shift the bus ring and break connections
+      //   Mitigation: use tinned copper radials, deeper burial (30+ cm), armored
+      //   conduit for feeder runs below grade.
+      //
+      // FLOOD ZONE RISK PROXY
+      // ─────────────────────
+      //   This guide uses distance from current site and latitude as a rough
+      //   proxy for flood risk (flat, low-lying coastal/river valley areas have
+      //   higher flood risk).  A real FEMA FIRM lookup requires coordinates.
+      //
+      // COST ESTIMATES
+      //   FEMA FIRM flood zone determination: $500–$1,500
+      //   Elevation certificate (if in AE zone): $600–$1,200
+      //   Environmental Assessment (EA) for floodplain: $5,000–$15,000
+      //   Flood-resistant radial system upgrade (tinned/deeper): $15,000–$40,000
+      //   Annual flood insurance premium (building, AE zone): $3,000–$8,000
+
+      const dist_km = pt.distance_from_current_km ?? 0;
+      const lat     = pt.lat ?? 39;  // fallback to mid-US latitude
+
+      // Flood risk proxy: coastal latitudes + low distances = higher risk
+      // This is a screening-grade proxy only; actual risk requires FIRM lookup
+      const isCoastalLat = lat < 35 || lat > 45;  // Gulf Coast, SE, or northern Great Lakes
+      const isLowlying   = dist_km < 20 && isCoastalLat;
+
+      const flood_risk_level =
+        isLowlying ? 'ELEVATED'
+        : isCoastalLat ? 'MODERATE'
+        : 'LOW';
+
+      const ea_required_if_in_floodplain = true;
+
+      // Flood mitigation measures
+      const MITIGATION_MEASURES = [
+        { measure: 'Tinned copper radials (corrosion-resistant)', cost_usd: 5000,  applicable: true },
+        { measure: 'Deeper radial burial (30+ cm vs standard 15 cm)', cost_usd: 8000, applicable: true },
+        { measure: 'Armored conduit for below-grade feeder runs', cost_usd: 3000,  applicable: true },
+        { measure: 'Elevated transmitter building (above BFE)', cost_usd: 20000, applicable: flood_risk_level !== 'LOW' },
+        { measure: 'Annual flood insurance (AE zone estimate)', cost_usd: 5000,  applicable: flood_risk_level === 'ELEVATED' },
+      ];
+
+      const applicable_measures = MITIGATION_MEASURES.filter(m => m.applicable);
+      const mitigation_cost_usd = applicable_measures.reduce((s, m) => s + m.cost_usd, 0);
+
+      const FIRM_COST_LOW  = 500;
+      const FIRM_COST_HIGH = 1500;
+      const EA_COST_LOW    = flood_risk_level !== 'LOW' ? 5000  : 0;
+      const EA_COST_HIGH   = flood_risk_level !== 'LOW' ? 15000 : 0;
+
+      const total_low  = round2(FIRM_COST_LOW  + EA_COST_LOW);
+      const total_high = round2(FIRM_COST_HIGH + EA_COST_HIGH + (flood_risk_level === 'ELEVATED' ? mitigation_cost_usd : 0));
+
+      return {
+        flood_risk_level,
+        ea_required_if_in_floodplain,
+        fema_zones_requiring_ea: ['AE', 'A', 'AH', 'VE', 'V'],
+        mitigation_measures: applicable_measures,
+        n_mitigation_measures: applicable_measures.length,
+        cost_estimates: {
+          firm_determination_low_usd: FIRM_COST_LOW,
+          firm_determination_high_usd: FIRM_COST_HIGH,
+          environmental_assessment_low_usd: EA_COST_LOW,
+          environmental_assessment_high_usd: EA_COST_HIGH,
+          total_low_usd:  total_low,
+          total_high_usd: total_high,
+        },
+        reference: '47 CFR §1.1307(a)(3); §1.1311; FEMA FIRM; 44 CFR §60.3',
+        note: `Site hydrology risk: ${flood_risk_level} (screening-grade proxy; actual risk requires FEMA FIRM lookup at coordinates). ${flood_risk_level !== 'LOW' ? `EA may be required if in FEMA AE/A zone. ` : ''}Est. cost $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),
 
