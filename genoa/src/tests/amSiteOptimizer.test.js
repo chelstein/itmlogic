@@ -18669,3 +18669,56 @@ test('#138 candidate_comparison_table has fee_* columns', async () => {
     assert.ok('fee_total_with_consulting_low_usd' in row, 'fee_total_with_consulting_low_usd missing');
   }
 });
+
+// ── Guide #139: Site Accessibility & ADA Compliance ──────────────────────────
+test('#139 am_site_accessibility_and_ada_compliance_guide is present and valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_accessibility_and_ada_compliance_guide;
+  assert.ok(g, 'guide must exist');
+  assert.ok(['FULL','PARTIAL','MINIMAL'].includes(g.ada_applicability), 'ada_applicability must be valid');
+  assert.ok(typeof g.is_likely_staffed === 'boolean', 'is_likely_staffed must be boolean');
+  assert.ok(g.n_accessibility_features >= 0, 'n_accessibility_features must be non-negative');
+  assert.ok(Array.isArray(g.accessibility_features), 'accessibility_features must be array');
+});
+
+test('#139 KAZM (tpo=5) is staffed and FULL ADA applicability', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const g = out.candidates[0].am_site_accessibility_and_ada_compliance_guide;
+  assert.strictEqual(g.is_likely_staffed, true, 'tpo>=5 must be staffed');
+  assert.strictEqual(g.ada_applicability, 'FULL', 'staffed site must be FULL ADA');
+});
+
+test('#139 low-power NDA site has lower ADA applicability than KAZM', async () => {
+  const lowOut = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.1, pattern_mode: 'NDA', candidate_limit: 1 });
+  const kazOut = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const gLow = lowOut.candidates[0].am_site_accessibility_and_ada_compliance_guide;
+  const gKAZM = kazOut.candidates[0].am_site_accessibility_and_ada_compliance_guide;
+  assert.ok(
+    ['PARTIAL','MINIMAL'].includes(gLow.ada_applicability),
+    'low-power NDA site should be PARTIAL or MINIMAL'
+  );
+  assert.notStrictEqual(gKAZM.ada_applicability, gLow.ada_applicability, 'KAZM and low-power must differ');
+});
+
+test('#139 FULL ADA sites have higher cost than MINIMAL', async () => {
+  const fullOut    = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const minimalOut = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.1, pattern_mode: 'NDA', candidate_limit: 1 });
+  const gFull    = fullOut.candidates[0].am_site_accessibility_and_ada_compliance_guide;
+  const gMinimal = minimalOut.candidates[0].am_site_accessibility_and_ada_compliance_guide;
+  if (gMinimal.ada_applicability === 'MINIMAL') {
+    assert.ok(
+      gFull.cost_estimates.accessibility_low_usd > gMinimal.cost_estimates.accessibility_low_usd,
+      'FULL ADA cost must exceed MINIMAL'
+    );
+  }
+});
+
+test('#139 candidate_comparison_table has ada_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ada_applicability'  in row, 'ada_applicability missing');
+    assert.ok('ada_n_features'     in row, 'ada_n_features missing');
+    assert.ok('ada_is_staffed'     in row, 'ada_is_staffed missing');
+    assert.ok('ada_access_low_usd' in row, 'ada_access_low_usd missing');
+  }
+});

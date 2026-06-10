@@ -4589,3 +4589,14 @@ test('am_fcc_application_fee_budget_guide present across colocation candidates',
     assert.ok(g.n_fee_items >= 4, 'must list ≥4 fee items');
   }
 });
+
+test('am_site_accessibility_and_ada_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_accessibility_and_ada_compliance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_site_accessibility_and_ada_compliance_guide');
+    assert.ok(['FULL','PARTIAL','MINIMAL'].includes(g.ada_applicability), 'ada_applicability must be valid enum');
+    assert.ok(typeof g.is_likely_staffed === 'boolean', 'is_likely_staffed must be boolean');
+    assert.ok(g.n_accessibility_features >= 0, 'n_accessibility_features must be non-negative');
+  }
+});
