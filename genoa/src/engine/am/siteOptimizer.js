@@ -1660,7 +1660,12 @@ export async function runSiteOptimizer(body = {}){
     pml_n_base_current_meters:          c.am_transmitter_power_monitoring_and_operating_log_guide?.n_base_current_meters ?? null,
     pml_antenna_monitor_required:       c.am_transmitter_power_monitoring_and_operating_log_guide?.antenna_monitor_required ?? null,
     pml_apc_required:                   c.am_transmitter_power_monitoring_and_operating_log_guide?.automatic_power_control_required ?? null,
-    pml_total_monitoring_low_usd:       c.am_transmitter_power_monitoring_and_operating_log_guide?.total_monitoring_low_usd ?? null
+    pml_total_monitoring_low_usd:       c.am_transmitter_power_monitoring_and_operating_log_guide?.total_monitoring_low_usd ?? null,
+    coq_rp_permit_required:             c.am_operator_and_chief_operator_qualification_guide?.rp_permit_required ?? null,
+    coq_n_weekly_duties:                c.am_operator_and_chief_operator_qualification_guide?.n_weekly_duties ?? null,
+    coq_unattended_authorized:          c.am_operator_and_chief_operator_qualification_guide?.unattended_operation?.authorized ?? null,
+    coq_n_mod_triggers:                 c.am_operator_and_chief_operator_qualification_guide?.n_modification_triggers ?? null,
+    coq_n_calendar_items:               c.am_operator_and_chief_operator_qualification_guide?.n_calendar_items ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -29376,6 +29381,133 @@ async function scoreCandidate(pt, ctx, warnings){
         note: isDA
           ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: ${n_base_current_meters} base current meters required (one/element), antenna monitor required per §73.68, APC ${apc_required ? 'required for day/night switch' : 'not required'}. Operating log must record all pattern changes. Log retention: ${log_retention_years} years.`
           : `NDA station at ${frequency_khz} kHz: 1 base current meter required (§73.1215), no antenna monitor, ±${power_tolerance_pct}% AIP tolerance (§73.1560). Operating log required (§73.1820); retain ${log_retention_years} years.`
+      };
+    })(),
+
+    am_operator_and_chief_operator_qualification_guide: (() => {
+      // Chief operator and operator qualification guide for AM stations.
+      //
+      // 47 CFR §73.1870 — Chief operator designation and duties.
+      //   Every AM station must designate a chief operator in writing.
+      //   The chief operator must be a U.S. citizen and hold a Restricted
+      //   Radiotelephone Operator Permit or higher (or be the licensee).
+      //   Chief operator responsibilities:
+      //     (1) Ensure station operates in compliance with FCC rules
+      //     (2) Review operating logs at least weekly
+      //     (3) Ensure transmitter performance meets §73.1560 requirements
+      //     (4) Sign/date logs to confirm review
+      //   The chief operator designation must be posted at the transmitter site
+      //   or kept in the station's records with the license.
+      //
+      // 47 CFR §73.1690 — Modification of transmission systems.
+      //   Any modification to the transmitter, antenna, transmission line, or
+      //   associated equipment that changes licensed parameters requires a new
+      //   construction permit or STA filed via FCC LMS before any change.
+      //   For AM, changes to power, pattern, antenna configuration, or
+      //   operating frequency require prior FCC authorization.
+      //
+      // 47 CFR §73.801 — Unattended transmitter operation.
+      //   AM stations may operate unattended (no operator on duty) if:
+      //     (a) The transmitter has automatic reset or shutoff capability
+      //     (b) The licensee can be reached by telephone within 3 hours
+      //     (c) Remote control meets §73.1400 requirements
+      //   No FCC license is required for persons who operate remote-controlled
+      //   equipment if operation is per §73.1400 and no changes to licensed
+      //   parameters are made.
+      //
+      // FCC Restricted Radiotelephone Operator Permit (RP):
+      //   - Required for anyone who adjusts or operates a transmitter
+      //   - Application: FCC Form 605, no exam required, no expiration
+      //   - Available electronically via FCC ULS system
+      //   - Exception: §73.801 unattended operation under a §73.1400 remote
+      //     control setup does not require an operator permit
+      //
+      // References:
+      //   47 CFR §73.801; §73.1400; §73.1560; §73.1690; §73.1870
+      //   FCC Form 605 (operator permit application)
+
+      const isDA = /^DA/i.test(pattern_mode);
+      const isDA2 = /^DA-2/i.test(pattern_mode);
+
+      // Chief operator designation
+      const CHIEF_OP_DESIGNATION = {
+        required: true,
+        cfr: '§73.1870',
+        must_be_us_citizen: true,
+        minimum_license: 'Restricted Radiotelephone Operator Permit (RP) or higher',
+        posting_required: true,
+        posting_location: 'Transmitter site or with station license records',
+        form: 'FCC Form 605 (RP application — no exam, no expiration)'
+      };
+
+      // Weekly log review duties
+      const WEEKLY_LOG_DUTIES = [
+        { duty: 'Review operating logs; sign and date confirming review',   cfr: '§73.1870(b)(1)' },
+        { duty: 'Verify transmitter power within ±10% AIP (§73.1560)',      cfr: '§73.1870(b)(2)' },
+        { duty: 'Check DA antenna monitor readings (DA stations only)',      cfr: '§73.1870(b)(3)', da_only: true },
+        { duty: 'Confirm EAS equipment operational; log weekly test',        cfr: '§73.1870(b)(4)' },
+        { duty: 'Review any equipment failures and corrective action taken', cfr: '§73.1870(b)(5)' }
+      ];
+      const applicable_duties = WEEKLY_LOG_DUTIES.filter(d => !d.da_only || isDA);
+
+      // Modification rules
+      const MODIFICATION_TRIGGERS = [
+        { change: 'Power increase or decrease', prior_auth: true, cfr: '§73.1690(b)' },
+        { change: 'Antenna height or configuration change', prior_auth: true, cfr: '§73.1690(b)' },
+        { change: 'Pattern change (DA) — new or revised parameters', prior_auth: true, cfr: '§73.1690(b)', da_only: true },
+        { change: 'Transmitter type change (different model)', prior_auth: false, cfr: '§73.1350(c)', note: 'May require notification; no CP if power/pattern unchanged' },
+        { change: 'Frequency change', prior_auth: true, cfr: '§73.1690(b)' },
+        { change: 'Call sign change', prior_auth: false, cfr: '§73.3550', note: 'FCC Form 303-S or online request' }
+      ];
+      const applicable_mods = MODIFICATION_TRIGGERS.filter(m => !m.da_only || isDA);
+
+      // Unattended operation
+      const unattended_eligible = true;  // all licensed AM stations with remote control
+      const UNATTENDED_REQUIREMENTS = {
+        authorized: unattended_eligible,
+        cfr: '§73.801',
+        conditions: [
+          'Transmitter must have automatic reset or automatic shutoff (§73.801(a))',
+          'Licensee reachable by telephone within 3 hours of any contact (§73.801(b))',
+          'Remote control system must meet §73.1400 requirements'
+        ],
+        operator_permit_required_for_remote: false,
+        note: 'Remote operators adjusting transmitter parameters must hold RP permit; monitoring-only operations do not require permit'
+      };
+
+      // Compliance calendar — key recurring items
+      const COMPLIANCE_CALENDAR = [
+        { item: 'Weekly operating log review by chief operator',         interval: 'weekly', cfr: '§73.1870' },
+        { item: 'Annual base current meter calibration (§73.1215)',      interval: 'annual', cfr: '§73.1215' },
+        { item: 'Annual antenna monitor calibration (DA only)',           interval: 'annual', cfr: '§73.68', da_only: true },
+        { item: 'Biennial ownership report (FCC Form 323)',              interval: 'biennial', cfr: '§73.3615' },
+        { item: 'DA proof of performance (after modification)',          interval: 'on-change', cfr: '§73.154', da_only: true },
+        { item: 'License renewal (FCC Form 303-S)',                      interval: '8 years', cfr: '§73.3539' }
+      ];
+      const applicable_calendar = COMPLIANCE_CALENDAR.filter(c => !c.da_only || isDA);
+
+      // Cost to obtain RP permit
+      const rp_permit_cost_usd = 0;  // FCC charges no fee for RP permits
+      const rp_permit_processing_days = { low: 3, high: 14 };
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        is_da_station:               isDA,
+        chief_operator_designation:  CHIEF_OP_DESIGNATION,
+        weekly_log_duties:           applicable_duties,
+        n_weekly_duties:             applicable_duties.length,
+        modification_triggers:       applicable_mods,
+        n_modification_triggers:     applicable_mods.length,
+        unattended_operation:        UNATTENDED_REQUIREMENTS,
+        compliance_calendar:         applicable_calendar,
+        n_calendar_items:            applicable_calendar.length,
+        rp_permit_required:          true,
+        rp_permit_cost_usd,
+        rp_permit_processing_days,
+        reference: '47 CFR §73.801; §73.1400; §73.1560; §73.1690; §73.1870; FCC Form 605',
+        note: isDA
+          ? `DA station (${pattern_mode}) at ${frequency_khz} kHz: chief operator required (§73.1870); must review logs weekly and check antenna monitor readings. DA pattern modification requires prior CP/STA. Unattended operation authorized under §73.801 with remote control.`
+          : `NDA station at ${frequency_khz} kHz: chief operator required (§73.1870); weekly log review and transmitter power verification. Transmitter modifications to power or antenna require prior FCC authorization (§73.1690). Unattended operation authorized under §73.801.`
       };
     })(),
 

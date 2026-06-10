@@ -10138,6 +10138,70 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Operator & Chief Operator Qualification Guide */}
+        {candidate.am_operator_and_chief_operator_qualification_guide && (() => {
+          const g = candidate.am_operator_and_chief_operator_qualification_guide;
+          const cd = g.chief_operator_designation || {};
+          const uo = g.unattended_operation || {};
+          const calColors = { weekly: '#4ade80', annual: '#fbbf24', biennial: '#94a3b8', 'on-change': '#f97316', '8 years': '#94a3b8' };
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Operator &amp; Chief Operator Qualification (§73.1870)
+              </h4>
+              {/* Chief Operator Designation */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 5 }}>CHIEF OPERATOR DESIGNATION</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Required</span>
+                  <span style={{ color: '#4ade80', fontWeight: 700 }}>Yes — {cd.cfr}</span>
+                  <span style={{ color: '#94a3b8' }}>Minimum License</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 10 }}>Restricted Radiotelephone RP (no exam)</span>
+                  <span style={{ color: '#94a3b8' }}>US Citizen</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 600 }}>{cd.must_be_us_citizen ? 'Required' : 'Not required'}</span>
+                  <span style={{ color: '#94a3b8' }}>Posting Required</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{cd.posting_required ? 'Yes — transmitter site or with license' : 'No'}</span>
+                  <span style={{ color: '#94a3b8' }}>RP Permit Cost</span>
+                  <span style={{ color: '#4ade80', fontWeight: 700 }}>${g.rp_permit_cost_usd} (free via FCC ULS)</span>
+                  <span style={{ color: '#94a3b8' }}>RP Processing</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.rp_permit_processing_days?.low}–{g.rp_permit_processing_days?.high} days</span>
+                </div>
+              </div>
+              {/* Weekly Duties */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>WEEKLY LOG REVIEW DUTIES (§73.1870)</div>
+                {(g.weekly_log_duties ?? []).map((d, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0', borderBottom: '1px solid #0a1624', color: '#ccc' }}>
+                    <span style={{ color: '#38bdf8', minWidth: 50, fontFamily: 'monospace', fontSize: 9 }}>{d.cfr.split('§')[1] ?? d.cfr}</span>
+                    {d.duty}
+                  </div>
+                ))}
+              </div>
+              {/* Unattended Operation */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>UNATTENDED OPERATION — §73.801</div>
+                <div style={{ color: '#4ade80', fontWeight: 700, marginBottom: 4 }}>{uo.authorized ? 'Authorized under §73.801 with remote control' : 'Not authorized'}</div>
+                {(uo.conditions ?? []).map((c, i) => (
+                  <div key={i} style={{ color: '#64748b', fontSize: 10, padding: '1px 0' }}>• {c}</div>
+                ))}
+              </div>
+              {/* Compliance Calendar */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>COMPLIANCE CALENDAR</div>
+                {(g.compliance_calendar ?? []).map((item, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 10, padding: '2px 0', borderBottom: '1px solid #0a1624' }}>
+                    <span style={{ color: calColors[item.interval] ?? '#94a3b8', fontWeight: 700, minWidth: 60, fontSize: 9 }}>{item.interval.toUpperCase()}</span>
+                    <span style={{ color: '#ccc', flex: 1 }}>{item.item}</span>
+                    <span style={{ color: '#38bdf8', fontSize: 9, fontFamily: 'monospace' }}>{item.cfr}</span>
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
