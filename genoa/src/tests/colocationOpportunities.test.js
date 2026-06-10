@@ -4326,3 +4326,14 @@ test('am_tia222_tower_structural_certification_guide present across colocation c
     assert.ok(g.total_pe_analysis_low_usd > 0, 'PE analysis cost must be positive');
   }
 });
+
+test('am_broadcast_lease_and_spectrum_sharing_agreement_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_broadcast_lease_and_spectrum_sharing_agreement_guide');
+    assert.ok(typeof g.min_licensee_hours_per_week === 'number' && g.min_licensee_hours_per_week > 0, 'min_licensee_hours_per_week must be positive');
+    assert.ok(Array.isArray(g.agreement_types) && g.agreement_types.length >= 3, 'must have at least 3 agreement types');
+    assert.ok(g.market_station_limits?.total >= 6, 'market station limit must be at least 6');
+  }
+});

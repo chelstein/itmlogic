@@ -10138,6 +10138,72 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Broadcast Lease & Spectrum Sharing Agreement Guide */}
+        {candidate.am_broadcast_lease_and_spectrum_sharing_agreement_guide && (() => {
+          const g = candidate.am_broadcast_lease_and_spectrum_sharing_agreement_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const riskColors = { LOW: '#4ade80', MODERATE: '#fbbf24', HIGH: '#ef4444' };
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Broadcast Lease &amp; Spectrum Sharing (§73.3555 TBA/LMA/JSA)
+              </h4>
+              {/* Market Station Limits */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>MARKET STATION OWNERSHIP LIMITS — §73.3555</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Class</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 700 }}>Class {g.fcc_class} — {g.is_large_market ? 'Large' : g.is_medium_market ? 'Medium' : 'Small'} Market</span>
+                  <span style={{ color: '#94a3b8' }}>Max Total Stations</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>{g.market_station_limits?.total} stations</span>
+                  <span style={{ color: '#94a3b8' }}>Max Same Service</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 600 }}>{g.market_station_limits?.same_service} AM stations</span>
+                  <span style={{ color: '#94a3b8' }}>TBA Attribution Threshold</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>&gt;{g.tba_threshold?.attributable_threshold_pct}% weekly hours</span>
+                  <span style={{ color: '#94a3b8' }}>Min Licensee Control</span>
+                  <span style={{ color: '#4ade80', fontWeight: 700 }}>≥{g.min_licensee_control_pct}% ({g.min_licensee_hours_per_week} hrs/wk)</span>
+                </div>
+              </div>
+              {/* Agreement Types */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>AGREEMENT TYPES</div>
+                {(g.agreement_types ?? []).map((a, i) => (
+                  <div key={i} style={{ background: '#020c18', borderRadius: 4, padding: '6px 10px', marginBottom: 4, fontSize: 11 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                      <span style={{ color: riskColors[a.risk_level] ?? '#94a3b8', fontWeight: 700, fontSize: 10 }}>{a.risk_level}</span>
+                      <span style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 11 }}>{a.type}</span>
+                      {a.fcc_form && <span style={{ color: '#38bdf8', fontSize: 9, marginLeft: 'auto' }}>{a.fcc_form.split(' (')[0]}</span>}
+                    </div>
+                    <div style={{ color: '#64748b', fontSize: 10, lineHeight: 1.4 }}>{a.description.split('.')[0]}.</div>
+                  </div>
+                ))}
+              </div>
+              {/* Cost Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>TBA Legal Review</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(g.tba_legal_review_usd?.low)}</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>LMA Legal Review</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>{fmtUsd(g.lma_legal_review_usd?.low)}</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>JSA Legal Review</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>{fmtUsd(g.jsa_legal_review_usd?.low)}</div>
+                </div>
+              </div>
+              {g.political_obligation_note && (
+                <div style={{ fontSize: 10, color: '#94a3b8', padding: '5px 8px', background: '#020c18', borderRadius: 4, marginBottom: 6, fontStyle: 'italic' }}>
+                  {g.political_obligation_note}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* TIA-222-H Tower Structural Certification Guide */}
         {candidate.am_tia222_tower_structural_certification_guide && (() => {
           const g = candidate.am_tia222_tower_structural_certification_guide;

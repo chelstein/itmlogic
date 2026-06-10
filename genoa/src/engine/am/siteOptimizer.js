@@ -1680,7 +1680,12 @@ export async function runSiteOptimizer(body = {}){
     tia_wind_speed_mph:                 c.am_tia222_tower_structural_certification_guide?.wind_speed_mph ?? null,
     tia_ice_thickness_in:               c.am_tia222_tower_structural_certification_guide?.ice_thickness_in ?? null,
     tia_asr_triggered_qw:               c.am_tia222_tower_structural_certification_guide?.asr_triggered_qw ?? null,
-    tia_total_pe_low_usd:               c.am_tia222_tower_structural_certification_guide?.total_pe_analysis_low_usd ?? null
+    tia_total_pe_low_usd:               c.am_tia222_tower_structural_certification_guide?.total_pe_analysis_low_usd ?? null,
+    lsa_max_total_stations:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.market_station_limits?.total ?? null,
+    lsa_tba_threshold_pct:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.tba_threshold?.attributable_threshold_pct ?? null,
+    lsa_min_licensee_hours:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.min_licensee_hours_per_week ?? null,
+    lsa_n_agreement_types:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.n_agreement_types ?? null,
+    lsa_lma_legal_low_usd:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.lma_legal_review_usd?.low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -29894,6 +29899,141 @@ async function scoreCandidate(pt, ctx, warnings){
         upgrade_cost_per_tower_usd: upgrade_cost_usd,
         reference: 'ANSI/TIA-222-H (2017); ASCE 7-16 §26.5, §10; 47 CFR §17.7; FCC Form 854',
         note: `${frequency_khz} kHz: λ/4 = ${qw_ft} ft (${qw_m} m), 5/8λ = ${five_eighth_ft} ft. ${n_towers} tower(s), Structural Category ${structural_category}. Wind: ${wind_speed_mph} mph. Ice: ${ice_thickness_in} in. ASR (λ/4): ${asr_height_trigger ? 'REQUIRED (>200 ft)' : 'not required (<200 ft)'}.`
+      };
+    })(),
+
+    am_broadcast_lease_and_spectrum_sharing_agreement_guide: (() => {
+      // Broadcast lease and spectrum sharing agreement guide for AM stations.
+      //
+      // FCC rules governing commercial arrangements where a licensee leases
+      // air time, sells program time to third parties, or enters into operational
+      // agreements with other broadcast entities.
+      //
+      // 47 CFR §73.3555 — Multiple ownership rules (local radio limits).
+      //   In any market, a single entity may own or attribute no more than:
+      //   - 8 commercial stations (≤5 in same service) in markets with ≥45 stations
+      //   - 7 stations (≤4 same service) in markets with 30–44 stations
+      //   - 6 stations (≤4 same service) in markets with 15–29 stations
+      //   - 5 stations (≤3 same service) in markets with 14 or fewer stations
+      //   Note: 2024 FCC rule changes may apply; verify current §73.3555 text.
+      //
+      // 47 CFR §73.3555(b) — Attribution rules.
+      //   Local Marketing Agreements (LMAs) and Time Brokerage Agreements (TBAs)
+      //   that give one licensee control over more than 15% of total weekly broadcast
+      //   hours of another station in the same market are ATTRIBUTABLE for ownership
+      //   counting purposes.
+      //
+      // 47 CFR §73.3555(e) — Joint Sales Agreements (JSAs).
+      //   A JSA under which one station sells more than 15% of the weekly advertising
+      //   time of another AM station in the same market is attributable.
+      //
+      // Spectrum leasing (47 CFR §73.3597) — AM spectrum leasing is generally
+      //   not permitted in the same way as ancillary spectrum leasing for wireless.
+      //   AM licensees may enter into time brokerage (selling blocks of air time)
+      //   but the licensee retains full legal and programming responsibility.
+      //
+      // Key compliance obligations for TBA/LMA:
+      //   1. Licensee must retain control over programming for at least 15% of
+      //      weekly broadcast hours (§73.3555(b)) — otherwise attributable
+      //   2. FCC Form 323 (biennial ownership report) must reflect TBA/LMA attribution
+      //   3. Main Studio Rule (§73.1125, now largely eliminated) — licensees may
+      //      operate with a "main studio" or SBE-compliant remote operation
+      //   4. Political advertising equal-time obligations persist on the broker
+      //      (§73.1940 / §315 of the Communications Act)
+      //   5. Licensee remains solely responsible for compliance with FCC rules
+      //      regardless of TBA/LMA programming content
+      //
+      // References:
+      //   47 CFR §73.3555; §73.3555(b); §73.3555(e); §73.1940
+      //   FCC Form 323; Communications Act §315
+
+      // Market size classification (approximated from tpo_kw and fcc_class)
+      // Class A/B = larger markets; Class C/D = smaller/local markets
+      const isLargeMarket  = ['A', 'B'].includes(fcc_class.toUpperCase());
+      const isMediumMarket = fcc_class.toUpperCase() === 'C';
+      const isSmallMarket  = fcc_class.toUpperCase() === 'D';
+
+      // Maximum attributable stations (varies by market size)
+      const maxStations = isLargeMarket ? { total: 8, same_service: 5 }
+        : isMediumMarket ? { total: 7, same_service: 4 }
+        : { total: 6, same_service: 4 };
+
+      // TBA compliance thresholds
+      const TBA_THRESHOLD = {
+        attributable_threshold_pct: 15,   // >15% weekly hours = attribution
+        attribution_cfr: '§73.3555(b)',
+        political_obligation_holder: 'broker',
+        political_obligation_cfr: '§73.1940 / §315 Communications Act'
+      };
+
+      // Available agreement types for AM
+      const AGREEMENT_TYPES = [
+        {
+          type: 'Time Brokerage Agreement (TBA)',
+          description: 'Licensee sells blocks of air time to a programmer/broker. Licensee retains ≥85% of weekly hours OR accepts attribution.',
+          attributable: false,  // only if >15% threshold crossed
+          filing_required: false,
+          fcc_form: null,
+          risk_level: 'MODERATE',
+          cfr: '§73.3555(b)'
+        },
+        {
+          type: 'Local Marketing Agreement (LMA)',
+          description: 'Broker provides programming, sells advertising, controls station operations under the licensee\'s supervision. May trigger multiple ownership attribution if >15% weekly hours.',
+          attributable: 'if_threshold_exceeded',
+          filing_required: true,
+          fcc_form: 'FCC Form 323 (biennial ownership report — must disclose LMA)',
+          risk_level: 'HIGH',
+          cfr: '§73.3555(b)'
+        },
+        {
+          type: 'Joint Sales Agreement (JSA)',
+          description: 'One station sells advertising time for another in the same market. Attributable if >15% weekly advertising time.',
+          attributable: 'if_threshold_exceeded',
+          filing_required: true,
+          fcc_form: 'FCC Form 323',
+          risk_level: 'HIGH',
+          cfr: '§73.3555(e)'
+        },
+        {
+          type: 'Local News Service Agreement',
+          description: 'Two stations share news resources; not attributable if neither party has editorial control over the other\'s programming.',
+          attributable: false,
+          filing_required: false,
+          fcc_form: null,
+          risk_level: 'LOW',
+          cfr: '§73.3555 FCC guidance'
+        }
+      ];
+
+      // Licensee retention requirement
+      const MIN_LICENSEE_CONTROL_HOURS_PCT = 15;
+      const weekly_hours_total = 24 * 7;  // 168 hours/week
+      const min_licensee_hours = round2(weekly_hours_total * MIN_LICENSEE_CONTROL_HOURS_PCT / 100);  // 25.2 hrs/week
+
+      // Cost of compliance / legal review
+      const tba_legal_review_usd   = { low: 2500, high: 6000 };
+      const lma_legal_review_usd   = { low: 5000, high: 15000 };
+      const jsa_legal_review_usd   = { low: 5000, high: 15000 };
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_large_market:             isLargeMarket,
+        is_medium_market:            isMediumMarket,
+        is_small_market:             isSmallMarket,
+        market_station_limits:       maxStations,
+        tba_threshold:               TBA_THRESHOLD,
+        agreement_types:             AGREEMENT_TYPES,
+        n_agreement_types:           AGREEMENT_TYPES.length,
+        min_licensee_control_pct:    MIN_LICENSEE_CONTROL_HOURS_PCT,
+        min_licensee_hours_per_week: min_licensee_hours,
+        weekly_hours_total,
+        tba_legal_review_usd,
+        lma_legal_review_usd,
+        jsa_legal_review_usd,
+        political_obligation_note: 'Broker/programmer must comply with §315 equal-time rules for political advertising, regardless of TBA/LMA structure.',
+        reference: '47 CFR §73.3555; §73.3555(b); §73.3555(e); §73.1940; FCC Form 323; Communications Act §315',
+        note: `Class ${fcc_class} — market limits: up to ${maxStations.total} total stations (${maxStations.same_service} same service). TBA/LMA attributable if broker controls >15% of weekly hours (>${min_licensee_hours} hrs/wk). Political ad obligations remain with broker under §315.`
       };
     })(),
 
