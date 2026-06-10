@@ -10138,6 +10138,92 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Interference Distance & Service Area Overlap Guide */}
+        {candidate.am_interference_distance_and_service_area_overlap_guide && (() => {
+          const g = candidate.am_interference_distance_and_service_area_overlap_guide;
+          const riskColors = { LOW: '#4ade80', MODERATE: '#fbbf24', HIGH: '#ef4444' };
+          const chanColors = { clear_channel: '#34d399', regional: '#fbbf24', local: '#f97171' };
+          const sc = g.service_contours || {};
+          const du = g.du_requirements || {};
+          const sep = g.min_separation_km || {};
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Interference Distance &amp; Service Area Overlap (§73.182 / §73.37)
+              </h4>
+              {/* Channel Class Banner */}
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ background: '#020c18', border: `1px solid ${chanColors[g.channel_class] ?? '#38bdf8'}`, borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, color: chanColors[g.channel_class] ?? '#38bdf8' }}>
+                  {(g.channel_class ?? '').replace('_', ' ').toUpperCase()}
+                </div>
+                <div style={{ background: '#020c18', border: `1px solid ${riskColors[g.interference_risk_level] ?? '#94a3b8'}`, borderRadius: 5, padding: '4px 10px', fontSize: 11, fontWeight: 700, color: riskColors[g.interference_risk_level] ?? '#94a3b8' }}>
+                  {g.interference_risk_level} INTERFERENCE RISK
+                </div>
+              </div>
+              {/* Service Contour Distances */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>0.5 mV/m Contour</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{sc.d_05_mvm_km} km</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>{sc.area_05_km2} km²</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>0.1 mV/m Contour</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{sc.d_01_mvm_km} km</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>{sc.area_01_km2} km²</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Co-Ch Min Sep.</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>{sep.co_km} km</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>§73.37</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>D/U Co-Channel</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>≥{du.co_channel_groundwave_db} dB</div>
+                  <div style={{ fontSize: 9, color: '#64748b' }}>at 0.5 mV/m</div>
+                </div>
+              </div>
+              {/* D/U Requirements */}
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
+                <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 5 }}>D/U REQUIREMENTS — §73.182 TABLE 1</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Ground-wave co-channel</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>≥ {du.co_channel_groundwave_db} dB</span>
+                  {du.co_channel_dominant_db != null && (
+                    <>
+                      <span style={{ color: '#94a3b8' }}>Class A dominant</span>
+                      <span style={{ color: '#f97316', fontWeight: 700 }}>≥ {du.co_channel_dominant_db} dB (§73.187)</span>
+                    </>
+                  )}
+                  <span style={{ color: '#94a3b8' }}>Adjacent ±10 kHz</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{du.adj_10khz_db > 0 ? '≥ ' : ''}{du.adj_10khz_db} dB</span>
+                  <span style={{ color: '#94a3b8' }}>Adjacent ±20 kHz</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{du.adj_20khz_db} dB</span>
+                  {du.night_skywave_dominant_db != null && (
+                    <>
+                      <span style={{ color: '#94a3b8' }}>Night skywave (dominant)</span>
+                      <span style={{ color: '#f97316', fontWeight: 700 }}>≥ {du.night_skywave_dominant_db} dB</span>
+                    </>
+                  )}
+                </div>
+              </div>
+              {/* Risk Note & Skywave Obligation */}
+              {g.risk_note && (
+                <div style={{ color: riskColors[g.interference_risk_level] ?? '#94a3b8', fontSize: 11, marginBottom: 6, padding: '6px 10px', background: '#020c18', borderRadius: 5 }}>
+                  {g.risk_note}
+                </div>
+              )}
+              {g.skywave_obligation && (
+                <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, fontStyle: 'italic', padding: '5px 8px', background: '#020c18', borderRadius: 4 }}>
+                  {g.skywave_obligation}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Field Strength Measurement & Contour Verification Guide */}
         {candidate.am_field_strength_measurement_and_contour_verification_guide && (() => {
           const g = candidate.am_field_strength_measurement_and_contour_verification_guide;
