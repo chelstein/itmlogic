@@ -1700,7 +1700,12 @@ export async function runSiteOptimizer(body = {}){
     scm_n_radials:                      c.am_signal_coverage_mapping_and_contour_documentation_guide?.n_radials ?? null,
     scm_d_05mvm_km:                     c.am_signal_coverage_mapping_and_contour_documentation_guide?.contour_distances_km?.d_05mvm_km ?? null,
     scm_total_low_usd:                  c.am_signal_coverage_mapping_and_contour_documentation_guide?.cost_estimates?.total_low_usd ?? null,
-    scm_formal_proof_required:          c.am_signal_coverage_mapping_and_contour_documentation_guide?.formal_proof_required ?? null
+    scm_formal_proof_required:          c.am_signal_coverage_mapping_and_contour_documentation_guide?.formal_proof_required ?? null,
+    tta_power_category:                 c.am_transmitter_type_acceptance_and_fcc_certification_guide?.power_category ?? null,
+    tta_max_power_kw:                   c.am_transmitter_type_acceptance_and_fcc_certification_guide?.authorized_power_range?.max_kw ?? null,
+    tta_min_power_kw:                   c.am_transmitter_type_acceptance_and_fcc_certification_guide?.authorized_power_range?.min_kw ?? null,
+    tta_total_equipment_low_usd:        c.am_transmitter_type_acceptance_and_fcc_certification_guide?.cost_estimates?.total_equipment_low_usd ?? null,
+    tta_n_verification_steps:           c.am_transmitter_type_acceptance_and_fcc_certification_guide?.n_verification_steps ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30447,6 +30452,139 @@ async function scoreCandidate(pt, ctx, warnings){
         formal_proof_required: is_da2,
         reference: '47 CFR §73.182; §73.183; §73.184; §73.186; §73.24(j)',
         note: `${frequency_khz} kHz (${fcc_class}): ${CONTOURS_REQUIRED.length} contours required. Map scale ${map_scale}. ${is_da ? `DA: ${n_radials} radials required. ` : 'NDA: omnidirectional contours. '}Cost estimate $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_transmitter_type_acceptance_and_fcc_certification_guide: (() => {
+      // Guide #119 — Transmitter Type Acceptance & FCC Certification
+      //
+      // AM broadcast transmitters must meet FCC type-acceptance requirements
+      // under 47 CFR Part 73 Subpart F.  This guide covers what equipment is
+      // legally required, how to verify compliance, and what the rules mean
+      // in practice for a new or relocated transmitter site.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.1660 — Transmitter type acceptance.
+      //   All AM broadcast transmitters must be FCC type-accepted (or have
+      //   been granted a waiver or STA for experimental/prototype equipment).
+      //   Type acceptance is demonstrated by an FCC ID or prior acceptance
+      //   letter from the Commission.
+      //
+      // 47 CFR §73.1665 — Transmitter measurements.
+      //   Licensee must measure and verify operating power within 10% of
+      //   authorized power (§73.1560).  For TPO measurements, transmitter
+      //   output power must be measured at the transmitter output terminals.
+      //
+      // 47 CFR §73.1670 — Digital modulation and IBOC.
+      //   If operating with IBOC (HD Radio), additional FCC authorization
+      //   is required.  IBOC AM is hybrid digital+analog; power injection
+      //   limits apply separately from the analog TPO.
+      //
+      // 47 CFR §73.1660(b) — Discontinued models.
+      //   FCC type-accepted transmitters that have been discontinued may
+      //   still be legally operated provided they were type-accepted at
+      //   time of manufacture and continue to meet technical standards.
+      //   No re-certification required for continued operation of legacy hardware.
+      //
+      // POWER TOLERANCE
+      // ───────────────
+      //   §73.1560: Station must not operate at more than 105% or less than 90%
+      //   of authorized power (the ±10% tolerance commonly cited is actually
+      //   asymmetric: +5% high, -10% low).
+      //   For DA stations: each element's relative power must be within ±5%.
+      //
+      // TYPICAL AM TRANSMITTER POWER RANGES (KW → MODEL CATEGORY)
+      //   < 1 kW:   Low-power local (Class D)
+      //   1–5 kW:   Regional (Class B/C)
+      //   5–50 kW:  Major regional / clear (Class A/B)
+      //   > 50 kW:  High-power clear (Class A, e.g. 50 kW max)
+      //   Max licensed power for AM: 50 kW (Class A clear channel daytime)
+      //
+      // TYPE ACCEPTANCE VERIFICATION STEPS
+      // ────────────────────────────────────
+      //  1. Locate transmitter make/model and FCC ID or type acceptance letter.
+      //  2. Confirm ID appears in FCC Equipment Authorization database (apps.fcc.gov/oetcf/eas/reports).
+      //  3. Verify plate voltage/current meters or certified power meter is operable.
+      //  4. Measure and log TPO at installation.  Compare to authorized value.
+      //  5. For DA: confirm each tower's relative contribution is within ±5%.
+      //
+      // COST ESTIMATES
+      //   Transmitter (new, 5 kW):    $30,000–$60,000
+      //   Transmitter (new, 50 kW):   $150,000–$300,000
+      //   Installation labor:         $5,000–$15,000
+      //   Power measurement/verify:   $500–$2,000
+      //   IBOC upgrade kit (5 kW):    $15,000–$40,000
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const tpo_kw_num = Number(tpo_kw) || 5;
+
+      // Power category
+      const power_category =
+        tpo_kw_num < 1   ? 'LOW_POWER'
+        : tpo_kw_num < 5   ? 'REGIONAL_LOW'
+        : tpo_kw_num < 10  ? 'REGIONAL'
+        : tpo_kw_num < 50  ? 'MAJOR'
+        : 'CLEAR_CHANNEL';
+
+      // Transmitter cost estimate
+      const XMTR_COST_MAP = {
+        LOW_POWER:      { low: 8000,   high: 20000  },
+        REGIONAL_LOW:   { low: 20000,  high: 40000  },
+        REGIONAL:       { low: 30000,  high: 60000  },
+        MAJOR:          { low: 60000,  high: 150000 },
+        CLEAR_CHANNEL:  { low: 150000, high: 300000 },
+      };
+      const xmtr_cost = XMTR_COST_MAP[power_category];
+      const install_low = 5000;
+      const install_high = 15000;
+      const power_verify_low = 500;
+      const power_verify_high = 2000;
+
+      const total_equipment_low  = round2(xmtr_cost.low  + install_low  + power_verify_low);
+      const total_equipment_high = round2(xmtr_cost.high + install_high + power_verify_high);
+
+      // Power tolerance: +5% high, -10% low
+      const max_power_kw = round2(tpo_kw_num * 1.05);
+      const min_power_kw = round2(tpo_kw_num * 0.90);
+
+      // DA pattern tolerance: ±5% on element power
+      const da_element_tolerance_pct = is_da ? 5 : null;
+
+      const TYPE_ACCEPTANCE_STEPS = [
+        'Locate transmitter FCC ID or type acceptance letter',
+        'Confirm FCC Equipment Authorization database entry (apps.fcc.gov)',
+        'Verify plate voltage/current meters or calibrated power meter is operational',
+        `Measure and log TPO at installation; must be ${min_power_kw}–${max_power_kw} kW`,
+        ...(is_da ? ['Verify each tower element power within ±5% of authorized ratio'] : []),
+      ];
+
+      return {
+        power_category,
+        tpo_kw: tpo_kw_num,
+        authorized_power_range: {
+          min_kw: min_power_kw,
+          max_kw: max_power_kw,
+          tolerance_high_pct: 5,
+          tolerance_low_pct: 10,
+        },
+        da_element_tolerance_pct,
+        cost_estimates: {
+          transmitter_low_usd:  xmtr_cost.low,
+          transmitter_high_usd: xmtr_cost.high,
+          installation_low_usd: install_low,
+          installation_high_usd: install_high,
+          power_verify_low_usd: power_verify_low,
+          total_equipment_low_usd:  total_equipment_low,
+          total_equipment_high_usd: total_equipment_high,
+        },
+        type_acceptance_steps: TYPE_ACCEPTANCE_STEPS,
+        n_verification_steps: TYPE_ACCEPTANCE_STEPS.length,
+        max_licensed_am_power_kw: 50,
+        iboc_requires_separate_auth: true,
+        discontinued_models_ok: true,
+        reference: '47 CFR §73.1560; §73.1660; §73.1665; §73.1670',
+        note: `${tpo_kw_num} kW (${power_category}): authorized range ${min_power_kw}–${max_power_kw} kW (+5%/−10%). Transmitter cost est. $${total_equipment_low.toLocaleString()}–$${total_equipment_high.toLocaleString()}. ${is_da ? `DA element tolerance ±${da_element_tolerance_pct}%.` : 'NDA: TPO tolerance only.'} Max AM power 50 kW.`
       };
     })(),
 

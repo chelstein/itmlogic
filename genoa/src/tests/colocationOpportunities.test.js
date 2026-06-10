@@ -4370,3 +4370,14 @@ test('am_signal_coverage_mapping_and_contour_documentation_guide present across 
     assert.ok(typeof g.formal_proof_required === 'boolean', 'formal_proof_required must be boolean');
   }
 });
+
+test('am_transmitter_type_acceptance_and_fcc_certification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_type_acceptance_and_fcc_certification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_type_acceptance_and_fcc_certification_guide');
+    assert.ok(typeof g.power_category === 'string', 'power_category must be a string');
+    assert.ok(g.authorized_power_range?.min_kw > 0, 'min_kw must be positive');
+    assert.ok(g.cost_estimates?.total_equipment_low_usd > 0, 'equipment cost must be positive');
+  }
+});
