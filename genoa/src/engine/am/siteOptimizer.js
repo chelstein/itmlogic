@@ -1790,7 +1790,11 @@ export async function runSiteOptimizer(body = {}){
     wfr_wildfire_risk_level:            c.am_wildfire_risk_and_vegetation_management_guide?.wildfire_risk_level ?? null,
     wfr_ea_required:                    c.am_wildfire_risk_and_vegetation_management_guide?.ea_required ?? null,
     wfr_veg_clearance_ft:               c.am_wildfire_risk_and_vegetation_management_guide?.veg_clearance_ft ?? null,
-    wfr_total_low_usd:                  c.am_wildfire_risk_and_vegetation_management_guide?.cost_estimates?.total_low_usd ?? null
+    wfr_total_low_usd:                  c.am_wildfire_risk_and_vegetation_management_guide?.cost_estimates?.total_low_usd ?? null,
+    fee_form_301_fee_usd:               c.am_fcc_application_fee_budget_guide?.form_301_fee_usd ?? null,
+    fee_total_fcc_fees_usd:             c.am_fcc_application_fee_budget_guide?.total_fcc_fees_usd ?? null,
+    fee_consulting_low_usd:             c.am_fcc_application_fee_budget_guide?.cost_estimates?.consulting_low_usd ?? null,
+    fee_total_with_consulting_low_usd:  c.am_fcc_application_fee_budget_guide?.cost_estimates?.total_with_consulting_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -32251,6 +32255,67 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §1.1307(a)(4); §73.49; 40 CFR §1508.9; CAL FIRE / state wildfire codes',
         note: `Wildfire risk: ${wildfire_risk_level}. NEPA EA: ${ea_required ? 'REQUIRED' : 'NOT REQUIRED'}. Defensible space: ${veg_clearance_ft} ft. ${n_mitigation_measures} mitigation measures. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}/yr.`
+      };
+    })(),
+
+    am_fcc_application_fee_budget_guide: (() => {
+      // FCC application fees per §1.1102 and §1.1104 fee schedule (FY 2023+).
+      // AM relocation requires: Form 301-AM (major modification) + potentially STA.
+      // Fees last updated per FCC 20-75 (Annual Adjustment proceeding).
+      const isDA      = /^DA/i.test(pattern_mode ?? '');
+      const fcc_cl    = fcc_class ?? 'D';
+      const tpo       = tpo_kw ?? 1;
+
+      // FCC Form 301-AM: Major Modification (facility change) fee — FY2023 schedule
+      // Class A: $7,265 | Class B: $5,020 | Class C/D: $2,195
+      const FORM_301_FEE =
+        fcc_cl === 'A' ? 7265 :
+        fcc_cl === 'B' ? 5020 : 2195;
+
+      // STA (Special Temporary Authority) — needed if construction begins before CP grant
+      const STA_FEE = 340;
+
+      // License to cover (Form 302-AM) after construction
+      const FORM_302_FEE = 365;
+
+      // Amendment fee (if CP must be amended mid-construction)
+      const AMENDMENT_FEE = 585;
+
+      // Legal/consultant cost to prepare Form 301-AM (not FCC fee — consulting cost)
+      const CONSULTING_LOW  = round2(isDA ? 8000 : 4500);
+      const CONSULTING_HIGH = round2(isDA ? 18000 : 10000);
+
+      // Total FCC fees for typical relocation
+      const total_fcc_fees = round2(FORM_301_FEE + FORM_302_FEE + STA_FEE);
+      const total_with_consulting_low  = round2(total_fcc_fees + CONSULTING_LOW);
+      const total_with_consulting_high = round2(total_fcc_fees + CONSULTING_HIGH);
+
+      // Fee items list
+      const fee_items = [
+        { item: 'Form 301-AM Major Modification', fee_usd: FORM_301_FEE, required: true },
+        { item: 'Form 302-AM License to Cover',   fee_usd: FORM_302_FEE, required: true },
+        { item: 'Special Temporary Authority (STA, if needed)', fee_usd: STA_FEE, required: false },
+        { item: 'Amendment fee (if CP amended)',  fee_usd: AMENDMENT_FEE, required: false },
+      ];
+
+      return {
+        fcc_class:                fcc_cl,
+        form_301_fee_usd:         FORM_301_FEE,
+        form_302_fee_usd:         FORM_302_FEE,
+        sta_fee_usd:              STA_FEE,
+        amendment_fee_usd:        AMENDMENT_FEE,
+        total_fcc_fees_usd:       total_fcc_fees,
+        n_fee_items:              fee_items.length,
+        fee_items,
+        cost_estimates: {
+          fcc_fees_usd:            total_fcc_fees,
+          consulting_low_usd:      CONSULTING_LOW,
+          consulting_high_usd:     CONSULTING_HIGH,
+          total_with_consulting_low_usd:  total_with_consulting_low,
+          total_with_consulting_high_usd: total_with_consulting_high,
+        },
+        reference: '47 CFR §1.1102; §1.1104; FCC Fee Schedule FY2023; FCC Form 301-AM',
+        note: `FCC Class ${fcc_cl} Form 301-AM fee: $${FORM_301_FEE.toLocaleString()}. Total FCC fees: $${total_fcc_fees.toLocaleString()}. With consulting: $${total_with_consulting_low.toLocaleString()}–$${total_with_consulting_high.toLocaleString()}${isDA ? ' (DA premium)' : ''}.`
       };
     })(),
 

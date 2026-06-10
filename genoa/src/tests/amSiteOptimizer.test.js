@@ -18624,3 +18624,48 @@ test('#137 candidate_comparison_table has wfr_* columns', async () => {
     assert.ok('wfr_total_low_usd'       in row, 'wfr_total_low_usd missing');
   }
 });
+
+// ---- Feature #138: am_fcc_application_fee_budget_guide ----
+test('#138 KAZM: FCC fee budget guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_fee_budget_guide;
+  assert.ok(g, 'am_fcc_application_fee_budget_guide missing');
+  assert.ok(g.form_301_fee_usd > 0, 'Form 301-AM fee must be positive');
+  assert.ok(g.total_fcc_fees_usd > g.form_301_fee_usd, 'total FCC fees must exceed Form 301 fee alone');
+  assert.ok(Array.isArray(g.fee_items) && g.fee_items.length >= 4, 'must list ≥4 fee items');
+});
+
+test('#138 Class A fee exceeds Class D fee', async () => {
+  const classAOut = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const classDOut = await runSiteOptimizer({ ...KAZM, fcc_class: 'D', candidate_limit: 1 });
+  const gA = classAOut.candidates[0].am_fcc_application_fee_budget_guide;
+  const gD = classDOut.candidates[0].am_fcc_application_fee_budget_guide;
+  assert.ok(gA.form_301_fee_usd > gD.form_301_fee_usd, 'Class A 301-AM fee must exceed Class D');
+  assert.strictEqual(gA.form_301_fee_usd, 7265, 'Class A Form 301 fee must be $7,265');
+  assert.strictEqual(gD.form_301_fee_usd, 2195, 'Class D Form 301 fee must be $2,195');
+});
+
+test('#138 DA station has higher consulting cost than NDA', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_fcc_application_fee_budget_guide;
+  const gDA  = daOut.candidates[0].am_fcc_application_fee_budget_guide;
+  assert.ok(gDA.cost_estimates.consulting_low_usd > gNDA.cost_estimates.consulting_low_usd, 'DA consulting must cost more than NDA');
+});
+
+test('#138 total_fcc_fees = Form 301 + Form 302 + STA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_fcc_application_fee_budget_guide;
+  const expected = g.form_301_fee_usd + g.form_302_fee_usd + g.sta_fee_usd;
+  assert.strictEqual(g.total_fcc_fees_usd, expected, 'total FCC fees must equal sum of 301+302+STA');
+});
+
+test('#138 candidate_comparison_table has fee_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fee_form_301_fee_usd'              in row, 'fee_form_301_fee_usd missing');
+    assert.ok('fee_total_fcc_fees_usd'            in row, 'fee_total_fcc_fees_usd missing');
+    assert.ok('fee_consulting_low_usd'            in row, 'fee_consulting_low_usd missing');
+    assert.ok('fee_total_with_consulting_low_usd' in row, 'fee_total_with_consulting_low_usd missing');
+  }
+});

@@ -4578,3 +4578,14 @@ test('am_wildfire_risk_and_vegetation_management_guide present across colocation
     assert.ok(g.veg_clearance_ft >= 0, 'veg_clearance_ft must be non-negative');
   }
 });
+
+test('am_fcc_application_fee_budget_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_application_fee_budget_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_fcc_application_fee_budget_guide');
+    assert.ok(g.form_301_fee_usd > 0, 'Form 301-AM fee must be positive');
+    assert.ok(g.total_fcc_fees_usd > 0, 'total FCC fees must be positive');
+    assert.ok(g.n_fee_items >= 4, 'must list ≥4 fee items');
+  }
+});
