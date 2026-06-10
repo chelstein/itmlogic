@@ -17626,3 +17626,53 @@ test('#115 candidate_comparison_table has lsa_* columns', async () => {
     assert.ok('lsa_lma_legal_low_usd'   in row, 'lsa_lma_legal_low_usd missing');
   }
 });
+
+// ---- Feature #116: am_fcc_registration_and_database_management_guide ----
+test('#116 KAZM: FCC registration guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_fcc_registration_and_database_management_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+  assert.ok(g.one_time_registration_costs?.total_usd >= 0, 'one_time total must be non-negative');
+  assert.ok(g.annual_maintenance_costs?.total_annual_low_usd > 0, 'annual total must be positive');
+  assert.ok(Array.isArray(g.filing_deadlines) && g.filing_deadlines.length >= 4, 'must have ≥4 filing deadlines');
+});
+
+test('#116 high-frequency station (1600 kHz) does not require ASR; low-frequency (540 kHz) may', async () => {
+  const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const gHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide;
+  const gLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide;
+  assert.strictEqual(gHigh.asr_required, false, '1600 kHz λ/4 ≈ 47 m — below 61 m threshold');
+  assert.strictEqual(gLow.asr_required,  true,  '540 kHz λ/4 ≈ 139 m — above 61 m threshold');
+});
+
+test('#116 DA station has more da_certifications than NDA', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_fcc_registration_and_database_management_guide;
+  const gDA2 = da2.candidates[0].am_fcc_registration_and_database_management_guide;
+  assert.strictEqual(gNDA.n_da_certifications, 0, 'NDA has zero DA certifications');
+  assert.ok(gDA2.n_da_certifications > 0, 'DA-2 must have at least one DA certification');
+});
+
+test('#116 annual cost includes ASR inspection only when ASR required', async () => {
+  const highFreq = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const lowFreq  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const annHigh = highFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
+  const annLow  = lowFreq.candidates[0].am_fcc_registration_and_database_management_guide.annual_maintenance_costs;
+  assert.strictEqual(annHigh.asr_annual_inspection_usd, 0, '1600 kHz: no ASR inspection cost');
+  assert.ok(annLow.asr_annual_inspection_usd > 0, '540 kHz: must have ASR inspection cost');
+  assert.ok(annLow.total_annual_low_usd > annHigh.total_annual_low_usd, 'low-freq annual cost > high-freq');
+});
+
+test('#116 candidate_comparison_table has rdb_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('rdb_asr_required'        in row, 'rdb_asr_required missing');
+    assert.ok('rdb_one_time_total_usd'  in row, 'rdb_one_time_total_usd missing');
+    assert.ok('rdb_annual_total_low_usd' in row, 'rdb_annual_total_low_usd missing');
+    assert.ok('rdb_n_annual_obligations' in row, 'rdb_n_annual_obligations missing');
+    assert.ok('rdb_n_da_certifications'  in row, 'rdb_n_da_certifications missing');
+  }
+});
