@@ -27437,7 +27437,7 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Nighttime skywave obligation for this class
       const hasSkywave   = fcc_class !== 'C';   // Class C has no skywave protection obligation
-      const hasDaytimeDA = /^DA/i.test(pattern_mode) && erp_kw > 0;
+      const hasDaytimeDA = /^DA/i.test(pattern_mode) && tpo_kw > 0;
 
       // Form 301-AM sections triggered by relocation
       const FORM301_SECTIONS = [
