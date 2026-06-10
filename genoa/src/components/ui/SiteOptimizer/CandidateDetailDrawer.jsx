@@ -2356,6 +2356,63 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM License-to-Cover and STA Guide */}
+        {candidate.am_license_to_cover_and_sta_guide && (() => {
+          const ltc = candidate.am_license_to_cover_and_sta_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div key="ltc-guide" style={{ background: '#0e0a1a', border: '1px solid #3d2a6e', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, color: '#c084fc', fontSize: 13, marginBottom: 6 }}>
+                License-to-Cover &amp; STA — §73.3598 / §73.1635
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 8 }}>
+                <div style={{ background: '#1a0e30', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>CP Term</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#f3e8ff' }}>{ltc.cp_term_years} yr</div>
+                </div>
+                <div style={{ background: '#1a0e30', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>LTC Items Required</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#f3e8ff' }}>{ltc.n_ltc_required_items}</div>
+                </div>
+                <div style={{ background: '#1a0e30', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#c084fc' }}>LTC Soft Cost</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#f3e8ff' }}>{fmtUsd(ltc.filing_fees?.total_ltc_soft_cost_low_usd)}–{fmtUsd(ltc.filing_fees?.total_ltc_soft_cost_high_usd)}</div>
+                </div>
+              </div>
+              <div style={{ fontSize: 10, color: '#fbbf24', background: '#1a1200', border: '1px solid #5a4200', borderRadius: 4, padding: '5px 8px', marginBottom: 8 }}>
+                {ltc.critical_risk}
+              </div>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 6, fontWeight: 600 }}>Post-Grant Milestones</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
+                <thead>
+                  <tr style={{ background: '#1a0e30' }}>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#c084fc' }}>Day</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#c084fc' }}>Event</th>
+                    <th style={{ padding: '3px 6px', textAlign: 'left', fontSize: 9, color: '#c084fc' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(ltc.post_grant_milestones ?? []).map((m, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #2d1a50' }}>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#c084fc', whiteSpace: 'nowrap' }}>+{m.day_from_grant}d</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#e9d5ff', fontWeight: 600 }}>{m.event}</td>
+                      <td style={{ padding: '3px 6px', fontSize: 9, color: '#bbb' }}>{m.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ fontSize: 10, color: '#aaa', marginBottom: 4, fontWeight: 600 }}>Common STA Use Cases</div>
+              {(ltc.sta_use_cases ?? []).slice(0, 3).map((s, i) => (
+                <div key={i} style={{ background: '#160c2a', borderRadius: 4, padding: '4px 8px', marginBottom: 4, fontSize: 9, color: '#ccc' }}>
+                  <span style={{ color: '#c084fc', fontWeight: 600 }}>{s.label}</span>
+                  {' · '}{s.typical_duration_days}d typical · Grant: {s.grant_probability}
+                </div>
+              ))}
+              <div className="font-mono text-[8px] text-textDim leading-snug mt-2">{ltc.note}</div>
+            </div>
+          );
+        })()}
+
         {/* AM Site Buildout Risk Assessment Guide */}
         {candidate.am_site_buildout_risk_assessment_guide && (() => {
           const bra = candidate.am_site_buildout_risk_assessment_guide;

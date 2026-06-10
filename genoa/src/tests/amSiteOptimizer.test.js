@@ -16627,3 +16627,52 @@ test('#96 candidate_comparison_table has bra_* columns', async () => {
     assert.ok('bra_capex_low_usd'       in row, 'bra_capex_low_usd missing');
   }
 });
+
+// ---- Feature #97: am_license_to_cover_and_sta_guide ----
+
+test('#97 KAZM: am_license_to_cover_and_sta_guide present with correct CP term', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ltc = out.candidates[0].am_license_to_cover_and_sta_guide;
+  assert.ok(ltc, 'am_license_to_cover_and_sta_guide must be present');
+  assert.strictEqual(ltc.cp_term_years, 3, 'CP term must be 3 years (§73.3598)');
+  assert.ok(ltc.n_ltc_required_items >= 8, `must have ≥ 8 required LTC items, got ${ltc.n_ltc_required_items}`);
+  assert.ok(Array.isArray(ltc.post_grant_milestones) && ltc.post_grant_milestones.length >= 5, 'post_grant_milestones must have ≥ 5 entries');
+});
+
+test('#97 DA station has DA-specific proof requirement in LTC items', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const ltc = out.candidates[0].am_license_to_cover_and_sta_guide;
+  assert.strictEqual(ltc.is_da, true, 'is_da must be true');
+  assert.ok(ltc.n_da_specific_items >= 1, 'DA station must have ≥ 1 DA-specific LTC item');
+  const proofReq = ltc.ltc_requirements.find(r => r.id === 'DA_PROOF');
+  assert.ok(proofReq?.required === true, 'DA_PROOF must be required for DA station');
+});
+
+test('#97 NDA station: DA_PROOF requirement is not required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const ltc = out.candidates[0].am_license_to_cover_and_sta_guide;
+  const proofReq = ltc.ltc_requirements.find(r => r.id === 'DA_PROOF');
+  assert.ok(proofReq?.required === false, 'DA_PROOF must be not-required for NDA station');
+});
+
+test('#97 STA use cases array has ≥ 3 entries with required fields', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const ltc = out.candidates[0].am_license_to_cover_and_sta_guide;
+  assert.ok(Array.isArray(ltc.sta_use_cases) && ltc.sta_use_cases.length >= 3, 'sta_use_cases must have ≥ 3 entries');
+  for (const s of ltc.sta_use_cases) {
+    assert.ok(s.id,                          'STA use case must have id');
+    assert.ok(s.typical_duration_days > 0,   'typical_duration_days must be positive');
+    assert.ok(s.grant_probability,            'grant_probability must be present');
+  }
+});
+
+test('#97 candidate_comparison_table has ltc_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('ltc_cp_term_years'      in row, 'ltc_cp_term_years missing');
+    assert.ok('ltc_n_required_items'   in row, 'ltc_n_required_items missing');
+    assert.ok('ltc_da_items'           in row, 'ltc_da_items missing');
+    assert.ok('ltc_soft_cost_low_usd'  in row, 'ltc_soft_cost_low_usd missing');
+    assert.ok('ltc_sta_fee_usd'        in row, 'ltc_sta_fee_usd missing');
+  }
+});

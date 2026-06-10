@@ -4139,3 +4139,13 @@ test('am_site_buildout_risk_assessment_guide present across colocation candidate
     assert.ok(typeof bra.buildout_feasibility_score === 'number', 'buildout_feasibility_score must be numeric');
   }
 });
+
+test('am_license_to_cover_and_sta_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const ltc = c.am_license_to_cover_and_sta_guide;
+    assert.ok(ltc !== undefined && ltc !== null, 'candidate missing am_license_to_cover_and_sta_guide');
+    assert.strictEqual(ltc.cp_term_years, 3, 'cp_term_years must be 3');
+    assert.ok(ltc.n_ltc_required_items >= 8, 'must have ≥ 8 required LTC items');
+  }
+});

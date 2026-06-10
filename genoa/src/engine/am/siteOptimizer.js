@@ -1590,7 +1590,12 @@ export async function runSiteOptimizer(body = {}){
     bra_risk_tier:                      c.am_site_buildout_risk_assessment_guide?.buildout_risk_tier ?? null,
     bra_primary_risk_factor:            c.am_site_buildout_risk_assessment_guide?.primary_risk_factor ?? null,
     bra_months_low:                     c.am_site_buildout_risk_assessment_guide?.est_buildout_months_low ?? null,
-    bra_capex_low_usd:                  c.am_site_buildout_risk_assessment_guide?.est_capex_low_usd ?? null
+    bra_capex_low_usd:                  c.am_site_buildout_risk_assessment_guide?.est_capex_low_usd ?? null,
+    ltc_cp_term_years:                  c.am_license_to_cover_and_sta_guide?.cp_term_years ?? null,
+    ltc_n_required_items:               c.am_license_to_cover_and_sta_guide?.n_ltc_required_items ?? null,
+    ltc_da_items:                       c.am_license_to_cover_and_sta_guide?.n_da_specific_items ?? null,
+    ltc_soft_cost_low_usd:              c.am_license_to_cover_and_sta_guide?.filing_fees?.total_ltc_soft_cost_low_usd ?? null,
+    ltc_sta_fee_usd:                    c.am_license_to_cover_and_sta_guide?.filing_fees?.sta_form_700_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27358,6 +27363,143 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_license_to_cover_and_sta_guide: (() => {
+      // License-to-Cover (LTC) and Special Temporary Authority (STA) guide.
+      //
+      // After the FCC grants a Construction Permit (CP) the licensee must:
+      //   1. Build the authorized facility within the CP term (§73.3598: 3 years for AM).
+      //   2. File for License-to-Cover (FCC Form 302-AM) within 10 days of completion.
+      //   3. Obtain the License before commencing permanent operation on the new facility.
+      //
+      // STA (§73.1635) is the mechanism to continue or modify operations during
+      // construction — e.g., operating at reduced power, from a temporary antenna,
+      // or with a modified pattern — without a full CP/license amendment.
+      //
+      // References: 47 CFR §73.3598; §73.1635; §73.1690; §73.3536; §73.3544
+      // FCC Form 302-AM; FCC Form 303-S; FCC Form 301-AM; FCC Form 700
+
+      const isDA_ltc  = /^DA/i.test(pattern_mode);
+      const isClear_ltc = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+
+      // ---- CP term and LTC deadline ----
+      // §73.3598(a): AM CP term is 3 years from grant; extensions under §73.3598(b)
+      // require showing of good cause; FCC rarely grants > 6-month extensions.
+      const cp_term_years  = 3;
+      const ltc_days_after = 10;    // §73.3536: LTC must be filed within 10 days of construction completion
+      const ltc_grace_days = 180;   // FCC informal policy: up to 180-day STA may bridge if LTC delayed
+
+      // ---- Form 302-AM requirements (License-to-Cover) ----
+      // The Form 302-AM certifies:
+      //   (a) Frequency and mode of operation match the CP authorization.
+      //   (b) Equipment ID (transmitter), antenna system details.
+      //   (c) Radiation pattern and base currents (DA only): ±3°, ±5% tolerance per §73.154.
+      //   (d) HAAT/RCAMSL computed from final site survey (§73.685 / §73.1215).
+      //   (e) FAA notification (if tower ≥ 200 ft AGL) within 5 business days of completion.
+      //   (f) RF exposure compliance statement per OET Bulletin 65.
+      //   (g) Emergency Alert System operability certification per §11.35.
+      //   (h) For DA: full Proof of Performance per §73.154 (antenna monitor measurements).
+      const ltc_requirements = [
+        { id: 'FREQ_MODE',      required: true,    label: 'Frequency/mode matches CP authorization',           cfr: '§73.3536' },
+        { id: 'EQUIP_ID',       required: true,    label: 'Transmitter equipment ID (FCC Part 73 certified)',  cfr: '§73.1660' },
+        { id: 'ANTENNA_SYS',    required: true,    label: 'Antenna system parameters (HAAT, RCAMSL, pattern)', cfr: '§73.685' },
+        { id: 'SITE_SURVEY',    required: true,    label: 'Licensed site coordinates verified by survey',      cfr: '§73.1215' },
+        { id: 'FAA_NOTICE',     required: true,    label: 'FAA Form 7460-2 filed within 5 days of completion', cfr: '§17.7; §73.1215' },
+        { id: 'RF_EXPOSURE',    required: true,    label: 'OET Bulletin 65 RF exposure compliance statement',  cfr: '§1.1310' },
+        { id: 'EAS_CERT',       required: true,    label: 'EAS equipment operability certification',           cfr: '§11.35' },
+        { id: 'DA_PROOF',       required: isDA_ltc, label: 'DA Proof of Performance (§73.154): base currents, phases, field measurements', cfr: '§73.154; §73.62' },
+        { id: 'OPIF_UPDATE',    required: true,    label: 'Online Public Inspection File updated for new facility', cfr: '§73.3526' },
+        { id: 'INSURANCE',      required: false,   label: 'Verify E&O / property insurance covers new site',  cfr: 'Internal' }
+      ];
+      const n_required = ltc_requirements.filter(r => r.required).length;
+      const n_da_specific = ltc_requirements.filter(r => r.id === 'DA_PROOF' && r.required).length;
+
+      // ---- STA process ----
+      // §73.1635: STA application (FCC Form 700) must be filed BEFORE the operation begins.
+      // FCC grants STAs for up to 180 days; renewable.  Processing: 10–30 days for routine requests.
+      // Common STA use cases for AM relocation:
+      //   - Reduced-power operation from temporary antenna during tower construction
+      //   - Daytime-only operation during nighttime NIF study verification
+      //   - Silent STA (§73.1740) if site is not ready and operator cannot meet CP antenna schedule
+      const STA_USE_CASES = [
+        {
+          id: 'TEMP_ANTENNA',
+          label: 'Temporary antenna / reduced power during tower construction',
+          typical_duration_days: 120,
+          filing_lead_days: 30,
+          grant_probability: 'HIGH',
+          notes: 'Most common STA; FCC routinely grants for up to 180 days. Must specify temporary antenna coordinates, HAAT, power.'
+        },
+        {
+          id: 'DAYTIME_ONLY',
+          label: 'Daytime-only STA pending nighttime NIF study approval',
+          typical_duration_days: 90,
+          filing_lead_days: 14,
+          grant_probability: isClear_ltc ? 'HIGH' : 'MODERATE',
+          notes: isClear_ltc
+            ? 'Clear channel stations commonly need daytime-only STA while FCC reviews §73.182 NIF study.'
+            : 'Less common for regional/local; FCC may require showing why nighttime NIF cannot be completed first.'
+        },
+        {
+          id: 'SILENT_STA',
+          label: 'Silent STA (§73.1740) — temporary cessation of operations',
+          typical_duration_days: 60,
+          filing_lead_days: 7,
+          grant_probability: 'HIGH',
+          notes: 'FCC grants silent STAs for force majeure, construction delays, or equipment failure. Maximum 30 days before mandatory renewal; license forfeiture risk at 12 months.'
+        },
+        {
+          id: 'POWER_INCREASE',
+          label: 'STA for incremental power increase during proof period',
+          typical_duration_days: 30,
+          filing_lead_days: 14,
+          grant_probability: 'MODERATE',
+          notes: isDA_ltc ? 'DA stations may need STA to operate at licensed pattern power while proof measurements are ongoing.' : 'N/A for NDA in most cases.'
+        }
+      ];
+
+      // ---- Post-grant compliance timeline ----
+      // Key milestones after CP is granted
+      const MILESTONES = [
+        { day_from_grant: 0,     event: 'CP Grant',                    description: 'Construction Permit issued by FCC. 3-year buildout clock starts.' },
+        { day_from_grant: 30,    event: 'STA filing (if needed)',       description: 'File FCC Form 700 for temporary operations or reduced power during construction.' },
+        { day_from_grant: 90,    event: 'Tower foundation / permitting', description: 'Site work begins; local building permit and zoning approvals expected.' },
+        { day_from_grant: 365,   event: '1-year progress review',       description: 'Internal review: construction on track? Extension petition needed?' },
+        { day_from_grant: 548,   event: 'LTC deadline target (18 mo)',  description: 'Best practice: file Form 302-AM well before 24-month hard deadline.' },
+        { day_from_grant: 730,   event: '24-month FCC milestone check', description: isDA_ltc ? 'DA stations: confirm proof of performance measurements are scheduled.' : 'NDA: confirm transmitter testing scheduled.' },
+        { day_from_grant: 1095,  event: '3-year CP expiration',         description: '§73.3598: CP expires. LTC must be filed or extension must be granted. FAILURE = license forfeiture risk.' }
+      ];
+
+      // ---- FCC filing fees (Form 302-AM) ----
+      // FCC Schedule of Application Fees (2023): AM License fee $345
+      // STA (Form 700): $75 filing fee
+      const fees = {
+        ltc_form_302_am_usd: 345,
+        sta_form_700_usd:     75,
+        total_ltc_soft_cost_low_usd:  3500,   // Engineering report + filing preparation
+        total_ltc_soft_cost_high_usd: isDA_ltc ? 12000 : 6000  // DA proof-of-performance adds cost
+      };
+
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        is_da: isDA_ltc, is_clear_channel: isClear_ltc,
+        cp_term_years,
+        ltc_days_after_construction: ltc_days_after,
+        ltc_grace_period_days: ltc_grace_days,
+        ltc_requirements,
+        n_ltc_required_items: n_required,
+        n_da_specific_items:  n_da_specific,
+        sta_use_cases: STA_USE_CASES,
+        n_sta_use_cases: STA_USE_CASES.length,
+        post_grant_milestones: MILESTONES,
+        filing_fees: fees,
+        critical_risk: isDA_ltc
+          ? 'DA proof of performance must be completed and filed with Form 302-AM — this typically adds 30–60 days to the LTC timeline; plan proof measurements before tower construction wraps.'
+          : 'File Form 302-AM within 10 days of construction completion; do not operate on new site until license is granted.',
+        reference: '47 CFR §73.3598 (CP term); §73.3536 (LTC); §73.1635 (STA); §73.154 (DA proof); §73.1740 (silent STA); FCC Form 302-AM; FCC Form 700',
+        note: `CP term: ${cp_term_years} yr from grant. LTC (Form 302-AM): file within ${ltc_days_after} days of completion. STA (Form 700): $75; file before non-authorized operation. ${isDA_ltc ? 'DA proof required before LTC.' : ''} LTC filing fee: $${fees.ltc_form_302_am_usd}; est. soft cost $${(fees.total_ltc_soft_cost_low_usd/1000).toFixed(1)}K–$${(fees.total_ltc_soft_cost_high_usd/1000).toFixed(1)}K.`
       };
     })(),
 
