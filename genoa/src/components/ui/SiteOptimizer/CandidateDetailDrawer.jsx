@@ -11004,6 +11004,731 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Frequency Interference Analysis & Channel Study Guide */}
+        {candidate.am_frequency_interference_analysis_and_channel_study_guide && (() => {
+          const g = candidate.am_frequency_interference_analysis_and_channel_study_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Frequency Interference Analysis &amp; Channel Study (§73.182)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>0.5 mV/m REACH</span>
+                  <div style={{ color: '#38bdf8', fontSize: 11, fontWeight: 700 }}>{g.d_05mvm_km ?? 'N/A'} km</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MIN CO-CH SEP</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.min_co_channel_separation_km ?? 'N/A'} km</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONTOUR OVERLAP</span>
+                  <div style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>PROHIBITED</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>STUDY COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.channel_study_low_usd || 0).toLocaleString()}–${(costs.channel_study_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>D/U Requirements</div>
+              {(g.du_requirements || []).map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: 9, fontWeight: 700 }}>{d.separation}</span>
+                  <span style={{ color: '#22c55e', fontSize: 9 }}>≥{d.du_ratio_db} dB ({d.du_ratio_linear}:1)</span>
+                  <span style={{ color: '#64748b', fontSize: 9 }}>{d.domain}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Site Hydrology & Flood Zone Guide */}
+        {candidate.am_site_hydrology_and_flood_zone_guide && (() => {
+          const g = candidate.am_site_hydrology_and_flood_zone_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor = g.flood_risk_level === 'LOW' ? '#22c55e' : g.flood_risk_level === 'MODERATE' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Site Hydrology &amp; Flood Zone (§1.1307(a)(3) / FEMA FIRM)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FLOOD RISK</span>
+                  <div style={{ color: riskColor, fontSize: 13, fontWeight: 700 }}>{g.flood_risk_level}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EA IF IN FLOODPLAIN</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>REQUIRED</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FEMA ZONES → EA</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10 }}>{(g.fema_zones_requiring_ea || []).join(', ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.mitigation_measures || []).length > 0 && (
+                <div>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Mitigation Measures</div>
+                  {g.mitigation_measures.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{m.measure}</span>
+                      <span style={{ color: '#64748b', fontSize: 9 }}>${m.cost_usd.toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Soil Conductivity & Radial Design Validation Guide */}
+        {candidate.am_soil_conductivity_measurement_and_radial_design_validation_guide && (() => {
+          const g = candidate.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor = g.coverage_deviation_risk === 'NEGLIGIBLE' ? '#22c55e' :
+                            g.coverage_deviation_risk === 'LOW'        ? '#4ade80' :
+                            g.coverage_deviation_risk === 'MODERATE'   ? '#f59e0b' : '#f87171';
+          const validColor = g.itm_validation_status === 'MAP_VALUE_ACCEPTABLE'    ? '#22c55e' :
+                             g.itm_validation_status === 'MEASUREMENT_RECOMMENDED' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Soil Conductivity &amp; Radial Design Validation (§73.186(b) / §73.190(e) / ITU-R P.832)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONDUCTIVITY</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.conductivity_msm} mS/m</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>{g.conductivity_category}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ITM VALIDATION</span>
+                  <div style={{ color: validColor, fontSize: 10, fontWeight: 700 }}>{(g.itm_validation_status || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>DEVIATION RISK</span>
+                  <div style={{ color: riskColor, fontSize: 11, fontWeight: 700 }}>{g.coverage_deviation_risk}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MEAS RADIALS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_measurement_radials}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>λ/4</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.quarter_wave_ft} ft</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MIN RADIALS (CLASS)</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.min_radials_fcc_class}</div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                {(g.measurement_methods || []).map((m, i) => (
+                  <span key={i} style={{ background: '#1e293b', color: '#94a3b8', fontSize: 9, padding: '2px 5px', borderRadius: 3 }}>{m}</span>
+                ))}
+              </div>
+              <div style={{ color: '#94a3b8', fontSize: 9 }}>Est. Test Cost: <span style={{ color: '#e2e8f0' }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</span></div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Transmitter Site EMC Assessment Guide */}
+        {candidate.am_transmitter_site_emc_assessment_guide && (() => {
+          const g = candidate.am_transmitter_site_emc_assessment_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor = g.emc_risk_level === 'LOW'      ? '#22c55e' :
+                            g.emc_risk_level === 'MODERATE' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Transmitter Site EMC Assessment (§73.182(n) / OET Bulletin 65)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EMC RISK</span>
+                  <div style={{ color: riskColor, fontSize: 13, fontWeight: 700 }}>{g.emc_risk_level}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>IM3 RISK CHANNELS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_im3_risk_channels}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>INTERFERENCE SOURCES</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_interference_sources}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONDUCTED TEST</span>
+                  <div style={{ color: g.conducted_emission_test_required ? '#f59e0b' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                    {g.conducted_emission_test_required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.interference_sources || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Interference Sources to Evaluate</div>
+                  {g.interference_sources.map((src, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{src}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Noise Floor & RF Interference Environment Survey Guide */}
+        {candidate.am_noise_floor_and_interference_environment_survey_guide && (() => {
+          const g = candidate.am_noise_floor_and_interference_environment_survey_guide;
+          const costs = g.cost_estimates || {};
+          const snrColor = g.adequate_snr ? '#22c55e' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Noise Floor &amp; Interference Environment Survey (§73.182(a) / ITU-R P.372)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NOISE ENVIRONMENT</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{(g.noise_environment || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>AMBIENT FLOOR</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.ambient_noise_floor_dbuv} dBμV/m</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>SNR @ 0.5 mV/m</span>
+                  <div style={{ color: snrColor, fontSize: 13, fontWeight: 700 }}>{g.snr_at_05mvm_contour_db} dB</div>
+                  <div style={{ color: snrColor, fontSize: 9 }}>{g.adequate_snr ? 'ADEQUATE' : 'MARGINAL'}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NOISE SOURCES</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_noise_sources}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.noise_sources || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Noise Sources to Survey</div>
+                  {g.noise_sources.map((src, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{src}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Online Public File Compliance Guide */}
+        {candidate.am_online_public_file_compliance_guide && (() => {
+          const g = candidate.am_online_public_file_compliance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Online Public File Compliance (§73.3526)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TRIGGERED DOCS</span>
+                  <div style={{ color: '#f59e0b', fontSize: 13, fontWeight: 700 }}>{g.n_triggered_on_relocation}</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>of {g.n_opif_categories} categories</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>UPDATE DEADLINE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.opif_update_deadline_days} days post-CP</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.opif_categories || []).filter(c => c.trigger_on_relocation).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Documents Triggered by Relocation</div>
+                  {g.opif_categories.filter(c => c.trigger_on_relocation).map((cat, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{cat.category}</span>
+                      <span style={{ color: '#64748b', fontSize: 9, maxWidth: '55%', textAlign: 'right' }}>{cat.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Modulation Monitor & Carrier Frequency Compliance Guide */}
+        {candidate.am_modulation_monitor_and_carrier_frequency_compliance_guide && (() => {
+          const g = candidate.am_modulation_monitor_and_carrier_frequency_compliance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Modulation Monitor &amp; Carrier Frequency Compliance (§73.1215 / §73.1560)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CARRIER TOLERANCE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>±{g.carrier_tolerance_hz} Hz</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>{g.carrier_tolerance_ppm} ppm</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD MONITOR</span>
+                  <div style={{ color: g.modulation_monitor_required ? '#f59e0b' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                    {g.modulation_monitor_required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MOD LIMITS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10 }}>+{g.modulation_limit_positive_pct}% / −{g.modulation_limit_negative_pct}%</div>
+                </div>
+                {g.n_monitor_points_required > 0 && (
+                  <div>
+                    <span style={{ color: '#94a3b8', fontSize: 9 }}>DA MONITOR PTS</span>
+                    <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_monitor_points_required}</div>
+                  </div>
+                )}
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.calibration_items || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Calibration Items</div>
+                  {g.calibration_items.map((item, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{item}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Coverage Population & Demographic Analysis Guide */}
+        {candidate.am_coverage_population_and_demographic_analysis_guide && (() => {
+          const g = candidate.am_coverage_population_and_demographic_analysis_guide;
+          const deltaColor = (g.coverage_delta_vs_baseline_pct ?? 0) >= 0 ? '#22c55e' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Coverage Population &amp; Demographic Analysis (§73.182)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>AREA TYPE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.area_classification}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EST SERVED POP</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{(g.est_served_population || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COVERAGE AREA</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{(g.est_coverage_area_km2 || 0).toLocaleString()} km²</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>POP DENSITY</span>
+                  <div style={{ color: '#64748b', fontSize: 10 }}>{g.pop_density_proxy_per_km2} /km²</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COVERAGE DELTA</span>
+                  <div style={{ color: deltaColor, fontSize: 11, fontWeight: 700 }}>
+                    {(g.coverage_delta_vs_baseline_pct ?? 0) >= 0 ? '+' : ''}{g.coverage_delta_vs_baseline_pct}%
+                  </div>
+                </div>
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Antenna Phasing Unit (ATU) Installation Guide */}
+        {candidate.am_antenna_phasing_unit_installation_guide && (() => {
+          const g = candidate.am_antenna_phasing_unit_installation_guide;
+          const costs = g.cost_estimates || {};
+          if (!g.applicable) return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: 6, padding: '8px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 4 }}>ATU Installation (§73.62 / §73.68)</div>
+              <div style={{ color: '#475569', fontSize: 10 }}>Not applicable — NDA station, no phasing unit required.</div>
+            </div>
+          );
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Antenna Phasing Unit Installation (§73.62 / §73.68)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOWERS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.n_towers}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>PHASE TOL</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>±{g.phase_tolerance_deg}°</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>RATIO TOL</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>±{g.ratio_tolerance_pct}%</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>INSTALL STEPS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_installation_steps}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.installation_steps || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Installation Steps</div>
+                  {g.installation_steps.map((step, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{i + 1}. {step}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Transmission Line & Coax Maintenance Guide */}
+        {candidate.am_transmission_line_coax_maintenance_guide && (() => {
+          const g = candidate.am_transmission_line_coax_maintenance_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Transmission Line &amp; Coax Maintenance (§73.1580)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>LINE TYPE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10, fontWeight: 700 }}>{(g.line_type || '').replace(/_/g, ' ')}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>LENGTH</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.line_length_ft} ft</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>INSPECTION</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 10 }}>Every {g.inspection_interval_months} months</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>VSWR TEST</span>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>{g.vswr_test_interval}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.annual_low_usd || 0).toLocaleString()}–${(costs.annual_high_usd || 0).toLocaleString()}/yr</div>
+                </div>
+              </div>
+              {(g.failure_modes || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Monitored Failure Modes</div>
+                  {g.failure_modes.map((fm, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{fm}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Auxiliary Transmitter & Emergency Operations Guide */}
+        {candidate.am_auxiliary_transmitter_and_emergency_operations_guide && (() => {
+          const g = candidate.am_auxiliary_transmitter_and_emergency_operations_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Auxiliary Transmitter &amp; Emergency Operations (§73.1680 / §73.1250)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MIN AUX POWER</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.aux_min_power_kw} kW</div>
+                  <div style={{ color: '#64748b', fontSize: 9 }}>({g.aux_min_power_pct}% of licensed)</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>SWITCHOVER</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>≤{g.switchover_max_days} days</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NDA EMERGENCY OP</span>
+                  <div style={{ color: g.aux_nda_allowed ? '#22c55e' : '#475569', fontSize: 10, fontWeight: 700 }}>
+                    {g.aux_nda_allowed ? 'ALLOWED (DA→NDA)' : 'N/A (NDA)'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CHECKLIST ITEMS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_checklist_items}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.emergency_checklist || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Emergency Operations Checklist</div>
+                  {g.emergency_checklist.map((item, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>☐ {item}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Wildfire Risk & Vegetation Management Guide */}
+        {candidate.am_wildfire_risk_and_vegetation_management_guide && (() => {
+          const g = candidate.am_wildfire_risk_and_vegetation_management_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor =
+            g.wildfire_risk_level === 'VERY_HIGH' ? '#ef4444' :
+            g.wildfire_risk_level === 'HIGH'      ? '#f87171' :
+            g.wildfire_risk_level === 'ELEVATED'  ? '#f59e0b' :
+            g.wildfire_risk_level === 'MODERATE'  ? '#fbbf24' : '#22c55e';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Wildfire Risk &amp; Vegetation Management (§1.1307(a)(4) / §73.49)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>WILDFIRE RISK</span>
+                  <div style={{ color: riskColor, fontSize: 13, fontWeight: 700 }}>{g.wildfire_risk_level}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NEPA EA</span>
+                  <div style={{ color: g.ea_required ? '#f87171' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                    {g.ea_required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>VEG CLEARANCE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.veg_clearance_ft} ft</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MITIGATIONS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_mitigation_measures}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}/yr</div>
+                </div>
+              </div>
+              {(g.mitigation_measures || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Mitigation Measures</div>
+                  {g.mitigation_measures.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{m.measure}</span>
+                      {m.annual_cost_usd > 0 && <span style={{ color: '#64748b', fontSize: 9 }}>${m.annual_cost_usd.toLocaleString()}/yr</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* FCC Application Fee Budget Guide */}
+        {candidate.am_fcc_application_fee_budget_guide && (() => {
+          const g = candidate.am_fcc_application_fee_budget_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                FCC Application Fee Budget (§1.1102 / §1.1104 — FY2023 Schedule)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CLASS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 700 }}>{g.fcc_class}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>FORM 301-AM FEE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>${(g.form_301_fee_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>TOTAL FCC FEES</span>
+                  <div style={{ color: '#f59e0b', fontSize: 11, fontWeight: 700 }}>${(g.total_fcc_fees_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>WITH CONSULTING</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_with_consulting_low_usd || 0).toLocaleString()}–${(costs.total_with_consulting_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.fee_items || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>FCC Fee Itemization</div>
+                  {g.fee_items.map((fi, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: fi.required ? '#cbd5e1' : '#64748b', fontSize: 9 }}>{fi.item}{!fi.required ? ' *' : ''}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 9 }}>${(fi.fee_usd || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div style={{ color: '#475569', fontSize: 9, marginTop: 2 }}>* conditional fee</div>
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Site Accessibility & ADA Compliance */}
+        {candidate.am_site_accessibility_and_ada_compliance_guide && (() => {
+          const g = candidate.am_site_accessibility_and_ada_compliance_guide;
+          const ADA_COLOR = g.ada_applicability === 'FULL' ? '#7c3aed' : g.ada_applicability === 'PARTIAL' ? '#2563eb' : '#64748b';
+          return (
+            <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#5b21b6', marginBottom: 6 }}>
+                Site Accessibility & ADA Compliance
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ background: ADA_COLOR, color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                  {g.ada_applicability}
+                </span>
+                <span style={{ background: g.is_likely_staffed ? '#7c3aed' : '#94a3b8', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+                  {g.is_likely_staffed ? 'Staffed Site' : 'Unstaffed'}
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 11, marginBottom: 6 }}>
+                <div><span style={{ color: '#6b7280' }}>ADA Features Required:</span> <b>{g.n_accessibility_features}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Est. Cost:</span> <b>${(g.cost_estimates?.accessibility_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.accessibility_high_usd ?? 0).toLocaleString()}</b></div>
+              </div>
+              {Array.isArray(g.accessibility_features) && g.accessibility_features.length > 0 && (
+                <div style={{ marginBottom: 5 }}>
+                  <div style={{ color: '#5b21b6', fontWeight: 600, fontSize: 11, marginBottom: 3 }}>Accessibility Features</div>
+                  <ul style={{ margin: 0, padding: '0 0 0 16px' }}>
+                    {g.accessibility_features.map((f, i) => (
+                      <li key={i} style={{ fontSize: 10, color: '#374151', marginBottom: 1 }}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* Ground System & Radial Field Installation */}
+        {candidate.am_ground_system_and_radial_field_installation_guide && (() => {
+          const g = candidate.am_ground_system_and_radial_field_installation_guide;
+          return (
+            <div style={{ background: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#92400e', marginBottom: 6 }}>
+                Ground System & Radial Field Installation
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 11, marginBottom: 6 }}>
+                <div><span style={{ color: '#6b7280' }}>Standard Radials:</span> <b>{g.std_n_radials} × {g.std_radial_len_m} m ({g.std_radial_len_ft} ft)</b></div>
+                <div><span style={{ color: '#6b7280' }}>Wavelength:</span> <b>{g.wavelength_m} m at freq</b></div>
+                <div><span style={{ color: '#6b7280' }}>Total Copper:</span> <b>{g.copper_kg} kg AWG #10</b></div>
+                <div><span style={{ color: '#6b7280' }}>Towers:</span> <b>{g.n_towers}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Install Cost:</span> <b>${(g.cost_estimates?.total_system_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.total_system_high_usd ?? 0).toLocaleString()}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Proof Required:</span> <b style={{ color: g.proof_of_performance_required ? '#dc2626' : '#16a34a' }}>{g.proof_of_performance_required ? 'Yes (§73.151)' : 'No'}</b></div>
+              </div>
+              {Array.isArray(g.checklist) && g.checklist.length > 0 && (
+                <details style={{ marginBottom: 5 }}>
+                  <summary style={{ color: '#92400e', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                    Installation Checklist ({g.n_checklist_items} items)
+                  </summary>
+                  <ul style={{ margin: '4px 0 0', padding: '0 0 0 16px' }}>
+                    {g.checklist.map((item, i) => (
+                      <li key={i} style={{ fontSize: 10, color: '#374151', marginBottom: 1 }}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
+        {/* FAA Tower Lighting & Obstruction Marking */}
+        {candidate.am_faa_tower_lighting_and_obstruction_marking_guide && (() => {
+          const g = candidate.am_faa_tower_lighting_and_obstruction_marking_guide;
+          const LIGHT_COLOR = g.lighting_type === 'HIGH_INTENSITY_WHITE_DAY_RED_NIGHT' ? '#dc2626' : g.lighting_type === 'MEDIUM_INTENSITY_RED' ? '#ea580c' : '#ca8a04';
+          return (
+            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '10px 14px', marginBottom: 10 }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#c2410c', marginBottom: 6 }}>
+                FAA Tower Lighting & Obstruction Marking
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+                <span style={{ background: LIGHT_COLOR, color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>
+                  {g.lighting_type?.replace(/_/g, ' ')}
+                </span>
+                {g.asr_required && (
+                  <span style={{ background: '#7c3aed', color: '#fff', borderRadius: 4, padding: '2px 8px', fontSize: 11 }}>
+                    ASR Required
+                  </span>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 10px', fontSize: 11, marginBottom: 6 }}>
+                <div><span style={{ color: '#6b7280' }}>Est. Tower Height:</span> <b>{g.tower_height_ft} ft AGL ({g.tower_height_m} m)</b></div>
+                <div><span style={{ color: '#6b7280' }}>Towers:</span> <b>{g.n_towers}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Form 7460-1:</span> <b>{g.requires_form_7460_1 ? 'Required' : 'Not required'}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Form 854 (ASR):</span> <b>{g.requires_form_854 ? 'Required' : 'Not required'}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Install Cost:</span> <b>${(g.cost_estimates?.lighting_install_low_usd ?? 0).toLocaleString()}–${(g.cost_estimates?.lighting_install_high_usd ?? 0).toLocaleString()}</b></div>
+                <div><span style={{ color: '#6b7280' }}>Annual Maint.:</span> <b>${(g.cost_estimates?.annual_maintenance_usd ?? 0).toLocaleString()}</b></div>
+              </div>
+              {Array.isArray(g.checklist) && g.checklist.length > 0 && (
+                <details style={{ marginBottom: 5 }}>
+                  <summary style={{ color: '#c2410c', fontWeight: 600, fontSize: 11, cursor: 'pointer' }}>
+                    Compliance Checklist ({g.n_checklist_items} items)
+                  </summary>
+                  <ul style={{ margin: '4px 0 0', padding: '0 0 0 16px' }}>
+                    {g.checklist.map((item, i) => (
+                      <li key={i} style={{ fontSize: 10, color: '#374151', marginBottom: 1 }}>{item}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

@@ -4447,3 +4447,179 @@ test('am_antenna_commissioning_and_proof_of_performance_guide present across col
     assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
   }
 });
+
+test('am_frequency_interference_analysis_and_channel_study_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_frequency_interference_analysis_and_channel_study_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_frequency_interference_analysis_and_channel_study_guide');
+    assert.ok(g.d_05mvm_km > 0, '0.5 mV/m reach must be positive');
+    assert.ok(Array.isArray(g.du_requirements) && g.du_requirements.length >= 3, 'must have ≥3 D/U requirements');
+    assert.strictEqual(g.contour_overlap_prohibited, true, 'contour overlap must be prohibited');
+  }
+});
+
+test('am_site_hydrology_and_flood_zone_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_hydrology_and_flood_zone_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_site_hydrology_and_flood_zone_guide');
+    assert.ok(['LOW','MODERATE','ELEVATED'].includes(g.flood_risk_level), 'flood_risk_level must be valid enum');
+    assert.strictEqual(g.ea_required_if_in_floodplain, true, 'EA must be required if in floodplain');
+    assert.ok(g.n_mitigation_measures >= 3, 'must have ≥3 mitigation measures');
+  }
+});
+
+test('am_soil_conductivity_measurement_and_radial_design_validation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_soil_conductivity_measurement_and_radial_design_validation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_soil_conductivity_measurement_and_radial_design_validation_guide');
+    assert.ok(['POOR','FAIR','GOOD','EXCELLENT'].includes(g.conductivity_category), 'conductivity_category must be valid enum');
+    assert.ok(g.n_measurement_radials >= 3, 'must recommend ≥3 measurement radials');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'measurement cost must be positive');
+  }
+});
+
+test('am_transmitter_site_emc_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_site_emc_assessment_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_site_emc_assessment_guide');
+    assert.ok(['LOW','MODERATE','HIGH'].includes(g.emc_risk_level), 'emc_risk_level must be valid enum');
+    assert.ok(g.n_interference_sources >= 4, 'must identify ≥4 interference sources');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'EMC assessment cost must be positive');
+  }
+});
+
+test('am_noise_floor_and_interference_environment_survey_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_noise_floor_and_interference_environment_survey_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_noise_floor_and_interference_environment_survey_guide');
+    assert.ok(['URBAN_INDUSTRIAL','SUBURBAN','RURAL_HIGHWAY','RURAL_QUIET'].includes(g.noise_environment), 'noise_environment must be valid enum');
+    assert.ok(typeof g.snr_at_05mvm_contour_db === 'number', 'SNR must be a number');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'survey cost must be positive');
+  }
+});
+
+test('am_online_public_file_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_online_public_file_compliance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_online_public_file_compliance_guide');
+    assert.ok(g.n_triggered_on_relocation >= 5, 'relocation must trigger ≥5 OPIF categories');
+    assert.strictEqual(g.opif_update_deadline_days, 30, 'OPIF deadline must be 30 days');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'OPIF compliance cost must be positive');
+  }
+});
+
+test('am_modulation_monitor_and_carrier_frequency_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_modulation_monitor_and_carrier_frequency_compliance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_modulation_monitor_and_carrier_frequency_compliance_guide');
+    assert.strictEqual(g.carrier_tolerance_hz, 20, 'carrier tolerance must be ±20 Hz');
+    assert.ok(g.n_calibration_items >= 3, 'must have ≥3 calibration items');
+    assert.ok(g.cost_estimates?.total_low_usd >= 0, 'cost must be non-negative');
+  }
+});
+
+test('am_coverage_population_and_demographic_analysis_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_coverage_population_and_demographic_analysis_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_coverage_population_and_demographic_analysis_guide');
+    assert.ok(['URBAN','SUBURBAN','RURAL','REMOTE'].includes(g.area_classification), 'area_classification must be valid enum');
+    assert.ok(g.est_served_population >= 0, 'est_served_population must be non-negative');
+    assert.ok(g.est_coverage_area_km2 >= 0, 'est_coverage_area_km2 must be non-negative');
+  }
+});
+
+test('am_antenna_phasing_unit_installation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_antenna_phasing_unit_installation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_antenna_phasing_unit_installation_guide');
+    assert.ok(typeof g.applicable === 'boolean', 'applicable must be boolean');
+    assert.ok(g.n_towers >= 1, 'n_towers must be ≥1');
+  }
+});
+
+test('am_transmission_line_coax_maintenance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmission_line_coax_maintenance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmission_line_coax_maintenance_guide');
+    assert.ok(['RIGID_COAX_6IN','HARDLINE_3IN','HARDLINE_1_5IN','FLEXIBLE_COAX_7_8IN'].includes(g.line_type), 'line_type must be valid');
+    assert.ok(g.n_failure_modes >= 4, 'must identify ≥4 failure modes');
+    assert.ok(g.cost_estimates?.annual_low_usd > 0, 'annual maintenance cost must be positive');
+  }
+});
+
+test('am_auxiliary_transmitter_and_emergency_operations_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_auxiliary_transmitter_and_emergency_operations_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_auxiliary_transmitter_and_emergency_operations_guide');
+    assert.strictEqual(g.switchover_max_days, 30, 'switchover must be within 30 days');
+    assert.ok(g.n_checklist_items >= 5, 'emergency checklist must have ≥5 items');
+    assert.ok(g.aux_min_power_kw >= 0, 'aux_min_power_kw must be non-negative');
+  }
+});
+
+test('am_wildfire_risk_and_vegetation_management_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_wildfire_risk_and_vegetation_management_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_wildfire_risk_and_vegetation_management_guide');
+    assert.ok(['VERY_HIGH','HIGH','ELEVATED','MODERATE','LOW'].includes(g.wildfire_risk_level), 'wildfire_risk_level must be valid enum');
+    assert.ok(typeof g.ea_required === 'boolean', 'ea_required must be boolean');
+    assert.ok(g.veg_clearance_ft >= 0, 'veg_clearance_ft must be non-negative');
+  }
+});
+
+test('am_fcc_application_fee_budget_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_application_fee_budget_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_fcc_application_fee_budget_guide');
+    assert.ok(g.form_301_fee_usd > 0, 'Form 301-AM fee must be positive');
+    assert.ok(g.total_fcc_fees_usd > 0, 'total FCC fees must be positive');
+    assert.ok(g.n_fee_items >= 4, 'must list ≥4 fee items');
+  }
+});
+
+test('am_site_accessibility_and_ada_compliance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_site_accessibility_and_ada_compliance_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_site_accessibility_and_ada_compliance_guide');
+    assert.ok(['FULL','PARTIAL','MINIMAL'].includes(g.ada_applicability), 'ada_applicability must be valid enum');
+    assert.ok(typeof g.is_likely_staffed === 'boolean', 'is_likely_staffed must be boolean');
+    assert.ok(g.n_accessibility_features >= 0, 'n_accessibility_features must be non-negative');
+  }
+});
+
+test('am_faa_tower_lighting_and_obstruction_marking_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_faa_tower_lighting_and_obstruction_marking_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_faa_tower_lighting_and_obstruction_marking_guide');
+    assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+    assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+    assert.ok(Array.isArray(g.checklist), 'checklist must be array');
+  }
+});
+
+test('am_ground_system_and_radial_field_installation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_ground_system_and_radial_field_installation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_ground_system_and_radial_field_installation_guide');
+    assert.ok(g.std_n_radials > 0, 'std_n_radials must be positive');
+    assert.ok(g.copper_kg > 0, 'copper_kg must be positive');
+    assert.ok(g.cost_estimates.total_system_low_usd > 0, 'total_system_low_usd must be positive');
+  }
+});
+
