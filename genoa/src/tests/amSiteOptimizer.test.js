@@ -18813,7 +18813,7 @@ test('#141 candidate_comparison_table has gnd_* columns', async () => {
   for (const row of out.candidate_comparison_table) {
     assert.ok('gnd_std_n_radials'        in row, 'gnd_std_n_radials missing');
     assert.ok('gnd_std_radial_len_m'     in row, 'gnd_std_radial_len_m missing');
-    assert.ok('gnd_total_system_low_usd' in row, 'gnd_total_system_low_usd missing');
+    assert.ok('rfi_total_system_low_usd' in row, 'rfi_total_system_low_usd missing');
     assert.ok('gnd_proof_required'       in row, 'gnd_proof_required missing');
   }
 });

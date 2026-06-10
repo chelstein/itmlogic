@@ -1805,7 +1805,7 @@ export async function runSiteOptimizer(body = {}){
     faa_lighting_install_low_usd:       c.am_faa_tower_lighting_and_obstruction_marking_guide?.cost_estimates?.lighting_install_low_usd ?? null,
     gnd_std_n_radials:                  c.am_ground_system_and_radial_field_installation_guide?.std_n_radials ?? null,
     gnd_std_radial_len_m:               c.am_ground_system_and_radial_field_installation_guide?.std_radial_len_m ?? null,
-    gnd_total_system_low_usd:           c.am_ground_system_and_radial_field_installation_guide?.cost_estimates?.total_system_low_usd ?? null,
+    rfi_total_system_low_usd:           c.am_ground_system_and_radial_field_installation_guide?.cost_estimates?.total_system_low_usd ?? null,
     gnd_proof_required:                 c.am_ground_system_and_radial_field_installation_guide?.proof_of_performance_required ?? null
   }));
 
@@ -31217,8 +31217,8 @@ async function scoreCandidate(pt, ctx, warnings){
       const isClassA = fcc_class.toUpperCase() === 'A';
       const rec_radials = isClassA ? 120 : 120;  // 120 is baseline; Class A often more
 
-      // λ/4 radial length
-      const lambda_m      = 300000 / frequency_khz;
+      // λ/4 radial length (use exact speed of light to match §73.182(n) calculations)
+      const lambda_m      = round2(299792458 / (frequency_khz * 1000));
       const qw_m          = round2(lambda_m / 4);
       const qw_ft         = round2(qw_m * 3.28084);
 
