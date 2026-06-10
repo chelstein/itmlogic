@@ -16221,12 +16221,14 @@ async function scoreCandidate(pt, ctx, warnings){
 
       // Man-made noise figure by inferred land use (ITU-R P.372 Table 1)
       // Use distance from current site as a proxy for rural vs urban character.
-      // >20 km from current site (which is typically in/near town): likely rural
-      // 8-20 km: suburban/agricultural edge
-      // <8 km: urban edge / mixed-use
+      // >9.5 km from current site (which is typically in/near town): likely rural
+      // >4.5 km: suburban/agricultural edge
+      // <=4.5 km: urban edge / mixed-use
+      // Thresholds are set slightly below grid spacing (10 km / 5 km) to account
+      // for haversine distances that fall just under the nominal grid step.
       const dist_nf_km = pt.distance_from_current_km ?? 0;
-      const land_use_noise_class = dist_nf_km > 20 ? 'rural'
-        : dist_nf_km > 8 ? 'suburban'
+      const land_use_noise_class = dist_nf_km > 9.5 ? 'rural'
+        : dist_nf_km > 4.5 ? 'suburban'
         : 'urban_edge';
       const fa_man_made_db = land_use_noise_class === 'rural' ? 20
         : land_use_noise_class === 'suburban' ? 32
