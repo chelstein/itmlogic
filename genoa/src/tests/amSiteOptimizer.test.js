@@ -18444,3 +18444,46 @@ test('#133 candidate_comparison_table has cpd_* columns', async () => {
     assert.ok('cpd_coverage_delta_pct'    in row, 'cpd_coverage_delta_pct missing');
   }
 });
+
+// ---- Feature #134: am_antenna_phasing_unit_installation_guide ----
+test('#134 KAZM NDA: ATU guide reports not applicable for NDA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_phasing_unit_installation_guide;
+  assert.ok(g, 'am_antenna_phasing_unit_installation_guide missing');
+  assert.strictEqual(g.applicable, false, 'NDA station should not require ATU');
+  assert.ok(g.reason, 'must provide reason for non-applicability');
+});
+
+test('#134 DA-2 station requires ATU with 2 towers', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_phasing_unit_installation_guide;
+  assert.strictEqual(g.applicable, true, 'DA-2 must require ATU');
+  assert.strictEqual(g.n_towers, 2, 'DA-2 requires 2 towers');
+  assert.ok(g.n_installation_steps >= 6, 'must have ≥6 installation steps');
+});
+
+test('#134 §73.68 tolerances: ±3° phase, ±5% ratio', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const g = out.candidates[0].am_antenna_phasing_unit_installation_guide;
+  assert.strictEqual(g.phase_tolerance_deg, 3, '§73.68 phase tolerance is ±3°');
+  assert.strictEqual(g.ratio_tolerance_pct, 5, '§73.68 ratio tolerance is ±5%');
+});
+
+test('#134 cost scales with tower count', async () => {
+  const da2Out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const da3Out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const gDA2 = da2Out.candidates[0].am_antenna_phasing_unit_installation_guide;
+  const gDA3 = da3Out.candidates[0].am_antenna_phasing_unit_installation_guide;
+  assert.ok(gDA3.cost_estimates.total_low_usd > gDA2.cost_estimates.total_low_usd, 'more towers = higher cost');
+});
+
+test('#134 candidate_comparison_table has atu_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('atu_applicable'          in row, 'atu_applicable missing');
+    assert.ok('atu_n_towers'            in row, 'atu_n_towers missing');
+    assert.ok('atu_phase_tolerance_deg' in row, 'atu_phase_tolerance_deg missing');
+    assert.ok('atu_n_installation_steps' in row, 'atu_n_installation_steps missing');
+    assert.ok('atu_total_low_usd'       in row, 'atu_total_low_usd missing');
+  }
+});

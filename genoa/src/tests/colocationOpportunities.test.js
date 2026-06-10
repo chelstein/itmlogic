@@ -4535,3 +4535,13 @@ test('am_coverage_population_and_demographic_analysis_guide present across coloc
     assert.ok(g.est_coverage_area_km2 >= 0, 'est_coverage_area_km2 must be non-negative');
   }
 });
+
+test('am_antenna_phasing_unit_installation_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_antenna_phasing_unit_installation_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_antenna_phasing_unit_installation_guide');
+    assert.ok(typeof g.applicable === 'boolean', 'applicable must be boolean');
+    assert.ok(g.n_towers >= 1, 'n_towers must be ≥1');
+  }
+});

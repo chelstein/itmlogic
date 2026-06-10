@@ -1773,7 +1773,12 @@ export async function runSiteOptimizer(body = {}){
     cpd_area_classification:            c.am_coverage_population_and_demographic_analysis_guide?.area_classification ?? null,
     cpd_est_served_population:          c.am_coverage_population_and_demographic_analysis_guide?.est_served_population ?? null,
     cpd_est_coverage_area_km2:          c.am_coverage_population_and_demographic_analysis_guide?.est_coverage_area_km2 ?? null,
-    cpd_coverage_delta_pct:             c.am_coverage_population_and_demographic_analysis_guide?.coverage_delta_vs_baseline_pct ?? null
+    cpd_coverage_delta_pct:             c.am_coverage_population_and_demographic_analysis_guide?.coverage_delta_vs_baseline_pct ?? null,
+    atu_applicable:                     c.am_antenna_phasing_unit_installation_guide?.applicable ?? null,
+    atu_n_towers:                       c.am_antenna_phasing_unit_installation_guide?.n_towers ?? null,
+    atu_phase_tolerance_deg:            c.am_antenna_phasing_unit_installation_guide?.phase_tolerance_deg ?? null,
+    atu_n_installation_steps:           c.am_antenna_phasing_unit_installation_guide?.n_installation_steps ?? null,
+    atu_total_low_usd:                  c.am_antenna_phasing_unit_installation_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31980,6 +31985,70 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.182; FCC Form 301-AM Technical Exhibit; Census Bureau TIGER',
         note: `Coverage area classification: ${area_classification}. Est. served pop: ${est_served_pop.toLocaleString()} (${pop_density_proxy} /km² × ${coverage_area_km2.toLocaleString()} km²). Coverage ${coverage_delta_pct >= 0 ? '+' : ''}${coverage_delta_pct}% vs baseline. GIS population overlay recommended.`
+      };
+    })(),
+
+    am_antenna_phasing_unit_installation_guide: (() => {
+      // §73.62: DA station ATU must be installed per manufacturer specs and FCC-approved design.
+      // §73.68: Operating tolerances: ±3° phase, ±5% current ratio at each tower.
+      // Applies only to DA stations — NDA stations have no ATU requirement.
+      const isDA   = /^DA/i.test(pattern_mode ?? '');
+      const isDA2  = /^DA-2/i.test(pattern_mode ?? '');
+      const isDA_N = /^DA-N/i.test(pattern_mode ?? '');
+      const n_towers = isDA2 ? 2 : isDA_N ? 3 : isDA ? 2 : 1;
+
+      if (!isDA) {
+        return {
+          applicable: false,
+          reason: 'NDA station — no ATU required',
+          n_towers: 1,
+          reference: '47 CFR §73.62; §73.68',
+          note: 'Not applicable: non-directional antenna requires no phasing unit.'
+        };
+      }
+
+      // §73.68 tolerances
+      const PHASE_TOL_DEG  = 3;
+      const RATIO_TOL_PCT  = 5;
+
+      // Installation steps
+      const installation_steps = [
+        'ATU/phasor physical installation and alignment',
+        'Impedance matching network tuning per design parameters',
+        'Base current ratio verification (±5% of licensed value per §73.68)',
+        'Phase angle verification at each tower (±3° of licensed per §73.68)',
+        'Remote monitoring wiring and system commissioning',
+        'Final documentation: ATU inspection report for FCC proof',
+      ];
+      if (n_towers > 2) installation_steps.push(`${n_towers}-tower system cross-coupling verification`);
+
+      const n_installation_steps = installation_steps.length;
+
+      // Costs scale with tower count
+      const ATU_EQUIP_LOW  = round2(n_towers * 8000);
+      const ATU_EQUIP_HIGH = round2(n_towers * 20000);
+      const INSTALL_LOW    = round2(n_towers * 3000);
+      const INSTALL_HIGH   = round2(n_towers * 7000);
+      const total_low_usd  = round2(ATU_EQUIP_LOW  + INSTALL_LOW);
+      const total_high_usd = round2(ATU_EQUIP_HIGH + INSTALL_HIGH);
+
+      return {
+        applicable:            true,
+        n_towers,
+        phase_tolerance_deg:   PHASE_TOL_DEG,
+        ratio_tolerance_pct:   RATIO_TOL_PCT,
+        n_installation_steps,
+        installation_steps,
+        cost_estimates: {
+          equipment_low_usd:   ATU_EQUIP_LOW,
+          equipment_high_usd:  ATU_EQUIP_HIGH,
+          installation_low_usd: INSTALL_LOW,
+          installation_high_usd: INSTALL_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.62; §73.68; §73.154',
+        note: `${n_towers}-tower DA ATU. §73.68 tolerances: ±${PHASE_TOL_DEG}° phase, ±${RATIO_TOL_PCT}% ratio. ${n_installation_steps} installation steps. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 
