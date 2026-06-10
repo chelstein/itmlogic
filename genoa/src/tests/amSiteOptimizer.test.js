@@ -17415,3 +17415,57 @@ test('#111 candidate_comparison_table has coq_* columns', async () => {
     assert.ok('coq_n_calendar_items'      in row, 'coq_n_calendar_items missing');
   }
 });
+
+// ---- Feature #112: am_field_strength_measurement_and_contour_verification_guide ----
+
+test('#112 KAZM NDA: field strength guide present; formal proof not required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  assert.ok(g, 'am_field_strength_measurement_and_contour_verification_guide must be present');
+  assert.strictEqual(g.formal_proof_required, false, 'NDA must NOT require formal proof (§73.152)');
+  assert.strictEqual(g.n_radials_required, 0, 'NDA has 0 required radials for formal proof');
+  assert.strictEqual(g.filing_deadline_days, null, 'NDA has no filing deadline');
+  assert.ok(g.nda_spot_check_radials > 0, 'NDA must recommend spot-check radials internally');
+  assert.ok(Array.isArray(g.measurement_conditions) && g.measurement_conditions.length >= 5, 'must have ≥5 measurement conditions');
+});
+
+test('#112 DA station requires formal proof; radials = 360 / step; total = radials × 3', async () => {
+  const outN = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const gN = outN.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  assert.strictEqual(gN.formal_proof_required, true, 'DA-N must require formal proof');
+  assert.ok(gN.n_radials_required > 0, 'DA must have radials required');
+  assert.strictEqual(gN.total_field_measurements, gN.n_radials_required * gN.min_points_per_radial,
+    'total_field_measurements must equal n_radials × min_points_per_radial');
+  assert.strictEqual(gN.filing_deadline_days, 90, '§73.154 deadline must be 90 days');
+  assert.strictEqual(gN.min_points_per_radial, 3, '§73.151 requires ≥3 points per radial');
+});
+
+test('#112 DA-2 (3 towers) uses 10° step; DA-2 total measurements > DA-N total', async () => {
+  const out2  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const outN  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const g2    = out2.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  const gN    = outN.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  assert.ok(g2.total_field_measurements >= gN.total_field_measurements,
+    `DA-2 measurements (${g2.total_field_measurements}) must be ≥ DA-N (${gN.total_field_measurements})`);
+  assert.ok(g2.total_cost_low_usd >= gN.total_cost_low_usd,
+    `DA-2 cost (${g2.total_cost_low_usd}) must be ≥ DA-N cost (${gN.total_cost_low_usd})`);
+});
+
+test('#112 total_cost_low_usd is sum of field_crew and engineer costs', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const g = out.candidates[0].am_field_strength_measurement_and_contour_verification_guide;
+  const expected = (g.field_crew_cost_usd?.low ?? 0) + (g.engineer_review_cost_usd?.low ?? 0);
+  assert.ok(Math.abs(g.total_cost_low_usd - expected) <= 1,
+    `total_cost_low_usd (${g.total_cost_low_usd}) must equal field crew + engineer (${expected})`);
+});
+
+test('#112 candidate_comparison_table has fsm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fsm_formal_proof_required' in row, 'fsm_formal_proof_required missing');
+    assert.ok('fsm_n_radials'             in row, 'fsm_n_radials missing');
+    assert.ok('fsm_total_measurements'    in row, 'fsm_total_measurements missing');
+    assert.ok('fsm_total_cost_low_usd'    in row, 'fsm_total_cost_low_usd missing');
+    assert.ok('fsm_filing_deadline_days'  in row, 'fsm_filing_deadline_days missing');
+  }
+});

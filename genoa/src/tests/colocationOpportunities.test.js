@@ -4293,3 +4293,14 @@ test('am_operator_and_chief_operator_qualification_guide present across colocati
     assert.strictEqual(g.unattended_operation.authorized, true, 'unattended operation must be authorized');
   }
 });
+
+test('am_field_strength_measurement_and_contour_verification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_field_strength_measurement_and_contour_verification_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_field_strength_measurement_and_contour_verification_guide');
+    assert.ok(typeof g.formal_proof_required === 'boolean', 'formal_proof_required must be boolean');
+    assert.ok(g.total_cost_low_usd > 0, 'total_cost_low_usd must be positive');
+    assert.ok(Array.isArray(g.measurement_conditions), 'measurement_conditions must be an array');
+  }
+});

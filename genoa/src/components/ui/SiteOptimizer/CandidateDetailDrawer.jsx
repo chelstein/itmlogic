@@ -10138,6 +10138,81 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Field Strength Measurement & Contour Verification Guide */}
+        {candidate.am_field_strength_measurement_and_contour_verification_guide && (() => {
+          const g = candidate.am_field_strength_measurement_and_contour_verification_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const proofColor = g.formal_proof_required ? '#f97316' : '#4ade80';
+          const reqConds = (g.measurement_conditions ?? []).filter(c => c.required);
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Field Strength Measurement &amp; Contour Verification (§73.151/§73.154)
+              </h4>
+              {/* Proof Requirement Banner */}
+              <div style={{ background: g.formal_proof_required ? '#1a0a00' : '#0a1a0a', border: `1px solid ${proofColor}`, borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ color: proofColor, fontWeight: 700, marginBottom: 4 }}>
+                  {g.formal_proof_required ? 'FORMAL PROOF REQUIRED — §73.154' : 'FORMAL PROOF NOT REQUIRED — §73.152 (NDA)'}
+                </div>
+                <div style={{ color: '#94a3b8', fontSize: 11 }}>{g.proof_trigger}</div>
+                {g.filing_deadline_days && (
+                  <div style={{ color: '#fbbf24', fontWeight: 600, marginTop: 4 }}>
+                    Filing deadline: {g.filing_deadline_days} days after commencing operation
+                  </div>
+                )}
+              </div>
+              {/* Measurement Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Radials Required</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>
+                    {g.n_radials_required > 0 ? `${g.n_radials_required} (${g.radial_step_deg}°)` : `${g.nda_spot_check_radials} spot`}
+                  </div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Pts/Radial</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#e2e8f0' }}>{g.min_points_per_radial}</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Total Meas.</div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#fbbf24' }}>
+                    {g.total_field_measurements > 0 ? g.total_field_measurements : g.nda_spot_check_points}
+                  </div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Est. Cost (low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(g.total_cost_low_usd)}</div>
+                </div>
+              </div>
+              {/* Recommended Meter */}
+              {g.recommended_meter && (
+                <div style={{ background: '#020c18', borderRadius: 6, padding: '7px 11px', marginBottom: 8, fontSize: 11 }}>
+                  <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 3 }}>RECOMMENDED FIELD STRENGTH METER</div>
+                  <div style={{ color: '#e2e8f0', fontWeight: 700 }}>{g.recommended_meter.model}</div>
+                  <div style={{ color: '#64748b', marginTop: 2 }}>
+                    Range: {g.recommended_meter.range_khz} kHz &nbsp;|&nbsp;
+                    Accuracy: ±{g.recommended_meter.accuracy_db} dB &nbsp;|&nbsp;
+                    Est.: {fmtUsd(g.recommended_meter.cost_usd)}
+                  </div>
+                  <div style={{ color: '#94a3b8', fontSize: 10, marginTop: 3 }}>Calibration certificate required &lt; 12 months (§73.151)</div>
+                </div>
+              )}
+              {/* Measurement Conditions */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>REQUIRED MEASUREMENT CONDITIONS (§73.315)</div>
+                {reqConds.slice(0, 6).map((c, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0', borderBottom: '1px solid #0a1624', color: '#ccc' }}>
+                    <span style={{ color: '#4ade80', minWidth: 8 }}>✓</span>
+                    {c.condition}
+                  </div>
+                ))}
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Operator & Chief Operator Qualification Guide */}
         {candidate.am_operator_and_chief_operator_qualification_guide && (() => {
           const g = candidate.am_operator_and_chief_operator_qualification_guide;
