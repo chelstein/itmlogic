@@ -18722,3 +18722,50 @@ test('#139 candidate_comparison_table has ada_* columns', async () => {
     assert.ok('ada_access_low_usd' in row, 'ada_access_low_usd missing');
   }
 });
+
+// ── Guide #140: FAA Tower Lighting & Obstruction Marking ─────────────────────
+test('#140 am_faa_tower_lighting_and_obstruction_marking_guide is present and valid', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
+  assert.ok(g, 'guide must exist');
+  assert.ok(g.tower_height_ft > 0, 'tower_height_ft must be positive');
+  assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+  assert.ok(['HIGH_INTENSITY_WHITE_DAY_RED_NIGHT','MEDIUM_INTENSITY_RED','LOW_INTENSITY_RED'].includes(g.lighting_type), 'lighting_type must be valid');
+});
+
+test('#140 high-frequency station (1000 kHz) has shorter tower than low-frequency (540 kHz)', async () => {
+  const hiFreqOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 1000, candidate_limit: 1 });
+  const loFreqOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const gHi = hiFreqOut.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
+  const gLo = loFreqOut.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
+  assert.ok(gLo.tower_height_ft > gHi.tower_height_ft, 'lower frequency = taller tower');
+});
+
+test('#140 DA station has more towers than NDA', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
+  const gDA  = daOut.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
+  assert.ok(gDA.n_towers > gNDA.n_towers, 'DA must have more towers than NDA');
+  assert.strictEqual(gNDA.n_towers, 1, 'NDA must have exactly 1 tower');
+});
+
+test('#140 tower height triggers correct ASR requirement', async () => {
+  // At 780 kHz, quarter-wave ~318 ft, tower ~169 ft => no ASR required
+  // At 540 kHz, quarter-wave ~459 ft, tower ~243 ft => ASR required
+  const loFreqOut = await runSiteOptimizer({ ...KAZM, frequency_khz: 540, candidate_limit: 1 });
+  const g = loFreqOut.candidates[0].am_faa_tower_lighting_and_obstruction_marking_guide;
+  assert.ok(g.tower_height_ft > 200, '540 kHz tower must exceed 200 ft ASR threshold');
+  assert.strictEqual(g.asr_required, true, '540 kHz tower must require ASR');
+  assert.strictEqual(g.asr_registration_threshold_ft, 200, 'ASR threshold must be 200 ft');
+});
+
+test('#140 candidate_comparison_table has faa_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('faa_tower_height_ft'          in row, 'faa_tower_height_ft missing');
+    assert.ok('faa_asr_required'             in row, 'faa_asr_required missing');
+    assert.ok('faa_lighting_type'            in row, 'faa_lighting_type missing');
+    assert.ok('faa_lighting_install_low_usd' in row, 'faa_lighting_install_low_usd missing');
+  }
+});
