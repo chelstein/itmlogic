@@ -1685,7 +1685,12 @@ export async function runSiteOptimizer(body = {}){
     lsa_tba_threshold_pct:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.tba_threshold?.attributable_threshold_pct ?? null,
     lsa_min_licensee_hours:             c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.min_licensee_hours_per_week ?? null,
     lsa_n_agreement_types:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.n_agreement_types ?? null,
-    lsa_lma_legal_low_usd:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.lma_legal_review_usd?.low ?? null
+    lsa_lma_legal_low_usd:              c.am_broadcast_lease_and_spectrum_sharing_agreement_guide?.lma_legal_review_usd?.low ?? null,
+    rdb_asr_required:                   c.am_fcc_registration_and_database_management_guide?.asr_required ?? null,
+    rdb_one_time_total_usd:             c.am_fcc_registration_and_database_management_guide?.one_time_registration_costs?.total_usd ?? null,
+    rdb_annual_total_low_usd:           c.am_fcc_registration_and_database_management_guide?.annual_maintenance_costs?.total_annual_low_usd ?? null,
+    rdb_n_annual_obligations:           c.am_fcc_registration_and_database_management_guide?.n_annual_obligations ?? null,
+    rdb_n_da_certifications:            c.am_fcc_registration_and_database_management_guide?.n_da_certifications ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30034,6 +30039,148 @@ async function scoreCandidate(pt, ctx, warnings){
         political_obligation_note: 'Broker/programmer must comply with §315 equal-time rules for political advertising, regardless of TBA/LMA structure.',
         reference: '47 CFR §73.3555; §73.3555(b); §73.3555(e); §73.1940; FCC Form 323; Communications Act §315',
         note: `Class ${fcc_class} — market limits: up to ${maxStations.total} total stations (${maxStations.same_service} same service). TBA/LMA attributable if broker controls >15% of weekly hours (>${min_licensee_hours} hrs/wk). Political ad obligations remain with broker under §315.`
+      };
+    })(),
+
+    am_fcc_registration_and_database_management_guide: (() => {
+      // Guide #116 — FCC Registration & Database Management
+      //
+      // Every AM broadcast station must maintain current records in multiple
+      // FCC databases.  Failures trigger enforcement action, license non-renewal,
+      // or application dismissal.
+      //
+      // KEY DATABASES
+      // ─────────────
+      // 1. CORES (Commission Registration System) — frn.fcc.gov
+      //    Every entity that interacts with the FCC must have a FRN (FCC
+      //    Registration Number).  Required before any application can be filed.
+      //    Annual update required if contact/address changes.
+      //    47 CFR §1.8001–§1.8004.
+      //
+      // 2. LMS (Licensing Management System) — licensing.fcc.gov
+      //    Replaced CDBS in 2021.  All AM broadcast applications and licenses
+      //    must be filed here.  Station must keep technical parameters (ERP,
+      //    antenna, coordinates) exactly matching the current license.
+      //    47 CFR §73.24, §73.3571.
+      //
+      // 3. ASR (Antenna Structure Registration) — wireless2.fcc.gov/UlsApp/AsrSearch
+      //    Required for any tower > 200 ft (61 m) AGL, or near airports/airways.
+      //    47 CFR §17.4, §17.7.  The ASR number must appear in LMS filings.
+      //    Annual inspection report must be filed for each registered structure.
+      //
+      // 4. EAS/ETRS (EAS Test Reporting System) — fcc.gov/ecfs (ETRS)
+      //    Must participate in and report on Nationwide EAS tests.
+      //    Annual EAS test reporting window; missing filings = potential fine.
+      //    47 CFR §11.61.
+      //
+      // 5. OPIF (Online Public Inspection File) — publicfiles.fcc.gov
+      //    Real-time online OPIF required for all commercial AM stations.
+      //    Documents must be posted no later than the business day they are
+      //    received/created.  47 CFR §73.3526.
+      //
+      // 6. Form 323 (Ownership Report) — biennial filing required.
+      //    Due by December 1 of odd-numbered years for commercial stations.
+      //    47 CFR §73.3615.
+      //
+      // 7. EEO Public File (Equal Employment Opportunity)
+      //    Annual EEO public file report + biennial EEO program statement.
+      //    47 CFR §73.2080.
+      //
+      // TOWER-SITE REGISTRATION CHECKLIST
+      // ───────────────────────────────────
+      // A new AM transmitter site involves several concurrent registrations:
+      //  • Obtain or transfer ASR registration for the tower (FCC Form 854).
+      //  • File CP application in LMS (FCC Form 301-AM).
+      //  • Update OPIF same day CP is granted.
+      //  • File STA if operating during construction (FCC Form 309).
+      //  • File License to Cover (FCC Form 302-AM) within 3 years of CP.
+      //
+      // DA STATIONS: additional parameter records
+      // ──────────────────────────────────────────
+      // DA patterns require exact phase/ratio values recorded in LMS.
+      // Any deviation >2° (phase) or >5% (ratio) from authorized requires
+      // STA or modification application.  47 CFR §73.62.
+
+      const is_da = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      // ASR requirement: tower height proxy from wavelength.
+      // λ/4 at lowest common AM frequencies is a rough height proxy.
+      const lambda_m      = 300000 / frequency_khz;   // speed of light / freq
+      const qw_m          = round2(lambda_m / 4);
+      const asr_required  = qw_m > 61;                // >200 ft AGL triggers ASR
+
+      // Annual database maintenance cost estimates (USD)
+      const OPIF_ANNUAL_USD       = 0;         // no FCC fee, internal labor ~$200
+      const ASR_ANNUAL_INSP_USD   = asr_required ? 850  : 0;  // PE tower inspection
+      const EAS_ETRS_ANNUAL_USD   = 150;       // annual ETRS filing prep labor
+      const CORES_ANNUAL_USD      = 0;         // no fee; update labor if needed
+      const FORM323_BIENNIAL_USD  = 750;       // attorney prep, biennial (amortized 375/yr)
+      const EEO_ANNUAL_USD        = 300;       // annual EEO report labor
+      const LMS_MAINT_ANNUAL_USD  = 500;       // annual LMS record audit / engineering
+
+      // DA stations: pattern parameter monitoring adds cost
+      const DA_PARAM_ANNUAL_USD = is_da ? 600 : 0;
+
+      const total_annual_low_usd = round2(
+        OPIF_ANNUAL_USD + ASR_ANNUAL_INSP_USD + EAS_ETRS_ANNUAL_USD +
+        CORES_ANNUAL_USD + FORM323_BIENNIAL_USD / 2 + EEO_ANNUAL_USD +
+        LMS_MAINT_ANNUAL_USD + DA_PARAM_ANNUAL_USD
+      );
+
+      // New-site registration one-time costs
+      const asr_registration_usd = asr_required ? 1200 : 0;   // Form 854 filing + engineer
+      const lms_cp_filing_usd    = 2500;   // attorney/engineer fee for CP
+      const opif_setup_usd       = 200;    // initial OPIF configuration
+      const one_time_total_usd   = round2(asr_registration_usd + lms_cp_filing_usd + opif_setup_usd);
+
+      // Key filing deadlines
+      const FILING_DEADLINES = [
+        { obligation: 'Form 323 Ownership Report',    cadence: 'Biennial',  due: 'December 1 odd years', rule: '47 CFR §73.3615' },
+        { obligation: 'EEO Annual Public File Report',cadence: 'Annual',    due: 'Anniversary of license grant', rule: '47 CFR §73.2080' },
+        { obligation: 'ASR Annual Inspection Report', cadence: 'Annual',    due: 'Within 30 days of inspection', rule: '47 CFR §17.21' },
+        { obligation: 'ETRS EAS Test Report',         cadence: 'Annual',    due: 'Within EAS test window', rule: '47 CFR §11.61' },
+        { obligation: 'License to Cover',             cadence: 'One-time',  due: 'Within 3 years of CP grant', rule: '47 CFR §73.3598' },
+        { obligation: 'Renewal Application',          cadence: 'Every 8 yrs', due: '4 months before expiry', rule: '47 CFR §73.3539' },
+      ];
+
+      // DA-2 stations need additional parameter certifications
+      const DA_CERTIFICATIONS = is_da2 ? [
+        { cert: 'DA phase/ratio proof of performance', rule: '47 CFR §73.62', frequency: 'At license modification or upon FCC request' },
+        { cert: 'Monitor point measurements', rule: '47 CFR §73.158', frequency: 'After any DA parameter change' },
+      ] : is_da ? [
+        { cert: 'DA pattern verification', rule: '47 CFR §73.62', frequency: 'At license modification' },
+      ] : [];
+
+      const n_annual_obligations = FILING_DEADLINES.filter(d => d.cadence === 'Annual').length + (is_da ? 1 : 0);
+
+      return {
+        asr_required,
+        asr_height_threshold_m: 61,
+        asr_height_proxy_m: qw_m,
+        one_time_registration_costs: {
+          asr_registration_usd,
+          lms_cp_filing_usd,
+          opif_setup_usd,
+          total_usd: one_time_total_usd
+        },
+        annual_maintenance_costs: {
+          opif_annual_usd: OPIF_ANNUAL_USD,
+          asr_annual_inspection_usd: ASR_ANNUAL_INSP_USD,
+          eas_etrs_annual_usd: EAS_ETRS_ANNUAL_USD,
+          form323_amortized_annual_usd: round2(FORM323_BIENNIAL_USD / 2),
+          eeo_annual_usd: EEO_ANNUAL_USD,
+          lms_maintenance_annual_usd: LMS_MAINT_ANNUAL_USD,
+          da_parameter_annual_usd: DA_PARAM_ANNUAL_USD,
+          total_annual_low_usd
+        },
+        filing_deadlines: FILING_DEADLINES,
+        da_certifications: DA_CERTIFICATIONS,
+        n_annual_obligations,
+        n_da_certifications: DA_CERTIFICATIONS.length,
+        key_databases: ['CORES/FRN', 'LMS', 'ASR', 'ETRS/EAS', 'OPIF'],
+        reference: '47 CFR §1.8001; §17.4; §17.7; §73.2080; §73.3526; §73.3539; §73.3571; §73.3598; §73.3615; §11.61',
+        note: `${frequency_khz} kHz (${fcc_class}): ASR ${asr_required ? 'REQUIRED (λ/4 ≈ ' + qw_m + ' m > 61 m)' : 'not required (λ/4 ≈ ' + qw_m + ' m ≤ 61 m)'}. Annual compliance cost ≈ $${total_annual_low_usd.toLocaleString()}. ${n_annual_obligations} annual obligations. ${is_da ? 'DA pattern parameters must be current in LMS.' : 'NDA — no pattern maintenance required.'}`
       };
     })(),
 

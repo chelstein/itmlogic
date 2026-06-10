@@ -4337,3 +4337,14 @@ test('am_broadcast_lease_and_spectrum_sharing_agreement_guide present across col
     assert.ok(g.market_station_limits?.total >= 6, 'market station limit must be at least 6');
   }
 });
+
+test('am_fcc_registration_and_database_management_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_fcc_registration_and_database_management_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_fcc_registration_and_database_management_guide');
+    assert.ok(typeof g.asr_required === 'boolean', 'asr_required must be boolean');
+    assert.ok(g.annual_maintenance_costs?.total_annual_low_usd > 0, 'annual cost must be positive');
+    assert.ok(Array.isArray(g.key_databases) && g.key_databases.length >= 3, 'must have at least 3 key databases');
+  }
+});

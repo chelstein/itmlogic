@@ -10502,6 +10502,67 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* FCC Registration & Database Management Guide */}
+        {candidate.am_fcc_registration_and_database_management_guide && (() => {
+          const g = candidate.am_fcc_registration_and_database_management_guide;
+          const ot = g.one_time_registration_costs || {};
+          const ann = g.annual_maintenance_costs || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                FCC Registration &amp; Database Management (§1.8001 / §17.4 / §73.3526)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ASR REQUIRED</span>
+                  <div style={{ color: g.asr_required ? '#f59e0b' : '#22c55e', fontSize: 11, fontWeight: 700 }}>
+                    {g.asr_required ? 'YES' : 'NO'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ONE-TIME REG COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>${(ot.total_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL MAINT COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>${(ann.total_annual_low_usd || 0).toLocaleString()}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL OBLIGATIONS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11, fontWeight: 700 }}>{g.n_annual_obligations}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 4 }}>Key Databases</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+                {(g.key_databases || []).map((db, i) => (
+                  <span key={i} style={{ background: '#1e293b', color: '#38bdf8', fontSize: 9, padding: '2px 6px', borderRadius: 3 }}>{db}</span>
+                ))}
+              </div>
+              {(g.filing_deadlines || []).length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>Filing Deadlines</div>
+                  {g.filing_deadlines.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{d.obligation}</span>
+                      <span style={{ color: '#94a3b8', fontSize: 9 }}>{d.cadence} — {d.due}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {(g.da_certifications || []).length > 0 && (
+                <div style={{ marginBottom: 6 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>DA Pattern Certifications</div>
+                  {g.da_certifications.map((d, i) => (
+                    <div key={i} style={{ color: '#fbbf24', fontSize: 9, padding: '1px 0' }}>• {d.cert} ({d.rule})</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
