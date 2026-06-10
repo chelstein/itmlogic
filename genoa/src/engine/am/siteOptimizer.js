@@ -1750,7 +1750,12 @@ export async function runSiteOptimizer(body = {}){
     scr_itm_validation_status:          c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.itm_validation_status ?? null,
     scr_coverage_deviation_risk:        c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.coverage_deviation_risk ?? null,
     scr_n_measurement_radials:          c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.n_measurement_radials ?? null,
-    scr_total_low_usd:                  c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.cost_estimates?.total_low_usd ?? null
+    scr_total_low_usd:                  c.am_soil_conductivity_measurement_and_radial_design_validation_guide?.cost_estimates?.total_low_usd ?? null,
+    emc_risk_level:                     c.am_transmitter_site_emc_assessment_guide?.emc_risk_level ?? null,
+    emc_n_interference_sources:         c.am_transmitter_site_emc_assessment_guide?.n_interference_sources ?? null,
+    emc_conducted_test_required:        c.am_transmitter_site_emc_assessment_guide?.conducted_emission_test_required ?? null,
+    emc_n_im3_risk_channels:            c.am_transmitter_site_emc_assessment_guide?.n_im3_risk_channels ?? null,
+    emc_total_low_usd:                  c.am_transmitter_site_emc_assessment_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31643,6 +31648,73 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.186(b); §73.190(e); §73 App B; ITU-R P.832',
         note: `Soil conductivity ${sigma_base} mS/m (${conductivity_category}). ITM validation: ${itm_validation_status}. Coverage deviation risk: ${coverage_deviation_risk}. Recommended ${n_measurement_radials} Bevington radials; min FCC class-${fcc_class ?? '?'} radials: ${min_radials}. λ/4 = ${quarter_wave_ft} ft. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_transmitter_site_emc_assessment_guide: (() => {
+      // EMC at new AM sites: evaluate intermodulation, receiver desensitization,
+      // and co-located broadcast interference per OET Bulletin 65 and §73.182/§73.186.
+      const freq_khz    = frequency_khz ?? 1000;
+      const tpo         = tpo_kw ?? 1;
+      const isDA        = /^DA/i.test(pattern_mode ?? '');
+
+      // Intermodulation products (3rd-order) from co-located AM transmitters
+      // significant when co-located transmitters are within ~100 kHz
+      const IM3_WINDOW_KHZ = 100;
+      const n_im3_risk_channels = Math.floor(IM3_WINDOW_KHZ / 10);  // 10-kHz channel grid
+
+      // Field strength at site boundary for RF hazard — used for EMC evaluation
+      const POWER_DENSITY_AT_100FT = round2(tpo * 1000 * 0.3 / (4 * Math.PI * Math.pow(30.48, 2)));
+
+      // Conducted/radiated emission compliance assessment
+      const isHighPower = tpo >= 10;
+      const conducted_emission_test_required = isHighPower;
+      const radiated_emission_test_required  = isHighPower || isDA;
+
+      // Key EMC interference sources to evaluate at new site
+      const interference_sources = [
+        'Co-located AM transmitters (IM3 products)',
+        'FM/TV transmitters on shared tower (harmonic coupling)',
+        'Adjacent site cellular/PCS base stations (receiver desensitization)',
+        'Power line carrier (PLC) on utility feed (broadband noise)',
+      ];
+      if (isDA) interference_sources.push('DA phasing unit harmonic radiation (§73.182(n))');
+
+      const n_interference_sources = interference_sources.length;
+
+      // EMC site survey cost estimate
+      const EMC_SURVEY_LOW   = 2500;
+      const EMC_SURVEY_HIGH  = 6500;
+      const IM3_ANALYSIS_LOW = isDA ? 1500 : 800;
+      const IM3_ANALYSIS_HIGH= isDA ? 3000 : 1800;
+      const total_low_usd    = round2(EMC_SURVEY_LOW  + IM3_ANALYSIS_LOW);
+      const total_high_usd   = round2(EMC_SURVEY_HIGH + IM3_ANALYSIS_HIGH);
+
+      // Risk level based on power and DA complexity
+      const emc_risk_level =
+        tpo >= 50 ? 'HIGH' :
+        tpo >= 10 ? 'MODERATE' :
+        isDA      ? 'MODERATE' : 'LOW';
+
+      return {
+        frequency_khz:                freq_khz,
+        emc_risk_level,
+        n_im3_risk_channels,
+        n_interference_sources,
+        interference_sources,
+        conducted_emission_test_required,
+        radiated_emission_test_required,
+        power_density_100ft_wm2:      POWER_DENSITY_AT_100FT,
+        cost_estimates: {
+          emc_survey_low_usd:         EMC_SURVEY_LOW,
+          emc_survey_high_usd:        EMC_SURVEY_HIGH,
+          im3_analysis_low_usd:       IM3_ANALYSIS_LOW,
+          im3_analysis_high_usd:      IM3_ANALYSIS_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.182(n); §73.186; OET Bulletin 65; FCC Part 15 §15.1',
+        note: `EMC risk: ${emc_risk_level} at ${tpo} kW${isDA ? ' DA' : ''}. ${n_interference_sources} interference sources to evaluate. ${conducted_emission_test_required ? 'Conducted emissions test required. ' : ''}Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 

@@ -11143,6 +11143,55 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Site EMC Assessment Guide */}
+        {candidate.am_transmitter_site_emc_assessment_guide && (() => {
+          const g = candidate.am_transmitter_site_emc_assessment_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor = g.emc_risk_level === 'LOW'      ? '#22c55e' :
+                            g.emc_risk_level === 'MODERATE' ? '#f59e0b' : '#f87171';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Transmitter Site EMC Assessment (§73.182(n) / OET Bulletin 65)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>EMC RISK</span>
+                  <div style={{ color: riskColor, fontSize: 13, fontWeight: 700 }}>{g.emc_risk_level}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>IM3 RISK CHANNELS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_im3_risk_channels}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>INTERFERENCE SOURCES</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_interference_sources}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONDUCTED TEST</span>
+                  <div style={{ color: g.conducted_emission_test_required ? '#f59e0b' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                    {g.conducted_emission_test_required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>COST RANGE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              {(g.interference_sources || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Interference Sources to Evaluate</div>
+                  {g.interference_sources.map((src, i) => (
+                    <div key={i} style={{ color: '#94a3b8', fontSize: 9, borderBottom: '1px solid #1e293b', padding: '2px 0' }}>{src}</div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

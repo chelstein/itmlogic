@@ -18227,3 +18227,46 @@ test('#128 candidate_comparison_table has scr_* columns', async () => {
     assert.ok('scr_total_low_usd'           in row, 'scr_total_low_usd missing');
   }
 });
+
+// ---- Feature #129: am_transmitter_site_emc_assessment_guide ----
+test('#129 KAZM: EMC assessment guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_site_emc_assessment_guide;
+  assert.ok(g, 'am_transmitter_site_emc_assessment_guide missing');
+  assert.ok(['LOW','MODERATE','HIGH'].includes(g.emc_risk_level), 'emc_risk_level must be valid enum');
+  assert.ok(g.n_interference_sources >= 4, 'must identify ≥4 interference sources');
+  assert.ok(Array.isArray(g.interference_sources), 'interference_sources must be array');
+});
+
+test('#129 NDA low-power station has LOW EMC risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 1, pattern_mode: 'NDA', candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_site_emc_assessment_guide;
+  assert.strictEqual(g.emc_risk_level, 'LOW', '1 kW NDA should be LOW EMC risk');
+  assert.strictEqual(g.conducted_emission_test_required, false, 'low power NDA should not require conducted test');
+});
+
+test('#129 high-power station has MODERATE or HIGH EMC risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 50, candidate_limit: 1 });
+  const g = out.candidates[0].am_transmitter_site_emc_assessment_guide;
+  assert.ok(['MODERATE','HIGH'].includes(g.emc_risk_level), '50 kW should be MODERATE or HIGH EMC risk');
+  assert.strictEqual(g.conducted_emission_test_required, true, '50 kW requires conducted emissions test');
+});
+
+test('#129 DA adds extra interference source', async () => {
+  const ndaOut = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const daOut  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = ndaOut.candidates[0].am_transmitter_site_emc_assessment_guide;
+  const gDA  = daOut.candidates[0].am_transmitter_site_emc_assessment_guide;
+  assert.ok(gDA.n_interference_sources > gNDA.n_interference_sources, 'DA must add at least one interference source vs NDA');
+});
+
+test('#129 candidate_comparison_table has emc_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('emc_risk_level'              in row, 'emc_risk_level missing');
+    assert.ok('emc_n_interference_sources'  in row, 'emc_n_interference_sources missing');
+    assert.ok('emc_conducted_test_required' in row, 'emc_conducted_test_required missing');
+    assert.ok('emc_n_im3_risk_channels'     in row, 'emc_n_im3_risk_channels missing');
+    assert.ok('emc_total_low_usd'           in row, 'emc_total_low_usd missing');
+  }
+});

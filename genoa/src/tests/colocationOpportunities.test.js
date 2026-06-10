@@ -4480,3 +4480,14 @@ test('am_soil_conductivity_measurement_and_radial_design_validation_guide presen
     assert.ok(g.cost_estimates?.total_low_usd > 0, 'measurement cost must be positive');
   }
 });
+
+test('am_transmitter_site_emc_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_site_emc_assessment_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_site_emc_assessment_guide');
+    assert.ok(['LOW','MODERATE','HIGH'].includes(g.emc_risk_level), 'emc_risk_level must be valid enum');
+    assert.ok(g.n_interference_sources >= 4, 'must identify ≥4 interference sources');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'EMC assessment cost must be positive');
+  }
+});
