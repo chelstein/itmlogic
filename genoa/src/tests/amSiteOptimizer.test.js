@@ -18045,3 +18045,47 @@ test('#124 candidate_comparison_table has gnd_* columns', async () => {
     assert.ok('gnd_n_inspection_tasks' in row, 'gnd_n_inspection_tasks missing');
   }
 });
+
+// ---- Feature #125: am_antenna_commissioning_and_proof_of_performance_guide ----
+test('#125 KAZM: antenna commissioning guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(g.n_commissioning_steps >= 6, 'must have ≥6 commissioning steps');
+  assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
+});
+
+test('#125 NDA has no formal proof; DA-2 requires formal proof', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide.formal_proof_required, false, 'NDA: no proof');
+  assert.strictEqual(da2.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide.formal_proof_required, true,  'DA-2: proof required');
+  assert.ok(da2.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide.proof_radials_required >= 8, 'DA-2: ≥8 radials required');
+});
+
+test('#125 DA-2 has more commissioning steps and costs more than NDA', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide;
+  const gDA2 = da2.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide;
+  assert.ok(gDA2.n_commissioning_steps > gNDA.n_commissioning_steps, 'DA-2 must have more steps than NDA');
+  assert.ok(gDA2.cost_estimates.total_low_usd > gNDA.cost_estimates.total_low_usd, 'DA-2 commissioning must cost more');
+});
+
+test('#125 NDA has 0 monitor points; DA has ≥1 monitor point', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  assert.strictEqual(nda.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide.n_monitor_points, 0, 'NDA: 0 monitor points');
+  assert.ok(da2.candidates[0].am_antenna_commissioning_and_proof_of_performance_guide.n_monitor_points >= 1, 'DA-2: ≥1 monitor point');
+});
+
+test('#125 candidate_comparison_table has acp_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('acp_n_steps'             in row, 'acp_n_steps missing');
+    assert.ok('acp_formal_proof_required' in row, 'acp_formal_proof_required missing');
+    assert.ok('acp_n_monitor_points'    in row, 'acp_n_monitor_points missing');
+    assert.ok('acp_total_low_usd'       in row, 'acp_total_low_usd missing');
+    assert.ok('acp_proof_radials'       in row, 'acp_proof_radials missing');
+  }
+});

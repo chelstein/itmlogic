@@ -1730,7 +1730,12 @@ export async function runSiteOptimizer(body = {}){
     gnd_radial_length_ft:               c.am_rf_ground_system_inspection_and_maintenance_guide?.radial_length_ft ?? null,
     gnd_rehab_low_usd:                  c.am_rf_ground_system_inspection_and_maintenance_guide?.rehabilitation_cost?.total_rehab_low_usd ?? null,
     gnd_annual_low_usd:                 c.am_rf_ground_system_inspection_and_maintenance_guide?.annual_cost?.total_annual_low_usd ?? null,
-    gnd_n_inspection_tasks:             c.am_rf_ground_system_inspection_and_maintenance_guide?.n_inspection_tasks ?? null
+    gnd_n_inspection_tasks:             c.am_rf_ground_system_inspection_and_maintenance_guide?.n_inspection_tasks ?? null,
+    acp_n_steps:                        c.am_antenna_commissioning_and_proof_of_performance_guide?.n_commissioning_steps ?? null,
+    acp_formal_proof_required:          c.am_antenna_commissioning_and_proof_of_performance_guide?.formal_proof_required ?? null,
+    acp_n_monitor_points:               c.am_antenna_commissioning_and_proof_of_performance_guide?.n_monitor_points ?? null,
+    acp_total_low_usd:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.cost_estimates?.total_low_usd ?? null,
+    acp_proof_radials:                  c.am_antenna_commissioning_and_proof_of_performance_guide?.proof_radials_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31200,6 +31205,127 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.68; §73.69; §73.1560',
         note: `${frequency_khz} kHz: λ/4 radial = ${qw_ft} ft (${qw_m} m). ${n_towers} tower(s) × ${rec_radials} radials = ${total_radials} total. Annual inspection est. $${(ANNUAL_INSP_LOW + SAMPLING_MAINT_ANNUAL).toLocaleString()}–$${(ANNUAL_INSP_HIGH + SAMPLING_MAINT_ANNUAL).toLocaleString()}. Full rehab: $${rehab_low.toLocaleString()}–$${rehab_high.toLocaleString()}.`
+      };
+    })(),
+
+    am_antenna_commissioning_and_proof_of_performance_guide: (() => {
+      // Guide #125 — Antenna System Commissioning & Proof of Performance
+      //
+      // A new or modified AM antenna system must be commissioned before the
+      // station can operate under the new license/CP.  DA stations additionally
+      // require a formal proof of performance demonstrating the antenna system
+      // produces the authorized pattern.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.62 — Directional antenna performance requirements.
+      //   A DA station must maintain its authorized pattern within the
+      //   tolerances of §73.62: ±2° phase, ±5% ratio.
+      //   The licensee is responsible for ensuring the pattern is correct
+      //   at all times.
+      //
+      // 47 CFR §73.151 — Field strength measurements for proof of performance.
+      //   Proof consists of radial field strength measurements on at least
+      //   8 radials (more for complex patterns).  Each radial has ≥3 sample
+      //   points beyond the 1 km monitor point.
+      //
+      // 47 CFR §73.154 — Partial proof of performance.
+      //   When only a minor modification is made to an existing DA pattern,
+      //   a partial proof (fewer radials) may be accepted.
+      //
+      // 47 CFR §73.158 — Directional antenna monitoring points.
+      //   Each DA station must designate a monitor point (≥1 km from each
+      //   tower) where the field strength is measured to confirm pattern
+      //   integrity.  Monitor point values become license conditions.
+      //
+      // 47 CFR §73.67 — Sampling system specifications.
+      //   The antenna monitor sampling system must meet phase/amplitude
+      //   accuracy specifications to be used for pattern verification.
+      //
+      // COMMISSIONING CHECKLIST (NDA)
+      // ──────────────────────────────
+      //   1. Verify transmitter type acceptance (§73.1660)
+      //   2. Measure base impedance (bridge measurement)
+      //   3. Verify operating power within ±10% of authorized (§73.1560)
+      //   4. Set up base current meter and calibrate
+      //   5. Conduct 5 mV/m spot measurement in the direction of COL
+      //   6. File License to Cover (Form 302-AM) with measurements
+      //
+      // COMMISSIONING CHECKLIST (DA)
+      // ──────────────────────────────
+      //   All NDA steps plus:
+      //   7. Calibrate antenna monitor against reference bridge
+      //   8. Verify phase and ratio at each tower within ±2°/±5%
+      //   9. Measure field strength on ≥8 radials (§73.151)
+      //   10. Establish and measure monitor point(s) (§73.158)
+      //   11. Submit formal proof of performance to FCC
+      //   12. Obtain FCC acceptance of proof before commencing nighttime
+      //       operation (if applicable)
+      //
+      // COST ESTIMATES
+      //   NDA commissioning:                $2,000–$5,000
+      //   DA proof of performance (8 rad):  $8,000–$20,000
+      //   DA proof (complex, 16+ radials):  $15,000–$40,000
+      //   Monitor point establishment:       $1,000–$2,500 per point
+      //   FCC application review fee:        $1,020
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      const NDA_STEPS = [
+        { step: 1, task: 'Verify transmitter type acceptance (FCC ID)', rule: '§73.1660' },
+        { step: 2, task: 'Measure base impedance (bridge measurement)', rule: '§73.1560' },
+        { step: 3, task: 'Verify operating power within ±10% of authorized', rule: '§73.1560' },
+        { step: 4, task: 'Install and calibrate base current meter', rule: '§73.1665' },
+        { step: 5, task: '5 mV/m spot measurement toward community of license', rule: '§73.24(j)' },
+        { step: 6, task: 'File License to Cover (FCC Form 302-AM)', rule: '§73.3598' },
+      ];
+
+      const DA_ADDITIONAL_STEPS = is_da ? [
+        { step: 7,  task: 'Calibrate antenna monitor against reference bridge', rule: '§73.67' },
+        { step: 8,  task: 'Verify phase (±2°) and ratio (±5%) at each tower', rule: '§73.62' },
+        { step: 9,  task: 'Conduct field strength proof on ≥8 radials', rule: '§73.151' },
+        { step: 10, task: 'Establish and measure monitor point(s)', rule: '§73.158' },
+        { step: 11, task: 'Submit formal proof of performance to FCC', rule: '§73.151' },
+        ...(is_da2 ? [{ step: 12, task: 'Obtain FCC acceptance before nighttime DA-2 operation', rule: '§73.62' }] : []),
+      ] : [];
+
+      const all_steps = [...NDA_STEPS, ...DA_ADDITIONAL_STEPS];
+
+      // Monitor points: one per unique direction of concern (simplified: 1 per tower for DA)
+      const n_towers = is_da2 ? 2 : is_da ? 2 : 1;
+      const n_monitor_points = is_da ? n_towers : 0;
+
+      // Cost estimates
+      const BASE_COMM_LOW  = 2000;
+      const BASE_COMM_HIGH = 5000;
+      const PROOF_LOW  = is_da2 ? 8000 : is_da ? 6000 : 0;
+      const PROOF_HIGH = is_da2 ? 20000 : is_da ? 12000 : 0;
+      const MONITOR_LOW  = n_monitor_points * 1000;
+      const MONITOR_HIGH = n_monitor_points * 2500;
+      const FCC_FEE = 1020;
+
+      const total_low  = round2(BASE_COMM_LOW  + PROOF_LOW  + MONITOR_LOW  + FCC_FEE);
+      const total_high = round2(BASE_COMM_HIGH + PROOF_HIGH + MONITOR_HIGH + FCC_FEE);
+
+      return {
+        n_commissioning_steps: all_steps.length,
+        commissioning_steps: all_steps,
+        formal_proof_required: is_da,
+        n_monitor_points,
+        proof_radials_required: is_da ? 8 : 0,
+        cost_estimates: {
+          base_commissioning_low_usd:  BASE_COMM_LOW,
+          base_commissioning_high_usd: BASE_COMM_HIGH,
+          proof_of_performance_low_usd: PROOF_LOW,
+          proof_of_performance_high_usd:PROOF_HIGH,
+          monitor_point_low_usd: MONITOR_LOW,
+          fcc_fee_usd: FCC_FEE,
+          total_low_usd:  total_low,
+          total_high_usd: total_high,
+        },
+        reference: '47 CFR §73.62; §73.67; §73.151; §73.154; §73.158; §73.1560; §73.1660; §73.3598',
+        note: `${frequency_khz} kHz (${fcc_class}): ${all_steps.length} commissioning steps. ${is_da ? `DA: formal proof required on ≥8 radials, ${n_monitor_points} monitor point(s). ` : 'NDA: no formal proof required. '}Cost est. $${total_low.toLocaleString()}–$${total_high.toLocaleString()}.`
       };
     })(),
 
