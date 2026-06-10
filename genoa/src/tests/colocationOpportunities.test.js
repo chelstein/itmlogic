@@ -4241,3 +4241,13 @@ test('am_tower_electrical_height_and_efficiency_guide present across colocation 
     assert.ok(['OPTIMAL','ACCEPTABLE','SUBOPTIMAL'].includes(teh.height_rating), 'height_rating must be valid');
   }
 });
+
+test('am_ground_radial_system_cost_and_specification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const grs = c.am_ground_radial_system_cost_and_specification_guide;
+    assert.ok(grs !== undefined && grs !== null, 'candidate missing am_ground_radial_system_cost_and_specification_guide');
+    assert.ok(typeof grs.radial_length_m === 'number' && grs.radial_length_m > 0, 'radial_length_m must be positive');
+    assert.ok(grs.recommended_config?.label === 'standard', 'recommended config must be standard');
+  }
+});

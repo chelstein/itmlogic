@@ -2356,6 +2356,35 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Ground Radial System Cost & Specification Guide */}
+        {candidate.am_ground_radial_system_cost_and_specification_guide && (() => {
+          const grs = candidate.am_ground_radial_system_cost_and_specification_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const rec = grs.recommended_config;
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#fb923c' }}>🌐</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Ground Radial System (§73.150)</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#e2e8f0', background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {rec?.n_radials} RADIALS (STD)
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>Radial length (λ/4): <b style={{ color: '#e2e8f0' }}>{grs.radial_length_m}m</b></span>
+                <span>Total wire (std): <b style={{ color: '#e2e8f0' }}>{rec?.total_wire_m?.toLocaleString()}m</b></span>
+                <span>Efficiency (std): <b style={{ color: '#4ade80' }}>{rec?.efficiency_pct}%</b></span>
+                <span>Ground loss (std): <b style={{ color: '#e2e8f0' }}>{rec?.r_loss_ohm}Ω</b></span>
+                <span>Installed cost (std): <b style={{ color: '#e2e8f0' }}>{fmtUsd(rec?.cost_usd?.low)}–{fmtUsd(rec?.cost_usd?.high)}</b></span>
+                <span>Wire gauge: <b style={{ color: '#e2e8f0' }}>#{grs.wire_gauge_awg} AWG copper</b></span>
+              </div>
+              <div style={{ fontSize: 11, color: grs.sigma_ms_m < 2 ? '#f87171' : '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                {grs.soil_note}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Tower Electrical Height & Efficiency Guide */}
         {candidate.am_tower_electrical_height_and_efficiency_guide && (() => {
           const teh = candidate.am_tower_electrical_height_and_efficiency_guide;

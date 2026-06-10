@@ -17146,3 +17146,56 @@ test('#106 candidate_comparison_table has teh_* columns', async () => {
     assert.ok('teh_height_rating'   in row, 'teh_height_rating missing');
   }
 });
+
+// ---- Feature #107: am_ground_radial_system_cost_and_specification_guide ----
+
+test('#107 KAZM: ground radial guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const grs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  assert.ok(grs, 'am_ground_radial_system_cost_and_specification_guide must be present');
+  assert.ok(Array.isArray(grs.configurations) && grs.configurations.length === 3, 'must have 3 configurations');
+  assert.ok(typeof grs.radial_length_m === 'number' && grs.radial_length_m > 0, 'radial_length_m must be positive');
+  assert.ok(typeof grs.lambda_m === 'number', 'lambda_m must be present');
+  assert.ok(grs.recommended_config?.label === 'standard', 'recommended config must be standard');
+});
+
+test('#107 radial length equals λ/4 for station frequency', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const grs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  // radial_length_m = round2(round2(300000/freq)/4); allow ±0.5m for rounding
+  const expected = (300000 / KAZM.frequency_khz) / 4;
+  assert.ok(Math.abs(grs.radial_length_m - expected) <= 0.5,
+    `radial_length_m ${grs.radial_length_m}m must be within 0.5m of ${expected.toFixed(2)}m`);
+});
+
+test('#107 optimum config has more radials and better efficiency than economy', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const configs = out.candidates[0].am_ground_radial_system_cost_and_specification_guide.configurations;
+  const economy  = configs.find(c => c.label === 'economy');
+  const optimum  = configs.find(c => c.label === 'optimum');
+  assert.ok(optimum.n_radials > economy.n_radials, 'optimum must have more radials than economy');
+  assert.ok(optimum.efficiency_pct > economy.efficiency_pct, 'optimum must have better efficiency than economy');
+  assert.ok(optimum.r_loss_ohm < economy.r_loss_ohm, 'optimum must have lower ground loss than economy');
+});
+
+test('#107 lower frequency station has longer radials and higher cost', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const grsLow  = outLow.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  const grsHigh = outHigh.candidates[0].am_ground_radial_system_cost_and_specification_guide;
+  assert.ok(grsLow.radial_length_m > grsHigh.radial_length_m,
+    `540 kHz radial (${grsLow.radial_length_m}m) must be longer than 1600 kHz (${grsHigh.radial_length_m}m)`);
+  assert.ok(grsLow.recommended_config.cost_usd.low > grsHigh.recommended_config.cost_usd.low,
+    'Lower frequency station must have higher ground system cost');
+});
+
+test('#107 candidate_comparison_table has grs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('grs_radial_length_m'     in row, 'grs_radial_length_m missing');
+    assert.ok('grs_std_n_radials'       in row, 'grs_std_n_radials missing');
+    assert.ok('grs_std_wire_m'          in row, 'grs_std_wire_m missing');
+    assert.ok('grs_std_cost_low_usd'    in row, 'grs_std_cost_low_usd missing');
+    assert.ok('grs_std_efficiency_pct'  in row, 'grs_std_efficiency_pct missing');
+  }
+});

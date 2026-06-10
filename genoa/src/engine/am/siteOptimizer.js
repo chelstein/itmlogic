@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    grs_radial_length_m:                c.am_ground_radial_system_cost_and_specification_guide?.radial_length_m ?? null,
+    grs_std_n_radials:                  c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.n_radials ?? null,
+    grs_std_wire_m:                     c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.total_wire_m ?? null,
+    grs_std_cost_low_usd:               c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.cost_usd?.low ?? null,
+    grs_std_efficiency_pct:             c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.efficiency_pct ?? null,
     teh_qwave_height_m:                 c.am_tower_electrical_height_and_efficiency_guide?.quarter_wave_height_m ?? null,
     teh_elec_height_deg:                c.am_tower_electrical_height_and_efficiency_guide?.electrical_height_deg ?? null,
     teh_radiation_r_ohm:                c.am_tower_electrical_height_and_efficiency_guide?.radiation_resistance_ohm ?? null,
@@ -27498,6 +27503,95 @@ async function scoreCandidate(pt, ctx, warnings){
         form:                         'FCC Form 301-AM',
         reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
         note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
+      };
+    })(),
+
+    am_ground_radial_system_cost_and_specification_guide: (() => {
+      // AM ground radial system cost and specification guide.
+      //
+      // The AM broadcast ground radial system is the buried copper wire network
+      // that provides the return-current path for the monopole antenna.  It is
+      // the single largest capital cost item for most AM relocations outside of
+      // the tower itself.
+      //
+      // FCC/industry standards (§73.150(b); FCC AM engineering guidance):
+      //   - Optimum (minimum-loss) system: 120 radials, each λ/4 in length
+      //   - Practical minimum for licensed operation: 30–60 radials
+      //   - Systems with <30 radials show significant efficiency degradation
+      //
+      // Radial length:
+      //   L_radial_m = λ/4 = 75,000 / frequency_khz  (metres)
+      //
+      // Wire sizing:
+      //   - Typical: #10 AWG (2.59mm) stranded copper, bare
+      //   - High-power (>10 kW): #8 or #6 AWG recommended
+      //   - Depth: 2–6 inches (FCC requires buried; 6 in nominal)
+      //
+      // Material cost estimates (US, 2024):
+      //   - #10 AWG bare copper wire: ~$1.80–$2.40/m
+      //   - Trench/burial labour (machine): ~$1.00–$1.80/m
+      //   - Total installed cost per metre: ~$2.80–$4.20
+      //
+      // Total material length = n_radials × L_radial_m
+      //
+      // Configurations:
+      //   - Economy: 60 radials (code-minimum, +2–3 dB loss vs. 120-radial)
+      //   - Standard: 90 radials (typical new construction)
+      //   - Optimum: 120 radials (FCC-recommended, maximum efficiency)
+
+      const lambda_m      = round2(300000 / frequency_khz);
+      const radial_length_m = round2(lambda_m / 4);
+
+      const CONFIGS = [
+        { label: 'economy',  n_radials: 60,  r_loss_ohm: 5.0 },
+        { label: 'standard', n_radials: 90,  r_loss_ohm: 3.0 },
+        { label: 'optimum',  n_radials: 120, r_loss_ohm: 1.5 },
+      ];
+
+      // Cost per metre of installed radial (mid range)
+      const COST_PER_M_LOW  = 2.80;
+      const COST_PER_M_HIGH = 4.20;
+
+      const configs = CONFIGS.map(cfg => {
+        const total_wire_m = cfg.n_radials * radial_length_m;
+        const cost_low     = Math.round(total_wire_m * COST_PER_M_LOW);
+        const cost_high    = Math.round(total_wire_m * COST_PER_M_HIGH);
+
+        // Efficiency with this ground system (using R_r ≈ 36.5Ω for λ/4 tower)
+        const R_r = 36.5;
+        const eff = round2((R_r / (R_r + cfg.r_loss_ohm)) * 100);
+
+        return {
+          label:          cfg.label,
+          n_radials:      cfg.n_radials,
+          radial_length_m,
+          total_wire_m:   Math.round(total_wire_m),
+          r_loss_ohm:     cfg.r_loss_ohm,
+          efficiency_pct: eff,
+          cost_usd:       { low: cost_low, high: cost_high }
+        };
+      });
+
+      // Recommended configuration
+      const recommended = configs.find(c => c.label === 'standard');
+
+      // Soil type modifier note (sandy/rocky soils = worse coupling, more radials needed)
+      const sigmaEff = (sigma_msm != null && Number.isFinite(sigma_msm) && sigma_msm > 0) ? sigma_msm : 4;
+      const soil_note = sigmaEff < 2 ? 'Poor soil conductivity: 120-radial optimum system STRONGLY recommended.'
+                      : sigmaEff < 5 ? 'Moderate soil: standard 90-radial system sufficient.'
+                      : 'Good soil conductivity: economy 60-radial system may be adequate for Class C/D.';
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        radial_length_m,
+        lambda_m,
+        sigma_ms_m:         sigmaEff,
+        configurations:     configs,
+        recommended_config: recommended,
+        soil_note,
+        wire_gauge_awg:     tpo_kw > 10 ? 8 : 10,
+        reference:          '47 CFR §73.150(b); FCC AM engineering guidance',
+        note:               `Radial length: ${radial_length_m}m (λ/4). Recommended: ${recommended?.n_radials} radials × ${radial_length_m}m = ${recommended?.total_wire_m}m wire. Est. installed cost: $${recommended?.cost_usd?.low?.toLocaleString()}–$${recommended?.cost_usd?.high?.toLocaleString()}.`
       };
     })(),
 
