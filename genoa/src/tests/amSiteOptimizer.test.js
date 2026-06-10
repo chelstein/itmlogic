@@ -17995,3 +17995,53 @@ test('#123 candidate_comparison_table has rep_* columns', async () => {
     assert.ok('rep_total_load_kw'        in row, 'rep_total_load_kw missing');
   }
 });
+
+// ---- Feature #124: am_rf_ground_system_inspection_and_maintenance_guide ----
+test('#124 KAZM: ground system inspection guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(g.total_radials >= 120, 'total_radials must be ≥120');
+  assert.ok(g.radial_length_ft > 0, 'radial_length_ft must be positive');
+  assert.ok(g.rehabilitation_cost?.total_rehab_low_usd > 0, 'rehab cost must be positive');
+});
+
+test('#124 DA-2 station has 2× radials and higher rehab cost than NDA', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  const gDA2 = da2.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  assert.strictEqual(gNDA.n_towers, 1, 'NDA must have 1 tower');
+  assert.strictEqual(gDA2.n_towers, 2, 'DA-2 must have 2 towers');
+  assert.ok(gDA2.total_radials === 2 * gNDA.total_radials, 'DA-2 must have 2× total radials');
+  assert.ok(gDA2.rehabilitation_cost.total_rehab_low_usd > gNDA.rehabilitation_cost.total_rehab_low_usd, 'DA-2 rehab must cost more');
+});
+
+test('#124 low-frequency station has longer radials than high-frequency', async () => {
+  const low  = await runSiteOptimizer({ ...KAZM, frequency_khz: 540,  candidate_limit: 1 });
+  const high = await runSiteOptimizer({ ...KAZM, frequency_khz: 1600, candidate_limit: 1 });
+  const gL   = low.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  const gH   = high.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  assert.ok(gL.radial_length_ft > gH.radial_length_ft, '540 kHz radial must be longer than 1600 kHz radial');
+});
+
+test('#124 DA station has extra sampling maintenance task', async () => {
+  const nda = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const da2 = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const gNDA = nda.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  const gDA2 = da2.candidates[0].am_rf_ground_system_inspection_and_maintenance_guide;
+  assert.strictEqual(gNDA.da_sampling_maintenance, false, 'NDA must not have sampling maintenance');
+  assert.strictEqual(gDA2.da_sampling_maintenance, true,  'DA-2 must have sampling maintenance');
+  assert.ok(gDA2.n_inspection_tasks > gNDA.n_inspection_tasks, 'DA-2 must have more inspection tasks');
+});
+
+test('#124 candidate_comparison_table has gnd_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('gnd_total_radials'     in row, 'gnd_total_radials missing');
+    assert.ok('gnd_radial_length_ft'  in row, 'gnd_radial_length_ft missing');
+    assert.ok('gnd_rehab_low_usd'     in row, 'gnd_rehab_low_usd missing');
+    assert.ok('gnd_annual_low_usd'    in row, 'gnd_annual_low_usd missing');
+    assert.ok('gnd_n_inspection_tasks' in row, 'gnd_n_inspection_tasks missing');
+  }
+});
