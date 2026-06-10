@@ -4447,3 +4447,14 @@ test('am_antenna_commissioning_and_proof_of_performance_guide present across col
     assert.ok(g.cost_estimates?.total_low_usd > 0, 'total cost must be positive');
   }
 });
+
+test('am_frequency_interference_analysis_and_channel_study_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_frequency_interference_analysis_and_channel_study_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_frequency_interference_analysis_and_channel_study_guide');
+    assert.ok(g.d_05mvm_km > 0, '0.5 mV/m reach must be positive');
+    assert.ok(Array.isArray(g.du_requirements) && g.du_requirements.length >= 3, 'must have ≥3 D/U requirements');
+    assert.strictEqual(g.contour_overlap_prohibited, true, 'contour overlap must be prohibited');
+  }
+});

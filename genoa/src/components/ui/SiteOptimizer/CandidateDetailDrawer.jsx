@@ -11004,6 +11004,47 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Frequency Interference Analysis & Channel Study Guide */}
+        {candidate.am_frequency_interference_analysis_and_channel_study_guide && (() => {
+          const g = candidate.am_frequency_interference_analysis_and_channel_study_guide;
+          const costs = g.cost_estimates || {};
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Frequency Interference Analysis &amp; Channel Study (§73.182)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>0.5 mV/m REACH</span>
+                  <div style={{ color: '#38bdf8', fontSize: 11, fontWeight: 700 }}>{g.d_05mvm_km ?? 'N/A'} km</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MIN CO-CH SEP</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.min_co_channel_separation_km ?? 'N/A'} km</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>CONTOUR OVERLAP</span>
+                  <div style={{ color: '#f87171', fontSize: 11, fontWeight: 700 }}>PROHIBITED</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>STUDY COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.channel_study_low_usd || 0).toLocaleString()}–${(costs.channel_study_high_usd || 0).toLocaleString()}</div>
+                </div>
+              </div>
+              <div style={{ color: '#64748b', fontSize: 9, marginBottom: 3 }}>D/U Requirements</div>
+              {(g.du_requirements || []).map((d, i) => (
+                <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                  <span style={{ color: '#e2e8f0', fontSize: 9, fontWeight: 700 }}>{d.separation}</span>
+                  <span style={{ color: '#22c55e', fontSize: 9 }}>≥{d.du_ratio_db} dB ({d.du_ratio_linear}:1)</span>
+                  <span style={{ color: '#64748b', fontSize: 9 }}>{d.domain}</span>
+                </div>
+              ))}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;
