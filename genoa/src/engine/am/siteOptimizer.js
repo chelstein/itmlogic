@@ -1595,7 +1595,12 @@ export async function runSiteOptimizer(body = {}){
     ltc_n_required_items:               c.am_license_to_cover_and_sta_guide?.n_ltc_required_items ?? null,
     ltc_da_items:                       c.am_license_to_cover_and_sta_guide?.n_da_specific_items ?? null,
     ltc_soft_cost_low_usd:              c.am_license_to_cover_and_sta_guide?.filing_fees?.total_ltc_soft_cost_low_usd ?? null,
-    ltc_sta_fee_usd:                    c.am_license_to_cover_and_sta_guide?.filing_fees?.sta_form_700_usd ?? null
+    ltc_sta_fee_usd:                    c.am_license_to_cover_and_sta_guide?.filing_fees?.sta_form_700_usd ?? null,
+    dtv_active_towers:                  c.am_tower_detuning_and_phasor_verification_guide?.active_towers_typ ?? null,
+    dtv_n_phasor_triggers:              c.am_tower_detuning_and_phasor_verification_guide?.n_phasor_triggers ?? null,
+    dtv_detuning_cap_pf:                c.am_tower_detuning_and_phasor_verification_guide?.detuning_cap_pf ?? null,
+    dtv_da_proof_cost_low_usd:          c.am_tower_detuning_and_phasor_verification_guide?.cost_estimates?.full_da_proof_low_usd ?? null,
+    dtv_monitor_est_low_usd:            c.am_tower_detuning_and_phasor_verification_guide?.antenna_monitor?.est_cost_usd?.low ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27363,6 +27368,121 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_tower_detuning_and_phasor_verification_guide: (() => {
+      // Tower detuning and phasor verification guide.
+      //
+      // §73.153: Any AM tower used as an antenna support (not in the active array)
+      // must be detuned so it does not re-radiate and distort the licensed pattern.
+      // §73.150(b): The phasor (ATU + power divider) must be checked after any
+      // modification to the antenna system (tower work, feeder repairs, etc.).
+      // §73.154(a): DA proof of performance must be re-conducted if field measurements
+      // show base currents outside ±5% or phases outside ±3°.
+      //
+      // Detuning is achieved by installing a series capacitor (skirt/cage) or a
+      // parallel LC circuit at the tower base to make the tower appear non-resonant
+      // at the operating frequency. Guard (detuning) networks must be verified
+      // periodically and logged in the station's technical records.
+      //
+      // References: 47 CFR §73.150; §73.153; §73.154; §73.158; §73.159; §73.1215;
+      //             NAB Engineering Handbook (11th ed.), Ch. 5
+
+      const isDA_dtv  = /^DA/i.test(pattern_mode);
+      const isDA2_dtv = /^DA-2$/i.test(pattern_mode) || /^DA2$/i.test(pattern_mode);
+      const freq_mhz_dtv = frequency_khz / 1000;
+
+      // ---- Tower count and detuning requirements ----
+      // For an NDA station: 1 active tower; no detuning required unless a non-radiating
+      // support tower is also on the site (unusual for greenfield sites).
+      // For DA: N towers, all actively driven; if there are also non-driven support towers
+      // on the site they must be detuned.
+      const active_towers_min = isDA_dtv ? 2 : 1;
+      const active_towers_typ = isDA_dtv ? (isDA2_dtv ? 2 : 3) : 1;
+      const detuning_required = false; // at the candidate site — unknown until site survey
+      const detuning_guard_note = isDA_dtv
+        ? 'DA stations: all towers are active and driven from the phasor. Any non-driven structure on the same parcel must be detuned (§73.153).'
+        : 'NDA station: 1 active tower. Detuning not required unless a non-radiating support structure is co-located on the site.';
+
+      // ---- Phasor verification triggers ----
+      // Any of these events require a phasor re-check and base-current log entry:
+      //   1. Transmitter replacement or power change
+      //   2. Antenna system modification (coax, ATU component, tower work)
+      //   3. Ground system modification (radial addition/removal)
+      //   4. After storm/lightning event
+      //   5. Quarterly: §73.159 antenna monitor system verification
+      //   6. Any base current departure ≥ 5% (DA) or > 10% (NDA) from licensed value
+      const PHASOR_TRIGGERS = [
+        { id: 'TRANSMITTER_CHANGE', label: 'Transmitter replacement / power change',       cfr: '§73.1350', frequency: 'AS NEEDED' },
+        { id: 'ANTENNA_MOD',        label: 'Antenna system modification (coax, ATU, tower)', cfr: '§73.1215', frequency: 'AS NEEDED' },
+        { id: 'GROUND_MOD',         label: 'Ground system modification',                    cfr: '§73.190',  frequency: 'AS NEEDED' },
+        { id: 'STORM_EVENT',        label: 'After storm, lightning, or physical damage',    cfr: '§73.1215', frequency: 'AS NEEDED' },
+        { id: 'QUARTERLY_MONITOR',  label: 'Antenna monitor system verification',           cfr: '§73.159',  frequency: 'QUARTERLY' },
+        { id: 'BASE_CURRENT_EXCEEDANCE', label: `Base current departure ≥ ${isDA_dtv ? 5 : 10}% from licensed value`, cfr: isDA_dtv ? '§73.154' : '§73.1350', frequency: 'IMMEDIATE' }
+      ];
+
+      // ---- DA-specific: proof of performance re-run criteria ----
+      // §73.154(a): Full proof required after:
+      //   - Initial construction
+      //   - Any modification that could affect the antenna pattern
+      //   - Any base current deviation > 5% or phase deviation > 3°
+      const DA_PROOF_RETRIGGERS = isDA_dtv ? [
+        { condition: 'Initial construction (new CP)',                    cfr: '§73.154', mandatory: true },
+        { condition: 'Antenna tower modification (height, guy, base)',    cfr: '§73.154', mandatory: true },
+        { condition: 'ATU / phasor component replacement',               cfr: '§73.154', mandatory: true },
+        { condition: 'Base current departure > 5% (any tower)',          cfr: '§73.154', mandatory: true },
+        { condition: 'Phase departure > 3° (any tower)',                 cfr: '§73.154', mandatory: true },
+        { condition: 'Ground system major modification (> 20 radials)',   cfr: '§73.190', mandatory: false }
+      ] : [];
+
+      // ---- Antenna monitor system requirements (§73.158/§73.159) ----
+      // DA stations: must use an approved antenna monitor to continuously display
+      // base currents and phases for all towers; readings logged at prescribed intervals.
+      // NDA stations: base current logged at each TPO change and at least every 3 hours.
+      const MONITOR_REQUIREMENTS = {
+        type:            isDA_dtv ? 'ANTENNA_MONITOR_SYSTEM' : 'BASE_CURRENT_METER',
+        cfr:             isDA_dtv ? '§73.158; §73.159' : '§73.1215',
+        log_interval_hr: isDA_dtv ? 3 : 3,
+        display:         isDA_dtv ? 'Continuous base current + phase display for all towers' : 'Base current meter at transmitter; TPO power level reading',
+        calibration:     'Annual calibration recommended; documented in station records',
+        approved_types:  isDA_dtv ? ['Potomac Instruments PI-4100', 'BE 4835', 'Hatfield-Dawson ADMS'] : ['Any FCC-type-accepted base current meter'],
+        est_cost_usd:    isDA_dtv ? { low: 8000, high: 25000 } : { low: 500, high: 2000 }
+      };
+
+      // ---- Detuning network design (if applicable) ----
+      // Series detuning capacitor: Xc = -j·Rr (Rr = tower radiation resistance, ~30–50 Ω typical)
+      // Component values depend on frequency; for MF AM, typical capacitor range 50–500 pF
+      const rr_ohm_approx = 36;  // Ω, typical quarter-wave tower radiation resistance
+      const xc_ohm = rr_ohm_approx;
+      const detuning_cap_pf = round2(1e12 / (2 * Math.PI * frequency_khz * 1e3 * xc_ohm));
+      const detuning_cap_note = `Series detuning capacitor: ~${detuning_cap_pf} pF at ${frequency_khz} kHz (Xc = ${xc_ohm} Ω approx).`;
+
+      // ---- Cost estimates ----
+      const COST = {
+        detuning_network_low_usd:    1500,
+        detuning_network_high_usd:   6000,
+        phasor_check_per_event_usd:   800,  // consultant hourly × 4 hours
+        full_da_proof_low_usd:       8000,
+        full_da_proof_high_usd:     25000
+      };
+
+      return {
+        frequency_khz, fcc_class, pattern_mode,
+        is_da: isDA_dtv, is_da2: isDA2_dtv,
+        active_towers_min, active_towers_typ,
+        detuning_required_at_candidate: detuning_required,
+        detuning_guard_note,
+        detuning_cap_pf,
+        detuning_cap_note,
+        phasor_verification_triggers: PHASOR_TRIGGERS,
+        n_phasor_triggers: PHASOR_TRIGGERS.length,
+        da_proof_retriggers: DA_PROOF_RETRIGGERS,
+        n_da_proof_retriggers: DA_PROOF_RETRIGGERS.length,
+        antenna_monitor: MONITOR_REQUIREMENTS,
+        cost_estimates: COST,
+        reference: '47 CFR §73.150; §73.153; §73.154; §73.158; §73.159; §73.190; §73.1215; NAB Engineering Handbook Ch. 5',
+        note: `${isDA_dtv ? `DA station (${active_towers_typ}-tower array typical). Phasor re-check required on ${PHASOR_TRIGGERS.length} trigger events. Full DA proof (~$${(COST.full_da_proof_low_usd/1000).toFixed(0)}K–$${(COST.full_da_proof_high_usd/1000).toFixed(0)}K) required after tower mod.` : `NDA station. Base current meter required; logged every 3 hours. Phasor check on ${PHASOR_TRIGGERS.length} trigger events ($${COST.phasor_check_per_event_usd}/event).`}`
       };
     })(),
 

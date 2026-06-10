@@ -4149,3 +4149,13 @@ test('am_license_to_cover_and_sta_guide present across colocation candidates', a
     assert.ok(ltc.n_ltc_required_items >= 8, 'must have ≥ 8 required LTC items');
   }
 });
+
+test('am_tower_detuning_and_phasor_verification_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const dtv = c.am_tower_detuning_and_phasor_verification_guide;
+    assert.ok(dtv !== undefined && dtv !== null, 'candidate missing am_tower_detuning_and_phasor_verification_guide');
+    assert.ok(dtv.n_phasor_triggers >= 5, 'must have ≥ 5 phasor triggers');
+    assert.ok(dtv.detuning_cap_pf > 0, 'detuning_cap_pf must be positive');
+  }
+});
