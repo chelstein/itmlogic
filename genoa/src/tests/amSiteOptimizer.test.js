@@ -18136,3 +18136,46 @@ test('#126 candidate_comparison_table has fia_* columns', async () => {
     assert.ok('fia_contour_overlap_prohibited' in row, 'fia_contour_overlap_prohibited missing');
   }
 });
+
+// ---- Feature #127: am_site_hydrology_and_flood_zone_guide ----
+test('#127 KAZM: flood zone guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_site_hydrology_and_flood_zone_guide;
+  assert.ok(g !== undefined && g !== null, 'guide must be present');
+  assert.ok(['LOW','MODERATE','ELEVATED'].includes(g.flood_risk_level), 'flood_risk_level must be valid enum');
+  assert.strictEqual(g.ea_required_if_in_floodplain, true, 'EA must be required if in floodplain');
+  assert.ok(Array.isArray(g.fema_zones_requiring_ea) && g.fema_zones_requiring_ea.length >= 3, 'must list ≥3 FEMA zones');
+});
+
+test('#127 all candidates have a flood risk level', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const g = c.am_site_hydrology_and_flood_zone_guide;
+    assert.ok(['LOW','MODERATE','ELEVATED'].includes(g.flood_risk_level), `each candidate must have valid flood_risk_level, got ${g.flood_risk_level}`);
+  }
+});
+
+test('#127 FEMA zones AE and VE require EA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_site_hydrology_and_flood_zone_guide;
+  assert.ok(g.fema_zones_requiring_ea.includes('AE'), 'AE zone must require EA');
+  assert.ok(g.fema_zones_requiring_ea.includes('VE'), 'VE zone must require EA');
+});
+
+test('#127 mitigation measures include tinned copper radials', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g   = out.candidates[0].am_site_hydrology_and_flood_zone_guide;
+  assert.ok(g.mitigation_measures.some(m => m.measure.toLowerCase().includes('tinned')), 'must include tinned copper radials mitigation');
+  assert.ok(g.n_mitigation_measures >= 3, 'must have ≥3 mitigation measures');
+});
+
+test('#127 candidate_comparison_table has fhz_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fhz_flood_risk_level'         in row, 'fhz_flood_risk_level missing');
+    assert.ok('fhz_ea_required_if_in_floodplain' in row, 'fhz_ea_required_if_in_floodplain missing');
+    assert.ok('fhz_n_mitigation_measures'    in row, 'fhz_n_mitigation_measures missing');
+    assert.ok('fhz_total_low_usd'            in row, 'fhz_total_low_usd missing');
+    assert.ok('fhz_ea_cost_low_usd'          in row, 'fhz_ea_cost_low_usd missing');
+  }
+});
