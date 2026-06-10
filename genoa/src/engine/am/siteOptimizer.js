@@ -1695,7 +1695,12 @@ export async function runSiteOptimizer(body = {}){
     sal_total_cost_high_usd:            c.am_station_sale_and_license_assignment_guide?.total_cost_high_usd ?? null,
     sal_streamlined_days:               c.am_station_sale_and_license_assignment_guide?.timeline_days?.streamlined ?? null,
     sal_n_critical_items:               c.am_station_sale_and_license_assignment_guide?.n_critical_items ?? null,
-    sal_fcc_form_fee_usd:               c.am_station_sale_and_license_assignment_guide?.fcc_form_fee_usd ?? null
+    sal_fcc_form_fee_usd:               c.am_station_sale_and_license_assignment_guide?.fcc_form_fee_usd ?? null,
+    scm_n_contours_required:            c.am_signal_coverage_mapping_and_contour_documentation_guide?.n_contours_required ?? null,
+    scm_n_radials:                      c.am_signal_coverage_mapping_and_contour_documentation_guide?.n_radials ?? null,
+    scm_d_05mvm_km:                     c.am_signal_coverage_mapping_and_contour_documentation_guide?.contour_distances_km?.d_05mvm_km ?? null,
+    scm_total_low_usd:                  c.am_signal_coverage_mapping_and_contour_documentation_guide?.cost_estimates?.total_low_usd ?? null,
+    scm_formal_proof_required:          c.am_signal_coverage_mapping_and_contour_documentation_guide?.formal_proof_required ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -30310,6 +30315,138 @@ async function scoreCandidate(pt, ctx, warnings){
         streamlined_eligible: true,
         reference: '47 CFR §73.3540; §73.3597; §310(d) Communications Act; FCC Form 314; FCC Form 315; FCC Form 316',
         note: `${frequency_khz} kHz (${fcc_class}): Assignment cost range $${total_cost_low_usd.toLocaleString()}–$${total_cost_high_usd.toLocaleString()}. Streamlined timeline ~${TIMELINE_DAYS.streamlined} days. ${n_critical_items} critical due-diligence items. ${is_da ? 'DA station: pattern exhibits required.' : 'NDA: standard exhibits.'}`
+      };
+    })(),
+
+    am_signal_coverage_mapping_and_contour_documentation_guide: (() => {
+      // Guide #118 — Signal Coverage Mapping & Contour Documentation
+      //
+      // FCC Form 301-AM requires a coverage map showing the predicted groundwave
+      // contours.  The specific contours and exhibit requirements vary by station
+      // class, pattern mode, and the nature of the application.
+      //
+      // KEY RULES
+      // ─────────
+      // 47 CFR §73.183 — Groundwave field strengths.
+      //   Specifies the FCC M3 conductivity map and Terman/Soil Conductivity
+      //   prediction method for AM groundwave field-strength estimation.
+      //   Contour predictions must use FCC-published M3 values or better.
+      //
+      // 47 CFR §73.184 — Groundwave field strength curves.
+      //   The FCC Figure curves (Figures 1a–1e in §73.184) are the authoritative
+      //   source for converting ERP × distance to field strength.  Computer
+      //   software (e.g., AM_STAT, ITM) must match these curves.
+      //
+      // 47 CFR §73.186 — Computation of coverage.
+      //   NDA stations: single omnidirectional contour centered on the antenna.
+      //   DA stations: full 360° radiation pattern applied to §73.183 M3 ground.
+      //   Class A (clear channel) coverage: 0.5 mV/m daytime.
+      //   Class B (regional): 0.5 mV/m daytime.
+      //   Class C (local): 0.5 mV/m daytime (service contour).
+      //   Class D (secondary): 0.5 mV/m daytime, 0.025 mV/m nighttime.
+      //
+      // 47 CFR §73.182 — Engineering standards.
+      //   Directional antennas must file a theoretical pattern and,
+      //   if required, a proof of performance.
+      //
+      // CONTOURS REQUIRED IN FCC FORM 301-AM EXHIBIT
+      // ─────────────────────────────────────────────
+      //   • 5 mV/m contour (principal community coverage, §73.24(j))
+      //   • 0.5 mV/m contour (service contour, §73.186)
+      //   • 0.1 mV/m contour (nighttime — required for Class A, B, D)
+      //   • 0.025 mV/m contour (Class D nighttime, §73.186(d))
+      //   • Interference contours to co-channel/adjacent applicants (if applicable)
+      //
+      // MAP REQUIREMENTS
+      // ────────────────
+      //   • USGS 7.5-minute topographic base OR equivalent digital base map.
+      //   • Scale: typically 1:500,000 for Class A/B; 1:250,000 for C/D.
+      //   • Site coordinates: NAD83 datum, accurate to ±1 arc-second.
+      //   • Community of license must be visible on map.
+      //   • Contours must be labeled with field strength values.
+      //   • For DA, show all 36 radials (every 10°) from M3 calculation.
+      //
+      // SOFTWARE / METHODS ACCEPTED BY FCC
+      // ────────────────────────────────────
+      //   • AM_STAT (FCC-published legacy program)
+      //   • Any program that correctly implements §73.184 curves + §73.183 M3
+      //   • Measured data (overrides computed where measurement > computation)
+      //
+      // COST ESTIMATES
+      //   Contour maps (computer-generated, NDA): $1,000–$2,500
+      //   Contour maps (DA, full pattern): $2,500–$6,000
+      //   Full proof of performance (DA): $8,000–$20,000 (includes field work)
+
+      const is_da  = /^DA/i.test(pattern_mode);
+      const is_da2 = /^DA-2/i.test(pattern_mode);
+
+      // Determine contours required based on class
+      const isClassA = fcc_class.toUpperCase() === 'A';
+      const isClassB = fcc_class.toUpperCase() === 'B';
+      const isClassD = fcc_class.toUpperCase() === 'D';
+      const needsNighttime025 = isClassD;
+      const needsNighttime01  = isClassA || isClassB || isClassD;
+
+      const CONTOURS_REQUIRED = [
+        { contour: '5 mV/m',     purpose: 'Principal community coverage',       rule: '§73.24(j)', required: true },
+        { contour: '0.5 mV/m',   purpose: 'Daytime service contour',            rule: '§73.186',   required: true },
+        { contour: '0.1 mV/m',   purpose: 'Nighttime protection contour',       rule: '§73.186',   required: needsNighttime01 },
+        { contour: '0.025 mV/m', purpose: 'Class D secondary nighttime',        rule: '§73.186(d)',required: needsNighttime025 },
+        { contour: 'Interference', purpose: 'Co-channel/adjacent interference', rule: '§73.182',   required: is_da },
+      ].filter(c => c.required);
+
+      // DA map requires 36 radials (every 10°)
+      const n_radials = is_da ? 36 : 0;
+
+      // Map scale by class
+      const map_scale = (isClassA || isClassB) ? '1:500,000' : '1:250,000';
+
+      // Cost estimates
+      const CONTOUR_MAP_LOW_USD  = is_da ? 2500 : 1000;
+      const CONTOUR_MAP_HIGH_USD = is_da ? 6000 : 2500;
+      // DA-2 proof of performance (formal field measurements)
+      const PROOF_LOW_USD  = is_da2 ? 8000  : 0;
+      const PROOF_HIGH_USD = is_da2 ? 20000 : 0;
+
+      const total_low_usd  = round2(CONTOUR_MAP_LOW_USD  + PROOF_LOW_USD);
+      const total_high_usd = round2(CONTOUR_MAP_HIGH_USD + PROOF_HIGH_USD);
+
+      // Contour distances (rough proxies using fccAmDistanceKm)
+      let d_5mvm_km = null;
+      let d_05mvm_km = null;
+      let d_01mvm_km = null;
+      try {
+        const r5   = fccAmDistanceKm({ frequency_khz, target_mvm: 5.0,  conductivity_msm: 4, erp_kw: tpo_kw });
+        const r05  = fccAmDistanceKm({ frequency_khz, target_mvm: 0.5,  conductivity_msm: 4, erp_kw: tpo_kw });
+        const r01  = fccAmDistanceKm({ frequency_khz, target_mvm: 0.1,  conductivity_msm: 4, erp_kw: tpo_kw });
+        d_5mvm_km  = round2(r5.distance_km);
+        d_05mvm_km = round2(r05.distance_km);
+        d_01mvm_km = round2(r01.distance_km);
+      } catch (_){ /* leave null */ }
+
+      return {
+        contours_required: CONTOURS_REQUIRED,
+        n_contours_required: CONTOURS_REQUIRED.length,
+        n_radials,
+        map_scale,
+        map_datum: 'NAD83',
+        accepted_methods: ['FCC §73.184 curves + §73.183 M3', 'AM_STAT', 'Measured field data'],
+        contour_distances_km: {
+          d_5mvm_km,
+          d_05mvm_km,
+          d_01mvm_km
+        },
+        cost_estimates: {
+          contour_map_low_usd:  CONTOUR_MAP_LOW_USD,
+          contour_map_high_usd: CONTOUR_MAP_HIGH_USD,
+          proof_of_performance_low_usd:  PROOF_LOW_USD,
+          proof_of_performance_high_usd: PROOF_HIGH_USD,
+          total_low_usd,
+          total_high_usd
+        },
+        formal_proof_required: is_da2,
+        reference: '47 CFR §73.182; §73.183; §73.184; §73.186; §73.24(j)',
+        note: `${frequency_khz} kHz (${fcc_class}): ${CONTOURS_REQUIRED.length} contours required. Map scale ${map_scale}. ${is_da ? `DA: ${n_radials} radials required. ` : 'NDA: omnidirectional contours. '}Cost estimate $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 
