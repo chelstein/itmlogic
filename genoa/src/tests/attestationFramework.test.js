@@ -271,20 +271,20 @@ test('PDF source attestation section renders operative + conflicting rows and na
   assert.equal(sec.heading, 'SOURCE ATTESTATION');
   assert.equal(sec.type, 'table-with-summary');
 
-  const haatRow = sec.table.rows.find(r => r.field === 'HAAT');
+  const haatRow = sec.table.rows.find(r => r.field === 'HAAT (filing-controlling)');
   assert.ok(haatRow, 'HAAT operative row present');
   assert.match(haatRow.value, /506/);
   assert.equal(haatRow.source, 'FCC LMS');
   assert.equal(haatRow.authority, 'PRIMARY');
   assert.equal(haatRow.status, 'RESOLVED_WITH_CONFLICT');
 
-  const demRow = sec.table.rows.find(r => /HAAT \(non-operative\)/.test(r.field) && r.source === 'USGS DEM');
+  const demRow = sec.table.rows.find(r => /HAAT \(filing-controlling\) \(non-operative\)/.test(r.field) && r.source === 'USGS DEM');
   assert.ok(demRow, 'non-operative DEM HAAT row present');
   assert.match(demRow.value, /533\.2/);
   assert.match(demRow.status, /NON_OPERATIVE_CONFLICT \(SOURCE_CONFLICT_HAAT\)/);
 
-  assert.match(sec.summary, /operative HAAT for filing calculations is 506 m from FCC LMS/);
-  assert.match(sec.summary, /does not control filing\s+calculations unless reviewed and promoted by the engineer of record/);
+  assert.match(sec.summary, /filing-controlling HAAT used in this exhibit/);
+  assert.match(sec.summary, /basis-selection issue/);
 
   assert.equal(buildSourceAttestationSection({}, {}), null, 'legacy exhibits self-defer');
 });

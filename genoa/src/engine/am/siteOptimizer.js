@@ -1610,7 +1610,27 @@ export async function runSiteOptimizer(body = {}){
     cos_opportunity_tier:               c.am_colocation_opportunity_score_guide?.opportunity_tier ?? null,
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
-    cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null
+    cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    cpe_n_required_exhibits:            c.am_construction_permit_exhibit_requirements_guide?.n_required_exhibits ?? null,
+    cpe_asr_required:                   c.am_construction_permit_exhibit_requirements_guide?.asr_required ?? null,
+    cpe_ea_required:                    c.am_construction_permit_exhibit_requirements_guide?.environmental_assessment_required ?? null,
+    cpe_nif_required:                   c.am_construction_permit_exhibit_requirements_guide?.nif_required ?? null,
+    cpe_total_cost_low_usd:             c.am_construction_permit_exhibit_requirements_guide?.total_filing_cost_low_usd ?? null,
+    pop_proof_required:                 c.am_proof_of_performance_guide?.proof_required ?? null,
+    pop_n_radials:                      c.am_proof_of_performance_guide?.n_radials_required ?? null,
+    pop_total_points:                   c.am_proof_of_performance_guide?.total_measurement_points ?? null,
+    pop_cost_low_usd:                   c.am_proof_of_performance_guide?.proof_cost_usd?.total_low ?? null,
+    pop_radial_step_deg:                c.am_proof_of_performance_guide?.radial_step_deg ?? null,
+    env_nepa_disposition:               c.am_environmental_and_rf_hazard_assessment_guide?.nepa_disposition ?? null,
+    env_rf_eval_required:               c.am_environmental_and_rf_hazard_assessment_guide?.rf_eval_required ?? null,
+    env_rf_safe_dist_m:                 c.am_environmental_and_rf_hazard_assessment_guide?.rf_safe_dist_m ?? null,
+    env_nhpa_likely:                    c.am_environmental_and_rf_hazard_assessment_guide?.nhpa_likely_required ?? null,
+    env_n_required:                     c.am_environmental_and_rf_hazard_assessment_guide?.n_env_required ?? null,
+    fcs_channel_class:                  c.am_frequency_coordination_and_channel_study_guide?.channel_class ?? null,
+    fcs_has_skywave:                    c.am_frequency_coordination_and_channel_study_guide?.has_skywave_obligation ?? null,
+    fcs_coch_radius_km:                 c.am_frequency_coordination_and_channel_study_guide?.co_channel_search_radius_km ?? null,
+    fcs_adj_radius_km:                  c.am_frequency_coordination_and_channel_study_guide?.adj_channel_search_radius_km ?? null,
+    fcs_study_effort_max_hrs:           c.am_frequency_coordination_and_channel_study_guide?.study_effort_hrs?.max ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27378,6 +27398,456 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_construction_permit_exhibit_requirements_guide: (() => {
+      // FCC Form 301-AM construction permit exhibit requirements.
+      //
+      // When relocating an AM station, the applicant must file a construction
+      // permit (CP) application on FCC Form 301-AM.  Required exhibits vary
+      // by station class, operating mode (DA/NDA), transmitter power, estimated
+      // tower height, and triggered environmental categories.
+      //
+      // Mandatory exhibits for ALL AM CP applications (§73.182; §73.24):
+      //   1. §73.182 Engineering Interference Study
+      //   2. NEPA §1.1307 Environmental Checklist
+      //   3. Tower/Site Description (coordinates, height, ground system)
+      //   4. Community Coverage Analysis (§73.24(j) 5 mV/m contour)
+      //
+      // Additional exhibits triggered by station characteristics:
+      //   • TPO ≥ 1 kW:  OET-65 RF radiation hazard analysis required
+      //   • TPO > 5 kW:  Environmental Assessment (EA) per §1.1307(a)(5)
+      //   • DA mode:     Horizontal Radiation Pattern (HRP) table (§73.316),
+      //                  antenna array technical data, phasor description
+      //   • Tower ≥ 60.96m (200 ft): FAA Form 7460-1 / ASR registration (§17.7)
+      //   • Class A/B:   Nighttime NIF analysis (§73.182 skywave tables)
+      //
+      // Tower height estimate: a first-order estimate uses the quarter-wave
+      // height (λ/4) which is the optimum electrical height for a series-excited
+      // AM monopole.  λ/4 (m) = 75,000 / frequency_khz.
+      //
+      // Form 301-AM filing fee: $1,705 (as of 2024 FCC fee schedule, 47 CFR
+      // §1.1104).  Post-grant license fee (Form 302-AM): $190.
+
+      const isDA = /^DA/i.test(pattern_mode);
+
+      // Quarter-wave height estimate
+      const quarter_wave_height_m = round2(75000 / frequency_khz);
+      // ASR registration threshold: 200 feet = 60.96 m (47 CFR §17.7)
+      const asr_required          = quarter_wave_height_m > 60.96;
+
+      const rf_hazard_required    = tpo_kw >= 1.0;
+      const ea_required           = tpo_kw > 5.0;
+      // NIF required for Class A and B (subject to skywave interference)
+      const nif_required          = fcc_class === 'A' || fcc_class === 'B';
+
+      // Build ordered exhibit list
+      const exhibits = [
+        { id: 'E1', name: '§73.182 Engineering Interference Study',         required: true },
+        { id: 'E2', name: 'NEPA §1.1307 Environmental Checklist',           required: true },
+        { id: 'E3', name: 'Tower/Site Description + Ground System Data',    required: true },
+        { id: 'E4', name: '§73.24(j) Community Coverage Analysis',          required: true },
+        { id: 'E5', name: 'OET-65 RF Radiation Hazard Analysis',            required: rf_hazard_required },
+        { id: 'E6', name: 'Horizontal Radiation Pattern Table (§73.316)',   required: isDA },
+        { id: 'E7', name: 'Antenna Array Technical Data / Phasor Desc.',    required: isDA },
+        { id: 'E8', name: 'FAA Form 7460-1 / ASR Registration (§17.7)',     required: asr_required },
+        { id: 'E9', name: 'Environmental Assessment EA (§1.1307(a)(5))',    required: ea_required },
+        { id: 'E10', name: 'Nighttime NIF Analysis (§73.182 skywave)',      required: nif_required },
+      ];
+
+      const n_required_exhibits = exhibits.filter(e => e.required).length;
+
+      // Engineering preparation cost estimate
+      // Base: interference study + coverage + forms
+      const base_cost_low  = 3500;
+      const base_cost_high = 6000;
+      const da_increment   = isDA        ? 4000 : 0;
+      const ea_increment   = ea_required ? 3000 : 0;
+      const nif_increment  = nif_required ? 5000 : 0;
+      const prep_cost_low  = base_cost_low  + Math.round(da_increment * 0.8) + Math.round(ea_increment * 0.75) + Math.round(nif_increment * 0.8);
+      const prep_cost_high = base_cost_high + da_increment + ea_increment + nif_increment + 2000;
+
+      // Filing fee per 47 CFR §1.1104 (2024 schedule)
+      const fcc_filing_fee_usd = 1705;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_da:                        isDA,
+        quarter_wave_height_m,
+        asr_required,
+        rf_hazard_exhibit_required:   rf_hazard_required,
+        environmental_assessment_required: ea_required,
+        nif_required,
+        exhibits,
+        n_required_exhibits,
+        exhibit_prep_cost_usd:        { low: prep_cost_low, high: prep_cost_high },
+        fcc_filing_fee_usd,
+        total_filing_cost_low_usd:    prep_cost_low  + fcc_filing_fee_usd,
+        total_filing_cost_high_usd:   prep_cost_high + fcc_filing_fee_usd,
+        form:                         'FCC Form 301-AM',
+        reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
+        note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
+      };
+    })(),
+
+    am_proof_of_performance_guide: (() => {
+      // Proof of performance (field measurement) guide for AM stations.
+      //
+      // 47 CFR §73.151 requires AM licensees to conduct field-strength
+      // measurements and file a formal proof of performance whenever:
+      //   (a) The station first begins operation (new CP or initial license)
+      //   (b) A DA antenna system is installed, modified, or replaced
+      //   (c) The Commission orders a proof
+      //   (d) An antenna array fails to conform to licensed parameters
+      //
+      // Non-directional (NDA) stations must file proof only on initial
+      // license grant or when ordered by FCC.
+      //
+      // DA proof requirements (§73.151):
+      //   - Radial measurements at 5°, 10°, 15° increments (FCC specifies per application)
+      //   - Minimum 3 measurement points per radial (typically 2 km, 5 km, 10 km or to
+      //     the licensed contour distance)
+      //   - Measurements on all authorized radials per the license DA parameters
+      //   - Filed via Form 302-AM or as part of a CP or modification application
+      //
+      // NDA proof requirements (§73.152):
+      //   - Spot checks if FCC questions the antenna efficiency
+      //   - No periodic proof required for NDA stations
+      //
+      // Field measurement methodology:
+      //   - Calibrated field strength meter (or equivalent SDR with calibration)
+      //   - GPS coordinates for each measurement point logged
+      //   - Measurement taken ≥ 100 ft from overhead wires, buildings, fences
+      //   - No rain/wet ground conditions (increases ground conductivity)
+      //   - Multiple readings averaged per point (typically 3–5 sweeps)
+      //
+      // References:
+      //   47 CFR §73.151 (DA proof)
+      //   47 CFR §73.152 (NDA no proof required)
+      //   47 CFR §73.154 (proof filing — not required for NDA unless ordered)
+      //   FCC Form 302-AM Instructions
+
+      const isDA       = /^DA/i.test(pattern_mode);
+      const isDAN      = /^DA-N/i.test(pattern_mode);
+      const isDAD      = /^DA-D/i.test(pattern_mode);
+      const isDAND     = /^DA(?:-N|-D|-2)?/i.test(pattern_mode);  // any DA variant
+      const isSynthesized = /^DA-2/i.test(pattern_mode);
+
+      // Number of towers in a typical DA array
+      // DA-N (nighttime) or DA-D (daytime) typically 2–4 towers
+      // DA-2 (day and night) typically 3–6 towers
+      const TYPICAL_TOWER_COUNTS = {
+        NDA:  1,
+        'DA-N': 2,
+        'DA-D': 2,
+        'DA-2': 3
+      };
+      const typical_towers = TYPICAL_TOWER_COUNTS[pattern_mode] ?? (isDA ? 2 : 1);
+
+      // Proof requirement
+      const proofRequired      = isDA;
+      const proofType          = isDA ? 'DA_PROOF' : 'NDA_NO_PROOF';
+
+      // Radial step for field measurements (per §73.151 for typical DA)
+      // FCC usually specifies 5° increments for 4-tower arrays and 10° for 2-tower
+      const radial_step_deg    = typical_towers >= 4 ? 5 : 10;
+      const n_radials          = Math.round(360 / radial_step_deg);
+
+      // Minimum measurement points per radial (2 km, 5 km, and ≥ contour)
+      const MIN_POINTS_PER_RADIAL = 3;
+      const total_measurement_points = proofRequired ? n_radials * MIN_POINTS_PER_RADIAL : 0;
+
+      // Cost estimate for a DA proof (field crew + engineer review + filing)
+      const PROOF_COST_USD = proofRequired ? {
+        field_crew_low:   800 * n_radials,
+        field_crew_high:  1400 * n_radials,
+        engineer_review:  2500,
+        filing_fee_usd:   0,   // no FCC fee for proof filing
+        total_low:        round2(800 * n_radials + 2500),
+        total_high:       round2(1400 * n_radials + 2500),
+        note:             `${n_radials} radials × field crew cost + engineer review. No FCC filing fee.`
+      } : null;
+
+      // Form 302-AM filing schedule
+      const FORM302_SCHEDULE = proofRequired ? {
+        filing_trigger:   'After DA antenna system installed/modified at new site',
+        deadline_days:    90,   // 90 days from first operation under new parameters
+        form:             'FCC Form 302-AM',
+        cfr:              '§73.154',
+        note:             'Proof must be filed within 90 days of commencing operation. Extension available on showing good cause.'
+      } : null;
+
+      // Equipment requirements
+      const EQUIPMENT = [
+        { item: 'Calibrated field strength meter (or SDR with cal certificate)', required: true },
+        { item: 'GPS receiver (sub-meter accuracy preferred)', required: true },
+        { item: 'Base camp communication (cellular or radio)', required: true },
+        { item: 'Licensed surveyor (for property-line or right-of-way crossings)', required: false },
+        { item: 'Drone (aerial measurements in inaccessible terrain)', required: false }
+      ];
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        is_da_station:              isDA,
+        is_da_n:                    isDAN,
+        is_da_d:                    isDAD,
+        typical_tower_count:        typical_towers,
+        proof_required:             proofRequired,
+        proof_type:                 proofType,
+        radial_step_deg:            radial_step_deg,
+        n_radials_required:         proofRequired ? n_radials : 0,
+        min_points_per_radial:      MIN_POINTS_PER_RADIAL,
+        total_measurement_points:   total_measurement_points,
+        proof_cost_usd:             PROOF_COST_USD,
+        form_302_schedule:          FORM302_SCHEDULE,
+        equipment:                  EQUIPMENT,
+        n_equipment_required:       EQUIPMENT.filter(e => e.required).length,
+        reference: '47 CFR §73.151; §73.152; §73.154; FCC Form 302-AM Instructions',
+        note: proofRequired
+          ? `DA proof required: ${n_radials} radials at ${radial_step_deg}° step, ${MIN_POINTS_PER_RADIAL} points/radial (${total_measurement_points} total measurements). File Form 302-AM within 90 days of first operation.`
+          : `Non-directional station — no periodic proof of performance required per §73.152 (unless ordered by FCC).`
+      };
+    })(),
+
+    am_environmental_and_rf_hazard_assessment_guide: (() => {
+      // Environmental review and RF hazard assessment for transmitter site relocation.
+      //
+      // Any FCC construction permit application for a new/relocated AM transmitter
+      // site requires the applicant to address environmental impact under:
+      //
+      //   1. NEPA (National Environmental Policy Act) — FCC's rules at 47 CFR §1.1301–§1.1319
+      //      Most AM site relocations qualify for a Categorical Exclusion (CE) if the
+      //      site does not trigger any "significant environmental effect" threshold.
+      //      Eight categories require a full Environmental Assessment (EA):
+      //        (a) wilderness areas, (b) wildlife refuges, (c) floodplains,
+      //        (d) surface features, (e) high-intensity RF (>5 kW ERP or towers >60 m),
+      //        (f) Native American sites, (g) nuclear waste sites, (h) antenna farms.
+      //
+      //   2. NHPA §106 (National Historic Preservation Act) — FCC's rules at 47 CFR §1.1307(a)(4)
+      //      Proposed towers ≥ 200 ft AGL or requiring FAA marking/lighting may require
+      //      consultation with State Historic Preservation Officer (SHPO).
+      //
+      //   3. RF Exposure (47 CFR §1.1307(b) / §1.1310) — OET Bulletin 65
+      //      AM stations ≥ 1 kW TPO must evaluate general-population/uncontrolled
+      //      MPE limits.  AM towers carry RF current on the structure itself;
+      //      the base area is a controlled-environment hazard zone.  The 1.6 mW/cm²
+      //      general population limit at AM frequencies requires the tower fence to
+      //      be ≥ the calculated safe distance.
+      //
+      // References:
+      //   47 CFR §1.1301–§1.1319 (NEPA)
+      //   47 CFR §1.1307 (environmental significance)
+      //   47 CFR §1.1310 (RF safety)
+      //   OET Bulletin 65 (RF exposure evaluation)
+      //   36 CFR §800 (NHPA §106)
+
+      // NEPA CE vs EA threshold analysis
+      const NEPA_EA_TRIGGERS = [
+        {
+          code:       'NEPA_EA_WILDERNESS',
+          label:      'Wilderness area or wildlife refuge',
+          cfr:        '§1.1307(a)(1)(2)',
+          triggered:  false,   // requires GIS lookup — advisory only
+          advisory:   true
+        },
+        {
+          code:       'NEPA_EA_FLOODPLAIN',
+          label:      'Floodplain or wetland',
+          cfr:        '§1.1307(a)(3)',
+          triggered:  false,
+          advisory:   true
+        },
+        {
+          code:       'NEPA_EA_HIGH_RF',
+          label:      'High-intensity RF (ERP > 5 kW or tower > 60 m AGL)',
+          cfr:        '§1.1307(a)(5)',
+          triggered:  tpo_kw > 5,
+          advisory:   false
+        },
+        {
+          code:       'NEPA_EA_NATIVE_AMERICAN',
+          label:      'Native American/Alaskan Native religious or cultural site',
+          cfr:        '§1.1307(a)(6)',
+          triggered:  false,
+          advisory:   true
+        },
+        {
+          code:       'NEPA_EA_ANTENNA_FARM',
+          label:      'Antenna farm (site with ≥ 3 other broadcast structures)',
+          cfr:        '§1.1307(a)(8)',
+          triggered:  false,
+          advisory:   true
+        }
+      ];
+
+      const nDefinitelyTriggered = NEPA_EA_TRIGGERS.filter(t => t.triggered && !t.advisory).length;
+      const nAdvisory            = NEPA_EA_TRIGGERS.filter(t => t.advisory).length;
+
+      const nepaDisposition = nDefinitelyTriggered > 0
+        ? 'EA_REQUIRED'
+        : 'CE_LIKELY_PENDING_SITE_REVIEW';
+
+      // RF safety: approximate minimum safe distance at fence line
+      // AM base current creates near-field RF hazard in tower base area.
+      // General population MPE at AM: 1.6 mW/cm² (uncontrolled).
+      // Simplified: safe_dist_m ≈ sqrt(60 × P_watts / (4π × 1.6)) (EIRP model, very rough)
+      // For a full evaluation use OET Bulletin 65 procedure.
+      const tpo_watts        = tpo_kw * 1000;
+      const MPE_LIMIT_MW_CM2 = 1.6;  // mW/cm²; OET-65 Table 1 general population AM
+      const MPE_LIMIT_W_M2   = MPE_LIMIT_MW_CM2 * 10; // 16 W/m²
+      const safe_dist_m      = tpo_watts > 0
+        ? round2(Math.sqrt((30 * tpo_watts) / (Math.PI * MPE_LIMIT_W_M2)))
+        : null;
+
+      // NHPA §106 trigger: towers ≥ 200 ft AGL or requiring FAA marking
+      // Use tpo_kw and fcc_class as proxies for whether tower height is plausible
+      const NHPA_HEIGHT_TRIGGER_FT = 200;
+      const NHPA_HEIGHT_TRIGGER_M  = round2(NHPA_HEIGHT_TRIGGER_FT * 0.3048);
+      const nhpaLikelyRequired     = fcc_class === 'A' || fcc_class === 'B';  // proxy only
+
+      // Environmental checklist (Form 301 Section VII items)
+      const ENV_CHECKLIST = [
+        { item: 'NEPA Categorical Exclusion or Environmental Assessment', required: true,  cfr: '§1.1307' },
+        { item: 'RF Exposure evaluation (OET-65 procedure)', required: tpo_kw >= 1.0, cfr: '§1.1310; OET-65' },
+        { item: 'Floodplain / wetland screening (FIRM maps, NWI)', required: true, cfr: '§1.1307(a)(3)' },
+        { item: 'NHPA §106 consultation with SHPO (if tower ≥ 200 ft or FAA-required marking)', required: nhpaLikelyRequired, cfr: '36 CFR §800; FCC §1.1307(a)(4)' },
+        { item: 'Native American sacred site consultation (tribal SHPO)', required: false, cfr: '§1.1307(a)(6); NHPA §106', advisory: true },
+        { item: 'Migratory Bird Treaty Act screening (if tower ≥ 200 ft with guy wires)', required: false, cfr: 'MBTA; FCC guidance 2023', advisory: true },
+        { item: 'Antenna farm check (3+ structures within 640 acres)', required: false, cfr: '§1.1307(a)(8)', advisory: true }
+      ];
+
+      const nRequired  = ENV_CHECKLIST.filter(c => c.required && !c.advisory).length;
+      const nAdvisoryC = ENV_CHECKLIST.filter(c => c.advisory).length;
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        nepa_disposition:        nepaDisposition,
+        nepa_ea_triggers:        NEPA_EA_TRIGGERS,
+        n_nepa_ea_definitely:    nDefinitelyTriggered,
+        n_nepa_ea_advisory:      nAdvisory,
+        rf_safe_dist_m:          safe_dist_m,
+        rf_mpe_limit_mw_cm2:     MPE_LIMIT_MW_CM2,
+        rf_eval_required:        tpo_kw >= 1.0,
+        nhpa_height_trigger_ft:  NHPA_HEIGHT_TRIGGER_FT,
+        nhpa_height_trigger_m:   NHPA_HEIGHT_TRIGGER_M,
+        nhpa_likely_required:    nhpaLikelyRequired,
+        env_checklist:           ENV_CHECKLIST,
+        n_env_required:          nRequired,
+        n_env_advisory:          nAdvisoryC,
+        reference: '47 CFR §1.1301–§1.1319; §1.1307; §1.1310; OET Bulletin 65; 36 CFR §800; FCC Environmental Rules',
+        note: `NEPA: ${nepaDisposition}. RF eval required: ${tpo_kw >= 1.0 ? 'YES (TPO ≥ 1 kW)' : 'NO (TPO < 1 kW)'}. NHPA §106: ${nhpaLikelyRequired ? 'LIKELY (Class A/B — verify tower height)' : 'CHECK TOWER HEIGHT (< 200 ft AGL = exempt)'}. RF fence distance estimate: ${safe_dist_m != null ? safe_dist_m + ' m' : '—'}.`
+      };
+    })(),
+
+    am_frequency_coordination_and_channel_study_guide: (() => {
+      // Frequency coordination and channel interference study guide.
+      //
+      // Before an AM relocation can be accepted by FCC LMS, the applicant must
+      // demonstrate that the proposed site and antenna configuration do not
+      // create prohibited interference to:
+      //   1. Co-channel Class A (clear-channel) and Class B dominant stations
+      //      per §73.182 skywave (50% RSS sky-wave protection)
+      //   2. Co-channel daytime groundwave per §73.182(a)–(d) D/U ratios
+      //   3. Adjacent-channel (±10 kHz) stations per §73.182(g)/(h) tables
+      //   4. 2nd-adjacent (±20 kHz) stations per §73.182(k)
+      //   5. International stations — US/MX (1986 agreement) and US/CA treaty
+      //
+      // Channel classification determines which rules apply.  Local channels
+      // (Class C, 1230–1490 kHz) have relaxed protection obligations vs.
+      // regional (Class B) and clear (Class A) channels.
+      //
+      // References:
+      //   47 CFR §73.182 (nighttime protection)
+      //   47 CFR §73.37 (daytime prohibited operations)
+      //   47 CFR §73.183/§73.184 (groundwave method)
+      //   FCC Form 301-AM Instructions
+      //   US/Mexico AM Agreement (1986); US/Canada Agreement
+
+      const isClearCh  = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isLocalCh  = LOCAL_CHANNEL_KHZ.has(frequency_khz);
+      const isRegional = !isClearCh && !isLocalCh;
+
+      // Channel class label
+      const channelClass = isClearCh ? 'CLEAR (Class A dominant)' : isLocalCh ? 'LOCAL (Class C, ≤250W)' : 'REGIONAL (Class B)';
+
+      // Daytime groundwave D/U requirements (§73.182(a)–(d) simplified)
+      // Co-channel Class A stations require 20 dB D/U at the proposed transmitter site.
+      // These are screening thresholds — exact §73.182 table interpolation required.
+      const CO_CHANNEL_DU_DB = isClearCh ? 26 : isLocalCh ? 6 : 20;  // dB required
+      const ADJ_CHANNEL_DU_DB = 6;   // §73.182(g) ±10 kHz minimum D/U
+      const SEC_ADJ_DU_DB     = 0;   // §73.182(k) ±20 kHz — equal signal acceptable
+
+      // Required groundwave study radius (km) for Form 301 co-channel search
+      // §73.182 table lookup requires searching to the 0.5 mV/m co-channel contour.
+      // As a proxy: 0.5 mV/m ~ 1.5× the 25 mV/m distance for typical erp/HAAT.
+      // Use class-based search radius floor from FCC practice.
+      const CO_CHANNEL_SEARCH_RADIUS_KM = isClearCh ? 1000 : isLocalCh ? 300 : 650;
+      const ADJ_CHANNEL_SEARCH_RADIUS_KM = isClearCh ? 500 : isLocalCh ? 200 : 350;
+
+      // International treaty zone check
+      const MX_TREATY_RADIUS_KM  = 320;
+      const CA_TREATY_RADIUS_KM  = 800;
+
+      // Nighttime skywave obligation for this class
+      const hasSkywave   = fcc_class !== 'C';   // Class C has no skywave protection obligation
+      const hasDaytimeDA = /^DA/i.test(pattern_mode) && tpo_kw > 0;
+
+      // Form 301-AM sections triggered by relocation
+      const FORM301_SECTIONS = [
+        { section: 'Section I',  item: 'Station identification and license data', required: true },
+        { section: 'Section II', item: 'Technical operating parameters (ERP, ant pattern, HAAT)', required: true },
+        { section: 'Section III', item: 'Transmitter site coordinates and AMSL', required: true },
+        { section: 'Section IV', item: 'Co-channel and adjacent-channel interference study (§73.182)', required: true },
+        { section: 'Section IV', item: 'International station check (US/MX, US/CA treaties)', required: isClearCh || isRegional },
+        { section: 'Section V',  item: 'Nighttime RSS skywave calculation if Class A, B, or D', required: hasSkywave },
+        { section: 'Section VI', item: 'DA antenna pattern table if directional (§73.316)', required: hasDaytimeDA },
+        { section: 'Section VII', item: 'Environmental notification (NEPA/NHPA) if applicable', required: true }
+      ];
+
+      // Co-channel search methodology overview
+      const STUDY_METHODOLOGY = {
+        groundwave_method: '47 CFR §73.183 / §73.184 FCC gwave conductivity curves',
+        skywave_method:    hasSkywave ? '47 CFR §73.190(c) Wang 1985 Ionospheric method (FCCAM sidecar)' : 'N/A — Class C no skywave obligation',
+        rss_formula:       hasSkywave ? 'RSS = √(∑ Eₙ²) where Eₙ is interfering skywave field; proposed ≤ √(Eprotected² - ∑ Eₙ²)' : 'N/A',
+        du_ratio_method:   '§73.182 Table I (co-channel), Table II (adj-channel); FCC gwave distance',
+        search_tools:      'FCC AM Query (CDBS), LMS AM search, FCCAM sidecar (skywave RSS)'
+      };
+
+      // Estimated study effort (person-hours) based on channel class
+      const STUDY_EFFORT_HRS = isClearCh ? { min: 16, max: 40, note: 'Clear-channel skywave RSS can require querying 100+ stations' }
+                              : isLocalCh ? { min: 4,  max: 12, note: 'Local channels: groundwave-only study; shorter search radius' }
+                              :             { min: 8,  max: 24, note: 'Regional B channels: groundwave + skywave; moderate radius' };
+
+      // Cost estimate
+      const COST_EST_USD = {
+        diy_engineer:    isClearCh ? 4000 : isLocalCh ? 1200 : 2500,
+        consulting_firm: isClearCh ? 12000 : isLocalCh ? 3500 : 7500,
+        note:            'Consulting cost ranges from independent engineer to full filing firm'
+      };
+
+      return {
+        fcc_class, frequency_khz, pattern_mode,
+        channel_class:           channelClass,
+        is_clear_channel:        isClearCh,
+        is_local_channel:        isLocalCh,
+        is_regional_channel:     isRegional,
+        has_skywave_obligation:  hasSkywave,
+        has_da_pattern:          hasDaytimeDA,
+        co_channel_du_required_db:  CO_CHANNEL_DU_DB,
+        adj_channel_du_required_db: ADJ_CHANNEL_DU_DB,
+        sec_adj_du_required_db:     SEC_ADJ_DU_DB,
+        co_channel_search_radius_km:  CO_CHANNEL_SEARCH_RADIUS_KM,
+        adj_channel_search_radius_km: ADJ_CHANNEL_SEARCH_RADIUS_KM,
+        international_treaty_mx_km:  MX_TREATY_RADIUS_KM,
+        international_treaty_ca_km:  CA_TREATY_RADIUS_KM,
+        form_301_sections:        FORM301_SECTIONS,
+        n_form_301_required:      FORM301_SECTIONS.filter(s => s.required).length,
+        study_methodology:        STUDY_METHODOLOGY,
+        study_effort_hrs:         STUDY_EFFORT_HRS,
+        cost_est_usd:             COST_EST_USD,
+        reference: '47 CFR §73.182; §73.37; §73.183; §73.184; §73.190; FCC Form 301-AM; US/Mexico 1986 AM Agreement; US/Canada AM Treaty',
+        note: `${channelClass} channel. Required study radius: co-channel ${CO_CHANNEL_SEARCH_RADIUS_KM} km, adj-channel ${ADJ_CHANNEL_SEARCH_RADIUS_KM} km. ${hasSkywave ? 'Nighttime skywave RSS required.' : 'No nighttime skywave obligation (Class C).'}`
       };
     })(),
 

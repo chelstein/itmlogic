@@ -2356,6 +2356,122 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Construction Permit Exhibit Requirements Guide */}
+        {candidate.am_construction_permit_exhibit_requirements_guide && (() => {
+          const cpe = candidate.am_construction_permit_exhibit_requirements_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const asrColor = cpe.asr_required ? '#f87171' : '#4ade80';
+          const eaColor  = cpe.environmental_assessment_required ? '#f87171' : '#4ade80';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#818cf8' }}>📋</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Form 301-AM Exhibit Requirements</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#e2e8f0', background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {cpe.n_required_exhibits} EXHIBITS
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>Quarter-wave tower: <b style={{ color: '#e2e8f0' }}>{cpe.quarter_wave_height_m}m</b></span>
+                <span>ASR registration: <b style={{ color: asrColor }}>{cpe.asr_required ? 'REQUIRED' : 'NOT REQUIRED'}</b></span>
+                <span>Env. Assessment: <b style={{ color: eaColor }}>{cpe.environmental_assessment_required ? 'EA REQUIRED (>5 kW)' : 'CE LIKELY'}</b></span>
+                <span>Nighttime NIF: <b style={{ color: cpe.nif_required ? '#facc15' : '#4ade80' }}>{cpe.nif_required ? 'REQUIRED (A/B)' : 'NOT REQUIRED'}</b></span>
+                <span>FCC filing fee: <b style={{ color: '#e2e8f0' }}>{fmtUsd(cpe.fcc_filing_fee_usd)}</b></span>
+                <span>Total est. cost: <b style={{ color: '#e2e8f0' }}>{fmtUsd(cpe.total_filing_cost_low_usd)}–{fmtUsd(cpe.total_filing_cost_high_usd)}</b></span>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                Form 301-AM · {cpe.is_da ? 'DA' : 'NDA'} · Class {cpe.fcc_class} · {cpe.tpo_kw} kW · Ref: {cpe.reference}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Proof of Performance Guide */}
+        {candidate.am_proof_of_performance_guide && (() => {
+          const pop = candidate.am_proof_of_performance_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const reqColor = pop.proof_required ? '#f87171' : '#4ade80';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#fbbf24' }}>📐</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Proof of Performance (§73.151)</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: reqColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {pop.proof_required ? 'DA PROOF REQUIRED' : 'NDA — NO PROOF'}
+                </div>
+              </div>
+              {pop.proof_required ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                  <span>Radials: <b style={{ color: '#e2e8f0' }}>{pop.n_radials_required} ({pop.radial_step_deg}° step)</b></span>
+                  <span>Total measurements: <b style={{ color: '#e2e8f0' }}>{pop.total_measurement_points}</b></span>
+                  <span>Towers (typical): <b style={{ color: '#e2e8f0' }}>{pop.typical_tower_count}</b></span>
+                  <span>Cost estimate: <b style={{ color: '#e2e8f0' }}>{fmtUsd(pop.proof_cost_usd?.total_low)}–{fmtUsd(pop.proof_cost_usd?.total_high)}</b></span>
+                  <span>Filing: <b style={{ color: '#e2e8f0' }}>Form 302-AM</b></span>
+                  <span>Deadline: <b style={{ color: '#facc15' }}>90 days from first op.</b></span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: '#4ade80', marginBottom: 8 }}>No periodic proof required for NDA stations (§73.152).</div>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* AM Environmental & RF Hazard Assessment Guide */}
+        {candidate.am_environmental_and_rf_hazard_assessment_guide && (() => {
+          const env = candidate.am_environmental_and_rf_hazard_assessment_guide;
+          const nepaColor = env.nepa_disposition === 'EA_REQUIRED' ? '#f87171' : '#4ade80';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#86efac' }}>🌿</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Environmental & RF Hazard Assessment</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: nepaColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {env.nepa_disposition === 'EA_REQUIRED' ? 'EA REQUIRED' : 'CE LIKELY'}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>NEPA: <b style={{ color: nepaColor }}>{env.nepa_disposition?.replace(/_/g,' ')}</b></span>
+                <span>RF eval required: <b style={{ color: env.rf_eval_required ? '#f87171' : '#4ade80' }}>{env.rf_eval_required ? 'YES (≥1 kW)' : 'NO'}</b></span>
+                <span>RF fence dist: <b style={{ color: '#e2e8f0' }}>{env.rf_safe_dist_m != null ? `~${env.rf_safe_dist_m} m` : '—'}</b></span>
+                <span>NHPA §106: <b style={{ color: env.nhpa_likely_required ? '#facc15' : '#4ade80' }}>{env.nhpa_likely_required ? 'VERIFY HEIGHT' : 'CHECK HEIGHT'}</b></span>
+                <span>Checklist items: <b style={{ color: '#e2e8f0' }}>{env.n_env_required} required</b></span>
+                <span>Advisory items: <b style={{ color: '#64748b' }}>{env.n_env_advisory}</b></span>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                {env.note}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* AM Frequency Coordination & Channel Study Guide */}
+        {candidate.am_frequency_coordination_and_channel_study_guide && (() => {
+          const fcs = candidate.am_frequency_coordination_and_channel_study_guide;
+          const clsColor = fcs.is_clear_channel ? '#f59e0b' : fcs.is_local_channel ? '#6ee7b7' : '#93c5fd';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: clsColor }}>📡</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Frequency Coordination & Channel Study</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: clsColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>{fcs.is_clear_channel ? 'CLEAR' : fcs.is_local_channel ? 'LOCAL' : 'REGIONAL'}</div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>Channel class: <b style={{ color: clsColor }}>{fcs.channel_class || '—'}</b></span>
+                <span>Skywave obligation: <b style={{ color: fcs.has_skywave_obligation ? '#f87171' : '#4ade80' }}>{fcs.has_skywave_obligation ? 'YES' : 'NO (Class C)'}</b></span>
+                <span>Co-channel search: <b style={{ color: '#e2e8f0' }}>{fcs.co_channel_search_radius_km} km</b></span>
+                <span>Adj-channel search: <b style={{ color: '#e2e8f0' }}>{fcs.adj_channel_search_radius_km} km</b></span>
+                <span>Study effort: <b style={{ color: '#e2e8f0' }}>{fcs.study_effort_hrs?.min}–{fcs.study_effort_hrs?.max} hrs</b></span>
+                <span>Form 301 sections: <b style={{ color: '#e2e8f0' }}>{fcs.n_form_301_required} required</b></span>
+              </div>
+              {fcs.cost_est_usd && (
+                <div style={{ fontSize: 11, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                  Est. study cost: DIY ${Number(fcs.cost_est_usd.diy_engineer).toLocaleString()} — consulting ${Number(fcs.cost_est_usd.consulting_firm).toLocaleString()}
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* AM Colocation Opportunity Score Guide */}
         {candidate.am_colocation_opportunity_score_guide && (() => {
           const cos = candidate.am_colocation_opportunity_score_guide;

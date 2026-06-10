@@ -16828,3 +16828,204 @@ test('#100 candidate_comparison_table has cos_* columns', async () => {
     assert.ok('cos_tower_density'     in row, 'cos_tower_density missing');
   }
 });
+
+// ---- Feature #101: am_frequency_coordination_and_channel_study_guide ----
+
+test('#101 KAZM (780 kHz clear-channel): channel study guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs, 'am_frequency_coordination_and_channel_study_guide must be present');
+  assert.ok(typeof fcs.channel_class === 'string', 'channel_class must be a string');
+  assert.ok(typeof fcs.co_channel_search_radius_km === 'number', 'co_channel_search_radius_km must be numeric');
+  assert.ok(typeof fcs.adj_channel_search_radius_km === 'number', 'adj_channel_search_radius_km must be numeric');
+  assert.ok(Array.isArray(fcs.form_301_sections), 'form_301_sections must be an array');
+  assert.ok(typeof fcs.n_form_301_required === 'number', 'n_form_301_required must be numeric');
+});
+
+test('#101 780 kHz is CLEAR channel: large search radius, skywave obligation', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 780, candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs.is_clear_channel, '780 kHz must be flagged as clear channel');
+  assert.ok(fcs.has_skywave_obligation, '780 kHz clear-channel must have skywave obligation');
+  assert.ok(fcs.co_channel_search_radius_km >= 800, `clear-channel search radius must be ≥ 800 km, got ${fcs.co_channel_search_radius_km}`);
+});
+
+test('#101 1240 kHz is LOCAL channel: no skywave obligation, short radius', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, frequency_khz: 1240, fcc_class: 'C', candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs.is_local_channel, '1240 kHz must be flagged as local channel');
+  assert.ok(!fcs.has_skywave_obligation, 'local channel (Class C) has no skywave obligation');
+  assert.ok(fcs.co_channel_search_radius_km < 400, `local channel search radius must be < 400 km, got ${fcs.co_channel_search_radius_km}`);
+});
+
+test('#101 DA pattern triggers DA-related Form 301 section', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  const fcs = out.candidates[0].am_frequency_coordination_and_channel_study_guide;
+  assert.ok(fcs.has_da_pattern, 'DA-D pattern must set has_da_pattern');
+  const daSection = fcs.form_301_sections.find(s => /directional|pattern/i.test(s.item));
+  assert.ok(daSection?.required, 'DA antenna pattern section must be required in form_301_sections');
+});
+
+test('#101 candidate_comparison_table has fcs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('fcs_channel_class'      in row, 'fcs_channel_class missing');
+    assert.ok('fcs_has_skywave'        in row, 'fcs_has_skywave missing');
+    assert.ok('fcs_coch_radius_km'     in row, 'fcs_coch_radius_km missing');
+    assert.ok('fcs_adj_radius_km'      in row, 'fcs_adj_radius_km missing');
+    assert.ok('fcs_study_effort_max_hrs' in row, 'fcs_study_effort_max_hrs missing');
+  }
+});
+
+// ---- Feature #102: am_environmental_and_rf_hazard_assessment_guide ----
+
+test('#102 KAZM: environmental guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(env, 'am_environmental_and_rf_hazard_assessment_guide must be present');
+  assert.ok(typeof env.nepa_disposition === 'string', 'nepa_disposition must be a string');
+  assert.ok(Array.isArray(env.nepa_ea_triggers), 'nepa_ea_triggers must be an array');
+  assert.ok(typeof env.rf_eval_required === 'boolean', 'rf_eval_required must be boolean');
+  assert.ok(Array.isArray(env.env_checklist), 'env_checklist must be an array');
+  assert.ok(typeof env.n_env_required === 'number', 'n_env_required must be numeric');
+});
+
+test('#102 station ≥ 1 kW: rf_eval_required = true', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 5, candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(env.rf_eval_required, 'TPO ≥ 1 kW must require RF evaluation');
+  assert.ok(env.rf_safe_dist_m > 0, 'RF safe distance must be positive for ≥ 1 kW');
+});
+
+test('#102 station < 1 kW: rf_eval_required = false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 0.25, fcc_class: 'C', candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(!env.rf_eval_required, 'TPO < 1 kW must not require RF evaluation');
+});
+
+test('#102 high ERP (>5 kW) triggers NEPA EA', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const env = out.candidates[0].am_environmental_and_rf_hazard_assessment_guide;
+  assert.ok(env.n_nepa_ea_definitely >= 1, 'TPO > 5 kW must trigger at least 1 definite NEPA EA condition');
+  assert.strictEqual(env.nepa_disposition, 'EA_REQUIRED', 'High-ERP station must require EA');
+});
+
+test('#102 candidate_comparison_table has env_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('env_nepa_disposition' in row, 'env_nepa_disposition missing');
+    assert.ok('env_rf_eval_required' in row, 'env_rf_eval_required missing');
+    assert.ok('env_rf_safe_dist_m'   in row, 'env_rf_safe_dist_m missing');
+    assert.ok('env_nhpa_likely'      in row, 'env_nhpa_likely missing');
+    assert.ok('env_n_required'       in row, 'env_n_required missing');
+  }
+});
+
+// ---- Feature #103: am_proof_of_performance_guide ----
+
+test('#103 KAZM NDA: proof not required, no measurement points', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const pop = out.candidates[0].am_proof_of_performance_guide;
+  assert.ok(pop, 'am_proof_of_performance_guide must be present');
+  assert.strictEqual(pop.proof_required, false, 'NDA station must not require proof');
+  assert.strictEqual(pop.n_radials_required, 0, 'NDA: n_radials_required must be 0');
+  assert.strictEqual(pop.total_measurement_points, 0, 'NDA: total_measurement_points must be 0');
+});
+
+test('#103 DA-N station: proof required, has radials and cost', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const pop = out.candidates[0].am_proof_of_performance_guide;
+  assert.ok(pop.proof_required, 'DA-N station must require proof');
+  assert.ok(pop.n_radials_required > 0, 'DA-N must have radials');
+  assert.ok(pop.total_measurement_points > 0, 'DA-N must have measurement points');
+  assert.ok(pop.proof_cost_usd?.total_low > 0, 'DA-N proof must have cost estimate');
+  assert.ok(pop.form_302_schedule?.deadline_days === 90, 'Form 302-AM deadline must be 90 days');
+});
+
+test('#103 4-tower array uses 5° radial step', async () => {
+  // Simulate a station where typical_towers ≥ 4 → radial_step_deg = 5
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-2', candidate_limit: 1 });
+  const pop = out.candidates[0].am_proof_of_performance_guide;
+  if (pop.typical_tower_count >= 4) {
+    assert.strictEqual(pop.radial_step_deg, 5, '4+ tower array must use 5° step');
+    assert.strictEqual(pop.n_radials_required, 72, '5° step = 72 radials');
+  } else {
+    assert.strictEqual(pop.radial_step_deg, 10, '2-tower DA uses 10° step');
+    assert.strictEqual(pop.n_radials_required, 36, '10° step = 36 radials');
+  }
+});
+
+test('#103 is_da_n and is_da_d flags match pattern_mode', async () => {
+  const outN = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outD = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-D', candidate_limit: 1 });
+  assert.ok( outN.candidates[0].am_proof_of_performance_guide.is_da_n, 'DA-N must set is_da_n');
+  assert.ok(!outN.candidates[0].am_proof_of_performance_guide.is_da_d, 'DA-N must NOT set is_da_d');
+  assert.ok( outD.candidates[0].am_proof_of_performance_guide.is_da_d, 'DA-D must set is_da_d');
+  assert.ok(!outD.candidates[0].am_proof_of_performance_guide.is_da_n, 'DA-D must NOT set is_da_n');
+});
+
+test('#103 candidate_comparison_table has pop_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('pop_proof_required' in row, 'pop_proof_required missing');
+    assert.ok('pop_n_radials'       in row, 'pop_n_radials missing');
+    assert.ok('pop_total_points'    in row, 'pop_total_points missing');
+    assert.ok('pop_cost_low_usd'    in row, 'pop_cost_low_usd missing');
+    assert.ok('pop_radial_step_deg' in row, 'pop_radial_step_deg missing');
+  }
+});
+
+// ---- Feature #104: am_construction_permit_exhibit_requirements_guide ----
+
+test('#104 KAZM NDA: exhibit guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA', candidate_limit: 1 });
+  const cpe = out.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpe, 'am_construction_permit_exhibit_requirements_guide must be present');
+  assert.ok(Array.isArray(cpe.exhibits), 'exhibits must be an array');
+  assert.ok(typeof cpe.n_required_exhibits === 'number', 'n_required_exhibits must be numeric');
+  assert.ok(cpe.n_required_exhibits >= 4, 'NDA must require at least 4 base exhibits');
+  assert.ok(typeof cpe.quarter_wave_height_m === 'number', 'quarter_wave_height_m must be numeric');
+  assert.ok(typeof cpe.fcc_filing_fee_usd === 'number', 'fcc_filing_fee_usd must be numeric');
+});
+
+test('#104 DA station adds DA-specific exhibits (HRP table + phasor)', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const cpeDA  = outDA.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  const cpeNDA = outNDA.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpeDA.is_da,  'DA-N must have is_da = true');
+  assert.ok(!cpeNDA.is_da, 'NDA must have is_da = false');
+  assert.ok(cpeDA.n_required_exhibits > cpeNDA.n_required_exhibits, 'DA must require more exhibits than NDA');
+  const hrpExhibit = cpeDA.exhibits.find(e => /horizontal radiation pattern/i.test(e.name));
+  assert.ok(hrpExhibit?.required, 'DA must require Horizontal Radiation Pattern exhibit');
+});
+
+test('#104 high-power station (>5 kW) flags EA required', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, tpo_kw: 10, candidate_limit: 1 });
+  const cpe = out.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpe.environmental_assessment_required, 'TPO > 5 kW must require Environmental Assessment exhibit');
+  const eaExhibit = cpe.exhibits.find(e => /environmental assessment/i.test(e.name));
+  assert.ok(eaExhibit?.required, 'EA exhibit must be in exhibits list and marked required');
+});
+
+test('#104 Class A station requires NIF exhibit; Class C does not', async () => {
+  const outA = await runSiteOptimizer({ ...KAZM, fcc_class: 'A', candidate_limit: 1 });
+  const outC = await runSiteOptimizer({ ...KAZM, fcc_class: 'C', candidate_limit: 1 });
+  const cpeA = outA.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  const cpeC = outC.candidates[0].am_construction_permit_exhibit_requirements_guide;
+  assert.ok(cpeA.nif_required,  'Class A must require NIF exhibit');
+  assert.ok(!cpeC.nif_required, 'Class C must not require NIF exhibit');
+  const nifExhibitA = cpeA.exhibits.find(e => /nighttime nif/i.test(e.name));
+  assert.ok(nifExhibitA?.required, 'NIF exhibit must be required for Class A');
+});
+
+test('#104 candidate_comparison_table has cpe_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('cpe_n_required_exhibits' in row, 'cpe_n_required_exhibits missing');
+    assert.ok('cpe_asr_required'        in row, 'cpe_asr_required missing');
+    assert.ok('cpe_ea_required'         in row, 'cpe_ea_required missing');
+    assert.ok('cpe_nif_required'        in row, 'cpe_nif_required missing');
+    assert.ok('cpe_total_cost_low_usd'  in row, 'cpe_total_cost_low_usd missing');
+  }
+});

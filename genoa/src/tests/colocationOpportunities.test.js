@@ -4179,3 +4179,45 @@ test('am_colocation_opportunity_score_guide present across colocation candidates
     assert.ok(cos.optimal_tower_height_ft > 0, 'optimal_tower_height_ft must be positive');
   }
 });
+
+test('am_frequency_coordination_and_channel_study_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const fcs = c.am_frequency_coordination_and_channel_study_guide;
+    assert.ok(fcs !== undefined && fcs !== null, 'candidate missing am_frequency_coordination_and_channel_study_guide');
+    assert.ok(typeof fcs.channel_class === 'string', 'channel_class must be a string');
+    assert.ok(typeof fcs.co_channel_search_radius_km === 'number', 'co_channel_search_radius_km must be numeric');
+    assert.ok(fcs.n_form_301_required > 0, 'n_form_301_required must be positive');
+  }
+});
+
+test('am_environmental_and_rf_hazard_assessment_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const env = c.am_environmental_and_rf_hazard_assessment_guide;
+    assert.ok(env !== undefined && env !== null, 'candidate missing am_environmental_and_rf_hazard_assessment_guide');
+    assert.ok(typeof env.nepa_disposition === 'string', 'nepa_disposition must be a string');
+    assert.ok(Array.isArray(env.env_checklist), 'env_checklist must be an array');
+  }
+});
+
+test('am_proof_of_performance_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const pop = c.am_proof_of_performance_guide;
+    assert.ok(pop !== undefined && pop !== null, 'candidate missing am_proof_of_performance_guide');
+    assert.ok(typeof pop.proof_required === 'boolean', 'proof_required must be boolean');
+    assert.ok(typeof pop.proof_type === 'string', 'proof_type must be a string');
+  }
+});
+
+test('am_construction_permit_exhibit_requirements_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const cpe = c.am_construction_permit_exhibit_requirements_guide;
+    assert.ok(cpe !== undefined && cpe !== null, 'candidate missing am_construction_permit_exhibit_requirements_guide');
+    assert.ok(typeof cpe.n_required_exhibits === 'number', 'n_required_exhibits must be numeric');
+    assert.ok(Array.isArray(cpe.exhibits), 'exhibits must be an array');
+    assert.ok(cpe.n_required_exhibits >= 4, 'must have at least 4 required exhibits');
+  }
+});

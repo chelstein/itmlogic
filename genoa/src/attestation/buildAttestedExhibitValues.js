@@ -227,9 +227,18 @@ export function buildAttestedExhibitValues(exhibit, evidence, options = {}){
   }]));
   const payload_sha256 = hashValue({ fields: projection, statuses });
 
+  // Strip override.reason / override.reviewer from candidates before returning —
+  // those fields contain engineer PII and must not reach external API callers.
+  // The payload_sha256 projection above already excludes them; here we match that
+  // for the public fields surface, keeping all other resolution metadata intact.
+  const publicResolutions = Object.fromEntries(Object.entries(resolutions).map(([k, r]) => [k, {
+    ...r,
+    candidates: (r.candidates || []).map(({ override: _override, notes: _notes, ...rest }) => rest)
+  }]));
+
   return {
     schema:       'source-attestation/v2',
-    fields:       resolutions,
+    fields:       publicResolutions,
     statuses,
     warnings,
     blockers,
