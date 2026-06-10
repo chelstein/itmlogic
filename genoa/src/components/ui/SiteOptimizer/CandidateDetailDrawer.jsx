@@ -11513,6 +11513,61 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Wildfire Risk & Vegetation Management Guide */}
+        {candidate.am_wildfire_risk_and_vegetation_management_guide && (() => {
+          const g = candidate.am_wildfire_risk_and_vegetation_management_guide;
+          const costs = g.cost_estimates || {};
+          const riskColor =
+            g.wildfire_risk_level === 'VERY_HIGH' ? '#ef4444' :
+            g.wildfire_risk_level === 'HIGH'      ? '#f87171' :
+            g.wildfire_risk_level === 'ELEVATED'  ? '#f59e0b' :
+            g.wildfire_risk_level === 'MODERATE'  ? '#fbbf24' : '#22c55e';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 6, padding: '10px 12px', marginBottom: 10 }}>
+              <div style={{ color: '#38bdf8', fontWeight: 700, fontSize: 11, marginBottom: 6 }}>
+                Wildfire Risk &amp; Vegetation Management (§1.1307(a)(4) / §73.49)
+              </div>
+              <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginBottom: 6 }}>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>WILDFIRE RISK</span>
+                  <div style={{ color: riskColor, fontSize: 13, fontWeight: 700 }}>{g.wildfire_risk_level}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>NEPA EA</span>
+                  <div style={{ color: g.ea_required ? '#f87171' : '#22c55e', fontSize: 10, fontWeight: 700 }}>
+                    {g.ea_required ? 'REQUIRED' : 'NOT REQUIRED'}
+                  </div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>VEG CLEARANCE</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.veg_clearance_ft} ft</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>MITIGATIONS</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>{g.n_mitigation_measures}</div>
+                </div>
+                <div>
+                  <span style={{ color: '#94a3b8', fontSize: 9 }}>ANNUAL COST</span>
+                  <div style={{ color: '#e2e8f0', fontSize: 11 }}>${(costs.total_low_usd || 0).toLocaleString()}–${(costs.total_high_usd || 0).toLocaleString()}/yr</div>
+                </div>
+              </div>
+              {(g.mitigation_measures || []).length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <div style={{ color: '#64748b', fontSize: 9, marginBottom: 2 }}>Mitigation Measures</div>
+                  {g.mitigation_measures.map((m, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid #1e293b', padding: '2px 0' }}>
+                      <span style={{ color: '#cbd5e1', fontSize: 9 }}>{m.measure}</span>
+                      {m.annual_cost_usd > 0 && <span style={{ color: '#64748b', fontSize: 9 }}>${m.annual_cost_usd.toLocaleString()}/yr</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

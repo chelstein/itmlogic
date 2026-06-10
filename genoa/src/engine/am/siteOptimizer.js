@@ -1786,7 +1786,11 @@ export async function runSiteOptimizer(body = {}){
     aux_min_power_kw:                   c.am_auxiliary_transmitter_and_emergency_operations_guide?.aux_min_power_kw ?? null,
     aux_switchover_max_days:            c.am_auxiliary_transmitter_and_emergency_operations_guide?.switchover_max_days ?? null,
     aux_n_checklist_items:              c.am_auxiliary_transmitter_and_emergency_operations_guide?.n_checklist_items ?? null,
-    aux_total_low_usd:                  c.am_auxiliary_transmitter_and_emergency_operations_guide?.cost_estimates?.total_low_usd ?? null
+    aux_total_low_usd:                  c.am_auxiliary_transmitter_and_emergency_operations_guide?.cost_estimates?.total_low_usd ?? null,
+    wfr_wildfire_risk_level:            c.am_wildfire_risk_and_vegetation_management_guide?.wildfire_risk_level ?? null,
+    wfr_ea_required:                    c.am_wildfire_risk_and_vegetation_management_guide?.ea_required ?? null,
+    wfr_veg_clearance_ft:               c.am_wildfire_risk_and_vegetation_management_guide?.veg_clearance_ft ?? null,
+    wfr_total_low_usd:                  c.am_wildfire_risk_and_vegetation_management_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -32178,6 +32182,75 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.1680; §73.1250; §73.1350',
         note: `Auxiliary transmitter must produce ≥${AUX_MIN_POWER_PCT}% of licensed power (${aux_min_power_kw} kW min). Switchover within ${SWITCHOVER_MAX_DAYS} days of failure. ${n_checklist_items} checklist items.${aux_nda_allowed ? ' DA may operate NDA in emergency.' : ''} Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_wildfire_risk_and_vegetation_management_guide: (() => {
+      // §1.1307(a)(4): NEPA EA required if site is in or near a flammable vegetation area.
+      // §73.49: Fenced transmitter sites must prevent access to RF hazard areas.
+      // Wildfire risk at AM transmitter sites has risen sharply — radial ground systems
+      // are particularly vulnerable to ground fires destroying buried copper conductors.
+      const lat      = pt.lat ?? 38;
+      const lon      = pt.lon ?? -97;
+
+      // US wildfire risk proxy by geographic region
+      // Western US (lon > -103, lat 30–49): HIGH to VERY_HIGH
+      // Pacific Northwest / Rocky Mountain (lon > -117, lat > 42): ELEVATED
+      // Southeast / Gulf Coast (lat < 35, lon > -90): MODERATE (lightning-ignition)
+      // Midwest / Great Plains: LOW
+      // Western US = lon < -103 (more negative = further west); Eastern US = lon > -90
+      const isWesternUS  = lon < -103 && lat > 30 && lat < 49;
+      const isPacificNW  = lon < -117 && lon > -125 && lat > 42;
+      const isSoutheast  = lat < 35 && lon > -90;
+
+      const wildfire_risk_level =
+        (isWesternUS && lat > 35 && lat < 42) ? 'VERY_HIGH' :
+        isWesternUS                            ? 'HIGH'      :
+        isPacificNW                            ? 'ELEVATED'  :
+        isSoutheast                            ? 'MODERATE'  : 'LOW';
+
+      const ea_required = ['VERY_HIGH','HIGH'].includes(wildfire_risk_level);
+
+      // Vegetation management requirements
+      const veg_clearance_ft = wildfire_risk_level === 'VERY_HIGH' ? 100 :
+                               wildfire_risk_level === 'HIGH'      ? 75  :
+                               wildfire_risk_level === 'ELEVATED'  ? 50  :
+                               wildfire_risk_level === 'MODERATE'  ? 30  : 0;
+
+      const mitigation_measures = [];
+      if (veg_clearance_ft > 0) mitigation_measures.push({ measure: `Defensible space clearance (${veg_clearance_ft} ft radius)`, annual_cost_usd: round2(veg_clearance_ft * 20) });
+      if (['VERY_HIGH','HIGH','ELEVATED'].includes(wildfire_risk_level)) {
+        mitigation_measures.push({ measure: 'Annual radial ground system inspection for fire damage', annual_cost_usd: 600 });
+        mitigation_measures.push({ measure: 'Fire-resistant conduit for buried utility feeds', annual_cost_usd: 0 }); // one-time at install
+      }
+      if (ea_required) mitigation_measures.push({ measure: 'NEPA EA wildfire section (§1.1307(a)(4))', annual_cost_usd: 0 });
+
+      const n_mitigation_measures = mitigation_measures.length;
+
+      // Cost
+      const EA_COST_LOW    = ea_required ? 3000 : 0;
+      const EA_COST_HIGH   = ea_required ? 8000 : 0;
+      const VEG_COST_LOW   = round2(veg_clearance_ft * 15);
+      const VEG_COST_HIGH  = round2(veg_clearance_ft * 40);
+      const total_low_usd  = round2(EA_COST_LOW  + VEG_COST_LOW);
+      const total_high_usd = round2(EA_COST_HIGH + VEG_COST_HIGH);
+
+      return {
+        wildfire_risk_level,
+        ea_required,
+        veg_clearance_ft,
+        n_mitigation_measures,
+        mitigation_measures,
+        cost_estimates: {
+          ea_low_usd:   EA_COST_LOW,
+          ea_high_usd:  EA_COST_HIGH,
+          veg_mgmt_low_usd:  VEG_COST_LOW,
+          veg_mgmt_high_usd: VEG_COST_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §1.1307(a)(4); §73.49; 40 CFR §1508.9; CAL FIRE / state wildfire codes',
+        note: `Wildfire risk: ${wildfire_risk_level}. NEPA EA: ${ea_required ? 'REQUIRED' : 'NOT REQUIRED'}. Defensible space: ${veg_clearance_ft} ft. ${n_mitigation_measures} mitigation measures. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}/yr.`
       };
     })(),
 
