@@ -2356,6 +2356,36 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Licensed Contour Migration Guide */}
+        {candidate.am_licensed_contour_migration_guide && (() => {
+          const lcm = candidate.am_licensed_contour_migration_guide;
+          const advColor = lcm.soil_coverage_advantage === 'EXPANDED' ? '#4ade80'
+                         : lcm.soil_coverage_advantage === 'CONTRACTED' ? '#f87171' : '#facc15';
+          const deltaSign = lcm.contour_delta_pct >= 0 ? '+' : '';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#38bdf8' }}>🗺️</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Licensed Contour Migration (§73.24)</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: advColor, background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {lcm.soil_coverage_advantage} {deltaSign}{lcm.contour_delta_pct}%
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>5 mV/m day contour: <b style={{ color: '#e2e8f0' }}>{lcm.daytime_5mvm_contour_km} km</b></span>
+                <span>0.5 mV/m night: <b style={{ color: '#e2e8f0' }}>{lcm.nighttime_05mvm_contour_km} km</b></span>
+                <span>Ref contour (σ=5): <b style={{ color: '#64748b' }}>{lcm.reference_daytime_contour_km} km</b></span>
+                <span>Coverage area: <b style={{ color: '#e2e8f0' }}>{lcm.coverage_area_km2 != null ? `~${lcm.coverage_area_km2.toLocaleString()} km²` : '—'}</b></span>
+                <span>Soil used: <b style={{ color: '#e2e8f0' }}>{lcm.sigma_used_ms_m} mS/m</b></span>
+                {lcm.is_da && <span style={{ color: '#facc15', gridColumn: '1 / -1' }}>DA station: contour is circular estimate only</span>}
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                SCREENING GRADE · §73.24(j) · §73.184 FCC groundwave
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Construction Permit Exhibit Requirements Guide */}
         {candidate.am_construction_permit_exhibit_requirements_guide && (() => {
           const cpe = candidate.am_construction_permit_exhibit_requirements_guide;

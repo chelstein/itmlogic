@@ -17029,3 +17029,66 @@ test('#104 candidate_comparison_table has cpe_* columns', async () => {
     assert.ok('cpe_total_cost_low_usd'  in row, 'cpe_total_cost_low_usd missing');
   }
 });
+
+// ---- Feature #105: am_licensed_contour_migration_guide ----
+
+test('#105 KAZM: licensed contour migration guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const lcm = out.candidates[0].am_licensed_contour_migration_guide;
+  assert.ok(lcm, 'am_licensed_contour_migration_guide must be present');
+  assert.ok(typeof lcm.daytime_5mvm_contour_km === 'number', 'daytime_5mvm_contour_km must be numeric');
+  assert.ok(lcm.daytime_5mvm_contour_km > 0, 'daytime contour radius must be positive');
+  assert.ok(typeof lcm.nighttime_05mvm_contour_km === 'number', 'nighttime contour must be numeric');
+  assert.ok(lcm.nighttime_05mvm_contour_km >= lcm.daytime_5mvm_contour_km, 'nighttime 0.5 mV/m contour must be >= daytime 5 mV/m');
+  assert.ok(['EXPANDED','SIMILAR','CONTRACTED'].includes(lcm.soil_coverage_advantage), 'soil_coverage_advantage must be one of EXPANDED/SIMILAR/CONTRACTED');
+});
+
+test('#105 contour advantage label is consistent with delta_pct sign', async () => {
+  // sigma_msm is derived from M3 per-candidate lookup; test logical consistency
+  // rather than trying to override it through the input.
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 5 });
+  for (const c of out.candidates) {
+    const lcm = c.am_licensed_contour_migration_guide;
+    if (lcm.contour_delta_pct >= 5) {
+      assert.strictEqual(lcm.soil_coverage_advantage, 'EXPANDED',
+        `delta_pct=${lcm.contour_delta_pct} must yield EXPANDED`);
+    } else if (lcm.contour_delta_pct <= -5) {
+      assert.strictEqual(lcm.soil_coverage_advantage, 'CONTRACTED',
+        `delta_pct=${lcm.contour_delta_pct} must yield CONTRACTED`);
+    } else {
+      assert.strictEqual(lcm.soil_coverage_advantage, 'SIMILAR',
+        `delta_pct=${lcm.contour_delta_pct} must yield SIMILAR`);
+    }
+    // sigma_used must match which advantage tier we land in
+    if (lcm.sigma_used_ms_m > lcm.sigma_reference_ms_m + 1) {
+      assert.ok(lcm.daytime_5mvm_contour_km >= lcm.reference_daytime_contour_km,
+        'Higher sigma must not produce shorter contour than reference');
+    }
+  }
+});
+
+test('#105 low-conductivity soil contracts contour vs reference', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, sigma_msm: 0.5, candidate_limit: 1 });
+  const lcm = out.candidates[0].am_licensed_contour_migration_guide;
+  assert.ok(lcm.daytime_5mvm_contour_km < lcm.reference_daytime_contour_km,
+    `Low σ contour (${lcm.daytime_5mvm_contour_km} km) must be less than reference (${lcm.reference_daytime_contour_km} km)`);
+  assert.strictEqual(lcm.soil_coverage_advantage, 'CONTRACTED', 'Low-conductivity soil must be CONTRACTED');
+});
+
+test('#105 DA station sets contour_is_circular_estimate = false', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const lcm = out.candidates[0].am_licensed_contour_migration_guide;
+  assert.strictEqual(lcm.contour_is_circular_estimate, false, 'DA station contour is not circular');
+  assert.ok(typeof lcm.da_contour_directional_note === 'string', 'DA station must have directional note');
+});
+
+test('#105 candidate_comparison_table has lcm_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('lcm_daytime_contour_km'  in row, 'lcm_daytime_contour_km missing');
+    assert.ok('lcm_nighttime_contour_km' in row, 'lcm_nighttime_contour_km missing');
+    assert.ok('lcm_contour_delta_pct'   in row, 'lcm_contour_delta_pct missing');
+    assert.ok('lcm_coverage_area_km2'   in row, 'lcm_coverage_area_km2 missing');
+    assert.ok('lcm_soil_advantage'      in row, 'lcm_soil_advantage missing');
+  }
+});

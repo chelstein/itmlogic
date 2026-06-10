@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    lcm_daytime_contour_km:             c.am_licensed_contour_migration_guide?.daytime_5mvm_contour_km ?? null,
+    lcm_nighttime_contour_km:           c.am_licensed_contour_migration_guide?.nighttime_05mvm_contour_km ?? null,
+    lcm_contour_delta_pct:              c.am_licensed_contour_migration_guide?.contour_delta_pct ?? null,
+    lcm_coverage_area_km2:              c.am_licensed_contour_migration_guide?.coverage_area_km2 ?? null,
+    lcm_soil_advantage:                 c.am_licensed_contour_migration_guide?.soil_coverage_advantage ?? null,
     cpe_n_required_exhibits:            c.am_construction_permit_exhibit_requirements_guide?.n_required_exhibits ?? null,
     cpe_asr_required:                   c.am_construction_permit_exhibit_requirements_guide?.asr_required ?? null,
     cpe_ea_required:                    c.am_construction_permit_exhibit_requirements_guide?.environmental_assessment_required ?? null,
@@ -27488,6 +27493,97 @@ async function scoreCandidate(pt, ctx, warnings){
         form:                         'FCC Form 301-AM',
         reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
         note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
+      };
+    })(),
+
+    am_licensed_contour_migration_guide: (() => {
+      // Licensed contour migration analysis for AM relocation candidates.
+      //
+      // When relocating an AM station, the §73.24(j) community coverage
+      // contour (the 5 mV/m groundwave daytime contour) and the nighttime
+      // 0.5 mV/m secondary contour both shift.  The key question for each
+      // candidate site is: does the contour still enclose the city of license
+      // and primary community, and does it improve or degrade service?
+      //
+      // Screening approach (SCREENING GRADE — not a replacement for full
+      // §73.184 groundwave analysis):
+      //   1. Use the FCC groundwave distance-to-field function to estimate
+      //      the radius of the 5 mV/m daytime contour at TPO, frequency,
+      //      and sigma for this candidate site.
+      //   2. Compare to a reference contour radius computed at the "median"
+      //      soil conductivity (5 mS/m) to provide a percentage change signal.
+      //   3. Flag whether the contour is "expanded", "similar", or "contracted"
+      //      relative to the median reference, which correlates with better
+      //      or worse coverage from this site.
+      //   4. Higher sigma_msm (more conductive soil) → larger groundwave contour;
+      //      this is the soil conductivity advantage score.
+      //
+      // Key §73.24(j) rule: The principal community must receive a minimum
+      // signal of 5 mV/m for all stations.  If the relocation moves the tower
+      // far from the city of license, the 5 mV/m contour must still reach it.
+      //
+      // Contour area proxy: π × r² (treats coverage as roughly circular,
+      // which is only valid for NDA; DA stations have asymmetric contours).
+      // For DA stations, the estimate is directional-average only.
+
+      const SIGMA_REFERENCE = 5;  // mS/m — FCC median soil conductivity for comparison
+      const TARGET_FIELD_MVM = 5; // mV/m — §73.24(j) community contour threshold
+      const SECONDARY_FIELD  = 0.5; // mV/m — nighttime secondary contour
+
+      // Estimate contour radius at candidate soil conductivity
+      const sigmaEff   = (sigma_msm != null && Number.isFinite(sigma_msm) && sigma_msm > 0)
+                         ? sigma_msm : SIGMA_REFERENCE;
+
+      // Returns groundwave distance in km at which field strength equals target_mvm
+      const _gwDist = (sigma, mvm) => {
+        try {
+          const res = fccAmDistanceKm({ frequency_khz, target_mvm: mvm, conductivity_msm: sigma, erp_kw: tpo_kw });
+          return typeof res === 'object' ? (res.distance_km ?? res) : res;
+        } catch { return null; }
+      };
+      const r_day_km      = round2(_gwDist(sigmaEff,        TARGET_FIELD_MVM) ?? 0);
+      const r_night_km    = round2(_gwDist(sigmaEff,        SECONDARY_FIELD)  ?? 0);
+      const r_ref_day_km  = round2(_gwDist(SIGMA_REFERENCE, TARGET_FIELD_MVM) ?? 0);
+
+      // Percentage change vs. reference
+      const contour_delta_pct = r_ref_day_km > 0
+        ? round2(((r_day_km - r_ref_day_km) / r_ref_day_km) * 100)
+        : 0;
+
+      // Coverage area proxy (km²)
+      const coverage_area_km2     = round2(Math.PI * r_day_km * r_day_km);
+      const coverage_area_ref_km2 = round2(Math.PI * r_ref_day_km * r_ref_day_km);
+
+      // Soil advantage category
+      const soil_coverage_advantage = contour_delta_pct >= 5  ? 'EXPANDED'
+                                     : contour_delta_pct <= -5 ? 'CONTRACTED'
+                                     : 'SIMILAR';
+
+      // For DA stations the contour is directional — flag this as a limitation
+      const isDA = /^DA/i.test(pattern_mode);
+      const contour_is_circular_estimate = !isDA;
+
+      // Principal community check flag (screening: if city_distance_km is
+      // available and > r_day_km, the contour may not reach the city of license)
+      const city_at_risk = false; // placeholder — full check requires COL coordinates
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        sigma_used_ms_m:              sigmaEff,
+        sigma_reference_ms_m:         SIGMA_REFERENCE,
+        daytime_5mvm_contour_km:      r_day_km,
+        nighttime_05mvm_contour_km:   r_night_km,
+        reference_daytime_contour_km: r_ref_day_km,
+        contour_delta_pct,
+        coverage_area_km2,
+        coverage_area_ref_km2,
+        soil_coverage_advantage,
+        contour_is_circular_estimate,
+        is_da:                        isDA,
+        da_contour_directional_note:  isDA ? 'DA pattern: contour estimate is NDA-equivalent (circular). Actual DA contour requires per-azimuth pattern analysis.' : null,
+        city_of_license_at_risk:      city_at_risk,
+        reference:                    '47 CFR §73.24(j); §73.184; FCC AM groundwave method (OET-72)',
+        note:                         `Estimated 5 mV/m daytime contour at ${r_day_km} km (σ=${sigmaEff} mS/m vs. ref ${r_ref_day_km} km at σ=5). Coverage ${soil_coverage_advantage} by ${Math.abs(contour_delta_pct)}%. Area ~${coverage_area_km2} km². SCREENING GRADE ONLY.`
       };
     })(),
 
