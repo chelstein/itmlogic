@@ -4567,3 +4567,14 @@ test('am_auxiliary_transmitter_and_emergency_operations_guide present across col
     assert.ok(g.aux_min_power_kw >= 0, 'aux_min_power_kw must be non-negative');
   }
 });
+
+test('am_wildfire_risk_and_vegetation_management_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_wildfire_risk_and_vegetation_management_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_wildfire_risk_and_vegetation_management_guide');
+    assert.ok(['VERY_HIGH','HIGH','ELEVATED','MODERATE','LOW'].includes(g.wildfire_risk_level), 'wildfire_risk_level must be valid enum');
+    assert.ok(typeof g.ea_required === 'boolean', 'ea_required must be boolean');
+    assert.ok(g.veg_clearance_ft >= 0, 'veg_clearance_ft must be non-negative');
+  }
+});

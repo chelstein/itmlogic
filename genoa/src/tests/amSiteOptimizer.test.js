@@ -18573,3 +18573,54 @@ test('#136 candidate_comparison_table has aux_* columns', async () => {
     assert.ok('aux_total_low_usd'       in row, 'aux_total_low_usd missing');
   }
 });
+
+// ---- Feature #137: am_wildfire_risk_and_vegetation_management_guide ----
+test('#137 KAZM: wildfire guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_wildfire_risk_and_vegetation_management_guide;
+  assert.ok(g, 'am_wildfire_risk_and_vegetation_management_guide missing');
+  assert.ok(['VERY_HIGH','HIGH','ELEVATED','MODERATE','LOW'].includes(g.wildfire_risk_level), 'wildfire_risk_level must be valid enum');
+  assert.ok(typeof g.ea_required === 'boolean', 'ea_required must be boolean');
+  assert.ok(g.veg_clearance_ft >= 0, 'veg_clearance_ft must be non-negative');
+});
+
+test('#137 NEPA EA required only for HIGH and VERY_HIGH risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_wildfire_risk_and_vegetation_management_guide;
+  if (['HIGH','VERY_HIGH'].includes(g.wildfire_risk_level)) {
+    assert.strictEqual(g.ea_required, true, 'HIGH/VERY_HIGH risk requires EA');
+  } else {
+    assert.strictEqual(g.ea_required, false, 'LOW/MODERATE/ELEVATED risk does not require EA');
+  }
+});
+
+test('#137 LOW risk has zero vegetation clearance', async () => {
+  // KAZM is in Arizona (lon -111, lat 34) — Western US, should be HIGH or VERY_HIGH risk
+  // Run with a Midwest location proxy to get LOW
+  const midwestOut = await runSiteOptimizer({ ...KAZM, current_site: { lat: 41.5, lon: -93.5 }, candidate_limit: 1 });
+  const g = midwestOut.candidates[0].am_wildfire_risk_and_vegetation_management_guide;
+  if (g.wildfire_risk_level === 'LOW') {
+    assert.strictEqual(g.veg_clearance_ft, 0, 'LOW risk requires no vegetation clearance');
+  } else {
+    assert.ok(g.veg_clearance_ft >= 0, 'non-LOW risk veg_clearance must be ≥0');
+  }
+});
+
+test('#137 mitigation_measures is array with ≥1 item for elevated/high risk', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_wildfire_risk_and_vegetation_management_guide;
+  assert.ok(Array.isArray(g.mitigation_measures), 'mitigation_measures must be array');
+  if (['ELEVATED','HIGH','VERY_HIGH'].includes(g.wildfire_risk_level)) {
+    assert.ok(g.n_mitigation_measures >= 1, 'elevated risk must have ≥1 mitigation measure');
+  }
+});
+
+test('#137 candidate_comparison_table has wfr_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('wfr_wildfire_risk_level' in row, 'wfr_wildfire_risk_level missing');
+    assert.ok('wfr_ea_required'         in row, 'wfr_ea_required missing');
+    assert.ok('wfr_veg_clearance_ft'    in row, 'wfr_veg_clearance_ft missing');
+    assert.ok('wfr_total_low_usd'       in row, 'wfr_total_low_usd missing');
+  }
+});
