@@ -1782,7 +1782,11 @@ export async function runSiteOptimizer(body = {}){
     tlm_line_type:                      c.am_transmission_line_coax_maintenance_guide?.line_type ?? null,
     tlm_inspection_interval_months:     c.am_transmission_line_coax_maintenance_guide?.inspection_interval_months ?? null,
     tlm_n_failure_modes:                c.am_transmission_line_coax_maintenance_guide?.n_failure_modes ?? null,
-    tlm_annual_low_usd:                 c.am_transmission_line_coax_maintenance_guide?.cost_estimates?.annual_low_usd ?? null
+    tlm_annual_low_usd:                 c.am_transmission_line_coax_maintenance_guide?.cost_estimates?.annual_low_usd ?? null,
+    aux_min_power_kw:                   c.am_auxiliary_transmitter_and_emergency_operations_guide?.aux_min_power_kw ?? null,
+    aux_switchover_max_days:            c.am_auxiliary_transmitter_and_emergency_operations_guide?.switchover_max_days ?? null,
+    aux_n_checklist_items:              c.am_auxiliary_transmitter_and_emergency_operations_guide?.n_checklist_items ?? null,
+    aux_total_low_usd:                  c.am_auxiliary_transmitter_and_emergency_operations_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -32114,6 +32118,66 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.1580; §73.1590; ARRL Handbook — Transmission Line Maintenance',
         note: `Line type: ${line_type} (${line_length_ft} ft). Inspect every ${inspection_interval_months} months. VSWR test: ${vswr_test_interval}. ${failure_modes.length} monitored failure modes. Annual cost: $${annual_low_usd.toLocaleString()}–$${annual_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_auxiliary_transmitter_and_emergency_operations_guide: (() => {
+      // §73.1680: Auxiliary transmitters must be operable within 30 days of primary failure.
+      // §73.1250: EAS (Emergency Alert System) must remain operable during emergencies.
+      // On relocation, auxiliary equipment must be re-installed and tested at new site.
+      const tpo        = tpo_kw ?? 1;
+      const isDA       = /^DA/i.test(pattern_mode ?? '');
+      const fcc_cl     = fcc_class ?? 'D';
+      const dist_km    = pt.distance_from_current_km ?? 10;
+
+      // §73.1680(a): Auxiliary must produce ≥10% of licensed power
+      const AUX_MIN_POWER_PCT = 10;
+      const aux_min_power_kw  = round2(tpo * AUX_MIN_POWER_PCT / 100);
+
+      // §73.1680 also allows operation in non-directional mode during failure
+      const aux_nda_allowed = isDA;
+
+      // Emergency operations checklist
+      const emergency_checklist = [
+        'Auxiliary transmitter installed and tested at new site',
+        'EAS equipment wired and monitored per §73.1250',
+        'Emergency contact list updated with new site address and coordinates',
+        'Emergency generator fuel checked and load-tested',
+        'Remote control / unattended operation verified per §73.1350',
+      ];
+      if (isDA) emergency_checklist.push('Auxiliary NDA operation mode documented (§73.1680(a)(2))');
+      if (dist_km > 30) emergency_checklist.push('New site road access and emergency response route documented');
+
+      const n_checklist_items = emergency_checklist.length;
+
+      // Switchover time requirement
+      const SWITCHOVER_MAX_DAYS = 30;
+
+      // Cost
+      const AUX_EQUIP_LOW  = round2(tpo >= 10 ? 8000 : 3000);
+      const AUX_EQUIP_HIGH = round2(tpo >= 10 ? 20000 : 8000);
+      const INSTALL_LOW    = 1500;
+      const INSTALL_HIGH   = 4000;
+      const total_low_usd  = round2(AUX_EQUIP_LOW  + INSTALL_LOW);
+      const total_high_usd = round2(AUX_EQUIP_HIGH + INSTALL_HIGH);
+
+      return {
+        aux_min_power_kw,
+        aux_min_power_pct:     AUX_MIN_POWER_PCT,
+        aux_nda_allowed,
+        switchover_max_days:   SWITCHOVER_MAX_DAYS,
+        n_checklist_items,
+        emergency_checklist,
+        cost_estimates: {
+          equipment_low_usd:   AUX_EQUIP_LOW,
+          equipment_high_usd:  AUX_EQUIP_HIGH,
+          installation_low_usd: INSTALL_LOW,
+          installation_high_usd: INSTALL_HIGH,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.1680; §73.1250; §73.1350',
+        note: `Auxiliary transmitter must produce ≥${AUX_MIN_POWER_PCT}% of licensed power (${aux_min_power_kw} kW min). Switchover within ${SWITCHOVER_MAX_DAYS} days of failure. ${n_checklist_items} checklist items.${aux_nda_allowed ? ' DA may operate NDA in emergency.' : ''} Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 

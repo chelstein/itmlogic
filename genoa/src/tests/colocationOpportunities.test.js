@@ -4556,3 +4556,14 @@ test('am_transmission_line_coax_maintenance_guide present across colocation cand
     assert.ok(g.cost_estimates?.annual_low_usd > 0, 'annual maintenance cost must be positive');
   }
 });
+
+test('am_auxiliary_transmitter_and_emergency_operations_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_auxiliary_transmitter_and_emergency_operations_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_auxiliary_transmitter_and_emergency_operations_guide');
+    assert.strictEqual(g.switchover_max_days, 30, 'switchover must be within 30 days');
+    assert.ok(g.n_checklist_items >= 5, 'emergency checklist must have ≥5 items');
+    assert.ok(g.aux_min_power_kw >= 0, 'aux_min_power_kw must be non-negative');
+  }
+});
