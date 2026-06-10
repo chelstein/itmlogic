@@ -1585,7 +1585,12 @@ export async function runSiteOptimizer(body = {}){
     sw_night_op_type:                   c.am_skywave_nighttime_guide?.night_operation_type ?? null,
     sw_night_study_required:            c.am_skywave_nighttime_guide?.night_study_required ?? null,
     sw_dominant_station:                c.am_skywave_nighttime_guide?.dominant_station ?? null,
-    sw_psa_eligible:                    c.am_skywave_nighttime_guide?.psa_eligible ?? null
+    sw_psa_eligible:                    c.am_skywave_nighttime_guide?.psa_eligible ?? null,
+    bra_feasibility_score:              c.am_site_buildout_risk_assessment_guide?.buildout_feasibility_score ?? null,
+    bra_risk_tier:                      c.am_site_buildout_risk_assessment_guide?.buildout_risk_tier ?? null,
+    bra_primary_risk_factor:            c.am_site_buildout_risk_assessment_guide?.primary_risk_factor ?? null,
+    bra_months_low:                     c.am_site_buildout_risk_assessment_guide?.est_buildout_months_low ?? null,
+    bra_capex_low_usd:                  c.am_site_buildout_risk_assessment_guide?.est_capex_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -27353,6 +27358,170 @@ async function scoreCandidate(pt, ctx, warnings){
         n_calendar_actions: complianceCalendar.length,
         reference: '47 CFR §73.3539; §73.3526; §73.2080; §73.3580; §73.3615; FCC Form 303-S; FCC Form 323; FCC Form 2100',
         note: `AM Class ${fcc_class}. 8-year license term. Form 303-S renewal filing fee $345. OPIF: ${OPIF_REQUIREMENTS.filter(o => o.required).length} required items. EEO: 2 outreach initiatives/year if ≥5 FTE.`
+      };
+    })(),
+
+    am_site_buildout_risk_assessment_guide: (() => {
+      // Composite buildout risk assessment for this candidate site.
+      // Synthesizes five independent risk dimensions into a single tier and score
+      // for rapid comparison across candidates.  Each dimension is scored 0–4:
+      //   0 = Negligible  1 = Low  2 = Moderate  3 = High  4 = Critical
+      //
+      // References: §73.24 (site eligibility), §73.150 (DA), §73.315/§73.37
+      // (spacing), Part 17 / §17.7 (ASR), NEPA (40 CFR 1500), FCC NEPA rules
+      // (47 CFR §1.1307), local zoning baseline from population density proxy.
+
+      const isClearCh_bra = CLEAR_CHANNEL_KHZ.has(frequency_khz);
+      const isDA_bra      = /^DA/i.test(pattern_mode);
+      const isTreaty_bra  = !!(pt.in_treaty_zone);
+
+      // ---- (1) Regulatory / FCC risk ----
+      // Higher for DA stations (§73.150 proof), clear channels (NIF study),
+      // and treaty zones (Canada/Mexico coordination).
+      let regScore = 0;
+      if (isDA_bra)      regScore += 1;  // DA proof of performance adds complexity
+      if (isClearCh_bra) regScore += 1;  // NIF skywave study required
+      if (isTreaty_bra)  regScore += 2;  // IBOC notification + bilateral coordination delay
+      const regulatory_risk_score = Math.min(4, regScore);
+      const regulatory_risk_items = [
+        ...(isDA_bra      ? ['DA proof of performance (§73.154): ±3° phase, ±5% base current at each tower'] : []),
+        ...(isClearCh_bra ? ['Clear-channel NIF skywave study required (§73.182); 6–12 consultant-weeks']     : []),
+        ...(isTreaty_bra  ? ['Canadian/Mexican coordination required; typically adds 90–180 days to CP grant'] : []),
+        ...(!isDA_bra && !isClearCh_bra && !isTreaty_bra ? ['NDA non-clear: standard engineering report only; lowest regulatory overhead'] : [])
+      ];
+
+      // ---- (2) Environmental / NEPA risk ----
+      // Proxy: tower height triggers §1.1307 NEPA categorical exclusion review;
+      // towers >200 ft require FAA aeronautical study (§17.7).
+      // High population density or proximity to sensitive areas elevates risk.
+      // We use tpo_kw as a proxy for tower height need (higher power → taller tower).
+      const est_height_ft_bra = round2(Math.min(850, 150 + (tpo_kw / (FCC_CLASS_POWER_KW[fcc_class]?.max ?? 5)) * 450));
+      let envScore = 0;
+      if (est_height_ft_bra > 200) envScore += 1;  // FAA aeronautical study required (§17.7)
+      if (est_height_ft_bra > 450) envScore += 1;  // Red obstruction lighting required (§17.21)
+      // Wetlands / tribal / historic: no precise data at screening stage; proxy from lat/lon range
+      const lat_bra = pt.lat ?? 0;
+      if (lat_bra > 48.0 || lat_bra < 26.0) envScore += 0; // no additional modifier at range extremes
+      const env_nepa_ea_likely = est_height_ft_bra > 450 || isTreaty_bra;
+      if (env_nepa_ea_likely)  envScore += 1;
+      const environmental_risk_score = Math.min(4, envScore);
+      const environmental_risk_items = [
+        `Estimated tower height need: ~${est_height_ft_bra} ft (proxy from ${tpo_kw} kW TPO / Class ${fcc_class} max)`,
+        ...(est_height_ft_bra > 200 ? ['FAA aeronautical study required (§17.7 / Part 17): 60–120 days'] : []),
+        ...(est_height_ft_bra > 450 ? ['Red obstruction lighting required (§17.21); painting per §17.23'] : []),
+        ...(env_nepa_ea_likely      ? ['NEPA Environmental Assessment (EA) likely; categorical exclusion may not apply'] : ['NEPA categorical exclusion likely; no formal EA unless special circumstances'])
+      ];
+
+      // ---- (3) Site acquisition risk ----
+      // Proxied from distance from current site (farther = more uncertain market)
+      // and whether we have treaty-zone constraints (rural, limited parcels).
+      const dist_km_bra = pt.distance_from_current_km ?? 0;
+      let acqScore = 0;
+      if (dist_km_bra > 40)  acqScore += 1;  // moving far from current market; unfamiliar parcel pool
+      if (dist_km_bra > 80)  acqScore += 1;  // substantial relocation; condemnation or easement likely
+      if (isTreaty_bra)      acqScore += 1;  // border areas often rural with limited options
+      if (sigma_msm < 2)     acqScore += 1;  // poor conductivity zones often low-value rural (easier acq)
+      else if (sigma_msm > 8) acqScore -= 1; // high conductivity = coastal/alluvial = competitive land market
+      const acquisition_risk_score = Math.min(4, Math.max(0, acqScore));
+      const acquisition_risk_items = [
+        `Candidate site is ${round2(dist_km_bra)} km from current site`,
+        ...(dist_km_bra > 80 ? ['Long-distance relocation; parcel identification and title work substantially elevated'] : []),
+        ...(dist_km_bra > 40 && dist_km_bra <= 80 ? ['Moderate relocation distance; broker engagement recommended early'] : []),
+        `Soil conductivity ${sigma_msm} mS/m (${sigma_msm >= 8 ? 'high — competitive agricultural/coastal land market' : sigma_msm >= 4 ? 'moderate — typical mid-market rural parcel' : 'low — may indicate desert/rocky terrain; rural, lower land cost'})`
+      ];
+
+      // ---- (4) Construction risk ----
+      // Tower height, DA (multiple towers), ground radial system complexity.
+      let conScore = 0;
+      if (isDA_bra) conScore += 2;       // multi-tower array with phasor; high complexity
+      if (est_height_ft_bra > 350) conScore += 1;
+      if (est_height_ft_bra > 600) conScore += 1;
+      const construction_risk_score = Math.min(4, conScore);
+
+      // ---- (5) Zoning / land-use risk ----
+      // Proxy from population density (blanket_population_pct) and tower height.
+      // Higher blanket pop → more urban → stricter zoning.
+      const bp_bra = pt.blanket_population_pct ?? 0;
+      let zonScore = 0;
+      if (bp_bra > 0.05) zonScore += 1;  // 5 %+ blanket pop → some suburban/urban zoning
+      if (bp_bra > 0.15) zonScore += 1;  // 15%+ → likely urban-adjacent; conditional use permit
+      if (est_height_ft_bra > 400) zonScore += 1;  // very tall towers face local pushback
+      const zoning_risk_score = Math.min(4, zonScore);
+
+      // ---- Composite score (weighted average × 25 to give 0–100) ----
+      const WEIGHTS = { regulatory: 0.25, environmental: 0.20, acquisition: 0.20, construction: 0.20, zoning: 0.15 };
+      const weighted = (
+        regulatory_risk_score    * WEIGHTS.regulatory    +
+        environmental_risk_score * WEIGHTS.environmental +
+        acquisition_risk_score   * WEIGHTS.acquisition   +
+        construction_risk_score  * WEIGHTS.construction  +
+        zoning_risk_score        * WEIGHTS.zoning
+      );
+      // Map 0–4 weighted avg to 0–100 buildout feasibility (inverted: low risk = high feasibility)
+      const buildout_feasibility_score = round2(Math.max(0, 100 - weighted * 25));
+
+      const TIER_THRESHOLDS = [
+        { tier: 'LOW',      min_score: 75, label: 'LOW RISK',      color: '#2d6a2d', summary: 'Straightforward buildout; all major risk factors are manageable.' },
+        { tier: 'MODERATE', min_score: 50, label: 'MODERATE RISK', color: '#7a6500', summary: 'Buildout feasible but requires careful planning on 1–2 elevated risk dimensions.' },
+        { tier: 'HIGH',     min_score: 25, label: 'HIGH RISK',     color: '#8a2200', summary: 'Multiple elevated risk factors; significant time and cost contingency required.' },
+        { tier: 'CRITICAL', min_score: 0,  label: 'CRITICAL RISK', color: '#5a0a0a', summary: 'Major blockers present (treaty, DA, long-distance, tall tower, urban zoning); expert legal and engineering review before committing.' }
+      ];
+      const { tier: buildout_risk_tier, label: buildout_risk_label, color: risk_color, summary: risk_summary } =
+        TIER_THRESHOLDS.find(t => buildout_feasibility_score >= t.min_score) ?? TIER_THRESHOLDS[3];
+
+      // Primary risk dimension
+      const riskScores = [
+        { key: 'regulatory',    score: regulatory_risk_score },
+        { key: 'environmental', score: environmental_risk_score },
+        { key: 'acquisition',   score: acquisition_risk_score },
+        { key: 'construction',  score: construction_risk_score },
+        { key: 'zoning',        score: zoning_risk_score }
+      ];
+      const primary_risk_factor = riskScores.reduce((a, b) => a.score >= b.score ? a : b).key.toUpperCase();
+
+      // Estimated total buildout months
+      const buildout_months_low  = round2(
+        8 + (isDA_bra ? 4 : 0) + (isClearCh_bra ? 2 : 0) + (isTreaty_bra ? 6 : 0) +
+        (est_height_ft_bra > 450 ? 3 : 0)
+      );
+      const buildout_months_high = round2(buildout_months_low * 1.6);
+
+      // Estimated total capex (rough order of magnitude; all sub-guides have more detail)
+      const capex_low_usd  = Math.round((
+        (isDA_bra ? 400000 : 150000) +          // tower + phasor
+        est_height_ft_bra * 200 +               // tower material proxy
+        (est_height_ft_bra > 200 ? 25000 : 0) + // FAA study
+        (isTreaty_bra ? 50000 : 0) +            // coordination cost
+        120 * 360 * 1.5 +                       // 120 radials × 360 ft × $1.50/ft
+        50000                                    // transmitter building baseline
+      ) / 1000) * 1000;
+      const capex_high_usd = Math.round(capex_low_usd * 2.2 / 1000) * 1000;
+
+      const SCORE_LABEL = ['NEGLIGIBLE', 'LOW', 'MODERATE', 'HIGH', 'CRITICAL'];
+
+      return {
+        frequency_khz, fcc_class, tpo_kw, pattern_mode,
+        is_da: isDA_bra, is_clear_channel: isClearCh_bra, in_treaty_zone: isTreaty_bra,
+        buildout_feasibility_score,
+        buildout_risk_tier,
+        buildout_risk_label,
+        risk_color,
+        risk_summary,
+        primary_risk_factor,
+        risk_dimensions: {
+          regulatory:    { score: regulatory_risk_score,    label: SCORE_LABEL[regulatory_risk_score],    items: regulatory_risk_items },
+          environmental: { score: environmental_risk_score, label: SCORE_LABEL[environmental_risk_score], items: environmental_risk_items },
+          acquisition:   { score: acquisition_risk_score,   label: SCORE_LABEL[acquisition_risk_score],   items: acquisition_risk_items },
+          construction:  { score: construction_risk_score,  label: SCORE_LABEL[construction_risk_score],  items: ['Tower construction', ...(isDA_bra ? ['Multi-tower DA array + phasor; specialized contractor required'] : ['Single-tower NDA; standard AM tower contractor']), `Estimated height: ~${est_height_ft_bra} ft`] },
+          zoning:        { score: zoning_risk_score,        label: SCORE_LABEL[zoning_risk_score],        items: [`Blanket population pct: ${round2(bp_bra * 100)}%`, zoning_risk_score >= 2 ? 'Conditional use permit or variance likely required' : 'Agricultural/rural zoning likely; standard tower conditional use permit'] }
+        },
+        est_buildout_months_low:  buildout_months_low,
+        est_buildout_months_high: buildout_months_high,
+        est_capex_low_usd:        capex_low_usd,
+        est_capex_high_usd:       capex_high_usd,
+        est_tower_height_ft:      est_height_ft_bra,
+        reference: '47 CFR §17.7 (ASR); §73.24; §73.150; §73.154; §73.37; 40 CFR 1500 (NEPA); 47 CFR §1.1307',
+        note: `Buildout feasibility: ${buildout_feasibility_score}/100 (${buildout_risk_tier} RISK). Primary risk: ${primary_risk_factor}. Est. timeline: ${buildout_months_low}–${buildout_months_high} months. Est. capex: $${(capex_low_usd/1000).toFixed(0)}K–$${(capex_high_usd/1000).toFixed(0)}K.`
       };
     })(),
 
