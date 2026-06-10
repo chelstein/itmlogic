@@ -17199,3 +17199,56 @@ test('#107 candidate_comparison_table has grs_* columns', async () => {
     assert.ok('grs_std_efficiency_pct'  in row, 'grs_std_efficiency_pct missing');
   }
 });
+
+// ---- Feature #108: am_transmitter_building_specification_guide ----
+
+test('#108 KAZM: transmitter building guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const tbs = out.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(tbs, 'am_transmitter_building_specification_guide must be present');
+  assert.ok(typeof tbs.floor_area_m2 === 'number' && tbs.floor_area_m2 > 0, 'floor_area_m2 must be positive');
+  assert.ok(typeof tbs.hvac_tons === 'number' && tbs.hvac_tons > 0, 'hvac_tons must be positive');
+  assert.ok(tbs.generator?.recommended_std_kw > 0, 'generator.recommended_std_kw must be positive');
+  assert.ok(tbs.building_cost_usd?.low < tbs.building_cost_usd?.high, 'building cost range must be valid');
+});
+
+test('#108 DA station requires larger floor area than NDA at same power', async () => {
+  const outDA  = await runSiteOptimizer({ ...KAZM, pattern_mode: 'DA-N', candidate_limit: 1 });
+  const outNDA = await runSiteOptimizer({ ...KAZM, pattern_mode: 'NDA',  candidate_limit: 1 });
+  const tbsDA  = outDA.candidates[0].am_transmitter_building_specification_guide;
+  const tbsNDA = outNDA.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(tbsDA.floor_area_m2 > tbsNDA.floor_area_m2,
+    `DA floor area (${tbsDA.floor_area_m2}m²) must exceed NDA (${tbsNDA.floor_area_m2}m²)`);
+  assert.ok(tbsDA.is_da,  'DA station must have is_da = true');
+  assert.ok(!tbsNDA.is_da, 'NDA station must have is_da = false');
+});
+
+test('#108 higher TPO station needs larger generator', async () => {
+  const outLow  = await runSiteOptimizer({ ...KAZM, tpo_kw: 1,   candidate_limit: 1 });
+  const outHigh = await runSiteOptimizer({ ...KAZM, tpo_kw: 50,  candidate_limit: 1 });
+  const tbsLow  = outLow.candidates[0].am_transmitter_building_specification_guide;
+  const tbsHigh = outHigh.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(tbsHigh.generator.recommended_std_kw > tbsLow.generator.recommended_std_kw,
+    'Higher TPO must require larger generator');
+  assert.ok(tbsHigh.heat_dissipation_w > tbsLow.heat_dissipation_w,
+    'Higher TPO must produce more heat');
+});
+
+test('#108 generator recommended_std_kw is one of standard sizes', async () => {
+  const STD_SIZES = [15, 20, 25, 30, 45, 60, 80, 100, 125, 150, 200, 250];
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const tbs = out.candidates[0].am_transmitter_building_specification_guide;
+  assert.ok(STD_SIZES.includes(tbs.generator.recommended_std_kw),
+    `Generator ${tbs.generator.recommended_std_kw} kW must be a standard size`);
+});
+
+test('#108 candidate_comparison_table has tbs_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('tbs_floor_area_m2'     in row, 'tbs_floor_area_m2 missing');
+    assert.ok('tbs_hvac_tons'         in row, 'tbs_hvac_tons missing');
+    assert.ok('tbs_gen_std_kw'        in row, 'tbs_gen_std_kw missing');
+    assert.ok('tbs_bldg_cost_low_usd' in row, 'tbs_bldg_cost_low_usd missing');
+    assert.ok('tbs_heat_w'            in row, 'tbs_heat_w missing');
+  }
+});

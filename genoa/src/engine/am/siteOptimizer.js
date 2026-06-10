@@ -1611,6 +1611,11 @@ export async function runSiteOptimizer(body = {}){
     cos_tower_height_ft:                c.am_colocation_opportunity_score_guide?.optimal_tower_height_ft ?? null,
     cos_savings_low_usd:                c.am_colocation_opportunity_score_guide?.cost_comparison?.potential_savings_low_usd ?? null,
     cos_tower_density:                  c.am_colocation_opportunity_score_guide?.existing_tower_density ?? null,
+    tbs_floor_area_m2:                  c.am_transmitter_building_specification_guide?.floor_area_m2 ?? null,
+    tbs_hvac_tons:                      c.am_transmitter_building_specification_guide?.hvac_tons ?? null,
+    tbs_gen_std_kw:                     c.am_transmitter_building_specification_guide?.generator?.recommended_std_kw ?? null,
+    tbs_bldg_cost_low_usd:              c.am_transmitter_building_specification_guide?.building_cost_usd?.low ?? null,
+    tbs_heat_w:                         c.am_transmitter_building_specification_guide?.heat_dissipation_w ?? null,
     grs_radial_length_m:                c.am_ground_radial_system_cost_and_specification_guide?.radial_length_m ?? null,
     grs_std_n_radials:                  c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.n_radials ?? null,
     grs_std_wire_m:                     c.am_ground_radial_system_cost_and_specification_guide?.recommended_config?.total_wire_m ?? null,
@@ -27503,6 +27508,87 @@ async function scoreCandidate(pt, ctx, warnings){
         form:                         'FCC Form 301-AM',
         reference:                    '47 CFR §73.182; §73.316; §73.24(j); §1.1307; §17.7; OET-65; 47 CFR §1.1104',
         note:                         `Class ${fcc_class} ${isDA ? 'DA' : 'NDA'} at ${tpo_kw} kW / ${frequency_khz} kHz. ${n_required_exhibits} required exhibits for Form 301-AM. Quarter-wave tower: ${quarter_wave_height_m}m (${asr_required ? 'ASR required' : 'ASR likely not required'}). Total est. cost: $${(prep_cost_low + fcc_filing_fee_usd).toLocaleString()}–$${(prep_cost_high + fcc_filing_fee_usd).toLocaleString()} including FCC fee.`
+      };
+    })(),
+
+    am_transmitter_building_specification_guide: (() => {
+      // AM transmitter building (equipment shelter) specification guide.
+      //
+      // The transmitter building houses transmitter(s), antenna tuning unit (ATU),
+      // phasor (DA stations), backup power, and control/monitoring equipment.
+      // Building requirements are driven by transmitter power, DA vs. NDA, and
+      // local climate.
+      //
+      // Floor area guidelines (industry practice, not FCC-mandated):
+      //   NDA low-power  (<1 kW): 10–15 m² (prefab shed or modular shelter)
+      //   NDA medium     (1–5 kW): 20–30 m²
+      //   NDA high-power (>5 kW): 30–50 m²
+      //   DA (any power):  add 15–25 m² for phasor cabinet and ATU
+      //
+      // HVAC sizing:
+      //   Transmitter heat dissipation ≈ TPO × (1 - efficiency) / efficiency
+      //   Typical transmitter efficiency: 70–80% (solid-state), 60–70% (tube)
+      //   HVAC BTU/hr = heat_watts × 3.412
+      //
+      // Generator sizing:
+      //   Minimum = (TPO / transmitter_efficiency) × 1.25 safety factor
+      //   Add 5–10 kW for building HVAC + control loads
+      //
+      // Building cost estimates (2024, US, turn-key):
+      //   Prefab metal shelter: $350–$550/m²
+      //   Masonry/CMU: $900–$1,400/m²
+      //   Site work + utilities: add $15,000–$40,000 flat
+
+      const isDA = /^DA/i.test(pattern_mode);
+
+      // Floor area
+      const base_area_m2  = tpo_kw < 1   ? 12
+                           : tpo_kw <= 5  ? 25
+                           : tpo_kw <= 25 ? 40
+                           : 60;
+      const da_area_add_m2 = isDA ? 20 : 0;
+      const floor_area_m2  = base_area_m2 + da_area_add_m2;
+
+      // Heat dissipation (solid-state transmitter, ~75% efficiency)
+      const TX_EFFICIENCY  = 0.75;
+      const heat_watts     = Math.round(tpo_kw * 1000 * (1 - TX_EFFICIENCY) / TX_EFFICIENCY);
+      const hvac_btu_hr    = Math.round(heat_watts * 3.412);
+      // Add 20% for building envelope + lighting + control
+      const total_hvac_btu = Math.round(hvac_btu_hr * 1.2);
+      const hvac_tons      = round2(total_hvac_btu / 12000);
+
+      // Generator size
+      const gen_tx_load_kw   = round2(tpo_kw / TX_EFFICIENCY);
+      const gen_aux_load_kw  = round2(hvac_tons * 1.2 + 3); // HVAC + control
+      const gen_min_kw       = round2((gen_tx_load_kw + gen_aux_load_kw) * 1.25);
+      // Round up to next standard generator size
+      const STD_GEN_SIZES_KW = [15, 20, 25, 30, 45, 60, 80, 100, 125, 150, 200, 250];
+      const gen_std_kw       = STD_GEN_SIZES_KW.find(s => s >= gen_min_kw) ?? 250;
+
+      // Building cost estimate (prefab metal)
+      const PREFAB_LOW  = 350;  // $/m²
+      const PREFAB_HIGH = 550;  // $/m²
+      const SITE_LOW    = 15000;
+      const SITE_HIGH   = 35000;
+      const bldg_cost_low  = Math.round(floor_area_m2 * PREFAB_LOW  + SITE_LOW);
+      const bldg_cost_high = Math.round(floor_area_m2 * PREFAB_HIGH + SITE_HIGH);
+
+      return {
+        fcc_class, frequency_khz, tpo_kw,
+        is_da:              isDA,
+        floor_area_m2,
+        heat_dissipation_w: heat_watts,
+        hvac_required_btu:  total_hvac_btu,
+        hvac_tons,
+        generator: {
+          tx_load_kw:  gen_tx_load_kw,
+          aux_load_kw: gen_aux_load_kw,
+          min_required_kw: gen_min_kw,
+          recommended_std_kw: gen_std_kw
+        },
+        building_cost_usd:  { low: bldg_cost_low, high: bldg_cost_high },
+        reference:          'Industry standard AM transmitter building practice; NFPA 70; FCC §73.1030',
+        note:               `${floor_area_m2}m² floor (${isDA ? 'DA incl. phasor room' : 'NDA'}). Heat: ${heat_watts}W → ${hvac_tons} AC tons. Generator: ${gen_std_kw} kW. Building: $${bldg_cost_low.toLocaleString()}–$${bldg_cost_high.toLocaleString()} (prefab + site).`
       };
     })(),
 

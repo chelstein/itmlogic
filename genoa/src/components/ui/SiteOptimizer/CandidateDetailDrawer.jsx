@@ -2356,6 +2356,34 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* AM Transmitter Building Specification Guide */}
+        {candidate.am_transmitter_building_specification_guide && (() => {
+          const tbs = candidate.am_transmitter_building_specification_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          return (
+            <div style={{ background: '#0f172a', border: '1px solid #1e3a5f', borderRadius: 8, padding: '12px 16px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontSize: 15, color: '#f59e0b' }}>🏗️</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#e2e8f0' }}>Transmitter Building Specification</span>
+                <div style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: '#e2e8f0', background: '#1e293b', padding: '2px 8px', borderRadius: 4 }}>
+                  {tbs.floor_area_m2}m² {tbs.is_da ? '(DA)' : '(NDA)'}
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 16px', fontSize: 11, color: '#94a3b8', marginBottom: 8 }}>
+                <span>Floor area: <b style={{ color: '#e2e8f0' }}>{tbs.floor_area_m2}m²</b></span>
+                <span>HVAC: <b style={{ color: '#e2e8f0' }}>{tbs.hvac_tons} tons ({tbs.hvac_required_btu?.toLocaleString()} BTU/hr)</b></span>
+                <span>Heat dissipation: <b style={{ color: '#e2e8f0' }}>{tbs.heat_dissipation_w?.toLocaleString()} W</b></span>
+                <span>Generator: <b style={{ color: '#facc15' }}>{tbs.generator?.recommended_std_kw} kW</b></span>
+                <span>Building cost: <b style={{ color: '#e2e8f0' }}>{fmtUsd(tbs.building_cost_usd?.low)}–{fmtUsd(tbs.building_cost_usd?.high)}</b></span>
+                <span>Gen. min req: <b style={{ color: '#64748b' }}>{tbs.generator?.min_required_kw} kW</b></span>
+              </div>
+              <div style={{ fontSize: 10, color: '#64748b', borderTop: '1px solid #1e293b', paddingTop: 6 }}>
+                {tbs.note}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* AM Ground Radial System Cost & Specification Guide */}
         {candidate.am_ground_radial_system_cost_and_specification_guide && (() => {
           const grs = candidate.am_ground_radial_system_cost_and_specification_guide;
