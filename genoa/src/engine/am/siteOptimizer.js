@@ -1755,7 +1755,12 @@ export async function runSiteOptimizer(body = {}){
     emc_n_interference_sources:         c.am_transmitter_site_emc_assessment_guide?.n_interference_sources ?? null,
     emc_conducted_test_required:        c.am_transmitter_site_emc_assessment_guide?.conducted_emission_test_required ?? null,
     emc_n_im3_risk_channels:            c.am_transmitter_site_emc_assessment_guide?.n_im3_risk_channels ?? null,
-    emc_total_low_usd:                  c.am_transmitter_site_emc_assessment_guide?.cost_estimates?.total_low_usd ?? null
+    emc_total_low_usd:                  c.am_transmitter_site_emc_assessment_guide?.cost_estimates?.total_low_usd ?? null,
+    nfl_noise_environment:              c.am_noise_floor_and_interference_environment_survey_guide?.noise_environment ?? null,
+    nfl_ambient_floor_dbuv:             c.am_noise_floor_and_interference_environment_survey_guide?.ambient_noise_floor_dbuv ?? null,
+    nfl_snr_at_contour_db:              c.am_noise_floor_and_interference_environment_survey_guide?.snr_at_05mvm_contour_db ?? null,
+    nfl_adequate_snr:                   c.am_noise_floor_and_interference_environment_survey_guide?.adequate_snr ?? null,
+    nfl_total_low_usd:                  c.am_noise_floor_and_interference_environment_survey_guide?.cost_estimates?.total_low_usd ?? null
   }));
 
   // ---- 16a. Frequency allocation context ----
@@ -31715,6 +31720,74 @@ async function scoreCandidate(pt, ctx, warnings){
         },
         reference: '47 CFR §73.182(n); §73.186; OET Bulletin 65; FCC Part 15 §15.1',
         note: `EMC risk: ${emc_risk_level} at ${tpo} kW${isDA ? ' DA' : ''}. ${n_interference_sources} interference sources to evaluate. ${conducted_emission_test_required ? 'Conducted emissions test required. ' : ''}Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
+      };
+    })(),
+
+    am_noise_floor_and_interference_environment_survey_guide: (() => {
+      // Pre-construction ambient noise floor survey determines if co-channel and
+      // adjacent-channel interference will degrade coverage at the candidate site.
+      // Relevant: §73.182(a), OET Bulletin 65, and ITU-R P.372 (radio noise).
+      const freq_khz   = frequency_khz ?? 1000;
+      const lat        = pt.lat ?? 38;
+      const lon        = pt.lon ?? -97;
+      const dist_km    = pt.distance_from_current_km ?? 10;
+
+      // Urban/suburban noise environment proxy by latitude band and distance
+      // (shorter distance from current site → likely same noise environment)
+      const isUrbanLat    = (lat > 30 && lat < 45) && (lon > -100 && lon < -70);
+      const isNearHighway = dist_km < 15;
+
+      // ITU-R P.372 noise categories relevant to AM band (535–1705 kHz)
+      const noise_environment =
+        isUrbanLat && isNearHighway ? 'URBAN_INDUSTRIAL' :
+        isUrbanLat                  ? 'SUBURBAN'         :
+        isNearHighway               ? 'RURAL_HIGHWAY'    : 'RURAL_QUIET';
+
+      // Ambient noise floor estimates per ITU-R P.372 (dBμV/m at 1 kHz above carrier)
+      const NOISE_FLOOR_DB = {
+        URBAN_INDUSTRIAL: 40,
+        SUBURBAN:         28,
+        RURAL_HIGHWAY:    22,
+        RURAL_QUIET:      14,
+      };
+      const ambient_noise_floor_dbuv = NOISE_FLOOR_DB[noise_environment];
+
+      // Signal-to-noise margin at 0.5 mV/m contour (54 dBμV/m)
+      const SNR_AT_CONTOUR_DB = round2(54 - ambient_noise_floor_dbuv);
+      const adequate_snr = SNR_AT_CONTOUR_DB >= 6;   // 6 dB is minimum acceptable
+
+      // Noise sources to survey
+      const noise_sources = [
+        'Power line corona and spark discharge (60 Hz harmonics)',
+        'Highway vehicle ignition noise (broadband impulse)',
+        'Industrial machinery and motor drives (conducted + radiated)',
+        'Switching power supplies and LED driver harmonics (Part 15)',
+      ];
+      if (!adequate_snr) noise_sources.push('Potential coverage degradation due to high ambient noise — mitigation required');
+
+      // Survey cost
+      const SURVEY_COST_LOW  = 1800;
+      const SURVEY_COST_HIGH = 4500;
+      const MITIGATION_COST  = adequate_snr ? 0 : 5000;
+      const total_low_usd    = round2(SURVEY_COST_LOW);
+      const total_high_usd   = round2(SURVEY_COST_HIGH + MITIGATION_COST);
+
+      return {
+        noise_environment,
+        ambient_noise_floor_dbuv,
+        snr_at_05mvm_contour_db: SNR_AT_CONTOUR_DB,
+        adequate_snr,
+        n_noise_sources:         noise_sources.length,
+        noise_sources,
+        cost_estimates: {
+          survey_low_usd:        SURVEY_COST_LOW,
+          survey_high_usd:       SURVEY_COST_HIGH,
+          mitigation_cost_usd:   MITIGATION_COST,
+          total_low_usd,
+          total_high_usd,
+        },
+        reference: '47 CFR §73.182(a); ITU-R P.372; OET Bulletin 65; FCC Part 15',
+        note: `Noise environment: ${noise_environment}. Ambient floor: ${ambient_noise_floor_dbuv} dBμV/m. SNR at 0.5 mV/m contour: ${SNR_AT_CONTOUR_DB} dB — ${adequate_snr ? 'ADEQUATE' : 'MARGINAL — mitigation may be required'}. Est. $${total_low_usd.toLocaleString()}–$${total_high_usd.toLocaleString()}.`
       };
     })(),
 

@@ -18270,3 +18270,46 @@ test('#129 candidate_comparison_table has emc_* columns', async () => {
     assert.ok('emc_total_low_usd'           in row, 'emc_total_low_usd missing');
   }
 });
+
+// ---- Feature #130: am_noise_floor_and_interference_environment_survey_guide ----
+test('#130 KAZM: noise floor survey guide present with correct shape', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_interference_environment_survey_guide;
+  assert.ok(g, 'am_noise_floor_and_interference_environment_survey_guide missing');
+  assert.ok(['URBAN_INDUSTRIAL','SUBURBAN','RURAL_HIGHWAY','RURAL_QUIET'].includes(g.noise_environment), 'noise_environment must be valid enum');
+  assert.ok(typeof g.ambient_noise_floor_dbuv === 'number', 'ambient_noise_floor_dbuv must be number');
+  assert.ok(typeof g.snr_at_05mvm_contour_db === 'number', 'snr_at_05mvm_contour_db must be number');
+});
+
+test('#130 SNR at 0.5 mV/m contour is correct (54 dBμV/m reference)', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_interference_environment_survey_guide;
+  const expectedSNR = Math.round((54 - g.ambient_noise_floor_dbuv) * 100) / 100;
+  assert.ok(Math.abs(g.snr_at_05mvm_contour_db - expectedSNR) < 0.1, `SNR should be 54 - ${g.ambient_noise_floor_dbuv} = ${expectedSNR}, got ${g.snr_at_05mvm_contour_db}`);
+});
+
+test('#130 adequate_snr is true when SNR ≥ 6 dB', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_interference_environment_survey_guide;
+  const expectedAdequate = g.snr_at_05mvm_contour_db >= 6;
+  assert.strictEqual(g.adequate_snr, expectedAdequate, 'adequate_snr must match SNR ≥ 6 dB criterion');
+});
+
+test('#130 noise sources list has ≥4 entries', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
+  const g = out.candidates[0].am_noise_floor_and_interference_environment_survey_guide;
+  assert.ok(Array.isArray(g.noise_sources), 'noise_sources must be array');
+  assert.ok(g.n_noise_sources >= 4, 'must identify ≥4 noise sources');
+  assert.ok(g.cost_estimates.total_low_usd > 0, 'survey cost must be positive');
+});
+
+test('#130 candidate_comparison_table has nfl_* columns', async () => {
+  const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 3 });
+  for (const row of out.candidate_comparison_table) {
+    assert.ok('nfl_noise_environment'  in row, 'nfl_noise_environment missing');
+    assert.ok('nfl_ambient_floor_dbuv' in row, 'nfl_ambient_floor_dbuv missing');
+    assert.ok('nfl_snr_at_contour_db'  in row, 'nfl_snr_at_contour_db missing');
+    assert.ok('nfl_adequate_snr'       in row, 'nfl_adequate_snr missing');
+    assert.ok('nfl_total_low_usd'      in row, 'nfl_total_low_usd missing');
+  }
+});

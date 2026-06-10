@@ -4491,3 +4491,14 @@ test('am_transmitter_site_emc_assessment_guide present across colocation candida
     assert.ok(g.cost_estimates?.total_low_usd > 0, 'EMC assessment cost must be positive');
   }
 });
+
+test('am_noise_floor_and_interference_environment_survey_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_noise_floor_and_interference_environment_survey_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_noise_floor_and_interference_environment_survey_guide');
+    assert.ok(['URBAN_INDUSTRIAL','SUBURBAN','RURAL_HIGHWAY','RURAL_QUIET'].includes(g.noise_environment), 'noise_environment must be valid enum');
+    assert.ok(typeof g.snr_at_05mvm_contour_db === 'number', 'SNR must be a number');
+    assert.ok(g.cost_estimates?.total_low_usd > 0, 'survey cost must be positive');
+  }
+});
