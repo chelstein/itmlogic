@@ -10057,6 +10057,87 @@ export default function CandidateDetailDrawer({ candidate, baseline, onClose, on
           );
         })()}
 
+        {/* Transmitter Power Monitoring & Operating Log Guide */}
+        {candidate.am_transmitter_power_monitoring_and_operating_log_guide && (() => {
+          const g = candidate.am_transmitter_power_monitoring_and_operating_log_guide;
+          const fmtUsd = (n) => n != null ? `$${Number(n).toLocaleString()}` : '—';
+          const apcColor = g.automatic_power_control_required ? '#f97316' : '#4ade80';
+          const monColor = g.antenna_monitor_required ? '#f97316' : '#4ade80';
+          return (
+            <div>
+              <h4 style={{ color: '#38bdf8', marginBottom: 6, fontSize: 13, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Power Monitoring &amp; Operating Log (§73.1560 / §73.1800)
+              </h4>
+              <div style={{ background: '#020c18', borderRadius: 6, padding: '10px 12px', marginBottom: 8, fontSize: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 12px' }}>
+                  <span style={{ color: '#94a3b8' }}>Pattern Mode</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{g.pattern_mode}</span>
+                  <span style={{ color: '#94a3b8' }}>Power Tolerance</span>
+                  <span style={{ color: '#fbbf24', fontWeight: 700 }}>±{g.power_tolerance_pct}% AIP (§73.1560)</span>
+                  <span style={{ color: '#94a3b8' }}>Base Current Meters</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 700 }}>{g.n_base_current_meters} (1 per element)</span>
+                  <span style={{ color: '#94a3b8' }}>Cal. Interval</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.calibration_interval_months} months (§73.1215)</span>
+                  <span style={{ color: '#94a3b8' }}>Antenna Monitor</span>
+                  <span style={{ color: monColor, fontWeight: 700 }}>{g.antenna_monitor_required ? `Required (${g.antenna_monitor_cfr})` : 'Not required (NDA)'}</span>
+                  <span style={{ color: '#94a3b8' }}>Auto Power Control</span>
+                  <span style={{ color: apcColor, fontWeight: 700 }}>{g.automatic_power_control_required ? 'Required (day/night switch)' : 'Not required'}</span>
+                  <span style={{ color: '#94a3b8' }}>Log Retention</span>
+                  <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{g.log_retention_years} years (§73.1840)</span>
+                </div>
+              </div>
+              {/* Recommended Wattmeter */}
+              {g.recommended_wattmeter && (
+                <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
+                  <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>RECOMMENDED WATTMETER</div>
+                  <div style={{ color: '#e2e8f0', fontWeight: 700 }}>{g.recommended_wattmeter.type}</div>
+                  <div style={{ color: '#64748b', marginTop: 2 }}>
+                    Max: {g.recommended_wattmeter.suitable_kw_max} kW &nbsp;|&nbsp;
+                    Est. cost: {fmtUsd(g.recommended_wattmeter.cost_usd)}
+                  </div>
+                </div>
+              )}
+              {/* Log Entry Triggers */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ color: '#94a3b8', fontSize: 11, fontWeight: 600, letterSpacing: 0.5, marginBottom: 4 }}>LOG ENTRY TRIGGERS (§73.1820)</div>
+                {(g.log_entry_triggers ?? []).map((t, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, fontSize: 10, padding: '2px 0', borderBottom: '1px solid #0a1624', color: '#ccc' }}>
+                    <span style={{ color: '#38bdf8', minWidth: 40, fontFamily: 'monospace', fontSize: 9 }}>{t.cfr.split('§')[1] ?? t.cfr}</span>
+                    {t.trigger}
+                  </div>
+                ))}
+              </div>
+              {/* Station ID */}
+              {g.station_id_requirements && (
+                <div style={{ background: '#020c18', borderRadius: 6, padding: '8px 12px', marginBottom: 8, fontSize: 11 }}>
+                  <div style={{ color: '#94a3b8', fontWeight: 600, marginBottom: 4 }}>STATION ID — §73.1201</div>
+                  <div style={{ color: '#e2e8f0' }}>Required every <strong style={{ color: '#fbbf24' }}>{g.station_id_requirements.frequency_minutes} minutes</strong> (top of hour)</div>
+                  <div style={{ color: '#64748b', marginTop: 2, fontSize: 10 }}>Must include call letters + city of license. Sign-on and sign-off required.</div>
+                </div>
+              )}
+              {/* Cost Summary */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 5, marginBottom: 8 }}>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Base Meters (low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#e2e8f0' }}>{fmtUsd(g.base_current_meter_cost_usd?.low)}</div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Ant. Monitor (low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: g.antenna_monitor_cost_usd ? '#e2e8f0' : '#4ade80' }}>
+                    {g.antenna_monitor_cost_usd ? fmtUsd(g.antenna_monitor_cost_usd.low) : 'N/A'}
+                  </div>
+                </div>
+                <div style={{ background: '#020c18', borderRadius: 4, padding: '5px 8px' }}>
+                  <div style={{ fontSize: 9, color: '#38bdf8' }}>Total Monitoring (low)</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>{fmtUsd(g.total_monitoring_low_usd)}</div>
+                </div>
+              </div>
+              <div style={{ color: '#475569', fontSize: 10, marginTop: 4 }}>{g.reference}</div>
+              {g.note && <div style={{ color: '#64748b', fontSize: 10, marginTop: 3, fontStyle: 'italic' }}>{g.note}</div>}
+            </div>
+          );
+        })()}
+
         {/* Adjacent Market Coverage Analysis */}
         {candidate.adjacent_market_coverage_analysis && (() => {
           const a = candidate.adjacent_market_coverage_analysis;

@@ -4271,3 +4271,14 @@ test('am_total_project_capital_cost_rollup_guide present across colocation candi
     assert.ok(Array.isArray(cap.components), 'components must be an array');
   }
 });
+
+test('am_transmitter_power_monitoring_and_operating_log_guide present across colocation candidates', async () => {
+  const out = await runColocationOpportunities(baseBody({ candidate_limit: 5 }));
+  for (const c of out.candidates) {
+    const g = c.am_transmitter_power_monitoring_and_operating_log_guide;
+    assert.ok(g !== undefined && g !== null, 'candidate missing am_transmitter_power_monitoring_and_operating_log_guide');
+    assert.strictEqual(g.power_tolerance_pct, 10, '§73.1560 tolerance must be 10%');
+    assert.ok(g.n_base_current_meters >= 1, 'must have at least 1 base current meter');
+    assert.ok(Array.isArray(g.log_entry_triggers) && g.log_entry_triggers.length >= 3, 'must have at least 3 log entry triggers');
+  }
+});
