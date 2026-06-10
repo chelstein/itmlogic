@@ -14381,7 +14381,7 @@ it('candidate_comparison_table fin columns are present and valid for KAZM', asyn
   const out = await runSiteOptimizer({ ...KAZM, candidate_limit: 1 });
   const r0 = out.candidate_comparison_table[0];
   assert.ok(Number.isFinite(r0.fin_npv_optimistic_10yr), 'fin_npv_optimistic_10yr must be finite');
-  assert.ok(r0.fin_payback_years_low > 0, 'fin_payback_years_low must be positive');
+  assert.ok(r0.sff_payback_years_low > 0, 'sff_payback_years_low must be positive');
   assert.ok(r0.fin_feasibility_flag != null, 'fin_feasibility_flag must not be null');
 });
 

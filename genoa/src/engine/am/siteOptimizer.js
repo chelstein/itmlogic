@@ -1409,7 +1409,7 @@ export async function runSiteOptimizer(body = {}){
     fmtc_total_monitoring_equip_low_usd: c.am_frequency_monitoring_and_technical_compliance_guide?.total_monitoring_equip_low_usd ?? null,
     fmtc_annual_compliance_low_usd:     c.am_frequency_monitoring_and_technical_compliance_guide?.annual_fcc_compliance_low_usd ?? null,
     fin_npv_optimistic_10yr:            c.am_station_financial_feasibility_guide?.npv_optimistic_10yr ?? null,
-    fin_payback_years_low:              c.am_station_financial_feasibility_guide?.payback_years_low ?? null,
+    sff_payback_years_low:              c.am_station_financial_feasibility_guide?.payback_years_low ?? null,
     fin_feasibility_flag:               c.am_station_financial_feasibility_guide?.feasibility_flag ?? null,
     pm_total_construction_weeks_low:    c.am_construction_contractor_and_pm_guide?.total_construction_weeks_low ?? null,
     pm_tower_erection_cost_low_usd:     c.am_construction_contractor_and_pm_guide?.tower_erection_cost_low_usd ?? null,
